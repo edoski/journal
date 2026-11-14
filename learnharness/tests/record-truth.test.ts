@@ -81,13 +81,15 @@ describe("a prediction is what he was asked to predict", () => {
 		assert.equal("predicted" in saves[0]!.observations![0]!, false);
 	});
 
-	it("an answer to a prediction is saved predicted, and a probe's recall never is", async () => {
-		const prediction = asked("predict");
+	it("an answer to a prediction is saved as the tutor judged it, counted when it was answerable from what was taught; a probe's recall is never a prediction", async () => {
+		const guess = asked("predict");
+		const reasoned = asked("predict");
 		const recall = call("recall", { question: "Recall", correctAnswer: "2" }, { details: { kind: "explain", tool: "recall", questionText: "Recall", answers: [], answeredAt: "", text: "2" } });
-		const { saves, tools } = savingCourse([...prediction.messages, ...recall.messages]);
-		await courseSave(tools, [attempt({ question: prediction.id }), attempt({ question: recall.id, predicted: true })]);
+		const { saves, tools } = savingCourse([...guess.messages, ...reasoned.messages, ...recall.messages]);
+		await courseSave(tools, [attempt({ question: guess.id, predicted: true }), attempt({ question: reasoned.id }), attempt({ question: recall.id, predicted: true })]);
 		assert.equal(saves[0]!.observations![0]!.predicted, true);
 		assert.equal("predicted" in saves[0]!.observations![1]!, false);
+		assert.equal("predicted" in saves[0]!.observations![2]!, false);
 	});
 });
 

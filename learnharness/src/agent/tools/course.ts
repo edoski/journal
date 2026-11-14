@@ -60,8 +60,9 @@ const recordsAnAnswer = (o: Record<string, unknown>) => (o.kind ?? "attempt") ==
 const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
 
 /** What a save's observations say, ruled by the answers they name: each
- *  observation as the engine reads it, without `question`, its prediction
- *  as he was asked it and its confidence as he chose it; the question each
+ *  observation as the engine reads it, without `question`, never a
+ *  prediction unless he was asked to predict, and its confidence as he
+ *  chose it; the question each
  *  names; and the first one refused, which saves nothing. Refused: an
  *  attempt that names no answer, a name that is no answer of this session,
  *  and an answer already saved (round 6: once an unreadable course read
@@ -102,8 +103,7 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
 			refuse(`observations[${i}].question: ${JSON.stringify(named)} is already saved, so it is not saved again. Leave it out and send the rest; a re-mark of it names its attempt with corrects.`);
 		}
 		const ruled: Record<string, unknown> = { ...rest };
-		if (answer.predicted === true) ruled.predicted = true;
-		else if (answer.predicted === false) delete ruled.predicted;
+		if (answer.predicted === false) delete ruled.predicted;
 		if (answer.confidence !== undefined) {
 			delete ruled.sure;
 			Object.assign(ruled, engineConfidence(answer.confidence ?? undefined));
@@ -118,7 +118,7 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
  * answer it records (`question`); the field is the app's, so it is checked
  * against the session's answers and taken off before the engine reads the
  * patch. The answer then sets what only he and the question can say: it is
- * a prediction only when he was asked to predict, and its confidence is
+ * never a prediction unless he was asked to predict, and its confidence is
  * the one he chose, none when he chose none (round 6: a check saved as a
  * prediction, "gut feeling" saved as a guess over his Confident). An answer
  * already saved is refused. The shown-solution rule (shown-help.ts) saves

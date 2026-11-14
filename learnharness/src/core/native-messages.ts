@@ -780,8 +780,9 @@ export interface AnsweredQuestion {
 	 *  problem that ended (shown-help.ts). */
 	seenBefore: boolean;
 	/** Asked as a prediction (an `explain` with `type` predict): only such
-	 *  an answer is saved `predicted`. Absent for an answer in words, which
-	 *  no question declared. */
+	 *  an answer may be saved `predicted`, and only when the tutor judges it
+	 *  was not answerable from what was taught. Absent for an answer in
+	 *  words, which no question declared. */
 	predicted?: boolean;
 	/** The confidence he chose with this answer, null for none (the meter
 	 *  left alone, or a message, which has no meter). Absent for a
