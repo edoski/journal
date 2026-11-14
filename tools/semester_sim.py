@@ -7,6 +7,12 @@ an outside model of memory, never the engine's scheduler. Each policy reports
 total reviews, the busiest day, reviews on the exam day, topics never
 introduced by the exam and the recall FSRS predicts on the exam day.
 
+``--arcs`` cuts the same 30 topics into six arcs with needs, so new topics
+come from the plan's window (``progress.window``) and load and recall are
+measured under it: five chained arcs, each entered from the first topic of
+the one before, so a later arc can start early, and a last arc that needs
+nothing from the others. Only the cut differs from a run without it.
+
 ``--engine ROOT`` imports ``learning`` from another checkout, so the same
 learners run on the base commit's engine and on this one:
 
@@ -59,6 +65,8 @@ OWN_PACE = {"steady": 5, "typical": 3, "patchy": 2}
 RUNUP_DAYS = 21
 EXAM_GAP_DAYS = 8
 WEAK = 0.8
+ARC_SIZE = 5
+ARC_REASON = {"reason": "six chapters of five topics"}
 
 
 def retrievability(elapsed: float, stability: float) -> float:
@@ -141,6 +149,38 @@ def handle(index: int) -> str:
     return f"t{index:02d}"
 
 
+def arc_cut(topics: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """The patch that cuts ``topics`` into arcs of ``ARC_SIZE``. Inside an arc
+    the second and third topics need the first, the fourth the second, and
+    the fifth the third and fourth. Each arc but the first and the last
+    needs the first topic of the arc before; the last needs no other arc."""
+    keys = list(topics)
+    names = [f"arc{at}" for at in range(len(keys) // ARC_SIZE)]
+    inside = {1: [0], 2: [0], 3: [1], 4: [2, 3]}
+    cut: dict[str, dict[str, Any]] = {}
+    for at, name in enumerate(names):
+        chunk = keys[at * ARC_SIZE : (at + 1) * ARC_SIZE]
+        for place, key in enumerate(chunk):
+            needs = [chunk[i] for i in inside.get(place, [])]
+            if place == 0 and 0 < at < len(names) - 1:
+                needs = [keys[(at - 1) * ARC_SIZE]]
+            cut[key] = {
+                **topics[key],
+                "arc": name,
+                **({"needs": needs} if needs else {}),
+            }
+    arcs = {
+        name: {"title": name, "question": f"What is {name}?", "purpose": name}
+        for name in names
+    }
+    return {
+        "arcs": arcs,
+        "topics": cut,
+        "path": {"order": keys, "arcs": names},
+        "arc_change": ARC_REASON,
+    }
+
+
 def attempt(topic: str, correct: bool) -> dict[str, Any]:
     return {
         "topics": [topic],
@@ -159,11 +199,16 @@ class Run:
         scenario: Scenario,
         preferences: dict[str, str],
         ease: float = 1.0,
+        arcs: bool = False,
     ) -> None:
         self.engine = engine
         self.schema, self.progress = engine["schema"], engine["progress"]
         self.agenda = engine.get("agenda")
         self.scenario = scenario
+        # A course with arcs names the exam's scope: here the whole course.
+        self.exam: dict[str, Any] = {"date": day(EXAM_DAY).isoformat()}
+        if arcs:
+            self.exam["arcs"] = None
         self.rng = random.Random(f"{scenario.learner}/{scenario.late}/{scenario.seed}")
         # Days off from their own stream, so every engine meets the same days.
         self.days_off = random.Random(
@@ -175,11 +220,15 @@ class Run:
         self.memory: dict[str, Memory] = {}
         self.outcome = Outcome()
         topics = {handle(i): {"title": f"Topic {i}"} for i in range(TOPICS)}
-        patch: dict[str, Any] = {"topics": topics, "path": {"order": list(topics)}}
+        patch: dict[str, Any] = (
+            arc_cut(topics)
+            if arcs
+            else {"topics": topics, "path": {"order": list(topics)}}
+        )
         if preferences:
             patch["preferences"] = preferences
         if not scenario.late:
-            patch["exam"] = {"date": day(EXAM_DAY).isoformat()}
+            patch["exam"] = self.exam
         self.record = self.schema.empty()
         self.save(patch, 0)
 
@@ -251,7 +300,7 @@ class Run:
             if n == EXAM_DAY:
                 self.sit_exam()
             if self.scenario.late and n == LATE_SET_DAY:
-                self.save({"exam": {"date": day(EXAM_DAY).isoformat()}}, n)
+                self.save({"exam": self.exam}, n)
             if n < EXAM_DAY and self.days_off.random() < skip:
                 continue
             reviews, new = self.planned(n) if self.agenda else self.doctrine(n)
@@ -301,7 +350,8 @@ def saved(
     """Course ``name`` after one save, as the app's saves store it: the patch
     applied to the course read with the plan, its final review read again when
     the exam moves (``capacity.replanned``), and a final review's start kept
-    only once it has begun (``progress.begun``)."""
+    only once it has begun (``progress.begun``), its arcs settled between
+    (``arcs.settle``) on an engine that has them."""
     schema, progress = engine["schema"], engine["progress"]
     if not hasattr(progress, "begun"):
         patched, outcome = schema.apply_patch(
@@ -311,6 +361,8 @@ def saved(
         return dict(schema.validate_record(planned))
     seen = read(engine, records, today)[name]
     patched, outcome = schema.apply_patch(seen, patch, today=today, now=now)
+    if "arcs" in engine:
+        engine["arcs"].settle(seen, patched, patch, outcome, today)
     if outcome.exam_moved:
         patched = engine["capacity"].replanned({**records, name: patched}, name, today)
     planned, _ = progress.schedule(patched, outcome, today)
@@ -322,7 +374,7 @@ def load_engine(root: str | None) -> dict[str, ModuleType]:
         sys.path.insert(0, str(Path(root).resolve()))
     names = ("schema", "progress")
     modules = {name: importlib.import_module(f"learning.{name}") for name in names}
-    for name in ("agenda", "capacity"):
+    for name in ("agenda", "capacity", "arcs"):
         try:
             modules[name] = importlib.import_module(f"learning.{name}")
         except ModuleNotFoundError:
@@ -333,16 +385,20 @@ def load_engine(root: str | None) -> dict[str, ModuleType]:
 _ENGINE: dict[str, ModuleType] = {}
 _PREFERENCES: dict[str, str] = {}
 _EASE: list[float] = []
+_ARCS: list[bool] = []
 
 
-def _init(root: str | None, preferences: dict[str, str], ease: float) -> None:
+def _init(
+    root: str | None, preferences: dict[str, str], ease: float, arcs: bool
+) -> None:
     _ENGINE.update(load_engine(root))
     _PREFERENCES.update(preferences)
     _EASE.append(ease)
+    _ARCS.append(arcs)
 
 
 def _one(scenario: Scenario) -> dict[str, Any]:
-    outcome = Run(_ENGINE, scenario, _PREFERENCES, _EASE[0]).run()
+    outcome = Run(_ENGINE, scenario, _PREFERENCES, _EASE[0], _ARCS[0]).run()
     return {
         "learner": scenario.learner,
         "late": scenario.late,
@@ -365,9 +421,13 @@ def scenarios(seeds: int) -> Iterator[Scenario]:
 
 
 def simulate(
-    root: str | None, preferences: dict[str, str], seeds: int, ease: float = 1.0
+    root: str | None,
+    preferences: dict[str, str],
+    seeds: int,
+    ease: float = 1.0,
+    arcs: bool = False,
 ) -> list[dict[str, Any]]:
-    with Pool(initializer=_init, initargs=(root, preferences, ease)) as pool:
+    with Pool(initializer=_init, initargs=(root, preferences, ease, arcs)) as pool:
         return pool.map(_one, list(scenarios(seeds)))
 
 
@@ -477,6 +537,9 @@ def main() -> int:
         default=1.0,
         help="the median topic's first stability as a share of FSRS's (harder: < 1)",
     )
+    parser.add_argument(
+        "--arcs", action="store_true", help="cut the topics into arcs with needs"
+    )
     parser.add_argument("--out", type=Path)
     parser.add_argument("--report", nargs="+", type=Path)
     args = parser.parse_args()
@@ -484,7 +547,7 @@ def main() -> int:
         print(report(args.report))
         return 0
     preferences = dict(item.split("=", 1) for item in args.preference)
-    runs = simulate(args.engine, preferences, args.seeds, args.ease)
+    runs = simulate(args.engine, preferences, args.seeds, args.ease, args.arcs)
     if args.out:
         content = {"name": args.name, "preferences": preferences, "runs": runs}
         args.out.write_text(json.dumps(content), encoding="utf-8")
