@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  */
 export function PageFrame({ className, children, ...rest }: ComponentProps<"div">) {
 	return (
-		<div data-slot="page-frame" className={cn("mx-auto flex min-h-0 w-full max-w-[72rem] flex-1 flex-col gap-5 px-6 pt-6 pb-6", className)} {...rest}>
+		<div data-slot="page-frame" className={cn("mx-auto flex min-h-0 w-full max-w-[80rem] flex-1 flex-col gap-5 px-6 pt-6 pb-6", className)} {...rest}>
 			{children}
 		</div>
 	);

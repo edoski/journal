@@ -2,8 +2,8 @@
  * Where each demo course's map opens on Edo's 14" window (1512×982), on the
  * demo seed's graphs (the logbook seed, 14 Nov 2026): on its course page
  * (through the pane's scroll, as he sees it), on Home and in the enlarged
- * map. Edo's ruling (14 Nov 2026): "You are here" and the topics it leads to
- * are whole, at 80% or more; a card cut at the frame's edge elsewhere is
+ * map. Edo's ruling (14 Nov 2026): "You are here" and every topic it leads
+ * to are whole, at 80% or more; a card cut at the frame's edge elsewhere is
  * fine, and a map is never shrunk or moved just to avoid one. The view
  * never shows empty room past the drawing's room on an axis the course
  * overflows, so no frame ends on an empty band.
@@ -26,9 +26,11 @@ const COURSES = [
 	{ title: "Real Analysis", current: "series", needs: { sequences: [], cauchy: ["sequences"], series: ["sequences"], continuity: ["sequences"], uniform: ["continuity"] } },
 ] as const satisfies readonly { title: string; current: string; needs: Record<string, readonly string[]> }[];
 
-/** The frames at 1512×982 with the sidebar at its default width, measured in the running app. */
+/** The frames at 1512×982 with the sidebar at its default width, measured in the running app. The course page's
+ *  map is the frame's 1208px of content beside the 256px sidebar, less the 320px list and the 24px gap: at 80%
+ *  Random variables' four next topics in a row take 851px. */
 const TAG = 20;
-const PAGE = { width: 696, height: 737 };
+const PAGE = { width: 864, height: 737 };
 const PAGE_FADE = { x: 48, y: 32 };
 const HOME = { width: 896, height: 413 };
 const ENLARGED = { width: 1192, height: 866 };
@@ -81,22 +83,6 @@ const SURFACES = [
 	{ name: "in the enlarged map", open: (course: (typeof COURSES)[number]) => inFrame(course, ENLARGED) },
 ];
 
-/** The most of "You are here"'s next topics that can be whole with it at the readable floor: the largest run of
- *  them, left to right, whose box with it fits the frame. A geometric bound, not the camera's own search. */
-function mostNextWhole(course: (typeof COURSES)[number], frame: { width: number; height: number }): number {
-	const { layout, next } = courseOf(course);
-	const here = layout.topics.get(h(course.current))!;
-	const placed = next.map((t) => layout.topics.get(t)!).sort((a, b) => a.x - b.x);
-	const fits = (run: typeof placed) => {
-		const all = [here, ...run];
-		const width = (Math.max(...all.map((p) => p.x)) + layout.node.width - Math.min(...all.map((p) => p.x))) * READABLE_ZOOM;
-		const height = (Math.max(...all.map((p) => p.y)) + layout.node.height - Math.min(...all.map((p) => p.y))) * READABLE_ZOOM + TAG;
-		return width <= frame.width && height <= frame.height;
-	};
-	for (let size = placed.length; size > 0; size--) for (let i = 0; i + size <= placed.length; i++) if (fits(placed.slice(i, i + size))) return size;
-	return 0;
-}
-
 /** The box the whole drawing takes in the frame. */
 function drawingOf(boxes: Map<TopicHandle, Box>): Box {
 	const all = [...boxes.values()];
@@ -107,7 +93,7 @@ describe("where each demo course's map opens on Edo's window", () => {
 	for (const course of COURSES) {
 		for (const surface of SURFACES) {
 			const label = `${course.title} ${surface.name}`;
-			it(`${label}: on You are here at 80% or more, with every topic it leads to whole that fits beside it`, () => {
+			it(`${label}: on You are here at 80% or more, with every topic it leads to whole`, () => {
 				const { zoom, boxes, frame, fade } = surface.open(course);
 				const fits = new Map<TopicHandle, CardFit>([...boxes].map(([handle, box]) => [handle, cardFit(box, frame, fade)]));
 				const here = boxes.get(h(course.current))!;
@@ -116,7 +102,7 @@ describe("where each demo course's map opens on Edo's window", () => {
 				assert.ok(here.top - TAG >= fade.y - 1, "its tag, clear of the fade");
 				const next = courseOf(course).next;
 				const whole = next.filter((t) => ["clear", "faded"].includes(fits.get(t)!));
-				assert.equal(whole.length, mostNextWhole(course, frame), `where he goes next, whole: ${whole.join(", ")} of ${next.join(", ")}`);
+				assert.deepEqual(whole, next, `where he goes next, whole: ${whole.join(", ")} of ${next.join(", ")}`);
 			});
 			it(`${label}: no empty band past the drawing on an axis it overflows`, () => {
 				const { boxes, frame } = surface.open(course);
@@ -132,15 +118,11 @@ describe("where each demo course's map opens on Edo's window", () => {
 		}
 	}
 
-	it("opens Probability on Home and in the enlarged map with Poisson beside Binomial, Geometric and Expectation (round 5: Poisson sat off the map)", () => {
-		for (const frame of [HOME, ENLARGED]) {
-			const { boxes, fade } = inFrame(COURSES[2], frame);
-			for (const next of ["binomial", "poisson", "geometric", "expectation"]) assert.ok(["clear", "faded"].includes(cardFit(boxes.get(h(next))!, frame, fade)), `${next} in ${frame.width}px`);
+	it("opens Probability with Poisson beside Binomial, Geometric and Expectation on its course page, on Home and in the enlarged map (round 5: Poisson sat off the map; round 6: the course page's pane was too narrow for all four)", () => {
+		for (const { open, name } of SURFACES) {
+			const { boxes, frame, fade } = open(COURSES[2]);
+			for (const next of ["binomial", "poisson", "geometric", "expectation"]) assert.ok(["clear", "faded"].includes(cardFit(boxes.get(h(next))!, frame, fade)), `${next} ${name}`);
 		}
-	});
-
-	it("keeps three of Random variables' four next topics whole on Probability's course page, where all four in a row are wider than the pane at 80%", () => {
-		assert.equal(mostNextWhole(COURSES[2], PAGE), 3);
 	});
 
 	it("opens Linear Algebra on Home with no empty band under Diagonalization (round 5: 144px of nothing above Today)", () => {
