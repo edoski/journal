@@ -9,6 +9,7 @@ the fix and, for unknown fields or handles, the closest known ones.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -832,6 +833,73 @@ def number(observation_id: str) -> int:
 def unaided(observation: dict[str, Any]) -> bool:
     """No help was given: help ``none``, or an exam."""
     return observation.get("kind") == "exam" or observation.get("help") == UNAIDED
+
+
+SCHEDULING_KINDS = frozenset({"attempt", "exam"})
+
+
+def counts(observation: dict[str, Any]) -> bool:
+    """An answer that counts for levels and reviews: an attempt or an exam,
+    except a prediction made before its step was taught (``predicted``).
+    Before the teaching a wrong guess is expected, so it says nothing about
+    what is held, and a right one is not yet recall of what was taught; it
+    stays in the history as what happened."""
+    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
+
+
+def _predictions_alone(record: dict[str, Any], topic: str) -> list[str]:
+    """A topic's predictions when they are all its answers that stand; empty
+    once one of them counts, or when it has none."""
+    superseded = {
+        target
+        for item in record["observations"].values()
+        for target in item.get("corrects", ())
+    }
+    found = []
+    for key, item in record["observations"].items():
+        if key in superseded or topic not in item["topics"]:
+            continue
+        if counts(item):
+            return []
+        if item.get("predicted"):
+            found.append(key)
+    return found
+
+
+def _check_predictions(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    changes: dict[str, Any],
+    outcome: PatchResult,
+) -> None:
+    """Refuse a patch that treats a prediction as evidence: a topic whose
+    only answers are predictions is not taught, mistaken or due, so the patch
+    may not introduce it, give it a gap, date its review or move the path
+    onto it. Teaching with no question asked is still introduced."""
+    claims: dict[str, list[str]] = defaultdict(list)
+    for key in outcome.introduced:
+        claims[key].append(f"topics.{key}.introduced")
+    for key, change in (changes.get("topics") or {}).items():
+        gap = (change or {}).get("gap")
+        if gap is not None and gap != before["topics"].get(key, {}).get("gap"):
+            claims[key].append(f"topics.{key}.gap")
+    for key in outcome.tutor_reviews:
+        claims[key].append(f"topics.{key}.review")
+    current = (changes.get("path") or {}).get("current")
+    if current and current != before.get("path", {}).get("current"):
+        claims[current].append("path.current")
+    for topic, fields in claims.items():
+        predictions = _predictions_alone(after, topic)
+        if predictions:
+            raise ValueError(
+                f"{', '.join(fields)}: {topic}'s only answers are predictions "
+                f"({', '.join(predictions)}), made before its step was taught, and "
+                "a prediction never counts: it does not teach a topic, show a "
+                "mistake, date its review or move the path onto it. Leave "
+                f"{'them' if len(fields) > 1 else 'it'} out until an answer on "
+                f"{topic} that counts is saved (a check or a recall after the "
+                "teaching), in this save or a later one"
+            )
 
 
 def _observation_rules(observation: dict[str, Any], path: str) -> None:
@@ -1761,6 +1829,7 @@ def apply_patch(
             f"{', '.join(citing[:12])} cite it; change those refs first, or keep "
             "the source"
         )
+    _check_predictions(record, result, changes, outcome)
     outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
     outcome.questions_moved = record["preferences"].get(
         preferences.QUESTIONS

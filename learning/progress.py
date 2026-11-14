@@ -28,7 +28,7 @@ from itertools import groupby
 from typing import Any
 
 from learning import arc_rules, preferences
-from learning.schema import PatchResult, number, unaided
+from learning.schema import PatchResult, counts, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
 INTERVALS = {"missed": 1, "helped": 2}
@@ -40,17 +40,6 @@ RELEARN_MISSES = 2
 # The shortest final review: a topic missed on its first day comes back after
 # the miss interval and is answered again before the exam.
 SHORTEST_FINAL_REVIEW = INTERVALS["missed"] + 1
-SCHEDULING_KINDS = frozenset({"attempt", "exam"})
-
-
-def counts(observation: dict[str, Any]) -> bool:
-    """An answer that counts for levels and reviews: an attempt or an exam,
-    except a prediction made before its step was taught (``predicted``).
-    Before the teaching a wrong guess is expected, so it says nothing about
-    what is held, and a right one is not yet recall of what was taught; it
-    stays in the history as what happened."""
-    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
-
 
 DUE_LIMIT = 5
 RUNUP_DAYS = 21

@@ -357,6 +357,11 @@ def test_predictions_corrected_answers_and_left_out_topics_are_no_mistakes(
                 "remarked": {"introduced": day(-3)},
                 "dropped": {"introduced": day(-3), "excluded": "Not on the exam"},
             },
+        },
+    )
+    records.save(
+        workspace,
+        {
             "observations": [
                 attempt("guess", -2, result="incorrect", predicted=True),
                 attempt("remarked", -2, result="incorrect"),

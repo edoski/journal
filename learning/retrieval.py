@@ -538,7 +538,7 @@ def _topic_item(
 def _graded(item: dict[str, Any]) -> dict[str, Any]:
     """An observation with its ``grade`` when it is scored, so a reader shows
     how each answer counted without judging it again."""
-    if item["kind"] not in progress.SCHEDULING_KINDS:
+    if item["kind"] not in schema.SCHEDULING_KINDS:
         return item
     return {**item, "grade": progress.grade(item)}
 

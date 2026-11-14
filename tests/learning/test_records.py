@@ -392,3 +392,58 @@ def test_a_final_review_is_stored_once_begun_and_moving_the_exam_drops_it(
     storage.publish_text(workspace.record, storage.encode(stored))
     monkeypatch.setenv("LEARNING_TODAY", "2026-10-28")
     assert records.load(workspace)["exam"]["final_review"] == "2026-10-25"
+
+
+DIAGONAL = {"diag": {"title": "Diagonalization", "needs": ["rank"]}}
+
+
+def test_a_prediction_alone_never_teaches_marks_dates_or_moves_to_its_topic(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {**COURSE, "topics": {**COURSE["topics"], **DIAGONAL}})
+    records.save(
+        workspace,
+        {"observations": [attempt("diag", result="partial", predicted=True)]},
+    )
+    claims = {
+        "introduced": {"topics": {"diag": {"introduced": True}}},
+        "gap": {"topics": {"diag": {"gap": "Takes the identity for any diagonal"}}},
+        "review": {"topics": {"diag": {"review": {"in_days": 1}}}},
+        "path": {"path": {"current": "diag"}},
+    }
+    for claim in claims.values():
+        with pytest.raises(ValueError, match=r"only answers are predictions \(o1\)"):
+            records.save(workspace, claim)
+    stored = records.load(workspace)
+    assert stored["topics"]["diag"] == DIAGONAL["diag"]
+    assert stored["path"]["current"] == "rank"
+    with pytest.raises(ValueError, match="only answers are predictions"):
+        records.save(
+            workspace,
+            {
+                "observations": [attempt("diag", text="Guess again", predicted=True)],
+                "topics": {"diag": {"introduced": True}},
+            },
+        )
+    receipt = records.save(
+        workspace,
+        {
+            "observations": [attempt("diag", text="Checked the step")],
+            **claims["introduced"],
+            **claims["path"],
+        },
+    )
+    assert receipt["path_current"] == "diag"
+    assert records.load(workspace)["topics"]["diag"]["introduced"] == TODAY
+
+
+def test_a_topic_taught_without_any_question_is_still_introduced(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {**COURSE, "topics": {**COURSE["topics"], **DIAGONAL}})
+    receipt = records.save(
+        workspace,
+        {"topics": {"diag": {"introduced": True}}, "path": {"current": "diag"}},
+    )
+    assert receipt["reviews"]["diag"]["by"] == "engine"
+    assert receipt["path_current"] == "diag"
