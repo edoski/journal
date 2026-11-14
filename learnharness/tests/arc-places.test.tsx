@@ -49,12 +49,20 @@ function planned(course: StudyCourse, startsWhy: StartsWhy): StudyCourse {
 const row = (course: StudyCourse): TodayRow => ({ kind: "course", course, step: nextStepOf(course) });
 
 describe("Home's rows", () => {
-	it("name the arc when every topic of the lesson lies in it, and none when the lesson spans arcs", () => {
-		assert.equal(arcPlace(LINALG_ARCS.map, h("rank", "det")), "Linear systems");
+	it("place a lesson in the arc every one of its topics lies in, and in none when it spans arcs", () => {
+		assert.equal(arcPlace(LINALG_ARCS.map, h("rank", "det"))?.handle, "systems");
 		assert.equal(arcPlace(LINALG_ARCS.map, h("independence", "rank")), null, "a review that mixes arcs names none");
 		assert.equal(arcPlace(LINALG_ARCS.map, h("gone")), null);
 		assert.equal(arcPlace(LINALG_ARCS.map, []), null);
 		assert.equal(arcPlace(LINALG.map, h("rank", "det")), null, "a course without arcs has no place");
+	});
+
+	it("give Home's map the arc of the row he points at: a course's step and a waiting session", () => {
+		const waiting = chat("q", { pendingQuestion: true, updatedAt: `${TODAY}T09:00:00.000Z`, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
+		const [session, review] = todayRows([LINALG_ARCS], [waiting], TODAY);
+		assert.equal(lessonOf(session!).place?.handle, "eigenvalues");
+		assert.equal(lessonOf(review!).place?.handle, "spaces");
+		assert.equal(lessonOf(todayRows([LINALG], [], TODAY)[0]!).place, null, "a course without arcs picks none");
 	});
 
 	it("keep the course alone on the course line, never its arc (Edo, 14 Nov 2026)", () => {

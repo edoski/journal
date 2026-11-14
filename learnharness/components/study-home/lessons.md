@@ -8,12 +8,12 @@ Today's lines as lessons in plain words, which the study home, the course page a
 |---|---|---|
 | course | the course's title; "No course" for a session without one | the engine's map, the session's record |
 | exam | "Exam in 11 days", only inside the exam run-up | `plan`'s run-up, the map's exam |
-| place | the arc the lesson sits in, by its title, when every one of its topics lies in that arc (`arcPlace`); none when its topics span arcs (a review mixes arcs by design) and in a course without arcs | the lesson's topics' `arc` on the course map, the arc's title from `map.arcs` |
+| place | the arc the lesson sits in, when every one of its topics lies in that arc (`arcPlace`); none when its topics span arcs (a review mixes arcs by design) and in a course without arcs. Never drawn on the row: pointing at the row picks this arc on Home's map (`HomeMap`'s `arc`), as the course tab slides to its course | the lesson's topics' `arc` on the course map, the arc from `map.arcs` |
 | title | the session's title, "Review A, B, C", "Continue <task or topic>", "Start a lesson" | `stepWords` |
 | detail | "Waiting for your reply"; "Then <task or topic>" after reviews, left out when it only repeats a review; the open task's step | the session's state, the map's tasks |
 | action | Open (a session), Review, Continue, Start | the lesson's kind |
 
-A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place replaced "topic 5–7 of 24" when arcs landed (design v2, 5.4): an arc is the place he can read after days away, and Home's course line, the sidebar's cards and the course page all name the same one.
+A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place replaced "topic 5–7 of 24" when arcs landed (design v2, 5.4). Edo turned down the arc as row text (14 Nov 2026): it shows on Home's map, in the arc strip's bubble style, while he points at the row.
 
 ## The page frame
 

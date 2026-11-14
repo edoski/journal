@@ -22,7 +22,8 @@ const FOLLOW_DWELL_MS = 150;
  * The agenda study home (spec: study-home.md): what to study now, in one
  * window. A course's map on top behind course tabs, then Today, one line per course. The
  * map follows Today: it shows the course of the line he points at, with
- * that line's topics lit (home-map.md).
+ * that line's topics lit and, in a course with arcs, the arc they lie in
+ * picked on the map's arc strip (home-map.md).
  */
 export function StudyHome() {
 	const [enlarged, setEnlarged] = useState(false);
@@ -51,10 +52,8 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 
 	const followed = chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null) : null;
 	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
-	const highlight = useMemo<ReadonlySet<TopicHandle> | null>(() => {
-		const topics = followed ? lessonOf(followed).topics : [];
-		return topics.length ? new Set(topics) : null;
-	}, [followed]);
+	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
+	const highlight = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
 
 	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
 		clearTimeout(dwell.current);
@@ -73,6 +72,7 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 					workspace={workspace}
 					onSelect={(ws) => setChosen({ by: "tab", workspace: ws })}
 					highlight={highlight}
+					arc={lesson?.place?.handle ?? null}
 					enlarged={enlarged}
 					onEnlarge={onEnlarge}
 				/>

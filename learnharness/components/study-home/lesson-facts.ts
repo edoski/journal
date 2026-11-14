@@ -1,4 +1,4 @@
-import { courseLabel, type CourseMap, type StudyCourse, type TopicHandle } from "@/src/core";
+import { courseLabel, type CourseMap, type CourseMapArc, type StudyCourse, type TopicHandle } from "@/src/core";
 import { runupExam, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 
 /** What a lesson's button does: open the session that waits, or take up the
@@ -8,7 +8,7 @@ export type LessonAction = "Open" | "Review" | "Continue" | "Start";
 /**
  * One lesson of Today in plain words, the same for every study home: what
  * it is by name, the course it belongs to, what its second line says and
- * the arc it sits in. Engine fields only.
+ * the arc it sits in, which Home's map shows. Engine fields only.
  */
 export interface Lesson {
 	key: string;
@@ -22,23 +22,24 @@ export interface Lesson {
 	action: LessonAction;
 	/** The course topics the lesson works on. */
 	topics: readonly TopicHandle[];
-	/** The arc every topic of the lesson lies in, by its title (`arcPlace`). */
-	place: string | null;
+	/** The arc every topic of the lesson lies in (`arcPlace`): the arc
+	 *  Home's map picks while he points at the lesson's row. */
+	place: CourseMapArc | null;
 	open: { kind: "session"; href: string } | { kind: "course"; workspace: string };
 }
 
 const ACTION: Record<NextStep["kind"], LessonAction> = { review: "Review", task: "Continue", topic: "Continue", none: "Start" };
 
-/** The arc some topics lie in, by its title, when every one of them lies
- *  in the same arc; null when they span arcs (a review mixes arcs by
- *  design), when none is on the map, and in a course without arcs. Pure. */
-export function arcPlace(map: Pick<CourseMap, "arcs" | "topics">, topics: readonly TopicHandle[]): string | null {
+/** The arc some topics lie in, when every one of them lies in the same
+ *  arc; null when they span arcs (a review mixes arcs by design), when
+ *  none is on the map, and in a course without arcs. Pure. */
+export function arcPlace(map: Pick<CourseMap, "arcs" | "topics">, topics: readonly TopicHandle[]): CourseMapArc | null {
 	if (!map.arcs) return null;
 	const wanted = new Set<string>(topics);
 	const arcs = new Set(map.topics.filter((t) => wanted.has(t.handle)).map((t) => t.arc));
 	const [arc] = arcs;
 	if (arcs.size !== 1 || !arc) return null;
-	return map.arcs.find((a) => a.handle === arc)?.title ?? null;
+	return map.arcs.find((a) => a.handle === arc) ?? null;
 }
 
 /** A line of Today as a lesson. A waiting session sits at the course topics
