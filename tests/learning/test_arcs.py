@@ -1,6 +1,7 @@
 """Arcs in the course record: the hard checks, placement, the guards, and the
 explicit migration between schema 6 and 7."""
 
+import ast
 from copy import deepcopy
 from datetime import date
 import json
@@ -9,7 +10,8 @@ from typing import Any
 
 import pytest
 
-from learning import arc_rules, arcs, records, retrieval, schema, storage
+from learning import arc_rules, arcs, migrate, records, retrieval, schema, storage
+from learning import workspace as workspaces
 from learning.workspace import Workspace
 
 TODAY = "2026-11-20"
@@ -874,3 +876,239 @@ def test_a_course_that_takes_no_questions_has_no_check(workspace: Workspace) -> 
         {"global_preferences": {"questions": "none"}},
         "global_preferences.questions belongs to one course",
     )
+
+
+# --- migration ------------------------------------------------------------------
+
+
+def v6(record: dict[str, Any]) -> dict[str, Any]:
+    return {**record, "schema": 6}
+
+
+SIX = {
+    "schema": 6,
+    "title": "Calculus I",
+    "topics": {
+        "limit": {"title": "Limits"},
+        "continuity": {"title": "Continuity", "needs": ["limit"]},
+    },
+    "observations": {},
+    "next_observation": 1,
+    "revision": 12,
+    "updated_at": "2026-11-01T09:00:00+00:00",
+}
+
+
+def course(root: Path, name: str, content: dict[str, Any] | None = SIX) -> Workspace:
+    (root / name).mkdir(parents=True)
+    workspace = workspaces.initialize(root / name)
+    if content is not None:
+        workspace.record.write_text(storage.encode(content), encoding="utf-8")
+    return workspace
+
+
+def test_a_schema_6_course_is_refused_with_the_command_that_fixes_it(
+    tmp_path: Path,
+) -> None:
+    workspace = course(tmp_path, "calculus")
+    with pytest.raises(storage.Unreadable) as error:
+        records.load(workspace)
+    assert str(error.value).endswith(
+        "has schema 6; run python -m learning migrate --all (it keeps a backup) and "
+        "retry. Nothing was changed"
+    )
+    with pytest.raises(storage.Unreadable, match="migrate --all"):
+        records.save(workspace, {"title": "Calculus"})
+    assert json.loads(workspace.record.read_text())["schema"] == 6
+
+
+def test_a_stale_engine_refuses_a_newer_record_and_names_the_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = course(tmp_path, "calculus", {**SIX, "schema": schema.SCHEMA})
+    monkeypatch.setattr(schema, "SCHEMA", schema.SCHEMA - 1)
+    with pytest.raises(storage.Unreadable) as error:
+        records.load(workspace)
+    assert "has schema 7, and this learning engine reads schema 6: update the " in str(
+        error.value
+    )
+    assert "migrate --all --to 6" in str(error.value)
+
+
+def test_migrating_up_backs_up_each_course_and_changes_only_the_schema(
+    tmp_path: Path,
+) -> None:
+    first = course(tmp_path / "msc", "calculus")
+    second = course(tmp_path / "bsc", "calculus")
+    original = first.record.read_bytes()
+    empty = course(tmp_path, "new", None)
+    report = migrate.migrate(None)
+    assert report["courses"] == {
+        str(first.directory): "migrated",
+        str(second.directory): "migrated",
+        str(empty.directory): "empty",
+    }
+    batch = Path(report["backup"])
+    assert batch.parent == workspaces.support_directory() / "backups"
+    assert batch.name.startswith("v6-")
+    folders = sorted(path.name for path in batch.iterdir())
+    assert folders == sorted([migrate.key(first), migrate.key(second)])
+    assert folders[0] != folders[1] and all(f.startswith("calculus-") for f in folders)
+    assert (batch / migrate.key(first) / "course.json").read_bytes() == original
+    assert json.loads((batch / migrate.key(first) / "origin.json").read_text()) == {
+        "record": str(first.record)
+    }
+    assert first.record.read_bytes() == original.replace(b'"schema":6', b'"schema":7')
+    assert records.load(first)["revision"] == 12
+
+
+def test_migrating_twice_changes_nothing_the_second_time(tmp_path: Path) -> None:
+    workspace = course(tmp_path, "calculus")
+    migrate.migrate(workspace)
+    migrated = workspace.record.read_bytes()
+    again = migrate.migrate(workspace)
+    assert again == {"to": 7, "courses": {str(workspace.directory): "current"}}
+    assert workspace.record.read_bytes() == migrated
+
+
+def test_a_crash_midway_leaves_each_course_whole_and_a_rerun_finishes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = course(tmp_path, "algebra")
+    crashed = course(tmp_path, "calculus")
+    original = crashed.record.read_bytes()
+    publish = storage.publish_text
+
+    def crash(path: Path, content: str) -> None:
+        if path == crashed.record:
+            raise OSError("disk full")
+        publish(path, content)
+
+    monkeypatch.setattr(storage, "publish_text", crash)
+    report = migrate.migrate(None)
+    assert report["courses"] == {str(done.directory): "migrated"}
+    assert report["failed"] == {str(crashed.directory): "disk full"}
+    assert crashed.record.read_bytes() == original
+    monkeypatch.setattr(storage, "publish_text", publish)
+    report = migrate.migrate(None)
+    assert report["courses"] == {
+        str(done.directory): "current",
+        str(crashed.directory): "migrated",
+    }
+    assert records.load(crashed)["schema"] == 7
+
+
+def test_a_record_of_another_schema_is_reported_and_left_alone(tmp_path: Path) -> None:
+    workspace = course(tmp_path, "old", {"schema": 5})
+    report = migrate.migrate(workspace)
+    assert (
+        "has schema 5; this engine moves schema 6 to 7 and back"
+        in report["failed"][str(workspace.directory)]
+    )
+    assert json.loads(workspace.record.read_text()) == {"schema": 5}
+
+
+def test_migrating_down_strips_every_arc_field_and_keeps_every_other_save(
+    tmp_path: Path,
+) -> None:
+    workspace = course(tmp_path, "calculus")
+    original = workspace.record.read_bytes()
+    migrate.migrate(workspace)
+    report = migrate.migrate(workspace, to=6)
+    assert report["courses"] == {str(workspace.directory): "migrated"}
+    assert workspace.record.read_bytes() == original, "up then down is byte-identical"
+
+    migrate.migrate(workspace)
+    records.save(
+        workspace,
+        {
+            **deepcopy(FORMED),
+            "topics": {
+                **deepcopy(TOPICS),
+                "limit": {"title": "Limits", "arc": "limits"},
+            },
+            "exam": {
+                "date": "2026-12-20",
+                "arcs": ORDER[:2],
+                "leaves_out": ["chain-rule"],
+            },
+            "preferences": {"questions": "asked", "tone": "Calm"},
+        },
+    )
+    records.save(
+        workspace, {"observations": [attempt("riemann", checkpoint="integrals")]}
+    )
+    up = json.loads(workspace.record.read_text())
+    report = migrate.migrate(workspace, to=6)
+    down = json.loads(workspace.record.read_text())
+    assert down["schema"] == 6 and down["revision"] == up["revision"] + 1
+    assert "arcs" not in down and "arc_log" not in down
+    assert "path" not in down, "a path holding only arcs goes with them"
+    assert down["exam"] == {"date": "2026-12-20"}
+    assert not any("arc" in topic for topic in down["topics"].values())
+    assert down["observations"]["o1"] == {
+        k: v for k, v in up["observations"]["o1"].items() if k != "checkpoint"
+    }
+    assert down["preferences"] == {"tone": "Calm"}
+    assert set(down["topics"]) == set(up["topics"])
+    backup = Path(report["backup"]) / migrate.key(workspace) / "course.json"
+    assert Path(report["backup"]).name.startswith("v7-")
+    assert json.loads(backup.read_text()) == up
+
+
+def test_restore_puts_a_backup_back_after_keeping_what_it_replaces(
+    tmp_path: Path,
+) -> None:
+    workspace = course(tmp_path, "calculus")
+    original = workspace.record.read_bytes()
+    report = migrate.migrate(workspace)
+    records.save(workspace, {"title": "Calculus, renamed"})
+    replaced = workspace.record.read_bytes()
+    restored = migrate.restore(Path(report["backup"]))
+    assert restored["restored"] == {str(workspace.record): "restored"}
+    assert workspace.record.read_bytes() == original
+    kept = Path(restored["backup"]) / migrate.key(workspace) / "course.json"
+    assert kept.read_bytes() == replaced
+    with pytest.raises(ValueError, match="holds no course backups"):
+        migrate.restore(tmp_path)
+
+
+def test_the_cli_migrates_on_purpose_only(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from learning.__main__ import main
+
+    workspace = course(tmp_path, "calculus")
+    assert main(["migrate"]) == 1
+    assert "migrate needs one of --all or --workspace DIR" in capsys.readouterr().err
+    assert main(["migrate", "--workspace", str(workspace.directory)]) == 0
+    assert json.loads(capsys.readouterr().out)["courses"] == {
+        str(workspace.directory): "migrated"
+    }
+    assert main(["--workspace", str(workspace.directory), "migrate", "--to", "6"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert main(["migrate", "--restore", report["backup"]]) == 0
+    assert json.loads(workspace.record.read_text())["schema"] == 7
+
+
+def test_only_the_cli_reaches_migrate() -> None:
+    package = Path(migrate.__file__).parent
+    reaching = []
+    for path in sorted(package.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            names = (
+                [alias.name for alias in node.names]
+                if isinstance(node, (ast.Import, ast.ImportFrom))
+                else []
+            )
+            module = node.module if isinstance(node, ast.ImportFrom) else None
+            if "learning.migrate" in names or (
+                module == "learning" and "migrate" in names
+            ):
+                reaching.append(path.name)
+    assert reaching == ["cli.py"]
+    app = package.parent / "learnharness"
+    for folder in ("src", "electron", "app", "scripts"):
+        for path in (app / folder).rglob("*.[tj]s") if (app / folder).is_dir() else ():
+            assert '"migrate"' not in path.read_text(encoding="utf-8"), path

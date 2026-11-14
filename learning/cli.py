@@ -86,6 +86,24 @@ def save(args: argparse.Namespace) -> dict[str, Any]:
     return retrieval.dated(workspace, records.save(workspace, _stdin_json()))
 
 
+def migrate(args: argparse.Namespace) -> dict[str, Any]:
+    """The one way a record changes schema; nothing else imports ``migrate``."""
+    from pathlib import Path
+
+    from learning import migrate as migration
+
+    if args.restore is not None:
+        if args.all or args.to is not None:
+            raise ValueError(
+                "migrate --restore puts a backup back; give it no --all or --to"
+            )
+        return migration.restore(Path(args.restore))
+    if args.all == (args.workspace is not None):
+        raise ValueError("migrate needs one of --all or --workspace DIR")
+    workspace = None if args.all else _workspace(args)
+    return migration.migrate(workspace, to=args.to)
+
+
 def _taken(record: dict[str, Any]) -> set[str]:
     return {*record["topics"], *record["knowledge"], *record["tasks"]}
 
@@ -213,6 +231,21 @@ def _build_save(parser: argparse.ArgumentParser) -> None:
     parser.description = "Apply one JSON patch read from stdin; prints the receipt."
 
 
+def _build_migrate(parser: argparse.ArgumentParser) -> None:
+    parser.description = (
+        "Move course records to this engine's schema, or back with --to, after "
+        "a backup of each; or put a backup back with --restore."
+    )
+    parser.add_argument("--all", action="store_true", help="Every registered course")
+    parser.add_argument(
+        "--workspace", default=argparse.SUPPRESS, help="One course's directory"
+    )
+    parser.add_argument("--to", type=int, help="The schema to move to")
+    parser.add_argument(
+        "--restore", metavar="BACKUP", help="A backup folder to put back"
+    )
+
+
 def _build_sources(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--scan", action="store_true", help="List local material")
     parser.add_argument("--add", nargs="+", metavar="PATH", help="Register files")
@@ -290,6 +323,12 @@ COMMANDS: tuple[Command, ...] = (
         "Apply a JSON patch from stdin and print the receipt",
         save,
         _build_save,
+    ),
+    Command(
+        "migrate",
+        "Move course records between schemas, with a backup",
+        migrate,
+        _build_migrate,
     ),
     Command(
         "sources",

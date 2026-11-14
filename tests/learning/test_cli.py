@@ -96,7 +96,7 @@ def test_failures_print_one_error_object_and_exit_1(
     assert error["kind"] == "validation"
     _, error = run(capsys, monkeypatch, workspace, "show", "--limit", "0", "x")
     assert error["kind"] == "validation" and "--limit" in error["message"]
-    _, error = run(capsys, monkeypatch, workspace, "migrate")
+    _, error = run(capsys, monkeypatch, workspace, "migrat")
     assert error["kind"] == "validation" and "invalid choice" in error["message"]
     (workspace / ".study" / "course.json").mkdir()
     _, error = run(capsys, monkeypatch, workspace, "resume")
