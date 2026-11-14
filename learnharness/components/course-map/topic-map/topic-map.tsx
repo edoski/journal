@@ -37,12 +37,14 @@ function reducedMotion(): boolean {
  * drag or scroll and zooms by pinch. Hover or focus lights a topic's
  * prerequisite chain; arrows walk the edges. `highlight` lights a set of
  * topics while nothing is hovered or focused, for a page that points at
- * them from elsewhere; off by default.
+ * them from elsewhere, and `marked` the one topic among them a page
+ * points at, whose card glows (`lh-card-mark`); both off by default.
  */
 export function TopicMap({
 	map,
 	margin = ROOM,
 	highlight = null,
+	marked = null,
 	zoom,
 	whole = false,
 	onOpensWhole,
@@ -51,6 +53,8 @@ export function TopicMap({
 	margin?: { x: number; y: number };
 	/** Topics to light, the rest dimmed as a hover dims them; null lights none. */
 	highlight?: ReadonlySet<TopicHandle> | null;
+	/** The topic a page points at from elsewhere, whose card glows; null marks none. */
+	marked?: TopicHandle | null;
 	/** The scale to draw the whole course at, in the frame's middle, for a
 	 *  page that sizes the frame to it and scrolls it; unset, the map
 	 *  frames itself. */
@@ -115,7 +119,7 @@ export function TopicMap({
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} zoom={zoom} whole={whole} onOpensWhole={onOpensWhole} />
+			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} onOpensWhole={onOpensWhole} />
 		</ReactFlowProvider>
 	);
 }
@@ -128,6 +132,7 @@ function Flow({
 	titleOf,
 	margin: frameMargin,
 	highlight,
+	marked,
 	zoom: fixedZoom,
 	whole,
 	onOpensWhole,
@@ -139,6 +144,7 @@ function Flow({
 	titleOf: (handle: TopicHandle) => string;
 	margin: { x: number; y: number };
 	highlight: ReadonlySet<TopicHandle> | null;
+	marked: TopicHandle | null;
 	zoom: number | undefined;
 	whole: boolean;
 	onOpensWhole: ((fits: boolean) => void) | undefined;
@@ -214,6 +220,7 @@ function Flow({
 	const state = useMemo<TopicMapState>(
 		() => ({
 			lit,
+			marked,
 			tabStop,
 			onActive: setActive,
 			onFocus: (handle) => {
@@ -234,7 +241,7 @@ function Flow({
 				else links.current.delete(handle);
 			},
 		}),
-		[lit, tabStop, layout, map.edges, follow],
+		[lit, marked, tabStop, layout, map.edges, follow],
 	);
 
 	const current = map.current ? titleOf(map.current) : null;

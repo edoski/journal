@@ -26,7 +26,7 @@ The map sits on a surface the pane scrolls (`surfaceOf`), sized so `TopicMap` fi
 
 | He does | The page answers |
 |---|---|
-| rests on or focuses a row (120ms) | the map lights that topic with its whole prerequisite chain, the other topics at 60% (the map's `highlight`), and, when the topic is not already clear of the fade, the pane glides it into view in 200ms (at once under reduced motion) |
+| points at or focuses a row | its card glows at once (the map's `marked`: a ring and a soft glow in the accent that blooms in and settles, held while he points), and the map lights that topic with its whole prerequisite chain, the other topics at 50% (the map's `highlight`); once he rests on it for 120ms, when the topic is not already clear of the fade, the pane glides it into view in 200ms (at once under reduced motion) |
 | points at or focuses a node | the map lights its chain itself; the topic's row holds the hover fill (`highlighted`) and comes into view in the list if it is out of it, moving the pane as little as it can |
 | clicks either | the topic's page opens |
 | leaves a pane | only that pane's pointing clears; the map stays where it is |

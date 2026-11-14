@@ -33,6 +33,8 @@ export type TopicFlowNode = Node<
 export interface TopicMapState {
 	/** The hovered or focused topic with its prerequisites, or null at rest. */
 	lit: ReadonlySet<TopicHandle> | null;
+	/** The topic a page points at from elsewhere (a row on the course page), whose card glows. */
+	marked?: TopicHandle | null;
 	tabStop: TopicHandle | null;
 	onActive: (handle: TopicHandle | null) => void;
 	onFocus: (handle: TopicHandle) => void;
@@ -92,12 +94,13 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 	const state = useContext(TopicMapContext);
 	const { topic, current, standing, status, label, needs, href } = data;
 	const dim = state?.lit ? !state.lit.has(topic.handle) : false;
+	const marked = state?.marked === topic.handle;
 	return (
 		<div
 			className={cn(
 				"relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none",
-				// Faded, yet its muted line still reads at 3.2:1 on the page (WCAG 1.4.3's floor for large text, 1.4.11's for marks).
-				dim && "opacity-60",
+				// Dimmed past its muted line's 3:1 (Edo, 14 Nov 2026: the pointed chain must stand out); the title still reads.
+				dim && "opacity-50",
 			)}
 		>
 			{current && (
@@ -112,6 +115,7 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 				data-slot="course-map-node"
 				data-level={topic.level}
 				data-current={current || undefined}
+				data-marked={marked || undefined}
 				data-testid={`map-node-${topic.handle}`}
 				aria-label={label}
 				aria-description={needs ?? undefined}
@@ -123,10 +127,11 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 				onBlur={() => state?.onActive(null)}
 				onKeyDown={(event) => state?.onKeyDown(topic.handle, event)}
 				className={cn(
-					"pointer-events-auto flex size-full cursor-pointer rounded-lg border outline-none transition-colors duration-150 motion-reduce:transition-none",
+					"pointer-events-auto flex size-full cursor-pointer rounded-lg border outline-none transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none",
 					"hover:border-white/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 					"items-center border-border bg-card px-3",
 					current && "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)] hover:border-ring",
+					marked && "lh-card-mark",
 				)}
 			>
 				<NodeBody topic={topic} standing={standing} status={status} />

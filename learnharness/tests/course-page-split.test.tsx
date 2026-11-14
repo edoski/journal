@@ -58,7 +58,8 @@ const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 const noop = () => {};
 const LAYOUT = layoutTopicMap(MAP.topics, MAP.edges);
-const drawMap = (lit: ReadonlySet<TopicHandle> | null = null) => render(<SplitMap map={MAP} layout={LAYOUT} lit={lit} aim={null} reveal={null} onPoint={noop} onLeave={noop} />);
+const drawMap = (lit: ReadonlySet<TopicHandle> | null = null, reveal: TopicHandle | null = null) =>
+	render(<SplitMap map={MAP} layout={LAYOUT} lit={lit} aim={null} reveal={reveal} onPoint={noop} onLeave={noop} />);
 
 describe("what ties the two panes", () => {
 	it("lights a pointed row's topic with its whole prerequisite chain, as a hover on the map does", () => {
@@ -158,8 +159,16 @@ describe("the map pane", () => {
 
 	it("dims every topic but the ones a row lights", () => {
 		const document = drawMap(litOf({ handle: h("span"), from: "list" }, MAP.edges));
-		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-60")).map((n) => n.getAttribute("data-testid"));
+		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-50")).map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(dimmed.sort(), ["map-node-basis", "map-node-eigen", "map-node-independence"]);
+	});
+
+	it("rings the card of the row he points at with the glow, and no other", () => {
+		const pointed = { handle: h("span"), from: "list" } as const;
+		const document = drawMap(litOf(pointed, MAP.edges), revealOf(pointed));
+		const glowing = [...document.querySelectorAll('[data-slot="course-map-node"].lh-card-mark')].map((n) => n.getAttribute("data-testid"));
+		assert.deepEqual(glowing, ["map-node-span"]);
+		assert.equal(drawMap().querySelector(".lh-card-mark"), null, "nothing glows at rest");
 	});
 });
 

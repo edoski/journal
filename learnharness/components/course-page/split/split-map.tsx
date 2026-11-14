@@ -41,7 +41,8 @@ function reducedMotion(): boolean {
  * instead, always to a view that cuts as few topics at its edges as it
  * can (`scrollOn`). `reveal` (the row he points at,
  * once he rests on it for 120ms) glides into view in 200ms when it is not
- * already clear of the fade, and so does a node the keyboard reaches.
+ * already clear of the fade, and so does a node the keyboard reaches; its
+ * card glows at once (the map's `marked`).
  * Wheel, trackpad and a drag on the background scroll it. `lit` lights
  * the row's topic and prerequisites. Pointing at or focusing a node tells
  * the page its topic (`onPoint`), so the list marks its row; Escape on a
@@ -217,7 +218,7 @@ export function SplitMap({
 			<div ref={scroller} data-slot="course-split-map-scroller" className={`size-full overflow-auto overscroll-contain ${NO_BAR}`}>
 				{/* The surface's size, from the course's layout: the map fits it whole. */}
 				<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-					<TopicMap map={map} margin={FADE} highlight={lit} zoom={surface.zoom} />
+					<TopicMap map={map} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
 				</div>
 			</div>
 		</section>

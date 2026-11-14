@@ -602,6 +602,42 @@ body {
 	}
 }
 
+/* The card a row on the left points at, so he sees at once which it is
+   (Edo, 14 Nov 2026): a hairline ring and a soft glow in the accent, held
+   while he points. It blooms in once over 1.6s, brighter for the first
+   second, then settles; no loop. On the course page the map marks the
+   card (topic-map.md); on the topic page the step the shown lesson
+   stopped on answers its row being pointed at or focused (hybrid.md).
+   Unlayered, so it wins over the card's own ring and hover border. */
+.lh-card-mark,
+[data-slot="topic-panes"]:has([data-shown]:hover, [data-shown]:focus-within) [data-slot="topic-step"][aria-current="step"] {
+	border-color: var(--ring);
+	box-shadow:
+		0 0 0 1px color-mix(in oklab, var(--ring) 60%, transparent),
+		0 0 16px 2px color-mix(in oklab, var(--ring) 24%, transparent);
+}
+
+@keyframes lh-card-mark {
+	from {
+		box-shadow:
+			0 0 0 0 transparent,
+			0 0 0 0 transparent;
+	}
+	18%,
+	60% {
+		box-shadow:
+			0 0 0 2px color-mix(in oklab, var(--ring) 85%, transparent),
+			0 0 28px 6px color-mix(in oklab, var(--ring) 40%, transparent);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lh-card-mark,
+	[data-slot="topic-panes"]:has([data-shown]:hover, [data-shown]:focus-within) [data-slot="topic-step"][aria-current="step"] {
+		animation: lh-card-mark 1600ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+}
+
 /* Source-message arrival: a brief, static theme-colored spotlight. */
 .lh-source-passage {
 	scroll-margin-top: 1rem;
