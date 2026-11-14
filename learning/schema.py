@@ -1596,6 +1596,7 @@ def apply_patch(
     places and logs them in the same save.
     """
     changes = check_patch(patch)
+    arc_rules.check_arcless_patch(record, changes)
     outcome = PatchResult(global_preferences=changes.pop("global_preferences", None))
     result = _shallow(record)
     removals = _removals(record, changes)

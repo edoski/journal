@@ -303,6 +303,37 @@ def _check_exam(record: dict[str, Any]) -> None:
             )
 
 
+def check_arcless_patch(record: dict[str, Any], changes: dict[str, Any]) -> None:
+    """A save to a course with no arcs sets no arc field unless it forms
+    arcs, and the refusal lists every one, so the save can go again without
+    them."""
+    if record["arcs"] or any(
+        item is not None for item in changes.get("arcs", {}).values()
+    ):
+        return
+    exam, path = changes.get("exam") or {}, changes.get("path") or {}
+    stray = [
+        f"exam.{name}" for name in ("arcs", "leaves_out") if exam.get(name) is not None
+    ]
+    stray += ["path.arcs"] if path.get("arcs") is not None else []
+    stray += [
+        f"topics.{key}.arc"
+        for key, topic in (changes.get("topics") or {}).items()
+        if topic is not None and topic.get("arc") is not None
+    ]
+    stray += [
+        f"observations[{index}].checkpoint"
+        for index, item in enumerate(changes.get("observations", ()))
+        if "checkpoint" in item
+    ]
+    stray += ["arc_change"] if "arc_change" in changes else []
+    if stray:
+        raise ValueError(
+            f"this course has no arcs, so a save sets no arc field: drop "
+            f"{', '.join(stray)} from the patch, and save the rest again"
+        )
+
+
 def check_exam_patch(
     before: dict[str, Any], after: dict[str, Any], change: dict[str, Any] | None
 ) -> None:

@@ -22,7 +22,7 @@ const schemaBytes = (tools: Record<string, { name: string; description: string; 
 
 const chatStore = { getChat: () => ({ messages: [] }) } as never;
 const job = { chatId: "c", chatStore, jobStore: {} as never, spawn: () => {}, deliver: () => {} } as never;
-const course = courseTools({ course: { workspace: "/w", title: "Course" }, records: {} as never }) as never;
+const course = courseTools({ course: { workspace: "/w", title: "Course" }, records: {} as never, arcs: true }) as never;
 const rows = [
 	{ role: "prober" as const, prompt: composeInstructions("prober"), tools: createProberTools(job) },
 	{ role: "teacher" as const, prompt: composeInstructions("teacher"), tools: createTeacherTools(job) },
@@ -34,5 +34,5 @@ console.log(`course tool schemas ${schemaBytes(course)} B`);
 for (const { name, json } of resumes) console.log(`full resume ${name}: ${bytes(JSON.stringify(json))} B`);
 for (const row of rows) {
 	const briefs = resumes.map(({ name, json }) => `${name} ${bytes(projectCourseBrief(json, row.role === "practice" ? "practice" : "teach").text)} B`);
-	console.log(`${row.role}: app prompt ${bytes(row.prompt)} B, course doctrine ${bytes(courseRecordPrompt(row.role))} B, app tool schemas ${schemaBytes(row.tools as never)} B, brief ${briefs.join(", ") || "n/a"}`);
+	console.log(`${row.role}: app prompt ${bytes(row.prompt)} B, course doctrine ${bytes(courseRecordPrompt(row.role, { arcs: true }))} B, app tool schemas ${schemaBytes(row.tools as never)} B, brief ${briefs.join(", ") || "n/a"}`);
 }

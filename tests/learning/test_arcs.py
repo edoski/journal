@@ -349,6 +349,38 @@ def test_leaves_out_holds_topics_of_the_named_arcs_without_emptying_one(
     assert "leaves_out" not in records.load(workspace)["exam"]
 
 
+def test_a_save_to_a_course_without_arcs_is_told_to_drop_its_arc_fields(
+    workspace: Workspace,
+) -> None:
+    plain = {
+        key: {k: v for k, v in t.items() if k != "arc"} for key, t in TOPICS.items()
+    }
+    records.save(workspace, {"topics": plain})
+    lesson = {
+        "exam": {"date": "2026-12-20", "arcs": ["limits"]},
+        "topics": {"limit": {"arc": "limits", "introduced": True}},
+        "observations": [attempt("limit", checkpoint="limits")],
+        "arc_change": REASON,
+    }
+    refused(
+        workspace,
+        lesson,
+        "this course has no arcs, so a save sets no arc field: drop exam.arcs, "
+        "topics.limit.arc, observations[0].checkpoint, arc_change from the patch, "
+        "and save the rest again",
+    )
+    records.save(
+        workspace,
+        {
+            "exam": {"date": "2026-12-20"},
+            "topics": {"limit": {"introduced": True}},
+            "observations": [attempt("limit")],
+        },
+    )
+    record = records.load(workspace)
+    assert record["exam"] == {"date": "2026-12-20"} and record["arcs"] == {}
+
+
 def test_a_new_exam_date_states_its_scope(workspace: Workspace) -> None:
     formed(workspace)
     records.save(

@@ -21,6 +21,9 @@ import { studyDay, withDayWords } from "../../core/day-words.ts";
 export interface CourseToolContext {
 	course: CourseLink;
 	records: CourseRecords;
+	/** Whether the record groups its topics into arcs, read when the turn
+	 *  starts: the agent reads the arcs doctrine only then. */
+	arcs: boolean;
 	/** The topics whose solution this session has shown him since his last
 	 *  answer on each (shown-help.ts), read from the session's record when
 	 *  the turn starts and kept by every save in it. The course tools and

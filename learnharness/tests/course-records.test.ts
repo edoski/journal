@@ -285,7 +285,7 @@ const COURSE = { workspace: "/s/linalg", title: "Linear Algebra" };
 describe("course tools", () => {
 	it("are bound to the session's course and return the engine JSON verbatim", async () => {
 		const { records, seen } = memoryRecords(() => ({ ok: true, json: { revision: 2, observations: ["o4"] } }));
-		const tools = courseTools({ course: COURSE, records });
+		const tools = courseTools({ course: COURSE, records, arcs: false });
 		assert.deepEqual(Object.keys(tools).sort(), ["course_resume", "course_save", "course_search", "course_show"]);
 		assert.match(tools.course_save!.description, /Linear Algebra/);
 		const changes = { observations: [{ topics: ["rank"], text: "q", help: "none", result: "partial" }] };
@@ -296,7 +296,7 @@ describe("course tools", () => {
 
 	it("a refused save fails the call with the engine's repair message", async () => {
 		const { records } = memoryRecords(() => ({ ok: false, kind: "validation", message: 'unknown topic "nope"; create it in the same patch' }));
-		const tools = courseTools({ course: COURSE, records });
+		const tools = courseTools({ course: COURSE, records, arcs: false });
 		await assert.rejects(
 			() => tools.course_save!.execute("call-2", { changes: { observations: [] } }, undefined) as Promise<unknown>,
 			/Nothing was saved or read\. unknown topic "nope"/,
@@ -305,7 +305,7 @@ describe("course tools", () => {
 
 	it("a save into a deleted course is refused before the engine runs, so the course never comes back (round 3)", async () => {
 		const { records, seen } = memoryRecords(() => ({ ok: true, json: {} }));
-		const tools = courseTools({ course: COURSE, records: { ...records, forgotten: () => true } });
+		const tools = courseTools({ course: COURSE, records: { ...records, forgotten: () => true }, arcs: false });
 		await assert.rejects(
 			() => tools.course_save!.execute("call-3", { changes: { observations: [] } }, undefined) as Promise<unknown>,
 			/course was deleted, so nothing was saved/,
@@ -315,7 +315,7 @@ describe("course tools", () => {
 
 	it("show needs handles or all", async () => {
 		const { records, seen } = memoryRecords(() => ({ ok: true, json: {} }));
-		const tools = courseTools({ course: COURSE, records });
+		const tools = courseTools({ course: COURSE, records, arcs: false });
 		await assert.rejects(() => tools.course_show!.execute("c", {}, undefined) as Promise<unknown>, /Pass handles, or all: true/);
 		await tools.course_show!.execute("c", { all: true }, undefined);
 		assert.deepEqual(seen.map((s) => s.verb), [{ verb: "show", handles: "all" }]);
@@ -329,22 +329,32 @@ describe("course composition into the agents", () => {
 	const faux = createFauxCore({});
 	const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
 	const builds = {
-		prober: (course?: { course: typeof COURSE; records: CourseRecords }) =>
+		prober: (course?: { course: typeof COURSE; records: CourseRecords; arcs: boolean }) =>
 			createProberAgent({ chatId: "c1", chatStore, deliver: () => {}, jobStore, spawn: () => {} }, course ? { course, engine } : { engine }),
-		teacher: (course?: { course: typeof COURSE; records: CourseRecords }) =>
+		teacher: (course?: { course: typeof COURSE; records: CourseRecords; arcs: boolean }) =>
 			createTeacherAgent({ chatId: "c1", chatStore, jobStore, spawn: () => {} }, course ? { course, engine } : { engine }),
-		practice: (course?: { course: typeof COURSE; records: CourseRecords }) =>
+		practice: (course?: { course: typeof COURSE; records: CourseRecords; arcs: boolean }) =>
 			createPracticeAgent({ chatId: "c1", chatStore }, course ? { course, engine } : { engine }),
 	};
 	for (const [kind, build] of Object.entries(builds)) {
 		it(`${kind}: a linked session gets the course tools and doctrine; an unlinked one gets neither`, () => {
-			const linked = build({ course: COURSE, records });
+			const linked = build({ course: COURSE, records, arcs: false });
 			const names = linked.state.tools.map((t) => t.name);
 			for (const name of ["course_resume", "course_show", "course_search", "course_save"]) assert.ok(names.includes(name), name);
 			assert.match(linked.state.systemPrompt, /## The course record/);
 			const plain = build();
 			assert.ok(!plain.state.tools.some((t) => t.name.startsWith("course_")));
 			assert.doesNotMatch(plain.state.systemPrompt, /## The course record/);
+		});
+
+		it(`${kind}: the arcs doctrine joins the prompt only in a course with arcs (round 4)`, () => {
+			const grouped = build({ course: COURSE, records, arcs: true }).state.systemPrompt;
+			const flat = build({ course: COURSE, records, arcs: false }).state.systemPrompt;
+			for (const heading of ["\n# Arcs\n", "\n## What an arc is\n", "\n## Placing a new topic\n", "\n## Changing arcs\n"]) {
+				assert.ok(grouped.includes(heading), `a course with arcs: ${heading.trim()}`);
+				assert.ok(!flat.includes(heading), `a course without arcs: no ${heading.trim()}`);
+			}
+			assert.doesNotMatch(flat, /exam\.arcs|arc_change|path\.arcs/, "no arc field to write in a course without arcs");
 		});
 	}
 });

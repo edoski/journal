@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { PATHS } from "../config.ts";
-import { ARC_CUT_DOCTRINE, ARC_EDGES_DOCTRINE, ENGINE_DOCTRINE, composeDoctrine, courseMapDoctrine, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
+import { recordHasArcs } from "../src/core/contracts/course.ts";
+import { ARCS_DOCTRINE, ARC_CUT_DOCTRINE, ARC_EDGES_DOCTRINE, ENGINE_DOCTRINE, composeDoctrine, courseMapDoctrine, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import { COURSE_MAP_INSTRUCTIONS } from "../src/agent/subagents/course-map-builder.ts";
 import { DIGEST_INSTRUCTIONS, digestSystemPrompt } from "../src/agent/subagents/lesson-digest.ts";
 
@@ -14,6 +15,8 @@ after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 const ADAPTER = fs.readFileSync(path.join(PATHS.root, "src", "agent", "prompts", "course", "10-record.md"), "utf8").trim();
 const AGENTS = ["prober", "teacher", "practice"] as const;
+/** A course with arcs: every arcs.md part its agent reads is composed. */
+const ARCS = { arcs: true } as const;
 /** Sections no agent composes, and why: the week and the exam run-up read
  *  figures the course brief lacks; practice states difficulty itself. */
 const LEFT_OUT = { "teaching.md": ["Difficulty"], "reviews.md": ["The week"] } as const;
@@ -35,11 +38,11 @@ function arcSections(dir: string = PATHS.tutorReferences): Map<string, string> {
 const RECORD = ["What an arc is", "Placing a new topic", "Changing arcs"];
 /** Every prompt path that reads arcs.md, and the sections it reads (design-v2, 3.0). */
 const ARC_PATHS: ReadonlyArray<{ name: string; prompt: (dir?: string) => string; sections: readonly string[] }> = [
-	{ name: "prober", prompt: (dir) => courseRecordPrompt("prober", dir), sections: [...RECORD, "Probing an arc's start"] },
-	{ name: "teacher", prompt: (dir) => courseRecordPrompt("teacher", dir), sections: [...RECORD, "Teaching with arcs"] },
-	{ name: "practice", prompt: (dir) => courseRecordPrompt("practice", dir), sections: [...RECORD, "Teaching with arcs"] },
-	{ name: "course map builder", prompt: (dir) => courseMapDoctrine(dir), sections: RECORD },
-	{ name: "lesson digest", prompt: (dir) => digestSystemPrompt(dir), sections: ["Placing a new topic"] },
+	{ name: "prober", prompt: (dir) => courseRecordPrompt("prober", ARCS, dir), sections: [...RECORD, "Probing an arc's start"] },
+	{ name: "teacher", prompt: (dir) => courseRecordPrompt("teacher", ARCS, dir), sections: [...RECORD, "Teaching with arcs"] },
+	{ name: "practice", prompt: (dir) => courseRecordPrompt("practice", ARCS, dir), sections: [...RECORD, "Teaching with arcs"] },
+	{ name: "course map builder", prompt: (dir) => courseMapDoctrine(ARCS, dir), sections: RECORD },
+	{ name: "lesson digest", prompt: (dir) => digestSystemPrompt(ARCS, dir), sections: ["Placing a new topic"] },
 	{ name: "arc cut", prompt: (dir) => composeDoctrine(ARC_CUT_DOCTRINE, dir), sections: ["What an arc is", "Forming arcs"] },
 	{ name: "arc edges", prompt: (dir) => composeDoctrine(ARC_EDGES_DOCTRINE, dir), sections: [] },
 ];
@@ -55,9 +58,9 @@ describe("engine doctrine", () => {
 
 	it("each agent's course prompt is the adapter, then each listed file or its opening and listed sections", () => {
 		for (const agent of AGENTS) {
-			const prompt = courseRecordPrompt(agent);
+			const prompt = courseRecordPrompt(agent, ARCS);
 			assert.ok(prompt.startsWith(`${ADAPTER}\n\n`), agent);
-			const expected = ["The course record", ...ENGINE_DOCTRINE[agent].flatMap((part) =>
+			const expected = ["The course record", ...[...ENGINE_DOCTRINE[agent], ARCS_DOCTRINE[agent]].flatMap((part) =>
 				"sections" in part ? part.sections : headings(fs.readFileSync(path.join(PATHS.tutorReferences, part.file), "utf8")))];
 			assert.deepEqual(headings(prompt), expected, agent);
 			for (const title of ["# Evidence", "# Teaching", "# Reviews"]) assert.ok(prompt.includes(`\n${title}\n`), `${agent}: ${title}`);
@@ -76,35 +79,35 @@ describe("engine doctrine", () => {
 
 	it("the prober skips teaching.md's opening; the teacher and practice read it", () => {
 		const opening = "The learner does the thinking.";
-		assert.ok(!courseRecordPrompt("prober").includes(opening));
-		assert.ok(courseRecordPrompt("prober").includes("\n# Teaching\n"));
-		assert.ok(courseRecordPrompt("teacher").includes(opening) && courseRecordPrompt("practice").includes(opening));
+		assert.ok(!courseRecordPrompt("prober", ARCS).includes(opening));
+		assert.ok(courseRecordPrompt("prober", ARCS).includes("\n# Teaching\n"));
+		assert.ok(courseRecordPrompt("teacher", ARCS).includes(opening) && courseRecordPrompt("practice", ARCS).includes(opening));
 	});
 
 	it("carries the rules the app's prompts point to", () => {
-		const prober = normalize(courseRecordPrompt("prober"));
+		const prober = normalize(courseRecordPrompt("prober", ARCS));
 		assert.ok(prober.includes("Enter near the hardest thing the goal needs and let a miss walk you down."));
 		assert.ok(prober.includes("choose each next one from the last answer's result, reasoning and confidence"));
 		assert.ok(prober.includes("never re-ask what an answer already settled"));
-		const teacher = normalize(courseRecordPrompt("teacher"));
+		const teacher = normalize(courseRecordPrompt("teacher", ARCS));
 		assert.ok(teacher.includes("Each conceptual step, one per message, is predict, teach, check"));
 		assert.ok(teacher.includes("Skip it when there is nothing to anticipate"));
-		const practice = normalize(courseRecordPrompt("practice"));
+		const practice = normalize(courseRecordPrompt("practice", ARCS));
 		for (const rung of ["R0", "R1", "R2", "R3", "R4", "R5"]) assert.ok(practice.includes(`| ${rung} |`), `the hint ladder lost ${rung}`);
 		assert.ok(practice.includes("cue miss (nothing came to mind), discrimination error (a competing method won; record `chose`), execution slip (the right idea run wrongly), careless, or structural (a misconception;"));
 	});
 
 	it("every agent reads how to keep the record coherent from one session to the next", () => {
 		for (const agent of AGENTS) {
-			const prompt = normalize(courseRecordPrompt(agent));
+			const prompt = normalize(courseRecordPrompt(agent, ARCS));
 			assert.ok(prompt.includes("When more than five topics are due, or the exam is 21 days away or less and any topic is due, an open-ended start says so in one line"), `${agent}: the backlog`);
 			assert.ok(prompt.includes("with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice."), `${agent}: focus`);
 			assert.ok(prompt.includes('`{"preferences": {"explanation_depth": "Short first, details on request"}}` sets a course preference') && prompt.includes("A preference is never a `knowledge` entry."), `${agent}: preferences`);
-			assert.ok(headings(courseRecordPrompt(agent)).includes("Exam facts"), `${agent}: exam facts`);
+			assert.ok(headings(courseRecordPrompt(agent, ARCS)).includes("Exam facts"), `${agent}: exam facts`);
 			assert.ok(prompt.includes('Write these to the learner, in plain words a reader understands after days away: "you", never "he" or "the learner"; no dates, observation ids or plan-node ids'), `${agent}: what the learner reads`);
 		}
 		for (const agent of ["teacher", "practice"] as const) {
-			assert.ok(normalize(courseRecordPrompt(agent)).includes("Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete"), `${agent}: the close`);
+			assert.ok(normalize(courseRecordPrompt(agent, ARCS)).includes("Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete"), `${agent}: the close`);
 		}
 	});
 
@@ -117,26 +120,26 @@ describe("engine doctrine", () => {
 		);
 		assert.ok(tools.has("save") && tools.has("list_sources") && tools.has("guide"), [...tools].join(", "));
 		for (const agent of AGENTS) {
-			const doctrine = courseRecordPrompt(agent).slice(ADAPTER.length);
+			const doctrine = courseRecordPrompt(agent, ARCS).slice(ADAPTER.length);
 			for (const tool of tools) assert.ok(!doctrine.includes(`\`${tool}\``), `${agent}: the doctrine names the tool \`${tool}\``);
 		}
 	});
 
 	it("every agent reads what resolves a gap, how a new topic joins the path, and how a hint's rung is judged", () => {
 		for (const agent of ["prober", "teacher", "practice"] as const) {
-			const prompt = normalize(courseRecordPrompt(agent));
+			const prompt = normalize(courseRecordPrompt(agent, ARCS));
 			assert.ok(prompt.includes("A `gap` is resolved, and set to `null`, only by an unaided correct answer to a question that invites it, on a later day than its repair"), `${agent}: a resolved gap`);
 			assert.ok(prompt.includes("A new topic is added to the `needs` of the topics that build on it, and to `order` where it belongs"), `${agent}: a new topic`);
 			assert.ok(prompt.includes("a topic missing from `order` goes just before the first ordered topic that builds on it, else just after its last prerequisite"), `${agent}: where a late topic lands`);
 		}
 		for (const agent of ["teacher", "practice"] as const) {
-			assert.ok(normalize(courseRecordPrompt(agent)).includes("Record the rung of what the hint said, not of what was asked or meant."), `${agent}: the rung given`);
+			assert.ok(normalize(courseRecordPrompt(agent, ARCS)).includes("Record the rung of what the hint said, not of what was asked or meant."), `${agent}: the rung given`);
 		}
-		assert.ok(normalize(courseRecordPrompt("practice")).includes("once one other problem has come between, the retest comes next"), "practice: an owed retest");
+		assert.ok(normalize(courseRecordPrompt("practice", ARCS)).includes("once one other problem has come between, the retest comes next"), "practice: an owed retest");
 	});
 
 	it("carries the practice rules approved in the app, word for word", () => {
-		const practice = normalize(courseRecordPrompt("practice"));
+		const practice = normalize(courseRecordPrompt("practice", ARCS));
 		for (const approved of [
 			"When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress.",
 			"state the verdict plainly and localize the first break without giving the correction. Give the smallest nudge that lets the learner make the next move, then wait. If that nudge does not land, give another minimal nudge based on the new thinking. A failed attempt is never a reason to reveal the correction or conclude the problem. Continue until the learner finds and completes the correct solution.",
@@ -152,14 +155,14 @@ describe("engine doctrine", () => {
 	});
 
 	it("each agent reads the parts its job uses", () => {
-		const prober = headings(courseRecordPrompt("prober"));
-		const teacher = headings(courseRecordPrompt("teacher"));
-		const practice = headings(courseRecordPrompt("practice"));
+		const prober = headings(courseRecordPrompt("prober", ARCS));
+		const teacher = headings(courseRecordPrompt("teacher", ARCS));
+		const practice = headings(courseRecordPrompt("practice", ARCS));
 		assert.ok(prober.includes("Finding the edge") && prober.includes("Today's review") && !prober.includes("The chain"));
 		assert.ok(teacher.includes("The chain") && teacher.includes("Today's review") && teacher.includes("The close") && !teacher.includes("Practice problems"));
 		assert.ok(practice.includes("Practice problems") && practice.includes("Hints") && !practice.includes("Finding the edge"));
 		for (const agent of AGENTS) {
-			const prompt = headings(courseRecordPrompt(agent));
+			const prompt = headings(courseRecordPrompt(agent, ARCS));
 			assert.ok(!prompt.includes("The week"), `${agent} reads no figures it lacks`);
 			// Only practice's brief carries the run-up figures (course-brief tests).
 			assert.equal(prompt.includes("Exam run-up"), agent === "practice", `${agent}: the exam run-up`);
@@ -170,23 +173,23 @@ describe("engine doctrine", () => {
 		const dir = path.join(TMP, "missing-file");
 		copyReferences(dir);
 		fs.rmSync(path.join(dir, "teaching.md"));
-		assert.throws(() => courseRecordPrompt("teacher", dir), /ENOENT/);
+		assert.throws(() => courseRecordPrompt("teacher", ARCS, dir), /ENOENT/);
 	});
 
 	it("fails when a listed section is renamed", () => {
 		const dir = path.join(TMP, "renamed-section");
 		copyReferences(dir, (file, text) => (file === "teaching.md" ? text.replace("## Hints", "## Help") : text));
-		assert.throws(() => courseRecordPrompt("practice", dir), /engine doctrine: no "## Hints" in teaching\.md/);
+		assert.throws(() => courseRecordPrompt("practice", ARCS, dir), /engine doctrine: no "## Hints" in teaching\.md/);
 	});
 
 	it("the course map builder reads the one path-building recipe: sources, true prerequisites, contrasts, exclusions, revision", () => {
-		const recipe = courseMapDoctrine();
+		const recipe = courseMapDoctrine(ARCS);
 		assert.match(recipe, /^# Course, exam and path\n\n## Building the path\n/);
 		for (const rule of [/Cite only registered sources/, /could the learner work an exercise on B having never seen A/, /go in `contrasts`/, /give it `excluded` with the reason/, /Keep every handle/, /`\$…\$`/]) assert.match(recipe, rule);
 		assert.doesNotMatch(recipe, /## Exam facts/);
 		const dir = path.join(TMP, "renamed-recipe");
 		copyReferences(dir, (file, text) => (file === "course.md" ? text.replace("## Building the path", "## The path") : text));
-		assert.throws(() => courseMapDoctrine(dir), /engine doctrine: no "## Building the path" in course\.md/);
+		assert.throws(() => courseMapDoctrine(ARCS, dir), /engine doctrine: no "## Building the path" in course\.md/);
 	});
 
 	it("every prompt path composes its arcs.md sections verbatim, and no sentence of any other", () => {
@@ -207,11 +210,34 @@ describe("engine doctrine", () => {
 	it("the course adapter defers every arc rule to arcs.md, which each agent composes below it", () => {
 		assert.ok(normalize(ADAPTER).includes("In a course with arcs, place a new topic and change arcs or the exam's scope only as *Arcs* below says."));
 		for (const agent of AGENTS) {
-			const prompt = courseRecordPrompt(agent);
+			const prompt = courseRecordPrompt(agent, ARCS);
 			const below = prompt.slice(ADAPTER.length);
 			assert.ok(below.includes("\n# Arcs\n"), `${agent}: *Arcs* is composed below the adapter`);
 			for (const title of RECORD) assert.ok(below.includes(arcSections().get(title)!), `${agent}: "## ${title}" follows the adapter`);
 		}
+	});
+
+	it("a course without arcs composes no sentence of arcs.md: the tutors, the map builder and the digest (round 4)", () => {
+		const flat = { arcs: false } as const;
+		const all = [...arcSections().values()].flatMap(sentences);
+		const prompts: Array<[string, string]> = [
+			...AGENTS.map((agent): [string, string] => [agent, courseRecordPrompt(agent, flat)]),
+			["course map builder", courseMapDoctrine(flat)],
+			["lesson digest", digestSystemPrompt(flat)],
+		];
+		for (const [name, text] of prompts) {
+			assert.ok(!text.includes("\n# Arcs"), `${name}: no *Arcs*`);
+			for (const sentence of all) assert.ok(!normalize(text).includes(sentence), `${name} reads "${sentence}" in a course without arcs`);
+		}
+		assert.ok(courseMapDoctrine(flat).includes("## Building the path"));
+		assert.equal(digestSystemPrompt(flat), DIGEST_INSTRUCTIONS);
+	});
+
+	it("a course has arcs when its whole record lists one: a v6 record and one before its arc pass have none", () => {
+		assert.equal(recordHasArcs({ schema: 6, topics: {} }), false);
+		assert.equal(recordHasArcs({ schema: 7, arcs: {}, topics: {} }), false);
+		assert.equal(recordHasArcs({ schema: 7, arcs: { limits: { title: "Limits" } } }), true);
+		assert.equal(recordHasArcs(null), false);
 	});
 
 	it("every section of arcs.md is read by some prompt path", () => {
@@ -252,8 +278,8 @@ describe("engine doctrine", () => {
 	});
 
 	it("an arc's first lesson: the prober brackets its entry, the teacher's goal line is its purpose, and the close points elsewhere for the check", () => {
-		const prober = normalize(courseRecordPrompt("prober"));
-		const teacher = normalize(courseRecordPrompt("teacher"));
+		const prober = normalize(courseRecordPrompt("prober", ARCS));
+		const teacher = normalize(courseRecordPrompt("teacher", ARCS));
 		assert.ok(prober.includes("its `entry`, are one more strand to bracket, lapsed topics first"));
 		assert.ok(!teacher.includes("one more strand to bracket"), "the teacher recalls no entry a second time");
 		assert.ok(teacher.includes("The lesson's one-line goal is the arc's purpose line, in your words: no other preamble, and teaching starts in the same turn."));
@@ -266,7 +292,7 @@ describe("engine doctrine", () => {
 	});
 
 	it("one meaning of excluded: no exam session examines it", () => {
-		const recipe = normalize(courseMapDoctrine());
+		const recipe = normalize(courseMapDoctrine(ARCS));
 		assert.ok(recipe.includes("`excluded` is only for what no exam session of the course examines"));
 		assert.ok(normalize(arcSections().get("Changing arcs")!).includes("`excluded` is only for what no exam session of the course ever examines"));
 		assert.doesNotMatch(recipe, /What the exam leaves out stays out of the path/);
@@ -284,7 +310,7 @@ describe("engine doctrine", () => {
 	it("reads sections from a checkout with Windows line endings", () => {
 		const dir = path.join(TMP, "crlf");
 		copyReferences(dir, (_, text) => text.replace(/\n/g, "\r\n"));
-		for (const agent of AGENTS) assert.deepEqual(headings(courseRecordPrompt(agent, dir)), headings(courseRecordPrompt(agent)));
+		for (const agent of AGENTS) assert.deepEqual(headings(courseRecordPrompt(agent, ARCS, dir)), headings(courseRecordPrompt(agent, ARCS)));
 	});
 
 	it("the desktop package ships the references the build copies beside the server", () => {
