@@ -615,6 +615,7 @@ def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
         "contrasts": ["step-0"],
         "level": "new",
         "starts": day(0),
+        "starts_why": {"kind": "next"},
         "weak": False,
         "tasks": [],
     }

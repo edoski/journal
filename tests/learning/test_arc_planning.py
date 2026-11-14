@@ -38,7 +38,7 @@ def arc(title: str) -> dict[str, str]:
 
 
 # Four arcs: a chain from A to C, and D, which needs nothing from the others.
-TOPICS = {
+TOPICS: dict[str, dict[str, Any]] = {
     "a1": {"arc": "a"},
     "a2": {"arc": "a", "needs": ["a1"]},
     "b1": {"arc": "b", "needs": ["a1"]},
@@ -187,7 +187,7 @@ def test_the_final_review_is_as_long_as_the_topics_the_exam_examines() -> None:
 
 # --- a course that takes no questions ----------------------------------------
 
-BRANCHES = {
+BRANCHES: dict[str, dict[str, Any]] = {
     "gtm-site": {"arc": "gtm"},
     "gtm-ops": {"arc": "gtm", "needs": ["gtm-site"]},
     "eve-api": {"arc": "eve"},
@@ -212,3 +212,149 @@ def test_a_course_that_takes_no_questions_builds_on_what_was_taught() -> None:
     result = plan({"c": record}, on(1), 10, week(10, 1))
     assert set(starts(result)) == {"gtm-ops", "eve-api", "eve-ops"}
     assert all(not day["reviews"] for day in result.days["c"]), "nothing falls due"
+
+
+# --- the window: the order new topics come in, and why -----------------------
+
+
+def answer(topic: str) -> dict[str, Any]:
+    return {"topics": [topic], "text": "q", "help": "none", "result": "correct"}
+
+
+def evidence(record: dict[str, Any], solid: list[str], learning: str) -> dict[str, Any]:
+    """``solid`` taught and answered right on a later day; ``learning`` taught
+    yesterday, its first review pinned to day 3."""
+    taught_ = {key: {"introduced": True} for key in solid}
+    record = save(record, {"topics": taught_}, on(-10))
+    record = save(record, {"observations": [answer(k) for k in solid]}, on(-9))
+    far = {key: {"review": {"due": on(60).isoformat()}} for key in solid}
+    record = save(record, {"topics": far}, on(-9))
+    late = {"introduced": True, "review": {"due": on(3).isoformat()}}
+    return save(
+        record, {"topics": {learning: late}, "path": {"current": learning}}, on(-1)
+    )
+
+
+WINDOW: dict[str, dict[str, Any]] = {
+    "a1": {"arc": "a"},
+    "a2": {"arc": "a", "needs": ["a1"], "contrasts": ["a3"]},
+    "a3": {"arc": "a"},
+    "b1": {"arc": "b", "needs": ["a1"]},
+    "c1": {"arc": "c", "needs": ["a1"]},
+    "d1": {"arc": "d"},
+}
+
+
+def windowed() -> dict[str, Any]:
+    patch: dict[str, Any] = {
+        "arcs": {name: arc(name.upper()) for name in "abcd"},
+        "topics": WINDOW,
+        "path": {"order": list(WINDOW), "arcs": list("abcd")},
+        "arc_change": REASON,
+    }
+    return evidence(save(schema.empty(), patch, MONDAY), ["a1"], "a3")
+
+
+def test_new_topics_come_from_the_current_arc_the_next_and_free_arcs() -> None:
+    result = plan({"c": windowed()}, MONDAY, 6, week(10, 1))
+    days = {day["date"]: day["new"] for day in result.days["c"]}
+    assert days[on(0).isoformat()] == ["b1"], "the next arc while A waits"
+    assert days[on(1).isoformat()] == ["d1"], "D needs nothing from another arc"
+    assert days[on(2).isoformat()] == [], "C is two arcs on: it waits"
+    assert days[on(3).isoformat()] == ["a2"]
+    assert days[on(4).isoformat()] == ["c1"], "A is done, so C is the next arc"
+    why = result.when("c", MONDAY, True).why
+    assert why["b1"] == {"arc": "b", "kind": "early", "waiting_on": ["a3"]}
+    assert why["d1"] == {"arc": "d", "kind": "early", "waiting_on": ["a3"]}
+    assert why["a2"] == {"arc": "a", "kind": "after", "partners": ["a3"]}
+    assert why["c1"] == {"arc": "c", "kind": "next"}
+
+
+def test_an_early_start_does_not_open_the_arc_after_it() -> None:
+    record = save(windowed(), {"path": {"current": "b1"}}, MONDAY)
+    result = plan({"c": record}, MONDAY, 3, week(10, 1))
+    assert "c1" not in starts(result), "B's start leaves A the current arc"
+
+
+def test_each_independent_branch_moves_while_the_others_wait() -> None:
+    topics = {
+        "g1": {"arc": "g"},
+        "g2": {"arc": "g", "needs": ["g1"]},
+        "e1": {"arc": "e"},
+        "e2": {"arc": "e", "needs": ["e1"]},
+        "k1": {"arc": "k"},
+    }
+    patch: dict[str, Any] = {
+        "arcs": {name: arc(name.upper()) for name in "gek"},
+        "topics": topics,
+        "path": {"order": list(topics), "arcs": list("gek")},
+        "arc_change": REASON,
+    }
+    record = save(schema.empty(), patch, MONDAY)
+    pinned = {"introduced": True, "review": {"due": on(3).isoformat()}}
+    record = save(record, {"topics": {"g1": pinned, "e1": pinned}}, on(-1))
+    result = plan({"c": record}, MONDAY, 1, week(10, 1))
+    assert result.days["c"][0]["new"] == ["k1"]
+    assert result.when("c", MONDAY, True).why["k1"]["kind"] == "early"
+
+
+def test_without_arcs_a_topic_that_builds_on_nothing_waits_its_place() -> None:
+    topics = {
+        "x0": {},
+        "x1": {},
+        "x2": {"needs": ["x1"]},
+        "x3": {},
+        "x4": {"needs": ["x0"]},
+    }
+    record = save(
+        schema.empty(), {"topics": topics, "path": {"order": list(topics)}}, MONDAY
+    )
+    record = evidence(record, ["x0"], "x1")
+    result = plan({"c": record}, MONDAY, 6, week(10, 1))
+    days = {day["date"]: day["new"] for day in result.days["c"]}
+    assert days[on(0).isoformat()] == ["x4"], "it builds on what he has started"
+    assert days[on(3).isoformat()] == ["x2"]
+    assert days[on(4).isoformat()] == ["x3"], "it opens a new line: in its place"
+    why = result.when("c", MONDAY, True).why
+    assert why["x4"] == {"kind": "early", "waiting_on": ["x1"]}
+    assert why["x2"] == {"kind": "after", "needs": ["x1"]}
+    assert why["x3"] == {"kind": "next"}
+
+
+def test_an_exams_pace_passes_the_window_only_when_holding_would_raise_it() -> None:
+    topics = {**WINDOW, "c2": {"arc": "c", "needs": ["a1"]}}
+    patch: dict[str, Any] = {
+        "arcs": {name: arc(name.upper()) for name in "abcd"},
+        "topics": topics,
+        "path": {"order": list(topics), "arcs": list("abcd")},
+        "arc_change": REASON,
+    }
+    record = evidence(save(schema.empty(), patch, MONDAY), ["a1"], "a3")
+    near = save(record, {"exam": scoped(["a", "b", "c"], 4)}, MONDAY)
+    first = plan({"c": near}, MONDAY, 2, week(10, 3))
+    assert first.days["c"][1]["new"] == ["c1"], "three topics in three days"
+    assert first.when("c", MONDAY, True).why["c1"] == {
+        "arc": "c",
+        "kind": "early",
+        "waiting_on": ["a3"],
+        "exam": True,
+    }
+    far = save(record, {"exam": scoped(["a", "b", "c"], 40)}, MONDAY)
+    calm = plan({"c": far}, MONDAY, 3, week(10, 3))
+    assert "c1" not in starts(calm), "weeks to go: the pace holds for the material"
+
+
+def test_reviews_ignore_arcs() -> None:
+    every = {key: {"introduced": True} for key in TOPICS}
+    with_arcs = save(course(), {"topics": every}, on(-10))
+    plain = {
+        key: {k: v for k, v in t.items() if k != "arc"} for key, t in TOPICS.items()
+    }
+    without = save(schema.empty(), {"topics": plain, "path": {"order": ORDER}}, MONDAY)
+    without = save(without, {"topics": every}, on(-10))
+    rates = week(100, 0)
+    one = plan({"c": with_arcs}, MONDAY, 30, rates).days["c"]
+    other = plan({"c": without}, MONDAY, 30, rates).days["c"]
+    assert [set(day["reviews"]) for day in one] == [
+        set(day["reviews"]) for day in other
+    ]

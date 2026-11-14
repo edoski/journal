@@ -23,6 +23,7 @@ from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 import heapq
+import math
 from itertools import groupby
 from typing import Any
 
@@ -53,6 +54,10 @@ def counts(observation: dict[str, Any]) -> bool:
 
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
+# New topics come from the arc he is in and the next one (Edo's ruling of 14
+# Nov 2026): the material keeps its chapters' order, and at most one chapter
+# runs early while the one he is in waits on evidence.
+NEW_TOPIC_ARCS = 2
 RECENT_SOLID_DAYS = 14
 WEEK_DAYS = 7
 # Grades from worst to best.
@@ -916,6 +921,65 @@ def needs(record: dict[str, Any], key: str) -> list[str]:
         for need in topics[key].get("needs", ())
         if need in topics and "excluded" not in topics[need]
     ]
+
+
+def free_arcs(record: dict[str, Any]) -> frozenset[str]:
+    """Arcs whose live topics need nothing from another arc: a strand of the
+    course that stands on its own (Amoreg's GTM, Eve and Check)."""
+    topics = record["topics"]
+    return frozenset(
+        arc
+        for arc in arc_rules.live(record)
+        if all(
+            topics[need].get("arc") == arc
+            for key in arc_rules.members(record, arc)
+            if "excluded" not in topics[key]
+            for need in needs(record, key)
+        )
+    )
+
+
+def window(
+    record: dict[str, Any],
+    front: str | None,
+    free: frozenset[str] | None = None,
+) -> frozenset[str] | None:
+    """The arcs new topics may come from: the current arc and the next
+    (``NEW_TOPIC_ARCS``), and every arc that needs nothing from another
+    (``free_arcs``, or ``free`` when the caller has them). None without arcs.
+
+    The current arc here is the arc of ``front``, the earliest untaught
+    topic: the arc he is in whenever he studies in order, and the current
+    arc's own rule when "You are here" names no topic (``arcs.current``).
+    "You are here" itself can lag in an arc he has finished, where its
+    window would close every arc with topics left, or lead into the next arc
+    after an early start, where its window would open the arc after that,
+    so early starts would chain away from the material."""
+    arcs = arc_rules.order(record)
+    if not arcs:
+        return None
+    current = record["topics"][front].get("arc") if front is not None else None
+    last = arcs.index(current) + NEW_TOPIC_ARCS if current in arcs else len(arcs)
+    return frozenset(arcs[:last]) | (free_arcs(record) if free is None else free)
+
+
+def opens(
+    record: dict[str, Any], key: str, open_: frozenset[str] | None, front: str | None
+) -> bool:
+    """Whether ``key`` may start now, in the material's order. With arcs, its
+    arc is in the window (``window``). Without, the path has no chapters to
+    bound a jump, so the path bounds it: a topic ahead of the first untaught
+    one (``front``) starts only when it builds on one, since a topic that
+    needs nothing opens a new line of the material and waits for its place."""
+    if open_ is not None:
+        return record["topics"][key].get("arc") in open_
+    return key == front or bool(needs(record, key))
+
+
+def holding_raises(left: int, rest: int, pace: int) -> bool:
+    """Whether starting none of ``rest`` today would raise the pace an exam
+    needs: its topics over the ``left`` study days, today included."""
+    return left <= 1 or math.ceil(rest / (left - 1)) > pace
 
 
 def _placed(

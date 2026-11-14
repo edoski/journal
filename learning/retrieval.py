@@ -401,6 +401,7 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
             for topic, day in sorted(planned.starts.items(), key=lambda item: item[1])
         }
         or None,
+        "starts_why": dict(planned.why) or None,
         "does_not_fit": planned.does_not_fit or None,
         "path": compact(
             {
@@ -570,7 +571,8 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
     memory asks because full days left it out (``held_for`` names the course
     whose final review came first, ``due`` is memory's day), and ``starts``
     is the day it starts an untaught topic, ``starts_after`` the courses
-    whose new topics take the days before that start. ``exam`` carries the
+    whose new topics take the days before that start, and ``starts_why``
+    why it comes then in the material (``agenda.Why``). ``exam`` carries the
     run-up: the final review's first day, the topics that do not fit before
     the exam and those its final review has no room for.
     """
@@ -603,6 +605,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             **_held(key, planned, overdue, stored),
             "starts": starts.isoformat() if starts else None,
             "starts_after": planned.starts_after.get(key) if starts else None,
+            "starts_why": planned.why.get(key) if starts else None,
             "weak": _is_weak(topic, standing),
             "right": standing.get("right"),
             "gap": topic.get("gap"),

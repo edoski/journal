@@ -183,6 +183,34 @@ def _reviews_left(
     return left
 
 
+def _opened(
+    record: dict[str, Any],
+    untaught: list[str],
+    ready: list[str],
+    pace: int,
+    free: frozenset[str],
+) -> list[str]:
+    """Up to ``pace`` of ``ready`` as the plan takes them from its window
+    (``progress.opens``), which each start moves on."""
+    left, taken = list(untaught), list[str]()
+    while len(taken) < pace and left:
+        front = left[0]
+        window = progress.window(record, front, free)
+        found = next(
+            (
+                key
+                for key in ready
+                if key not in taken and progress.opens(record, key, window, front)
+            ),
+            None,
+        )
+        if found is None:
+            break
+        taken.append(found)
+        left.remove(found)
+    return taken
+
+
 def _new_short(
     record: dict[str, Any],
     replayed: Mapping[str, progress.Replay],
@@ -192,7 +220,8 @@ def _new_short(
     """Of ``days``, those he started fewer of this course's topics than its
     exam pace owed: the topics the exam needed started that morning
     (``progress.exam_topics``) over the study days left, as many as were
-    ready."""
+    ready in the window the plan read them from (``progress.opens``), or
+    beyond it on a day holding them would have raised the pace."""
     exam = progress.exam_plan(record)
     if exam is None:
         return set()
@@ -204,6 +233,7 @@ def _new_short(
     order = progress.path_order(record)
     partners = progress.contrasts(record)
     asks = progress.asks(record)
+    free = progress.free_arcs(record)
     short: set[date] = set()
     for day in days:
         if exam.day <= day:
@@ -233,7 +263,13 @@ def _new_short(
                 for other in partners[key]
             )
         ]
-        owed = min(len(ready), math.ceil(len(untaught) / left))
+        pace = math.ceil(len(untaught) / left)
+        opened = _opened(record, untaught, ready, pace, free)
+        if len(opened) < pace and not progress.holding_raises(
+            left, len(untaught) - len(opened), pace
+        ):
+            ready = opened
+        owed = min(len(ready), pace)
         if sum(starts.get(key) == day for key in untaught) < owed:
             short.add(day)
     return short
