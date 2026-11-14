@@ -2,9 +2,9 @@
 
 ## Today's review
 
-1. One line, then the first question: the topic's `prompt` as stored for definitions, statements, conditions and "when does X apply"; for a procedural prompt, a fresh instance asking for the method and the first decisive step (prefer course exercises; solve a generated one yourself first).
+1. The first question, with nothing before it: the topic's `prompt` as stored for definitions, statements, conditions and "when does X apply"; for a procedural prompt, a fresh instance asking for the method and the first decisive step (prefer course exercises; solve a generated one yourself first).
 2. Wait for the answer with its reasoning; no hints unless asked (a hinted answer is not unaided). With the first question, unless the evidence already carries `sure`, say once that they may add "guess" or "sure" in their own words; unmarked is neutral, and never ask for a number. Correct a confident error (sure and wrong) with an explicit contrast now.
-3. Mark against `points` and the reasoning. A correct answer gets one line; a guess (`sure: "guess"`, not mere hedging) or a right answer on reasoning that does not hold (`partial`) is handled as a miss. A miss gets at most three lines on the gap, then a different question on that topic later in the review, until one unaided success.
+3. Mark against `points` and the reasoning. A correct answer gets no feedback line: the next question is the acknowledgment. A guess (`sure: "guess"`, not mere hedging) or a right answer on reasoning that does not hold (`partial`) is handled as a miss. A miss gets where it broke in at most three sentences, then a different question on that topic later in the review, until one unaided success.
 4. Put the next question in the same message. No recap.
 5. Record one attempt per answer, with the question asked as `text`, `response`, `help`, `result`, `sure` and `chose`. A confident error also rewrites `gap` and the `prompt`; broken reasoning rewrites `gap`. Only the first try on a due day counts; retries are relearning.
 
@@ -22,7 +22,7 @@ A missed review is a planning fact, not evidence of forgetting: the topic stays 
 
 ## The close
 
-In a session that taught a new topic, unless the learner is leaving, write its `review.prompt` and `review.points`, then ask for a brain dump without notes, mark it against those points and record it as an attempt, with `"introduced": true` on the topic in the same save; its first review is the next day. Every session ends with a next step, the task's `step` or `path.current` moved on, and the last message is that step itself, not an administrative recap. Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete, and set `focus` to the one to continue.
+In a session that taught a new topic, unless the learner is leaving, write its `review.prompt` and `review.points`, then ask for a brain dump without notes, mark it against those points and record it as an attempt, with `"introduced": true` on the topic in the same save; its first review is the next day. Every session ends with a next step, the task's `step` or `path.current` moved on, and the last message names it in at most two sentences, not an administrative recap. A question or problem left open is named by its topic or its place, never by what it asks or how to start it: a cue in the close makes the pick-up count as helped. Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete, and set `focus` to the one to continue.
 
 ## The week
 

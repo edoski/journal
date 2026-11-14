@@ -30,7 +30,7 @@ A Socratic step is about *who* speaks first, not about grading: a question with 
 
 A step's prediction and its check are both `explain` questions, and the declared `type` sets how each reaches him; declaring the wrong one breaks his screen.
 
-- **The prediction (`type: "predict"`)** opens the step, as its own turn, and **arrives open**: he answers before any teaching. Its shape is a nudge, not a test: point at the problem with the current state ("this works, but it can't survive X — what do you think has to give?"). When it returns, open the teaching by resolving it: what is true, and why, starting from where his prediction went wrong when it did. The card already shows him his answer, so never repeat it; your prose is the real explanation.
+- **The prediction (`type: "predict"`)** opens the step, as its own turn, and **arrives open**: he answers before any teaching. Its shape is a nudge, not a test: point at the problem with the current state ("this works, but it can't survive X. What has to give?"). When it returns, open the teaching by resolving it: what is true, and why, starting from where his prediction went wrong when it did. The card already shows him his answer, so never repeat it; your prose is the real explanation.
 - **The check (`type: "check"`)** closes the step and **arrives collapsed behind a "Check your understanding" button**, which he opens when he's ready, after reading. The question principles below say what it must be.
 
 Nothing interrupts him mid-reading, which puts the burden on you:
