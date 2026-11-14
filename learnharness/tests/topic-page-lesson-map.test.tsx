@@ -88,6 +88,11 @@ describe("the marks on a lesson's steps", () => {
 		assert.deepEqual(marks.get("maps"), { status: "upcoming", tag: null });
 	});
 
+	it("leave Left off here off a lesson that went through every step", () => {
+		const through: SessionPlan = { ...DET_PLAN, visited: DET_PLAN.tree.nodes.map((node) => node.id).filter((id) => id !== DET_PLAN.current) };
+		assert.deepEqual(stepMarks(through, false).get(DET_PLAN.current!), { status: "current", tag: null });
+	});
+
 	it("say where the finished Determinants lesson left off and nothing more", () => {
 		const marks = stepMarks(DET_PLAN, false);
 		assert.deepEqual(marks.get("product"), { status: "current", tag: "Left off here" });
