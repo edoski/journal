@@ -7,7 +7,7 @@ Why a line is on Today, as an icon and a few words. `why-mark.tsx` (`WhyMark`, `
 | Part | Notes |
 |---|---|
 | icon | one per kind of reason (`WHY_ICON`): a turn that waits, the question bubble; a miss, a crossed circle; a review, History; an open task, a bookmark; the next topic, an arrow |
-| words | `whyOf`'s `short` ("Your turn", "3d overdue", "Missed Chain rule", "At part (c)", "Next up"), or the caller's `words` (the sidebar's `NowLine.slot`: "Missed last time" on the lead topic itself, a task's step up to its first colon); one line, truncated |
+| words | `whyOf`'s `short` ("Your turn", "3d overdue", "Not right last time: Chain rule", "At part (c)", "Next up"), or the caller's `words` (the sidebar's `NowLine.slot`: "Not right last time" on the lead topic itself, a task's step up to its first colon); one line, truncated |
 
 ## Sizes
 

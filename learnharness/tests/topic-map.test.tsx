@@ -124,7 +124,7 @@ describe("why a topic needs him", () => {
 	const words = (handle: string) => needOf(byHandle(handle), titleOf)?.words ?? null;
 
 	it("gives a weak topic its first reason: a miss, a diagnosed mistake, a method chosen in its place, a sure wrong answer", () => {
-		assert.equal(words("matmul"), "Missed last time");
+		assert.equal(words("matmul"), "Not right last time");
 		assert.equal(words("independence"), "Mistake to fix");
 		assert.equal(words("elimination"), "Mixed up with Cramer's rule");
 		assert.equal(words("kernel"), "Sure, but wrong");
@@ -349,7 +349,7 @@ describe("topic map drawing", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
-			["1w overdue", "Mistake to fix", "Due today", "Missed last time", "Mixed up with Cramer's rule", "Look again", "Sure, but wrong"],
+			["1w overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Look again", "Sure, but wrong"],
 		);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-need"]'), null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");

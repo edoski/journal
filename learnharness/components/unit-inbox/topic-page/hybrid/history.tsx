@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon, WaypointsIcon } from "lucide-react";
 import type { TopicAttempt } from "@/src/core";
 import { cn } from "@/lib/utils";
+import { ATTEMPT_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -55,9 +56,9 @@ function DateCell({ date, className }: { date: string | null; className?: string
 const spine = ({ above, below }: Ends) => cn("relative", (above || below) && SPINE, above ? ABOVE : "before:hidden", below ? BELOW : "after:hidden");
 
 const RESULT = {
-	right: { Icon: CheckIcon, words: "Right" },
-	partly: { Icon: CircleDotIcon, words: "Partly right" },
-	missed: { Icon: CircleXIcon, words: "Missed" },
+	right: { Icon: CheckIcon, words: ATTEMPT_WORDS.right },
+	partly: { Icon: CircleDotIcon, words: ATTEMPT_WORDS.partly },
+	wrong: { Icon: CircleXIcon, words: ATTEMPT_WORDS.wrong },
 } as const;
 
 /** One scored attempt: how it went and the tutor's sentence. Not a

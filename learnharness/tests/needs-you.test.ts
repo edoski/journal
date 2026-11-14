@@ -48,11 +48,11 @@ describe("needsYouNow", () => {
 		assert.deepEqual([line!.topics, line!.lead], [[], null]);
 	});
 
-	it("words the status slot as Today does, a lapse on the lead itself as Missed last time and a task up to its colon", () => {
+	it("words the status slot as Today does, a lapse on the lead itself as Not right last time and a task up to its colon", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
 			[...lines, ...also].map((l) => l.slot),
-			["Your turn", "Your turn", "3d overdue", "4d overdue", "1w overdue", "Missed last time"],
+			["Your turn", "Your turn", "3d overdue", "4d overdue", "1w overdue", "Not right last time"],
 		);
 		const task: StudyCourse = {
 			...LINALG,
@@ -70,10 +70,10 @@ describe("needsYouNow", () => {
 	it("leads a lapse with the lapsed topic, so the card's title and its reason name the same topic", () => {
 		const other: StudyCourse = { ...CALCULUS, due: ["riemann", "chain"] as TopicHandle[] };
 		const [line] = needsYouNow([other], [], TODAY).lines;
-		assert.equal(line!.why?.short, "Missed Chain rule");
+		assert.equal(line!.why?.short, "Not right last time: Chain rule");
 		assert.deepEqual(
 			[line!.lead?.title, line!.slot, line!.topics.map((t) => t.title)],
-			["Chain rule", "Missed last time", ["Chain rule", "Riemann sums"]],
+			["Chain rule", "Not right last time", ["Chain rule", "Riemann sums"]],
 		);
 	});
 

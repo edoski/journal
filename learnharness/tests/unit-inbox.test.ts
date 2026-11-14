@@ -156,7 +156,7 @@ describe("unitStatus", () => {
 	it("ends each row with the fact that is its own, in Home's words: a session first, then a slip, how overdue, where he left off, when it comes back, else how long ago", () => {
 		assert.deepEqual(unitStatus(by("rank"), inbox.today), { kind: "working" });
 		assert.deepEqual(unitStatus(by("eigen"), inbox.today), { kind: "your-turn" });
-		assert.deepEqual(unitStatus(by("chain"), inbox.today), { kind: "slip", words: "Missed last time" });
+		assert.deepEqual(unitStatus(by("chain"), inbox.today), { kind: "slip", words: "Not right last time" });
 		assert.deepEqual(unitStatus(by("kernel"), inbox.today), { kind: "slip", words: "Mistake to fix" });
 		assert.deepEqual(unitStatus(by("elimination"), inbox.today), { kind: "slip", words: "Mixed up with cramer" }, "the method named by its title, as the map says it");
 		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Fixed, check again later" });

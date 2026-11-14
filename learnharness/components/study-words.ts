@@ -44,7 +44,9 @@ export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | 
  *  which names the method (`slipWords`). */
 export const SLIP_WORDS = {
 	repaired: "Fixed, check again later",
-	lapsed: "Missed last time",
+	// Not "Missed": beside an overdue review he read that as a review he
+	// skipped (round 3). A lapse is an answer that was not right.
+	lapsed: "Not right last time",
 	gap: "Mistake to fix",
 	confident: "Sure, but wrong",
 	none: "Look again",
@@ -64,6 +66,20 @@ export function slipWords(signals: TopicSignals, titleOf: (handle: TopicHandle) 
 	if (confidentErrors > 0) return SLIP_WORDS.confident;
 	return SLIP_WORDS.none;
 }
+
+/** A lapse on a line about another topic, naming the lapsed one: "Not
+ *  right last time: Chain rule". */
+export function lapsedOnWords(title: string): string {
+	return `${SLIP_WORDS.lapsed}: ${title}`;
+}
+
+/** How one scored attempt went, in a topic's history: right, partly right,
+ *  or not right (wrong, or given up). */
+export const ATTEMPT_WORDS = {
+	right: "Right",
+	partly: "Partly right",
+	wrong: "Not right",
+} as const;
 
 /** A review come due: "Due today", "3d overdue", "2w overdue". */
 export function overdueWords(overdue: number): string {

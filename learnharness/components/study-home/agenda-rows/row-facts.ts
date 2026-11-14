@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { overdueWords } from "@/components/study-words";
+import { lapsedOnWords, overdueWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -67,7 +67,7 @@ export function lessonTitle(row: TodayRow): string {
  *  words that fit beside an icon. */
 export interface Why {
 	kind: "reply" | "working" | "stopped" | "missed" | "review" | "task" | "next";
-	/** "Missed Chain rule". */
+	/** "Not right last time: Chain rule". */
 	short: string;
 }
 
@@ -75,7 +75,7 @@ export interface Why {
  *  topic it was), else how overdue the most overdue one is. Pure. */
 function reviewReason(due: readonly CourseMapTopic[]): Why | null {
 	const lapsed = due.find((t) => t.signals.lapsed);
-	if (lapsed) return { kind: "missed", short: `Missed ${lapsed.title}` };
+	if (lapsed) return { kind: "missed", short: lapsedOnWords(lapsed.title) };
 	const overdue = Math.max(-1, ...due.map((t) => (t.review?.kind === "due" ? t.review.overdue : -1)));
 	if (overdue < 0) return null;
 	return { kind: "review", short: overdueWords(overdue) };

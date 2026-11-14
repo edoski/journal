@@ -334,7 +334,7 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY)[0]!), ["reply", "Your turn"]);
 		assert.deepEqual(short(rowOf(LINALG)), ["review", "2w overdue"]);
 		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "1d overdue"]);
-		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Missed Sequences"]);
+		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time: Sequences"]);
 		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 3d ago"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
 	});

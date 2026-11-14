@@ -25,7 +25,7 @@ The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directl
 
 | Group | Holds | Order | Row's fact |
 |---|---|---|---|
-| Needs you | every topic the map gives a reason (`needOf`): a slip, or a topic he can do on his own whose review is due | slips first, a wrong answer he was sure of on top (Butterfield and Metcalfe 2001: confident errors are the most corrected), then the longest overdue | the map's reason: "Missed last time", "Mistake to fix", "Mixed up with …", "Sure, but wrong", "3d overdue" |
+| Needs you | every topic the map gives a reason (`needOf`): a slip, or a topic he can do on his own whose review is due | slips first, a wrong answer he was sure of on top (Butterfield and Metcalfe 2001: confident errors are the most corrected), then the longest overdue | the map's reason: "Not right last time", "Mistake to fix", "Mixed up with …", "Sure, but wrong", "3d overdue" |
 | Learning | the sidebar's Learning shelf less those | the sidebar's: a turn that waits first, then the latest studied | "You are here" on the current topic, else where an open task holding it was left ("At part (c): …"), else nothing. A topic still being learned never says its review is due (the sidebar's rule) |
 | Not started | what the sidebar leaves out | the engine's path order | "You are here" if it is the current topic, else nothing |
 | On your own | the sidebar's Known shelf | the soonest back first | "Back in 5d" |

@@ -186,16 +186,16 @@ describe("where he stands, in the app's one wording", () => {
 	it("says every seeded head line word for word", () => {
 		const lines: [CourseMapTopic, string][] = [
 			[TOPICS.rank, "Right with help. Mistake to fix. 3d overdue"],
-			[TOPICS.matmul, "Right with help. Missed last time. 2d overdue"],
+			[TOPICS.matmul, "Right with help. Not right last time. 2d overdue"],
 			[TOPICS.span, "On your own. 1w overdue"],
 			[TOPICS.vectors, "On your own. Back in 5d"],
 			[TOPICS.cramer, "Taught, not tried. 2d overdue"],
-			[TOPICS.riemann, "Right with help. Missed last time. Due today"],
+			[TOPICS.riemann, "Right with help. Not right last time. Due today"],
 			[TOPICS.elimination, "Right with help. Mixed up with Cramer's rule. 2d overdue"],
 			[TOPICS.kernel, "Tried, not right yet. Sure, but wrong. 1d overdue"],
 			[TOPICS.basis, "On your own. 1w overdue"],
 			[TOPICS.independence, "Right with help. Mistake to fix. 2w overdue"],
-			[TOPICS.chain, "Right with help. Missed last time. 4w overdue"],
+			[TOPICS.chain, "Right with help. Not right last time. 4w overdue"],
 			[TOPICS.eigen, "Not started"],
 		];
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
@@ -204,7 +204,7 @@ describe("where he stands, in the app's one wording", () => {
 
 	it("gives why it needs him and its review as marks of their own kind", () => {
 		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [
-			{ kind: "slip", words: "Missed last time" },
+			{ kind: "slip", words: "Not right last time" },
 			{ kind: "review", words: "2d overdue" },
 		]);
 		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);
@@ -365,11 +365,11 @@ describe("the topic's sessions", () => {
 });
 
 describe("how an attempt went", () => {
-	it("says right, partly or missed, and the one thing worth saying about it", () => {
+	it("says right, partly or wrong (never missed, which reads as skipped), and the one thing worth saying about it", () => {
 		assert.deepEqual(attemptMark(attempt(), titleOf), { result: "right", words: null });
 		assert.deepEqual(attemptMark(attempt({ result: "partial", unaided: false }), titleOf), { result: "partly", words: "With a hint" });
-		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false }), titleOf), { result: "missed", words: "Sure, but wrong" });
-		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false, chose: "cramer" }), titleOf), { result: "missed", words: "Mixed up with Cramer's rule" });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false }), titleOf), { result: "wrong", words: "Sure, but wrong" });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false, chose: "cramer" }), titleOf), { result: "wrong", words: "Mixed up with Cramer's rule" });
 	});
 });
 

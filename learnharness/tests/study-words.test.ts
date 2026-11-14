@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { courseShareWords, heldWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
+import { ATTEMPT_WORDS, courseShareWords, heldWords, lapsedOnWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
 
 // The app's one wording for where he stands and why a topic needs him
 // (study-words.ts), which every surface reads.
@@ -36,7 +36,7 @@ describe("where he stands, true to the record", () => {
 describe("why a slip needs him", () => {
 	it("says each signal on its own", () => {
 		assert.equal(slip({ repaired: true }), "Fixed, check again later");
-		assert.equal(slip({ lapsed: true }), "Missed last time");
+		assert.equal(slip({ lapsed: true }), "Not right last time");
 		assert.equal(slip({ gap: "Writes det as ad + bc" }), "Mistake to fix");
 		assert.equal(slip({ choiceErrors: { cramer: 2 } }), "Mixed up with Cramer's rule");
 		assert.equal(slip({ confidentErrors: 1 }), "Sure, but wrong");
@@ -46,7 +46,7 @@ describe("why a slip needs him", () => {
 	it("says the first signal when several hold: fixed, missed, a mistake, mixed up, then sure but wrong", () => {
 		const all = { repaired: true, lapsed: true, gap: "sign error", choiceErrors: { cramer: 1 }, confidentErrors: 1 };
 		assert.equal(slip(all), "Fixed, check again later");
-		assert.equal(slip({ ...all, repaired: false }), "Missed last time");
+		assert.equal(slip({ ...all, repaired: false }), "Not right last time");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false }), "Mistake to fix");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false, gap: null }), "Mixed up with Cramer's rule");
 		assert.equal(slip({ confidentErrors: 1, choiceErrors: {} }), "Sure, but wrong");
@@ -95,5 +95,12 @@ describe("why a review waits", () => {
 		assert.equal(heldWords({ kind: "scheduled", date: "2026-12-03" }, null), null);
 		assert.equal(heldWords({ kind: "due", date: "2026-11-08", overdue: 0 }, null), null);
 		assert.equal(heldWords(null, null), null);
+	});
+});
+
+describe("words he reads after days away", () => {
+	it("never says Missed, which beside an overdue review reads as a review he skipped", () => {
+		assert.equal(lapsedOnWords("Chain rule"), "Not right last time: Chain rule");
+		assert.deepEqual(Object.values(ATTEMPT_WORDS), ["Right", "Partly right", "Not right"]);
 	});
 });
