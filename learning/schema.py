@@ -118,6 +118,9 @@ _BY = "by"
 _STAMP = "stamp"
 _POINTS = "points"
 _ARC_EVENT = "arc_event"
+_EDGES = "edges"
+_EDGE_CHANGE = "edge_change"
+_ENTRY = "entry"
 MAX_POINTS = 5
 POINT_CHARS = 200
 
@@ -197,10 +200,23 @@ FIELDS: dict[str, dict[str, str]] = {
         "topic": _HANDLE,
         "from": _TEXT,
         "to": _TEXT,
+        "edges": _EDGES,
+        "edges_entry": _ENTRY,
         "reason": _TEXT,
         "asked": _TEXT,
     },
-    "arc_change": {"reason": _TEXT, "asked": _TEXT},
+    "arc_edge": {
+        "topic": _HANDLE,
+        "need": _HANDLE,
+        "change": _EDGE_CHANGE,
+        "reason": _TEXT,
+    },
+    "arc_change": {
+        "reason": _TEXT,
+        "asked": _TEXT,
+        "edges": _EDGES,
+        "edges_entry": _ENTRY,
+    },
 }
 HELPERS: dict[str, dict[str, str]] = {
     "exam": {"final_review": _DAY},
@@ -216,6 +232,7 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "knowledge": ("text",),
     "ref": ("source",),
     "arc_event": ("day", "kind", "reason"),
+    "arc_edge": ("topic", "need", "change", "reason"),
     "arc_change": ("reason",),
 }
 _REVIEW_PATCH = {
@@ -260,6 +277,15 @@ class Arc(TypedDict, total=False):
     refs: list[Reference]
 
 
+class ArcEdge(TypedDict):
+    """One prerequisite an ``edges`` event logs as added or dropped."""
+
+    topic: str
+    need: str
+    change: str
+    reason: str
+
+
 # "from" is a keyword, so the shape is declared functionally.
 ArcEvent = TypedDict(
     "ArcEvent",
@@ -270,6 +296,8 @@ ArcEvent = TypedDict(
         "topic": str,
         "from": str,
         "to": str,
+        "edges": list[ArcEdge],
+        "edges_entry": int,
         "reason": str,
         "asked": str,
     },
@@ -557,6 +585,33 @@ def _flag(value: Any, path: str, patch: bool) -> bool | None:
     return True if value else None
 
 
+def _edges(value: Any, path: str, patch: bool) -> list[dict[str, Any]]:
+    items = _list(
+        value,
+        path,
+        'objects like {"topic": "chain-rule", "need": "derivative", '
+        '"change": "add", "reason": "…"}',
+    )
+    if not items:
+        raise ValueError(f"{path} must list at least one edge")
+    found: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        edge = entry("arc_edge", item, f"{path}[{index}]")
+        if any((e["topic"], e["need"]) == (edge["topic"], edge["need"]) for e in found):
+            raise ValueError(
+                f'{path}[{index}]: "{edge["topic"]}" needs "{edge["need"]}" is '
+                "listed twice; list each edge once"
+            )
+        found.append(edge)
+    return found
+
+
+def _entry(value: Any, path: str, patch: bool) -> int:
+    if type(value) is int and value >= 0:
+        return value
+    raise ValueError(f"{path} must be the index of an arc_log entry, not {value!r}")
+
+
 def _choice(choices: tuple[str, ...]) -> Callable[[Any, str, bool], str]:
     def check(value: Any, path: str, patch: bool) -> str:
         if isinstance(value, str) and value in choices:
@@ -636,6 +691,9 @@ _RULES: dict[str, Callable[[Any, str, bool], Any]] = {
     _STAMP: _stamp,
     _POINTS: _points,
     _ARC_EVENT: _choice(arc_rules.ARC_EVENTS),
+    _EDGES: _edges,
+    _EDGE_CHANGE: _choice(arc_rules.EDGE_CHANGES),
+    _ENTRY: _entry,
     "in_days": _in_days,
 }
 
@@ -1003,10 +1061,22 @@ def empty() -> dict[str, Any]:
 
 
 def _arc_log(value: Any) -> list[dict[str, Any]]:
-    return [
-        entry("arc_event", item, f"arc_log[{index}]")
-        for index, item in enumerate(_list(value, "arc_log", "arc events"))
-    ]
+    """The log's events; an ``edges`` event lists its edges, and an
+    ``edges_entry`` names an earlier ``edges`` event."""
+    log: list[dict[str, Any]] = []
+    for index, item in enumerate(_list(value, "arc_log", "arc events")):
+        path = f"arc_log[{index}]"
+        event = entry("arc_event", item, path)
+        if (event["kind"] == "edges") != ("edges" in event):
+            raise ValueError(
+                f"{path}: an edges event lists its edges, and only an edges event does"
+            )
+        if "edges_entry" in event:
+            arc_rules.check_edges_entry(
+                log, event["edges_entry"], f"{path}.edges_entry"
+            )
+        log.append(event)
+    return log
 
 
 def validate_record(record: Any, *, placing: bool = False) -> dict[str, Any]:

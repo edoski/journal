@@ -460,6 +460,38 @@ def _guard(
             )
 
 
+def _logged(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    found: list[dict[str, Any]],
+    change: dict[str, Any],
+    log: list[dict[str, Any]],
+    day: str,
+) -> list[dict[str, Any]]:
+    """The events a save's ``arc_change`` logs after ``log``: its ``edges``
+    event first, then each arc change, which refers to the edges it rests on
+    (``edges_entry``); a reason with neither is a note."""
+    rest = {name: value for name, value in change.items() if name != "edges"}
+    events: list[dict[str, Any]] = []
+    if "edges" in change:
+        if "edges_entry" in change:
+            raise ValueError(
+                "arc_change: a save that lists edges logs them in its own entry, "
+                "which its arc changes refer to; drop edges_entry"
+            )
+        arc_rules.check_edges(before, after, change["edges"])
+        events.append({"day": day, "kind": "edges", **change})
+        rest["edges_entry"] = len(log)
+    elif "edges_entry" in change:
+        arc_rules.check_edges_entry(
+            log, change["edges_entry"], "arc_change.edges_entry"
+        )
+    events += [{"day": day, **event, **rest} for event in found]
+    if not events:
+        events.append({"day": day, "kind": "note", **rest})
+    return events
+
+
 def _scope(record: dict[str, Any], topics: set[str]) -> frozenset[str] | None:
     examined = arc_rules.examined(record)
     return None if examined is None else examined & topics
@@ -488,9 +520,7 @@ def settle(
     day = today.isoformat()
     log = [*record.get("arc_log", ()), *arc_rules.removals(outcome.pruned, day)]
     if change is not None:
-        log += [{"day": day, **event, **change} for event in found] or [
-            {"day": day, "kind": "note", **change}
-        ]
+        log += _logged(before, record, found, change, log, day)
     if log:
         record["arc_log"] = log
     old = set(before["topics"])

@@ -26,8 +26,10 @@ ARC_EVENTS = (
     "reworded",
     "reordered",
     "moved",
+    "edges",
     "note",
 )
+EDGE_CHANGES = ("add", "drop")
 TEXTS = {
     "title": "it is the arc's name on screen",
     "question": "every topic in the arc helps answer it, and agents place topics by it",
@@ -326,7 +328,10 @@ def check_arcless_patch(record: dict[str, Any], changes: dict[str, Any]) -> None
         for index, item in enumerate(changes.get("observations", ()))
         if "checkpoint" in item
     ]
-    stray += ["arc_change"] if "arc_change" in changes else []
+    # An arc_change that lists edges logs them: prerequisites are settled
+    # before a course has arcs.
+    if "arc_change" in changes and "edges" not in changes["arc_change"]:
+        stray.append("arc_change")
     if stray:
         raise ValueError(
             f"this course has no arcs, so a save sets no arc field: drop "
@@ -447,6 +452,32 @@ def events(before: dict[str, Any], after: dict[str, Any]) -> list[dict[str, Any]
                 {"kind": "moved", "topic": key, "from": was, "to": topic["arc"]}
             )
     return found
+
+
+def check_edges(
+    before: dict[str, Any], after: dict[str, Any], edges: list[dict[str, Any]]
+) -> None:
+    """An ``edges`` event lists only needs the save adds or drops."""
+    for index, edge in enumerate(edges):
+        topic, need, change = edge["topic"], edge["need"], edge["change"]
+        had = need in before["topics"].get(topic, {}).get("needs", ())
+        kept = topic in after["topics"]
+        has = need in after["topics"].get(topic, {}).get("needs", ())
+        done = (not had and has) if change == "add" else (had and kept and not has)
+        if not done:
+            raise ValueError(
+                f'arc_change.edges[{index}]: this save does not {change} "{need}" '
+                f'in the needs of "{topic}"; list only the needs it adds or drops'
+            )
+
+
+def check_edges_entry(log: list[dict[str, Any]], index: int, path: str) -> None:
+    """``edges_entry`` names an ``edges`` event already in the log."""
+    if index >= len(log) or log[index]["kind"] != "edges":
+        raise ValueError(
+            f"{path}: arc_log[{index}] is no edges event; give the index of the "
+            "arc_log entry that logged the edges this change rests on"
+        )
 
 
 def removals(dropped: dict[str, str], day: str) -> list[dict[str, Any]]:
