@@ -24,6 +24,7 @@ One form each, wherever it shows.
 | a review come due | Due today, 3d overdue (under a week), 1w overdue, 2w overdue |
 | a review dated ahead | Back in 5d, Back in 3w, Back in 2mo |
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 2w ago; Unfinished when no day is known. Never the tutor's step text. |
+| a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started |
 
 Home's line names the lapsed topic when the line is about another one ("Not right last time: Chain rule", `lapsedOnWords`, `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Not right: `ATTEMPT_WORDS`) is not a reason and keeps its own words.
 

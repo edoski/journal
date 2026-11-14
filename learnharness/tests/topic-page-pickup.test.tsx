@@ -107,7 +107,7 @@ describe("Now", () => {
 				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
 				["review", "2d overdue", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
-				["start", "Not started", null, "Start", null],
+				["start", "First lesson", null, "Start", null],
 				["continue", DET_STOPPED, "Left off yesterday", "Continue", "chat_demo_det"],
 				["study", "Nothing due", null, "Study", null],
 			],

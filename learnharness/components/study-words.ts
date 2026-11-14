@@ -108,6 +108,11 @@ export function returnWords(days: number): string {
 	return `Back in ${Math.round(days / 30)}mo`;
 }
 
+/** What a topic page's Now row offers on a topic not started: its first
+ *  lesson, since the head already says "Not started" (round 3 found it
+ *  twice). */
+export const FIRST_LESSON = "First lesson";
+
 /** Why a review waits past the day memory asks for it, when the engine's
  *  plan says a nearer exam's reviews filled the evenings before it
  *  (`held`): a course with no exam ahead of the review waits for the exam
