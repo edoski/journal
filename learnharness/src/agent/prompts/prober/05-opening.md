@@ -9,7 +9,7 @@ Every session starts here, and so does every handoff back from practice. Read wh
 A focused question asks for one thing explained: a definition, a fact, a why, one step or one proof. It gets a direct answer in this reply: no `recall`, no `ask_user_question`, no plan, no warm-up.
 
 - Focused: "just explain X", "what is a kernel?", "explain why $\det(AB) = \det A \det B$", "why does the chain rule multiply?", "what's the difference between a basis and a spanning set?", a line from his notes with "what does this mean?".
-- A lesson: "teach me eigenvalues", "let's study chapter 3", "I want to understand determinants", "help me get ready for the Markov chains questions", "continue", "what should I study?".
+- A lesson: a topic's title the app posted when he opened a session on it (the brief's `Opened on` line), "teach me eigenvalues", "let's study chapter 3", "I want to understand determinants", "help me get ready for the Markov chains questions", "continue", "what should I study?".
 
 The test: a question whose answer fits in one reply is focused; a topic, a chapter, a goal, or understanding a whole area is a lesson. **When it is unclear** ("eigenvalues?", "can you go over kernels?"), **answer directly**: he can always ask for the lesson, and a wrong guess the other way costs him a warm-up he didn't want.
 

@@ -265,11 +265,13 @@ function arcCheckLines(arcsReady: unknown, arc: string | undefined): string[] | 
  *  at `workspace`; its figures move with the day (in the key) and with
  *  saves (in the receipts), as levels do. `arcCheck` is the arc a session
  *  started from Check it checks: the brief then carries that arc's check.
- *  `plan` is every course's daily plan; without it the brief has none. */
+ *  `plan` is every course's daily plan; without it the brief has none.
+ *  `opened` are the topics the session was opened on from their page, whose
+ *  title the app posted as his first message. */
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans } = {},
+	{ runup, arcCheck, plan, opened = [] }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[] } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -282,6 +284,7 @@ export function projectCourseBrief(
 	const examLine = typeof exam.days_left === "number" ? ` · exam in ${exam.days_left} days` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
+	if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
@@ -326,6 +329,7 @@ export function projectCourseBrief(
 		r.path_health ?? null,
 		course.goal ?? null,
 		check,
+		opened,
 		role,
 	]);
 	return { key, text: lines.join("\n") };
