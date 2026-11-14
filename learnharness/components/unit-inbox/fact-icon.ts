@@ -1,4 +1,5 @@
 import { CalendarClockIcon, MapPinIcon, type LucideIcon } from "lucide-react";
+import { SLIP_ICON } from "@/components/slip-icons";
 import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import type { TopicFact } from "@/components/unit-inbox/sidebar-says";
 
@@ -17,3 +18,11 @@ export const FACT_ICON: Record<Exclude<TopicFact["kind"], "working" | "studied">
 	back: CalendarClockIcon,
 	here: MapPinIcon,
 };
+
+/** A fact's icon: a slip wears its own (`SLIP_ICON`), so "Sure, but wrong"
+ *  and "Fixed, check again later" never share the crossed circle of a
+ *  miss; null for a fact drawn without one. */
+export function factIcon(fact: TopicFact): LucideIcon | null {
+	if (fact.kind === "working" || fact.kind === "studied") return null;
+	return fact.kind === "slip" ? SLIP_ICON[fact.slip] : FACT_ICON[fact.kind];
+}

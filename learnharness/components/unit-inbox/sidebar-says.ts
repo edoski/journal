@@ -4,7 +4,7 @@ import { nowFor, plannedKeys, restShelves, shelfStatus } from "@/components/unit
 import { claimedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
 import { buildInbox, unitKey, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 import type { Why } from "@/components/study-home/agenda-rows/row-facts";
-import { TUTOR_WRITING } from "@/components/study-words";
+import { TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 
 /** The one fact a topic says, in the words the sidebar's row or Today's
  *  card says for it. `kind` picks its icon. */
@@ -15,8 +15,9 @@ export type TopicFact =
 	| { kind: "working"; words: string }
 	/** The tutor stopped mid-reply in a session on it. */
 	| { kind: "stopped"; words: string }
-	/** The engine calls it weak, and why: "Not right last time", "Sure, but wrong". */
-	| { kind: "slip"; words: string }
+	/** The engine calls it weak, and why: "Not right last time", "Sure, but
+	 *  wrong"; `slip` picks its own icon (`SLIP_ICON`). */
+	| { kind: "slip"; words: string; slip: SlipKey }
 	/** Its review is due: "Due today", "3d overdue". */
 	| { kind: "review"; words: string }
 	/** An open task holds it, and when he left it: "Left off 3d ago". */
@@ -47,7 +48,8 @@ const WHY_FACT: Record<Why["kind"], TopicFact["kind"]> = { reply: "your-turn", w
 function todayFact(item: NowItem, topic: CourseMapTopic): TopicFact | null {
 	const { why } = item.line;
 	const words = slotWords(why, topic);
-	return why && words ? { kind: WHY_FACT[why.kind], words } : null;
+	if (!why || !words) return null;
+	return why.kind === "missed" ? { kind: "slip", words, slip: "lapsed" } : { kind: WHY_FACT[why.kind] as Exclude<TopicFact["kind"], "slip">, words };
 }
 
 /** A shelf row's status (`shelfStatus`) as a fact. Pure. */
@@ -61,6 +63,8 @@ function shelfFact(status: UnitStatus): TopicFact | null {
 			return { kind: "working", words: TUTOR_WRITING };
 		case "returns":
 			return { kind: "back", words: status.words };
+		case "slip":
+			return { kind: "slip", words: status.words, slip: status.slip };
 		default:
 			return { kind: status.kind, words: status.words };
 	}

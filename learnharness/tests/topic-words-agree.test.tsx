@@ -12,7 +12,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import type { ChatListItem, StudyCourse } from "../src/core/index.ts";
+import type { ChatListItem, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
@@ -20,7 +20,9 @@ import { buildInbox, type Unit } from "../components/unit-inbox/units.ts";
 import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
 import { nowFor, plannedKeys, restShelves, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
 import { claimedKeys, todayTop } from "../components/unit-inbox/today/today-top.ts";
-import { CHATS, COURSES, LINALG } from "./fixtures/now-demo.ts";
+import { back, CHATS, COURSES, LINALG, topic } from "./fixtures/now-demo.ts";
+import { SLIP_ICON } from "../components/slip-icons.ts";
+import { factIcon } from "../components/unit-inbox/fact-icon.ts";
 
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>
@@ -77,5 +79,15 @@ describe("every Linear Algebra topic says one thing on the sidebar, the course p
 	it("Rank, whose session waits on him, says Your turn everywhere", () => {
 		const rank = rows.find((r) => r.topic.handle === "rank")!;
 		assert.deepEqual([rank.sidebar, rank.page, rank.card], ["Your turn", "Your turn", "Your turn"]);
+	});
+});
+
+describe("a slip, wherever it shows", () => {
+	it("keeps which slip it is, so it wears its own icon", () => {
+		const sure = topic("kernel", "Kernel and rank-nullity", "attempted", { weak: true, review: back("2026-11-12"), signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 1, repaired: false } });
+		const la: StudyCourse = { ...LINALG, map: { ...LINALG.map, topics: [...LINALG.map.topics.filter((t) => t.handle !== "kernel"), sure] } };
+		const fact = sidebarSays([la], CHATS, la.map.workspace).get("kernel" as TopicHandle)?.fact;
+		assert.deepEqual(fact, { kind: "slip", words: "Sure, but wrong", slip: "confident" });
+		assert.equal(factIcon(fact!), SLIP_ICON.confident, "a warning, not the crossed circle of a miss");
 	});
 });

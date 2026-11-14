@@ -163,7 +163,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 	it("keeps a weak topic Today does not take up in Learning, as the sidebar's Learning shelf does, saying why it is weak", () => {
 		const learning = groupOf(groups, "learning");
 		const kernel = learning.topics.find((t) => t.topic.handle === "kernel")!;
-		assert.deepEqual(kernel.fact, { kind: "slip", words: "Sure, but wrong" });
+		assert.deepEqual(kernel.fact, { kind: "slip", words: "Sure, but wrong", slip: "confident" });
 		assert.equal(groupOf(groups, "needs-you").topics.some((t) => t.topic.weak), false, "a slip alone does not need him today");
 	});
 
