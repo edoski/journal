@@ -69,6 +69,7 @@ import {
 	teachStepIndex,
 	toolQuestionKind,
 	questionNeedsReveal,
+	doneTonightAtEnd,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
@@ -86,6 +87,7 @@ import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
+import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
 
 /** The transcript's own column inside the scroller (the docks have their own find roots). */
 const TRANSCRIPT_COLUMN = "[data-transcript-column]";
@@ -718,7 +720,23 @@ export function Chat({
 	 * kind, nothing active, nothing in flight, and at least one problem
 	 * has ever been posed (the fresh session's opening turn is owed, not
 	 * the move-on). Enter-on-empty and the Next chip both key on it. */
+	// Done for tonight (done-tonight.tsx): stops the session whatever is
+	// open; until he writes again, the session waits on nothing.
+	const doneTonight = doneTonightAtEnd(nativeMessages);
+	const sendTonight = useCallback(() => {
+		if (busy || compacting || doneTonight) return;
+		void send({ type: "tonight" });
+	}, [busy, compacting, doneTonight, send]);
+	const sendTonightRef = useRef(sendTonight);
+	sendTonightRef.current = sendTonight;
+	useEffect(() => {
+		const onTonight = () => sendTonightRef.current();
+		window.addEventListener(kbdEventForChat("done-tonight"), onTonight);
+		return () => window.removeEventListener(kbdEventForChat("done-tonight"), onTonight);
+	}, []);
+
 	const nextReady =
+		!doneTonight &&
 		mode === "practice" &&
 		!pending &&
 		!activeProblem &&
@@ -1267,6 +1285,7 @@ export function Chat({
 						courseHref={course ? courseHref(course.workspace) : undefined}
 						phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
+						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
 						details={
 							<LessonDetails
 								turns={turns}
@@ -1339,6 +1358,8 @@ export function Chat({
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16).
 												return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
+											case "data-done-tonight":
+												return <DoneTonightLine key={pi} />;
 											// data-compaction (the moment the summary ran) stays
 											// unmarked: the cut's hairline is enough.
 											default:
