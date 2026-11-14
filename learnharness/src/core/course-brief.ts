@@ -6,7 +6,8 @@
  * with the course tools.
  *
  * The brief's key is the part that changes the lesson's opening move: the
- * study day, the due topics and backlog, the reviews the daily plan puts
+ * course's description in his words (the record's `goal`, written in the
+ * course page's Context), the study day, the due topics and backlog, the reviews the daily plan puts
  * on later days and the days it starts each new topic, the open tasks (with their steps
  * when none is in focus) and the current path topic. A new brief enters the transcript only when the key changes, so
  * the cached prompt prefix holds between saves; level changes in between
@@ -176,6 +177,7 @@ export function projectCourseBrief(
 	const lines: string[] = [];
 	const examLine = typeof exam.days_left === "number" ? ` · exam in ${exam.days_left} days` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
+	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
@@ -227,6 +229,7 @@ export function projectCourseBrief(
 		path.current ?? null,
 		handles(path.excluded),
 		r.path_health ?? null,
+		course.goal ?? null,
 		role,
 	]);
 	return { key, text: lines.join("\n") };

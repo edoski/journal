@@ -4,6 +4,8 @@
  * - a course is created with material (courses.ts);
  * - material is added to a course (`addMaterial`, below);
  * - a lesson's save registers material (a turn settles);
+ * - a folder or website is linked in Context, or a linked folder gets new
+ *   files (course-context.ts);
  * - the app starts: a build a quit cut short runs again.
  *
  * The builder runs on the app's default model, the conversation's, at high
@@ -18,6 +20,7 @@ import { claudeEngine, type PiEngine } from "../agent/models.ts";
 import { emit, subscribe, type ServerEvent } from "../core/events.ts";
 import { sourcesRegisteredInLastTurn } from "../core/native-messages.ts";
 import { effectiveSettings, stores } from "./stores.ts";
+import { createCourseContexts, watchLinkedFolders, type CourseContexts } from "./course-context.ts";
 
 /** The app's one model on its Claude account; undefined when that account
  *  cannot run it, so the build reports it instead of starting. */
@@ -118,4 +121,23 @@ export async function addMaterial(workspace: string, files: ReadonlyArray<{ path
 	emit("courses-changed", {});
 	startCourseMap(workspace);
 	return { ok: true, added: copied };
+}
+
+interface LhCourseContextGlobal {
+	__lhCourseContexts?: CourseContexts;
+}
+
+/** The one context service, on the builder this module owns. */
+export function courseContexts(): CourseContexts {
+	const g = globalThis as typeof globalThis & LhCourseContextGlobal;
+	return (g.__lhCourseContexts ??= createCourseContexts({
+		courseRecords: stores.courseRecords,
+		adopt: (workspace, except) => courseMapBuilder().adopt(workspace, except),
+		startMap: startCourseMap,
+	}));
+}
+
+/** At app start: watch every course's linked folders. */
+export function watchCourseFolders(): () => void {
+	return watchLinkedFolders({ contexts: courseContexts(), courseRecords: stores.courseRecords });
 }
