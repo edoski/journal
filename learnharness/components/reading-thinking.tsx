@@ -2,6 +2,7 @@
 
 import { useCallback, useLayoutEffect, useState } from "react";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
+import { Textarea } from "@/components/ui/textarea";
 
 /**
  * The reading-thinking field (owner design 2026-10-03, "two questions per
@@ -42,7 +43,7 @@ export function ReadingThinkingField({
 			<div className="pb-1 text-row text-muted-foreground">
 				Thinking while reading
 			</div>
-			<textarea
+			<Textarea
 				value={draft}
 				onChange={(e) => applyDraft(e.target.value)}
 				/* py-0.5 (owner round, 2026-10-07): the scrollbar fix. Source
@@ -82,7 +83,7 @@ export function ReadingThinkingField({
 				}}
 				placeholder="Whatever comes to mind as you read."
 				rows={1}
-				className="field-sizing-content max-h-40 w-full resize-none bg-transparent py-0.5 text-control text-foreground outline-none placeholder:text-muted-foreground"
+				className="inline-block max-h-40 min-h-0 resize-none rounded-none border-0 px-0 py-0.5 text-control focus-visible:ring-0"
 			/>
 		</div>
 	);

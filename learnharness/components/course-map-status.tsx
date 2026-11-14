@@ -28,9 +28,16 @@ export function mapStatusWords(status: MapStatus | null): { text: string; retry:
 	}
 }
 
-/** The New course dialog after Create, when material came with the course:
- *  the map building in the background, live, until Done. */
-export function CourseMapStatus({ course, onClose, fetchLike = fetch }: { course: CourseSummary; onClose: () => void; fetchLike?: typeof fetch }) {
+/** The New course dialog after Create when material came with the course,
+ *  and Add material after Add: the map building in the background, live,
+ *  until Done. */
+export function CourseMapStatus({ course, title, onClose, fetchLike = fetch }: {
+	course: Pick<CourseSummary, "workspace" | "title">;
+	/** The heading; "<course> is ready" after New course. */
+	title?: string;
+	onClose: () => void;
+	fetchLike?: typeof fetch;
+}) {
 	const [status, setStatus] = useState<MapStatus | null>(null);
 	const hub = useNotifyHub();
 	const url = `/api/courses/map?workspace=${encodeURIComponent(course.workspace)}`;
@@ -56,7 +63,7 @@ export function CourseMapStatus({ course, onClose, fetchLike = fetch }: { course
 	return (
 		<div className="flex flex-col gap-4" data-testid="course-map-status" data-state={status?.state ?? "building"}>
 			<DialogHeader>
-				<DialogTitle>{courseLabel(course)} is ready</DialogTitle>
+				<DialogTitle>{title ?? `${courseLabel(course)} is ready`}</DialogTitle>
 			</DialogHeader>
 			<p className="flex items-start gap-2 text-row text-muted-foreground" role="status">
 				{(status === null || status.state === "building") && <LoaderCircleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />}

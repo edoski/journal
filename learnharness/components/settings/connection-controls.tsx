@@ -16,7 +16,7 @@ export function ConnectionRow({ label, action, disabled, onAction, children, tes
 	return <div className="flex min-h-7 items-center gap-3" data-testid={testid}>
 		<span className="min-w-0 flex-1 truncate text-row text-foreground">{label}</span>
 		{children}
-		<Button type="button" size="sm" variant={action === "Connect" ? "outline" : "quiet"} className="h-7 cursor-pointer px-3 disabled:cursor-not-allowed" data-testid={actionTestid} disabled={disabled} onClick={onAction}>{action}</Button>
+		<Button type="button" size="compact" variant={action === "Connect" ? "outline" : "quiet"} className="cursor-pointer disabled:cursor-not-allowed" data-testid={actionTestid} disabled={disabled} onClick={onAction}>{action}</Button>
 	</div>;
 }
 

@@ -29,7 +29,7 @@ export const STATUS_SLOT = cn(
 /** A row's one action, over its status slot: hidden until the row is
  *  hovered or the action has keyboard focus. The caller places it. */
 export const ROW_ACTION =
-	"pointer-events-none absolute inline-flex items-center gap-1 rounded-md px-1.5 text-label font-medium text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 motion-reduce:transition-none [&>svg]:size-3";
+	"pointer-events-none absolute inline-flex items-center gap-1 rounded-md px-1.5 text-label font-medium text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 hover:bg-transparent disabled:opacity-0 group-hover/sidebar-row:disabled:opacity-100 motion-reduce:transition-none [&>svg]:size-3";
 
 /** Where a card's action sits: over the status slot of line 1. */
 export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";

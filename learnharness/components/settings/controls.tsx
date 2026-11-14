@@ -15,11 +15,6 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Hint } from "@/components/ui/hint";
 
-/** The field look (spec: settings.md): 28px, radius 8, the input
- *  edge (white 11%), 13px, the 2px focus ring. */
-export const SETTINGS_FIELD =
-	"h-7 rounded-md border border-input bg-transparent px-2 text-row text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none";
-
 /** A section block: pronounced mono heading + content. */
 export function SettingsSection({
 	title,
@@ -97,8 +92,8 @@ export function SettingsRow({
 	);
 }
 
-/** The on/off switch. With a disc icon it is a plain button in the switch
- *  role: the figure cards render it outside the settings dialog. */
+/** The on/off switch, shadcn's Switch. With a disc icon the icon is the
+ *  switch's disc (the figure cards' invert switch). */
 export function Toggle({
 	checked,
 	disabled,
@@ -116,82 +111,21 @@ export function Toggle({
 	 *  toggle renders the half-filled contrast circle AS the disc — the icon
 	 *  carries the meaning; plain toggles keep the plain disc. */
 	discIcon?: ReactNode;
-	/** Optional tooltip on the switch (native on the disc-icon button). */
+	/** Optional tooltip on the switch. */
 	title?: string;
 }) {
 	const testid = `toggle-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-	if (!discIcon) {
-		const control = (
-			<Switch
-				checked={checked}
-				onCheckedChange={onChange}
-				aria-label={label}
-				disabled={disabled}
-				data-testid={testid}
-			/>
-		);
-		return title ? <Hint label={title}>{control}</Hint> : control;
-	}
-	return (
-		<button
-			type="button"
-			role="switch"
-			aria-checked={checked}
+	const control = (
+		<Switch
+			checked={checked}
+			onCheckedChange={onChange}
 			aria-label={label}
-			{...(title ? { title } : {})}
 			disabled={disabled}
 			data-testid={testid}
-			onClick={() => onChange(!checked)}
-			className={cn(
-				"relative h-4.5 w-8 shrink-0 rounded-full border border-border transition-colors",
-				// Owner (2026-09-20): on is a gray track with a WHITE disc (a full-white
-				// track was too loud); off stays the muted track.
-				checked ? "bg-muted-foreground" : "bg-muted",
-				disabled && "cursor-not-allowed",
-			)}
-		>
-			{/* The icon IS the disc: same size, same slide, same state colors —
-			    only the knob's face changes (the invert affordance). */}
-			<span
-				className={cn(
-					"absolute left-0 top-0.5 flex size-3 items-center justify-center rounded-full transition-transform",
-					checked ? "translate-x-4 text-foreground" : "translate-x-0.5 text-muted-foreground",
-				)}
-			>
-				{discIcon}
-			</span>
-		</button>
+			thumb={discIcon}
+		/>
 	);
-}
-
-/** A thin select — native element, options as given. */
-export function ThinSelect({
-	value,
-	onChange,
-	children,
-	ariaLabel,
-	testid,
-	disabled,
-}: {
-	value: string;
-	onChange: (next: string) => void;
-	children: React.ReactNode;
-	ariaLabel: string;
-	testid?: string;
-	disabled?: boolean;
-}) {
-	return (
-		<select
-			value={value}
-			aria-label={ariaLabel}
-			data-testid={testid}
-			disabled={disabled}
-			onChange={(e) => onChange(e.target.value)}
-			className={SETTINGS_FIELD}
-		>
-			{children}
-		</select>
-	);
+	return title ? <Hint label={title}>{control}</Hint> : control;
 }
 
 /** A thin hex/text input committing on blur + Enter (settings pace, not

@@ -121,9 +121,9 @@ export function DeleteSessionBody({
 			{failure && (
 				<p role="alert" data-testid="delete-failure" className="text-row text-danger">
 					{FAILURE_WORDS[failure.code] ?? failure.error}{" "}
-					<button type="button" data-testid="delete-retry" onClick={onRun} disabled={busy} className="text-foreground underline-offset-2 hover:underline disabled:opacity-50">
+					<Button type="button" variant="link" data-testid="delete-retry" onClick={onRun} disabled={busy} className="h-auto p-0 text-row font-normal text-foreground underline-offset-2">
 						Try again
-					</button>
+					</Button>
 				</p>
 			)}
 			<AlertDialogFooter className="pt-2">

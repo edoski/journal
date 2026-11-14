@@ -9,6 +9,7 @@
  */
 
 import { useModelStatus } from "@/components/model-status";
+import { Button } from "@/components/ui/button";
 
 /** Unknown status (loading, or a failed read) is not "signed out": the
  *  server's turn gate stays the truth, so only a known sign-out shows. */
@@ -20,14 +21,9 @@ export function useModelSetup() {
 /** The pill itself. testid "setup-cta-keys". */
 export function SignInPill({ onOpen, inline = false }: { onOpen: () => void; inline?: boolean }) {
 	const button = (
-		<button
-			type="button"
-			data-testid="setup-cta-keys"
-			onClick={onOpen}
-			className="rounded-sm border border-border bg-card px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 hover:bg-accent cursor-pointer"
-		>
+		<Button type="button" variant="outline" size="compact" data-testid="setup-cta-keys" onClick={onOpen} className="cursor-pointer font-ui text-xs font-normal">
 			Sign in to Claude
-		</button>
+		</Button>
 	);
 	return inline ? button : <div className="pointer-events-auto mb-2 flex justify-center">{button}</div>;
 }

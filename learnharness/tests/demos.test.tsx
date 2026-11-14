@@ -505,7 +505,8 @@ describe("artifact chrome — scrollbar, invert toggles, downloads (release poli
 		assert.ok(captionAt < html.indexOf("visual-download"), "the controls ride the caption row");
 		// The invert affordance: the contrast-circle disc + the tooltip.
 		assert.ok(html.includes("size-3"), "the icon disc");
-		assert.ok(html.includes('title="Invert colors"'), "the tooltip names the toggle");
+		assert.ok(html.includes('role="switch"') && html.includes('aria-label="Invert figure brightness"'), "the invert switch");
+		assert.ok(!html.includes("title="), "the tooltips are the app's Hint, never the browser's title");
 		// The half-moon is ACTUALLY filled (owner catch: lucide's Contrast
 		// renders it hollow — fill="none" default; ours fills currentColor).
 		assert.ok(

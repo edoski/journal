@@ -42,6 +42,7 @@ import { MermaidError } from "@/components/mermaid-error";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { chartSize, useSessionMermaid } from "@/components/session-overlay";
 import { Hint } from "@/components/ui/hint";
+import { Button } from "@/components/ui/button";
 
 // ─── The one affordance: the hover-reveal corner copy ────────────────────────
 
@@ -97,11 +98,12 @@ export function CopyCorner({
 	useEffect(() => () => window.clearTimeout(timerRef.current), []);
 	return (
 		<span className={cn("relative inline-flex", className)}>
-			<button
-				type="button"
+			<Button
+				variant="quiet"
+				size="icon-inline"
 				aria-label={label}
 				data-testid="md-copy"
-				className="flex size-6 items-center justify-center rounded-md text-muted-foreground/70 opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/md:opacity-100"
+				className="text-muted-foreground/70 opacity-0 transition-opacity hover:bg-accent focus-visible:opacity-100 group-hover/md:opacity-100"
 				onClick={(e) => {
 					blurAfterPointerClick(e);
 					void copyText(getText()).then((ok) => {
@@ -113,7 +115,7 @@ export function CopyCorner({
 				}}
 			>
 				{copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
-			</button>
+			</Button>
 		</span>
 	);
 }
@@ -207,18 +209,19 @@ function MermaidInline({ chart }: { chart: string }) {
 					label="Open full-screen"
 					side="bottom"
 				>
-<button
-						type="button"
+					<Button
+						variant="quiet"
+						size="icon-inline"
 						aria-label="Expand diagram"
 						data-testid="md-mermaid-expand"
-												className="flex size-6 items-center justify-center rounded-md text-muted-foreground/70 opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/md:opacity-100"
+						className="text-muted-foreground/70 opacity-0 transition-opacity hover:bg-accent group-hover/md:opacity-100"
 						onClick={(e) => {
 							blurAfterPointerClick(e);
 							overlay.openMermaid(chart);
 						}}
 					>
 						<MaximizeIcon className="size-3.5" />
-					</button>
+					</Button>
 				</Hint>
 				)}
 			</div>

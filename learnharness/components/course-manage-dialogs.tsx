@@ -12,6 +12,9 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { CourseMapStatus } from "@/components/course-map-status";
+import { MaterialField } from "@/components/new-course-fields";
+import { addMaterialForm, type MaterialPick } from "@/components/new-course-facts";
 import { courseLabel, type CourseSummary } from "@/src/core";
 
 type Course = Pick<CourseSummary, "workspace" | "title">;
@@ -128,5 +131,60 @@ export function DeleteCourseDialog({ course, onClose, onDeleted, fetchLike = fet
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
+	);
+}
+
+/** Add material: New course's material field for a course that exists. The
+ *  server copies the files into the course and extends its topic map from
+ *  them in the background, which the dialog then follows until Done. */
+export function AddMaterialDialog({ course, onClose, fetchLike = fetch }: { course: Course; onClose: () => void; fetchLike?: typeof fetch }) {
+	const [picks, setPicks] = useState<MaterialPick[]>([]);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [added, setAdded] = useState(false);
+	const submit = async (e: FormEvent) => {
+		e.preventDefault();
+		if (picks.length === 0 || busy) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const res = await fetchLike("/api/courses/material", { method: "POST", body: addMaterialForm({ workspace: course.workspace, picks }) });
+			if (res.ok) return setAdded(true);
+			const answer = (await res.json().catch(() => ({}))) as { error?: string };
+			setError(answer.error ?? "The material could not be added. Try again.");
+		} catch {
+			setError(UNREACHABLE);
+		}
+		setBusy(false);
+	};
+	return (
+		<Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+			<DialogContent aria-describedby={undefined} data-testid="add-material-dialog" className="max-w-md">
+				{added ? (
+					<CourseMapStatus course={course} title={`Material added to ${courseLabel(course)}`} onClose={onClose} fetchLike={fetchLike} />
+				) : (
+					<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
+						<DialogHeader>
+							<DialogTitle>Add material to {courseLabel(course)}</DialogTitle>
+						</DialogHeader>
+						<div className="flex flex-col gap-2 text-row font-medium text-foreground">
+							<span className="text-label font-normal text-muted-foreground">
+								Slides, notes or past papers. They are copied into the course, and its topic map grows to cover them.
+							</span>
+							<MaterialField picks={picks} onChange={setPicks} disabled={busy} />
+						</div>
+						{error && <p role="alert" className="text-row text-danger">{error}</p>}
+						<DialogFooter className="pt-2">
+							<Button type="button" variant="quiet" onClick={onClose} disabled={busy}>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={picks.length === 0 || busy} data-testid="add-material-add">
+								{busy ? "Adding…" : "Add"}
+							</Button>
+						</DialogFooter>
+					</form>
+				)}
+			</DialogContent>
+		</Dialog>
 	);
 }

@@ -1,7 +1,7 @@
 /**
- * What the New course form holds and how it reads, kept pure for tests:
- * the exam day as the engine writes it, and the material picked so far,
- * one pick per press of Add files or Add a folder.
+ * What the New course and Add material forms hold and how they read, kept
+ * pure for tests: the exam day as the engine writes it, and the material
+ * picked so far, one pick per press of Add files or Add a folder.
  */
 
 /** One press of Add files or Add a folder. A folder's files carry their
@@ -44,12 +44,24 @@ export function pickWords(pick: MaterialPick): string {
 	return pick.files.length > 2 ? `${first}, ${second} and more` : `${first} and ${second}`;
 }
 
+/** Every picked file as a `material` entry, under the name it is sent as. */
+function appendMaterial(form: FormData, picks: readonly MaterialPick[]): FormData {
+	for (const pick of picks) for (const file of pick.files) form.append("material", file, sentName(file));
+	return form;
+}
+
 /** The form as the server reads it (app/api/courses, POST). */
 export function newCourseForm({ title, exam, root, picks }: { title: string; exam: string | null; root: string; picks: readonly MaterialPick[] }): FormData {
 	const form = new FormData();
 	form.set("title", title.trim());
 	if (exam) form.set("exam", exam);
 	if (root) form.set("root", root);
-	for (const pick of picks) for (const file of pick.files) form.append("material", file, sentName(file));
-	return form;
+	return appendMaterial(form, picks);
+}
+
+/** Add material's form as the server reads it (app/api/courses/material, POST). */
+export function addMaterialForm({ workspace, picks }: { workspace: string; picks: readonly MaterialPick[] }): FormData {
+	const form = new FormData();
+	form.set("workspace", workspace);
+	return appendMaterial(form, picks);
 }

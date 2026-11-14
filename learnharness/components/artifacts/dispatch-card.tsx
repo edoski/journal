@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useContext } from "react";
 import { CircleSlashIcon, SettingsIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
@@ -77,14 +78,9 @@ function DispatchRefusedCard({ label, line, button }: { label: string; line: str
 			<span className="font-medium uppercase tracking-wide">{label}</span>
 			<span>{line}</span>
 			{ctx && (
-				<button
-					type="button"
-					data-testid="dispatch-setup-link"
-					onClick={ctx.openSetup}
-					className="ml-1 rounded-sm border border-border bg-card px-2 py-0.5 font-ui normal-case tracking-normal text-foreground transition-colors hover:border-muted-foreground/50"
-				>
+				<Button variant="outline" size="xs" data-testid="dispatch-setup-link" onClick={ctx.openSetup} className="ml-1 h-auto px-2 py-0.5 font-ui font-normal normal-case tracking-normal text-foreground">
 					{button}
-				</button>
+				</Button>
 			)}
 		</div>
 	);

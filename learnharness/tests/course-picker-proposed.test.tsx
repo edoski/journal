@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { CoursePicker, NewCourseBody } from "../components/course-picker.tsx";
-import { DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
+import { AddMaterialDialog, DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
 import { pickWords } from "../components/new-course-facts.ts";
 import { CourseMapStatus } from "../components/course-map-status.tsx";
 import { kbdEventForAction } from "../src/core/keyboard.ts";
@@ -193,7 +193,7 @@ describe("New course", () => {
 		const { fetchLike } = recorder(() => Response.json({ state: "failed", reason: "it was stopped before it finished" }));
 		await mount(
 			<Dialog open>
-				<CourseMapStatus course={{ workspace: "/vault/courses/group-theory", title: "Group Theory", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null }} fetchLike={fetchLike} onClose={() => {}} />
+				<CourseMapStatus course={{ workspace: "/vault/courses/group-theory", title: "Group Theory" }} fetchLike={fetchLike} onClose={() => {}} />
 			</Dialog>,
 		);
 		await act(async () => {});
@@ -283,6 +283,41 @@ describe("course menu: rename and delete", () => {
 		await mount(<DeleteCourseDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={fetchLike} onClose={() => {}} onDeleted={() => assert.fail("not deleted")} />);
 		await press(element('[data-testid="delete-course-confirm"]'), "click");
 		assert.equal(element('[data-testid="delete-course-dialog"] [role="alert"]').textContent, "That course is no longer in your list.");
+	});
+});
+
+describe("Add material", () => {
+	it("sends the course and every picked file under its folder path, then follows the map growing", async () => {
+		const urls: unknown[] = [];
+		const { sent, fetchLike } = recorder((init) => (init.method === "POST" ? Response.json({ ok: true, added: ["material/Week 2.md"] }) : Response.json({ state: "building" })));
+		const spy = (async (url: unknown, init?: RequestInit) => {
+			urls.push(url);
+			return fetchLike(url as string, init);
+		}) as typeof fetch;
+		await mount(<AddMaterialDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={spy} onClose={() => {}} />);
+		assert.match(element('[data-testid="add-material-dialog"]').textContent ?? "", /Add material to SMM/);
+		assert.equal((element('[data-testid="add-material-add"]') as HTMLButtonElement).disabled, true, "nothing to add before a pick");
+		const week = new File(["w"], "Week 2.md");
+		Object.defineProperty(week, "webkitRelativePath", { value: "Lectures/Week 2.md" });
+		await pickFiles(element('[data-testid="new-course-folder-input"]') as HTMLInputElement, [week]);
+		await act(async () => { element('[data-testid="add-material-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
+		const posts = sent.filter((init) => init.method === "POST");
+		assert.equal(posts.length, 1);
+		assert.equal(urls[0], "/api/courses/material");
+		const form = posts[0]!.body as FormData;
+		assert.equal(form.get("workspace"), "/study/smm");
+		assert.deepEqual(form.getAll("material").map((f) => (f as File).name), ["Lectures/Week 2.md"]);
+		await act(async () => {});
+		assert.match(element('[data-testid="course-map-status"]').textContent ?? "", /Material added to SMM.*topic map is being built from your material/);
+	});
+
+	it("shows the server's plain sentence when the material cannot be added, and keeps the picks", async () => {
+		const { fetchLike } = recorder(() => Response.json({ error: "That course is no longer in your list." }, { status: 404 }));
+		await mount(<AddMaterialDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={fetchLike} onClose={() => {}} />);
+		await pickFiles(element('[data-testid="new-course-files-input"]') as HTMLInputElement, [new File(["s"], "Slides.pdf")]);
+		await act(async () => { element('[data-testid="add-material-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
+		assert.equal(element('[data-testid="add-material-dialog"] [role="alert"]').textContent, "That course is no longer in your list.");
+		assert.deepEqual([...document.querySelectorAll('[data-testid="new-course-material-pick"]')].map((r) => r.textContent), ["Slides.pdf"]);
 	});
 });
 
