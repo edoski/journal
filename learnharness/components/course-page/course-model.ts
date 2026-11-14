@@ -111,7 +111,9 @@ function shelfFact(status: UnitStatus, current: boolean): TopicFact | null {
  *   - Needs you: the topics Home's Today takes up (the sidebar's top,
  *     `todayTop` over every course), in Today's order, with Today's reason;
  *   - Learning: the sidebar's Working and Learning shelves, in their order;
- *   - Not started: the rest of the path, in the engine's order;
+ *   - Not started: the rest of the path, in the order the plan starts
+ *     them (`starts`), those it has no day for last, in the engine's path
+ *     order;
  *   - On your own: the sidebar's On your own shelf, in its order.
  * Each shelf row ends in the sidebar row's fact (`shelfStatus`). `chats`
  * are every session (with those started on a topic's page linked to it);
@@ -143,9 +145,11 @@ export function courseGroups(course: StudyCourse, chats: readonly ChatListItem[]
 		return { ...base, group: "not-started", fact: current ? { kind: "here", words: CURRENT_TAG } : null };
 	});
 	const at = (key: string) => order.indexOf(key);
+	const NEVER = "9999-12-31";
+	const byStart = (a: CourseTopic, b: CourseTopic) => (a.topic.starts ?? NEVER).localeCompare(b.topic.starts ?? NEVER);
 	return GROUP_IDS.map((id) => {
 		const mine = rows.filter((row) => row.group === id);
-		const sorted = id === "not-started" ? mine : mine.sort((a, b) => at(a.key) - at(b.key));
+		const sorted = id === "not-started" ? mine.sort(byStart) : mine.sort((a, b) => at(a.key) - at(b.key));
 		return { id, title: GROUP_WORDS[id], topics: sorted.map(({ key: _, ...row }) => row) };
 	});
 }

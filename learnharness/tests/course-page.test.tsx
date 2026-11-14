@@ -206,8 +206,14 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		assert.equal(sidebar(course(), [waiting]).get(`${WS}#determinant`), "Today: Your turn");
 	});
 
-	it("lists what is not started in the engine's path order", () => {
-		assert.deepEqual(handles(groupOf(groups, "not-started")), ["invertible", "eigen"]);
+	it("lists what is not started in the order the plan starts it, those it has no day for last in path order", () => {
+		assert.deepEqual(handles(groupOf(groups, "not-started")), ["invertible", "eigen"], "no planned day: the engine's path order");
+		const planned = course({
+			topics: [...TOPICS, topic("diag", { title: "Diagonalization" }), topic("change", { title: "Change of basis" })].map((t) =>
+				t.handle === "eigen" ? { ...t, starts: "2026-11-10" } : t.handle === "change" ? { ...t, starts: "2026-11-12" } : t,
+			),
+		});
+		assert.deepEqual(handles(groupOf(courseGroups(planned), "not-started")), ["eigen", "change", "invertible", "diag"]);
 	});
 
 	it("links each topic to its page", () => {
