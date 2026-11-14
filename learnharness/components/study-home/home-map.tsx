@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRightIcon, Maximize2Icon, Minimize2Icon } from "lucide-react";
-import type { StudyCourse, TopicHandle } from "@/src/core";
+import type { ChatListItem, StudyCourse, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { MathText, mathPlain } from "@/components/ui/math-text";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mapFade } from "@/components/study-home/map-frame";
 import { courseHref } from "@/components/unit-inbox/unit-href";
+import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
 
 /** How far the fade reaches in from the sides and from the top and bottom. */
@@ -32,6 +33,7 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  */
 export function HomeMap({
 	courses,
+	chats,
 	workspace,
 	onSelect,
 	highlight = null,
@@ -39,6 +41,8 @@ export function HomeMap({
 	onEnlarge,
 }: {
 	courses: readonly StudyCourse[];
+	/** Every session, for what the sidebar says on each card (`sidebarSays`). */
+	chats: readonly ChatListItem[];
 	/** The course whose map shows. */
 	workspace: string;
 	onSelect: (workspace: string) => void;
@@ -47,6 +51,7 @@ export function HomeMap({
 	enlarged: boolean;
 	onEnlarge: (enlarged: boolean) => void;
 }) {
+	const said = useMemo(() => new Map(courses.map((c) => [c.map.workspace, sidebarSays(courses, chats, c.map.workspace)])), [courses, chats]);
 	const chosen = courses.some((c) => c.map.workspace === workspace) ? workspace : courses[0]!.map.workspace;
 	const chosenTitle = mathPlain(courses.find((c) => c.map.workspace === chosen)!.map.title);
 	// The enlarged map's zoom out: the whole course, until he zooms back in or leaves the enlarged map.
@@ -114,6 +119,7 @@ export function HomeMap({
 						>
 							<CourseDrawing
 								course={course}
+								said={said.get(course.map.workspace)!}
 								highlight={shown ? highlight : null}
 								whole={shown && zoomedOut}
 								onOpensWhole={(fits) =>
@@ -172,11 +178,13 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 /** One course's map, drawn once and kept. */
 function CourseDrawing({
 	course,
+	said,
 	highlight,
 	whole,
 	onOpensWhole,
 }: {
 	course: StudyCourse;
+	said: ReadonlyMap<TopicHandle, Said>;
 	highlight: ReadonlySet<TopicHandle> | null;
 	whole: boolean;
 	onOpensWhole: (fits: boolean) => void;
@@ -184,5 +192,5 @@ function CourseDrawing({
 	const { map } = course;
 	if (map.topics.length === 0) return <p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>;
 	// As much room as the fade, so a topic at the edge scrolls clear of it.
-	return <TopicMap map={map} margin={FADE} highlight={highlight} whole={whole} onOpensWhole={onOpensWhole} />;
+	return <TopicMap map={map} said={said} margin={FADE} highlight={highlight} whole={whole} onOpensWhole={onOpensWhole} />;
 }

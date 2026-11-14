@@ -21,7 +21,7 @@ The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directl
 
 ## The groups
 
-`courseGroups(course, chats, courses)` sorts every topic once, always into the same four groups in this order, an empty one included. It reads the sidebar's own model (`../unit-inbox/now-inbox.ts`, `../unit-inbox/today/today-top.ts`), so a topic sits in the group the sidebar puts it in and ends in the words the sidebar says for it (Edo's brief, 14 Nov 2026: one fact per topic across surfaces; round 4 found Kernel under Learning in the sidebar and Needs you here, and Basis and dimension "Left off 2d ago" there and "Due since 29 Oct" here).
+`courseGroups(course, chats, courses)` sorts every topic once, always into the same four groups in this order, an empty one included. It reads what the sidebar says for each topic (`sidebarSays`, `../unit-inbox/sidebar-says.ts`, over `../unit-inbox/now-inbox.ts` and `../unit-inbox/today/today-top.ts`), the same source the map's cards read, so a topic sits in the group the sidebar puts it in and ends in the words the sidebar says for it (Edo's brief, 14 Nov 2026: one fact per topic across surfaces; round 4 found Kernel under Learning in the sidebar and Needs you here, and Basis and dimension "Left off 2d ago" there and "Due since 29 Oct" here).
 
 | Group | Holds | Order | Row's fact |
 |---|---|---|---|

@@ -83,6 +83,7 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 							key={map.workspace}
 							ref={drawing}
 							map={map}
+							said={view.said}
 							layout={layout}
 							lit={lit}
 							aim={aim}

@@ -3,11 +3,12 @@
 import { createContext, useContext, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { BookmarkIcon, CircleXIcon, HistoryIcon, type LucideIcon } from "lucide-react";
 import type { CourseMapTopic, TopicHandle } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { TopicGlyph } from "./topic-glyph";
-import { CURRENT_TAG, type Standing, type Status } from "./topic-standing";
+import { CURRENT_TAG, type CardFact, type Standing } from "./topic-standing";
+import { BrailleSpinner } from "@/components/braille-spinner";
+import { FACT_ICON } from "@/components/unit-inbox/fact-icon";
 import { MathText } from "@/components/ui/math-text";
 import { MathLine } from "@/components/ui/math-line";
 
@@ -18,8 +19,8 @@ export type TopicFlowNode = Node<
 		topic: CourseMapTopic;
 		current: boolean;
 		standing: Standing;
-		/** What the card says under its title in place of the standing. */
-		status: Status | null;
+		/** What the card says under its title in place of the standing (`cardLine`). */
+		line: CardFact | null;
 		/** The topic's name for a screen reader, and its prerequisites by name. */
 		label: string;
 		needs: string | null;
@@ -44,18 +45,17 @@ export interface TopicMapState {
 
 export const TopicMapContext = createContext<TopicMapState | null>(null);
 
-/** One icon per kind of need, the ones Today's rows and the sidebar use. */
-const NEED_ICON: Record<Status["kind"], LucideIcon> = { slip: CircleXIcon, review: HistoryIcon, task: BookmarkIcon };
-
-/** A status as Home's rows draw a reason: a 12px icon, then its words,
- *  on a caption line whose middle is the words' cap height. */
-function StatusMark({ status }: { status: Status }) {
-	const Icon = NEED_ICON[status.kind];
+/** A card's line as Home's rows draw a reason: a 12px icon (the
+ *  sidebar's and the course page's, a spinner while the tutor writes),
+ *  then its words, on a caption line whose middle is the words' cap
+ *  height. */
+function LineMark({ line }: { line: CardFact }) {
+	const Icon = line.kind === "working" ? null : FACT_ICON[line.kind];
 	return (
-		<span data-slot="topic-need" data-kind={status.kind} className="flex h-3.5 min-w-0 items-center gap-1 text-caption text-muted-foreground">
-			<Icon aria-hidden="true" className="size-3 shrink-0" />
+		<span data-slot="topic-need" data-kind={line.kind} className="flex h-3.5 min-w-0 items-center gap-1 text-caption text-muted-foreground">
+			{Icon ? <Icon aria-hidden="true" className="size-3 shrink-0" /> : <BrailleSpinner />}
 			<span className="truncate">
-				<MathText>{status.words}</MathText>
+				<MathText>{line.words}</MathText>
 			</span>
 		</span>
 	);
@@ -65,17 +65,17 @@ function StatusMark({ status }: { status: Status }) {
  * What a node holds (spec: topic-map.md, Node): Home's pie centred beside
  * two lines, as a hybrid row centres its pie beside its course and lesson.
  * The title on one 18px line, so a formula in it never makes the line
- * taller; under it, on its left edge, the status, or else where he stands
- * in words.
+ * taller; under it, on its left edge, its line (`cardLine`), or else where
+ * he stands in words.
  */
-export function NodeBody({ topic, standing, status }: { topic: CourseMapTopic; standing: Standing; status: Status | null }) {
+export function NodeBody({ topic, standing, line }: { topic: CourseMapTopic; standing: Standing; line: CardFact | null }) {
 	return (
 		<span className="flex w-full min-w-0 items-center gap-4">
 			<TopicGlyph standing={standing} />
 			<span className="flex min-w-0 flex-1 flex-col gap-1">
 				<MathLine className={cn("h-4.5 text-row font-medium", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{topic.title}</MathLine>
-				{status ? (
-					<StatusMark status={status} />
+				{line ? (
+					<LineMark line={line} />
 				) : (
 					<span data-slot="topic-standing" className="block h-3.5 truncate text-caption text-muted-foreground">
 						{standing.words}
@@ -92,7 +92,7 @@ export function NodeBody({ topic, standing, status }: { topic: CourseMapTopic; s
  */
 export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 	const state = useContext(TopicMapContext);
-	const { topic, current, standing, status, label, needs, href } = data;
+	const { topic, current, standing, line, label, needs, href } = data;
 	const dim = state?.lit ? !state.lit.has(topic.handle) : false;
 	const marked = state?.marked === topic.handle;
 	return (
@@ -134,7 +134,7 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 					marked && "lh-card-mark",
 				)}
 			>
-				<NodeBody topic={topic} standing={standing} status={status} />
+				<NodeBody topic={topic} standing={standing} line={line} />
 			</Link>
 			<Handle type="target" position={Position.Top} isConnectable={false} className="invisible" />
 			<Handle type="source" position={Position.Bottom} isConnectable={false} className="invisible" />

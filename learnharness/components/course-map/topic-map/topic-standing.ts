@@ -1,7 +1,7 @@
-import type { CourseMapTask, CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
+import type { CourseMapTopic, TopicLevel } from "@/src/core";
 import { mathPlain } from "@/components/ui/math-text";
-import { overdueWords, slipMark, standingWords, type Fill, type SlipKey } from "@/components/study-words";
-import { taskWords } from "@/components/unit-inbox/units";
+import { standingWords, type Fill } from "@/components/study-words";
+import type { Said, TopicFact } from "@/components/unit-inbox/sidebar-says";
 
 /** Where the learner stands on a topic, as the map draws and says it. */
 export interface Standing {
@@ -31,65 +31,28 @@ export function standingOf(topic: CourseMapTopic): Standing {
 	return { fill, slipping: topic.weak, words: standingWords(fill, topic) };
 }
 
-/** Why a topic needs the learner now. */
-export interface Need {
-	/** `slip`: the engine calls it weak. `review`: a topic he can do on his
-	 *  own whose review has come due. */
-	kind: "slip" | "review";
-	/** The reason in the app's words (study-words.ts). */
-	words: string;
-	/** A slip's own kind, which picks its icon (`slip-icons.ts`). */
-	slip?: SlipKey;
-}
+/** What a card can say under its title in place of where he stands: a
+ *  fact that needs him. When a review comes back, when he last studied it
+ *  and where he is never take the line. */
+export type CardFact = Exclude<TopicFact, { kind: "back" | "studied" | "here" }>;
 
 /**
- * The one thing a node says under its title, or null when the topic does
- * not need him: why it is weak, else that its review is due and how
- * overdue. A topic still being learned says nothing about its review,
- * since nearly every one is due (the sidebar's rule, units.ts). Engine
- * fields only. Pure.
+ * The one line a card says under its title (spec: topic-map.md, Node):
+ * the sidebar's fact for the topic (`sidebarSays`) when it needs him,
+ * else null, and the card says where he stands. One source, so a card
+ * says what the sidebar's row and the course page's row say, a session
+ * that waits on him included. Pure.
  */
-export function needOf(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): Need | null {
-	if (topic.weak) return slipNeed(topic, titleOf);
-	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
-	return null;
-}
-
-/** The one thing a candidate node says about a topic beyond its standing,
- *  in the order Home's rows give their reasons (row-facts.ts `whyOf`): a
- *  slip, a review come due, an open task that holds it. */
-export interface Status {
-	kind: "slip" | "review" | "task";
-	words: string;
-	/** A slip's own kind, which picks its icon (`slip-icons.ts`). */
-	slip?: SlipKey;
-}
-
-/** A weak topic's slip as a need: its words and its kind. */
-function slipNeed(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): { kind: "slip"; words: string; slip: SlipKey } {
-	const { key, words } = slipMark(topic.signals, titleOf);
-	return { kind: "slip", words, slip: key };
-}
-
-/**
- * What a candidate node says about a topic beyond its standing, or null:
- * why it is weak, else that its review is due (only for a topic he can do
- * on his own, the sidebar's rule), else where an open task holding it was
- * left ("Left off 3d ago"). Engine fields only. Pure.
- */
-export function statusOf(topic: CourseMapTopic, tasks: readonly CourseMapTask[], titleOf: (handle: TopicHandle) => string, today: string): Status | null {
-	if (topic.weak) return slipNeed(topic, titleOf);
-	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
-	if (topic.tasks.length === 0) return null;
-	const task = tasks.find((t) => topic.tasks.includes(t.key));
-	return { kind: "task", words: taskWords(task ?? { updated: null }, today) };
+export function cardLine(said: Said | undefined): CardFact | null {
+	const fact = said?.fact ?? null;
+	return fact && fact.kind !== "back" && fact.kind !== "studied" && fact.kind !== "here" ? fact : null;
 }
 
 /** The current topic's tag on the map. */
 export const CURRENT_TAG = "You are here";
 
 /** A node's name for a screen reader: its title, that it is the current
- *  topic, where he stands, and why it needs him. Pure. */
-export function topicLabel(topic: CourseMapTopic, current: boolean, titleOf: (handle: TopicHandle) => string): string {
-	return mathPlain([topic.title, current ? CURRENT_TAG : null, standingOf(topic).words, needOf(topic, titleOf)?.words ?? null].filter(Boolean).join(", "));
+ *  topic, where he stands, and its card's line (`cardLine`). Pure. */
+export function topicLabel(topic: CourseMapTopic, current: boolean, line: CardFact | null): string {
+	return mathPlain([topic.title, current ? CURRENT_TAG : null, standingOf(topic).words, line?.words ?? null].filter(Boolean).join(", "));
 }

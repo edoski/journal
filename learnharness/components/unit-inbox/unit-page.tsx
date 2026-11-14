@@ -6,9 +6,9 @@ import { useServerEvent } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
 import { TopicNotice, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 
-type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
+type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; courses: StudyCourse[]; chats: ChatListItem[] };
 
-/** The topic's course and every session, read again when a turn settles,
+/** The topic's course, every course and every session, read again when a turn settles,
  *  the list changes, the course record changes or the day turns over. A
  *  failed read keeps the last one. */
 function useUnitRead(workspace: string): Read {
@@ -27,7 +27,7 @@ function useUnitRead(workspace: string): Read {
 			.then(([study, { chats }]) => {
 				if (!live) return;
 				const course = study.available ? study.courses.find((c) => c.map.workspace === workspace) : undefined;
-				setRead(course ? { status: "ready", course, chats } : { status: "missing" });
+				setRead(course ? { status: "ready", course, courses: study.available ? study.courses : [course], chats } : { status: "missing" });
 			})
 			.catch(() => live && setRead((prev) => (prev.status === "ready" ? prev : { status: "missing" })));
 		return () => {
@@ -50,7 +50,7 @@ export function UnitPage({ workspace, handle }: { workspace: string; handle: str
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<div aria-hidden className="h-13 shrink-0" />
 			{read.status === "ready" && topic ? (
-				<TopicPage course={read.course} topic={topic} chats={read.chats} />
+				<TopicPage course={read.course} courses={read.courses} topic={topic} chats={read.chats} />
 			) : (
 				<TopicNotice>{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}</TopicNotice>
 			)}
