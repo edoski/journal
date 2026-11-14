@@ -194,6 +194,24 @@ def test_a_mistake_answered_right_since_is_repaired_until_a_later_check() -> Non
     assert (standing["lapsed"], standing["repaired"]) == (True, True)
 
 
+def test_a_partial_answer_after_the_repair_leaves_it_repaired() -> None:
+    gap = {"gap": "Takes lambda off one diagonal entry only"}
+    slip = attempt("rank", "incorrect", sure="confident")
+    fixed = attempt("rank", help="Showed the setup again", sure="confident")
+    recall = attempt("rank", "partial", help="none")
+    standing = progress.standing(course([slip, fixed, recall], **gap), "rank")
+    assert standing["repaired"] is True
+    assert "repaired" not in progress.standing(
+        course([fixed, attempt("rank", "partial")], **gap), "rank"
+    )
+    assert "repaired" not in progress.standing(
+        course([slip, fixed, attempt("rank", "incorrect")], **gap), "rank"
+    )
+    assert progress.standing(
+        course([attempt("rank", "partial"), fixed], **gap), "rank"
+    )["repaired"]
+
+
 @pytest.mark.parametrize(
     ("verdict", "streak", "expected"),
     [

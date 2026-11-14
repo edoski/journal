@@ -383,13 +383,26 @@ _MISTAKES = ("lapsed", "choice_errors", "confident_errors")
 def _repaired(
     topic: dict[str, Any], attempts: list[Attempt], standing: dict[str, Any]
 ) -> bool:
-    """A mistake answered right since: the newest attempt is correct and the
-    gap, if any, was not diagnosed after it. It stays weak until a later
-    day's unaided answer settles it."""
-    if not attempts or attempts[-1][1]["result"] != "correct":
+    """A mistake answered right since: a correct answer after the newest
+    incorrect one, else after the newest partial one, with the gap, if any,
+    not diagnosed on a later day than that answer. A partial answer after the
+    repair leaves it standing: its gap is what is left to check. It stays
+    weak until a later day's unaided answer settles it."""
+    results = [item["result"] for _, item in attempts]
+    wrong = next(
+        (
+            at
+            for result in ("incorrect", "partial")
+            for at in reversed(range(len(results)))
+            if results[at] == result
+        ),
+        -1,
+    )
+    fixes = [item for _, item in attempts[wrong + 1 :] if item["result"] == "correct"]
+    if not fixes:
         return False
     if "gap" in topic:
-        return str(topic.get("judged", "")) <= str(attempts[-1][1]["date"])
+        return str(topic.get("judged", "")) <= str(fixes[0]["date"])
     return any(flag in standing for flag in _MISTAKES)
 
 
