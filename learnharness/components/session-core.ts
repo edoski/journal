@@ -882,11 +882,12 @@ export class SessionModel {
 	 * — no turn, no stream, nothing wakes. The session pauses at the
 	 * user's choice; the next plain send is the wake. On failure the
 	 * durable record wins: the error surfaces, the record-changed sync
-	 * (or any later refetch) replaces the optimistic append with truth. */
-	async dismissQuestion(toolCallId: string, answer: QuestionAnswerData, questionKey?: string): Promise<void> {
-		if (!this.readyRef) return;
+	 * (or any later refetch) replaces the optimistic append with truth.
+	 * Resolves whether the record took it, so a message may follow it. */
+	async dismissQuestion(toolCallId: string, answer: QuestionAnswerData, questionKey?: string): Promise<boolean> {
+		if (!this.readyRef) return false;
 		const subject = pendingQuestionOf([...this.base, ...this.tail]);
-		if (questionKey !== undefined && (subject?.key !== questionKey || subject.toolCallId !== toolCallId)) return;
+		if (questionKey !== undefined && (subject?.key !== questionKey || subject.toolCallId !== toolCallId)) return false;
 		const tool = pendingCallTool([...this.base, ...this.tail], toolCallId) ?? "explain";
 		this.mutate(() => {
 			this.tail = [...this.tail, { ...newAnswerResult(toolCallId, tool, answer), id: localId() }];
@@ -898,8 +899,10 @@ export class SessionModel {
 				body: JSON.stringify({ input: { type: "dismiss", toolCallId, answer } }),
 			});
 			if (!res.ok) throw new Error(`The dismissal failed (${res.status}).`);
+			return true;
 		} catch (err) {
 			this.setError((err as Error).message);
+			return false;
 		}
 	}
 
