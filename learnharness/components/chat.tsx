@@ -100,7 +100,7 @@ import { formDraftText, strandedDraft } from "@/components/lesson/stranded-draft
 import { LESSON_WORDS, PHASE_WORDS } from "@/components/study-words";
 import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
-import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
+import { focusIsLost, landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
 import { CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
@@ -109,6 +109,9 @@ import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/p
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
 import { DisputeBubble, PlanLine, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
+import { AnswerSlot, ProblemSlot, type AnswerSlotHandle } from "@/components/lesson/slot/answer-slot";
+import { SlotAnswered, SlotBubble, SlotConclude, SlotDispute, SlotPlanLine, SlotProblem, SlotQuestion, SlotRequest, SlotThinking } from "@/components/lesson/slot/slot-records";
+import { slotFocusHome, SLOT_WORDS } from "@/components/lesson/slot/slot-focus";
 
 /** The chat routes' answer for a deleted lesson: TurnError reads it as
  *  "This lesson was deleted." with Go to Home. */
@@ -262,6 +265,10 @@ export function Chat({
 	// answering and asking (prose-composer.tsx binds it).
 	const proseToggleRef = useRef<(() => void) | null>(null);
 	const column = reading ? READING_COLUMN : LESSON_COLUMN;
+	// Candidate B (lesson/slot/answer-slot.md): each question owns an answer
+	// line in the flow; the composer stays for talking to the tutor.
+	const slot = lesson === "slot";
+	const answerSlotRef = useRef<AnswerSlotHandle>(null);
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
 
@@ -281,7 +288,9 @@ export function Chat({
 	const followAction = useCallback(() => {
 		const context = scrollContextRef.current;
 		if (!context) return;
-		replyAnchorRef.current = sessionFindScopeRef.current?.querySelector<HTMLElement>(TRANSCRIPT_COLUMN)?.lastElementChild as HTMLElement | null ?? null;
+		// An open answer line is not part of what came before the reply.
+		const kids = Array.from(sessionFindScopeRef.current?.querySelector<HTMLElement>(TRANSCRIPT_COLUMN)?.children ?? []).filter((el) => !el.hasAttribute("data-follow-skip"));
+		replyAnchorRef.current = (kids.at(-1) as HTMLElement | undefined) ?? null;
 		void context.scrollToBottom();
 	}, []);
 	const followTargetScrollTop = useCallback((bottom: number, { scrollElement }: { scrollElement: HTMLElement }) =>
@@ -830,6 +839,7 @@ export function Chat({
 			...pick('[data-testid="reading-thinking-field"] textarea'),
 			...pick('[data-testid="question-dock"] textarea'),
 			...pick('[data-testid="practice-dock"] textarea'),
+			...pick('[data-slot="answer-slot"] textarea'),
 			...pick('[data-testid="composer"] textarea'),
 		];
 	}, []);
@@ -1458,6 +1468,33 @@ export function Chat({
 		submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output, pending.key, photos);
 	};
 
+	/* B's composer (answer-slot.md): while a question is open his words go
+	 * to the tutor through the answer line's ask, never as its answer; while
+	 * a problem is open they are a message about it; otherwise it sends or
+	 * steers as ever. */
+	const onSlotSend = () => {
+		if (compacting) return;
+		if (pending) {
+			const t = textRef.current.trim();
+			if (t && answerSlotRef.current?.ask(t)) applyText("");
+			return;
+		}
+		if (activeProblem) {
+			const t = textRef.current.trim();
+			if (!t) return;
+			if (busy) {
+				applyText("");
+				void steer(t);
+				return;
+			}
+			draftRef.current = t;
+			applyText("");
+			void send({ type: "text", text: t });
+			return;
+		}
+		doSteerOrSend();
+	};
+
 	/* A message the topic page handed this lesson (lesson-message.ts): taken
 	 * once on mount and sent as the composer sends it, a steer while the
 	 * tutor writes; a lesson that cannot take it now (a question waits)
@@ -1627,8 +1664,10 @@ export function Chat({
 											case "data-compaction-cut":
 												return <CompactionCutDivider key={pi} />;
 											case "data-practice-thinking":
+												if (slot) return <SlotThinking key={pi} data={part.data as PracticeThinkingData} />;
 												return prose ? <ThinkingBubble key={pi} data={part.data as PracticeThinkingData} /> : <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-request":
+												if (slot) return <SlotRequest key={pi} data={part.data as PracticeRequestDetails} />;
 												return prose ? <RequestBubble key={pi} data={part.data as PracticeRequestDetails} /> : <RequestCard key={pi} data={part.data as PracticeRequestDetails} />;
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16).
@@ -1636,6 +1675,7 @@ export function Chat({
 											case "data-done-tonight":
 												return <DoneTonightLine key={pi} />;
 											case "data-dispute":
+												if (slot) return <SlotDispute key={pi} data={part.data as DisputeDetails} />;
 												return prose ? <DisputeBubble key={pi} data={part.data as DisputeDetails} /> : <DisputeRow key={pi} data={part.data as DisputeDetails} />;
 											// data-compaction (the moment the summary ran) stays
 											// unmarked: the cut's hairline is enough.
@@ -1674,6 +1714,8 @@ export function Chat({
 									{m.role === "user" && prose ? (
 										// His words in the Prose lesson: a bubble on the right.
 										<LearnerBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} photos={m.parts.filter((p) => p.type === "photos").flatMap((p) => p.data as Photo[])} />
+									) : m.role === "user" && slot ? (
+										<SlotBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("\n")} photos={m.parts.flatMap((p) => (p.type === "photos" ? (p.data as Photo[]) : []))} markdown />
 									) : m.role === "user" ? (
 										// The learner's words: a quiet surface, full width (the
 										// transcript reads as a document), no label, set in the
@@ -1732,6 +1774,7 @@ export function Chat({
 													case "data-plan-block":
 														// The plan in the chat (wave 4): a frozen snapshot
 														// card — rendered as carried, never re-derived.
+														if (slot) return <SlotPlanLine key={pi} onOpen={() => setPlanOpen(true)} />;
 														return prose ? <PlanLine key={pi} onOpen={() => setPlanOpen(true)} /> : <PlanCard key={pi} data={part.data as PlanBlockData} onOpen={() => setPlanOpen(true)} />;
 													// quiz/probe: the removed multiple-choice tools — an old
 													// transcript's answered ones render as plain cards.
@@ -1766,9 +1809,16 @@ export function Chat({
 														// Pending/streaming questions live in the dock, not the
 														// transcript; answered ones render as records.
 														if (part.state === "output-available") {
+															if (slot) return <SlotAnswered key={pi} answerId={part.toolCallId ?? ""} answer={part.output as QuestionAnswerData} input={part.input} photos={part.photos as Photo[] | undefined} />;
 															return (
 																<AnsweredCard key={pi} answerId={part.toolCallId} answer={part.output as QuestionAnswerData} input={part.input} photos={part.photos as Photo[] | undefined} />
 															);
+														}
+														// B: the open question stays in the flow as the
+														// tutor asked it; its answer line follows the lesson.
+														if (slot && pending && part.toolCallId === pending.toolCallId && part.state === "input-available") {
+															const asked = part.input as { question?: unknown; details?: unknown } | undefined;
+															return typeof asked?.question === "string" ? <SlotQuestion key={pi} question={asked.question} details={typeof asked.details === "string" ? asked.details : undefined} /> : null;
 														}
 														return null;
 													}
@@ -1791,6 +1841,8 @@ export function Chat({
 														// Artifact extension point (contracts.ts): job
 														// parts and future artifacts render via the
 														// registry — add renderers there, not here.
+														if (slot && part.type === "tool-problem") return <SlotProblem key={pi} part={part as ArtifactPartProps["part"]} />;
+														if (slot && part.type === "tool-conclude") return <SlotConclude key={pi} part={part as ArtifactPartProps["part"]} />;
 														if (part.type.startsWith("tool-")) {
 															const Renderer = artifactRenderers[part.type.slice("tool-".length)];
 															if (Renderer) return <Renderer key={pi} part={part as ArtifactPartProps["part"]} />;
@@ -1837,6 +1889,36 @@ export function Chat({
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}
+							{/* B's answer line: one stable place at the end of the lesson,
+							    so what the tutor writes or draws arrives above it and never
+							    remounts it (answer-slot.md, "Streaming"). */}
+							{slot && course && !gone && !courseGone && pending ? (
+								<AnswerSlot
+									key={`q:${pending.key}`}
+									ref={answerSlotRef}
+									toolName={pending.tool}
+									toolCallId={pending.toolCallId}
+									input={pending.input}
+									onSubmit={submitPendingAnswer}
+									initialDraft={questionDraft(pending.key)?.form}
+									onSaveDraft={(form) => saveQuestionDraft(pending.key, { form })}
+									onDraftChange={(text) => recordDockDraft(`q:${pending.key}`, text)}
+									keepAs={`${chatId}:q:${pending.key}`}
+									carryAs={carryScope}
+									compactionRunning={compacting}
+								/>
+							) : slot && course && !gone && !courseGone && activeProblem ? (
+								<ProblemSlot
+									key={`p:${activeProblem.toolCallId}`}
+									problemCallId={activeProblem.toolCallId}
+									onSubmit={submitThinking}
+									onRequest={sendPracticeRequest}
+									compactionRunning={compacting}
+									busy={busy}
+									onDraftChange={(text) => recordDockDraft(`p:${activeProblem.toolCallId}`, text)}
+									keepAs={`${chatId}:p:${activeProblem.toolCallId}`}
+								/>
+							) : null}
 						</div>
 
 						{/* The dock's reserved tail (DockOverlay reports its height):
@@ -1853,15 +1935,16 @@ export function Chat({
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
 				{gone || courseGone ? null : !course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
-					// Prose has no dock: the composer itself answers.
-					pending={prose ? null : pending}
+					// Prose and Slot have no dock: the composer, or the answer line, answers.
+					focusHome={slot ? slotFocusHome : undefined}
+					pending={reading ? null : pending}
 					initialQuestionDraft={pending ? questionDraft(pending.key)?.form : undefined}
 					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
-					practice={prose ? null : activeProblem}
+					practice={reading ? null : activeProblem}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
 					onPracticeRequest={sendPracticeRequest}
-					requiresReveal={!prose && requiresReveal}
+					requiresReveal={!reading && requiresReveal}
 					readingThinking={readingThinkingRef.current}
 					readingThinkingRevision={readingThinkingSeed.revision}
 					onReadingThinking={applyReadingThinking}
@@ -1913,20 +1996,22 @@ export function Chat({
 							onRequest={sendPracticeRequest}
 							onDraftChange={recordDockDraft}
 						/>
-					) : reading ? (
+					) : slot ? (
+						// B: the composer stays for talking to the tutor while a
+						// question or problem is open; its words never answer it.
 						<LessonSessionComposer
 							busy={busy}
 							value={textRef.current}
 							revision={composerDraftRevision}
 							onChange={recordComposerText}
-							onSend={onSend}
+							onSend={onSlotSend}
 							onStop={() => setAbortAsk("turn")}
-							sendAllowed={sendAllowed}
+							sendAllowed={!compacting}
 							nextProblem={nextReady}
 							onNext={sendNext}
 							onEmptyEnter={tryAgain}
-							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
-							photos={composerPhotos}
+							placeholder={pending || activeProblem ? SLOT_WORDS.askAbout : nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
+							photos={pending || activeProblem ? undefined : composerPhotos}
 						/>
 					) : (
 						<ChatSessionComposer
@@ -2107,6 +2192,7 @@ export function shouldStampGeometryMute(nextH: number, prevH: number, pending: b
 }
 
 function DockOverlay({
+	focusHome,
 	column,
 	pending,
 	initialQuestionDraft,
@@ -2135,6 +2221,9 @@ function DockOverlay({
 	setupCta,
 	queuedSteers,
 }: {
+	/** Where his next key belongs when it is outside the dock (B's answer
+	 *  line, lesson/slot/slot-focus.ts); the dock's own home otherwise. */
+	focusHome?: () => HTMLElement | null;
 	/** The reading column the dock sits in (lesson-column.ts). */
 	column: string;
 	pending: ReturnType<typeof pendingQuestionOf>;
@@ -2385,7 +2474,10 @@ function DockOverlay({
 	// he types next, if nothing holds it.
 	useEffect(() => {
 		const block = blockRef.current;
-		if (block) landFocus(document, block, replyingToDock);
+		const home = focusHome?.();
+		if (home) {
+			if (focusIsLost(document)) home.focus({ preventScroll: true });
+		} else if (block) landFocus(document, block, replyingToDock);
 	}, [mode, expanded, busy, focusEpoch, replyingToDock]);
 
 	// An empty field's arrows and page keys read the lesson (focus-home.ts):
