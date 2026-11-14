@@ -134,13 +134,15 @@ it("the fullscreen button opens the same SVG image and inversion; download keeps
 	const originalSvg = FIGURE.replace(' xmlns="http://www.w3.org/2000/svg"', '').replace("θ &amp; φ", "θ&nbsp;&amp; φ");
 	const displaySvg = FIGURE.replace("θ &amp; φ", "θ&#160;&amp; φ");
 	const dom = parseHTML("<html><body></body></html>");
-	const names = ["window", "document", "Element", "HTMLElement", "IS_REACT_ACT_ENVIRONMENT"] as const;
+	const names = ["window", "document", "Element", "HTMLElement", "HTMLFormElement", "IS_REACT_ACT_ENVIRONMENT"] as const;
 	const originals = names.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
 	Object.assign(globalThis, {
 		window: dom.window,
 		document: dom.document,
 		Element: dom.window.Element,
 		HTMLElement: dom.window.HTMLElement,
+		// The invert switch is Radix's, which asks whether it sits in a form.
+		HTMLFormElement: dom.window.HTMLFormElement ?? class {},
 		IS_REACT_ACT_ENVIRONMENT: true,
 	});
 	const host = dom.document.createElement("div");

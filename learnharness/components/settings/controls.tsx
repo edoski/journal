@@ -92,8 +92,8 @@ export function SettingsRow({
 	);
 }
 
-/** The on/off switch. With a disc icon it is a plain button in the switch
- *  role: the figure cards render it outside the settings dialog. */
+/** The on/off switch, shadcn's Switch. With a disc icon the icon is the
+ *  switch's disc (the figure cards' invert switch). */
 export function Toggle({
 	checked,
 	disabled,
@@ -111,52 +111,21 @@ export function Toggle({
 	 *  toggle renders the half-filled contrast circle AS the disc — the icon
 	 *  carries the meaning; plain toggles keep the plain disc. */
 	discIcon?: ReactNode;
-	/** Optional tooltip on the switch (native on the disc-icon button). */
+	/** Optional tooltip on the switch. */
 	title?: string;
 }) {
 	const testid = `toggle-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-	if (!discIcon) {
-		const control = (
-			<Switch
-				checked={checked}
-				onCheckedChange={onChange}
-				aria-label={label}
-				disabled={disabled}
-				data-testid={testid}
-			/>
-		);
-		return title ? <Hint label={title}>{control}</Hint> : control;
-	}
-	return (
-		<button
-			type="button"
-			role="switch"
-			aria-checked={checked}
+	const control = (
+		<Switch
+			checked={checked}
+			onCheckedChange={onChange}
 			aria-label={label}
-			{...(title ? { title } : {})}
 			disabled={disabled}
 			data-testid={testid}
-			onClick={() => onChange(!checked)}
-			className={cn(
-				"relative h-4.5 w-8 shrink-0 rounded-full border border-border transition-colors",
-				// Owner (2026-09-20): on is a gray track with a WHITE disc (a full-white
-				// track was too loud); off stays the muted track.
-				checked ? "bg-muted-foreground" : "bg-muted",
-				disabled && "cursor-not-allowed",
-			)}
-		>
-			{/* The icon IS the disc: same size, same slide, same state colors —
-			    only the knob's face changes (the invert affordance). */}
-			<span
-				className={cn(
-					"absolute left-0 top-0.5 flex size-3 items-center justify-center rounded-full transition-transform",
-					checked ? "translate-x-4 text-foreground" : "translate-x-0.5 text-muted-foreground",
-				)}
-			>
-				{discIcon}
-			</span>
-		</button>
+			thumb={discIcon}
+		/>
 	);
+	return title ? <Hint label={title}>{control}</Hint> : control;
 }
 
 /** A thin hex/text input committing on blur + Enter (settings pace, not
