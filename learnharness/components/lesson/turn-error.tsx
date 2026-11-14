@@ -9,14 +9,17 @@ import { turnErrorText } from "./turn-error-text";
 const ACTION = "h-8 px-2 text-row";
 
 /** A failed reply under the Proposed design (spec: turn-error.md): one plain
- *  sentence in the danger colour, then Retry, Open Settings for a rejected
+ *  sentence in the danger colour, then Retry, Sign in for a signed-out
+ *  Claude, Open Settings for a rejected
  *  key, Home for a lesson deleted elsewhere, and Details for the provider's
  *  own text. */
-export function TurnError({ message, onRetry, onOpenSettings, children }: {
+export function TurnError({ message, onRetry, onOpenSettings, onSignIn, children }: {
 	message: string;
 	/** Present while the failed turn can be retried. */
 	onRetry?: () => void;
 	onOpenSettings: () => void;
+	/** Opens the sign-in dialog, for a turn refused because Claude is signed out. */
+	onSignIn?: () => void;
 	/** A provider-specific prompt shown beside the sentence (the Claude plan limit). */
 	children?: ReactNode;
 }) {
@@ -30,6 +33,11 @@ export function TurnError({ message, onRetry, onOpenSettings, children }: {
 			{onRetry && text.kind !== "gone" && (
 				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "font-medium text-foreground")}>
 					Retry
+				</Button>
+			)}
+			{text.kind === "signed-out" && onSignIn && (
+				<Button variant="quiet" size="sm" data-testid="turn-error-sign-in" onClick={onSignIn} className={cn(ACTION, "font-medium text-foreground")}>
+					Sign in
 				</Button>
 			)}
 			{text.kind === "key" && (

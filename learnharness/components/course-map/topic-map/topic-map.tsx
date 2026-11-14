@@ -36,8 +36,8 @@ function reducedMotion(): boolean {
  * over the layout's own geometry. Each node says where he stands and,
  * from `said` (`sidebarSays`), what the sidebar says for it when that
  * needs him, and opens the topic's page. The map opens on the
- * whole course when that fits, else framed on the current topic with its
- * neighbours whole (`framedCamera`), or at `zoom` with the whole course in
+ * whole course when that fits, else framed on the current topic with the
+ * topics it leads to whole (`framedCamera`), or at `zoom` with the whole course in
  * its middle, for a page that frames the map itself; `whole` shows the
  * whole course however small (the enlarged map's zoom out). It pans by
  * drag or scroll and zooms by pinch. Hover or focus lights a topic's
@@ -187,15 +187,22 @@ function Flow({
 	const [active, setActive] = useState<TopicHandle | null>(null);
 	const [tabStop, setTabStop] = useState<TopicHandle | null>(map.current ?? map.topics[0]?.handle ?? null);
 	const links = useRef(new Map<TopicHandle, HTMLAnchorElement>());
-	// A hovered or focused topic's chain, else the page's highlight.
-	const lit = useMemo(() => (active ? chainOf(active, map.edges) : highlight), [active, map.edges, highlight]);
+	// A hovered or focused topic's chain; else the page's highlight, with "You are here" and the topics it leads to
+	// (Edo, 14 Nov 2026: they stay whole and readable; only topics further away recede).
+	const lit = useMemo(() => {
+		if (active) return chainOf(active, map.edges);
+		if (!highlight) return null;
+		const here = map.current;
+		const next = here ? map.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === here ? [e.topic] : [])) : [];
+		return new Set([...highlight, ...(here ? [here] : []), ...next]);
+	}, [active, map.edges, map.current, highlight]);
 
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
 	// Zoomed out as far as the whole course, however small: the enlarged map's overview.
 	const fitted = frame ? Math.min(1, wholeZoom(layout, frame, margin)) : 1;
 	const minZoom = fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
-	// As far as an opening may look (`framedCamera`): the room (in the frame's pixels) at the smallest scale the map
-	// shows, and one topic past it.
+	// As far as the camera may look: the room (in the frame's pixels) at the smallest scale the map shows, and one
+	// topic past it for a pan or a follow (`slackOf`).
 	const reach = useMemo(() => {
 		const slack = slackOf(layout.node);
 		const smallest = Math.min(READABLE_ZOOM, minZoom);

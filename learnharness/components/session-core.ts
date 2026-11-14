@@ -820,7 +820,7 @@ export class SessionModel {
 			// existing setup recovery. A newer send/reattach ALWAYS owns errors
 			// and status instead, even if that request has since been stopped.
 			// Ordinary text and answer teardown behavior stays unchanged.
-			if (input.type === "answer" || input.type === "tonight" || input.type === "dispute") {
+			if (input.type === "answer" || input.type === "thinking" || input.type === "request" || input.type === "tonight" || input.type === "dispute") {
 				const ids = new Set(optimistic.map(m => m.id));
 				this.mutate(() => {
 					this.tail = this.tail.filter(m => !ids.has(m.id));

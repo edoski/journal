@@ -31,7 +31,6 @@ import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import {
-	isProviderKeyRefusal,
 	firstSourceTextParts,
 	messageAnchorId,
 	sessionModeOf,
@@ -76,6 +75,7 @@ import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
+import { parseProviderKeyRefusal } from "@/components/lesson/turn-error-text";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
@@ -122,21 +122,6 @@ export const ChatActionsContext = createContext<{
 	 *  SetupDialog the send interception uses. */
 	openSetup: () => void;
 } | null>(null);
-
-/** The signed-out-account refusal's transport seam (zero-keys wave,
- *  Platform's 66dbea9): the DefaultChatTransport throws the 503 body
- *  VERBATIM as the error message, so the envelope's own matcher
- *  (core, invariant-tail) decides; the wording can never drift client-
- *  side. Exported pure for tests. */
-export function parseProviderKeyRefusal(message: string | undefined): boolean {
-	if (!message) return false;
-	try {
-		const body = JSON.parse(message) as { code?: unknown; error?: unknown };
-		return body.code === "provider_key_missing" && typeof body.error === "string" && isProviderKeyRefusal(body.error);
-	} catch {
-		return false;
-	}
-}
 
 /** Retry sends no composer text. Its refusal must not resurrect the draft
  * from an earlier, already-durable text send over today's unsent composer.
@@ -689,7 +674,8 @@ export function Chat({
 
 	// THE SIGNED-OUT REFUSAL: a send that lands the server's 503
 	// provider_key_missing envelope (the Claude account is signed out)
-	// renders as the SIGN-IN FLOW, never the error banner. The gate refuses
+	// opens the SIGN-IN FLOW and keeps one plain line under the transcript
+	// (turn-error.md, signed-out) with Sign in. The gate refuses
 	// BEFORE the write-ahead persist, so the server record is the truth
 	// minus the refused send — the optimistic message is an orphan that
 	// goes HOME: refetch the record, drop the orphan, put the draft back in
@@ -698,9 +684,7 @@ export function Chat({
 	useEffect(() => {
 		if (!error) return;
 		if (!parseProviderKeyRefusal(error.message)) return; // a real error keeps the honest banner
-		// ORDER MATTERS: clearError() flips this effect's own dep (`error`)
-		// and would cancel the in-flight work below — so the banner dismiss,
-		// the draft restore, and the dialog open all land TOGETHER after the
+		// The draft restore and the dialog open land together after the
 		// record refetch (the honest truth minus the refused send).
 		let cancelled = false;
 		void (async () => {
@@ -714,14 +698,13 @@ export function Chat({
 				applyText(draftRef.current);
 				draftRef.current = null;
 			}
-			clearError();
 			setSetupOpen(true);
 		})();
 		return () => {
 			cancelled = true;
 		};
-		// (setMessages/clearError are stable per useChat instance — the
-		//  dep pair [error, chatId] is what the flow actually keys on.)
+		// (setMessages is stable per useChat instance — the dep pair
+		//  [error, chatId] is what the flow actually keys on.)
 	}, [error, chatId]);
 	// TAB CYCLES THE CHAT'S FIELDS (owner, keyboard round 2026-10-06): the
 	// lesson has one, the composer. Gathered from live DOM at event time.
@@ -1655,7 +1638,7 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
+								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={() => setSetupOpen(true)}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}

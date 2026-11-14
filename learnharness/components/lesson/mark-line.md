@@ -6,6 +6,7 @@
 |---|---|
 | facts | `RowFacts` from `answer-mark.tsx`: result (in `foreground`), how it counted, the confidence recorded, each an icon and a few words; a practice problem's two tries are two groups on the line |
 | disputed | Disputed, and the tutor's ruling with math rendered |
-| Dispute | a quiet 32px button with a flag at the line's end, shown while the line is pointed at or focused, off while a turn runs; ⌘⇧M still opens the newest |
+| placement | the facts end on the bubble's right padding (16px), where his words end, so the line reads as the bubble's footnote whatever the answer's length |
+| Dispute | a quiet 32px button with a flag just before the facts, shown while the line is pointed at or focused, off while a turn runs; drawn out of the line's flow, so while hidden it takes no room and never pushes the facts in; ⌘⇧M still opens the newest |
 
 The mark is the engine's (`/api/chats/:id/marks` through `AnswerMarksProvider`), never the app's judgement; nothing renders until the engine holds one. Spec of the facts and the dialog: `components/answer-mark.md`.

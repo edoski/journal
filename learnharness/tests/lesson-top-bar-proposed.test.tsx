@@ -70,7 +70,7 @@ async function escapeReachesWindow(): Promise<boolean> {
 const STEPS: RoadmapStep[] = [
 	{ id: "maps", title: "A matrix is a linear map", status: "visited", done: true, next: false, taught: true },
 	{ id: "equation", title: "The eigen-equation", status: "current", done: false, next: false, taught: true },
-	{ id: "compute", title: "Computing a 2×2 spectrum", status: "upcoming", done: false, next: true, taught: false },
+	{ id: "compute", title: "Computing a $2 \\times 2$ spectrum", status: "upcoming", done: false, next: true, taught: false },
 ];
 const PLACE = { topic: { handle: "eigen", title: "Eigenvalues and eigenvectors" }, arc: { title: "Spectra" } };
 const COURSE = { title: "Linear Algebra", workspace: "/courses/la" };
@@ -128,6 +128,33 @@ describe("where the lesson is", () => {
 		assert.match(element('[data-testid="roadmap-topic"]').getAttribute("href")!, /^\/unit\/[^/]+\/eigen$/);
 		assert.match(element('[data-testid="roadmap-course"]').getAttribute("href")!, /^\/unit\/[^/]+$/);
 		assert.equal(element('[data-slot="arc-pill"]').textContent, "Spectra");
+	});
+
+	it("the strip's spoken name reads its maths as words, never as TeX", async () => {
+		const steps = STEPS.map((step) => ({ ...step, status: step.id === "compute" ? ("current" as const) : ("visited" as const) }));
+		await mount(<LessonRoadmap steps={steps} open={false} onOpenChange={() => {}} onJump={() => {}} />);
+		assert.equal(element('[data-testid="roadmap"]').getAttribute("aria-label"), "Where this lesson is: Computing a 2 × 2 spectrum");
+	});
+
+	it("arrows walk the panel's taught steps and links, Home and End jump to its ends", async () => {
+		await mount(<Roadmap />);
+		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
+		const panel = element('[data-testid="roadmap-panel"]');
+		const stops = [element('[data-testid="roadmap-step-maps"] button'), element('[data-testid="roadmap-step-equation"] button'), element('[data-testid="roadmap-topic"]'), element('[data-testid="roadmap-course"]')];
+		await act(async () => stops[0]!.focus());
+		const key = async (k: string) => press(document.activeElement ?? panel, "keydown", { key: k });
+		await key("ArrowDown");
+		assert.equal(document.activeElement, stops[1], "down to the next taught step");
+		await key("ArrowDown");
+		assert.equal(document.activeElement, stops[2], "past the step not taught yet, to the topic's page");
+		await key("ArrowUp");
+		assert.equal(document.activeElement, stops[1]);
+		await key("End");
+		assert.equal(document.activeElement, stops[3]);
+		await key("ArrowDown");
+		assert.equal(document.activeElement, stops[3], "the last stays put");
+		await key("Home");
+		assert.equal(document.activeElement, stops[0]);
 	});
 
 	it("Esc closes the panel without reaching the turn, and ⌘K opens it", async () => {

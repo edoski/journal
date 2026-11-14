@@ -21,4 +21,6 @@
 | `<chat>:opening` | photos for a new lesson's first message, taken once |
 | `carry:<course workspace>` | what the next question in the course opens with, taken once |
 
-Words live in localStorage under `lh.kept.<scope>`, read after mount so the server's page and the first client render agree. Photos live in IndexedDB (`lh-kept`, store `photos`), too large for localStorage. Storage that is full or refused leaves the box working without surviving a reload.
+A box belongs to the window it was typed in (round 5): words typed in one window never fill a box in another. Each window has an id that survives its reloads (sessionStorage, `lh.window`) and holds a Web Lock named `lh.window:<id>` while it is open. A window opening after another has closed (an app restart) takes the closed window's words and photos for a box it has none in, once; an open window's are never taken.
+
+Words live in localStorage under `lh.kept.<window>|<scope>`, read after mount so the server's page and the first client render agree. Photos live in IndexedDB (`lh-kept`, store `photos`), too large for localStorage. Storage that is full or refused leaves the box working without surviving a reload.

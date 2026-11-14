@@ -346,11 +346,11 @@ describe("a map of one arc", () => {
 		const rank = document.querySelector('[data-testid="map-node-rank"]')!;
 		assert.equal(rank.getAttribute("data-entry"), "true");
 		assert.equal(text(rank.querySelector('[data-slot="topic-from"]')), "From Linear systems");
-		assert.match(rank.parentElement!.className, /opacity-60/);
+		assert.match(rank.parentElement!.getAttribute("style") ?? "", /opacity:\s*0?\.\d/);
 		const eigen = document.querySelector('[data-testid="map-node-eigen"]')!;
 		assert.equal(eigen.getAttribute("data-entry"), null);
 		assert.equal(eigen.querySelector('[data-slot="topic-from"]'), null);
-		assert.doesNotMatch(eigen.parentElement!.className, /opacity-60/);
+		assert.doesNotMatch(eigen.parentElement!.getAttribute("style") ?? "", /opacity/);
 	});
 
 	it("lights a hovered topic's chain inside the shown arc only", () => {

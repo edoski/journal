@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatListItem } from "@/src/core";
 import type { useSessionsSidebar } from "@/components/sidebar-state";
+import { ROW_ITEM } from "@/components/unit-inbox/row-card";
 import { SessionSlimRow } from "@/components/unit-inbox/unit-row";
 import { Input } from "@/components/ui/input";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -65,7 +66,7 @@ export function SessionItem({
 		return <RenameRow chat={chat} onCommit={(next) => void s.commitRename(chat.id, next)} onCancel={() => s.setRenamingId(null)} />;
 	}
 	return (
-		<li className="group/sidebar-row relative list-none">
+		<li className={ROW_ITEM}>
 			<ContextMenu>
 				<ContextMenuTrigger asChild>
 					<SessionSlimRow

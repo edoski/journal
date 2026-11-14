@@ -206,8 +206,12 @@ function AnswerComposer({
 			setText("");
 			setConfidence(DEFAULT_CONFIDENCE);
 			const taken = photos.take();
+			// A send refused at once gives his work back, words and photos,
+			// unless he has started writing again.
 			void onSubmitThinking(words, confidence, sentPhotos(taken)).then((accepted) => {
-				if (!accepted) restorePhotos(taken);
+				if (accepted) return;
+				restorePhotos(taken);
+				setText((now) => (now.trim() ? now : words));
 			});
 			return;
 		}

@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseProviderKeyRefusal, retryFailedResponse } from "../components/chat.tsx";
+import { retryFailedResponse } from "../components/chat.tsx";
+import { parseProviderKeyRefusal } from "../components/lesson/turn-error-text.ts";
 import { SessionModel } from "../components/session-core.ts";
 import { fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { newUserMessage, type LhMessage } from "../src/core/native-messages.ts";

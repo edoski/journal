@@ -341,16 +341,18 @@ describe("the course topic row and group", () => {
 describe("the topic map's highlight", () => {
 	const map = course().map;
 	const dimmed = (document: Document) =>
-		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-50")).map((n) => n.getAttribute("data-testid"));
+		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
 
 	it("dims nothing by default, as Home draws it", () => {
 		assert.deepEqual(dimmed(render(<TopicMap map={map} said={new Map()} />) as unknown as Document), []);
 	});
 
-	it("lights the topics it is given and dims the rest", () => {
+	it("lights the topics it is given, You are here and the topics it leads to, and dims the rest", () => {
 		const document = render(<TopicMap map={map} said={new Map()} highlight={new Set([h("span"), h("independence")])} />) as unknown as Document;
-		const lit = TOPICS.filter((t) => !["span", "independence"].includes(t.handle)).map((t) => `map-node-${t.handle}`);
-		assert.deepEqual(dimmed(document).sort(), lit.sort());
+		const next = map.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === map.current ? [e.topic as string] : []));
+		const shown = new Set(["span", "independence", map.current as string, ...next]);
+		const rest = TOPICS.filter((t) => !shown.has(t.handle)).map((t) => `map-node-${t.handle}`);
+		assert.deepEqual(dimmed(document).sort(), rest.sort());
 	});
 });
 
