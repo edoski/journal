@@ -318,10 +318,10 @@ describe("Today", () => {
 		assert.equal(doc.querySelector('[data-slot="today-done"]'), null, "nothing says done before he finishes anything");
 	});
 
-	it("once he finished something today, asks what else and names what he did, never a count", () => {
+	it("once he studied something today, asks what else and names what he did, never a count", () => {
 		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], [], TODAY)} done={["Eigenvalues and eigenvectors", "Rank practice"]} busy={false} onContinue={() => {}} />);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What else are we studying (this morning|this afternoon|this evening|today)\?$/);
-		assert.equal(doc.querySelector('[data-slot="today-done"]')?.textContent, "Done today: Eigenvalues and eigenvectors, Rank practice");
+		assert.equal(doc.querySelector('[data-slot="today-done"]')?.textContent, "Studied today: Eigenvalues and eigenvectors, Rank practice");
 	});
 
 	it("past five lines, names the other lines on the last by their lesson, as a full line would, with the course and why in the tooltip", () => {

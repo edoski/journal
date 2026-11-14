@@ -28,24 +28,28 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 
 const NOW = new Date("2026-11-08T15:00:00");
 
-describe("what he finished today", () => {
-	it("names each session the tutor closed today, oldest first", () => {
+describe("what he studied today", () => {
+	it("names every session he worked in today, oldest first, however it stands now", () => {
 		const chats = [
-			chat({ id: "b", title: "Rank practice", kind: "practice", updatedAt: "2026-11-08T11:00:00" }),
-			chat({ id: "a", title: "Eigenvalues and eigenvectors", updatedAt: "2026-11-08T09:30:00" }),
+			chat({ id: "q", title: "What a kernel is", updatedAt: "2026-11-08T14:00:00" }),
+			chat({ id: "b", title: "Rank practice", kind: "practice", pendingProblem: true, updatedAt: "2026-11-08T11:00:00" }),
+			// Round 4: a 40-minute lesson ended with Done for today was missing.
+			chat({ id: "a", title: "Eigenvalues and eigenvectors", ended: "left", updatedAt: "2026-11-08T09:30:00" }),
+			chat({ id: "s", title: "Determinants", ended: "cut", updatedAt: "2026-11-08T10:00:00" }),
 		];
-		assert.deepEqual(doneToday(chats, NOW), ["Eigenvalues and eigenvectors", "Rank practice"]);
+		assert.deepEqual(doneToday(chats, NOW), ["Eigenvalues and eigenvectors", "Determinants", "Rank practice", "What a kernel is"]);
 	});
 
-	it("leaves out a session closed before today's midnight, one still waiting on him, one stopped mid-reply, the tutor writing, and an empty one", () => {
+	it("names a title other sessions share with its course, as the sidebar's row carries its course", () => {
 		const chats = [
-			chat({ title: "Yesterday", updatedAt: "2026-11-07T23:59:00" }),
-			chat({ title: "Waiting", pendingQuestion: true, ended: "mid-lesson" }),
-			chat({ title: "Problem posed", kind: "practice", pendingProblem: true }),
-			chat({ title: "Stopped", ended: "cut" }),
-			chat({ title: "Writing", busy: true }),
-			chat({ title: "Empty", messageCount: 0 }),
+			chat({ id: "r1", title: "Review", course: { workspace: "/c/la", title: "Linear Algebra" }, updatedAt: "2026-11-08T09:00:00" }),
+			chat({ id: "r2", title: "Review", course: { workspace: "/c/calc", title: "Calculus I" }, updatedAt: "2026-11-03T09:00:00" }),
 		];
+		assert.deepEqual(doneToday(chats, NOW), ["Review in Linear Algebra"]);
+	});
+
+	it("leaves out a session last worked in before today's midnight, and an empty one", () => {
+		const chats = [chat({ title: "Yesterday", updatedAt: "2026-11-07T23:59:00" }), chat({ title: "Empty", messageCount: 0 })];
 		assert.deepEqual(doneToday(chats, NOW), []);
 	});
 
@@ -76,7 +80,7 @@ describe("Home's heading and its done line", () => {
 
 	it("names what he did and never counts it", () => {
 		assert.equal(doneWords([]), null);
-		assert.equal(doneWords(["Eigenvalues and eigenvectors", "Rank practice"]), "Done today: Eigenvalues and eigenvectors, Rank practice");
+		assert.equal(doneWords(["Eigenvalues and eigenvectors", "Rank practice"]), "Studied today: Eigenvalues and eigenvectors, Rank practice");
 		assert.doesNotMatch(doneWords(["A", "B", "C"])!, /\d|two|three|lessons/i);
 	});
 });
