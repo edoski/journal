@@ -12,6 +12,8 @@ import { answerMarksOf } from "../src/core/answer-marks.ts";
 import { topicRecordOf } from "../src/server/topic.ts";
 import { RowFacts } from "../components/answer-mark.tsx";
 import { attemptMark } from "../components/unit-inbox/topic-page/topic-facts.ts";
+import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
+import { concludeInputObject } from "../src/agent/tools/practice.ts";
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
@@ -60,5 +62,21 @@ describe("the mark on the card and in Earlier", () => {
 		assert.doesNotMatch(card("hinted"), /Neutral/);
 		assert.doesNotMatch(card("own"), /Neutral/);
 		assert.match(card("guess"), /Guessing/);
+	});
+});
+
+describe("a partly right answer", () => {
+	// Round 5: "your rank and dim ker are right, the pivot columns are not"
+	// was saved Not right, because partial meant only a right result on bad
+	// reasoning.
+	const partlyRight = /some of its parts right and others not/;
+
+	it("is partial in the doctrine every tutor reads", () => {
+		for (const agent of ["prober", "teacher", "practice"] as const) assert.match(courseRecordPrompt(agent, { arcs: false }), partlyRight, agent);
+	});
+
+	it("is partial in the result a practice problem concludes with", () => {
+		const result = (concludeInputObject.properties.result as { description?: string }).description ?? "";
+		assert.match(result, partlyRight);
 	});
 });
