@@ -7,9 +7,12 @@ The one model of where a session stands. Home, the topic page, the calendar and 
 | State | When | What a surface says |
 |---|---|---|
 | `working` | a turn or a compaction runs (`busy`, `compacting`) | sidebar: Working; Home: "Tutor writing", the line stays where it was; topic page: Open |
-| `your-turn` | a question or problem the tutor posed is unanswered (`pendingQuestion`, `pendingProblem`), or `ended` is `mid-lesson`: the plan waits for his go-ahead, he dismissed its question, a lesson it picked up reached no step yet, its last words ask him something (end in a question mark) while plan steps remain, or a lesson moved to practice waits on Next problem with plan steps left | "Your turn"; topic page: Resume |
+| `your-turn` | a question or problem the tutor posed is unanswered (`pendingQuestion`, `pendingProblem`), or `ended` is `mid-lesson`: the plan waits for his go-ahead, he dismissed its question, a lesson it picked up reached no step yet, its last words ask him something (end in a question mark) while plan steps remain, or practice waits on Next problem with its work unfinished (below) | "Your turn"; topic page: Resume |
 | `paused` | the tutor's turn stopped before it finished (`ended` `cut`): it owes the next word | Home: "Stopped mid-reply"; topic page: Resume |
-| `finished` | anything else: the lesson closed, a practice round concluded with no plan steps left, a one-off answer, and a sign-off in words such as "Good place to stop" even with plan steps left | nothing waits; no Your turn, no Home line, never resumed |
+| `left` | his Done for today stopped work still open (`ended` `left`): it set aside a question or a problem, the lesson's plan has a step still to teach, or the session waited on him or owed him a reply just before he pressed it | "Left for next time" (bookmark) on Home, the sidebar and the topic page, however long ago, until he picks it up; topic page: Resume |
+| `finished` | anything else: the lesson closed, a practice round with its work done, a one-off answer, and a sign-off in words such as "Good place to stop" even with plan steps left | nothing waits; no Your turn, no Home line, never resumed |
+
+A practice session waits on Next problem (`mid-lesson`) while its work is unfinished: a lesson moved to practice with plan steps left, or a session opened on topics (a review, a topic's practice) one of which he has not solved without a hint in it, unless the tutor wrapped the round (its reply to his last Next problem posed nothing). A round he opened on no topics is his to end, so an old drill never waits on him.
 
 `ended` is the record's fold (`sessionEndOf`, `src/core/session-end.ts`).
 
@@ -21,7 +24,7 @@ Only a session's own topic says Your turn for it (`nowOf`); a session with none 
 
 ## Exports other modules read
 
-- `session-state.ts`: `SessionState`, `sessionState`, `resumableSession` (your turn, then working, then paused, newest first within each), `continueMove` and `ContinueMove` (pick up the resumable one, else reopen the newest finished lesson, a finished practice round never), `FINISHED_LESSON`.
+- `session-state.ts`: `SessionState`, `sessionState`, `resumableSession` (your turn, then working, then paused, then left, newest first within each), `continueMove` and `ContinueMove` (pick up the resumable one, else reopen the newest finished lesson, a finished practice round never), `FINISHED_LESSON`.
 - `unit-inbox/units.ts`: `topicSessions(chats, workspace, handle)`, `taskSessions(chats, workspace, key)`, `buildInbox`, whose `Unit.now` is `your-turn` or `working` from the topic's own sessions only.
 - `unit-inbox/topic-page/topic-facts.ts`: `topicAction(topic, map, chats)` and `topicFacts({ course, topic, chats, read })`, both over every session; `pickupsOf(topic, map, entries, chats, record, today)`. The action, first match: resume or open a session of the topic to pick up, Review when the engine has its review due (at any level, a new review session), Continue the open task, Start a topic not started, Continue one being learned with no review set, else Study.
 - `study-home/study-facts.ts`: `openSessions` (your turn, working or paused, newest first), `todayRows(courses, open, today)`, `courseMove(course, chats)` and `CourseMove`.

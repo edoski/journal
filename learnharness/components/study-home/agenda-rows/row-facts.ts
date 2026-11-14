@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { overdueWords } from "@/components/study-words";
+import { LESSON_WORDS, overdueWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -86,13 +86,14 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
 	"your-turn": { kind: "reply", short: "Your turn" },
 	working: { kind: "working", short: "Tutor writing" },
 	paused: { kind: "stopped", short: "Stopped mid-reply" },
+	left: { kind: "task", short: LESSON_WORDS.leftForTonight },
 	finished: null,
 };
 
 /**
  * Why a line is on Today, in words that need no memory of the system: a
- * session waiting on the learner, the tutor writing in it or stopped
- * mid-reply in it, why a review is due (a lapse, or how
+ * session waiting on the learner, the tutor writing in it, stopped
+ * mid-reply in it or left for next time, why a review is due (a lapse, or how
  * long it is overdue), when an open task was left, or that the topic is
  * next on the course's map. Engine fields only, never the tutor's prose.
  * Pure.

@@ -301,9 +301,10 @@ export interface SessionGoal {
 /** How the tutor's last turn left a session that waits on no question or
  *  problem it posed: its words asked him something, or its plan waits for
  *  his go-ahead, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
- *  the tutor's ("cut"), or it ended the lesson, a practice round or a
- *  one-off answer ("closed"). */
-export type SessionEnd = "mid-lesson" | "cut" | "closed";
+ *  the tutor's ("cut"), his Done for today stopped it with work still open
+ *  ("left", left for next time), or it ended the lesson, a practice round
+ *  or a one-off answer ("closed"). */
+export type SessionEnd = "mid-lesson" | "cut" | "left" | "closed";
 
 /** The list view's shape (messageCount instead of full messages) + the
  *  per-session status the picker renders. `phase` and `pendingQuestion`

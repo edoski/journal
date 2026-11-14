@@ -144,15 +144,15 @@ function laterOnly(step: NextStep): boolean {
 
 /**
  * Today's lines: each session to pick up since yesterday (it waits on the
- * learner, the tutor writes in it, or stopped mid-reply), most recent
- * first, then each course's next step, most urgent first and a line with
+ * learner, the tutor writes in it, or stopped mid-reply) and each one left
+ * for next time however long ago, most recent first, then each course's next step, most urgent first and a line with
  * nothing for tonight last (`laterOnly`), unless a session shown already
  * works on it. A session stays on its line while the tutor writes. An older
  * session to pick up stays in the sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
-	const recent = open.filter((c) => c.updatedAt.slice(0, 10) >= since);
+	const recent = open.filter((c) => sessionState(c) === "left" || c.updatedAt.slice(0, 10) >= since);
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
 	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
@@ -216,8 +216,9 @@ export function courseMove(course: StudyCourse, chats: readonly ChatListItem[]):
 }
 
 /** The states a session is picked up from: it waits on the learner, the
- *  tutor writes in it, or the tutor stopped mid-reply. */
-const PICK_UP: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused"]);
+ *  tutor writes in it, the tutor stopped mid-reply, or he left it for next
+ *  time. */
+const PICK_UP: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused", "left"]);
 const pickUp = (sessions: readonly ChatListItem[]) => sessions.some((c) => PICK_UP.has(sessionState(c)));
 
 /** The sessions to pick up, most recent first. Pure. */

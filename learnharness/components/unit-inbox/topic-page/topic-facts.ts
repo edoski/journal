@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { heldWords, overdueWords, returnWords } from "@/components/study-words";
+import { heldWords, LESSON_WORDS, overdueWords, returnWords } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -217,12 +217,14 @@ export const STOPPED = "Stopped mid-reply";
 
 /** Where a session stands: the step its newest tagged question is about;
  *  else, while the tutor writes, that it writes; else that it stopped
- *  mid-reply; else a practice problem waits; else a question waits. */
+ *  mid-reply; else that he left it for next time; else a practice problem
+ *  waits; else a question waits. */
 function whereOf(entry: SessionEntry): string {
 	const step = entry.plan?.tree.nodes.find((node) => node.id === entry.plan?.current);
 	if (step) return step.title;
 	if (entry.state === "working") return WRITING;
 	if (entry.state === "paused") return STOPPED;
+	if (entry.state === "left") return LESSON_WORDS.leftForTonight;
 	return entry.chat.pendingProblem ? "Problem waiting" : "Question waiting";
 }
 

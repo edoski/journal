@@ -118,7 +118,7 @@ function listChats(): ChatSummary[] {
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
 						ownTopics: summary.topics ?? [],
-						ended: sessionEndOf(messages, tree, summary.kind),
+						ended: sessionEndOf(messages, tree, summary.kind, summary.topics ?? []),
 						tasks: sessionTasksOf(messages),
 					};
 				} catch (err) {

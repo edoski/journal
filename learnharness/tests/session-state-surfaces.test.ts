@@ -203,3 +203,27 @@ describe("an open task", () => {
 		assert.ok(action.kind === "continue" && "chat" in action && action.chat.id === sheet, "Continue reopens the sheet's lesson");
 	});
 });
+
+describe("a lesson he stopped for today with a check open", () => {
+	it("is left for next time on every surface, days later too, until he picks it up", () => {
+		const open = lesson(EIGEN_STEPS, ["eigen"], [assistant([call("q3", "explain", { type: "check", nodeId: "compute", question: "Eigenvector for 1?", correctAnswer: "(1,-1)" })])]);
+		const qid = (open.at(-1) as unknown as { content: { id: string }[] }).content[0]!.id;
+		const stopped: LhMessage[] = [
+			...open,
+			{ id: `r${++n}`, role: "toolResult", toolCallId: qid, toolName: "explain", content: [{ type: "text", text: "left" }], details: { kind: "explain", questionText: "Eigenvector for 1?", answers: [], dismissed: true, reason: "tonight", answeredAt: TODAY }, isError: false, timestamp: n } as unknown as LhMessage,
+			{ id: `d${++n}`, role: "custom", customType: "done-tonight", content: "[DONE FOR TODAY]", display: true, details: {}, timestamp: n } as unknown as LhMessage,
+			assistant([text("Next time we start with that eigenvector.")], "stop"),
+		];
+		const id = seed("Eigenvalues, second pass", stopped, EIGEN_STEPS, "2026-11-05T19:00:00.000Z");
+		chatStore.nameSession(id, { title: "Eigenvalues, second pass", topic: "eigen" });
+		const chats = listed().filter((c) => c.id !== waiting);
+		const left = chats.find((c) => c.id === id)!;
+		assert.equal(sessionState(left), "left");
+		const row = todayRows([COURSE], openSessions(chats), TODAY).find((r) => r.kind === "session" && r.chat.id === id);
+		assert.ok(row, "Home keeps its line three days on");
+		assert.deepEqual(whyOf(row!), { kind: "task", short: "Left for next time" });
+		assert.deepEqual(topicAction(EIGEN, MAP, chats), { kind: "resume", chat: left }, "its topic page resumes it, never Nothing due");
+		assert.equal(sidebarRow(chats, "eigen")?.now, "left");
+		chatStore.deleteChat(id);
+	});
+});
