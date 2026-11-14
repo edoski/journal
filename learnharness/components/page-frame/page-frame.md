@@ -34,4 +34,4 @@ Other actions in `actions` are quiet shadcn `Button`s of the row size with a 16p
 
 ## Sources
 
-The topic page's head (`../unit-inbox/topic-page/topic-head.tsx`: the course line, the 20/500 title, the standing line) and its Now press (`../unit-inbox/topic-page/pickup/pickup-parts.tsx`); the course page's header before it (course-header.md).
+The topic page's head (`../unit-inbox/topic-page/topic-head.tsx`: the course line, the 20/500 title, the standing line) and its Now press (`../unit-inbox/topic-page/pickup/pickup-parts.tsx`); the course page's head (course-head/course-head.md).

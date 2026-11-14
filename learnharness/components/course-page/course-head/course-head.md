@@ -1,13 +1,9 @@
-# Course head candidates
+# Course head
 
-Three candidates for the course page's head, options of the dev-only `course-head` switch (`components/design-variant.ts`; production draws Current until one ships). `CourseHead` branches once. Each keeps the course's name and the page's press (Resume, Review, Continue or Start), replaces Add material with Context (`../../course-context/course-context.md`), and drops the progress words ("Some topics on your own") and the next-lesson line that repeated the Needs you rows (Edo, 14 Nov 2026).
+The course page's head is Pace (Edo picked it on 14 Nov 2026 over Brief and Road): the course's name and the page's press (Resume, Review, Continue or Start), Context in place of Add material (`../../course-context/course-context.md`), then whether the course is on track for its exam, then the exam and when he last studied. It drops the progress words ("Some topics on your own") and the next-lesson line that repeated the Needs you rows (Edo, 14 Nov 2026).
 
-Shared parts (`head-parts.tsx`): `ContextButton`; `ExamFact`, "Exam in 11 days" pressed opens the exam's run-up (the day, whether every topic fits, each week's new topics, the final review, Open the calendar); `StudiedFact`, "Studied 2 days ago" links to his latest session in the course, its title in the hint. Facts come from the engine only (`head-facts.ts`, pure, tested): its daily plan and run-up as the calendar reads them (`/api/calendar`), its map, the sessions.
+Under the title: the topics the plan has no room for before the exam, in the warning ink; inside the run-up the ones not yet solid; else "Every topic fits before the exam" or "Every topic started"; "No exam day set" without one. Once the engine has arcs, "In <arc>" leads the standing line.
 
-| Option | Thesis | Under the title | Arcs, once the engine has them |
-|---|---|---|---|
-| Pace | Will I be ready? (Linear's project health) | the topics the plan has no room for before the exam, in the warning ink; inside the run-up the ones not yet solid; else "Every topic fits before the exam" or "Every topic started"; "No exam day set" without one | "In <arc>" leads the standing line |
-| Brief | The course in his words (a Claude project's instructions, a Linear project's description) | the description from Context, two lines at most, or "Say what this course is, for the tutor and the map", which opens Context; the standing line adds the linked folders and websites, two of them, then More in Context | "In <arc>" above the title |
-| Road | What comes after today (Things' deadline, Coursera's week ahead) | "Next new topic Poisson distribution on Thursday", then "Final review from 13 Nov"; "Every topic started" or "No new topic planned yet" when the plan starts none | "In <arc>, next <arc> from Thursday" leads the line |
+Shared parts (`head-parts.tsx`): `ContextButton`; `ExamFact`, "Exam in 11 days" pressed opens the exam's run-up (the day, whether every topic fits, each week's new topics, the final review, Open the calendar); `StudiedFact`, "Studied 2 days ago" links to his latest session in the course, its title in the hint; `CourseLessonError`, the course frame's word when the press could not start a lesson. Facts come from the engine only (`head-facts.ts`, pure, tested): its daily plan and run-up as the calendar reads them (`/api/calendar`), its map, the sessions.
 
 Every line is words and icons: no counts, levels or percentages. The lead keeps its 20px row while the plan is read, so nothing below moves.

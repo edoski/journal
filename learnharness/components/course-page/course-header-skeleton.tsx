@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 const PULSE = "motion-reduce:animate-none";
 
 /** The course header's place while the course is read (spec:
- *  course-header.md): the same three rows at the same heights, so nothing
+ *  course-head/course-head.md): the same three rows at the same heights, so nothing
  *  moves when the course arrives. Read as one busy region. */
 export function CourseHeaderSkeleton({ className }: { className?: string }) {
 	return (

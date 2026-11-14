@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useContext, useState, type ReactNode } from "react";
+import { useContext, useState, type ReactNode, createContext } from "react";
 import { BookOpenIcon, CalendarIcon, ClockIcon, FolderOpenIcon, HistoryIcon } from "lucide-react";
 import type { CalendarCourse, StudyCourse } from "@/src/core";
 import type { CourseView } from "@/components/course-page/course-model";
-import { CourseLessonError } from "@/components/course-page/course-header";
 import { PageAction } from "@/components/page-frame/page-frame";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,6 +14,11 @@ import { distanceWords, finalReviewWords, longDayWords, roadOf, spanWords } from
 import { ContextSheet } from "@/components/course-context/context-sheet";
 import { paceOf } from "@/components/course-page/course-head/head-facts";
 import { cn } from "@/lib/utils";
+
+
+/** Why the head's button could not start a lesson, set by the course frame
+ *  so the alert shows under the button he pressed. */
+export const CourseLessonError = createContext<string | null>(null);
 
 /** A fact of the standing line that goes somewhere: its 16px mark and
  *  words, muted at rest and in full ink under the pointer. */

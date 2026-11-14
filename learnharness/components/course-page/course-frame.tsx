@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PageFrame } from "@/components/page-frame/page-frame";
 import { CourseChrome } from "@/components/course-page/course-chrome";
-import { CourseLessonError } from "@/components/course-page/course-header";
+import { CourseLessonError } from "@/components/course-page/course-head/head-parts";
 import { CourseHeaderSkeleton } from "@/components/course-page/course-header-skeleton";
 import type { CourseRead, CourseView } from "@/components/course-page/course-model";
 import { useCourse } from "@/components/course-page/use-course";

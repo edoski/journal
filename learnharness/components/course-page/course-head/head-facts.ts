@@ -1,9 +1,8 @@
 import type { CalendarCourse, ChatListItem, StudyCourse, TopicHandle } from "@/src/core";
 import { misfitWords } from "@/components/calendar/calendar-facts";
-import { daysBetween } from "@/components/unit-inbox/units";
 
 /**
- * The course page head candidates' facts (spec: course-head.md), each a
+ * The course page head's facts (spec: course-head.md), each a
  * few words from the engine's own fields: its daily plan (`plan`, read
  * with the calendar), its run-up, its course map. The app computes no
  * standing. Pure.
@@ -33,27 +32,6 @@ export function paceOf(course: StudyCourse, planned: Pick<CalendarCourse, "doesN
 
 /** Whether a topic the course keeps is still untaught. */
 export const untaughtLeft = (course: StudyCourse): boolean => course.map.topics.some((t) => t.introduced === null && !t.excluded);
-
-const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" });
-const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-
-/** A day ahead as a sentence ends with it: "today", "tomorrow", a
- *  weekday within the week ("on Thursday"), else the date ("on 2 Dec"). */
-export function aheadWords(day: string, today: string): string {
-	const days = daysBetween(today, day);
-	const date = new Date(`${day}T00:00:00Z`);
-	if (days <= 0) return "today";
-	if (days === 1) return "tomorrow";
-	return `on ${days < 7 ? WEEKDAY.format(date) : SHORT.format(date)}`;
-}
-
-/** The next day after today the plan starts new topics, and their titles. */
-export function nextStartOf(course: StudyCourse, planned: Pick<CalendarCourse, "planned"> | null): { day: string; titles: string[] } | null {
-	const { map } = course;
-	const day = planned?.planned.find((d) => d.date > map.today && d.new.length > 0 && (!map.exam || d.date < map.exam.date));
-	if (!day) return null;
-	return { day: day.date, titles: day.new.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h) };
-}
 
 /** His latest session in the course, the one "Studied" opens. */
 export function lastSessionOf(workspace: string, chats: readonly ChatListItem[]): { id: string; title: string } | null {

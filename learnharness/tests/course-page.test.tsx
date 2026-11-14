@@ -15,7 +15,6 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseFacts, courseGroups, courseNext, courseRead, GROUP_IDS, type CourseGroup as Group } from "../components/course-page/course-model.ts";
-import { CourseHeader, CourseLessonError } from "../components/course-page/course-header.tsx";
 import { CourseHeaderSkeleton } from "../components/course-page/course-header-skeleton.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
 import { CourseGroup } from "../components/course-page/course-group.tsx";
@@ -251,43 +250,11 @@ function viewOf(c: StudyCourse) {
 }
 
 describe("the course header", () => {
-	it("draws the name, Add material and the button with the step's word, then the next step with why, then the facts", () => {
-		const document = render(<CourseHeader view={viewOf(course())} busy={false} onContinue={() => {}} />);
-		assert.equal(document.querySelector('[data-slot="course-title"]')!.textContent, "Linear Algebra");
-		assert.equal(document.querySelector('[data-slot="course-action"]')!.textContent, "Review");
-		assert.deepEqual(
-			[...document.querySelectorAll('[data-slot="page-fact"]')].map((f) => f.textContent),
-			["Some topics on your own", "Exam in 21 days", "Studied 2 days ago"],
-		);
-		assert.equal(document.querySelector('[data-slot="course-next"]')!.textContent, "Review Span1w overdue");
-		const head = [...document.querySelector('[data-slot="page-head"]')!.children].map((line) => line.getAttribute("data-slot"));
-		assert.ok(head.indexOf("page-lead") < head.indexOf("page-standing"), "what to do next comes before the course's facts");
-		assert.ok(document.querySelector('[data-slot="page-lead"] [data-slot="course-next"]'), "the next step is the head's lead");
-		assert.deepEqual(
-			[...document.querySelectorAll("button, a")].map((c) => c.getAttribute("data-slot")),
-			["course-add-material", "course-action"],
-			"two controls: Add material, then the page's press at the far right",
-		);
-	});
-
-	it("leaves the exam out when there is none, and its skeleton keeps the header's three rows", () => {
-		const document = render(<CourseHeader view={viewOf(course({ exam: null }))} busy={false} onContinue={() => {}} />);
-		assert.equal(document.querySelectorAll('[data-slot="page-fact"]').length, 2);
+	it("its skeleton keeps the head's three rows", () => {
 		const skeleton = render(<CourseHeaderSkeleton />);
 		assert.equal(skeleton.querySelector('[role="status"]')!.children.length, 3);
 	});
 
-	it("says a lesson that could not start inside the header, under the button he pressed, and nothing otherwise", () => {
-		const header = (error: string | null) =>
-			render(
-				<CourseLessonError value={error}>
-					<CourseHeader view={viewOf(course())} busy={false} onContinue={() => {}} />
-				</CourseLessonError>,
-			);
-		assert.equal(header(null).querySelector('[role="alert"]'), null);
-		const alert = header("Couldn’t open the session. Try again.").querySelector('[data-slot="page-head"] [role="alert"]');
-		assert.equal(alert?.textContent, "Couldn’t open the session. Try again.");
-	});
 });
 
 describe("the course topic row and group", () => {

@@ -14,10 +14,9 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
-import { aheadWords, lastSessionOf, namesWords, nextStartOf, paceOf } from "../components/course-page/course-head/head-facts.ts";
+import { lastSessionOf, namesWords, paceOf } from "../components/course-page/course-head/head-facts.ts";
 import { PaceHead } from "../components/course-page/course-head/pace-head.tsx";
-import { BriefHead } from "../components/course-page/course-head/brief-head.tsx";
-import { RoadHead } from "../components/course-page/course-head/road-head.tsx";
+import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -75,19 +74,6 @@ describe("pace, from the engine's plan", () => {
 	});
 });
 
-describe("the road ahead", () => {
-	it("is the next day after today the plan starts new topics, before the exam", () => {
-		assert.deepEqual(nextStartOf(course(), plan()), { day: "2026-11-12", titles: ["Variance"] });
-		assert.equal(nextStartOf(course({ exam: { date: "2026-11-10", daysLeft: 2 } }), plan()), null);
-	});
-
-	it("says the day as a sentence ends with it", () => {
-		assert.equal(aheadWords("2026-11-09", "2026-11-08"), "tomorrow");
-		assert.equal(aheadWords("2026-11-12", "2026-11-08"), "on Thursday");
-		assert.equal(aheadWords("2026-11-20", "2026-11-08"), "on 20 Nov");
-	});
-});
-
 const chat = (id: string, updatedAt: string, workspace = WS): ChatListItem =>
 	({ id, title: `Session ${id}`, kind: "teach", createdAt: updatedAt, updatedAt, messageCount: 2, phase: "teach", pendingQuestion: false, pendingProblem: false, busy: false, compacting: false, course: { workspace, title: "Probability" } }) as ChatListItem;
 
@@ -115,8 +101,8 @@ function viewOf(c: StudyCourse, chats: ChatListItem[] = []) {
 	return (read as Extract<typeof read, { status: "ready" }>).view;
 }
 
-describe("every candidate head", () => {
-	for (const [name, Head] of [["Pace", PaceHead], ["Brief", BriefHead], ["Road", RoadHead]] as const) {
+describe("the course head", () => {
+	for (const [name, Head] of [["Pace", PaceHead]] as const) {
 		it(`${name}: the title and the press stay, Context replaces Add material, no progress words, no line repeating the rows, Studied opens the last session`, () => {
 			const document = render(<Head view={viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")])} busy={false} onContinue={() => {}} />);
 			const text = document.body.textContent ?? "";
@@ -130,4 +116,18 @@ describe("every candidate head", () => {
 			assert.match(document.querySelector("[data-slot=course-exam]")?.textContent ?? "", /Exam in 11 days/);
 		});
 	}
+});
+
+describe("a lesson that could not start", () => {
+	it("is said inside the head, under the button he pressed, and nothing otherwise", () => {
+		const head = (error: string | null) =>
+			render(
+				<CourseLessonError value={error}>
+					<PaceHead view={viewOf(course())} busy={false} onContinue={() => {}} />
+				</CourseLessonError>,
+			);
+		assert.equal(head(null).querySelector('[role="alert"]'), null);
+		const alert = head("Couldn’t open the session. Try again.").querySelector('[data-slot="page-head"] [role="alert"]');
+		assert.equal(alert?.textContent, "Couldn’t open the session. Try again.");
+	});
 });
