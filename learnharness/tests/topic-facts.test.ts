@@ -69,7 +69,7 @@ const TOPICS = {
 	riemann: topic("riemann-sums", { title: "Riemann sums", level: "retained", introduced: "2026-10-11", review: due("2026-11-08", 0), weak: true, signals: { ...QUIET, lapsed: true } }),
 	chain: topic("chain-rule", { title: "Chain rule", level: "retained", introduced: "2026-09-11", review: due("2026-10-09", 30), weak: true, signals: { ...QUIET, lapsed: true } }),
 };
-const SHEET = { key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A" };
+const SHEET = { key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A", updated: null };
 const MAP: CourseMap = {
 	workspace: WORKSPACE,
 	title: "Linear Algebra",
@@ -170,8 +170,8 @@ describe("the page's one action", () => {
 
 describe("the open tasks that hold a topic", () => {
 	it("puts the focused task first and leaves out a task that does not hold it", () => {
-		const other = { key: "sheet-3", title: "Problem sheet 3", step: null };
-		const unrelated = { key: "sheet-9", title: "Problem sheet 9", step: null };
+		const other = { key: "sheet-3", title: "Problem sheet 3", step: null, updated: null };
+		const unrelated = { key: "sheet-9", title: "Problem sheet 9", step: null, updated: null };
 		const map = { ...MAP, tasks: [other, SHEET, unrelated] };
 		const held = { ...TOPICS.rank, tasks: ["sheet-3", "sheet-4"] };
 		assert.deepEqual(

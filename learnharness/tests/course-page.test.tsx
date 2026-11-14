@@ -57,7 +57,7 @@ function course(over: Partial<StudyCourse["map"]> = {}, rest: Partial<Omit<Study
 			exam: { date: "2026-11-29", daysLeft: 21 },
 			current: h("cramer"),
 			focus: "sheet-4",
-			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c): show dim ker A = 2" }],
+			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Pending question, not yet answered: part (c)", updated: "2026-11-01" }],
 			topics: TOPICS,
 			edges: [
 				{ kind: "needs", prerequisite: h("vectors"), topic: h("span") },
@@ -135,7 +135,7 @@ describe("every topic once, in the group he would act on it from", () => {
 		assert.deepEqual(handles(learning).sort(), ["cramer", "determinant", "rank"]);
 		const fact = (handle: string) => learning.topics.find((t) => t.topic.handle === handle)!.fact;
 		assert.deepEqual(fact("cramer"), { kind: "here", words: "You are here" });
-		assert.deepEqual(fact("rank"), { kind: "task", words: "At part (c): show dim ker A = 2" });
+		assert.deepEqual(fact("rank"), { kind: "task", words: "Left off 7d ago" });
 		assert.equal(fact("determinant"), null, "a topic still being learned never says its review is due");
 	});
 

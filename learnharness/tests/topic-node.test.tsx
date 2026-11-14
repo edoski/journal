@@ -19,7 +19,8 @@ const h = (handle: string) => handle as TopicHandle;
 const QUIET: TopicSignals = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
 const titleOf = (handle: TopicHandle) => ({ cramer: "Cramer's rule" })[handle as string] ?? handle;
-const TASKS: CourseMapTask[] = [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }];
+const TODAY = "2026-11-08";
+const TASKS: CourseMapTask[] = [{ key: "sheet-4", title: "Problem sheet 4", step: "Pending question, not yet answered: part (c). Then pose the owed retest", updated: "2026-11-05" }];
 
 function topic(over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 	return { handle: h("t"), title: "Rank and the column space", level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...over };
@@ -27,7 +28,7 @@ function topic(over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 
 describe("a card's status", () => {
 	it("says a slip first, in the app's one wording", () => {
-		const status = (signals: Partial<TopicSignals>) => statusOf(topic({ level: "attempted", weak: true, signals: { ...QUIET, ...signals } }), TASKS, titleOf);
+		const status = (signals: Partial<TopicSignals>) => statusOf(topic({ level: "attempted", weak: true, signals: { ...QUIET, ...signals } }), TASKS, titleOf, TODAY);
 		assert.deepEqual(status({ lapsed: true }), { kind: "slip", words: "Missed last time" });
 		assert.equal(status({ gap: "sign error" })!.words, "Mistake to fix");
 		assert.deepEqual(status({ choiceErrors: { cramer: 2 } }), { kind: "slip", words: "Mixed up with Cramer's rule" });
@@ -36,23 +37,23 @@ describe("a card's status", () => {
 	});
 
 	it("says a due review as Home does, only for a topic he can do on his own", () => {
-		const review = (overdue: number) => statusOf(topic({ level: "independent", review: due(overdue) }), [], titleOf)!.words;
+		const review = (overdue: number) => statusOf(topic({ level: "independent", review: due(overdue) }), [], titleOf, TODAY)!.words;
 		assert.deepEqual([review(0), review(3), review(10), review(16)], ["Due today", "3d overdue", "1w overdue", "2w overdue"]);
-		assert.equal(statusOf(topic({ level: "attempted", review: due(4) }), [], titleOf), null, "a topic still being learned is nearly always due");
+		assert.equal(statusOf(topic({ level: "attempted", review: due(4) }), [], titleOf, TODAY), null, "a topic still being learned is nearly always due");
 	});
 
-	it("says where an open task holding the topic was left, after a slip and a review", () => {
-		assert.deepEqual(statusOf(topic({ level: "attempted", tasks: ["sheet-4"] }), TASKS, titleOf), { kind: "task", words: "At part (c)" });
-		assert.equal(statusOf(topic({ level: "attempted", tasks: ["sheet-4"] }), [{ ...TASKS[0]!, step: "Part (c): show dim ker A = 2" }], titleOf)!.words, "At part (c)", "the step up to its colon, as the sidebar says it");
-		assert.equal(statusOf(topic({ level: "attempted", tasks: ["gone"] }), TASKS, titleOf)!.words, "Unfinished");
-		assert.equal(statusOf(topic({ level: "independent", review: due(0), tasks: ["sheet-4"] }), TASKS, titleOf)!.kind, "review");
-		assert.equal(statusOf(topic(), TASKS, titleOf), null);
+	it("says when an open task holding the topic was left, never the tutor's step, after a slip and a review", () => {
+		assert.deepEqual(statusOf(topic({ level: "attempted", tasks: ["sheet-4"] }), TASKS, titleOf, TODAY), { kind: "task", words: "Left off 3d ago" });
+		assert.equal(statusOf(topic({ level: "attempted", tasks: ["sheet-4"] }), [{ ...TASKS[0]!, updated: TODAY }], titleOf, TODAY)!.words, "Left off today");
+		assert.equal(statusOf(topic({ level: "attempted", tasks: ["gone"] }), TASKS, titleOf, TODAY)!.words, "Unfinished");
+		assert.equal(statusOf(topic({ level: "independent", review: due(0), tasks: ["sheet-4"] }), TASKS, titleOf, TODAY)!.kind, "review");
+		assert.equal(statusOf(topic(), TASKS, titleOf, TODAY), null);
 	});
 });
 
 describe("the card", () => {
 	const render = (t: CourseMapTopic) =>
-		parseHTML(`<html><body>${renderToStaticMarkup(<NodeBody topic={t} standing={standingOf(t)} status={statusOf(t, TASKS, titleOf)} />)}</body></html>`).document;
+		parseHTML(`<html><body>${renderToStaticMarkup(<NodeBody topic={t} standing={standingOf(t)} status={statusOf(t, TASKS, titleOf, TODAY)} />)}</body></html>`).document;
 	const weak = (level: CourseMapTopic["level"], signals: Partial<TopicSignals>) => topic({ level, weak: true, signals: { ...QUIET, ...signals } });
 	/** Every state a card draws, and its line under the title: the status, else the standing in words. */
 	const STATES: { name: string; topic: CourseMapTopic; line: string }[] = [
@@ -62,7 +63,7 @@ describe("the card", () => {
 		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), line: "1w overdue" },
 		{ name: "missed after he had it", topic: weak("retained", { lapsed: true }), line: "Missed last time" },
 		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), line: "Mixed up with Cramer's rule" },
-		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), line: "At part (c)" },
+		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), line: "Left off 3d ago" },
 	];
 	const line = (doc: Document) => (doc.querySelector('[data-slot="topic-need"]') ?? doc.querySelector('[data-slot="topic-standing"]'))!.textContent;
 

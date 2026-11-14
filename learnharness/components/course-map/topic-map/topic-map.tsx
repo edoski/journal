@@ -73,7 +73,7 @@ export function TopicMap({
 						topic,
 						current: map.current === topic.handle,
 						standing: standingOf(topic),
-						status: statusOf(topic, map.tasks, titleOf),
+						status: statusOf(topic, map.tasks, titleOf, map.today),
 						label: topicLabel(topic, map.current === topic.handle, titleOf),
 						needs: needs.length ? `Needs ${needs.join(", ")}` : null,
 						href: unitHref(map.workspace, topic.handle),

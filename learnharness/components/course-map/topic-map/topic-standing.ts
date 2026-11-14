@@ -1,6 +1,7 @@
 import type { CourseMapTask, CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
 import { mathPlain } from "@/components/ui/math-text";
 import { overdueWords, slipWords, STANDING_WORDS, type Fill } from "@/components/study-words";
+import { taskWords } from "@/components/unit-inbox/units";
 
 /** Where the learner stands on a topic, as the map draws and says it. */
 export interface Standing {
@@ -60,25 +61,18 @@ export interface Status {
 	words: string;
 }
 
-/** Home's task words: where he left off, the step up to its first colon
- *  ("At part (c)"), else "Unfinished". */
-function taskWords(topic: CourseMapTopic, tasks: readonly CourseMapTask[]): string | null {
-	if (topic.tasks.length === 0) return null;
-	const step = tasks.find((task) => topic.tasks.includes(task.key))?.step?.split(":")[0]!.trimEnd();
-	return step ? `At ${step.charAt(0).toLowerCase()}${step.slice(1)}` : "Unfinished";
-}
-
 /**
  * What a candidate node says about a topic beyond its standing, or null:
  * why it is weak, else that its review is due (only for a topic he can do
  * on his own, the sidebar's rule), else where an open task holding it was
- * left. Engine fields only. Pure.
+ * left ("Left off 3d ago"). Engine fields only. Pure.
  */
-export function statusOf(topic: CourseMapTopic, tasks: readonly CourseMapTask[], titleOf: (handle: TopicHandle) => string): Status | null {
+export function statusOf(topic: CourseMapTopic, tasks: readonly CourseMapTask[], titleOf: (handle: TopicHandle) => string, today: string): Status | null {
 	if (topic.weak) return { kind: "slip", words: slipWords(topic.signals, titleOf) };
 	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
-	const task = taskWords(topic, tasks);
-	return task ? { kind: "task", words: task } : null;
+	if (topic.tasks.length === 0) return null;
+	const task = tasks.find((t) => topic.tasks.includes(t.key));
+	return { kind: "task", words: taskWords(task ?? { updated: null }, today) };
 }
 
 /** The current topic's tag on the map. */

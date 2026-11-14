@@ -70,7 +70,7 @@ const LINALG: StudyCourse = {
 		exam: { date: "2026-11-29", daysLeft: 21 },
 		current: "rank" as TopicHandle,
 		focus: "sheet-4",
-		tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }],
+		tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Pending question, not yet answered: part (c). He needs the matrix first", updated: "2026-11-05" }],
 		topics: [
 			topic("vectors", "Vectors", "transferred", { review: { kind: "scheduled", date: "2026-11-13" } }),
 			topic("span", "Span", "retained", { review: due(10) }),
@@ -304,7 +304,7 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(short(rowOf(LINALG)), ["review", "2w overdue"]);
 		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "1d overdue"]);
 		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Missed Sequences"]);
-		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "At part (c)"]);
+		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 3d ago"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
 	});
 

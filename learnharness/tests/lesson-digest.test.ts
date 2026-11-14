@@ -123,7 +123,7 @@ const MAP: CourseMap = {
 	exam: null,
 	current: "rank" as never,
 	focus: null,
-	tasks: [{ key: "sheet-2", title: "Sheet 2", step: "Exercise 1" }],
+	tasks: [{ key: "sheet-2", title: "Sheet 2", step: "Exercise 1", updated: null }],
 	topics: [
 		{ handle: "rank", title: "Rank", level: "assisted", introduced: "2026-11-13", review: null, weak: false, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false }, tasks: ["sheet-2"] },
 		{ handle: "nullity", title: "Nullity", level: "none", introduced: null, review: null, weak: false, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false }, tasks: [] },
@@ -134,7 +134,7 @@ const MAP: CourseMap = {
 const KNOWN = { handle: "rank-notation", text: "The course writes rank as $r(A)$", topics: ["rank"] };
 
 /** An in-memory engine: the map above, one note and one knowledge entry, and every save kept. */
-function memoryCourse() {
+function memoryCourse(refuse: (changes: Record<string, unknown>) => string | null = () => null) {
 	const saves: Array<Record<string, unknown>> = [];
 	const records: CourseRecords = {
 		list: async () => ({ available: true, courses: [] }),
@@ -146,6 +146,8 @@ function memoryCourse() {
 			}
 			if (verb.verb === "show") return { ok: true, json: { items: { rank: { kind: "topic", note: "Reads matrices by rows" } } } };
 			if (verb.verb === "save") {
+				const refused = refuse(verb.changes as Record<string, unknown>);
+				if (refused) return { ok: false, kind: "validation", message: refused };
 				saves.push(verb.changes as Record<string, unknown>);
 				return { ok: true, json: { saved: true } };
 			}
@@ -323,6 +325,21 @@ describe("a digest run", () => {
 		const again = createLessonDigest({ chatStore, courseRecords: course.records, engine: submitEngine(SUBMIT) });
 		assert.equal((await again.digestLesson(chatId)).status, "nothing");
 		assert.equal(course.saves.length, 1, "the same stretch is never saved twice");
+	});
+
+	it("a text the engine refuses goes back to the agent, which rewrites it, and only the rewrite is saved", async () => {
+		const chatId = chatWith(closedLesson());
+		const REFUSAL = 'topics.rank.gap speaks of the learner as "He", but the learner reads it in their study app: write it to them, as "you", and save again';
+		const course = memoryCourse((changes) => (JSON.stringify(changes).includes("He counts") ? REFUSAL : null));
+		const thirdPerson = { ...SUBMIT, topics: [{ ...SUBMIT.topics[0]!, gap: "He counts rows instead of pivots" }, SUBMIT.topics[1]!] };
+		const digest = createLessonDigest({
+			chatStore,
+			courseRecords: course.records,
+			engine: submitEngine((prompt: string) => (prompt.includes("speaks of the learner") ? SUBMIT : thirdPerson)),
+		});
+		assert.equal((await digest.digestLesson(chatId)).status, "saved");
+		assert.equal(course.saves.length, 1);
+		assert.deepEqual((course.saves[0]!.topics as Record<string, unknown>).rank, { gap: "You count rows instead of pivots" });
 	});
 
 	it("skips practice sessions and chats with no course", async () => {

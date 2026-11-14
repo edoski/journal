@@ -60,6 +60,8 @@ export interface CourseMapTask {
 	key: string;
 	title: string;
 	step: string | null;
+	/** The engine's day the task last changed, where he left off it. */
+	updated: string | null;
 }
 
 export interface CourseMap {

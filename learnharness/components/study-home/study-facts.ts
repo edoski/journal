@@ -39,7 +39,7 @@ export function todaysReview(course: StudyCourse): CourseMapTopic[] {
  *  it was never taught, and `planned` when today's plan starts it. */
 export type NextStep =
 	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null }
-	| { kind: "task"; key: string; title: string; step: string | null; topics: readonly TopicHandle[] }
+	| { kind: "task"; key: string; title: string; updated: string | null; topics: readonly TopicHandle[] }
 	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; fresh: boolean; planned: boolean }
 	| { kind: "none" };
 
@@ -53,7 +53,7 @@ export function nextStepOf(course: StudyCourse): NextStep {
 	}
 	if (task) {
 		const held = map.topics.filter((t) => t.tasks.includes(task.key)).map((t) => t.handle);
-		return { kind: "task", key: task.key, title: task.title, step: task.step, topics: held.length > 0 ? held : current ? [current.handle] : [] };
+		return { kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] };
 	}
 	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
 	if (planned.length > 0) {

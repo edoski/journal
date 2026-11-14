@@ -587,7 +587,9 @@ def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
     assert result["today"] == TODAY.isoformat()
     assert result["exam"] == {"date": day(23), "days_left": 23}
     assert result["current"] == "step-3" and result["focus"] == "sheet"
-    assert result["tasks"] == [{"key": "sheet", "title": "Sheet 1"}]
+    assert result["tasks"] == [
+        {"key": "sheet", "title": "Sheet 1", "updated": TODAY.isoformat()}
+    ]
     topics = {item["topic"]: item for item in result["topics"]}
     assert [item["topic"] for item in result["topics"]] == [*names, "cramer"]
     assert all("overdue" in topics[name] for name in names)

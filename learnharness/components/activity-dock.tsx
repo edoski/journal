@@ -331,7 +331,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	// header and one 32px row per process, its detail opening under it.
 	// Cost and context live in the detail, not on the row's face.
 	return (
-		<NavSection data-testid="activity-section" title="Background agents" className="shrink-0 px-2 pt-2">
+		<NavSection data-testid="activity-section" title="Working in the background" className="shrink-0 px-2 pt-2">
 			<div className="flex max-h-[40dvh] flex-col overflow-y-auto">
 				{blobs.map((blob) => (
 					<ActivityRow
@@ -349,11 +349,11 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	);
 }
 
-/** What a blob is, in words: "Researcher", "Digesting lesson". A
+/** What a blob is, in words: "Researcher", "Saving what you learned". A
  *  background run is a finished lesson's digest or a course's map being
  *  built from its material. */
 function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "extraction") return blob.phase === "mapping" ? "Mapping course" : "Digesting lesson";
+	if (blob.process === "extraction") return blob.phase === "mapping" ? "Mapping course" : "Saving what you learned";
 	switch (blob.jobKind) {
 		case "research":
 			return "Researcher";

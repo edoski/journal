@@ -180,7 +180,7 @@ describe("course records adapter (fake engine)", () => {
 			exam: { date: "2026-11-29", days_left: 21 },
 			current: "rank",
 			focus: "sheet-4",
-			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }],
+			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }],
 			topics: [
 				{ topic: "vectors", title: "Vectors", needs: [], contrasts: [], level: "transferred", introduced: "2026-10-16", review: "2026-11-23", weak: false, tasks: [] },
 				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
@@ -197,7 +197,7 @@ describe("course records adapter (fake engine)", () => {
 		assert.equal(map.workspace, "/s/linalg");
 		assert.deepEqual(map.exam, { date: "2026-11-29", daysLeft: 21 });
 		assert.equal(map.current, "rank");
-		assert.deepEqual(map.tasks, [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }]);
+		assert.deepEqual(map.tasks, [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }]);
 		assert.deepEqual(
 			map.topics.map((t) => t.handle),
 			["vectors", "elimination", "rank", "cramer"],

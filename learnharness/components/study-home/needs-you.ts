@@ -50,12 +50,10 @@ export function lineTopics(row: TodayRow): TopicHandle[] {
 
 /** The reason's words for a status slot: Home's short words, except a lapse
  *  on the lead topic itself ("Missed last time", since the card already
- *  names it) and a task's step cut at its first colon ("At part (c)").
- *  Pure. */
+ *  names it). Pure. */
 export function slotWords(why: Why | null, lead: CourseMapTopic | null): string | null {
 	if (!why) return null;
 	if (why.kind === "missed" && lead && why.short === `Missed ${lead.title}`) return SLIP_WORDS.lapsed;
-	if (why.kind === "task") return why.short.split(":")[0]!.trimEnd();
 	return why.short;
 }
 

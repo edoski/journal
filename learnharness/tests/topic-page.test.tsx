@@ -46,7 +46,7 @@ const MAP: CourseMap = {
 	exam: null,
 	current: "rank" as TopicHandle,
 	focus: "sheet-4",
-	tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }],
+	tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: null }],
 	topics: [RANK, SPAN, VECTORS, EIGEN],
 	edges: [],
 };

@@ -509,7 +509,12 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "focus": record.get("focus"),
             "tasks": [
                 compact(
-                    {"key": key, "title": task.get("title"), "step": task.get("step")}
+                    {
+                        "key": key,
+                        "title": task.get("title"),
+                        "step": task.get("step"),
+                        "updated": task.get("updated"),
+                    }
                 )
                 for key, task in tasks.items()
             ],

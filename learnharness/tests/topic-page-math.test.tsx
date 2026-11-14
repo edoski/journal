@@ -100,7 +100,7 @@ describe("math on the topic page", () => {
 });
 
 describe("math in the topic page's head and Next", () => {
-	const SHEET = { key: "sheet-4", title: "Problem sheet 4", step: "Part (c): show $\\dim\\ker A = 2$" };
+	const SHEET = { key: "sheet-4", title: "Problem sheet 4", step: "Part (c): show $\\dim\\ker A = 2$", updated: null };
 	const RANK: CourseMapTopic = {
 		...DET,
 		handle: "rank" as TopicHandle,

@@ -78,6 +78,7 @@ describe("engine doctrine", () => {
 			assert.ok(prompt.includes("with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice."), `${agent}: focus`);
 			assert.ok(prompt.includes('`{"preferences": {"explanation_depth": "Short first, details on request"}}` sets a course preference') && prompt.includes("A preference is never a `knowledge` entry."), `${agent}: preferences`);
 			assert.ok(headings(courseRecordPrompt(agent)).includes("Exam facts"), `${agent}: exam facts`);
+			assert.ok(prompt.includes('Write these to the learner, in plain words a reader understands after days away: "you", never "he" or "the learner"; no dates, observation ids or plan-node ids'), `${agent}: what the learner reads`);
 		}
 		for (const agent of ["teacher", "practice"] as const) {
 			assert.ok(normalize(courseRecordPrompt(agent)).includes("Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete"), `${agent}: the close`);

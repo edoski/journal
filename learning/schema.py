@@ -614,7 +614,60 @@ def entry(
         for name in REQUIRED.get(kind, ()):
             if name not in result:
                 raise ValueError(f'{path} needs "{name}"')
+    else:
+        _learner_reads(kind, result, path)
     return result
+
+
+# --- what the learner reads -------------------------------------------------
+
+# The recorded texts the learner reads in their study app, days later
+# (records.md, "What the learner reads"), and of those the ones written to the
+# learner: a topic's title names an idea and an attempt's text is the question
+# as asked, so a person in a word problem may be "he".
+LEARNER_READS: dict[str, tuple[str, ...]] = {
+    "topic": ("title", "gap", "note"),
+    "task": ("title", "goal", "step"),
+    "observation": ("text",),
+}
+WRITTEN_TO_LEARNER: dict[str, tuple[str, ...]] = {
+    "topic": ("gap", "note"),
+    "task": ("title", "goal", "step"),
+}
+_SHOWN_ID = re.compile(r"\bo[0-9]+\b")
+_SHOWN_DAY = re.compile(r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b")
+_THIRD_PERSON = re.compile(
+    r"\b(?:he|him|his|himself|she|her|hers|herself|learners?|the\s+students?)\b",
+    re.IGNORECASE,
+)
+
+
+def _learner_reads(kind: str, item: dict[str, Any], path: str) -> None:
+    """Refuse an id, a date or third-person words in text the learner reads."""
+    for name in LEARNER_READS.get(kind, ()):
+        text = item.get(name)
+        if not isinstance(text, str):
+            continue
+        where = f"{path}.{name}"
+        reads = "the learner reads it in their study app"
+        if found := _SHOWN_ID.search(text):
+            raise ValueError(
+                f'{where} names the observation "{found[0]}", but {reads}, where '
+                "ids mean nothing: say what happened instead and save again"
+            )
+        if found := _SHOWN_DAY.search(text):
+            raise ValueError(
+                f'{where} holds the date "{found[0]}", but {reads}, which dates '
+                'every entry itself: leave the date out, or say "the same day" '
+                'or "after the hint", and save again'
+            )
+        if name in WRITTEN_TO_LEARNER.get(kind, ()) and (
+            found := _THIRD_PERSON.search(text)
+        ):
+            raise ValueError(
+                f'{where} speaks of the learner as "{found[0]}", but {reads}: '
+                'write it to them, as "you", and save again'
+            )
 
 
 def _review_patch(value: Any, path: str) -> dict[str, Any]:

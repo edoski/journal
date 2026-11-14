@@ -146,6 +146,22 @@ describe("course chooser routes", () => {
 	});
 });
 
+/** Resolves once `check` holds, re-checked on every server event (the map
+ *  build announces itself in Activity); the cap only bounds a broken build. */
+async function untilEvent(check: () => boolean): Promise<void> {
+	if (check()) return;
+	const { subscribe } = await import("../src/core/events.ts");
+	await new Promise<void>((resolve) => {
+		const cap = setTimeout(done, 10_000);
+		const stop = subscribe(() => check() && done());
+		function done() {
+			clearTimeout(cap);
+			stop();
+			resolve();
+		}
+	});
+}
+
 describe("new course", () => {
 	it("creates <root>/<slug> with its title and exam day, copies the material in and registers it, and the course is listed", async () => {
 		const res = await createCourse({
@@ -161,7 +177,9 @@ describe("new course", () => {
 		const calls = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === directory);
 		const writes = calls.filter((c) => c.args[2] !== "show");
 		assert.deepEqual(writes.map((c) => c.args.slice(2)), [["init"], ["save"], ["sources", "--add", "material/Syllabus.pdf", "material/Lectures/Week 1.md", "material/escape.txt"]]);
-		assert.ok(calls.some((c) => c.args[2] === "show" && c.args[3] === "--all"), "its map starts building from the material in the background");
+		const reads = () => engineCalls().some((c) => c.args[1] === directory && c.args[2] === "show" && c.args[3] === "--all");
+		await untilEvent(reads);
+		assert.ok(reads(), "its map starts building from the material in the background");
 		assert.deepEqual(JSON.parse(writes[1]!.stdin), { title: "Measure Theory & Probability!", exam: { date: "2026-12-14" } });
 		assert.equal(fs.readFileSync(path.join(directory, "material", "Lectures", "Week 1.md"), "utf-8"), "week one");
 		assert.equal(fs.existsSync(path.join(directory, "material", "Lectures", ".DS_Store")), false, "hidden files stay out");

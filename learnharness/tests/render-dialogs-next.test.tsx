@@ -115,7 +115,7 @@ describe("background agents", () => {
 	it("one row per process under a quiet header: what it is doing and for which session, elapsed time and a named stop button; cost waits in the detail", () => {
 		const doc = documentFor(<ActivitySection feed={feed} />);
 		const section = doc.querySelector('[data-testid="activity-section"]');
-		assert.equal(section?.querySelector('[data-slot="nav-section-header"]')?.textContent, "Background agents");
+		assert.equal(section?.querySelector('[data-slot="nav-section-header"]')?.textContent, "Working in the background");
 		const row = section?.querySelector('[data-testid="activity-blob-job"] [data-slot="nav-row"]');
 		assert.equal(row?.querySelector('[data-slot="nav-row-label"]')?.textContent, "Researcher · Eigenvalues and eigenvectors");
 		assert.match(row?.querySelector('[data-testid="activity-blob-elapsed"]')?.textContent ?? "", /^\d+(s|m \d\ds|h \d\dm)$/);

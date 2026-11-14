@@ -54,7 +54,7 @@ const RANK = topic("rank", "Rank and the column space", { level: "assisted", rev
 const EIGEN = topic("eigen", "Eigenvalues and eigenvectors", { level: "assisted" });
 const DIAG = topic("diagonalization", "Diagonalization", { level: "new", introduced: null, review: null });
 const BASIS = topic("basis", "Basis and dimension", { tasks: ["sheet-4"] });
-const SHEET = { key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" };
+const SHEET = { key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: null };
 const MAP: CourseMap = { workspace: WS, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: EIGEN.handle, focus: null, tasks: [SHEET], topics: [RANK, BASIS, EIGEN, DIAG], edges: [] };
 const COURSE: CalendarCourse = { map: MAP, unready: null, due: [RANK.handle], lastActiveDaysAgo: 0, newToday: [], planned: [], doesNotFit: [], finalReview: null };
 
