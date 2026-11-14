@@ -1,7 +1,10 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { ArcHandle } from "@/src/core";
+import { blurAfterPointerClick } from "@/components/focus-hygiene";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Ring } from "@/components/ui/pie";
 import { MathText } from "@/components/ui/math-text";
 import { toggleVariants } from "@/components/ui/toggle";
@@ -18,15 +21,50 @@ export interface StripArc {
 
 type PillSize = "segment" | "segment-sm" | "segment-xs";
 
-/** What every arc pill holds: the arc's ring, then its name, which ends in
- *  … when the pill runs out of room. */
+/** An arc's name, whole. Only a name wider than its pill's stated width
+ *  (`max-w-*` where the pill sits) ends in …, and then shows whole in a
+ *  tooltip under the pointer (round 6: "Sam…", "De…" meant nothing). */
+function ArcName({ title }: { title: string }) {
+	const ref = useRef<HTMLSpanElement>(null);
+	const [cut, setCut] = useState(false);
+	useLayoutEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		let live = true;
+		const measure = () => live && setCut(el.scrollWidth > el.clientWidth + 0.5);
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(el);
+		void document.fonts?.ready.then(measure);
+		return () => {
+			live = false;
+			observer.disconnect();
+		};
+	}, [title]);
+	// One tree whether cut or not, so the measured span stays the same node; the tooltip opens only on a cut name.
+	return (
+		<TooltipProvider>
+			<Tooltip {...(cut ? {} : { open: false })}>
+				{/* Hover only, as `Hint`: Tab is dead app-wide. */}
+				<TooltipTrigger asChild onFocus={(e) => e.preventDefault()}>
+					<span ref={ref} data-slot="arc-name" data-cut={cut || undefined} className="min-w-0 truncate data-cut:pointer-events-auto">
+						<MathText>{title}</MathText>
+					</span>
+				</TooltipTrigger>
+				<TooltipContent>
+					<MathText>{title}</MathText>
+				</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
+	);
+}
+
+/** What every arc pill holds: the arc's ring, then its name (`ArcName`). */
 function PillFace({ arc, size }: { arc: StripArc; size: PillSize }) {
 	return (
 		<>
 			{arc.share !== null && <Ring aria-hidden share={arc.share} className={size === "segment" ? undefined : "size-3.5"} />}
-			<span className="min-w-0 truncate">
-				<MathText>{arc.title}</MathText>
-			</span>
+			<ArcName title={arc.title} />
 		</>
 	);
 }
@@ -36,16 +74,18 @@ const pillGap = (size: PillSize) => (size === "segment" ? "gap-2" : "gap-1.5");
 /**
  * One arc, as the strip's pills draw it (shadcn's Toggle, `pill`): the
  * only way an arc is named anywhere, never as "Course · Arc" text (Edo,
- * 14 Nov 2026). `on` draws it on the selected fill. With `href` it is a
- * link (the course page with that arc shown), else a plain mark. `size`
- * `segment-xs` keeps a line of facts at its height.
+ * 14 Nov 2026), its name whole up to the width where it sits (`ArcName`).
+ * `on` draws it on the selected fill. With `href` it is a link (the
+ * course page with that arc shown, as the topic page's head opens it),
+ * else a plain mark. `size` `segment-xs` keeps a line of facts at its
+ * height; `segment-sm` is the topic head's.
  */
 export function ArcPill({ arc, href, on = false, size = "segment-xs", className }: { arc: StripArc; href?: string; on?: boolean; size?: PillSize; className?: string }) {
 	const look = cn(toggleVariants({ variant: "pill", size }), "max-w-full min-w-0", pillGap(size), className);
 	const state = on ? "on" : "off";
 	if (href) {
 		return (
-			<Link href={href} data-slot="arc-pill" data-arc={arc.handle} data-state={state} className={look}>
+			<Link href={href} onClick={blurAfterPointerClick} data-slot="arc-pill" data-arc={arc.handle} data-state={state} className={look}>
 				<PillFace arc={arc} size={size} />
 			</Link>
 		);
@@ -62,9 +102,12 @@ export function ArcPill({ arc, href, on = false, size = "segment-xs", className 
  * study order as pills above a map (shadcn's ToggleGroup, `pill`, the same
  * pill as `ArcPill`), each its ring and its name, no counts; the shown arc
  * on the selected fill, the others quiet. Bubbles, never underline tabs,
- * so the arcs never read as Home's course tabs (Edo, 14 Nov 2026). A press
- * shows that arc (`onSelect`); the arrows move between pills. `quiet`
- * draws it a step smaller, under Home's course tabs.
+ * so the arcs never read as Home's course tabs (Edo, 14 Nov 2026). Each
+ * pill keeps its whole name: the strip wraps onto another row before a
+ * name is cut, and only a name wider than the strip itself ends in …,
+ * whole in its tooltip; no scrollbar. A press shows that arc
+ * (`onSelect`); the arrows move between pills. `quiet` draws it a step
+ * smaller, under Home's course tabs.
  */
 export function ArcStrip({
 	arcs,
@@ -90,10 +133,10 @@ export function ArcStrip({
 			value={value ?? ""}
 			// One arc is always shown: a press on the shown one keeps it.
 			onValueChange={(v) => v && onSelect(v as ArcHandle)}
-			className={cn("max-w-full min-w-0 overflow-hidden", className)}
+			className={cn("max-w-full min-w-0 flex-wrap gap-y-1.5", className)}
 		>
 			{arcs.map((arc) => (
-				<ToggleGroupItem key={arc.handle} value={arc.handle} data-arc={arc.handle} className={cn("lh-no-drag min-w-0 shrink", pillGap(size))}>
+				<ToggleGroupItem key={arc.handle} value={arc.handle} data-arc={arc.handle} className={cn("lh-no-drag max-w-full min-w-0 shrink-0", pillGap(size))}>
 					<PillFace arc={arc} size={size} />
 				</ToggleGroupItem>
 			))}

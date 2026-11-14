@@ -62,7 +62,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 
 | Reason | Words |
 |---|---|
-| `next` | Next in Matrices; without arcs, Next in Linear Algebra |
+| `next` | Next in Matrices; without arcs, Next in Linear Algebra; in an arc before the one "You are here" is in (`currentArc`), Back to Matrices, earlier in the course (short: Back to Matrices), so a lesson that moved him ahead never reads against "Next in" an arc behind him (round 6) |
 | `after`, its prerequisites | After Expectation, which it needs |
 | `after`, a method it competes with | After Separable equations, so the two methods stay apart |
 | `early` | Early, from Orthogonality; without arcs, Early, ahead of its place; then, while earlier topics wait on Rank, or, when the exam's pace took it, to keep pace with the exam |

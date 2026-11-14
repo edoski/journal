@@ -29,7 +29,7 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<span className="flex min-w-0 items-center gap-3">
 					<MathLine className="min-w-0 flex-1 text-row font-medium text-foreground">{row.topic.title}</MathLine>
-					{row.arc && <ArcPill arc={row.arc} className="max-w-36 shrink-0" />}
+					{row.arc && <ArcPill arc={row.arc} className="max-w-3/5 shrink-0" />}
 				</span>
 				<span className="flex min-w-0 items-center gap-3 text-label text-muted-foreground">
 					<MathLine className="min-w-0 flex-1">{row.words}</MathLine>

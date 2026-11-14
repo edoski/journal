@@ -31,13 +31,14 @@ function Lines({ label, why, title, arc }: { label: string; why: Why | null; tit
 		<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span className="flex min-w-0 items-center gap-3">
 				<span className="shrink-0 text-label text-muted-foreground">{label}</span>
-				<span className="ml-auto flex min-w-0 justify-end [&>*]:min-w-0">
+				{/* The line holds only the label and the reason, so the reason takes the line, past Today's row cap. */}
+				<span className="ml-auto flex min-w-0 justify-end [&>*]:min-w-0 [&_[data-slot=today-why]]:max-w-full">
 					<WhyMark why={why} />
 				</span>
 			</span>
 			<span className="flex min-w-0 items-center gap-3">
 				<MathLine className="min-w-0 flex-1 text-row font-medium text-foreground">{title}</MathLine>
-				{arc && <ArcPill arc={arc} className="max-w-40 shrink-0" />}
+				{arc && <ArcPill arc={arc} className="max-w-3/5 shrink-0" />}
 			</span>
 		</span>
 	);
