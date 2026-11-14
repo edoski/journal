@@ -1,4 +1,4 @@
-import type { LhMessage } from "./native-messages.ts";
+import { opensTurn, type LhMessage } from "./native-messages.ts";
 
 /**
  * The course topics a session's first turn looked at, in the order it
@@ -44,4 +44,14 @@ function parse(text: string): unknown {
 	} catch {
 		return null;
 	}
+}
+
+/** Whether the session is still on its first turn, the one turn that may
+ *  name it (round 4, 14 Nov 2026): no reply has come yet, or none of his
+ *  input (an answer, a message, a handoff) has followed the first reply.
+ *  Later turns, the first plan's included, keep the name it has, so a
+ *  session he left is found under the same name. Pure. */
+export function onFirstTurn(messages: readonly LhMessage[]): boolean {
+	const reply = messages.findIndex((m) => m.role === "assistant" && m.stopReason !== "aborted" && m.stopReason !== "error");
+	return reply < 0 || !messages.slice(reply + 1).some(opensTurn);
 }

@@ -17,6 +17,7 @@ import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
+import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
@@ -200,7 +201,7 @@ function nameSession(id: string, goal: SessionGoal): void {
 	if ((record.topics ?? []).length > 0) return;
 	const topic = goal.topic?.trim();
 	if (topic) record.topics = [topic];
-	if (!record.renamed && !record.named && goal.title.trim()) record.title = goal.title.trim();
+	if (!record.renamed && !record.named && onFirstTurn(record.messages) && goal.title.trim()) record.title = goal.title.trim();
 	record.named = true;
 	writeChat(record);
 	emit("chats-changed", { named: { id, title: record.title } });

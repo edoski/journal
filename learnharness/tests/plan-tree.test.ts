@@ -192,6 +192,43 @@ describe("name_session names a session on its first turn, once", () => {
 	});
 });
 
+describe("a session past its first turn keeps its name", () => {
+	// Round 4: "Rank practice" became "Rank and the column space" after Explain
+	// instead, and "Eigenvalues and eigenvectors" became "Eigenvalues of 2×2
+	// matrices" at the hand-off to practice.
+	const STAMPS = { api: "faux", provider: "test", model: "test", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+	const pastFirstTurn = [
+		{ id: "u1", role: "user", content: "rank practice please", timestamp: 1 },
+		{ id: "a1", role: "assistant", content: [{ type: "text", text: "Here is a problem." }], stopReason: "stop", timestamp: 2, ...STAMPS },
+		{ id: "u2", role: "user", content: "actually just explain it", timestamp: 3 },
+	] as never;
+	const name = (chatId: string, input: unknown) => nameSessionTool({ chatId, chatStore }).name_session!.execute("test", input);
+	const PLAN = "graph TD\n  setup[Write out A - lambda I] --> solve[Solve the kernel]\n";
+
+	it("a later turn's name_session leaves the name he knows it by", async () => {
+		const chatId = newChat("Rank practice");
+		chatStore.saveMessages(chatId, pastFirstTurn);
+		const result = await name(chatId, { title: "Rank and the column space", topic: "rank" });
+		assert.match(JSON.stringify(result.content), /keeps its name/);
+		assert.equal(chatStore.listChats().find((c) => c.id === chatId)!.title, "Rank practice");
+	});
+
+	it("a first plan after the first turn gives the topic, never a new name", async () => {
+		const chatId = newChat("Eigenvalues and eigenvectors");
+		chatStore.saveMessages(chatId, pastFirstTurn);
+		await exec(planTools({ chatId, chatStore }), "plan_init", { mermaid: PLAN, goal: { title: "Eigenvalues of 2×2 matrices", topic: "eigen" } });
+		const kept = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([kept.title, kept.ownTopics], ["Eigenvalues and eigenvectors", ["eigen"]]);
+	});
+
+	it("the first reply still names it, a question that ends the turn included", async () => {
+		const chatId = newChat("can you go over kernels");
+		chatStore.saveMessages(chatId, [pastFirstTurn[0]] as never);
+		await name(chatId, { title: "Kernel and rank-nullity" });
+		assert.equal(chatStore.listChats().find((c) => c.id === chatId)!.title, "Kernel and rank-nullity");
+	});
+});
+
 describe("a first turn that did not name its session", () => {
 	const STAMPS = { api: "faux", provider: "test", model: "test", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
 	const map = { ok: true as const, map: { topics: [{ handle: "the-derivative", title: "The derivative" }, { handle: "chain-rule", title: "Chain rule" }] } } as never;
