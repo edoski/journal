@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
-import { MathText } from "@/components/ui/math-text";
+import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
 import { formDraftText } from "@/components/lesson/stranded-draft";
+import { QUESTION_WORDS } from "@/components/study-words";
 import {
 	buildAnswer,
 	kbdEventForAction,
@@ -158,25 +159,13 @@ export function QuestionDock({
 	);
 }
 
-/** The question as one line of words and inline formulas, for MathText:
- *  display math joins the line, a matrix or a case split (one line can't
- *  hold its rows) folds to ⋯, a tall fraction becomes a text one, and
- *  markdown marks drop. */
-export function teaserLine(q: string): string {
-	return repairMathForDisplay(q)
-		.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$]+?)\$/g, (_, a, b, c, d) => `$${inline(a ?? b ?? c ?? d)}$`)
-		.replace(/\*\*|__|`/g, "")
-		.replace(/^\s*(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
-		.replace(/\s+/g, " ")
-		.trim();
-}
-
-function inline(tex: string): string {
-	return tex
-		.replace(/\\begin\{(\w+\*?)\}[\s\S]*?\\end\{\1\}/g, "\\cdots")
-		.replace(/\\dfrac/g, "\\tfrac")
-		.replace(/\s+/g, " ")
-		.trim();
+/** A question's label by what it asks (QUESTION_WORDS): a recall while
+ *  the tutor finds what he holds, a prediction before teaching, a check
+ *  after it, else a plain question. Pure. */
+export function questionLabel(toolName: string, type: unknown): string {
+	if (toolName === "recall") return QUESTION_WORDS.recall;
+	if (toolName !== "explain") return QUESTION_WORDS.question;
+	return normalizeQuestionType(type) === "predict" ? QUESTION_WORDS.predict : QUESTION_WORDS.check;
 }
 
 /** The collapsed strip. Two species (W5): "collapsed" is the scroll minimization
@@ -216,7 +205,7 @@ export function QuestionDockBar({
 				{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
 			</span>
 			<span className="min-w-0 flex-1 truncate text-muted-foreground">
-				<MathText>{teaserLine(question)}</MathText>
+				<LineText>{repairMathForDisplay(question)}</LineText>
 			</span>
 			<span className={cn("flex shrink-0 items-center gap-1", reveal ? "text-link" : "text-foreground")}>
 				{reveal ? "Open" : "Answer"}

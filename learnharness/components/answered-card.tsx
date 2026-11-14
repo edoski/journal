@@ -9,8 +9,6 @@ import { SentPhotos } from "@/components/photos";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { LESSON_WORDS } from "@/components/study-words";
-import { MathText } from "@/components/ui/math-text";
-import { teaserLine } from "@/components/question-dock";
 
 /**
  * Static rendering of an answered question (tool part in `output-available`):
@@ -33,16 +31,18 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 }) {
 	const answer = answerForPresentation(savedAnswer, input);
 	if (answer.dismissed && answer.reason === "tonight") {
+		// The whole question, so the record still says which matrix he left;
+		// its answer was never shown, and is not here either.
 		return (
-			<LessonCard data-testid="answered-card" className="text-row text-muted-foreground">
-				{LESSON_WORDS.leftForTonight}: <MathText>{teaserLine(answer.questionText)}</MathText>
+			<LessonCard data-testid="answered-card" label={LESSON_WORDS.leftForTonight}>
+				<ToolContentResponse className="text-muted-foreground">{answer.questionText}</ToolContentResponse>
 			</LessonCard>
 		);
 	}
 	if (answer.dismissed) {
 		return (
-			<LessonCard data-testid="answered-card" className="text-row text-muted-foreground">
-				Skipped: {answer.questionText}
+			<LessonCard data-testid="answered-card" label={LESSON_WORDS.skippedQuestion}>
+				<ToolContentResponse className="text-muted-foreground">{answer.questionText}</ToolContentResponse>
 			</LessonCard>
 		);
 	}

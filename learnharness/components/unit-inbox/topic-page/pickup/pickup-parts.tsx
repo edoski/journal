@@ -14,6 +14,7 @@ import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-fa
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { MathText } from "@/components/ui/math-text";
+import { LineText } from "@/components/line-text";
 
 const ICON = "size-4 text-muted-foreground";
 
@@ -125,7 +126,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 					<li key={item.kind === "task" ? item.key : "review"}>
 						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={item.kind === "task" && item.step ? TWO_LINE_ROW : ONE_LINE_ROW}>
 							{item.kind === "task" ? <BookmarkIcon aria-label="Unfinished" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
-							<span className="col-span-2 truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
+							<span className="col-span-2 truncate text-row text-foreground"><LineText>{item.kind === "task" ? item.title : item.words}</LineText></span>
 							{item.kind === "task" && item.step && (
 								<span data-slot="pickup-next-step" className="col-span-2 col-start-2 truncate text-label text-muted-foreground">
 									<MathText>{item.step}</MathText>
@@ -204,7 +205,7 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 		>
 			<NowIcon now={now} facts={facts} />
 			<span data-slot="pickup-now-words" className="line-clamp-2 text-control font-medium text-foreground">
-				<MathText>{now.words}</MathText>
+				<LineText>{now.words}</LineText>
 			</span>
 			<NowPress now={now} busy={busy} onAct={onAct} className="justify-self-end" />
 			{now.note && (

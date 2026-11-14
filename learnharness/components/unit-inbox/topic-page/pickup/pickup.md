@@ -27,7 +27,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |
 | Study | Nothing due (Scheduled holds the date) | |
 
-The press is the head button's word. The step after it is the map's Next, beside the list, so Now does not repeat it. The hybrid's head drops its review mark and "Studied yesterday" (`HybridTopic`), which Now, Scheduled and Earlier say. A step or session title may hold TeX (`MathText`).
+The press is the head button's word. The step after it is the map's Next, beside the list, so Now does not repeat it. The hybrid's head drops its review mark and "Studied yesterday" (`HybridTopic`), which Now, Scheduled and Earlier say. A step may hold TeX (`MathText`); a session or task title may hold markdown and TeX, drawn on one line (`LineText`, components/line-text.md).
 
 Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (kept) and in a gutter on the spine's left (dropped: it pushed Earlier's icons off the column's left edge and wrapped "Tue 3 Nov" onto two lines).
 

@@ -114,12 +114,34 @@ export function heldWords(review: CourseMapTopic["review"], exam: string | null)
  *  can't be read. One form each, wherever it shows. */
 export const LESSON_WORDS = {
 	newReply: "New reply",
+	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
 	tryAgain: "Try again",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
 	unreadableCourse: "Couldn't read this course's record",
+} as const;
+
+/** What a lesson's top bar says it is doing: asking its opening questions
+ *  (the same word as their label), planning, teaching, practice, or
+ *  stopped for the day. A lesson is never called a quiz (round 3). */
+export const PHASE_WORDS = {
+	probe: "Recall",
+	plan: "Planning",
+	teach: "Teaching",
+	practice: "Practice",
+	done: LESSON_WORDS.doneTonight,
+} as const;
+
+/** A question's label on its card and folded bar, by what it asks: a
+ *  check of what was just taught, a prediction before it, a recall of
+ *  what he knows, else a plain question. */
+export const QUESTION_WORDS = {
+	check: "Check",
+	predict: "Prediction",
+	recall: "Recall",
+	question: "Question",
 } as const;
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
