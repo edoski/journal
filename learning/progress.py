@@ -1017,10 +1017,17 @@ def opens(
     return key == front or bool(needs(record, key))
 
 
-def holding_raises(left: int, rest: int, pace: int) -> bool:
+def holding_raises(left: int, rest: int, pace: int, room: float | None = None) -> bool:
     """Whether starting none of ``rest`` today would raise the pace an exam
-    needs: its topics over the ``left`` study days, today included."""
-    return left <= 1 or math.ceil(rest / (left - 1)) > pace
+    needs: its topics over the ``left`` study days, today included, or, once
+    he has shown a limit, more of them than the ``room`` his limit holds on
+    the study days after today. A day held for the material that his room
+    cannot make up is a topic the exam loses."""
+    return (
+        left <= 1
+        or math.ceil(rest / (left - 1)) > pace
+        or (room is not None and room < rest)
+    )
 
 
 def _placed(

@@ -90,7 +90,9 @@ is not the current arc, the arc of "You are here" (``arcs.current``): the two
 differ once he studies ahead. Without arcs the path bounds it: a topic ahead of the
 earliest untaught one starts only when it builds on one, so a topic that
 needs nothing waits its place (``progress.opens``). An exam's pace passes the
-window only on a day when holding would raise the pace it needs. Each start
+window only on a day when holding would raise the pace it needs, or, once he
+has shown a limit, when his limit on the days left cannot make the day up
+(``progress.holding_raises``). Each start
 says why it comes then (``When.why``): next in its arc, after what it waited
 on, or early, with the earliest arc with topics left and what it waits on.
 
@@ -655,6 +657,15 @@ def _study_days(week: Capacity, first: date, last: date) -> int:
     )
 
 
+def _room_after(week: Capacity, day: date, last: date) -> float | None:
+    """The new topics his shown limit holds from the day after ``day`` to
+    ``last``; None while he has shown none."""
+    if not week.on(day).new.shown:
+        return None
+    days = (day + timedelta(days=n) for n in range(1, (last - day).days + 1))
+    return sum(week.on(other).new.value for other in days if week.studies(other))
+
+
 def _reviews(
     courses: list[_Course], day: date, room: float, week: Capacity
 ) -> dict[str, list[str]]:
@@ -876,7 +887,9 @@ def _new(
             if (
                 room > 0
                 and taken < pace
-                and progress.holding_raises(left, len(course.scoped), pace)
+                and progress.holding_raises(
+                    left, len(course.scoped), pace, _room_after(week, day, end)
+                )
             ):
                 scoped = set(course.scoped)
                 more = min(room, pace - taken)

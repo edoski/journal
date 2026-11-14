@@ -395,6 +395,29 @@ def test_an_exams_pace_passes_the_window_only_when_holding_would_raise_it() -> N
     assert "c1" not in starts(calm), "weeks to go: the pace holds for the material"
 
 
+def test_an_exams_pace_passes_the_window_when_his_room_cannot_make_up_a_day() -> None:
+    topics = {
+        "a1": {"arc": "a"},
+        "a2": {"arc": "a", "needs": ["a1"], "contrasts": ["a3"]},
+        "a3": {"arc": "a"},
+        "b1": {"arc": "b", "needs": ["a3"]},
+        "c1": {"arc": "c", "needs": ["a1"]},
+    }
+    patch: dict[str, Any] = {
+        "arcs": {name: arc(name.upper()) for name in "abc"},
+        "topics": topics,
+        "path": {"order": list(topics), "arcs": list("abc")},
+        "arc_change": REASON,
+        "exam": scoped(list("abc"), 14),
+    }
+    record = evidence(save(schema.empty(), patch, MONDAY), ["a1"], "a3")
+    one = plan({"c": record}, MONDAY, 14, week(10, 1))
+    assert starts(one) == ["a2", "b1", "c1"], "a topic a day makes up any day"
+    half = plan({"c": record}, MONDAY, 14, week(10, 0.5))
+    assert half.days["c"][0]["new"] == ["c1"], "half a topic a day cannot"
+    assert half.when("c", MONDAY, True).why["c1"]["exam"] is True
+
+
 def test_reviews_ignore_arcs() -> None:
     every = {key: {"introduced": True} for key in TOPICS}
     with_arcs = save(course(), {"topics": every}, on(-10))
