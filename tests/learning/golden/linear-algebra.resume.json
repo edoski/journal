@@ -43,7 +43,7 @@
     "inner-product": "2026-11-11",
     "invertibility": "2026-11-12",
     "projection": "2026-11-13",
-    "change-basis": "2026-11-19",
+    "change-basis": "2026-11-18",
     "diagonalization": "2026-11-20"
   },
   "starts_why": {
@@ -265,7 +265,7 @@
       "review": {
         "due": "2026-10-29",
         "by": "engine",
-        "planned": "2026-11-25"
+        "planned": "2026-11-23"
       },
       "standing": {
         "level": "retained",
@@ -372,7 +372,7 @@
       "review": {
         "due": "2026-11-07",
         "by": "engine",
-        "planned": "2026-11-18"
+        "planned": "2026-11-16"
       },
       "standing": {
         "level": "attempted",

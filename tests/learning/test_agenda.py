@@ -674,3 +674,47 @@ def test_the_engines_dates_follow_the_final_review_as_read() -> None:
     }
     read = progress.redated(progress.with_final_review(record, on(16)), MONDAY)
     assert read["topics"]["t00"]["review"]["due"] == on(16).isoformat()
+
+
+def reviews_by_date(result: agenda.Plan, name: str) -> dict[str, int]:
+    return {day["date"]: len(day["reviews"]) for day in result.days[name]}
+
+
+def test_a_plan_made_tomorrow_gives_each_date_the_room_todays_plan_gave_it() -> None:
+    record = taught(course(40), on(-1))
+    capacity_ = week(2.5, 0)
+    today = reviews_by_date(agenda.plan({"c": record}, MONDAY, 14, capacity_), "c")
+    tomorrow = agenda.plan({"c": record}, on(1), 13, capacity_)
+    assert reviews_by_date(tomorrow, "c") == {
+        day: count for day, count in today.items() if day > MONDAY.isoformat()
+    }
+
+
+def test_the_same_records_and_day_give_the_same_plan() -> None:
+    first = solid(taught(course(8, exam=20), on(-1)), on(2))
+    second = course(6, exam=12)
+    third = taught(course(5), on(-2))
+    records = {"a": first, "b": second, "c": third}
+    capacity_ = week(2.5, 1.5)
+    once = plan(records, 28, capacity_)
+    again = plan(dict(reversed(list(records.items()))), 28, capacity_)
+    assert once.days == again.days
+    assert once.held == again.held and once.why == again.why
+
+
+def test_a_save_that_changes_no_topic_moves_no_courses_days() -> None:
+    first = taught(course(8, exam=20), on(-1))
+    other = taught(course(6), on(-2))
+    capacity_ = week(2.5, 1.5)
+    before = plan({"a": first, "b": other}, 28, capacity_)
+    noted = save(
+        first,
+        {
+            "knowledge": {"notation": {"text": "Vectors are columns."}},
+            "tasks": {"sheet": {"title": "Sheet 1", "step": "part (b)"}},
+            "path": {"current": "t03"},
+        },
+        MONDAY,
+    )
+    after = plan({"a": noted, "b": other}, 28, capacity_)
+    assert after.days == before.days

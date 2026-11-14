@@ -8,6 +8,7 @@ import { parseMermaidPlan } from "./mermaid-plan.ts";
 import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
 import { topicsToIntroduce } from "../../core/contracts/course-map.ts";
+import { plannedDayWords } from "../../core/day-words.ts";
 
 /** The binding-id reminder riding plan_init's slim content (owner,
  *  2026-10-09): plan_init is the exact moment the node ids become
@@ -42,6 +43,26 @@ async function introduceLessonTopics(course: CourseToolContext, candidates: read
 		changes: { topics: Object.fromEntries(fresh.map((handle) => [handle, { introduced: true }])) },
 	});
 	return saved.ok ? `Marked introduced: ${fresh.join(", ")}.` : `The lesson's topics could not be marked introduced (${saved.message}).`;
+}
+
+type LessonDay = { planned: string; planned_words: string } | { starts: string; starts_words: string };
+
+/** Each of the lesson's topics on the plan as the engine holds it after the
+ *  close's save: its next review, or its start while untaught, in the words
+ *  the close copies. Read after the save, so the close never names a day
+ *  its own save has already moved. */
+async function lessonDays(course: CourseToolContext, candidates: readonly string[]): Promise<Record<string, LessonDay> | undefined> {
+	if (candidates.length === 0) return undefined;
+	const mapped = await course.records.map(course.course.workspace);
+	if (!mapped.ok) return undefined;
+	const wanted = new Set(candidates);
+	const days: Record<string, LessonDay> = {};
+	for (const topic of mapped.map.topics) {
+		if (!wanted.has(topic.handle)) continue;
+		if (topic.review) days[topic.handle] = { planned: topic.review.date, planned_words: plannedDayWords(topic.review.date, mapped.map.today) };
+		else if (topic.starts) days[topic.handle] = { starts: topic.starts, starts_words: plannedDayWords(topic.starts, mapped.map.today) };
+	}
+	return days;
 }
 
 /**
@@ -104,7 +125,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 			label: LESSON_PROGRESS_TOOL,
 			description:
 				"Mark plan steps done on his map, and say when you close the session for today. Call it in the turn that finishes a step, " +
-				"with that step's node id in `done`; in the turn that ends the session, add `close: true` before your closing words.",
+				"with that step's node id in `done`; in the turn that ends the session, add `close: true` before your closing words. " +
+				"The close's result gives each of the lesson's topics its day on the plan after the close: a day your closing words name is one of these, copied as written.",
 			parameters: lessonProgressInput,
 			execute: serverExecute(LESSON_PROGRESS_TOOL, lessonProgressInput, async ({ done, close }) => {
 				const record = ctx.chatStore.getChat(ctx.chatId);
@@ -115,8 +137,10 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					return { ok: false, error: `Not node ids of this session's plan: ${unknown.join(", ")}. Valid ids: ${[...ids].join(", ") || "(no plan yet)"}` };
 				}
 				if (!close || !ctx.course) return { ok: true };
-				const introduced = await introduceLessonTopics(ctx.course, [...new Set([...(record.topics ?? []), ...sessionTopicsOf(record.messages)])]);
-				return introduced ? { ok: true, record: introduced } : { ok: true };
+				const topics = [...new Set([...(record.topics ?? []), ...sessionTopicsOf(record.messages)])];
+				const introduced = await introduceLessonTopics(ctx.course, topics);
+				const days = await lessonDays(ctx.course, topics);
+				return { ok: true, ...(introduced ? { record: introduced } : {}), ...(days ? { days } : {}) };
 			}),
 		},
 		plan_init: {

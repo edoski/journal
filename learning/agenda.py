@@ -6,7 +6,8 @@ Pure and read-only. The plan projects every course's record forward from today
 together. Each study day (``capacity.Capacity``) takes every review due, and
 each exam course's pace of new topics, unless he has shown a limit for that
 kind of work: then it takes as many as his limit on that weekday, the
-fractions carried from day to day. Nothing lands on a weekday he does not
+fractions carried from day to day within the calendar week, so a date's room
+does not depend on the day the plan is made. Nothing lands on a weekday he does not
 study. Planned reviews are assumed ``solid``, so a later day's reviews are the
 ladder's next steps; what does not fit stays due. The plan never stores
 anything; the next save and the next plan start again from what happened.
@@ -620,18 +621,25 @@ class Plan:
         )
 
 
-class _Allowance:
-    """Whole items a day from fractional rates, the remainder carried."""
+def _whole(week: Capacity, day: date, kind: str) -> int:
+    """A study day's whole items of ``kind`` from his fractional rates: his
+    study days' rates this week through ``day``, summed and rounded, less the
+    same through the day before. The fractions carry from day to day within
+    the week, so a day never takes more than its own rate rounded up, and a
+    date gets the same room whichever day the plan is made on: a plan made
+    tomorrow keeps the days today's plan put things on."""
+    monday = day - timedelta(days=day.weekday())
 
-    def __init__(self) -> None:
-        self.carry = {"reviews": 0.5, "new": 0.5}
+    def rate(other: date) -> float:
+        weekday = week.on(other)
+        return (weekday.reviews if kind == "reviews" else weekday.new).value
 
-    def take(self, kind: str, rate: float) -> int:
-        """A day's whole items: never more than its own rate rounded up, so a
-        remainder carried from lighter days never doubles a day's load."""
-        whole = min(math.floor(self.carry[kind] + rate), math.ceil(rate))
-        self.carry[kind] += rate - whole
-        return whole
+    def through(last: date) -> float:
+        days = (monday + timedelta(days=n) for n in range((last - monday).days + 1))
+        return sum(rate(other) for other in days if week.studies(other))
+
+    before = math.floor(through(day - timedelta(days=1)) + 0.5)
+    return math.floor(through(day) + 0.5) - before
 
 
 def _gaps(record: dict[str, Any], untaught: set[str]) -> set[str]:
@@ -1005,7 +1013,6 @@ def plan(
     courses = [_Course.of(name, record) for name, record in records.items()]
     done = history.get(today, capacity.Done())
     spent = _spent_today(records, courses, today, week) if done.reviews else 0
-    allowance = _Allowance()
     for offset in range(days):
         day = today + timedelta(days=offset)
         rates = week.on(day)
@@ -1014,11 +1021,9 @@ def plan(
         begun: int | None = None
         if week.studies(day):
             reviews_room = (
-                allowance.take("reviews", rates.reviews.value)
-                if rates.reviews.shown
-                else math.inf
+                _whole(week, day, "reviews") if rates.reviews.shown else math.inf
             )
-            new_room = allowance.take("new", rates.new.value)
+            new_room = _whole(week, day, "new")
             if not rates.new.shown:
                 begun = done.new if offset == 0 else 0
         if offset == 0:
