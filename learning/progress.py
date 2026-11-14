@@ -40,6 +40,8 @@ RECENT_SOLID_DAYS = 14
 WEEK_DAYS = 7
 # Grades from worst to best.
 GRADES = ("missed", "helped", "solid")
+# Levels that rest on an unaided solid answer.
+SECURE = frozenset({"independent", "retained", "transferred"})
 LEARNING, PROBE, PRACTICE = "learning", "probe", "practice"
 
 Attempt = tuple[str, dict[str, Any]]
