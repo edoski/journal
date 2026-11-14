@@ -42,6 +42,31 @@ Both "left off" and "due" are true at once, and neither is wrong: a review due t
 
 Home's line names the lapsed topic when the line is about another one ("Not right last time: Chain rule", `lapsedOnWords`, `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Not right: `ATTEMPT_WORDS`) is not a reason and keeps its own words.
 
+## Arcs
+
+An arc is one of a course's chapters (`course-arcs.ts`). Its words follow the engine's state, never a count: the pie beside it draws the share.
+
+| State | Words |
+|---|---|
+| `new` | Not started |
+| `learning` | In progress |
+| `ready` | Ready for its check |
+| `checked` | Check passed |
+| `taught` (a course that takes no questions) | All taught |
+
+An arc the next exam does not examine whole reads Partly on the exam or Not on the exam (`ARC_EXAM_WORDS`, from `examCovers`). With no exam, or an exam over the whole course, nothing mentions it.
+
+## Why a topic starts then
+
+`startsWhyWords`: the engine's `starts_why`, in the course's names. "After Probability's new topics" (`startsAfterWords`) stays beside it for another course's starts.
+
+| Reason | Words |
+|---|---|
+| `next` | Next in Matrices; without arcs, Next in Linear Algebra |
+| `after`, its prerequisites | After Expectation, which it needs |
+| `after`, a method it competes with | After Separable equations, so the two methods stay apart |
+| `early` | Early, from Orthogonality; without arcs, Early, ahead of its place; then, while earlier topics wait on Rank, or, when the exam's pace took it, to keep pace with the exam |
+
 ## In a lesson
 
 `LESSON_WORDS`: what happened to his work, said the same way everywhere.

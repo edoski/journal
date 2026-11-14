@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
+import type { CourseMap } from "../src/core/contracts/course-map.ts";
+import { courseMapOf } from "../src/store/course-records.ts";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { SLIP_ICON } from "../components/slip-icons.ts";
 
 // The app's one wording for where he stands and why a topic needs him
@@ -131,5 +137,46 @@ describe("words he reads after days away", () => {
 	it("never says Missed, which beside an overdue review reads as a review he skipped", () => {
 		assert.equal(lapsedOnWords("Chain rule"), "Not right last time: Chain rule");
 		assert.deepEqual(Object.values(ATTEMPT_WORDS), ["Right", "Partly right", "Not right"]);
+	});
+});
+
+/** E2's demo Linear Algebra map, with and without arcs, parsed. */
+const golden = (name: string): CourseMap => {
+	const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "tests", "learning", "golden", `${name}.map.json`);
+	return courseMapOf("/s/linalg", JSON.parse(fs.readFileSync(file, "utf-8")))!;
+};
+
+describe("where an arc stands", () => {
+	it("has words for every engine state, none with a count or a percentage", () => {
+		assert.deepEqual(Object.keys(ARC_STATE_WORDS), [...ARC_STATES]);
+		for (const words of [...Object.values(ARC_STATE_WORDS), ...Object.values(ARC_EXAM_WORDS)]) assert.doesNotMatch(words, /\d|%|tonight/i, words);
+	});
+});
+
+describe("why a topic starts then", () => {
+	const arcs = golden("linear-algebra-arcs");
+	const plain = golden("linear-algebra");
+	const why = (map: CourseMap, handle: string) => startsWhyWords(map.topics.find((t) => t.handle === handle)!.startsWhy!, map);
+	it("names its prerequisites, in a course with arcs or without", () => {
+		assert.equal(why(arcs, "change-basis"), "After Invertible matrices, which it needs");
+		assert.equal(why(plain, "invertibility"), "After Determinants as volume scaling, which it needs");
+	});
+	it("names the arc an early start comes from, or the exam's pace that took it", () => {
+		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, to keep pace with the exam");
+		assert.equal(why(plain, "inner-product"), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
+		const orthogonality = "orthogonality" as ArcHandle;
+		assert.equal(startsWhyWords({ kind: "early", arc: orthogonality, waitingOn: [], exam: false }, arcs), "Early, from Orthogonality");
+	});
+	it("says next in its arc, else in the course", () => {
+		assert.equal(startsWhyWords({ kind: "next", arc: "systems" as ArcHandle }, arcs), "Next in Linear systems");
+		assert.equal(startsWhyWords({ kind: "next" }, plain), "Next in Linear Algebra");
+	});
+	it("names a method it competes with, beside what it needs", () => {
+		const [rank, kernel, cramer] = ["rank", "kernel", "cramer"].map((h) => arcs.topics.find((t) => t.handle === h)!.handle);
+		assert.equal(startsWhyWords({ kind: "after", needs: [], partners: [cramer!] }, arcs), "After Cramer's rule, so the two methods stay apart");
+		assert.equal(
+			startsWhyWords({ kind: "after", needs: [rank!, kernel!], partners: [cramer!] }, arcs),
+			"After Rank and the column space and Kernel and rank-nullity, which it needs, and Cramer's rule, so the two methods stay apart",
+		);
 	});
 });

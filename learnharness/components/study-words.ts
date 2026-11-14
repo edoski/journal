@@ -1,4 +1,4 @@
-import type { CourseMapTopic, JobKind, MarkResult, MarkRow, MarkSure, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import type { ArcState, CourseMap, CourseMapTopic, JobKind, MarkResult, MarkRow, MarkSure, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -179,15 +179,58 @@ export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today
 	return returnWords(Math.max(1, daysBetween(today, review.date)));
 }
 
+/** "A", "A and B", "A, B and C". */
+function listWords(names: readonly string[]): string {
+	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 /** Why a topic's first lesson waits (the engine's `starts_after`): the
  *  courses whose new topics take the days before it. "After Probability's
  *  new topics", "After Probability's and Linear Algebra's new topics";
  *  null when it waits for none. */
 export function startsAfterWords(courses: readonly string[] | undefined): string | null {
 	if (!courses || courses.length === 0) return null;
-	const names = courses.map((course) => `${course}'s`);
-	const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-	return `After ${list} new topics`;
+	return `After ${listWords(courses.map((course) => `${course}'s`))} new topics`;
+}
+
+/** Where an arc stands, in the engine's own states: no count, since the
+ *  pie beside it draws the share. `taught` is a course that takes no
+ *  questions, which never offers a check. */
+export const ARC_STATE_WORDS: Record<ArcState, string> = {
+	new: "Not started",
+	learning: "In progress",
+	ready: "Ready for its check",
+	checked: "Check passed",
+	taught: "All taught",
+};
+
+/** An arc the next exam does not examine whole (`examCovers`); an arc it
+ *  examines whole says nothing. */
+export const ARC_EXAM_WORDS = {
+	part: "Partly on the exam",
+	none: "Not on the exam",
+} as const;
+
+/** Why an untaught topic starts when the plan starts it, in his course's
+ *  names: "Next in Matrices"; "After Expectation, which it needs"; "After
+ *  Separable equations, so the two methods stay apart"; "Early, from
+ *  Orthogonality, while earlier topics wait on Rank"; "Early, from
+ *  Orthogonality, to keep pace with the exam". A course without arcs says
+ *  "Next in Linear Algebra" and "Early, ahead of its place". Pure. */
+export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "topics" | "arcs">): string {
+	const titles = (handles: readonly TopicHandle[]) => listWords(handles.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h));
+	const arc = why.arc && (map.arcs?.find((a) => a.handle === why.arc)?.title ?? why.arc);
+	if (why.kind === "early") {
+		const early = arc ? `Early, from ${arc}` : "Early, ahead of its place";
+		if (why.exam) return `${early}, to keep pace with the exam`;
+		return why.waitingOn.length > 0 ? `${early}, while earlier topics wait on ${titles(why.waitingOn)}` : early;
+	}
+	if (why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0)) {
+		const needs = why.needs.length > 0 ? `${titles(why.needs)}, which it needs` : null;
+		const apart = why.partners.length > 0 ? `${titles(why.partners)}, so the ${why.partners.length === 1 ? "two methods stay" : "methods stay"} apart` : null;
+		return `After ${[needs, apart].filter(Boolean).join(", and ")}`;
+	}
+	return `Next in ${arc ?? map.title}`;
 }
 
 /** How far a day is from the engine's, one form wherever a distance shows
