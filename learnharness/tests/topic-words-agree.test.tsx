@@ -20,7 +20,7 @@ import { buildInbox, type Unit } from "../components/unit-inbox/units.ts";
 import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
 import { nowFor, plannedKeys, restShelves, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
 import { claimedKeys, todayTop } from "../components/unit-inbox/today/today-top.ts";
-import { back, CHATS, COURSES, LINALG, topic } from "./fixtures/now-demo.ts";
+import { back, CHATS, COURSES, due, LINALG, PROB, TODAY, topic } from "./fixtures/now-demo.ts";
 import { SLIP_ICON } from "../components/slip-icons.ts";
 import { factIcon } from "../components/unit-inbox/fact-icon.ts";
 
@@ -79,6 +79,19 @@ describe("every Linear Algebra topic says one thing on the sidebar, the course p
 	it("Rank, whose session waits on him, says Your turn everywhere", () => {
 		const rank = rows.find((r) => r.topic.handle === "rank")!;
 		assert.deepEqual([rank.sidebar, rank.page, rank.card], ["Your turn", "Your turn", "Your turn"]);
+	});
+});
+
+describe("a review of several topics, on the course page and the map", () => {
+	it("gives each topic its own due day, never the most overdue one's", () => {
+		const prob: StudyCourse = {
+			...PROB,
+			map: { ...PROB.map, topics: [topic("rv", "Random variables and distributions", "assisted", { review: { kind: "due", date: TODAY, overdue: 0 } }), topic("binomial", "Binomial distribution", "assisted", { review: due(2) })] },
+			due: ["rv", "binomial"] as TopicHandle[],
+		};
+		const said = sidebarSays([LINALG, prob], [], prob.map.workspace);
+		assert.equal(said.get("rv" as TopicHandle)?.place, "today", "the review's line leads with Random variables");
+		assert.equal(said.get("rv" as TopicHandle)?.fact?.words, "Due today", "not Binomial's 2d overdue");
 	});
 });
 

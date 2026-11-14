@@ -1,7 +1,7 @@
 import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldWords, reviewWords, startsAfterWords } from "@/components/study-words";
+import { distanceWords, heldWords, overdueWords, reviewWords, startsAfterWords } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, stepWords, type CourseMove } from "@/components/study-home/study-facts";
 
@@ -157,6 +157,15 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
 	}
 	const things = [...counts.values()].map(([one, many, n]) => (n > 1 ? many : one));
 	return things.length > 0 ? `Also ${listWords(things)}` : "More";
+}
+
+/** An entry's words beside its icon: its look's, except a review due
+ *  today, which says how late as Home's rows and the sidebar do ("Due
+ *  today", "2d overdue"), so one review never reads "2d overdue" on Home
+ *  and "Overdue" here (round 5). Pure. */
+export function lookWords(entry: CalendarEntry, today: string): string {
+	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;
+	return review?.kind === "due" ? overdueWords(review.overdue) : LOOKS[lookOf(entry)].words;
 }
 
 export function lookOf(entry: CalendarEntry): EntryLook {
