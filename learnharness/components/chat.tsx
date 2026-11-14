@@ -87,6 +87,7 @@ import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
+import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
 
 /** The transcript's own column inside the scroller (the docks have their own find roots). */
@@ -361,8 +362,17 @@ export function Chat({
 	// the plan popup, or the setup dialog over a pending question must not
 	// dismiss the question underneath.
 	const [abortAsk, setAbortAsk] = useState<AbortMode | null>(null);
+	// Bumped when something that held focus goes away (a rename ends, a
+	// confirm closes): the dock puts focus back where he types (focus-home.ts).
+	const [focusEpoch, setFocusEpoch] = useState(0);
+	const settledFocusRef = useRef({ renaming: false, abortAsk: null as AbortMode | null });
 	const abortAskRef = useRef<AbortMode | null>(null);
 	abortAskRef.current = abortAsk;
+	useEffect(() => {
+		const was = settledFocusRef.current;
+		settledFocusRef.current = { renaming, abortAsk };
+		if ((was.renaming && !renaming) || (was.abortAsk !== null && abortAsk === null)) setFocusEpoch((n) => n + 1);
+	}, [renaming, abortAsk]);
 	useEffect(() => {
 		const onAbort = () => {
 			const target = escAbortTarget({
@@ -1556,6 +1566,7 @@ export function Chat({
 					phase={phases.at(-1) ?? "probe"}
 					onReserve={setDockReserve}
 					busy={busy}
+					focusEpoch={focusEpoch}
 					replyAnchorRef={replyAnchorRef}
 					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
@@ -1759,6 +1770,7 @@ function DockOverlay({
 	onSubmitAnswer,
 	onReserve,
 	busy,
+	focusEpoch,
 	replyAnchorRef,
 	onJumpToLatest,
 	setupCta,
@@ -1796,6 +1808,8 @@ function DockOverlay({
 	 *  the cue lets go of it once he reads to the end. */
 	/** A turn is running for this lesson (the practice dock waits). */
 	busy: boolean;
+	/** Changes when something that held focus went away (focus-home.ts). */
+	focusEpoch: number;
 	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
 	onJumpToLatest: () => void;
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
@@ -1985,6 +1999,34 @@ function DockOverlay({
 		root.addEventListener("wheel", onWheel, { passive: false });
 		return () => root.removeEventListener("wheel", onWheel);
 	}, [scrollRef]);
+
+	// FOCUS HOME (focus-home.ts): when the lesson opens, the dock swaps or
+	// folds, a turn ends, or a rename or confirm lets go, focus lands where
+	// he types next, if nothing holds it.
+	useEffect(() => {
+		const block = blockRef.current;
+		if (block) landFocus(document, block);
+	}, [mode, expanded, busy, focusEpoch]);
+
+	// An empty field's arrows and page keys read the lesson (focus-home.ts):
+	// the field he was put in must not swallow the keys he reads with.
+	useEffect(() => {
+		const block = blockRef.current;
+		const el = scrollRef.current;
+		if (!block || !el) return;
+		const onKeyDown = (e: KeyboardEvent) => {
+			const field = e.target as HTMLTextAreaElement | null;
+			if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+			if (field?.tagName !== "TEXTAREA" || !block.contains(field)) return;
+			const by = readingKeyScroll(e.key, field.value.length === 0, el.clientHeight);
+			if (by === null) return;
+			e.preventDefault();
+			if (by < 0) replyAnchorRef.current = null;
+			el.scrollBy({ top: by });
+		};
+		document.addEventListener("keydown", onKeyDown);
+		return () => document.removeEventListener("keydown", onKeyDown);
+	}, [scrollRef, replyAnchorRef]);
 
 	// Explicit expand (bar click): the smooth scroll to the bottom takes
 	// hundreds of ms, during which the position is still legitimately inside
