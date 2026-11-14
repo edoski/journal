@@ -106,6 +106,12 @@ def test_a_save_tells_the_day_the_plan_puts_the_next_review(
     assert receipt["reviews"]["today"]["planned"] == review["today"]
     assert review["today"] > day(1)
     assert receipt["due_count"] == 0
+    shown = run(monkeypatch, capsys, root, "show", "today")["items"]["today"]
+    assert shown["review"] == {
+        **shown["review"],
+        "due": day(1),
+        "planned": review["today"],
+    }
 
 
 def test_a_new_course_s_whole_path_is_planned_up_to_its_exam(

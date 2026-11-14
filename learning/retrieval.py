@@ -297,6 +297,19 @@ def _oldest_unlisted(due: list[dict[str, Any]]) -> dict[str, Any] | None:
     return {"topic": oldest["topic"], "overdue": oldest["overdue"]}
 
 
+def dated_topic(
+    topic: dict[str, Any], key: str, planned: agenda.When
+) -> dict[str, Any]:
+    """A stored topic with the plan's day beside memory's: its review's
+    ``planned`` day, or the day the plan ``starts`` it while untaught."""
+    review = topic.get("review", {})
+    if "due" in review:
+        day = planned.review(key, review["due"])
+        return {**topic, "review": {**review, "planned": day}}
+    starts = planned.starts.get(key)
+    return {**topic, "starts": starts.isoformat()} if starts else topic
+
+
 def tonight(
     due: list[dict[str, Any]], planned: agenda.When
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -340,7 +353,10 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
         progress.due(record, today, levels=levels, order=order), planned
     )
     topics = {
-        topic: {**record["topics"][topic], "standing": levels[topic]}
+        topic: {
+            **dated_topic(record["topics"][topic], topic, planned),
+            "standing": levels[topic],
+        }
         for topic in active
     }
     path = record.get("path", {})
@@ -400,12 +416,16 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
 
 
 def _topic_item(
-    record: dict[str, Any], key: str, standing: dict[str, Any], ids: list[str]
+    record: dict[str, Any],
+    key: str,
+    standing: dict[str, Any],
+    ids: list[str],
+    planned: agenda.When,
 ) -> dict[str, Any]:
     return compact(
         {
             "kind": "topic",
-            **record["topics"][key],
+            **dated_topic(record["topics"][key], key, planned),
             "standing": standing,
             "observations": ids,
             "tasks": [
@@ -445,6 +465,7 @@ def show(
     located = {handle: schema.locate(record, handle) for handle in handles}
     observations = record["observations"]
     levels = progress.standings(record) if "topics" in located.values() else {}
+    planned = when(workspace, record, clock.today()) if levels else None
     newest = _newest(observations) if levels else []
     corrected_by: dict[str, list[str]] = defaultdict(list)
     for key, item in observations.items():
@@ -456,7 +477,8 @@ def show(
     for handle, where in located.items():
         if where == "topics":
             ids = [key for key in newest if handle in observations[key]["topics"]]
-            items[handle] = _topic_item(record, handle, levels[handle], ids)
+            assert planned is not None
+            items[handle] = _topic_item(record, handle, levels[handle], ids, planned)
             shown.update(dict.fromkeys(ids[:limit]))
             related.update(ids)
         elif where == "observations":
