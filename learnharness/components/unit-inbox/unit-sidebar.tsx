@@ -12,7 +12,7 @@ import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseResultRow } from "@/components/unit-inbox/course-result-row";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
-import { nowFor, studyDay } from "@/components/unit-inbox/now-inbox";
+import { nowFor, studyDay, unitFor } from "@/components/unit-inbox/now-inbox";
 import type { NowListProps } from "@/components/unit-inbox/now-list-props";
 import { NowSkeleton } from "@/components/unit-inbox/now-skeleton";
 import { courseHref } from "@/components/unit-inbox/unit-href";
@@ -24,7 +24,7 @@ import { useSidebarWidth } from "@/components/unit-inbox/sidebar-width";
 import { isUnitOpen, TopicCard, TopicSlimRow } from "@/components/unit-inbox/unit-row";
 import { TodayList } from "@/components/unit-inbox/today/today-list";
 import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
-import { sessionTwins, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
+import { sessionTwins, unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,11 @@ import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/i
 import { cn } from "@/lib/utils";
 
 /** Every course, topic and session whose title matches the query, best
- *  first; courses only when the app has a course page to open. Pure. */
+ *  first; courses only when the app has a course page to open. Topics are
+ *  every topic on the courses' maps in the inbox's scope, those not
+ *  started included (a unit built for each, `unitFor`): the inbox lists
+ *  only topics he has started, so search missed Poisson until he began it
+ *  (round 4). Pure. */
 export function searchInbox(
 	inbox: UnitInbox,
 	chats: readonly ChatListItem[],
@@ -47,9 +51,19 @@ export function searchInbox(
 			.map((r) => r.item);
 	return {
 		courses: best(courses, (c) => c.map.title),
-		units: best([...inbox.active, ...inbox.working, ...inbox.known], (u) => u.topic.title),
+		units: best(everyTopic(inbox, chats, courses), (u) => u.topic.title),
 		sessions: filterSessions([...chats], query),
 	};
+}
+
+/** The inbox's units, then a unit for every other topic on the maps of
+ *  the courses it keeps. Pure. */
+function everyTopic(inbox: UnitInbox, chats: readonly ChatListItem[], courses: readonly StudyCourse[]): Unit[] {
+	const listed = [...inbox.active, ...inbox.working, ...inbox.known];
+	const keys = new Set(listed.map((u) => u.key));
+	const kept = courses.filter((c) => inbox.scope == null || c.map.workspace === inbox.scope);
+	const rest = kept.flatMap((c) => c.map.topics.filter((t) => !keys.has(unitKey(c.map.workspace, t.handle))).map((t) => unitFor(c, t, chats)));
+	return [...listed, ...rest];
 }
 
 /** Search's label and tooltip, in its shortcut's own words. */

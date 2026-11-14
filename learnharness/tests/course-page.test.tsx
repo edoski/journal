@@ -350,4 +350,15 @@ describe("the sidebar's search", () => {
 		);
 		assert.deepEqual(searchInbox(inbox, [], "lin").courses, []);
 	});
+
+	it("finds a topic not started yet on a course's map, which the inbox does not list (round 4: Poisson, Geometric, Variance)", () => {
+		const inbox = buildInbox([course()], [], null);
+		assert.ok(![...inbox.active, ...inbox.working, ...inbox.known].some((u) => u.topic.handle === "eigen"), "the inbox lists only started topics");
+		assert.deepEqual(
+			searchInbox(inbox, [], "eigen", [course()]).units.map((u) => u.topic.title),
+			["Eigenvalues"],
+		);
+		const scoped = buildInbox([course()], [], "/elsewhere");
+		assert.deepEqual(searchInbox(scoped, [], "eigen", [course()]).units, [], "under the course filter, only that course's topics");
+	});
 });
