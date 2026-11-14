@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent } from "@xyflow/react";
 import type { CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import { NeedEdge, type NeedFlowEdge } from "./need-edge";
-import { MIN_ZOOM, TOPIC_NODE_SIZE as node, WHOLE_COURSE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, layoutTopicMap, neighbourOf, slackOf, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
+import { READABLE_ZOOM, TOPIC_NODE_SIZE as node, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, layoutTopicMap, neighbourOf, slackOf, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, TopicNode, type TopicFlowNode, type TopicMapState } from "./topic-node";
 import { standingOf, statusOf, topicLabel } from "./topic-standing";
 
@@ -32,8 +32,9 @@ function reducedMotion(): boolean {
  * whether it needs him, and opens the topic's page. The map opens on the
  * whole course when that fits, else framed on the current topic with its
  * neighbours whole (`framedCamera`), or at `zoom` with the whole course in
- * its middle, for a page that frames the map itself; it pans by drag or
- * scroll and zooms by pinch. Hover or focus lights a topic's
+ * its middle, for a page that frames the map itself; `whole` shows the
+ * whole course however small (the enlarged map's zoom out). It pans by
+ * drag or scroll and zooms by pinch. Hover or focus lights a topic's
  * prerequisite chain; arrows walk the edges. `highlight` lights a set of
  * topics while nothing is hovered or focused, for a page that points at
  * them from elsewhere; off by default.
@@ -43,6 +44,8 @@ export function TopicMap({
 	margin = ROOM,
 	highlight = null,
 	zoom,
+	whole = false,
+	onOpensWhole,
 }: {
 	map: CourseMap;
 	margin?: { x: number; y: number };
@@ -52,6 +55,12 @@ export function TopicMap({
 	 *  page that sizes the frame to it and scrolls it; unset, the map
 	 *  frames itself. */
 	zoom?: number;
+	/** Show the whole course in the frame, at whatever scale fits it. */
+	whole?: boolean;
+	/** Told, whenever the frame changes, whether the map opens on the whole
+	 *  course (it fits at a readable scale), so a page offers a zoom out only
+	 *  when there is more to see. */
+	onOpensWhole?: (fits: boolean) => void;
 }) {
 	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node), [map.topics, map.edges]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
@@ -84,7 +93,6 @@ export function TopicMap({
 						label: topicLabel(topic, map.current === topic.handle, titleOf),
 						needs: needs.length ? `Needs ${needs.join(", ")}` : null,
 						href: unitHref(map.workspace, topic.handle),
-						layer: placed.layer,
 					},
 				};
 			}),
@@ -107,7 +115,7 @@ export function TopicMap({
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} zoom={zoom} />
+			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} zoom={zoom} whole={whole} onOpensWhole={onOpensWhole} />
 		</ReactFlowProvider>
 	);
 }
@@ -121,6 +129,8 @@ function Flow({
 	margin: frameMargin,
 	highlight,
 	zoom: fixedZoom,
+	whole,
+	onOpensWhole,
 }: {
 	map: CourseMap;
 	layout: TopicMapLayout;
@@ -130,6 +140,8 @@ function Flow({
 	margin: { x: number; y: number };
 	highlight: ReadonlySet<TopicHandle> | null;
 	zoom: number | undefined;
+	whole: boolean;
+	onOpensWhole: ((fits: boolean) => void) | undefined;
 }) {
 	const captionId = useId();
 	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y]);
@@ -146,28 +158,44 @@ function Flow({
 	// As far as a framed opening may look (`framedCamera`): the room at the smallest scale it opens at, and one topic past it.
 	const extent = useMemo<CoordinateExtent>(() => {
 		const slack = slackOf(layout.node);
-		const x = margin.x / WHOLE_COURSE_ZOOM + slack.x;
-		const y = margin.y / WHOLE_COURSE_ZOOM + slack.y;
+		const x = margin.x / READABLE_ZOOM + slack.x;
+		const y = margin.y / READABLE_ZOOM + slack.y;
 		return [
 			[-x, -y],
 			[layout.width + x, layout.height + y],
 		];
 	}, [layout, margin.x, margin.y]);
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
-	const fitted = frame ? Math.max(MIN_ZOOM, Math.min(1, wholeZoom(layout, frame, margin))) : 1;
+	// Zoomed out as far as the whole course, however small: the enlarged map's overview.
+	const fitted = frame ? Math.min(1, wholeZoom(layout, frame, margin)) : 1;
 	const minZoom = fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
+	const opensWhole = frame ? wholeZoom(layout, frame, margin) >= READABLE_ZOOM : null;
+	const told = useRef(onOpensWhole);
+	told.current = onOpensWhole;
+	useLayoutEffect(() => {
+		if (opensWhole !== null) told.current?.(opensWhole);
+	}, [opensWhole]);
 
-	// The camera returns to its opening view whenever the frame grows or shrinks.
+	// The camera returns to its opening view whenever the frame grows or shrinks, or `whole` turns.
+	// Placed before the browser paints the measured frame: the map shows at once, already framed.
 	const [placed, setPlaced] = useState(false);
-	useEffect(() => {
+	const wasWhole = useRef(whole);
+	useLayoutEffect(() => {
 		if (frameWidth <= 0 || frameHeight <= 0) return;
 		const size = { width: frameWidth, height: frameHeight };
-		const camera =
-			fixedZoom === undefined
+		const middle: [number, number] = [layout.width / 2, layout.height / 2];
+		const camera = whole
+			? cameraAt(layout, middle, minZoom, size, margin)
+			: fixedZoom === undefined
 				? framedCamera(layout, map.current, size, frameMargin, TAG_ROOM)
-				: cameraAt(layout, [layout.width / 2, layout.height / 2], fixedZoom, size, margin);
-		void flow.setViewport(camera).then(() => setPlaced(true));
-	}, [flow, layout, map.current, frameWidth, frameHeight, margin, frameMargin, fixedZoom]);
+				: cameraAt(layout, middle, fixedZoom, size, margin);
+		// Zooming out to the whole course and back glides; any other move is at once. Without a duration React Flow
+		// sets the viewport synchronously; only its promise settles later.
+		const glide = wasWhole.current !== whole && !reducedMotion();
+		wasWhole.current = whole;
+		void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
+		setPlaced(true);
+	}, [flow, layout, map.current, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom]);
 
 	/** Brings a topic the keyboard reached into view, when part of it is out of the frame. */
 	const follow = useCallback(
@@ -223,8 +251,8 @@ function Flow({
 					nodeTypes={nodeTypes}
 					edgeTypes={edgeTypes}
 					// No `colorMode="dark"`: its `dark` class on the wrapper would restate the old theme's tokens inside the map.
-					// The opening view is set once the frame is measured; the map fades in on it.
-					className={cn("transition-opacity duration-[180ms] ease-out motion-reduce:transition-none", !placed && "opacity-0")}
+					// Hidden only until the frame is measured and the opening view set, in the same frame.
+					className={cn(!placed && "invisible")}
 					minZoom={minZoom}
 					maxZoom={1}
 					translateExtent={extent}

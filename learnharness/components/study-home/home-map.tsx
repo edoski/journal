@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRightIcon, Maximize2Icon, Minimize2Icon } from "lucide-react";
+import { ArrowRightIcon, LocateFixedIcon, Maximize2Icon, Minimize2Icon, ZoomOutIcon } from "lucide-react";
 import type { StudyCourse, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,8 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * course's map stays drawn and the chosen one shows, so a change of course
  * crossfades instead of drawing a map afresh; the tabs' underline slides to the chosen course. The enlarge
  * control lets the map take over Home for a moment; it and Esc bring Home
- * back. Enlarged or not, it is only the map: no List view and no More menu
+ * back. Enlarged, a course too big to open whole has a Whole course control
+ * (and "-") that zooms out to every topic, and back to where he is. Enlarged or not, it is only the map: no List view and no More menu
  * (Edo, 12 Nov 2026).
  */
 export function HomeMap({
@@ -47,21 +48,46 @@ export function HomeMap({
 }) {
 	const chosen = courses.some((c) => c.map.workspace === workspace) ? workspace : courses[0]!.map.workspace;
 	const chosenTitle = mathPlain(courses.find((c) => c.map.workspace === chosen)!.map.title);
+	// The enlarged map's zoom out: the whole course, until he zooms back in or leaves the enlarged map.
+	const [whole, setWhole] = useState(false);
+	const [opensWhole, setOpensWhole] = useState<ReadonlyMap<string, boolean>>(new Map());
+	const canZoomOut = enlarged && opensWhole.get(chosen) === false;
+	const zoomedOut = canZoomOut && whole;
+	useEffect(() => {
+		if (!enlarged) setWhole(false);
+	}, [enlarged]);
 	useEffect(() => {
 		if (!enlarged) return;
-		// Anything open over the map claims Esc first (Radix marks it handled).
+		// Anything open over the map claims Esc first (Radix marks it handled); a key typed in a field is the field's.
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape" && !e.defaultPrevented) onEnlarge(false);
+			if (e.defaultPrevented) return;
+			if (e.key === "Escape") onEnlarge(false);
+			else if (e.key === "-" && canZoomOut && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target as Element | null)?.closest?.("input, textarea, [contenteditable=true]")) setWhole((w) => !w);
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [enlarged, onEnlarge]);
+	}, [enlarged, onEnlarge, canZoomOut]);
 
 	return (
 		<section aria-label="Course map" data-slot="home-map" data-enlarged={enlarged || undefined} className="relative flex min-h-0 flex-1 flex-col gap-2">
 			<div className="flex h-8 shrink-0 items-center justify-between gap-4">
 				<CourseTabs courses={courses} workspace={chosen} onSelect={onSelect} />
 				<div className="flex shrink-0 items-center gap-1">
+					{canZoomOut && (
+						<Hint label={zoomedOut ? "Back to where you are" : "Whole course"} binding="-" side="bottom">
+							<Button
+								variant="quiet"
+								size="icon-row"
+								data-slot="home-map-whole"
+								aria-label={zoomedOut ? "Back to where you are" : "Whole course"}
+								aria-pressed={zoomedOut}
+								onClick={() => setWhole((w) => !w)}
+								className="lh-no-drag"
+							>
+								{zoomedOut ? <LocateFixedIcon /> : <ZoomOutIcon />}
+							</Button>
+						</Hint>
+					)}
 					<Hint label={`${chosenTitle}'s course page`} side="bottom">
 						<Button variant="quiet" size="sm" asChild data-slot="home-map-course-page" className="lh-no-drag text-label font-normal">
 							<Link href={courseHref(chosen)}>
@@ -100,7 +126,14 @@ export function HomeMap({
 								shown ? "opacity-100" : "pointer-events-none opacity-0",
 							)}
 						>
-							<CourseDrawing course={course} highlight={shown ? highlight : null} />
+							<CourseDrawing
+								course={course}
+								highlight={shown ? highlight : null}
+								whole={shown && zoomedOut}
+								onOpensWhole={(fits) =>
+									setOpensWhole((was) => (was.get(course.map.workspace) === fits ? was : new Map(was).set(course.map.workspace, fits)))
+								}
+							/>
 						</div>
 					);
 				})}
@@ -151,9 +184,19 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 }
 
 /** One course's map, drawn once and kept. */
-function CourseDrawing({ course, highlight }: { course: StudyCourse; highlight: ReadonlySet<TopicHandle> | null }) {
+function CourseDrawing({
+	course,
+	highlight,
+	whole,
+	onOpensWhole,
+}: {
+	course: StudyCourse;
+	highlight: ReadonlySet<TopicHandle> | null;
+	whole: boolean;
+	onOpensWhole: (fits: boolean) => void;
+}) {
 	const { map } = course;
 	if (map.topics.length === 0) return <p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>;
 	// As much room as the fade, so a topic at the edge scrolls clear of it.
-	return <TopicMap map={map} margin={FADE} highlight={highlight} />;
+	return <TopicMap map={map} margin={FADE} highlight={highlight} whole={whole} onOpensWhole={onOpensWhole} />;
 }

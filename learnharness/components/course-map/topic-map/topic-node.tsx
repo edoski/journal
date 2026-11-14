@@ -25,7 +25,6 @@ export type TopicFlowNode = Node<
 		needs: string | null;
 		/** The topic's page. */
 		href: string;
-		layer: number;
 	},
 	"topic"
 >;
@@ -85,26 +84,21 @@ export function NodeBody({ topic, standing, status }: { topic: CourseMapTopic; s
 	);
 }
 
-/** The open's per-layer stagger, capped so the whole entrance ends under 300ms. */
-const STAGGER_MS = 15;
-const STAGGER_CAP_MS = 110;
-
 /**
  * One topic on the map (spec: topic-map.md): one card, its pie beside its
  * title and one line under it. A link to the topic's page.
  */
 export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 	const state = useContext(TopicMapContext);
-	const { topic, current, standing, status, label, needs, href, layer } = data;
+	const { topic, current, standing, status, label, needs, href } = data;
 	const dim = state?.lit ? !state.lit.has(topic.handle) : false;
 	return (
 		<div
 			className={cn(
-				"relative size-full transition-opacity duration-[120ms] motion-safe:animate-[lh-card-enter_180ms_cubic-bezier(0.19,1,0.22,1)_backwards] motion-reduce:transition-none",
+				"relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none",
 				// Faded, yet its muted line still reads at 3.2:1 on the page (WCAG 1.4.3's floor for large text, 1.4.11's for marks).
 				dim && "opacity-60",
 			)}
-			style={{ animationDelay: `${Math.min(layer * STAGGER_MS, STAGGER_CAP_MS)}ms` }}
 		>
 			{current && (
 				<span data-slot="course-map-current-tag" className="absolute -top-5 left-0 text-caption font-medium text-foreground">
