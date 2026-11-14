@@ -40,14 +40,16 @@ function fakeEngine(plan?: unknown) {
 }
 
 describe("course records adapter (fake engine)", () => {
-	it("lists registered courses from plan --all, with due counts including due_more", async () => {
+	it("lists registered courses from plan --all, with due counts including due_more, and keeps those it could not read", async () => {
 		const { engine, calls } = fakeEngine({
 			today: "2026-11-07",
 			courses: [
-				{ workspace: "/s/smm", title: "SMM", due: [{ topic: "a" }, { topic: "b" }], due_more: 3, current: "rank", current_title: "Rank", task: { key: "t", title: "Exercise 5" }, last_activity: { date: "2026-11-05", days_ago: 2 } },
-				{ workspace: "/s/bare" },
+				{ workspace: "/s/smm", title: "SMM", due: [{ topic: "a" }, { topic: "b" }], due_more: 3, current: "rank", current_title: "Rank", task: { key: "t", title: "Exercise 5" }, last_activity: { date: "2026-11-07", days_ago: 0 }, last_studied: { date: "2026-11-05", days_ago: 2 } },
+				{ workspace: "/s/bare", last_activity: { date: "2026-11-07", days_ago: 0 } },
 				{ title: "no workspace, skipped" },
-				{ workspace: "/s/broken", error: "course.json is not valid JSON" },
+				{ workspace: "/s/broken", error: "course.json is not valid JSON", problem: "damaged" },
+				{ workspace: "/s/closed", error: "Permission denied", problem: "denied" },
+				{ workspace: "/s/odd", error: "an engine before problems" },
 			],
 		});
 		const listing = await createCourseRecords(engine).list();
@@ -70,6 +72,11 @@ describe("course records adapter (fake engine)", () => {
 					lastActiveDaysAgo: 2,
 				},
 				{ workspace: "/s/bare", title: null, due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
+			],
+			unreadable: [
+				{ workspace: "/s/broken", title: "broken", problem: "damaged" },
+				{ workspace: "/s/closed", title: "closed", problem: "denied" },
+				{ workspace: "/s/odd", title: "odd", problem: "unreadable" },
 			],
 		});
 		assert.deepEqual(calls()[0]!.args, ["plan", "--all", "--days", "1"]);
@@ -183,8 +190,8 @@ describe("course records adapter (fake engine)", () => {
 			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }],
 			topics: [
 				{ topic: "vectors", title: "Vectors", needs: [], contrasts: [], level: "transferred", introduced: "2026-10-16", review: "2026-11-23", weak: false, tasks: [] },
-				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
-				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
+				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", right: "partial", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
+				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", right: "sideways", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
 				{ topic: "cramer", needs: ["vectors"], contrasts: ["elimination"], level: "introduced", weak: false, tasks: [] },
 				{ topic: "odd", level: "mastered", needs: [], contrasts: [], weak: false, tasks: [] },
 			],
@@ -208,6 +215,8 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(rank!.review, { kind: "due", date: "2026-11-05", overdue: 3 });
 		assert.deepEqual(rank!.signals, { gap: "Counts nonzero entries", lapsed: false, stale: true, choiceErrors: {}, confidentErrors: 0, repaired: true });
 		assert.equal(elimination!.signals.repaired, false);
+		assert.equal(elimination!.right, "partial", "how a topic not yet solid was best answered");
+		assert.equal("right" in rank!, false, "a word the engine does not have is dropped");
 		assert.deepEqual(elimination!.signals.choiceErrors, { cramer: 1 });
 		assert.equal(cramer!.title, "cramer", "a topic without a title shows its handle");
 		assert.deepEqual(map.edges, [
@@ -252,7 +261,7 @@ describe("course records adapter: create (fake engine)", () => {
 function memoryRecords(answer: (verb: CourseVerb) => Awaited<ReturnType<CourseRecords["run"]>>) {
 	const seen: Array<{ workspace: string; verb: CourseVerb }> = [];
 	const records: CourseRecords = {
-		list: async () => ({ available: true, courses: [] }),
+		list: async () => ({ available: true, courses: [], unreadable: [] }),
 		run: async (workspace, verb) => {
 			seen.push({ workspace, verb });
 			return answer(verb);

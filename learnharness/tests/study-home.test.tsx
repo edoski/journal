@@ -29,6 +29,7 @@ import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
+import { UnreadableLines } from "../components/study-home/unreadable-course.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
 
@@ -89,7 +90,7 @@ const PROB: StudyCourse = {
 		title: "Probability",
 		exam: { date: "2026-11-19", daysLeft: 11 },
 		current: "bayes" as TopicHandle,
-		topics: [topic("conditional", "Conditional probability", "independent", { review: { kind: "scheduled", date: "2026-11-09" } }), topic("bayes", "Bayes' rule", "independent")],
+		topics: [topic("conditional", "Conditional probability", "independent", { review: { kind: "scheduled", date: "2026-11-09" } }), topic("bayes", "Bayes' rule", "assisted")],
 	}),
 	unready: [],
 	due: [],
@@ -157,6 +158,35 @@ describe("study facts", () => {
 		assert.deepEqual(step.kind === "topic" && [step.topics, step.planned], [["bayes"], true]);
 		assert.equal(whyOf({ kind: "course", course: fresh, step })?.short, "Planned today");
 		assert.equal(stepWords(nextStepOf({ ...LINALG, newToday: ["span"] as TopicHandle[] })), "Review Linear independence, Rank, Span", "reviews still come first");
+	});
+
+	it("after a review leaves the current topic his own, next is the topic the plan starts next, not that topic again", () => {
+		const reviewed: StudyCourse = {
+			...PROB,
+			map: {
+				...PROB.map,
+				topics: [
+					topic("bayes", "Bayes' rule", "independent", { review: { kind: "scheduled", date: "2026-11-11" } }),
+					topic("geometric", "Geometric distribution", "new", { starts: "2026-11-11" }),
+					topic("poisson", "Poisson distribution", "new", { starts: "2026-11-09" }),
+				],
+			},
+		};
+		const step = nextStepOf(reviewed);
+		assert.equal(stepWords(step), "Start Poisson distribution");
+		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Next up");
+		const done: StudyCourse = { ...reviewed, map: { ...reviewed.map, topics: reviewed.map.topics.slice(0, 1) } };
+		assert.equal(nextStepOf(done).kind, "none", "nothing left to start: no Continue on a topic he has on his own");
+	});
+
+	it("a course never studied comes after every course with reviews tonight, even with the nearer exam", () => {
+		const fresh: StudyCourse = { map: map({ workspace: "/s/graphs", title: "Graph theory", exam: { date: "2026-11-20", daysLeft: 12 } }), unready: [], due: [], newToday: [], lastActiveDaysAgo: null };
+		const rows = todayRows([fresh, ANALYSIS], [], TODAY);
+		assert.deepEqual(
+			rows.map((r) => r.course?.map.title),
+			["Real Analysis", "Graph theory"],
+		);
+		assert.deepEqual(foldLines(todayRows([fresh, PROB, ANALYSIS, LINALG], [], TODAY)).shown.at(-1)?.course?.map.title, "Graph theory");
 	});
 
 	it("puts a course in its exam run-up first, the nearest exam first", () => {
@@ -240,13 +270,14 @@ describe("lessons", () => {
 describe("the study read", () => {
 	it("joins the map with plan's run-up, today's review and last activity, dropping handles the map does not list", () => {
 		const plan = {
-			courses: [{ runup: { days_left: 21, unready: ["span", "gone"] }, due: [{ topic: "rank" }, { topic: "gone" }, { topic: "span" }], last_activity: { days_ago: 2 } }],
+			courses: [{ runup: { days_left: 21, unready: ["span", "gone"] }, due: [{ topic: "rank" }, { topic: "gone" }, { topic: "span" }], last_activity: { days_ago: 0 }, last_studied: { days_ago: 2 } }],
 		};
 		const course = studyCourseOf(LINALG.map, plan);
 		assert.deepEqual(course.unready, ["span"]);
 		assert.deepEqual(course.due, ["rank", "span"]);
 		assert.equal(course.lastActiveDaysAgo, 2);
 		assert.deepEqual(studyCourseOf(LINALG.map, { courses: [{}] }), { map: LINALG.map, unready: null, due: [], lastActiveDaysAgo: null, newToday: [] });
+		assert.equal(studyCourseOf(LINALG.map, { courses: [{ last_activity: { days_ago: 0 } }] }).lastActiveDaysAgo, null, "a course saved today but never studied is not studied today");
 		assert.equal(studyCourseOf(LINALG.map, null).due, null);
 	});
 
@@ -315,7 +346,7 @@ describe("what a line of Today reads", () => {
 
 	it("counts how much of a course he can do on his own, weak topics left out", () => {
 		assert.deepEqual(courseProgress(LINALG), { solid: 2, of: 5 });
-		assert.deepEqual(courseProgress(PROB), { solid: 2, of: 2 });
+		assert.deepEqual(courseProgress(PROB), { solid: 1, of: 2 });
 		assert.equal(courseProgress({ ...LINALG, map: { ...LINALG.map, topics: [] } }), null);
 	});
 
@@ -347,5 +378,26 @@ describe("what a line of Today reads", () => {
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 4);
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["review", 1]]);
 		plain(doc);
+	});
+});
+
+describe("a course whose record can't be read", () => {
+	it("stays on Home by its name, with the line that says what's wrong in plain words", () => {
+		const html = renderToStaticMarkup(
+			<UnreadableLines
+				courses={[
+					{ workspace: "/s/real-analysis", title: "Real Analysis", problem: "damaged" },
+					{ workspace: "/s/probability", title: "Probability", problem: "denied" },
+				]}
+			/>,
+		);
+		const lines = [...parseHTML(`<html><body>${html}</body></html>`).document.querySelectorAll('[data-slot="unreadable-course"]')];
+		assert.deepEqual(
+			lines.map((p) => p.textContent),
+			[
+				"Real Analysis Couldn't read this course's record. Its file is damaged.",
+				"Probability Couldn't read this course's record. The app isn't allowed to open its files.",
+			],
+		);
 	});
 });

@@ -23,6 +23,10 @@ proposes raises it. Until then the same mean, over finished days only, is the
 most he has shown he does: new topics are proposed at least at that pace, and
 past each exam's pace when it needs more.
 
+A day he answered no review at all says only that he did not review that
+day, not how many he gets through when he does, so it never shows a review
+limit: a limit of none would hold every review off the plan for good.
+
 Which weekdays he studies is censored the same way: a day the plan held
 nothing and he did nothing says nothing, since nothing was proposed. A weekday
 is a study day while he is at least half as likely to study on it as on his
@@ -263,7 +267,7 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
         day: Done(
             reviews.get(day, 0),
             new.get(day, 0),
-            day in left and day in week.planned,
+            day in left and day in week.planned and reviews.get(day, 0) > 0,
             day in short,
         )
         for day in studied

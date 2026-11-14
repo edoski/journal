@@ -120,6 +120,7 @@ export function chat(id: string, over: Partial<ChatListItem> = {}): ChatListItem
 		pendingProblem: false,
 		busy: false,
 		compacting: false,
+		ownTopics: over.topics ?? [],
 		...over,
 	};
 }

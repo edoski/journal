@@ -5,6 +5,7 @@
  * invents no date.
  */
 
+import type { UnreadableCourse } from "./course.ts";
 import type { TopicHandle } from "./course-map.ts";
 import type { StudyCourse } from "./study.ts";
 
@@ -39,10 +40,13 @@ export interface StudyWindow {
 /** One day ahead: a day off when the engine has learned that he does not
  *  study on that weekday (`plan`'s `capacity.study_days`; the Journal's day
  *  off when the engine says nothing), else the Journal's study windows
- *  (lunch left out). */
+ *  (lunch left out). `journalOff` says the Journal rests the day: on a
+ *  day that is not `off`, his record shows he studies that weekday all the
+ *  same, so the plan holds work there. */
 export interface ScheduledDay {
 	date: string;
 	off: boolean;
+	journalOff: boolean;
 	windows: readonly StudyWindow[];
 }
 
@@ -50,5 +54,5 @@ export interface ScheduledDay {
  *  has no schedule to read. A course whose read failed is named in
  *  `failed`. */
 export type CalendarListing =
-	| { available: true; courses: CalendarCourse[]; failed: string[]; schedule: ScheduledDay[] }
+	| { available: true; courses: CalendarCourse[]; failed: UnreadableCourse[]; schedule: ScheduledDay[] }
 	| { available: false; reason: string };

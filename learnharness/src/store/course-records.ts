@@ -15,8 +15,16 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { emit } from "../core/events.ts";
-import { courseLabel, type CourseResult, type CourseSummary, type CourseVerb, type DueReview } from "../core/contracts/course.ts";
-import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type TopicHandle } from "../core/contracts/course-map.ts";
+import {
+	courseLabel,
+	type CourseResult,
+	type CourseSummary,
+	type CourseVerb,
+	type DueReview,
+	type UnreadableCourse,
+	type UnreadableProblem,
+} from "../core/contracts/course.ts";
+import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
 
 export interface EngineCommand {
@@ -133,15 +141,24 @@ function str(value: unknown): string | null {
 	return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-/** The chooser's view of one `plan --all` course entry. `plan --all` lists
- *  registered workspaces that have a course record, so a course appears
- *  here from its first save on. */
-function summaryOf(entry: unknown): CourseSummary | null {
-	if (typeof entry !== "object" || entry === null) return null;
-	const e = entry as Record<string, unknown>;
-	const workspace = str(e.workspace);
-	// An entry with `error` is a record the engine could not read: not linkable.
-	if (!workspace || "error" in e) return null;
+const PROBLEMS: readonly UnreadableProblem[] = ["denied", "damaged", "unreadable"];
+
+/** One `plan --all` course entry: a course, or, for an entry with `error`,
+ *  a course the engine could not read, by its folder's name. `plan --all`
+ *  lists registered workspaces that have a course record, so a course
+ *  appears here from its first save on. Null when it names no workspace. */
+function entryOf(entry: unknown): { course: CourseSummary } | { unreadable: UnreadableCourse } | null {
+	const e = record(entry);
+	const workspace = str(e?.workspace);
+	if (!e || !workspace) return null;
+	if ("error" in e) {
+		const problem = PROBLEMS.find((p) => p === e.problem) ?? "unreadable";
+		return { unreadable: { workspace, title: courseLabel({ workspace, title: null }), problem } };
+	}
+	return { course: summaryOf(workspace, e) };
+}
+
+function summaryOf(workspace: string, e: Record<string, unknown>): CourseSummary {
 	const dueMore = typeof e.due_more === "number" ? e.due_more : 0;
 	const due = Array.isArray(e.due) ? (e.due as unknown[]) : [];
 	const task = typeof e.task === "object" && e.task !== null ? (e.task as Record<string, unknown>) : {};
@@ -155,7 +172,7 @@ function summaryOf(entry: unknown): CourseSummary | null {
 		task: str(task.title),
 		step: str(task.step),
 		exam: examOf(e.exam),
-		lastActiveDaysAgo: daysAgoOf(e.last_activity),
+		lastActiveDaysAgo: daysAgoOf(e.last_studied),
 	};
 }
 
@@ -193,6 +210,9 @@ function count(value: unknown): number {
 	return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0;
 }
 
+const RIGHT_ANSWERS: readonly RightAnswer[] = ["unaided", "helped", "guess", "uncertain", "partial"];
+const isRightAnswer = (value: unknown): value is RightAnswer => RIGHT_ANSWERS.includes(value as RightAnswer);
+
 /** One `map` topic; null when it lacks a handle or an engine level. */
 function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contrasts: string[] }) | null {
 	const e = record(entry);
@@ -212,6 +232,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 				: { kind: "scheduled", date: reviewDate }
 			: null,
 		weak: e.weak === true,
+		...(isRightAnswer(e.right) ? { right: e.right } : {}),
 		signals: {
 			gap: str(e.gap),
 			lapsed: e.lapsed === true,
@@ -222,6 +243,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 		},
 		tasks: strings(e.tasks),
 		...(str(e.excluded) ? { excluded: str(e.excluded)! } : {}),
+		...(str(e.starts) ? { starts: str(e.starts)! } : {}),
 		needs: strings(e.needs),
 		contrasts: strings(e.contrasts),
 	};
@@ -296,10 +318,12 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 			const result = toResult(await exec(engine, ["plan", "--all", "--days", "1"], ""), "plan");
 			if (!result.ok) return { available: false, reason: result.message };
 			const entries = (result.json as { courses?: unknown }).courses;
-			const courses = (Array.isArray(entries) ? entries : [])
-				.map(summaryOf)
-				.filter((c): c is CourseSummary => c !== null);
-			return { available: true, courses };
+			const read = (Array.isArray(entries) ? entries : []).map(entryOf);
+			return {
+				available: true,
+				courses: read.flatMap((r) => (r && "course" in r ? [r.course] : [])),
+				unreadable: read.flatMap((r) => (r && "unreadable" in r ? [r.unreadable] : [])),
+			};
 		},
 		async run(workspace, verb) {
 			const { args, stdin } = argsFor(verb);

@@ -110,15 +110,16 @@ export function scheduleOf(plan: unknown): ScheduledDay[] {
 		journal.size > 0 ? [...journal.keys()] : studies && typeof today === "string" ? Array.from({ length: CALENDAR_DAYS }, (_, n) => addDays(today, n)) : [];
 	return dates.map((date) => {
 		const scheduled = journal.get(date);
-		const off = studies ? !studies.has(weekday(date)) : (scheduled?.off ?? false);
-		return { date, off, windows: off ? [] : (scheduled?.windows ?? []) };
+		const journalOff = scheduled?.off ?? false;
+		const off = studies ? !studies.has(weekday(date)) : journalOff;
+		return { date, off, journalOff, windows: off ? [] : (scheduled?.windows ?? []) };
 	});
 }
 
 export async function calendarRead(): Promise<CalendarListing> {
 	const listing = await readCourses(planDays);
 	if (!listing.available) return listing;
-	const read = listing.read.flatMap((c) => (typeof c === "string" ? [] : [c]));
+	const { read, failed } = listing;
 	return {
 		available: true,
 		courses: read.map(({ map, plan }) => ({
@@ -127,7 +128,7 @@ export async function calendarRead(): Promise<CalendarListing> {
 			doesNotFit: doesNotFitOf(plan, map),
 			finalReview: finalReviewOf(plan, map.exam),
 		})),
-		failed: listing.read.filter((c): c is string => typeof c === "string"),
+		failed,
 		schedule: read.map(({ plan }) => scheduleOf(plan)).find((days) => days.length > 0) ?? [],
 	};
 }

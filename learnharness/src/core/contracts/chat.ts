@@ -38,10 +38,13 @@ export interface ChatRecord {
 	 *  Absent only on sessions older than that rule: they stay readable and
 	 *  take no learner turn until the learner links a course. */
 	course?: CourseLink;
-	/** The course topics the session was started on (a topic's page, Home's
-	 *  review of those topics), set at creation: the session's own topics,
-	 *  on it from its first turn. */
+	/** The session's own topics, the topic it belongs to first: the course
+	 *  topics it was started on (a topic's page, Home's review of those
+	 *  topics), set at creation, else the topic its first plan's goal names
+	 *  (`SessionGoal`). Set once; the step the lesson is on never moves it. */
 	topics?: readonly string[];
+	/** The learner renamed the session: a plan's goal no longer names it. */
+	renamed?: true;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
 	/** Append-only usage log (observability, 2026-09): one entry per model
@@ -219,6 +222,20 @@ export const CONCLUDE_ACK_TEXT =
 export const NEXT_PROBLEM_TEXT =
 	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or wrap the session in text if the arc is complete.";
 
+/** What the agent reads when he presses Done for tonight: the
+ *  done-tonight marker's content, per answering agent (only the teacher
+ *  has `lesson_progress`). Anything he left open arrives just before it
+ *  already resolved: a question as a dismissal with reason "tonight", a
+ *  problem as a dismissed conclude. */
+export const DONE_TONIGHT_TEXT = {
+	prober:
+		"[DONE FOR TONIGHT] — the learner pressed Done for tonight. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more tonight. Close in two or three short lines: what you learned about where he stands, and where the lesson will start next time.",
+	teacher:
+		"[DONE FOR TONIGHT] — the learner pressed Done for tonight. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more tonight. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished), then two or three short lines naming where to start next time.",
+	practice:
+		"[DONE FOR TONIGHT] — the learner pressed Done for tonight. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more tonight. Close the session in two lines: what went well, and what to pick up next time.",
+} as const;
+
 /** The practice dock's request buttons: a hint, the rest of the
  *  solution, or teaching instead of this problem. A request is never an
  *  answer: it rides its own marker (`practice-request`), so the agent and
@@ -273,6 +290,14 @@ export interface PlanBlockData {
 	edges: Array<{ from: string; to: string }>;
 }
 
+/** What a lesson is for, as its first plan names it: a short `title`, and
+ *  the course `topic` it teaches when it teaches one. It names a session
+ *  started on no topic, once (`ChatStore.nameSession`). */
+export interface SessionGoal {
+	title: string;
+	topic?: string;
+}
+
 /** How the tutor's last turn left a session that waits on no question or
  *  problem it posed: its words asked him something, or its plan waits for
  *  his go-ahead, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
@@ -313,6 +338,10 @@ export interface ChatSummary {
 	 *  against the course map.
 	 *  The list always sets it; a summary made elsewhere may leave it out. */
 	topics?: readonly string[];
+	/** The session's own topics (the record's `topics`), the topic it
+	 *  belongs to first: fixed once, never the step the lesson is on. The
+	 *  list always sets it; a summary made elsewhere may leave it out. */
+	ownTopics?: readonly string[];
 	/** How the tutor's last turn left the session (sessionEndOf); a summary
 	 *  made elsewhere may leave it out, which reads as closed. */
 	ended?: SessionEnd;

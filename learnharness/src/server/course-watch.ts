@@ -23,7 +23,8 @@ export function watchCourses({ courseRecords, watch = watchCourseRecord }: Cours
 	const sync = async () => {
 		const listing = await courseRecords.list().catch(() => null);
 		if (stopped || !listing?.available) return;
-		const now = new Set(listing.courses.map((c) => c.workspace));
+		// A record it could not read is watched too, so its repair shows at once.
+		const now = new Set([...listing.courses, ...listing.unreadable].map((c) => c.workspace));
 		for (const [workspace, unwatch] of watched) {
 			if (now.has(workspace)) continue;
 			unwatch();

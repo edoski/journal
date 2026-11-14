@@ -41,7 +41,7 @@ The head's progress words ("Some topics on your own", `courseShareWords`) follow
 | loading | the header's skeleton, the header's three rows at their heights (course-header.md), so nothing moves when the course arrives |
 | engine not answering | "The study engine is not answering, so this course can't show right now." |
 | read failed | "Couldn't read this course." and Try again (Home's words) |
-| a record the engine could not read | "The study engine couldn't read this course." and Try again |
+| a record the engine could not read | Home's line for it ("Couldn't read this course's record." and why) and Try again |
 | a course not among his courses | "This course is not here." and Go to Home |
 | no exam | the facts line leaves the exam out |
 | no topics | the facts line leaves the count out; every group is empty; the button reads Start a lesson's word |

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { courseShareWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, type Fill } from "../components/study-words.ts";
+import { courseShareWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
 
 // The app's one wording for where he stands and why a topic needs him
 // (study-words.ts), which every surface reads.
@@ -16,6 +16,20 @@ describe("where he stands", () => {
 			fills.map((fill) => STANDING_WORDS[fill]),
 			["Not started", "Taught, not tried", "Tried, not right yet", "Right with help", "On your own"],
 		);
+	});
+});
+
+describe("where he stands, true to the record", () => {
+	it("says how a topic he cannot yet do on his own was best answered, never help he was not given", () => {
+		const assisted = (right?: "unaided" | "helped" | "guess" | "uncertain" | "partial") => standingWords(0.75, { level: "assisted", ...(right ? { right } : {}) });
+		assert.equal(assisted("unaided"), "Right on your own once", "right unaided on the day he learned it");
+		assert.equal(assisted("partial"), "Partly right");
+		assert.equal(assisted("guess"), "Right, but a guess");
+		assert.equal(assisted("uncertain"), "Right, not yet confirmed");
+		assert.equal(assisted("helped"), "Right with help");
+		assert.equal(assisted(), "Right with help", "an engine that does not say keeps the pie's words");
+		assert.equal(standingWords(0.75, { level: "independent" }), "Right with help", "a weak topic he could do on his own keeps its pie's words");
+		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet");
 	});
 });
 

@@ -80,6 +80,18 @@ const planInitInput = Type.Object({
 			"The only strict rule: ids are permanent lowercase slugs (a-z, 0-9, hyphens/underscores) — checks reference them via nodeId. " +
 			"Titles are free single-line text; `-->` means 'from = prerequisite' (chains fine); no subgraphs, styles, or classes.",
 	}),
+	goal: Type.Optional(
+		Type.Object(
+			{
+				title: Type.String({ minLength: 1, description: "A short name for the lesson, a few words in his language, e.g. \"Eigenvalues by hand\"." }),
+				topic: Type.Optional(Type.String({ minLength: 1, description: "The handle of the course topic the lesson teaches, when it teaches one." })),
+			},
+			{
+				description:
+					"What the lesson is for, on the first call: it names a session started from a free message, once, everywhere he sees it. A rewrite never renames it.",
+			},
+		),
+	),
 });
 
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
@@ -114,7 +126,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				"`-->` edges meaning 'from must be understood before to' (chains fine). 5–15 nodes: a map, not a syllabus — one reasoning step per node, compress. " +
 				"Every check you fire names the node it assesses via `nodeId`; where the lesson stands derives from those tags.",
 			parameters: planInitInput,
-			execute: serverExecute("plan_init", planInitInput, async ({ mermaid }) => {
+			execute: serverExecute("plan_init", planInitInput, async ({ mermaid, goal }) => {
 				const { chatId, chatStore } = ctx;
 				const record = chatStore.getChat(chatId);
 				if (!record) return { ok: false, error: `Chat not found: ${chatId}` };
@@ -131,6 +143,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					// edge endpoints, self-loops, cycles → PlanTreeError).
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
 					chatStore.saveTree(chatId, next);
+					if (goal && !record.tree) chatStore.nameSession(chatId, goal);
 					// Context diet: content = the validated nodeIds + the reminder (the
 				// ids just became binding for every explain call); details =
 					// the full tree for the record/UI — the plan popup's latestTree

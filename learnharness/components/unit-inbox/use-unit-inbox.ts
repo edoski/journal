@@ -1,25 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
+import type { ChatListItem, StudyCourse, StudyListing, UnreadableCourse } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
 import { buildInbox, type FoldedShelf, type UnitInbox } from "@/components/unit-inbox/units";
 
 /** Without the engine every session is listed under Other, and
  *  `unavailable` says the courses could not be read. `chats` is the
- *  session list the inbox was built from. */
+ *  session list the inbox was built from; `unreadable` the courses whose
+ *  record the engine could not read, under the course filter. */
 export type InboxState =
 	| { status: "loading" }
-	| { status: "ready"; inbox: UnitInbox; courses: readonly StudyCourse[]; chats: readonly ChatListItem[]; unavailable: boolean };
+	| {
+			status: "ready";
+			inbox: UnitInbox;
+			courses: readonly StudyCourse[];
+			unreadable: readonly UnreadableCourse[];
+			chats: readonly ChatListItem[];
+			unavailable: boolean;
+	  };
+
+type StudyRead = { courses: StudyCourse[]; failed: UnreadableCourse[] };
 
 /** Every course's map, read once per mount and again whenever a course
  *  record changes, a course is added, renamed or deleted, or the day turns
  *  over. Reads never overlap: an event during a read asks for one more
  *  read when it ends, so a burst of events costs at most two. A failed read
  *  keeps the last map. */
-function useStudyCourses(): StudyCourse[] | null | "unavailable" {
-	const [courses, setCourses] = useState<StudyCourse[] | null | "unavailable">(null);
+function useStudyCourses(): StudyRead | null | "unavailable" {
+	const [courses, setCourses] = useState<StudyRead | null | "unavailable">(null);
 	const reading = useRef(false);
 	const again = useRef(false);
 	const read = useCallback(async () => {
@@ -32,7 +42,7 @@ function useStudyCourses(): StudyCourse[] | null | "unavailable" {
 			again.current = false;
 			try {
 				const listing = (await (await fetch("/api/study", { cache: "no-store" })).json()) as StudyListing;
-				setCourses(listing.available ? listing.courses : "unavailable");
+				setCourses(listing.available ? { courses: listing.courses, failed: listing.failed } : "unavailable");
 			} catch {
 				setCourses((prev) => prev ?? "unavailable");
 			}
@@ -106,12 +116,14 @@ export function useUnitInbox(chats: readonly ChatListItem[] | null) {
 	const courses = useStudyCourses();
 	const [storedScope, setScope] = useStored("lh:unit-inbox-scope", parseScope);
 	const [folded, setFolded] = useStored("lh:topic-sidebar-folded", parseFolded);
-	const scope = Array.isArray(courses) && courses.some((c) => c.map.workspace === storedScope) ? storedScope : null;
+	const read = courses === "unavailable" ? null : courses;
+	const scope = read?.courses.some((c) => c.map.workspace === storedScope) ? storedScope : null;
 	const state = useMemo<InboxState>(() => {
 		if (courses === null || chats === null) return { status: "loading" };
-		const listed = courses === "unavailable" ? [] : courses;
-		return { status: "ready", inbox: buildInbox(listed, chats, scope), courses: listed, chats, unavailable: courses === "unavailable" };
-	}, [courses, chats, scope]);
+		const listed = read?.courses ?? [];
+		const unreadable = scope === null ? (read?.failed ?? []) : [];
+		return { status: "ready", inbox: buildInbox(listed, chats, scope), courses: listed, unreadable, chats, unavailable: courses === "unavailable" };
+	}, [courses, read, chats, scope]);
 	const fold = useCallback((shelf: FoldedShelf, next: boolean) => setFolded({ ...folded, [shelf]: next }), [folded, setFolded]);
 	return { state, scope, setScope, folded, fold };
 }

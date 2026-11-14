@@ -8,19 +8,23 @@ from pathlib import Path
 from typing import Any
 
 from learning import agenda, capacity, clock, progress, records
+from learning import workspace as workspaces
 from learning.retrieval import (
     DUE_LIMIT,
     compact,
     every_course,
     exam,
     last_activity,
+    last_studied,
     selected_task,
+    tonight,
 )
 from learning.workspace import Workspace
 from sync.study.context import journal_summary
 
-MAX_DAYS = 366
-Loaded = tuple[Workspace, dict[str, Any] | None, str | None]
+MAX_DAYS = agenda.MAX_DAYS
+Failure = dict[str, str]
+Loaded = tuple[Workspace, dict[str, Any] | None, Failure | None]
 
 
 def _journal(vault: Path, days: int, today: date, horizon: int) -> dict[str, Any]:
@@ -121,6 +125,21 @@ def _days(
     )
 
 
+def _upcoming(
+    planned: agenda.When, today: date, days: int, order: list[str]
+) -> list[dict[str, Any]]:
+    """Reviews the daily plan puts after today and within ``days`` days."""
+    end = today + timedelta(days=days)
+    rank = {key: index for index, key in enumerate(order)}
+    items = [
+        {"topic": key, "planned": day.isoformat()}
+        for key, day in planned.reviews.items()
+        if today < day <= end
+    ]
+    items.sort(key=lambda item: (item["planned"], rank.get(item["topic"], len(rank))))
+    return items
+
+
 def _course(
     workspace: Workspace,
     record: dict[str, Any],
@@ -134,7 +153,8 @@ def _course(
     name = str(workspace.directory)
     order = progress.path_order(record)
     levels = progress.standings(record)
-    due = progress.due(record, today, levels=levels, order=order)
+    planned = together.when(name, today, bool(week.study_weekdays))
+    due, _ = tonight(progress.due(record, today, levels=levels, order=order), planned)
     key, task = selected_task(record)
     countdown = exam(record, today)
     current = record.get("path", {}).get("current")
@@ -149,7 +169,7 @@ def _course(
             else None,
             "due": due[:DUE_LIMIT],
             "due_more": max(0, len(due) - DUE_LIMIT) or None,
-            "upcoming": progress.upcoming(record, today, days, order=order),
+            "upcoming": _upcoming(planned, today, days, order),
             "current": current,
             "current_title": record["topics"][current].get("title")
             if current
@@ -161,6 +181,7 @@ def _course(
             else None,
             "open_tasks": len(record["tasks"]),
             "last_activity": last_activity(record, today),
+            "last_studied": last_studied(record, today),
             "journal": _effort(record.get("journal"), journal),
             "week": _week(record, today, week_journal),
             "runup": _runup(record, today, order, levels, week),
@@ -179,7 +200,21 @@ def _load(workspace: Workspace) -> Loaded:
     try:
         return workspace, records.load(workspace), None
     except (ValueError, OSError) as error:
-        return workspace, None, str(error)
+        return workspace, None, _failure(error)
+
+
+def _failure(error: ValueError | OSError) -> Failure:
+    """A course that cannot be read: the error, and what stopped it as
+    ``denied`` (no permission), ``damaged`` (not a valid record) or
+    ``unreadable`` (any other I/O failure)."""
+    reason = error.__cause__ if isinstance(error.__cause__, OSError) else error
+    if isinstance(reason, PermissionError):
+        problem = "denied"
+    elif isinstance(reason, OSError) and not isinstance(reason, ValueError):
+        problem = "unreadable"
+    else:
+        problem = "damaged"
+    return {"error": str(error), "problem": problem}
 
 
 def plan(
@@ -231,6 +266,24 @@ def plan(
             if workspace is not None and item[0].directory == workspace.directory
         ]
     )
+    courses = [
+        _course(
+            target,
+            record,
+            today,
+            days,
+            (journal, week_journal),
+            (together, week),
+        )
+        if record is not None
+        else {"workspace": str(target.directory), **(error or {})}
+        for target, record, error in targets
+    ]
+    if everywhere:
+        courses += [
+            {"workspace": str(directory), **_failure(error)}
+            for directory, error in workspaces.unreadable()
+        ]
     titles = {
         str(target.directory): record.get("title")
         for target, record, _ in loaded
@@ -240,19 +293,7 @@ def plan(
         {
             "today": today.isoformat(),
             "capacity": week.summary(),
-            "courses": [
-                _course(
-                    target,
-                    record,
-                    today,
-                    days,
-                    (journal, week_journal),
-                    (together, week),
-                )
-                if record is not None
-                else {"workspace": str(target.directory), "error": error}
-                for target, record, error in targets
-            ],
+            "courses": sorted(courses, key=lambda entry: str(entry["workspace"])),
             "does_not_fit": [
                 {"workspace": name, "title": titles.get(name), "topics": topics}
                 for name, topics in together.does_not_fit.items()

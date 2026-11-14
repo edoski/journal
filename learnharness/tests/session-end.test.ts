@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { sessionEndOf } from "../src/core/session-end.ts";
-import { newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
+import { newSessionModeMessage, newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
 
 const USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 let n = 0;
@@ -55,5 +55,23 @@ describe("a lesson's tutor ends its turn in words, plan steps still ahead", () =
 
 	it("the plan waiting for his go-ahead waits on him", () => {
 		assert.equal(sessionEndOf(lesson("Say go.").slice(0, 6), TREE), "mid-lesson");
+	});
+});
+
+describe("a lesson the tutor moved to practice", () => {
+	const practised = (done: string[]): LhMessage[] => [
+		...lesson("Let's practise what we have so far."),
+		...(done.length > 0 ? [assistant([call("lp", "lesson_progress", { done })]), result("lp", "lesson_progress", { ok: true })] : []),
+		newSessionModeMessage("practice") as LhMessage,
+		assistant([text("Solved. Press Next problem when you are ready.")], "stop"),
+	];
+
+	it("waits on him at Next problem while its plan has steps left", () => {
+		assert.equal(sessionEndOf(practised([]), TREE), "mid-lesson");
+	});
+
+	it("ends with its plan done, and a practice round with no plan ends at its conclusion", () => {
+		assert.equal(sessionEndOf(practised(["rank-picture", "rank-rule", "rank-own"]), TREE), "closed");
+		assert.equal(sessionEndOf(practised([]), undefined), "closed");
 	});
 });

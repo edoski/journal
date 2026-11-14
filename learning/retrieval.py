@@ -14,7 +14,7 @@ import re
 from typing import Any
 import unicodedata
 
-from learning import clock, packing, progress, records, schema
+from learning import agenda, capacity, clock, packing, progress, records, schema
 from learning import workspace as workspaces
 from learning.workspace import Workspace
 
@@ -60,6 +60,22 @@ def last_activity(record: dict[str, Any], today: date) -> dict[str, Any] | None:
     if "updated_at" not in record:
         return None
     day = clock.local_day(record["updated_at"])
+    return {"date": day.isoformat(), "days_ago": (today - day).days}
+
+
+def last_studied(record: dict[str, Any], today: date) -> dict[str, Any] | None:
+    """The latest day the record shows study on, an observation's or a topic's
+    introduction, and how long ago it was; a save that records neither (a new
+    course, a renamed topic) does not move it."""
+    days = [item["date"] for item in record["observations"].values()]
+    days += [
+        str(topic["introduced"])
+        for topic in record["topics"].values()
+        if "introduced" in topic
+    ]
+    if not days:
+        return None
+    day = date.fromisoformat(max(days))
     return {"date": day.isoformat(), "days_ago": (today - day).days}
 
 
@@ -297,6 +313,36 @@ def _oldest_unlisted(due: list[dict[str, Any]]) -> dict[str, Any] | None:
     return {"topic": oldest["topic"], "overdue": oldest["overdue"]}
 
 
+def dated_topic(
+    topic: dict[str, Any], key: str, planned: agenda.When
+) -> dict[str, Any]:
+    """A stored topic with the plan's day beside memory's: its review's
+    ``planned`` day, or the day the plan ``starts`` it while untaught."""
+    review = topic.get("review", {})
+    if "due" in review:
+        day = planned.review(key, review["due"])
+        return {**topic, "review": {**review, "planned": day}}
+    starts = planned.starts.get(key)
+    return {**topic, "starts": starts.isoformat()} if starts else topic
+
+
+def tonight(
+    due: list[dict[str, Any]], planned: agenda.When
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Of the reviews memory asks for, those the plan puts today, and the
+    others with the later day it puts each on, soonest first."""
+    today = [item for item in due if planned.tonight(item["topic"])]
+    later = sorted(
+        (
+            {"topic": item["topic"], "planned": day.isoformat()}
+            for item in due
+            if item not in today and (day := planned.reviews.get(item["topic"]))
+        ),
+        key=lambda item: item["planned"],
+    )
+    return today, later
+
+
 def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
     return compact(
         {
@@ -318,9 +364,15 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
     active = _active_topics(record, chosen, order)
     evidence, left_out = _evidence(record, key, active)
     knowledge, knowledge_omitted, knowledge_index = _knowledge(record, active)
-    due = progress.due(record, today, levels=levels, order=order)
+    planned = when(workspace, record, today)
+    due, later = tonight(
+        progress.due(record, today, levels=levels, order=order), planned
+    )
     topics = {
-        topic: {**record["topics"][topic], "standing": levels[topic]}
+        topic: {
+            **dated_topic(record["topics"][topic], topic, planned),
+            "standing": levels[topic],
+        }
         for topic in active
     }
     path = record.get("path", {})
@@ -341,6 +393,14 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
         "due": [_brief(item, topics) for item in due[:DUE_LIMIT]],
         "due_more": max(0, len(due) - DUE_LIMIT) or None,
         "due_oldest": _oldest_unlisted(due),
+        "due_later": later[:DUE_LIMIT] or None,
+        "due_later_more": max(0, len(later) - DUE_LIMIT) or None,
+        "starts": {
+            topic: day.isoformat()
+            for topic, day in sorted(planned.starts.items(), key=lambda item: item[1])
+        }
+        or None,
+        "does_not_fit": planned.does_not_fit or None,
         "path": compact(
             {
                 "current": path.get("current"),
@@ -372,12 +432,16 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
 
 
 def _topic_item(
-    record: dict[str, Any], key: str, standing: dict[str, Any], ids: list[str]
+    record: dict[str, Any],
+    key: str,
+    standing: dict[str, Any],
+    ids: list[str],
+    planned: agenda.When,
 ) -> dict[str, Any]:
     return compact(
         {
             "kind": "topic",
-            **record["topics"][key],
+            **dated_topic(record["topics"][key], key, planned),
             "standing": standing,
             "observations": ids,
             "tasks": [
@@ -417,6 +481,7 @@ def show(
     located = {handle: schema.locate(record, handle) for handle in handles}
     observations = record["observations"]
     levels = progress.standings(record) if "topics" in located.values() else {}
+    planned = when(workspace, record, clock.today()) if levels else None
     newest = _newest(observations) if levels else []
     corrected_by: dict[str, list[str]] = defaultdict(list)
     for key, item in observations.items():
@@ -428,7 +493,8 @@ def show(
     for handle, where in located.items():
         if where == "topics":
             ids = [key for key in newest if handle in observations[key]["topics"]]
-            items[handle] = _topic_item(record, handle, levels[handle], ids)
+            assert planned is not None
+            items[handle] = _topic_item(record, handle, levels[handle], ids, planned)
             shown.update(dict.fromkeys(ids[:limit]))
             related.update(ids)
         elif where == "observations":
@@ -458,22 +524,28 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
     """Every topic with its edges, level, review and weak verdict, in path order.
 
     The whole course at once and nothing capped, with no observation text: the
-    projection a map of the course draws from. ``overdue`` is present exactly
-    when the topic is due today.
+    projection a map of the course draws from. ``review`` is the day the daily
+    plan puts the topic's next review (``when``), ``overdue`` is present
+    exactly when that day is today, and ``starts`` is the day it starts an
+    untaught topic.
     """
     record = records.load(workspace)
     today = clock.today()
     levels = progress.standings(record)
     order = progress.path_order(record, everything=True)
+    planned = when(workspace, record, today)
     overdue = {
         item["topic"]: item["overdue"]
         for item in progress.due(record, today, levels=levels)
+        if planned.tonight(item["topic"])
     }
     partners = progress.contrasts(record, everything=True)
     tasks = record["tasks"]
     topics = []
     for key in order:
         topic, standing = record["topics"][key], levels[key]
+        stored = topic.get("review", {}).get("due")
+        starts = planned.starts.get(key)
         entry = {
             "topic": key,
             "title": topic.get("title"),
@@ -481,9 +553,11 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "contrasts": partners[key],
             "level": standing["level"],
             "introduced": topic.get("introduced"),
-            "review": topic.get("review", {}).get("due"),
+            "review": planned.review(key, stored),
             "overdue": overdue.get(key),
+            "starts": starts.isoformat() if starts else None,
             "weak": _is_weak(topic, standing),
+            "right": standing.get("right"),
             "gap": topic.get("gap"),
             "excluded": topic.get("excluded"),
             **{
@@ -693,6 +767,39 @@ def every_course(workspace: Workspace | None) -> list[Workspace]:
         }
         chosen[str(workspace.directory)] = workspace
     return [chosen[key] for key in sorted(chosen) if chosen[key].record.is_file()]
+
+
+def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
+    """When the daily plan, made with every course (``agenda``), next puts
+    each of this course's topics: the one day each review and new topic has,
+    whichever verb reads it. A course whose record cannot be read is left out
+    of the others' plan, as ``plan`` leaves it out."""
+    readable: dict[str, dict[str, Any]] = {}
+    for target in every_course(workspace):
+        try:
+            readable[str(target.directory)] = records.load(target)
+        except (ValueError, OSError):
+            continue
+    name = str(workspace.directory)
+    readable[name] = record
+    week = capacity.of(readable.values(), today)
+    together = agenda.plan(readable, today, agenda.MAX_DAYS, week)
+    return together.when(name, today, bool(week.study_weekdays))
+
+
+def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
+    """A save's receipt with each review it set on the day the daily plan
+    puts it (``planned``), and ``due_count`` as the reviews the plan puts
+    today: the days the learner is told are the days every view shows."""
+    record = records.load(workspace)
+    today = clock.today()
+    planned = when(workspace, record, today)
+    reviews = {
+        topic: {**review, "planned": planned.review(topic, review["due"])}
+        for topic, review in receipt["reviews"].items()
+    }
+    due, _ = tonight(progress.due(record, today), planned)
+    return {**receipt, "reviews": reviews, "due_count": len(due)}
 
 
 def _searched(

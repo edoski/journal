@@ -4,6 +4,7 @@
  * standing.
  */
 
+import type { UnreadableCourse } from "./course.ts";
 import type { CourseMap, TopicHandle } from "./course-map.ts";
 
 /** One course on the home. */
@@ -17,15 +18,18 @@ export interface StudyCourse {
 	/** Today's review as the engine planned it (`plan`'s `due`, in its
 	 *  order); null when the plan could not be read. */
 	due: readonly TopicHandle[] | null;
-	/** Days since the record was last saved; null when it never was. */
+	/** Days since the record last shows study (the engine's `last_studied`:
+	 *  an observation or a topic taught); null when it shows none, even
+	 *  when the course was saved. */
 	lastActiveDaysAgo: number | null;
 	/** The new topics the engine's daily plan starts today, in its order;
 	 *  empty when today starts none or the plan could not be read. */
 	newToday: readonly TopicHandle[];
 }
 
-/** What GET /api/study answers. A course whose read failed is left out and
- *  named in `failed`, so one broken record never hides the others. */
+/** What GET /api/study answers. A course whose read failed is in `failed`
+ *  instead of `courses`, so one broken record never hides the others and
+ *  is never hidden itself. */
 export type StudyListing =
-	| { available: true; courses: StudyCourse[]; failed: string[] }
+	| { available: true; courses: StudyCourse[]; failed: UnreadableCourse[] }
 	| { available: false; reason: string };

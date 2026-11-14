@@ -37,7 +37,9 @@ export interface CourseSummary {
 	/** The exam, when the record has a date for it: `daysLeft` is the
 	 *  engine's own count from the study day. */
 	exam: { date: string; daysLeft: number } | null;
-	/** Days since the record was last saved; null when it never was. */
+	/** Days since the record last shows study (the engine's `last_studied`:
+	 *  an observation or a topic taught); null when it shows none, even
+	 *  when the course was saved. */
 	lastActiveDaysAgo: number | null;
 }
 
@@ -54,8 +56,21 @@ export interface DueReview {
 /** What the chooser endpoint returns. `roots` are the study folders a new
  *  course can be created in. `available: false` means the engine could not
  *  be run (not installed or misconfigured): no session can start. */
+/** What stops the engine reading a course (its `plan --all` entry's
+ *  `problem`): the app may not open its folder, its record is not a valid
+ *  record, or any other read failure. */
+export type UnreadableProblem = "denied" | "damaged" | "unreadable";
+
+/** A registered course whose record the engine could not read. `title` is
+ *  the title a linked session carries, else the folder's name. */
+export interface UnreadableCourse {
+	workspace: string;
+	title: string;
+	problem: UnreadableProblem;
+}
+
 export type CourseListing =
-	| { available: true; courses: CourseSummary[]; roots: string[] }
+	| { available: true; courses: CourseSummary[]; unreadable: UnreadableCourse[]; roots: string[] }
 	| { available: false; reason: string };
 
 /** One engine verb's outcome. `json` is the engine's own stdout object,

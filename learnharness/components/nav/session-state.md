@@ -7,15 +7,17 @@ The one model of where a session stands. Home, the topic page, the calendar and 
 | State | When | What a surface says |
 |---|---|---|
 | `working` | a turn or a compaction runs (`busy`, `compacting`) | sidebar: Working; Home: "Tutor writing", the line stays where it was; topic page: Open |
-| `your-turn` | a question or problem the tutor posed is unanswered (`pendingQuestion`, `pendingProblem`), or `ended` is `mid-lesson`: the plan waits for his go-ahead, he dismissed its question, a lesson it picked up reached no step yet, or its last words ask him something (end in a question mark) while plan steps remain | "Your turn"; topic page: Resume |
+| `your-turn` | a question or problem the tutor posed is unanswered (`pendingQuestion`, `pendingProblem`), or `ended` is `mid-lesson`: the plan waits for his go-ahead, he dismissed its question, a lesson it picked up reached no step yet, its last words ask him something (end in a question mark) while plan steps remain, or a lesson moved to practice waits on Next problem with plan steps left | "Your turn"; topic page: Resume |
 | `paused` | the tutor's turn stopped before it finished (`ended` `cut`): it owes the next word | Home: "Stopped mid-reply"; topic page: Resume |
-| `finished` | anything else: the lesson closed, a practice round concluded, a one-off answer, and a sign-off in words such as "Good place to stop" even with plan steps left | nothing waits; no Your turn, no Home line, never resumed |
+| `finished` | anything else: the lesson closed, a practice round concluded with no plan steps left, a one-off answer, and a sign-off in words such as "Good place to stop" even with plan steps left | nothing waits; no Your turn, no Home line, never resumed |
 
 `ended` is the record's fold (`sessionEndOf`, `src/core/session-end.ts`).
 
 ## Which session belongs to a topic
 
-A session is on a topic when the engine's records tie it there or it was started there: a problem posed on the topic, an attempt saved on it (a save sent as JSON text counts, as the engine reads it), the topic's introduction, or `topics` on the record, set at creation by `POST /api/chats` (a topic's page, Home's review, the calendar, the sidebar's Study). Never a plan step's name, and never a task covering the topic: a task links its sessions to the task (`taskSessions`), which its own row continues. Chats carry these as `topics` in `/api/chats`.
+A session has one identity, fixed once, never moved by the step its lesson is on: its title and the topic it belongs to (`ownTopics`, the record's `topics`). A session started on topics (a topic's page, Home's review, the calendar, the sidebar's Study, `POST /api/chats` with `topics`) belongs to them and keeps the title it was opened with. A session started from a free message belongs to no topic until its first plan names its goal (`plan_init`'s `goal`, `ChatStore.nameSession`): then it takes the goal's topic and, unless he renamed it, the goal's title. A rewritten plan never renames it. Home's line, the sidebar's card and the header all show that one title.
+
+Only a session's own topic says Your turn for it (`nowOf`); a session with none sits on Other sessions. A session is on a topic's history when the engine's records tie it there or it was started there: a problem posed on the topic, an attempt saved on it (a save sent as JSON text counts, as the engine reads it), the topic's introduction, or its own topics. Never a plan step's name, and never a task covering the topic: a task links its sessions to the task (`taskSessions`), which its own row continues. Chats carry these as `topics` in `/api/chats`.
 
 ## Exports other modules read
 

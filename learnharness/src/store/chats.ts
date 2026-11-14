@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, TurnUsage } from "../core/contracts.ts";
+import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, SessionGoal, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
@@ -26,7 +26,7 @@ function chatFile(id: string): string {
 }
 
 /** THE SILENCE LAW (push S6, 2026-10-02): chats-changed announces ONLY
- *  list-SHAPE mutations — createChat, renameChat, deleteChat (below,
+ *  list-SHAPE mutations — createChat, renameChat, nameSession, deleteChat (below,
  *  each emits post-write). The content writers (saveMessages,
  *  appendTurnUsage, saveDigestLedger, saveTree) are
  *  DELIBERATELY SILENT: saveMessages fires per turn-persist and would
@@ -117,6 +117,7 @@ function listChats(): ChatSummary[] {
 						// is refused while one is active.
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
+						ownTopics: summary.topics ?? [],
 						ended: sessionEndOf(messages, tree, summary.kind),
 						tasks: sessionTasksOf(messages),
 					};
@@ -183,9 +184,25 @@ function renameChat(id: string, title: string): ChatRecord {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
 	record.title = title.trim() || "Untitled session";
+	record.renamed = true;
 	writeChat(record);
 	emit("chats-changed", {});
 	return record;
+}
+
+/** Name a session by its first plan's goal (the port's rule): only a
+ *  session started on no topic, and its title only while the learner has
+ *  not renamed it. Like a rename, announced and not conversation
+ *  activity. */
+function nameSession(id: string, goal: SessionGoal): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	if ((record.topics ?? []).length > 0) return;
+	const topic = goal.topic?.trim();
+	if (topic) record.topics = [topic];
+	if (!record.renamed && goal.title.trim()) record.title = goal.title.trim();
+	writeChat(record);
+	emit("chats-changed", { named: { id, title: record.title } });
 }
 
 /** Delete the session record file entirely (session-deletion wave 6,
@@ -221,6 +238,7 @@ export const chatStore: ChatStore = {
 	saveTree,
 	linkCourse,
 	renameChat,
+	nameSession,
 	deleteChat,
 	appendTurnUsage,
 	saveDigestLedger,

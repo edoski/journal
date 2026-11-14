@@ -21,6 +21,7 @@ export function LessonTopBar({
 	courseHref,
 	phase,
 	plan,
+	tonight,
 	details,
 }: {
 	title: ReactNode;
@@ -31,6 +32,8 @@ export function LessonTopBar({
 	phase: string;
 	/** Present once the session has a plan: the toggle opens it as a popover. */
 	plan?: { open: boolean; onOpenChange: (open: boolean) => void; body: ReactNode };
+	/** Done for tonight (done-tonight.tsx): stop now, whatever is open. */
+	tonight?: ReactNode;
 	details: ReactNode;
 }) {
 	const linked = courseHref !== undefined;
@@ -60,6 +63,7 @@ export function LessonTopBar({
 			<span data-testid="phase-chip" aria-hidden className="pointer-events-none shrink-0 select-none text-row text-muted-foreground">
 				{phase}
 			</span>
+			{tonight}
 			{plan && (
 				<Popover open={plan.open} onOpenChange={plan.onOpenChange}>
 					<Hint label="Open the plan" side="bottom">

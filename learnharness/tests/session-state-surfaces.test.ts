@@ -114,6 +114,7 @@ const waiting = seed(
 	EIGEN_STEPS,
 	"2026-11-08T09:00:00.000Z",
 );
+chatStore.nameSession(waiting, { title: "Eigenvalues and eigenvectors", topic: "eigen" });
 /** The sheet, yesterday: it holds the task, which covers Basis, and the tutor signed off. */
 const sheetMessages = lesson(["sheet-a", "sheet-b"], ["rank"], [assistant([text("Part (c) next time.")], "stop")]);
 const focus = call("focus", "course_save", { changes: { focus: "sheet-4", tasks: { "sheet-4": { step: "Part (c)" } } } });
@@ -172,7 +173,7 @@ describe("a due review", () => {
 });
 
 describe("a lesson waiting on his answer", () => {
-	it("says Your turn only on the topic its records tie it to, never on a topic named like a plan step", () => {
+	it("says Your turn only on the topic it belongs to, never on a topic named like a plan step", () => {
 		const chats = listed();
 		const eigen = chats.find((c) => c.id === waiting)!;
 		assert.deepEqual(eigen.topics, ["eigen"], "read from a save sent as JSON text; no plan step");

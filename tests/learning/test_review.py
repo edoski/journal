@@ -262,12 +262,14 @@ def test_within_21_days_of_the_exam_unready_topics_come_before_overdue_ones() ->
     assert due(far) == ["overdue", "unready"]
 
 
+@pytest.mark.usefixtures("every_day")
 def test_today_s_review_is_capped_at_five(workspace: Workspace) -> None:
     records.save(
         workspace,
         {
             "topics": {
-                f"t{index}": {"review": {"due": day(-index)}} for index in range(8)
+                f"t{index}": {"introduced": day(-20), "review": {"due": day(-index)}}
+                for index in range(8)
             }
         },
     )
@@ -276,6 +278,7 @@ def test_today_s_review_is_capped_at_five(workspace: Workspace) -> None:
     assert result["due_more"] == 3
 
 
+@pytest.mark.usefixtures("every_day")
 def test_the_most_overdue_review_is_named_when_it_falls_past_the_first_five(
     workspace: Workspace,
 ) -> None:
@@ -324,6 +327,7 @@ def test_a_competing_method_follows_once_its_prerequisites_are_placed() -> None:
     assert due(ready) == ["parts", "substitution", "other"]
 
 
+@pytest.mark.usefixtures("every_day")
 def test_points_appear_in_due_but_not_again_for_a_topic_shown_whole(
     workspace: Workspace,
 ) -> None:
@@ -332,8 +336,11 @@ def test_points_appear_in_due_but_not_again_for_a_topic_shown_whole(
         workspace,
         {
             "topics": {
-                "parts": {"review": review},
-                "series": {"review": {**review, "points": ["Ratio test"]}},
+                "parts": {"introduced": day(-20), "review": review},
+                "series": {
+                    "introduced": day(-20),
+                    "review": {**review, "points": ["Ratio test"]},
+                },
             },
             "path": {"current": "parts"},
         },
@@ -384,6 +391,7 @@ def test_weak_shows_choice_errors(workspace: Workspace) -> None:
     ]
 
 
+@pytest.mark.usefixtures("every_day")
 def test_five_due_topics_with_points_keep_resume_within_its_budget(
     workspace: Workspace,
 ) -> None:
@@ -395,6 +403,7 @@ def test_five_due_topics_with_points_keep_resume_within_its_budget(
                 f"topic-{index}": {
                     "title": f"Topic {index}",
                     "gap": "Mixes up the two conditions " * 3,
+                    "introduced": day(-20),
                     "review": {
                         "due": day(-index),
                         "prompt": "Explain when the theorem applies and give a counterexample",

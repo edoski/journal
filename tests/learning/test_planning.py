@@ -50,13 +50,21 @@ ALGEBRA = {
     "exam": {"date": day(23), "format": "Written"},
     "journal": "SMM",
     "topics": {
-        "systems": {"review": {"due": day(-2), "prompt": "Solve unaided"}},
+        "systems": {
+            "introduced": day(-10),
+            "review": {"due": day(-2), "prompt": "Solve unaided"},
+        },
         "rank": {
             "title": "Rank",
             "needs": ["systems"],
+            "introduced": day(-10),
             "review": {"due": day(3)},
         },
-        "eigen": {"needs": ["rank"], "review": {"due": day(12)}},
+        "eigen": {
+            "needs": ["rank"],
+            "introduced": day(-10),
+            "review": {"due": day(12)},
+        },
     },
     "path": {"current": "rank"},
     "tasks": {
@@ -84,32 +92,31 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
                 "topic": "systems",
                 "due": day(-2),
                 "overdue": 2,
-                "level": "new",
+                "level": "introduced",
                 "prompt": "Solve unaided",
             }
         ],
-        "upcoming": [{"topic": "rank", "due": day(3)}],
+        "upcoming": [{"topic": "rank", "planned": day(3)}],
         "current": "rank",
         "current_title": "Rank",
         "task": {"key": "ex5", "title": "Exercise 5", "step": "Why unique?"},
         "open_tasks": 2,
         "last_activity": {"date": TODAY.isoformat(), "days_ago": 0},
+        "last_studied": {
+            "date": (TODAY - timedelta(days=10)).isoformat(),
+            "days_ago": 10,
+        },
         "journal": {"activity": "SMM", "study_minutes": 140, "sessions": 2},
         "week": {"minutes": 140},
         "plan": {
             "final_review_days": 6,
             "days": [
-                {"date": day(0), "reviews": [], "new": ["systems"]},
-                {"date": day(1), "reviews": ["systems"], "new": ["rank"]},
-                {"date": day(2), "reviews": ["rank"], "new": ["eigen"]},
-                {"date": day(3), "reviews": ["eigen"], "new": []},
-                {"date": day(4), "reviews": ["systems"], "new": []},
-                {"date": day(5), "reviews": ["rank"], "new": []},
-                {"date": day(6), "reviews": ["eigen"], "new": []},
+                {"date": day(0), "reviews": ["systems"], "new": []},
+                {"date": day(3), "reviews": ["rank", "systems"], "new": []},
             ],
         },
     }
-    assert result["capacity"]["evidence_days"] == 0
+    assert result["capacity"]["evidence_days"] == 1
     assert "daily" not in result["journal"]
     assert result["journal"]["by_activity"]["Other"]["study_minutes"] == 30
     wider = plan(workspace, vault, everywhere=False, days=14)
@@ -164,6 +171,30 @@ def test_plan_all_covers_registered_courses_and_contains_broken_ones(
     broken = plan(algebra, tmp_path / "vault", everywhere=True, days=7)
     assert broken["courses"][1]["workspace"] == str(analysis.directory)
     assert "invalid JSON" in broken["courses"][1]["error"]
+    assert broken["courses"][1]["problem"] == "damaged"
+
+
+def test_plan_all_reports_a_course_whose_folder_cannot_be_opened(
+    tmp_path: Path,
+) -> None:
+    algebra = course(tmp_path / "algebra", ALGEBRA)
+    closed = course(tmp_path / "closed", {"title": "Closed"})
+    damaged = course(tmp_path / "damaged", {"title": "Damaged"})
+    (damaged.root / "workspace.json").write_text("{", encoding="utf-8")
+    closed.root.chmod(0)
+    try:
+        result = plan(None, tmp_path / "vault", everywhere=True, days=7)
+    finally:
+        closed.root.chmod(0o755)
+    entries = {entry["workspace"]: entry for entry in result["courses"]}
+    assert list(entries) == [
+        str(algebra.directory),
+        str(closed.directory),
+        str(damaged.directory),
+    ]
+    assert entries[str(closed.directory)]["problem"] == "denied"
+    assert entries[str(damaged.directory)]["problem"] == "damaged"
+    assert "error" in entries[str(closed.directory)]
 
 
 def test_plan_of_a_new_course_and_invalid_windows(tmp_path: Path) -> None:
@@ -174,6 +205,32 @@ def test_plan_of_a_new_course_and_invalid_windows(tmp_path: Path) -> None:
         plan(workspace, tmp_path, everywhere=False, days=0)
     with pytest.raises(ValueError, match="--all"):
         plan(None, tmp_path, everywhere=False, days=7)
+
+
+def test_a_course_is_studied_on_the_days_its_record_shows_study(
+    tmp_path: Path,
+) -> None:
+    fresh = course(tmp_path / "fresh", {"title": "Graph theory"})
+    entry = plan(fresh, tmp_path / "vault", everywhere=False, days=1)["courses"][0]
+    assert entry["last_activity"] == {"date": TODAY.isoformat(), "days_ago": 0}
+    assert "last_studied" not in entry
+    studied = course(
+        tmp_path / "studied",
+        {
+            "topics": {"walks": {"introduced": day(-3)}},
+            "observations": [
+                {
+                    "topics": ["walks"],
+                    "text": "Named a walk",
+                    "result": "correct",
+                    "help": "none",
+                    "date": day(-1),
+                }
+            ],
+        },
+    )
+    entry = plan(studied, tmp_path / "vault", everywhere=False, days=1)["courses"][0]
+    assert entry["last_studied"] == {"date": day(-1), "days_ago": 1}
 
 
 def test_upcoming_schedule_resolves_overrides_and_excludes_lunch(

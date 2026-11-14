@@ -16,12 +16,18 @@ import { startCourseMap } from "./course-map.ts";
 
 /** The registered courses plus the study roots a new course can go in.
  *  Until the engine exposes its study roots, a root is the parent folder
- *  of a registered course. */
+ *  of a registered course. A course the engine could not read keeps the
+ *  title its newest linked session carries, since its record cannot say. */
 export async function listCourses(): Promise<CourseListing> {
 	const listing = await stores.courseRecords.list();
 	if (!listing.available) return listing;
-	const roots = [...new Set(listing.courses.map((c) => path.dirname(c.workspace)))].sort();
-	return { ...listing, roots };
+	const chats = listing.unreadable.length > 0 ? stores.chatStore.listChats() : [];
+	const unreadable = listing.unreadable.map((c) => ({
+		...c,
+		title: chats.find((chat) => chat.course?.workspace === c.workspace)?.course?.title ?? c.title,
+	}));
+	const roots = [...new Set([...listing.courses, ...unreadable].map((c) => path.dirname(c.workspace)))].sort();
+	return { ...listing, unreadable, roots };
 }
 
 /** The link for a picked workspace, or null when no registered course has it. */

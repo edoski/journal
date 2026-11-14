@@ -1,4 +1,4 @@
-import type { TopicHandle, TopicSignals } from "@/src/core";
+import type { CourseMapTopic, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -10,9 +10,8 @@ import type { TopicHandle, TopicSignals } from "@/src/core";
 /** How much of a topic's pie is filled, in quarters. */
 export type Fill = 0 | 0.25 | 0.5 | 0.75 | 1;
 
-/** Where he stands, one phrase per pie step. The words follow the pie, not
- *  the engine's level: a weak topic he could do on his own draws a 3/4 pie,
- *  so it says "Right with help". */
+/** Where he stands, one phrase per pie step, when the step says what
+ *  happened (`standingWords`). */
 export const STANDING_WORDS: Record<Fill, string> = {
 	0: "Not started",
 	0.25: "Taught, not tried",
@@ -20,6 +19,26 @@ export const STANDING_WORDS: Record<Fill, string> = {
 	0.75: "Right with help",
 	1: "On your own",
 };
+
+/** A topic he cannot yet do on his own, by how he has best answered it
+ *  (the engine's `right`): the 3/4 pie's words when help is what kept it
+ *  there. */
+export const RIGHT_WORDS: Record<RightAnswer, string> = {
+	unaided: "Right on your own once",
+	helped: STANDING_WORDS[0.75],
+	guess: "Right, but a guess",
+	uncertain: "Right, not yet confirmed",
+	partial: "Partly right",
+};
+
+/** Where he stands in words true to the engine's record: the pie step's
+ *  words, except at the `assisted` level, which says how he has best
+ *  answered the topic, so an unaided or a partial answer never reads
+ *  "Right with help". A weak topic he could do on his own keeps its 3/4
+ *  pie's words. Pure. */
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right">): string {
+	return topic.level === "assisted" ? RIGHT_WORDS[topic.right ?? "helped"] : STANDING_WORDS[fill];
+}
 
 /** A slip's words for each of the engine's signals but a mixed-up method,
  *  which names the method (`slipWords`). */
@@ -72,6 +91,28 @@ export function returnWords(days: number): string {
 	if (days < 60) return `Back in ${Math.round(days / 7)}w`;
 	return `Back in ${Math.round(days / 30)}mo`;
 }
+
+/** The lesson's words for what just happened to his work (round 2, 14 Nov
+ *  2026): a reply below the fold, a reply that never came, a draft another
+ *  window overtook, stopping for the night, and a course whose record
+ *  can't be read. One form each, wherever it shows. */
+export const LESSON_WORDS = {
+	newReply: "New reply",
+	stoppedBeforeReply: "The tutor stopped before replying.",
+	tryAgain: "Try again",
+	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
+	doneTonight: "Done for tonight",
+	leftForTonight: "Left for next time",
+	unreadableCourse: "Couldn't read this course's record",
+} as const;
+
+/** What stops a course's record being read, after
+ *  `LESSON_WORDS.unreadableCourse`, in a student's words. */
+export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {
+	denied: "The app isn't allowed to open its files.",
+	damaged: "Its file is damaged.",
+	unreadable: "Its file can't be opened.",
+};
 
 /** How much of a course he can do on his own, in words beside the ring
  *  that draws the share: no count, since the app shows none (Edo's

@@ -65,11 +65,16 @@ def last_new_day(exam: Exam) -> date:
 
 def new_end(exam: Exam, day: date) -> date:
     """The last day the course takes new topics, seen from ``day`` before its
-    exam: the last new-topic day, or once that has passed, the day before the
-    final review, since a topic started late is better known at the exam than
-    one never started."""
+    exam: the last new-topic day; once that has passed, the day before the
+    final review; once that has passed too, the day before the exam, since a
+    topic started late is better known at the exam than one never started, and
+    a nearer exam's last topics come before a later exam's pace."""
     last = last_new_day(exam)
-    return last if day <= last else exam.final - timedelta(days=1)
+    if day <= last:
+        return last
+    if day < exam.final:
+        return exam.final - timedelta(days=1)
+    return exam.day - timedelta(days=1)
 
 
 def exam_plan(record: dict[str, Any]) -> Exam | None:
@@ -344,6 +349,29 @@ def _since_solid(attempts: list[Attempt], replayed: Replay) -> list[dict[str, An
     return [item for _, item in attempts if item["date"] > since]
 
 
+RIGHT = ("unaided", "helped", "guess", "uncertain", "partial")
+
+
+def _answered(item: dict[str, Any]) -> str | None:
+    if item["result"] == "partial":
+        return "partial"
+    if item["result"] != "correct":
+        return None
+    if not unaided(item):
+        return "helped"
+    if item.get("sure") == "guess":
+        return "guess"
+    return "uncertain" if "uncertain" in item else "unaided"
+
+
+def _right(attempts: list[Attempt]) -> str | None:
+    """How the learner has best answered a topic not yet solid, the first of
+    ``RIGHT`` any attempt shows: right with no help (on the day it was
+    learned), with help, as a guess, on doubtful evidence, or partly."""
+    found = {_answered(item) for _, item in attempts}
+    return next((kind for kind in RIGHT if kind in found), None)
+
+
 def _standing(
     key: str, topic: dict[str, Any], history: _History, exam: Exam | None
 ) -> dict[str, Any]:
@@ -354,6 +382,8 @@ def _standing(
         "attempts": len(attempts),
         "unaided_days": sum(verdict == "solid" for _, verdict in replayed.verdicts),
     }
+    if result["level"] == "assisted":
+        result["right"] = _right(attempts)
     if attempts:
         key, item = attempts[-1]
         last = {"id": key, "date": item["date"], "result": item["result"]}
@@ -383,13 +413,26 @@ _MISTAKES = ("lapsed", "choice_errors", "confident_errors")
 def _repaired(
     topic: dict[str, Any], attempts: list[Attempt], standing: dict[str, Any]
 ) -> bool:
-    """A mistake answered right since: the newest attempt is correct and the
-    gap, if any, was not diagnosed after it. It stays weak until a later
-    day's unaided answer settles it."""
-    if not attempts or attempts[-1][1]["result"] != "correct":
+    """A mistake answered right since: a correct answer after the newest
+    incorrect one, else after the newest partial one, with the gap, if any,
+    not diagnosed on a later day than that answer. A partial answer after the
+    repair leaves it standing: its gap is what is left to check. It stays
+    weak until a later day's unaided answer settles it."""
+    results = [item["result"] for _, item in attempts]
+    wrong = next(
+        (
+            at
+            for result in ("incorrect", "partial")
+            for at in reversed(range(len(results)))
+            if results[at] == result
+        ),
+        -1,
+    )
+    fixes = [item for _, item in attempts[wrong + 1 :] if item["result"] == "correct"]
+    if not fixes:
         return False
     if "gap" in topic:
-        return str(topic.get("judged", "")) <= str(attempts[-1][1]["date"])
+        return str(topic.get("judged", "")) <= str(fixes[0]["date"])
     return any(flag in standing for flag in _MISTAKES)
 
 

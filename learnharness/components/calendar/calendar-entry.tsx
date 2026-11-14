@@ -39,8 +39,9 @@ const ICONS: Record<EntryLook, LucideIcon> = {
 };
 
 /** What a press on an entry can start: a session whose first message is
- *  `opening`, in `workspace`, linked to the topic `handle`. */
-export type StartSession = (opening: string, workspace: string, handle: string | null) => void;
+ *  `opening`, in `workspace`, on `topics`, picking up the finished lesson
+ *  `from`. */
+export type StartSession = (opening: string, workspace: string, how: { topics: readonly string[]; from?: string }) => void;
 
 /** The look's ink: an exam in full ink, the rest muted. An overdue
  *  review's icon alone is in danger, so a day of them stays quiet. */
@@ -213,8 +214,36 @@ function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }
 	);
 }
 
+/** The exam's next step, the one Home's line for its course takes. */
+function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, { kind: "exam" }>; busy: boolean; onStart: StartSession }) {
+	const { next } = entry;
+	if (!next) return null;
+	const { move } = next;
+	return (
+		<div data-slot="exam-next" className="flex min-w-0 items-center gap-2">
+			{move.kind === "open" ? (
+				<Button asChild size="sm" className="h-auto min-h-8 min-w-0 max-w-full justify-start whitespace-normal py-1.5 text-left">
+					<Link href={`/chat/${move.chat.id}`}>
+						<MathText>{next.words}</MathText>
+					</Link>
+				</Button>
+			) : (
+				<Button
+					size="sm"
+					disabled={busy}
+					className="h-auto min-h-8 min-w-0 max-w-full justify-start whitespace-normal py-1.5 text-left"
+					onClick={() => onStart(move.opening, entry.course.workspace, { topics: move.topics, ...(move.from ? { from: move.from } : {}) })}
+					data-slot="calendar-entry-start"
+				>
+					<MathText>{next.words}</MathText>
+				</Button>
+			)}
+		</div>
+	);
+}
+
 function EntryActions({ entry, busy, onStart }: { entry: Exclude<CalendarEntry, { kind: "session" }>; busy: boolean; onStart: StartSession }) {
-	if (entry.kind === "exam") return null;
+	if (entry.kind === "exam") return <ExamActions entry={entry} busy={busy} onStart={onStart} />;
 	const { topic } = entry;
 	const workspace = entry.course.workspace;
 	const handle = topic?.handle ?? null;
@@ -226,7 +255,7 @@ function EntryActions({ entry, busy, onStart }: { entry: Exclude<CalendarEntry, 
 					<Link href={`/chat/${action.chat.id}`}>{ACTION_WORDS[action.kind]}</Link>
 				</Button>
 			) : (
-				<Button size="sm" disabled={busy} onClick={() => onStart(action.opening, workspace, handle)} data-slot="calendar-entry-start">
+				<Button size="sm" disabled={busy} onClick={() => onStart(action.opening, workspace, { topics: handle ? [handle] : [] })} data-slot="calendar-entry-start">
 					{ACTION_WORDS[action.kind]}
 				</Button>
 			)}

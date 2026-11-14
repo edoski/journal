@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
-import { taskSessions, topicSessions } from "@/components/unit-inbox/units";
+import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 
 /** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
@@ -34,8 +34,10 @@ export function todaysReview(course: StudyCourse): CourseMapTopic[] {
 
 /** What a course's Continue takes up, in the order the doctrine answers
  *  "Let's continue": today's reviews, then the open task at its step, then
- *  the new topics the engine's daily plan starts today, else the current
- *  topic. `topics` are the topics it works on. A topic step is `fresh` when
+ *  the new topics the engine's daily plan starts today, then the current
+ *  topic while it is taught but not yet his own, then the next topic the
+ *  plan starts; a current topic he already has on his own is done, not
+ *  next. `topics` are the topics it works on. A topic step is `fresh` when
  *  it was never taught, and `planned` when today's plan starts it. */
 export type NextStep =
 	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null }
@@ -59,7 +61,11 @@ export function nextStepOf(course: StudyCourse): NextStep {
 	if (planned.length > 0) {
 		return { kind: "topic", title: titleList(planned.map((t) => t.title)), topics: planned.map((t) => t.handle), fresh: true, planned: true };
 	}
-	return current ? { kind: "topic", title: current.title, topics: [current.handle], fresh: current.level === "new", planned: false } : { kind: "none" };
+	if (current && current.level !== "new" && !SOLID.has(current.level)) {
+		return { kind: "topic", title: current.title, topics: [current.handle], fresh: false, planned: false };
+	}
+	const next = map.topics.filter((t) => t.starts !== undefined).sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? (current?.level === "new" ? current : undefined);
+	return next ? { kind: "topic", title: next.title, topics: [next.handle], fresh: true, planned: false } : { kind: "none" };
 }
 
 /** The step as a short instruction: "Review Linear independence, Rank",
@@ -128,12 +134,21 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
 	return step.topics.every((h) => topics.has(h));
 }
 
+/** Whether a course's line holds nothing for tonight: a course with
+ *  nothing to take up, such as one never studied, or a new topic the plan
+ *  starts on a later day. Such a line comes after every line with work
+ *  tonight, however near its exam. */
+function laterOnly(step: NextStep): boolean {
+	return step.kind === "none" || (step.kind === "topic" && step.fresh && !step.planned);
+}
+
 /**
  * Today's lines: each session to pick up since yesterday (it waits on the
  * learner, the tutor writes in it, or stopped mid-reply), most recent
- * first, then each course's next step, most urgent first, unless a session
- * shown already works on it. A session stays on its line while the tutor
- * writes. An older session to pick up stays in the sidebar. Pure.
+ * first, then each course's next step, most urgent first and a line with
+ * nothing for tonight last (`laterOnly`), unless a session shown already
+ * works on it. A session stays on its line while the tutor writes. An older
+ * session to pick up stays in the sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
@@ -141,11 +156,13 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
 	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
-	const rest = ordered.flatMap((course): TodayRow[] => {
-		const step = nextStepOf(course);
-		const taken = recent.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
-		return taken ? [] : [{ kind: "course", course, step }];
-	});
+	const rest = ordered
+		.flatMap((course): (TodayRow & { kind: "course" })[] => {
+			const step = nextStepOf(course);
+			const taken = recent.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
+			return taken ? [] : [{ kind: "course", course, step }];
+		})
+		.sort((a, b) => Number(laterOnly(a.step)) - Number(laterOnly(b.step)));
 	return [...sessions, ...rest];
 }
 

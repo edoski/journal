@@ -36,7 +36,7 @@ export function nowFor(courses: readonly StudyCourse[], chats: readonly ChatList
 export function unitFor(course: StudyCourse, topic: CourseMapTopic, chats: readonly ChatListItem[]): Unit {
 	const { workspace, title } = course.map;
 	const sessions = topicSessions(chats, workspace, topic.handle);
-	const now = nowOf(sessions);
+	const now = nowOf(sessions, topic.handle);
 	return { key: unitKey(workspace, topic.handle), course: { workspace, title }, topic, shelf: shelfOf(topic, now) ?? "learning", sessions, now, task: taskOf(course.map, topic), slip: slipOf(course.map, topic) };
 }
 

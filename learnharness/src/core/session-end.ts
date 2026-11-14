@@ -12,9 +12,11 @@ import { phaseAt3Lh } from "./phases.ts";
  * partway through a lesson when the plan waits for his go-ahead, when he
  * dismissed its question, when a lesson it picked up has reached no step
  * yet, or when its turn ended in words that ask him something while the
- * step it stopped on leads to another: "mid-lesson". Words that end
- * without a question ("Good place to stop") end the session there, like
- * anything else: "closed". Pure.
+ * step it stopped on leads to another: "mid-lesson". A lesson the tutor
+ * moved to practice waits on him too while its plan has steps left: a
+ * concluded problem waits on Next problem. Words that end without a
+ * question ("Good place to stop") end the session there, like anything
+ * else, as does a practice round with no plan or none left: "closed". Pure.
  */
 export function sessionEndOf(messages: readonly LhMessage[], tree: PlanTree | undefined, initial: SessionMode = "teach"): SessionEnd {
 	const last = [...messages].reverse().find((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
@@ -25,13 +27,20 @@ export function sessionEndOf(messages: readonly LhMessage[], tree: PlanTree | un
 	}
 	if (last.role !== "assistant" || last.stopReason !== "stop") return "cut";
 	if (closedTonight(messages)) return "closed";
-	if (sessionModeOf(messages, initial) === "practice") return "closed";
+	if (sessionModeOf(messages, initial) === "practice") return tree && stepsLeft(tree, messages) ? "mid-lesson" : "closed";
 	const phase = phaseAt3Lh(messages);
 	if (phase === "plan") return "mid-lesson";
 	if (phase !== "teach" || !tree) return "closed";
 	const { current } = derivePlanStatusesLh(tree, messages);
 	if (current === null) return "mid-lesson";
 	return asks(last) && tree.edges.some((edge) => edge.from === current) ? "mid-lesson" : "closed";
+}
+
+/** Whether the lesson's plan has a step not yet taught: one no tagged
+ *  question has moved past and no progress call marked done. Pure. */
+function stepsLeft(tree: PlanTree, messages: readonly LhMessage[]): boolean {
+	const { visited } = derivePlanStatusesLh(tree, messages);
+	return tree.nodes.some((node) => !visited.has(node.id));
 }
 
 /** Whether a reply's last words are a question to him: its text ends in a
@@ -41,9 +50,9 @@ function asks(reply: Extract<LhMessage, { role: "assistant" }>): boolean {
 	return /\?[\s*_)\]"'”’$]*$/.test(text);
 }
 
-/** True when the tutor's latest close (`lesson_progress` with `close: true`)
- *  has had no word from him since: he finished for tonight. His next
- *  message reopens the session. Pure. */
+/** True when the session closed for tonight with no word from him since:
+ *  the tutor's latest close (`lesson_progress` with `close: true`), or his
+ *  own Done for tonight. His next message reopens the session. Pure. */
 export function closedTonight(messages: readonly LhMessage[]): boolean {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const m = messages[i]!;
@@ -51,8 +60,22 @@ export function closedTonight(messages: readonly LhMessage[]): boolean {
 			if (m.stopReason === "error" || m.stopReason === "aborted") continue;
 			if (m.content.some((b) => b.type === "toolCall" && b.name === LESSON_PROGRESS_TOOL && lessonProgressOf(b.arguments)?.close === true)) return true;
 		} else if (nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") {
-			return false;
+			return isDoneTonight(m);
 		}
 	}
 	return false;
+}
+
+/** True while his Done for tonight is his latest input: nothing he sent
+ *  since reopened the session. Pure. */
+export function doneTonightAtEnd(messages: readonly LhMessage[]): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") return isDoneTonight(m);
+	}
+	return false;
+}
+
+function isDoneTonight(m: LhMessage): boolean {
+	return m.role === "custom" && m.customType === "done-tonight";
 }

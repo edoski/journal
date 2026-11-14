@@ -38,6 +38,7 @@ import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
+	DONE_TONIGHT_TEXT,
 	HANDOFF_TEXT,
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
@@ -85,6 +86,7 @@ export interface LhMarkerMessage {
 		| "practice-thinking"
 		| "practice-next"
 		| "practice-request"
+		| "done-tonight"
 		| "problem-dismissed"
 		| "compaction"
 		| "session-resume";
@@ -443,6 +445,21 @@ export function newNextMessage(): LhMarkerMessage {
 		role: "custom",
 		customType: "practice-next",
 		content: NEXT_PROBLEM_TEXT,
+		display: true,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** His Done for tonight: he stops now. The content tells the agent that
+ *  answers it to close without grading what he left open; the
+ *  transcript draws its own quiet line off the marker. */
+export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "done-tonight",
+		content: DONE_TONIGHT_TEXT[agent],
 		display: true,
 		details: {},
 		timestamp: Date.now(),
@@ -1000,6 +1017,14 @@ export function hasProbeDone(messages: readonly LhMessage[]): boolean {
 	return probeDoneResultIds(messages).size > 0;
 }
 
+/** Which agent answers the record's next input: practice in a practice
+ *  session, else the prober until the probe concluded or the session picks
+ *  up a lesson, then the teacher. */
+export function respondingAgentOf(messages: readonly LhMessage[], startedIn?: SessionMode): "prober" | "teacher" | "practice" {
+	if (sessionModeOf(messages, startedIn) === "practice") return "practice";
+	return hasProbeDone(messages) || resumesLesson(messages) ? "teacher" : "prober";
+}
+
 // ─── the continuation fold (Wave D: the SDK's
 //     lastAssistantMessageIsCompleteWithToolCalls, natively) ──────────────────
 
@@ -1071,7 +1096,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next", "practice-request"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
@@ -1133,7 +1158,14 @@ function trailingBatchOwner(messages: readonly LhMessage[]): number {
 	return messages[i]?.role === "assistant" ? i : -1;
 }
 
-export function needsContinuation(messages: readonly LhMessage[]): boolean {
+export function needsContinuation(record: readonly LhMessage[]): boolean {
+	// Context markers written after an answer (the course brief rides every
+	// learner input) carry no input of their own: what is owed is read from
+	// the input before them. Without this, a turn the app's restart cut
+	// right after his answer was never resumed.
+	let end = record.length;
+	while (end > 0 && record[end - 1]!.role === "custom" && NEUTRAL_MARKERS.includes((record[end - 1] as { customType: string }).customType)) end--;
+	const messages = end === record.length ? record : record.slice(0, end);
 	const last = messages[messages.length - 1];
 	if (!last || (last as { role?: string }).role !== "toolResult") return false;
 	// The dismissal rule (A2 + owner ruling 2026-10-03, round-1 incident):

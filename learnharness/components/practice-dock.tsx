@@ -59,14 +59,25 @@ export interface PracticeDockProps {
 	 *  and say so in the hint row. The server registry is the real gate;
 	 *  this is the affordance. */
 	compactionRunning?: boolean;
+	/** The tutor is answering him: the submit and the requests wait, so a
+	 *  second press cannot stack a second request on the first. */
+	busy?: boolean;
+	/** What he has typed so far, on every change (stranded-draft.ts). */
+	onDraftChange?: (text: string) => void;
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false }: PracticeDockProps) {
+export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false, busy = false, onDraftChange }: PracticeDockProps) {
+	const waiting = compactionRunning || busy;
 	const [thinking, setThinking] = useState("");
 	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
+	const draftChangeRef = useRef(onDraftChange);
+	draftChangeRef.current = onDraftChange;
+	useEffect(() => {
+		draftChangeRef.current?.(thinking);
+	}, [thinking]);
 
 	const submit = () => {
-		if (compactionRunning) return;
+		if (waiting) return;
 		const text = thinking.trim();
 		if (text.length === 0) return;
 		setThinking("");
@@ -74,11 +85,11 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 		onSubmit(text, confidence);
 	};
 
+	// A request carries the work so far and leaves it in the field: after
+	// a hint he carries on from it, and nothing he typed seems to vanish.
 	const request = (kind: PracticeRequest) => {
-		if (compactionRunning) return;
-		const text = thinking.trim();
-		setThinking("");
-		onRequest(kind, text);
+		if (waiting) return;
+		onRequest(kind, thinking.trim());
 	};
 	const requestRef = useRef(request);
 	requestRef.current = request;
@@ -99,7 +110,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 					variant="quiet"
 					size="pill"
 					data-testid={`practice-request-${kind}`}
-					disabled={compactionRunning}
+					disabled={waiting}
 					onClick={() => request(kind)}
 				>
 					<Icon />
@@ -171,7 +182,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				<Button
 					type="button"
 					data-testid="practice-send"
-					disabled={thinking.trim().length === 0 || compactionRunning}
+					disabled={thinking.trim().length === 0 || waiting}
 					onClick={() => submit()}
 					size="pill"
 						className="ml-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"

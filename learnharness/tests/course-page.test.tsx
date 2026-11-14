@@ -87,6 +87,7 @@ const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({
 	busy: false,
 	compacting: false,
 	course: { workspace: WS, title: "Linear Algebra" },
+	ownTopics: over.topics ?? [],
 	...over,
 });
 
@@ -202,13 +203,14 @@ describe("the header's facts and next lesson", () => {
 });
 
 describe("the course page's read", () => {
-	const ready = { status: "ready" as const, courses: [course()], failed: ["/study/broken"], open: [], chats: [] };
+	const broken = { workspace: "/study/broken", title: "Broken", problem: "damaged" as const };
+	const ready = { status: "ready" as const, courses: [course()], failed: [broken], open: [], chats: [] };
 
 	it("says why a course cannot show: still reading, the engine not answering, the read failing, a record it could not read, a course not his", () => {
 		assert.equal(courseRead({ status: "loading" }, WS).status, "loading");
 		assert.equal(courseRead({ status: "unavailable", reason: "engine not found" }, WS).status, "unavailable");
 		assert.equal(courseRead({ status: "failed" }, WS).status, "failed");
-		assert.equal(courseRead(ready, "/study/broken").status, "unreadable");
+		assert.deepEqual(courseRead(ready, "/study/broken"), { status: "unreadable", course: broken });
 		assert.equal(courseRead(ready, "/study/elsewhere").status, "missing");
 	});
 

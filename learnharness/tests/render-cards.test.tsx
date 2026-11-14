@@ -26,6 +26,7 @@ import { providerKeyMissing } from "../src/core/settings.ts";
 import { AnsweredCard } from "../components/answered-card.tsx";
 import {
 	buildAnswer,
+	dismissedAnswer,
 	normalizeOptions,
 	questionNeedsReveal,
 	type QuestionAnswerData,
@@ -382,6 +383,16 @@ describe("render smoke tests", () => {
 		const answer = { ...buildAnswer(askQD(), {}), dismissed: true };
 		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
 		assert.match(html, /Skipped: How confident are you\?/);
+	});
+
+	it("AnsweredCard renders a check left for tonight with its question and never its answer", () => {
+		const answer = dismissedAnswer("explain", "What is $\\lambda$ for $A = 2I$?", "tonight");
+		const input = { ...explainInput, question: "What is $\\lambda$ for $A = 2I$?", correctAnswer: "Two, the only eigenvalue." };
+		const html = renderToStaticMarkup(<AnsweredCard answer={{ ...answer, tool: "explain" }} input={input} />);
+		assert.match(html, /Left for next time/);
+		assert.ok(html.includes("katex"), "the question's math typesets");
+		assert.ok(!html.includes("The answer"), "no answer section");
+		assert.ok(!html.includes("only eigenvalue"), "the committed answer never shows");
 	});
 });
 

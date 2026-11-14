@@ -44,7 +44,7 @@ Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights 
 | engine unavailable | `CoursesUnavailable` with its fix |
 | read failed | "Couldn't read your courses." with Try again |
 | no courses | "No courses yet. Start a lesson from New lesson and pick a course there." |
-| one course unreadable | the others, then "Couldn't read one course: <folder>" |
+| one course unreadable | the others, then one line per unreadable course under Today: its name (the title a linked session carries, else its folder's), then "Couldn't read this course's record." and why in plain words: "Its file is damaged.", "The app isn't allowed to open its files." or "Its file can't be opened." (`unreadable-course.tsx`); with no readable course, only those lines |
 | map enlarged | the tabs and the map fill Home; Today is hidden until Esc or the same control |
 
 ## Scenarios checked (seeded demo, 12 Nov 2026)

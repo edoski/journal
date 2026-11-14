@@ -121,6 +121,41 @@ describe("plan titles that hold math", () => {
 	});
 });
 
+describe("plan_init names a lesson once, by its goal", () => {
+	const PLAN = "graph TD\n  setup[Write out A - lambda I] --> solve[Solve the kernel]\n";
+	const GOAL = { title: "Eigenvalues by hand", topic: "eigen" };
+
+	it("names a session started from a free message: its title and the topic it belongs to", async () => {
+		const chatId = newChat("Starting linear algebra tonight. I added the syllabus and the week 1 notes");
+		await exec(planTools({ chatId, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.equal(named.title, "Eigenvalues by hand");
+		assert.deepEqual(named.ownTopics, ["eigen"]);
+	});
+
+	it("never moves it again: a rewrite keeps the first name and topic", async () => {
+		const chatId = newChat("Some free question");
+		const tools = planTools({ chatId, chatStore });
+		await exec(tools, "plan_init", { mermaid: PLAN, goal: GOAL });
+		await exec(tools, "plan_init", { mermaid: "graph TD\n  rank[Rank counts pivots] --> setup[Setup]\n", goal: { title: "Rank and the column space", topic: "rank" } });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Eigenvalues by hand", ["eigen"]]);
+	});
+
+	it("leaves a session started on a topic as it was opened, and a renamed one its own title", async () => {
+		const onTopic = chatStore.createChat("Review Rank and the column space", undefined, ["rank"]);
+		createdChats.push(onTopic.id);
+		await exec(planTools({ chatId: onTopic.id, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		const kept = chatStore.listChats().find((c) => c.id === onTopic.id)!;
+		assert.deepEqual([kept.title, kept.ownTopics], ["Review Rank and the column space", ["rank"]]);
+		const renamed = newChat("first words");
+		chatStore.renameChat(renamed, "My eigen night");
+		await exec(planTools({ chatId: renamed, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		const own = chatStore.listChats().find((c) => c.id === renamed)!;
+		assert.deepEqual([own.title, own.ownTopics], ["My eigen night", ["eigen"]]);
+	});
+});
+
 describe("plan_init — the author-once mermaid tool (execute against the real store)", () => {
 	it("parses a mermaid block, builds the tree, persists, returns the full tree", async () => {
 		const chatId = newChat("Plan: init");
