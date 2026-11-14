@@ -24,7 +24,7 @@ import { useSidebarWidth } from "@/components/unit-inbox/sidebar-width";
 import { isUnitOpen, TopicCard, TopicSlimRow } from "@/components/unit-inbox/unit-row";
 import { TodayList } from "@/components/unit-inbox/today/today-list";
 import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
-import { sessionTwins, unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
+import { sessionsNow, sessionTwins, unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
@@ -68,13 +68,16 @@ export function searchInbox(
 }
 
 /** The inbox's units, then a unit for every other topic on the maps of
- *  the courses it keeps. Pure. */
+ *  the courses it keeps, each saying what every session tied to it does
+ *  now (`sessionsNow`), as its page and Today's top say: a topic a waiting
+ *  lesson worked on reads Your turn here too (round 6: Eigenvalues read
+ *  "Back in 1d" in search and "Your turn" on Home). Pure. */
 function everyTopic(inbox: UnitInbox, chats: readonly ChatListItem[], courses: readonly StudyCourse[]): Unit[] {
 	const listed = [...inbox.active, ...inbox.working, ...inbox.known];
 	const keys = new Set(listed.map((u) => u.key));
 	const kept = courses.filter((c) => inbox.scope == null || c.map.workspace === inbox.scope);
 	const rest = kept.flatMap((c) => c.map.topics.filter((t) => !keys.has(unitKey(c.map.workspace, t.handle))).map((t) => unitFor(c, t, chats)));
-	return [...listed, ...rest];
+	return [...listed, ...rest].map((u) => ({ ...u, now: sessionsNow(u.sessions) }));
 }
 
 /** Search's label and tooltip, in its shortcut's own words. */

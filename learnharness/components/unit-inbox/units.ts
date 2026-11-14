@@ -99,7 +99,15 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
  *  (`ownTopics`), never one that only touched it on the way, so a lesson
  *  is "Your turn" on its own topic alone. Pure. */
 export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNow {
-	const states = sessions.filter((c) => (c.ownTopics ?? []).includes(handle)).map(sessionState);
+	return sessionsNow(sessions.filter((c) => (c.ownTopics ?? []).includes(handle)));
+}
+
+/** What any of these sessions is doing now: one waits on the learner, the
+ *  tutor writes in one, or one was left for next time. A topic read with
+ *  every session tied to it (`topicSessions`) says what its page's Now and
+ *  the session's card on Today's top say. Pure. */
+export function sessionsNow(sessions: readonly ChatListItem[]): UnitNow {
+	const states = sessions.map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	if (states.includes("working")) return "working";
 	return states.includes("left") ? "left" : null;
