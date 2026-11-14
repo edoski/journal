@@ -11,8 +11,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EventCalendarViews } from "@/components/ui/event-calendar-views";
 import { EventCalendarCloseIcon } from "@/components/event-calendar-icons";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
-import { CalendarEntryView, type StartSession } from "@/components/calendar/calendar-entry";
-import { moreWords, quietBetween, studyTimeWords, type CalendarEntry } from "@/components/calendar/calendar-facts";
+import { CalendarEntryView, PANEL_WIDTH, type StartSession } from "@/components/calendar/calendar-entry";
+import { longDayWords, moreWords, quietBetween, studyTimeWords, type CalendarEntry } from "@/components/calendar/calendar-facts";
 import { overlayOpen } from "@/components/spatial-arrows";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +45,17 @@ const DAY_GRID = {
 	rowMoreLinkClass: "mx-1 mb-0.5 rounded-md text-muted-foreground hover:bg-fill-hover hover:text-foreground",
 	rowMoreLinkInnerClass: "px-1.5 py-0.5 text-label",
 };
+
+/** A day's More panel, the day grid's own: the entry panels' surface
+ *  (`PopoverContent`: radius 12, the popover fill, its edge and shadow) at
+ *  their one width. */
+const DAY_PANEL = cn("m-1 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg pointer-events-auto [--fc-popover-z:50]", PANEL_WIDTH);
+
+/** The day panel's head: as tall as its close button with the button's
+ *  inset above and below (8 + 32 + 8), so the date sits level with the ✕,
+ *  and inset as the panel's rows (12 + 6) so the date starts where their
+ *  marks do; clear of the ✕ at the right. */
+const DAY_PANEL_HEAD = "flex h-12 w-full items-center ps-3 pe-12";
 
 const VIEW_KEY = "lh:calendar-view";
 
@@ -242,9 +253,19 @@ export function CalendarView({
 					views={{ dayGrid: DAY_GRID }}
 					dayHeaderAlign="start"
 					dayHeaderClass="border-border/60"
-					dayHeaderInnerClass="flex w-full rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+					dayHeaderInnerClass={(info) =>
+						info.inPopover ? DAY_PANEL_HEAD : "flex w-full rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+					}
 					dayHeaderContent={(info) =>
-						compact ? <span className="px-2 pb-2 pt-1 text-label text-muted-foreground">{info.weekdayText}</span> : <DayHead info={info} schedule={days} />
+						info.inPopover ? (
+							<span data-slot="calendar-day-panel-head" className="px-1.5 text-row font-medium text-foreground">
+								{longDayWords(isoDay(info.date))}
+							</span>
+						) : compact ? (
+							<span className="px-2 pb-2 pt-1 text-label text-muted-foreground">{info.weekdayText}</span>
+						) : (
+							<DayHead info={info} schedule={days} />
+						)
 					}
 					dayCellClass={(info) => cn("border border-border/60", info.isDisabled && "bg-transparent")}
 					dayCellTopClass={compact ? "flex flex-row justify-start" : "hidden"}
@@ -257,6 +278,7 @@ export function CalendarView({
 					dayHeaderRowClass="border-0"
 					dayRowClass="border-border/60"
 					tableHeaderClass="bg-background"
+					popoverClass={DAY_PANEL}
 					popoverCloseContent={() => <EventCalendarCloseIcon />}
 				/>
 				{quiet && (

@@ -99,6 +99,11 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
  *  day's reviews: a tinted chip with its title in weight. */
 const EXAM_CHIP = "bg-foreground/10 font-medium hover:bg-foreground/15";
 
+/** Every panel the calendar opens, an entry's and a day's, is this wide:
+ *  the exam's road reads in it, and one width keeps them one family
+ *  (round 5: 318 against 286). */
+export const PANEL_WIDTH = "w-80";
+
 const FACE =
 	"flex w-full min-w-0 rounded-md px-1.5 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=open]:bg-fill-selected motion-reduce:transition-none";
 
@@ -132,7 +137,7 @@ export function CalendarEntryView({
 			<PopoverTrigger data-slot="calendar-entry" data-look={look} className={face}>
 				<Face entry={entry} today={today} compact={compact} />
 			</PopoverTrigger>
-			<PopoverContent data-slot="calendar-entry-detail" align="start" collisionPadding={12} className={cn("flex flex-col gap-3", entry.kind === "exam" ? "w-80" : "w-72")}>
+			<PopoverContent data-slot="calendar-entry-detail" align="start" collisionPadding={12} className={cn("flex flex-col gap-3", PANEL_WIDTH)}>
 				<EntryDetail entry={entry} today={today} busy={busy} onStart={onStart} />
 			</PopoverContent>
 		</Popover>
