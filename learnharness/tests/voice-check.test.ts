@@ -14,6 +14,7 @@ import { PATHS } from "../config.ts";
 import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import { composeInstructions } from "../src/agent/teacher-agent.ts";
 import { CONCLUDE_ACK_TEXT, DONE_TONIGHT_TEXT, HANDOFF_TEXT, MODE_HANDOFF_TEXT, NEXT_PROBLEM_TEXT, sessionResumeText } from "../src/core/contracts/chat.ts";
+import { PROBE_DONE_ACK_TEXT } from "../src/core/contracts/probe.ts";
 import { promptVoiceBreaks, sessionVoiceBreaks, voiceBreaks, type TurnKind, type VoiceRule } from "../src/core/voice-check.ts";
 
 const rules = (text: string, kind?: TurnKind) => voiceBreaks(text, kind).map((b) => b.rule);
@@ -36,6 +37,7 @@ const BROKEN: ReadonlyArray<{ text: string; kind?: TurnKind; breaks: VoiceRule }
 	{ text: "What upper bound do you get for $|x+3|$, and what $\\delta$ does that give? Could one $\\delta$ work for every $a$?", breaks: "questions" },
 	{ text: "### From the equation to numbers\n\nFor a $2 \\times 2$ matrix the characteristic polynomial has a shortcut.", kind: "teach", breaks: "headings" },
 	{ text: "Want a quick question on it?", kind: "teach", breaks: "offer" },
+	{ text: "You already know everything the Poisson formula is built from. The lesson starts with your chip example and works the formula out from it.", breaks: "plan" },
 ];
 
 /** The best passages of the same lessons: the voice as written. */
@@ -87,6 +89,7 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	["plan handoff", HANDOFF_TEXT],
 	["next problem", NEXT_PROBLEM_TEXT],
 	["conclude ack", CONCLUDE_ACK_TEXT],
+	["probe ack", PROBE_DONE_ACK_TEXT],
 	["continuing", sessionResumeText("Kernels", [{ id: "kernel", title: "Kernel" }], "Kernel")],
 	["tutor skill", fs.readFileSync(SKILL, "utf8")],
 	...fs.readdirSync(PATHS.tutorReferences).map((file): [string, string] => [`tutor ${file}`, fs.readFileSync(path.join(PATHS.tutorReferences, file), "utf8")]),

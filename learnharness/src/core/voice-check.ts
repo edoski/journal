@@ -49,7 +49,7 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "praise", re: /\b(?:nice work|great job|well done|good question|good instinct|good timing|that is exactly it)\b/i },
 	{ rule: "preview", re: /\b(?:next (?:is|up|comes|you'?ll|we'?ll)|next,? (?:we|you)(?:'ll| will)|the next (?:question|step|problem) (?:tests|is|will)|here(?:'s| is) a fresh|now (?:we|you)(?:'ll| will)|coming up next)\b/i },
 	{ rule: "narration", re: /\b(?:I(?:'ll| will| am going to|'m going to) (?:save|record|ask|check|build|verify|now|start|move|give|stop|wait)|I(?:'ve| have) (?:saved|recorded|noted|told you)|let me (?:verify|check|build|save|record|ask|start)|I'?m (?:having|waiting|saving|recording|building)|I'?ll stop)\b/i },
-	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so)\b/i },
+	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
 	{ rule: "comprehension", re: /\b(?:does (?:that|this) make sense|is that clear|any questions)\b/i },
 ];
@@ -66,6 +66,7 @@ const BANNED_ASKS: ReadonlyArray<{ re: RegExp; asks: string }> = [
 	{ re: /\bprogress messages\b|\bintroductions\b/i, asks: "messages about the session instead of the material" },
 	{ re: /\bwrap the session in text\b/i, asks: "an unbudgeted wrap-up" },
 	{ re: /\bwhere (?:the lesson will start|to start) next time\b/i, asks: "a close that may give away an open question's step" },
+	{ re: /\b(?:say|a short) (?:your )?closing sentence\b/i, asks: "a sentence about the session when the probe ends" },
 ];
 
 const NEGATION = /\b(?:never|no|not|don't|do not|nothing|without|instead of|rather than|ban|bans)\b/i;
