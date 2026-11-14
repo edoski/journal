@@ -1294,13 +1294,15 @@ export function isUiOnlyMarker(m: LhMessage): boolean {
 }
 
 /** The index of the assistant whose call batch ends the record: only its
- *  tool results and UI-only markers follow it (contiguous by construction —
- *  the agent appends its batch; the question gate keeps a quiz call and its
- *  learner answer adjacent). -1 when model-facing input, a context marker,
- *  or a compaction follows the newest assistant. */
+ *  tool results, UI-only markers and a compaction marker follow it
+ *  (contiguous by construction — the agent appends its batch; the question
+ *  gate keeps a quiz call and its learner answer adjacent; a compaction run
+ *  in his pause lands between them, and the session keeps its own summary,
+ *  so the marker is nothing the tutor reads). -1 when model-facing input or
+ *  a context marker follows the newest assistant. */
 function trailingBatchOwner(messages: readonly LhMessage[]): number {
 	let i = messages.length - 1;
-	while (i >= 0 && (messages[i]!.role === "toolResult" || isUiOnlyMarker(messages[i]!))) i--;
+	while (i >= 0 && (messages[i]!.role === "toolResult" || isUiOnlyMarker(messages[i]!) || (messages[i]!.role === "custom" && (messages[i] as LhMarkerMessage).customType === "compaction"))) i--;
 	return messages[i]?.role === "assistant" ? i : -1;
 }
 
