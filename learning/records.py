@@ -4,7 +4,8 @@ Writes run under the record lock on the latest content; two sessions editing the
 same field resolve as last writer wins. A save validates the patch before taking
 the lock, applies it, settles its arcs (placing new topics and guarding re-cuts),
 lets the progress engine schedule reviews, validates the whole record and
-publishes it only when something changed. Pinned knowledge loads in every session, so a save may not
+publishes it only when something changed; ``check`` runs the same steps and
+writes nothing. Pinned knowledge loads in every session, so a save may not
 grow it past ``PINNED_BYTES``; the tutor consolidates in the same save instead
 of ``resume`` dropping entries later.
 """
@@ -127,10 +128,19 @@ def _placed(record: dict[str, Any], created: set[str]) -> dict[str, Any] | None:
     return placed or None
 
 
-def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
-    """Apply one patch and return the receipt (see the v6 spec, section 3)."""
+def save(workspace: Workspace, patch: Any, *, check: bool = False) -> dict[str, Any]:
+    """Apply one patch and return the receipt (see the v6 spec, section 3).
+
+    With ``check`` the patch runs through every step of a save, and nothing
+    is written: the result says it would pass, or the save's refusal raises.
+    """
     changes = schema.check_patch(patch)
     global_changes = changes.pop("global_preferences", None)
+    if check and global_changes is not None:
+        raise ValueError(
+            "save --check writes nothing, and global_preferences are written "
+            "outside the course; check the course's part without them"
+        )
     today = clock.today()
     now = clock.now().isoformat(timespec="microseconds")
     outcome = schema.PatchResult()
@@ -154,6 +164,15 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
         levels = _levels(before, final)
         return final
 
+    if check:
+        stored = storage.load(workspace.record) or {}
+        transform({k: v for k, v in stored.items() if k not in storage.METADATA})
+        created = set(changes.get("topics") or ()) - known
+        return {
+            "ok": True,
+            "arcs_placed": arcs_placed,
+            "placed": _placed(final, created) or {},
+        }
     previous = global_preferences() if global_changes is not None else None
     if changes:
         record, changed = storage.update(workspace.record, transform)

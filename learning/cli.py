@@ -83,6 +83,8 @@ def plan(args: argparse.Namespace) -> dict[str, Any]:
 
 def save(args: argparse.Namespace) -> dict[str, Any]:
     workspace = _workspace(args)
+    if args.check:
+        return records.save(workspace, _stdin_json(), check=True)
     return retrieval.dated(workspace, records.save(workspace, _stdin_json()))
 
 
@@ -229,6 +231,11 @@ def _build_plan(parser: argparse.ArgumentParser) -> None:
 
 def _build_save(parser: argparse.ArgumentParser) -> None:
     parser.description = "Apply one JSON patch read from stdin; prints the receipt."
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Run every step of the save and write nothing",
+    )
 
 
 def _build_migrate(parser: argparse.ArgumentParser) -> None:

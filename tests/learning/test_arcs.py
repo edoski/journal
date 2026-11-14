@@ -904,6 +904,32 @@ def test_a_re_mark_stays_an_item_of_the_check(workspace: Workspace) -> None:
     assert records.load(workspace)["observations"]["o2"]["checkpoint"] == "integrals"
 
 
+# --- save --check ---------------------------------------------------------------
+
+
+def test_save_check_runs_the_save_and_writes_nothing(workspace: Workspace) -> None:
+    formed(workspace, path={"arcs": ORDER, "current": "derivative"})
+    before = workspace.record.read_bytes()
+    result = records.save(
+        workspace,
+        {"topics": {"product": {"title": "Product rule", "needs": ["derivative"]}}},
+        check=True,
+    )
+    assert result == {
+        "ok": True,
+        "arcs_placed": {"product": "derivatives"},
+        "placed": {"product": {"after": "derivative", "before": "chain-rule"}}
+        if result["placed"]
+        else {},
+    }
+    bad = {"topics": {"continuity": {"needs": ["limit", "chain-rule"]}}}
+    with pytest.raises(ValueError, match="no topic may need a later arc"):
+        records.save(workspace, bad, check=True)
+    with pytest.raises(ValueError, match="writes nothing, and global_preferences"):
+        records.save(workspace, {"global_preferences": {"tone": "Calm"}}, check=True)
+    assert workspace.record.read_bytes() == before
+
+
 # --- migration ------------------------------------------------------------------
 
 
