@@ -8,7 +8,8 @@ import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useModelStatus } from "@/components/model-status";
 import { sessionStatLabels } from "@/components/usage-format";
-import { CLAUDE_MODEL, kbdEventForAction, type SessionPricing, type TurnUsage } from "@/src/core";
+import { CLAUDE_MODEL, compactionTriggerTokens, kbdEventForAction, type SessionPricing, type TurnUsage } from "@/src/core";
+import { DETAIL_WORDS, roomWords } from "@/components/study-words";
 
 /** The lesson's top bar contents (spec: lesson-top-bar.md), rendered inside
  *  the shared TopBar at its slim size: the course and the title as one
@@ -84,9 +85,10 @@ export function LessonTopBar({
 	);
 }
 
-/** The one place the agent's machinery lives in a lesson: the model every
- *  agent runs (CLAUDE_MODEL, no choice), the context it has used and what
- *  it has cost. ⌘K opens it. */
+/** The one place the agent's machinery lives in a lesson, in his words
+ *  (DETAIL_WORDS): the tutor (CLAUDE_MODEL, no choice), how much room the
+ *  lesson has before the tutor sums it up, and what it has cost. ⌘K
+ *  opens it. */
 export function LessonDetails({
 	turns,
 	contextTokens,
@@ -97,8 +99,10 @@ export function LessonDetails({
 	pricing?: SessionPricing;
 }) {
 	const [open, setOpen] = useState(false);
-	const limit = useModelStatus().status?.contextWindow ?? null;
-	const { contextLabel, costLabel } = sessionStatLabels({ turns, contextTokens, pricing, limit });
+	const contextWindow = useModelStatus().status?.contextWindow ?? null;
+	const { costLabel, providers } = sessionStatLabels({ turns, contextTokens, pricing, limit: contextWindow });
+	const room = roomWords(contextTokens, compactionTriggerTokens(contextWindow));
+	const cost = costLabel === providers.join(" + ") && providers.length > 0 ? DETAIL_WORDS.plan : costLabel;
 	useEffect(() => {
 		const onOpen = () => setOpen(true);
 		window.addEventListener(kbdEventForAction("open-model-picker"), onOpen);
@@ -115,12 +119,12 @@ export function LessonDetails({
 			</Hint>
 			<PopoverContent forceMount hidden={!open} align="end" data-testid="session-details-panel" className="w-[22rem] p-3">
 				<dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 [&_dt]:whitespace-nowrap">
-					<dt className="text-muted-foreground">Model</dt>
+					<dt className="text-muted-foreground">{DETAIL_WORDS.tutor}</dt>
 					<dd data-testid="stats-model" className="text-right">{CLAUDE_MODEL.name}</dd>
-					<dt className="text-muted-foreground">Context</dt>
-					<dd data-testid="stats-context" className="text-right tabular-nums">{contextLabel}</dd>
-					<dt className="text-muted-foreground">Cost</dt>
-					<dd data-testid="stats-cost" className="text-right tabular-nums">{costLabel}</dd>
+					<dt className="text-muted-foreground">{DETAIL_WORDS.room}</dt>
+					<dd data-testid="stats-context" className="text-right">{room}</dd>
+					<dt className="text-muted-foreground">{DETAIL_WORDS.cost}</dt>
+					<dd data-testid="stats-cost" className="text-right tabular-nums">{cost}</dd>
 				</dl>
 			</PopoverContent>
 		</Popover>

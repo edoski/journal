@@ -33,7 +33,7 @@ import {
 	activeCompactionOf,
 	buildCompactionPrompt,
 	compactionCutIndex,
-	COMPACTION_RESERVE_TOKENS,
+	compactionTriggerTokens,
 	estimateContextTokens,
 	estimateTokens,
 	newCompactionMarker,
@@ -141,15 +141,12 @@ export async function awaitCompaction(chatId: string): Promise<void> {
 
 // ─── the effective threshold: min(bound, window − reserve) ─────────────────
 
-/** Every Claude reply re-sends the whole transcript, so this bound caps
- *  what each reply of a long lesson draws, well inside every window. */
-const COMPACTION_THRESHOLD_TOKENS = 150_000;
-
-/** Resolve the trigger from the model's context window. Unknown window →
- *  the bound alone (honest: no fake window — the catalog-index precedent). */
+/** Resolve the trigger from the model's context window (core's
+ *  `compactionTriggerTokens`: every Claude reply re-sends the whole
+ *  transcript, so its 150k bound caps what each reply of a long lesson
+ *  draws, well inside every window). Unknown window → the bound alone. */
 export function effectiveThresholdTokens(contextWindowTokens: number | undefined): number {
-	if (contextWindowTokens === undefined) return COMPACTION_THRESHOLD_TOKENS;
-	return Math.min(COMPACTION_THRESHOLD_TOKENS, Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1));
+	return compactionTriggerTokens(contextWindowTokens);
 }
 
 // ─── the estimate over the ACTIVE projection ────────────────────────────────

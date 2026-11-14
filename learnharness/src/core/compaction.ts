@@ -55,6 +55,14 @@ export const COMPACTION_RESERVE_TOKENS = 16_384;
 /** Factory default for the settings threshold (owner ruling: 150k). */
 export const DEFAULT_COMPACTION_THRESHOLD_TOKENS = 150_000;
 
+/** Where compaction triggers for a model window: the bound, or the window
+ *  less its reserve when that is smaller; the bound alone with no known
+ *  window (honest: no fake window). Pure. */
+export function compactionTriggerTokens(contextWindowTokens: number | undefined | null): number {
+	if (contextWindowTokens == null) return DEFAULT_COMPACTION_THRESHOLD_TOKENS;
+	return Math.min(DEFAULT_COMPACTION_THRESHOLD_TOKENS, Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1));
+}
+
 /** Tool-result truncation when serializing the span for the summarizer
  * (pi's mirror: long job/research results don't need verbatim inclusion
  * in the SUMMARY INPUT — the kept tail carries them whole). */

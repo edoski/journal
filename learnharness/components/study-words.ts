@@ -222,3 +222,24 @@ export function courseShareWords(solid: number, of: number): string {
 export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
 }
+
+/** The lesson's details panel, in his words: which tutor, how much room
+ *  the lesson has before the tutor sums it up, and what it has cost. */
+export const DETAIL_WORDS = {
+	tutor: "Tutor",
+	room: "Room left",
+	cost: "Cost so far",
+	unmeasured: "Not measured yet",
+	plenty: "Plenty",
+	filling: "Over half used. When it fills, the tutor sums up the lesson so far",
+	plan: "Included in your Claude plan",
+} as const;
+
+/** How much room the lesson has before the tutor sums it up (`used` of
+ *  `room`, both in the model's own units, never shown): plenty until half
+ *  is used, since half is the one split that needs no tuning, then a
+ *  warning of what happens when it fills. */
+export function roomWords(used: number | null, room: number): string {
+	if (used === null) return DETAIL_WORDS.unmeasured;
+	return used * 2 < room ? DETAIL_WORDS.plenty : DETAIL_WORDS.filling;
+}
