@@ -777,6 +777,10 @@ export function Chat({
 	// before the reply began) says so, with Try again (turn-cut.ts).
 	const replyCut = status === "ready" && !busy && !compacting && !error && replyNeverCame(nativeMessages);
 	const sendAllowed = !pending && !activeProblem && !compacting;
+	// Try again's key (round 3): Enter on the empty composer, from the field
+	// or anywhere outside one, runs the same retry as the button.
+	// A question or problem still open owns Enter (its own resend).
+	const tryAgain = pending || activeProblem ? undefined : replyCut ? () => void send({ type: "continue" }) : retryable && !claudeLimit ? retryFailedTurn : undefined;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -825,6 +829,7 @@ export function Chat({
 	 * pause — the dock-mounted listeners are gone by then (docks unmount
 	 * when nothing is active; the two never overlap). */
 	useEnterSubmits(sendNext);
+	useEnterSubmits(() => tryAgain?.());
 
 	const syncFromServer = useCallback(async () => {
 		const res = await fetch(`/api/chats/${chatId}`);
@@ -1669,14 +1674,17 @@ export function Chat({
 							revision={composerDraftRevision}
 							onChange={recordComposerText}
 							onSend={onSend}
-							onStop={abortInFlightTurn}
+							// The square asks first, as Esc does (abort-turn-dialog.tsx).
+							onStop={() => setAbortAsk("turn")}
 							sendAllowed={sendAllowed}
 							// The pause affordance (owner round 16): the placeholder
 							// IS the hint — empty state, exactly where Enter-on-empty
-							// applies.
+							// applies. A reply that never came, or a turn that
+							// failed, takes Try again the same way.
 							nextProblem={nextReady}
 							onNext={sendNext}
-							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : undefined}
+							onEmptyEnter={tryAgain}
+							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
 							photos={composerPhotos}
 						/>
 					}

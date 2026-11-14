@@ -51,6 +51,7 @@ export type KeyAction =
 	| "jump-latest"
 	| "done-tonight"
 	| "dialog-confirm"
+	| "try-again"
 	| "attach-photo";
 
 /** Where Settings and the cheat sheet group an action (display only —
@@ -108,6 +109,7 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "done-tonight", label: "Done for tonight", scope: "lesson", binding: "mod+shift+d" },
 	// The answer field on show (composer, check or problem) opens its picker.
 	{ id: "attach-photo", label: "Attach a photo of your working", scope: "lesson", binding: "mod+shift+p" },
+	{ id: "try-again", label: "Try again after a reply that never came", scope: "lesson", binding: "enter", displayOnly: true },
 	{ id: "dialog-confirm", label: "Confirm a stop or skip (← → pick a button)", scope: "lesson", binding: "mod+enter", displayOnly: true },
 	// The question dock's row machine (wave B) — displayOnly: the dock owns
 	// the keys while a question is open; the registry never dispatches

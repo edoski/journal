@@ -23,7 +23,7 @@
 | control focus-visible | 2px `ring` (send and next problem offset 2px from the surface) |
 | hover (toolbar pills) | `fill-hover`, ink to `foreground` |
 
-Enter sends, Shift+Enter is a newline, ⌘/Ctrl+Enter sends; the stop and next-problem rules are `enterAction`'s.
+Enter sends, Shift+Enter is a newline, ⌘/Ctrl+Enter sends. Enter never stops a turn: the square stops by a click, through the host's confirm. On the empty idle field Enter runs the next problem or the host's `onEmptyEnter` (Try again); the rules are `enterAction`'s.
 
 ## Sources
 

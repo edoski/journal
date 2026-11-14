@@ -116,6 +116,7 @@ export const LESSON_WORDS = {
 	newReply: "New reply",
 	stoppedBeforeReply: "The tutor stopped before replying.",
 	tryAgain: "Try again",
+	tryAgainPlaceholder: "Press Enter to try again, or write something new.",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
