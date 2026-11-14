@@ -23,6 +23,7 @@ import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { ChatSessionComposer } from "@/components/composer";
+import { LessonSessionComposer } from "@/components/lesson/lesson-composer";
 import type { LessonVariant } from "@/components/lesson-variant";
 import { SentPhotos, sentPhotos, usePhotoDraft, type PendingPhoto } from "@/components/photos";
 import { useEnterSubmits } from "@/components/enter-submits";
@@ -1772,7 +1773,22 @@ export function Chat({
 						unconnected && <SignInPill onOpen={() => setSetupOpen(true)} />
 					}
 					column={column}
-					composer={
+					composer={reading ? (
+						<LessonSessionComposer
+							busy={busy}
+							value={textRef.current}
+							revision={composerDraftRevision}
+							onChange={recordComposerText}
+							onSend={onSend}
+							onStop={() => setAbortAsk("turn")}
+							sendAllowed={sendAllowed}
+							nextProblem={nextReady}
+							onNext={sendNext}
+							onEmptyEnter={tryAgain}
+							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
+							photos={composerPhotos}
+						/>
+					) : (
 						<ChatSessionComposer
 							// Stop aborts ANY in-flight turn (stream-reattach wave): the
 							// square renders while a reattached/wake turn runs too — the
@@ -1796,7 +1812,7 @@ export function Chat({
 							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
 							photos={composerPhotos}
 						/>
-					}
+					)}
 					onSubmitAnswer={(output, photos) => {
 						if (!pending) return;
 						// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
