@@ -82,11 +82,11 @@ export type ModelRole =
 /**
  * THE USER SETTINGS RECORD (settings-storage wave, 2026-09-19): one
  * versioned, DELTA-shaped JSON blob at the data-dir seam holding every
- * non-secret product preference — agent (tool toggles), claude (the
- * account every agent runs on), appearance. Explicit user choices only: ABSENT keys resolve to the
+ * non-secret product preference — claude (the account every agent runs
+ * on) and appearance. Explicit user choices only: ABSENT keys resolve to the
  * factory defaults compiled into src/core/settings.ts (FACTORY_SETTINGS), so
- * a software update that adds a knob (new tool, new role, new appearance
- * field) needs no migration — old records simply lack the new keys. The
+ * a software update that adds a knob (a new appearance field) needs no
+ * migration — old records simply lack the new keys. The
  * version field is a PRIVATE schema counter for breaking shape changes
  * only (field renamed/meaning changed), unrelated to the app release
  * version. Secrets (login tokens) NEVER live here.
@@ -94,11 +94,10 @@ export type ModelRole =
 export const SETTINGS_FILE = path.join(DATA_ROOT, "settings.json");
 
 /**
- * Where the web/dev server keeps the ChatGPT sign-in
- * (chatgpt-credentials.json, owner-only): the project directory, or
- * LH_CREDENTIALS_DIR. The packaged desktop app keeps it in Electron's
- * userData instead, owned by the main process. No API key is stored
- * anywhere: the app runs only on subscriptions.
+ * Where older versions kept sign-in files (auth.json, chatgpt-credentials.json):
+ * the project directory, or LH_CREDENTIALS_DIR. Nothing reads or writes them
+ * now (every agent runs on the user's Claude plan), but a copy may remain,
+ * so the agent's file tools refuse them (src/agent/tools/fs-shared.ts).
  */
 export const CREDENTIALS_DIR = process.env.LH_CREDENTIALS_DIR
 	? path.resolve(process.env.LH_CREDENTIALS_DIR)

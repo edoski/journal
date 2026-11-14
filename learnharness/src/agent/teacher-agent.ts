@@ -23,10 +23,8 @@ import { createFindTool, findTool } from "./tools/find.ts";
 import { createGrepTool, grepTool } from "./tools/grep.ts";
 import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
-import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
-import { toLlmMessages, nativeInputCause, MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
-import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
-import { usageWasAdmitted } from "./subscription-request-cycle.ts";
+import { QUESTION_TOOLS } from "../core/pending.ts";
+import { toLlmMessages, MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
 
 /**
  * The two teaching-side agents (docs/probe-teach-split.md): the PROBER and
@@ -82,21 +80,12 @@ export type StepUsageCollector = (usage: Usage) => void;
 export interface AgentBuildOptions {
 	/** Model + stream function — tests inject a scripted faux engine. */
 	engine?: PiEngine;
-	callPurpose?: { background: boolean };
-	requestCycle?: ChatGPTRequestCycle;
 	/** The initial transcript, as pi messages (the record IS agent state). */
 	messages?: AgentMessage[];
 	/** Money channel: one call per model request. */
 	onUsage?: StepUsageCollector;
-	/** Tests may pass a bare tool registry to drive deterministic flows.
-	 *  An explicit registry is NEVER toggle-filtered — the caller owns it. */
+	/** Tests may pass a bare tool registry to drive deterministic flows. */
 	tools?: Record<string, AgentTool<any>>;
-	/** The resolved per-user tool toggles (core/pending EnabledTools — the
-	 *  2026-09-19 P2 bridge: Platform's chat-handler passes
-	 *  effective.agent.tools; the factories drop any tool explicitly false.
-	 *  THE DEFINITIVE toggleable set is TOGGLEABLE_TOOLS (job tools only);
-	 *  the filtering is generic, but writes validate against the list). */
-	toolToggles?: EnabledTools;
 	/** Native conversation identity: the existing persisted chat id, reused
 	 * across reconstructed prober, teacher, and practice Agents.
 	 * Debug: when set AND LH_PROVIDER_EVENTS=1, raw provider stream events
@@ -187,7 +176,6 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// LH_PROVIDER_EVENTS=1 and the caller handed a chatId; undefined is
 	// the normal no-observer path (tests, env-off).
 	const providerEvents = opts.chatId ? providerEventObserver(opts.chatId, kind) : undefined;
-	const seenInputs = new Set((opts.messages ?? []).map((m) => (m as { id?: string }).id).filter(Boolean));
 	const agent = new Agent({
 		identity: APP_IDENTITY,
 		sessionId: opts.chatId,
@@ -233,31 +221,13 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		// an abort's dangling question call gets its INTERRUPTED result. It
 		// must never throw (pi's convertToLlm contract).
 		convertToLlm: toLlmMessages,
-		prepareRequest: (request) => {
-			if (opts.callPurpose) {
-				let learner = false, automatic = false;
-				const messages = request.context.messages;
-				for (const message of messages) {
-					const id = (message as { id?: string }).id;
-					const cause = nativeInputCause(message, messages.slice(0, messages.indexOf(message)));
-					if (cause === "neutral") continue;
-					if (id && seenInputs.has(id)) continue;
-					if (id) seenInputs.add(id);
-					if (cause === "learner" && id) learner = true;
-					else automatic = true; // missing/unrecognized identity never grants foreground
-				}
-				if (automatic) opts.callPurpose.background = true;
-				else if (learner) opts.callPurpose.background = false;
-			}
-			opts.requestCycle?.prepare(request);
-		},
 	});
 	if (opts.onUsage) {
 		agent.subscribe((event: AgentEvent) => {
 			if (event.type === "message_end" && event.message.role === "assistant" && "usage" in event.message) {
 				// A cancelled call is not a billed step (partial/estimated
 				// usage on an aborted message is not money spent).
-				if (event.message.stopReason === "aborted" || !usageWasAdmitted(event.message.usage) || (opts.requestCycle && !opts.requestCycle.acceptsUsage(event.message))) return;
+				if (event.message.stopReason === "aborted") return;
 				opts.onUsage!(event.message.usage);
 			}
 		});
@@ -273,7 +243,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
  * handler keys teacher construction on.
  */
 export function createProberAgent(ctx: ProberToolContext, opts: AgentBuildOptions = {}) {
-	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx, opts.toolToggles)));
+	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx)));
 }
 
 /**
@@ -289,7 +259,7 @@ export function createTeacherAgent(
 	ctx?: TeacherToolContext,
 	opts: AgentBuildOptions = {},
 ) {
-	const tools = opts.tools ?? (ctx ? createTeacherTools({ ...ctx, ...(opts.course ? { course: opts.course } : {}) }, opts.toolToggles) : bareQuestionTools());
+	const tools = opts.tools ?? (ctx ? createTeacherTools({ ...ctx, ...(opts.course ? { course: opts.course } : {}) }) : bareQuestionTools());
 	return baseAgentOptions("teacher", opts, Object.values(tools));
 }
 

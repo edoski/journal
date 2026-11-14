@@ -65,44 +65,6 @@ export function toolQuestionKind(tool: string): "ask" | "explain" {
 /** Tools fulfilled by background sub-agent jobs (W2/W6). */
 export const JOB_TOOLS = ["research", "demo", "visual"] as const;
 
-// ─── Tool availability (2026-09 settings seam) ─────────────────────────────
-
-/** The tools a user may toggle off in settings — THE DEFINITIVE LIST
- *  (adjudicated 2026-09-19, P2 reconciliation: the sub-agent JOB tools
- *  only — research/demo/visual/pdf). Deliberately NOT toggleable, ever:
- *  the graded question tool + ask_user_question (the prober's flow is
- *  graded brackets → probe_done; removing it would collapse the
- *  assessment and teaching doctrine is built on graded verification), the
- *  learner-filesystem set (user-decided 2026-09, sources v1: always-on),
- *  plan tools, and probe_done (it is how the phase ENDS — a prober that
- *  can never conclude is a lockout).
- *  The write side validates against this list (settings-body.ts: unknown
- *  key = 400 with the supported list); the read-side sanitizer stays
- *  lenient for forward-compat. The names are the MODEL-FACING tool names
- *  (research, not researcher; pdf is the PDF-reader dispatch, sources v0
- *  2026-09). */
-export const TOGGLEABLE_TOOLS = ["research", "demo", "visual", "pdf"] as const;
-
-/** The resolved settings → factory seam shape (Platform wires chat-handler
- *  to pass this through from the settings record; storage and defaults are
- *  Platform's lane). JSON-native: a partial record keyed by tool name.
- *  Absent key / undefined = enabled — old records behave exactly as today.
- *  Any explicit `false` removes that tool from the registry, whatever its
- *  name — the machinery stays generic for future toggleables. */
-export type EnabledTools = Partial<Record<string, boolean>>;
-
-/** Drop every tool the resolved settings mark as disabled. The single
- *  filtering site every factory shares (prober/teacher). */
-export function filterEnabledTools<T>(tools: Record<string, T>, enabled?: EnabledTools): Record<string, T> {
-	if (!enabled) return tools;
-	const out: Record<string, T> = {};
-	for (const [name, tool] of Object.entries(tools)) {
-		if (enabled[name] === false) continue;
-		out[name] = tool;
-	}
-	return out;
-}
-
 /** Grouped view messages lose native assistant boundaries. Native callers
  * supply the exact occurrence, not just an id: its OWN part must have cleared
  * validation. Never fall back to an older available question.

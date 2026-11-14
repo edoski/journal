@@ -43,7 +43,6 @@ export { doneTonightAtEnd } from "./session-end.ts";
 export { replyNeverCame } from "./turn-cut.ts";
 export * from "./prices.ts";
 export * from "./context-usage.ts";
-export type { ChatGPTStatus, ChatGPTControlBridge } from "./contracts/chatgpt.ts";
 export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
 export type { ClaudeAccount, ClaudeAccountStatus, ClaudeConnection, ClaudeUsage } from "./contracts/claude.ts";
 export * from "./fuzzy.ts";

@@ -1,7 +1,7 @@
 /**
  * Settings-surface render tests (thin settings wave): SSR of the section
- * components pins the markup — toggle rows, the slot rows and tool rows,
- * the appearance rows that still apply. Fetches don't run under renderToStaticMarkup (effects never
+ * components pins the markup — the dialog frame and the appearance rows
+ * that still apply. Fetches don't run under renderToStaticMarkup (effects never
  * fire), so the SSR state IS the loading state — asserted as such.
  * Same tsx classic-JSX shim as render-sidebar.test.tsx.
  */
@@ -11,7 +11,6 @@ import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TOGGLE_TOOLS, AgentSection } from "../components/settings/agent-section.tsx";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
@@ -41,10 +40,11 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 	it("the dialog frame: the ✕ + the section nav, Providers first and General last", () => {
 		const html = renderToStaticMarkup(<SettingsDialogBody onClose={() => {}} />);
 		assert.ok(html.includes('aria-label="Close settings"'));
-		for (const id of ["general", "keys", "agent", "appearance", "keyboard"]) {
-			assert.ok(!html.includes("settings-nav-graph"), "no Graph tab");
+		for (const id of ["general", "keys", "appearance", "keyboard"]) {
 			assert.ok(html.includes(`data-testid="settings-nav-${id}"`), id);
 		}
+		assert.ok(!html.includes("settings-nav-graph"), "no Graph tab");
+		assert.ok(!html.includes("settings-nav-agent"), "no Tutor tab: every tutor tool is always on");
 		// Providers is the first landing section; internal keys deep links survive.
 		assert.ok(tagOf(html, "settings-nav-keys").includes('aria-selected="true"'));
 		assert.ok(html.indexOf('data-testid="settings-nav-keys"') < html.indexOf('data-testid="settings-nav-general"'));
@@ -55,46 +55,6 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 		assert.ok(!html.includes('href="/settings"'));
 	});
 });
-
-describe("AgentSection (thin SSR)", () => {
-	it("has no model or thinking choice: only the Tools group", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
-		for (const slot of ["strong", "cheap", "vision"]) assert.ok(!html.includes(`slot-row-${slot}`), `${slot} retired`);
-		assert.ok(!html.includes('data-testid="group-models"'), "no Models group");
-		assert.ok(html.includes('data-testid="group-tools"'), "Tools group");
-		assert.ok(!html.includes("group-prompts") && !html.includes("System prompts"), "no system prompt viewers");
-	});
-
-	it("has no search-engine row", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
-		assert.ok(!html.includes('data-testid="search-engine-row"'));
-	});
-
-	it("has no Knowledge map row (the knowledge-graph tools are gone)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
-		assert.ok(!html.includes("graph-tools-row") && !html.includes("Knowledge map"));
-	});
-
-	it("renders the owner's FINAL tool list — research, demo, visual, pdf", () => {
-		assert.deepEqual([...TOGGLE_TOOLS], ["research", "demo", "visual", "pdf"]);
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
-		for (const id of TOGGLE_TOOLS) assert.ok(html.includes(`data-testid="tool-row-${id}"`), id);
-	});
-
-	it("tools default ON (absent key = enabled)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
-		for (const id of TOGGLE_TOOLS) {
-			assert.ok(tagOf(html, `toggle-tool-${id}`).includes('aria-checked="true"'), `${id} defaults on`);
-		}
-	});
-
-	it("tools carry the delta", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={{ tools: { demo: false } }} onSectionChange={() => {}} />);
-		assert.ok(tagOf(html, "toggle-tool-demo").includes('aria-checked="false"'), "demo off");
-		assert.ok(tagOf(html, "toggle-tool-visual").includes('aria-checked="true"'), "visual still on");
-	});
-});
-
 
 describe("AppearanceSection (thin SSR)", () => {
 	it("the inputs carry the factory placeholders: 16 for the text size, same as text for the inks", () => {

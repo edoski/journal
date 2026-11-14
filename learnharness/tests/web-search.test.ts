@@ -231,22 +231,4 @@ describe("role registries", () => {
 		const tools = createProberTools({ ...ctxBase, deliver: () => {}, jobStore: fakeJobStore(), spawn: () => {} });
 		assert.ok(tools.research && tools.pdf && tools.probe_done, "the owner ruling: research + pdf in the probe phase");
 	});
-
-	it("createProberTools: the user toggle drops research", () => {
-		const tools = createProberTools(
-			{ ...ctxBase, deliver: () => {}, jobStore: fakeJobStore(), spawn: () => {} },
-			{ research: false },
-		);
-		assert.equal("research" in tools, false, "toggle-filtered like the teacher side");
-		assert.ok(tools.pdf, "pdf unaffected by a research toggle");
-	});
-
-	it("createTeacherTools: the user toggle drops research", () => {
-		const tools = createTeacherTools(
-			{ ...ctxBase, jobStore: fakeJobStore(), spawn: () => {} },
-			{ research: false },
-		);
-		assert.equal("research" in tools, false);
-		assert.ok(tools.pdf && tools.demo && tools.visual);
-	});
 });

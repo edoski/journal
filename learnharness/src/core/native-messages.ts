@@ -1092,8 +1092,6 @@ export function endsInQuestionRecovery(messages: readonly LhMessage[]): boolean 
 		(last.details as { questionRecovery?: unknown } | null)?.questionRecovery === true;
 }
 
-export type RequestCause = "foreground" | "background";
-export type ReconstructedCause = RequestCause | "ambiguous";
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
 /** Markers that carry context, never a new input. */
 export const NEUTRAL_MARKERS: readonly string[] = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction", "session-resume"];
@@ -1130,36 +1128,6 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	}
 	return "unrecognizable";
 }
-/** Full persisted native record, including pre-compaction causes. Never guessed foreground. */
-export function reconstructRequestCause(messages: readonly LhMessage[]): ReconstructedCause {
-	let inherited: ReconstructedCause = "ambiguous";
-	let triggers: NativeInputCause[] = [];
-	const seen = new Map<string, string>();
-	const history: AgentMessage[] = [];
-	const resolve = (): ReconstructedCause => {
-		if (triggers.includes("unrecognizable")) return "ambiguous";
-		const lastLearner = triggers.lastIndexOf("learner"), lastAutomatic = triggers.lastIndexOf("automatic");
-		if (lastLearner < 0 && lastAutomatic < 0) return inherited;
-		if (lastAutomatic < 0) return "foreground";
-		if (lastLearner < lastAutomatic) return "background";
-		return "ambiguous";
-	};
-	for (const message of messages) {
-		const cause = nativeInputCause(message, history);
-		const id = (message as { id?: string }).id;
-		if (id) {
-			const value = JSON.stringify(message);
-			if (seen.has(id)) { if (seen.get(id) !== value) triggers.push("unrecognizable"); continue; }
-			seen.set(id, value);
-		} else if (cause !== "neutral") triggers.push("unrecognizable");
-		if (message.role === "assistant" && !(message.provider === "synthetic" && message.api === "faux" && message.model === "synthetic-conclude" && message.content.some((b) => b.type === "toolCall" && b.name === "conclude" && b.arguments?.outcome === "dismissed"))) {
-			inherited = resolve(); triggers = [];
-		} else if (cause !== "neutral") triggers.push(cause);
-		history.push(message);
-	}
-	return resolve();
-}
-
 /** Markers toLlmMessages drops: the model never sees them between a call
  *  and its result. */
 function isUiOnlyMarker(m: LhMessage): boolean {

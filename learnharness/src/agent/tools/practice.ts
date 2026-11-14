@@ -315,9 +315,9 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 	// learner's files (always — the same read-only set the teacher and
 	// prober carry), the research + pdf jobs (available without search
 	// keys; demo/visual stay teach-only), and
-	// the prober's map readers when the settings gate opened. None are
-	// toggle-filtered: problem/conclude are the session; these are
-	// exceptions the doctrine says to reach for rarely.
+	// the prober's map readers when the settings gate opened.
+	// problem/conclude are the session; these are exceptions the doctrine
+	// says to reach for rarely.
 	const jobs = ctx.jobs ? jobTools(ctx.jobs) : null;
 	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry. problem/conclude

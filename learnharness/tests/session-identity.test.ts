@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Type } from "typebox";
 import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, normalizeContext, type Model, type SimpleStreamOptions } from "@earendil-works/pi-ai";
-import { streamSimple as streamCodex } from "@earendil-works/pi-ai/api/openai-codex-responses";
 import { APP_IDENTITY, piModels, type PiEngine } from "../src/agent/models.ts";
 import { createProberAgent, createTeacherAgent, createPracticeAgent, type AgentBuildOptions } from "../src/agent/teacher-agent.ts";
 import { runSubagent } from "../src/agent/subagents/pi-run.ts";
@@ -28,8 +27,8 @@ function recordingEngine() {
 const again = { name: "again", label: "again", description: "Continue", parameters: Type.Object({}), execute: async () => ({ content: [{ type: "text" as const, text: "ok" }], details: {} }) };
 
 /** pi's own SDK transport for a catalog model. The app never streams through
- *  it (it runs only on subscriptions); these tests pin the SDK serialization
- *  the ChatGPT path shares, against dummy keys and a closed fetch. */
+ *  it (it runs only on the Claude plan); this test pins the SDK's tool-call
+ *  handling against a dummy key and a closed fetch. */
 function sdkEngine(provider: string, id: string): PiEngine {
 	const models = piModels();
 	return { model: models.getModel(provider, id)!, level: "off", streamFn: models.streamSimple.bind(models) };
@@ -40,7 +39,7 @@ function sdkEngine(provider: string, id: string): PiEngine {
 async function closed<T>(run: () => Promise<T>): Promise<T> {
 	const env = process.env;
 	const fetch = globalThis.fetch;
-	process.env = { NODE_ENV: "test", HOME: "/nonexistent/session-identity", OPENROUTER_API_KEY: "dummy-router", OPENCODE_API_KEY: "dummy-go", OPENAI_API_KEY: "dummy-openai" };
+	process.env = { NODE_ENV: "test", HOME: "/nonexistent/session-identity", OPENROUTER_API_KEY: "dummy-router" };
 	globalThis.fetch = async () => { throw new Error("CLOSED: unexpected fetch"); };
 	try { return await run(); } finally { process.env = env; globalThis.fetch = fetch; }
 }
@@ -90,50 +89,6 @@ describe("native app and conversation identity", { concurrency: false }, () => {
 			assert.ok(result.newMessages.some((m) => m.role === "assistant" && typeof m.durationMs === "number"), "new native assistant duration fields are preserved");
 		}
 	});
-
-	it("native OpenAI cache keys clamp to 64 characters while affinity retains exact session", async () => closed(async () => {
-		const engine = sdkEngine("openai", "gpt-4o-mini");
-		const sessionId = "chat_" + "a".repeat(70);
-		let body: Record<string, unknown> = {};
-		let headers = new Headers();
-		globalThis.fetch = async (input, init) => { const request = new Request(input, init); headers = request.headers; body = JSON.parse(await request.text()); return new Response("{}", { status: 400, headers: { "content-type": "application/json" } }); };
-		await createTeacherAgent(undefined, { engine, chatId: sessionId, tools: {} }).prompt("offline");
-		assert.equal(body.prompt_cache_key, Array.from(sessionId).slice(0, 64).join(""));
-		assert.equal(headers.get("session_id"), sessionId);
-	}));
-
-	it("native OpenAI cache-key clamp counts Unicode code points, not UTF-16 units", async () => closed(async () => {
-		const engine = sdkEngine("openai", "gpt-4o-mini");
-		const sessionId = "chat_" + "😀".repeat(70);
-		let payload: unknown;
-		// HTTP affinity headers cannot encode emoji. Observe native payload
-		// serialization before transport, then stop deliberately (no accounts).
-		await engine.streamFn(engine.model, normalizeContext({ messages: [{ role: "user", content: "offline", timestamp: 1 }] }), {
-			sessionId,
-			onPayload: (value) => { payload = value; throw new Error("CLOSED: payload captured"); },
-		}).result();
-		assert.equal((payload as { prompt_cache_key: string }).prompt_cache_key, Array.from(sessionId).slice(0, 64).join(""));
-	}));
-
-	it("native Codex serialization shares the 64-code-point clamp without an account or OAuth flow", async () => closed(async () => {
-		const engine = sdkEngine("openai-codex", "gpt-6-luna");
-		// Synthetic, unsigned fixture token solely satisfies native local claim
-		// decoding. Stop at payload capture: no account, OAuth, or fetch.
-		const claims = { "https://api.openai.com/auth": { chatgpt_account_id: "offline-fixture" } };
-		const apiKey = `dummy.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.dummy`;
-		for (const sessionId of ["chat_" + "a".repeat(70), "chat_" + "😀".repeat(70)]) {
-			let payload: unknown;
-			// The app intentionally has no Codex auth row: exercise the native
-			// serializer directly rather than adding an OAuth configuration path.
-			assert.equal(engine.model.api, "openai-codex-responses");
-			const result = await streamCodex(engine.model as Model<"openai-codex-responses">, normalizeContext({ messages: [{ role: "user", content: "offline", timestamp: 1 }] }), {
-				apiKey, sessionId, identity: APP_IDENTITY,
-				onPayload: (value) => { payload = value; throw new Error("CLOSED: payload captured"); },
-			}).result();
-			assert.ok(payload, result.errorMessage);
-			assert.equal((payload as { prompt_cache_key: string }).prompt_cache_key, Array.from(sessionId).slice(0, 64).join(""));
-		}
-	}));
 
 	it("completed malformed native JSON stays rejected despite app prepareArguments healing", async () => closed(async () => {
 		const engine = sdkEngine("openrouter", "openai/gpt-4o-mini");

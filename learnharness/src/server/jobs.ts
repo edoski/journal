@@ -69,7 +69,7 @@ import type { TurnInput } from "../core/input-events.ts";
 import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, type LhMessage } from "../core/native-messages.ts";
 import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores, effectiveSettings } from "./stores.ts";
-import { connectionBackgroundAllowed, isSubscriptionProvider, onSubscriptionChange } from "../agent/subscription-connections.ts";
+import { connectionBackgroundAllowed } from "../agent/subscription-connections.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
 import { subscribe, type ServerEventType } from "../core/events.ts";
 import type { Agent } from "@earendil-works/pi-agent-core";
@@ -121,8 +121,6 @@ interface WakeState {
 	liveAgents: Map<string, Agent>;
 	/** Chats whose pump loop is currently active (serialization per chat). */
 	pumping: Set<string>;
-	stopConnectionWatch?: () => void;
-	automaticDeferred: WeakSet<Agent>;
 }
 
 interface LhWakeGlobal {
@@ -131,7 +129,7 @@ interface LhWakeGlobal {
 
 function state(): WakeState {
 	const g = globalThis as typeof globalThis & LhWakeGlobal;
-	return (g.__lhWakePipeline ??= { queues: new Map(), liveAgents: new Map(), userSteers: new Map(), pumping: new Set(), automaticDeferred: new WeakSet() });
+	return (g.__lhWakePipeline ??= { queues: new Map(), liveAgents: new Map(), userSteers: new Map(), pumping: new Set() });
 }
 
 /** chat-handler wires this at module init: its adapter around handleChatRequest. */
@@ -256,7 +254,6 @@ function lastProvider(chatId: string): string | undefined {
  *  run's FIRST LLM call (the native equivalent of the old continuation
  *  coalescing). */
 export function automaticFollowUpAllowed(chatId: string, agent?: Agent): boolean {
-	if (agent && state().automaticDeferred.has(agent)) return false;
 	const provider = agent?.state?.model?.provider ?? lastProvider(chatId) ?? effectiveSettings().claude.account;
 	return connectionBackgroundAllowed(provider);
 }
@@ -354,23 +351,7 @@ export function reconcileUserSteers(chatId: string, persisted: readonly LhMessag
 /** Clear the live agent at settlement — MUST run before settleSteers so the
  *  reconciliation's re-pump can never hand a marker to the dying agent. */
 export function unregisterLiveAgent(chatId: string): void {
-	const agent = state().liveAgents.get(chatId);
-	if (agent) state().automaticDeferred.delete(agent);
 	state().liveAgents.delete(chatId);
-}
-
-/** Restore exact registry objects after native drain but before dispatch.
- * The vehicle is disposable; result ownership/promises are not. */
-export function restoreUncommittedAutomatic(chatId: string, agent: Agent, automaticIds: ReadonlySet<string>, retainedIds: ReadonlySet<string>): void {
-	const s = state();
-	s.automaticDeferred.add(agent);
-	for (const entry of s.queues.get(chatId) ?? []) {
-		if (entry.handedTo === agent && automaticIds.has(entry.steer.id)) entry.handedTo = undefined;
-	}
-	agent.clearSteeringQueue();
-	for (const entry of s.userSteers.get(chatId) ?? []) {
-		if (!retainedIds.has(entry.message.id)) { agent.steer(entry.message); entry.handedTo = agent; }
-	}
 }
 
 /** TURN SETTLEMENT RECONCILIATION (Wave C): the handler calls this AFTER
@@ -621,26 +602,6 @@ async function pump(chatId: string): Promise<void> {
 		if (!parked && automaticFollowUpAllowed(chatId, state().liveAgents.get(chatId)) && q.some((e) => e.handedTo === undefined && !e.waking && !e.deferred)) void pump(chatId);
 	}
 }
-
-// Connection changes are the only wake for consent-deferred automatic work.
-// No retry timer, inference, or API-key fallback is started while consent is off.
-state().stopConnectionWatch?.();
-state().stopConnectionWatch = onSubscriptionChange(() => {
-	const s = state();
-	for (const [chatId, agent] of s.liveAgents) {
-		if (!isSubscriptionProvider(agent.state?.model?.provider) || automaticFollowUpAllowed(chatId, agent)) continue;
-		const consumed = new Set(agent.state.messages.map((m) => (m as { id?: string }).id));
-		const pending = (s.queues.get(chatId) ?? []).filter((entry) => entry.handedTo === agent && !consumed.has(entry.steer.id));
-		if (pending.length === 0) continue;
-		agent.clearSteeringQueue();
-		for (const entry of pending) entry.handedTo = undefined;
-		for (const entry of s.userSteers.get(chatId) ?? []) if (!consumed.has(entry.message.id)) entry.handedTo = undefined;
-		handOffEligible(chatId, agent); // only unconsumed learner input; never replay consumed steers
-	}
-	for (const chatId of s.queues.keys()) {
-		if (automaticFollowUpAllowed(chatId, s.liveAgents.get(chatId))) void pump(chatId);
-	}
-});
 
 function deferOrReject(chatId: string, entry: QueuedSteer, error: Error): void {
 	entry.waking = false;

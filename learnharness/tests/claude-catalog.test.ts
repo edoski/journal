@@ -5,7 +5,7 @@ import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 import { claudeEngine } from "../src/agent/models.ts";
 import { catalogContextLimits, claudeAccountKnown, modelStatus, providerConnected } from "../src/server/model-catalog.ts";
 
-import { isSubscriptionProvider } from "../src/agent/subscription-connections.ts";
+import { connectionBackgroundAllowed } from "../src/agent/subscription-connections.ts";
 
 const signedIn = JSON.stringify({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "learner@example.com", subscriptionType: "max" });
 const signedOut = JSON.stringify({ loggedIn: false, authMethod: "none", apiProvider: "firstParty" });
@@ -25,8 +25,8 @@ test("the model status and context limits follow whether Claude Code is signed i
 	assert.deepEqual(await modelStatus(), { account: "claude-subscription", connected: true, contextWindow: 1_000_000 });
 });
 
-test("Claude is an ordinary keyed provider, not an app-held subscription credential", () => {
-	assert.equal(isSubscriptionProvider("claude-subscription"), false);
+test("Claude is an ordinary keyed provider that may work in the background", () => {
+	assert.equal(connectionBackgroundAllowed("claude-subscription"), true);
 	const engine = claudeEngine("claude-subscription");
 	assert.equal(engine.model.provider, "claude-subscription");
 	assert.equal(engine.model.id, "claude-opus-5-5");

@@ -13,7 +13,6 @@ import { sanitizeUserSettings, type UserSettings } from "../src/core/settings.ts
 describe("resolveSettings", () => {
 	it("null record (first boot): every knob lands on its default, the account on the plain signed-in claude", () => {
 		const eff = resolveSettings(null);
-		assert.deepEqual(eff.agent.tools, {});
 		assert.deepEqual(eff.claude, { account: "claude-subscription" });
 		assert.equal(eff.appearance.mode, "dark");
 		assert.equal(eff.appearance.background, null);
@@ -26,12 +25,10 @@ describe("resolveSettings", () => {
 	it("explicit record values win over every factory default", () => {
 		const record: UserSettings = {
 			version: 1,
-			agent: { tools: { research: false } },
 			claude: { account: "claude-subscription-work" },
 			appearance: { mode: "light", proseFontSize: 20, mdRendering: { headingWeight: 600 } },
 		};
 		const eff = resolveSettings(record);
-		assert.deepEqual(eff.agent.tools, { research: false });
 		assert.deepEqual(eff.claude, { account: "claude-subscription-work" });
 		assert.equal(eff.appearance.mode, "light");
 		assert.equal(eff.appearance.proseFontSize, 20);
@@ -45,6 +42,6 @@ describe("resolveSettings", () => {
 			models: { strong: { model: { provider: "claude-subscription-work", id: "claude-haiku-5-5" }, thinkingLevel: "low" } },
 		}));
 		assert.deepEqual(eff.claude, { account: "claude-subscription-work" });
-		assert.deepEqual(Object.keys(eff).sort(), ["agent", "appearance", "claude"]);
+		assert.deepEqual(Object.keys(eff).sort(), ["appearance", "claude"]);
 	});
 });

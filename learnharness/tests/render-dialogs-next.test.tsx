@@ -12,7 +12,6 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
-import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
@@ -38,19 +37,6 @@ describe("Settings › Appearance", () => {
 		assert.ok(!/px|Empty =/.test(text), "no pixel counts or equals-sign notes");
 	});
 
-});
-
-describe("Settings › Agent", () => {
-	it("names the tools plainly inside the Tools group, one switch each", () => {
-		const html = renderToStaticMarkup(
-			<AgentSection agent={undefined} onSectionChange={() => {}} />,
-		);
-		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
-		assert.ok(!html.includes("Tool · "), "no repeated Tool prefix");
-		const labels = TOGGLE_TOOLS.map((id) => doc.querySelector(`[data-testid="tool-row-${id}"]`)?.textContent?.trim());
-		assert.deepEqual(labels, ["Research", "Interactive demos", "Figures", "Reading PDFs"]);
-		for (const id of TOGGLE_TOOLS) assert.ok(doc.querySelector(`[data-testid="toggle-tool-${id}"][role="switch"]`), `switch for ${id}`);
-	});
 });
 
 describe("Settings › Keyboard", () => {

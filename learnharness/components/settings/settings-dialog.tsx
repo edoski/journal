@@ -29,21 +29,18 @@ import {
 } from "react";
 import {
 	CURRENT_SETTINGS_VERSION,
-	type AgentSettings,
 	type AppearanceSettings,
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
 import { SettingsGroup, SettingsRow, SettingsSection } from "./controls.tsx";
-import { AgentSection } from "./agent-section.tsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { SubscriptionConnections } from "./subscription-connections.tsx";
+import { ClaudeConnectionRow } from "./claude-connection.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
-import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
@@ -54,7 +51,6 @@ import { XIcon } from "lucide-react";
  *  real question users ask). */
 const SECTIONS = [
 	{ id: "keys", label: "Accounts" },
-	{ id: "agent", label: "Tutor" },
 	{ id: "appearance", label: "Appearance" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
 	{ id: "general", label: "General" },
@@ -80,12 +76,12 @@ export function SettingsDialogProvider({
 		setShow(true);
 	}, []);
 	return (
-		<ChatGPTUIProvider><DialogContext.Provider value={{ open }}>
+		<DialogContext.Provider value={{ open }}>
 			{children}
 			{show && (
 				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} />
 			)}
-		</DialogContext.Provider></ChatGPTUIProvider>
+		</DialogContext.Provider>
 	);
 }
 
@@ -160,7 +156,7 @@ export function SettingsDialogBody({
 	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
-			section: "agent" | "appearance",
+			section: "appearance",
 			body: object,
 		) => {
 			setError(null);
@@ -186,8 +182,7 @@ export function SettingsDialogBody({
 					stored ?? ({ ...(prev ?? {}), [section]: body }) as UserSettings,
 			);
 			notifySettingsSaved(section);
-			if (section === "appearance")
-				onAppearanceChange(body as AppearanceSettings);
+			onAppearanceChange(body as AppearanceSettings);
 		},
 		[onAppearanceChange],
 	);
@@ -228,21 +223,8 @@ export function SettingsDialogBody({
 							{active === "keys" && (
 								<SettingsSection title="Accounts" testid="section-keys">
 									<SettingsGroup label="Subscriptions" testid="group-subscriptions">
-										<SubscriptionConnections />
+										<ClaudeConnectionRow />
 									</SettingsGroup>
-								</SettingsSection>
-							)}
-							{active === "agent" && (
-								<SettingsSection
-									title="Tutor"
-									testid="section-agent"
-								>
-									<AgentSection
-										agent={record.agent}
-										onSectionChange={(next: AgentSettings) =>
-											void write("agent", next)
-										}
-									/>
 								</SettingsSection>
 							)}
 							{active === "appearance" && (

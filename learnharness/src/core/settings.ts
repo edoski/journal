@@ -6,7 +6,7 @@
  * DELTA SEMANTICS (owner decision, 2026-09-19): the record stores EXPLICIT
  * user choices only — ABSENT keys resolve to the factory defaults compiled
  * into this module (FACTORY_SETTINGS). A software update that ADDS a knob
- * (new tool, new appearance field) therefore needs no migration: old
+ * (a new appearance field) therefore needs no migration: old
  * records simply lack the new keys. `version` is a PRIVATE schema counter
  * for BREAKING shape changes only (field renamed / meaning changed) —
  * unrelated to the app release version. Migrations live in the adapter
@@ -76,13 +76,6 @@ export interface ClaudeSettings {
 	account?: string;
 }
 
-/** Agent settings — everything about the non-conversation machinery. */
-export interface AgentSettings {
-	/** Tool toggles keyed by tool id (absent key = enabled). User-level
-	 *  only — no per-chat override (owner decision 2026-09-19). */
-	tools?: Record<string, boolean>;
-}
-
 /** Markdown-rendering knobs — the bare-bones set (owner decision). */
 export interface MdRenderingSettings {
 	/** Heading font weight (100–900, default 900). CSS resolves the nearest
@@ -116,14 +109,13 @@ export interface AppearanceSettings {
  *  preserved verbatim by the sanitizer (forward-compat with newer records). */
 export interface UserSettings {
 	version: number;
-	agent?: AgentSettings;
 	claude?: ClaudeSettings;
 	appearance?: AppearanceSettings;
 	[key: string]: unknown;
 }
 
 /** Factory defaults for everything core can pin (owner decisions
- *  2026-09-19); tools default on. */
+ *  2026-09-19). */
 export interface FactorySettings {
 	version: number;
 	appearance: {
@@ -191,22 +183,6 @@ function legacySlotAccount(models: unknown): string | undefined {
 	return undefined;
 }
 
-function sanitizeBooleanMap(raw: unknown): Record<string, boolean> | undefined {
-	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-	const out: Record<string, boolean> = {};
-	for (const [key, value] of Object.entries(raw)) {
-		if (typeof value === "boolean") out[key] = value;
-	}
-	return Object.keys(out).length ? out : undefined;
-}
-
-function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
-	const out: AgentSettings = {};
-	const tools = sanitizeBooleanMap(raw.tools);
-	if (tools) out.tools = tools;
-	return out;
-}
-
 function sanitizeMdRendering(raw: unknown): MdRenderingSettings {
 	const out: MdRenderingSettings = {};
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return out;
@@ -247,9 +223,6 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	const out: UserSettings = {
 		version: typeof r.version === "number" && Number.isInteger(r.version) && r.version >= 1 ? r.version : CURRENT_SETTINGS_VERSION,
 	};
-	if (r.agent !== null && typeof r.agent === "object" && !Array.isArray(r.agent)) {
-		out.agent = sanitizeAgent(r.agent as Record<string, unknown>);
-	}
 	if (r.appearance !== null && typeof r.appearance === "object" && !Array.isArray(r.appearance)) {
 		out.appearance = sanitizeAppearance(r.appearance as Record<string, unknown>);
 	}
@@ -264,10 +237,12 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	// known-DEAD keys are stripped instead of riding, so a fossil copy on
 	// disk never resurrects through reads and any later write flushes it:
 	// `chat` (the old default-settings section, died with per-session
-	// models, owner 2026-09-28) and `models` (the model slots, owner
-	// 2026-11-14 — their account carried over into `claude` above).
+	// models, owner 2026-09-28), `models` (the model slots, owner
+	// 2026-11-14 — their account carried over into `claude` above) and
+	// `agent` (the tool switches, owner 2026-11-14 — every tool is always
+	// on, so a stored `agent.tools` switches nothing off).
 	for (const [key, value] of Object.entries(r)) {
-		if (key === "chat" || key === "models") continue;
+		if (key === "chat" || key === "models" || key === "agent") continue;
 		if (!(key in out)) out[key] = value;
 	}
 	return out;

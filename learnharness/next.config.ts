@@ -22,8 +22,9 @@ const nextConfig: NextConfig = {
 	// SECRETS (2026-10-08, caught in the payload audit): the same sweep
 	// ships the repo-root auth.json — the DEV BYOK key store — byte-identical
 	// into the DMG. The app no longer uses API keys, but a developer's old
-	// copy of that retired store may remain in the checkout. Excluded here; build-server.mjs also REFUSES
-	// to package any standalone still containing it. .env* belt-and-braces
+	// copy of that retired store may remain in the checkout, as may the removed
+	// ChatGPT sign-in's chatgpt-credentials.json. Excluded here; build-server.mjs
+	// also REFUSES to package any standalone still containing either. .env* belt-and-braces
 	// the same class. Next also copies loaded bare .env after tracing;
 	// the build-server refusal remains required even with these excludes.
 	//
