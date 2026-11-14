@@ -29,6 +29,7 @@ import { lessonOf, topicSpan } from "../components/study-home/lesson-facts.ts";
 import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, lessonTitle, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
+import { alsoHint } from "../components/study-home/agenda-rows/today-also.tsx";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { UnreadableLines } from "../components/study-home/unreadable-course.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
@@ -323,11 +324,17 @@ describe("Today", () => {
 		assert.equal(doc.querySelector('[data-slot="today-done"]')?.textContent, "Done today: Eigenvalues and eigenvectors, Rank practice");
 	});
 
-	it("past five lines, names the other courses on the last", () => {
+	it("past five lines, names the other lines on the last by their lesson, as a full line would, with the course and why in the tooltip", () => {
 		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
-		const doc = render(<Today rows={todayRows(many, [], TODAY)} done={[]} busy={false} onContinue={() => {}} />);
+		const rows = todayRows(many, [], TODAY);
+		const doc = render(<Today rows={rows} done={[]} busy={false} onContinue={() => {}} />);
 		assert.equal(doc.querySelectorAll('[data-slot="today-line"]').length, 4);
-		assert.match(doc.querySelector('[data-slot="today-also"]')?.textContent ?? "", /Also today:Course 4Course 5/);
+		const folded = [...doc.querySelectorAll('[data-slot="today-also"] button')];
+		assert.deepEqual(
+			folded.map((b) => b.textContent),
+			["Continue Bayes' rule", "Continue Bayes' rule"],
+		);
+		assert.deepEqual(rows.slice(4).map(alsoHint), ["Course 4. Next up", "Course 5. Next up"]);
 	});
 });
 
