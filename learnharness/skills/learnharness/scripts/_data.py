@@ -116,7 +116,7 @@ def read_chat(root: Path, session_id: str) -> dict[str, Any]:
 
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
     """Common CLI options precede the subcommand, as shown in SKILL.md."""
-    parser.add_argument("--data-dir", metavar="PATH", help="LearnHarness data root (contains chats/ and/or graph/); default: normal desktop location")
+    parser.add_argument("--data-dir", metavar="PATH", help="LearnHarness data root (contains chats/); default: normal desktop location")
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown", help="Output format (default: markdown)")
 
 
