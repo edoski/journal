@@ -944,6 +944,22 @@ describe("automatic continuation after recovery failure", () => {
 		assert.equal(m.getState().error, null);
 	});
 
+	it("an app that stops just after accepting his answer reads as a dropped connection too, and recovers the same way", async () => {
+		const bodies: string[] = [];
+		const m = model({ initialMessages: [question], fetch: async (url, init) => {
+			if (String(url) === "/api/chat") { bodies.push(String(init?.body)); return Response.json({ ok: true }); }
+			if (bodies.length === 1) throw new TypeError("Failed to fetch");
+			if (String(url).endsWith("/stream")) return sseResponse("[DONE]");
+			return Response.json({ messages: answered });
+		} });
+		await m.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.", "not \"Couldn't reach the app\": the app took his answer");
+		m.recoverDroppedStream();
+		m.setMessages(answered);
+		await m.continueIfOwed(answered);
+		assert.equal(JSON.parse(bodies.at(-1)!).input.type, "continue");
+	});
+
 	it("only a dropped stream recovers so: a failed reply still waits for him", async () => {
 		const bodies: string[] = [];
 		const m = model({ initialMessages: answered, initialError: "The reply could not be saved.", fetch: dietFetch({ onPost: (body) => bodies.push(body), stream: () => sseResponse("[DONE]") }) });

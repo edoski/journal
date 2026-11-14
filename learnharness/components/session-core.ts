@@ -554,13 +554,16 @@ export class SessionModel {
 		await this.resumeStream(true, false);
 	}
 
+	/** A view read of a turn the server owns. Failing to reach the app is a
+	 *  dropped connection to that turn, never a refused input: the turn
+	 *  was accepted, so the record decides what it still owes. */
 	private async fetchView(url: string, signal: AbortSignal, recoveringDrop: boolean): Promise<Response> {
 		try {
 			const res = await this.fetch(url, { signal });
 			if (recoveringDrop && !res.ok) throw new Error((await res.text()) || STREAM_DROPPED);
 			return res;
 		} catch (err) {
-			if (recoveringDrop && !signal.aborted) throw new StreamReadError(err);
+			if (!signal.aborted && (recoveringDrop || err instanceof TypeError)) throw new StreamReadError(err);
 			throw err;
 		}
 	}
@@ -656,7 +659,7 @@ export class SessionModel {
 				this.tail = this.tail.filter(m => !this.unconfirmedAnswers.has(m.id));
 				this.unconfirmedAnswers.clear();
 			});
-			this.setError(!allowRecovery && err instanceof StreamReadError ? STREAM_DROPPED : (err as Error).message);
+			this.setError(err instanceof StreamReadError ? STREAM_DROPPED : (err as Error).message);
 			this.setStatus("error");
 		}
 	}
