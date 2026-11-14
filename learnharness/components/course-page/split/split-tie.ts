@@ -133,16 +133,18 @@ export interface Surface extends Size {
 /**
  * The map's drawing surface in the map pane, which the map fits whole at
  * `zoom` (the scale `framedCamera` opens the course at), so it never moves
- * its own camera; the pane scrolls the surface instead. On an axis where
- * the course with `room` around it (and `tag` more above and below, the
- * room the map keeps for its "You are here" tag) fits the pane at that
- * scale, the surface is the pane's width, or the course's height from the
- * pane's top, with nothing to scroll; on one it overflows, the course and
- * `slackOf` its node on each side, at that scale. Pure.
+ * its own camera; the pane scrolls the surface instead. `room` (and `tag`
+ * more above and below, the room the map keeps for its "You are here" tag)
+ * is in the pane's pixels at any scale, as `framedCamera` keeps it, so the
+ * pane can scroll to every view the camera opens on. On an axis where the
+ * course at that scale with its room fits the pane, the surface is the
+ * pane's width, or the course's height from the pane's top, with nothing
+ * to scroll; on one it overflows, the course, its room and `slackOf` its
+ * node on each side at that scale. Pure.
  */
 export function surfaceOf(layout: TopicMapLayout, pane: Size, room: { x: number; y: number }, tag: number, zoom = 1): Surface {
-	const width = (layout.width + room.x * 2) * zoom;
-	const height = (layout.height + (room.y + tag) * 2) * zoom;
+	const width = layout.width * zoom + room.x * 2;
+	const height = layout.height * zoom + (room.y + tag) * 2;
 	const slack = slackOf(layout.node);
 	return {
 		width: width > pane.width ? Math.ceil(width + slack.x * 2 * zoom) : pane.width,

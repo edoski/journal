@@ -201,10 +201,12 @@ export const READABLE_ZOOM = 0.8;
 /** The furthest the map zooms out by hand. */
 export const MIN_ZOOM = 0.4;
 
-/** The scale at which the whole drawing, with `room` around it, fits a frame. */
+/** The scale at which the whole drawing, with `room` around it, fits a
+ *  frame. `room` is in the frame's pixels at any scale, as is every room
+ *  here: the frame's fade is drawn on the screen, not on the drawing. */
 export function wholeZoom(layout: TopicMapLayout, frame: { width: number; height: number }, room: { x: number; y: number }): number {
 	if (layout.width === 0 || layout.height === 0) return 1;
-	return Math.min(1, frame.width / (layout.width + room.x * 2), frame.height / (layout.height + room.y * 2));
+	return Math.max(0, Math.min(1, (frame.width - room.x * 2) / layout.width, (frame.height - room.y * 2) / layout.height));
 }
 
 type Frame = { width: number; height: number };
@@ -214,8 +216,8 @@ type Room = { x: number; y: number };
  *  frame never looks past the drawing and its room; a drawing shorter than
  *  the frame sits at its middle. */
 function along(at: number, size: number, frame: number, room: number, zoom: number): number {
-	if ((size + room * 2) * zoom <= frame) return (frame - size * zoom) / 2;
-	return Math.min(room * zoom, Math.max(frame - (size + room) * zoom, frame / 2 - at * zoom));
+	if (size * zoom + room * 2 <= frame) return (frame - size * zoom) / 2;
+	return Math.min(room, Math.max(frame - size * zoom - room, frame / 2 - at * zoom));
 }
 
 /** The camera that brings a point of the drawing as near the frame's
@@ -245,13 +247,28 @@ export function openingCamera(layout: TopicMapLayout, current: TopicHandle | nul
 /** The scales a map may open at when the whole course does not fit: full
  *  size, down to the floor where titles stay readable. */
 const FRAMED_ZOOMS = [1, 0.95, 0.9, 0.85, READABLE_ZOOM];
-/** What a view is worth, per topic: one wholly clear of the fade earns its
- *  place, more for a prerequisite of the topic it opens on, and most for a
- *  topic that needs it, where he goes next;
- *  one partly in the fade costs a little; one the frame's edge cuts where
- *  it shows costs most. Zooming out costs per step below full size, and
- *  each pixel of empty room shown past the drawing's room costs one. */
-const VIEW_WORTH = { whole: 450, before: 250, next: 900, faded: 120, cut: 2500, zoom: 3000 };
+/** What a view is worth, per topic, among those that cut as few cards and
+ *  show as many next topics whole (`ViewScore`): one wholly clear of
+ *  the fade earns its place, more for a prerequisite of the topic it opens
+ *  on, and most for a topic that needs it, where he goes next; one partly
+ *  in the fade costs a little. Zooming out costs per step below full size,
+ *  and each pixel of empty room shown past the drawing's room costs one. */
+const VIEW_WORTH = { whole: 450, before: 250, next: 900, faded: 120, zoom: 3000 };
+/** How an opening view ranks, in order: the fewest cards cut at the
+ *  frame's edge, none wherever the course allows (Edo, 14 Nov 2026: maps
+ *  open with nothing cut); then the most topics he goes next shown whole;
+ *  then the lowest `VIEW_WORTH` cost. A cut weighed against whole topics
+ *  let three clear neighbours outbid it. */
+interface ViewScore {
+	cut: number;
+	nextWhole: number;
+	cost: number;
+}
+function ranksAbove(a: ViewScore, b: ViewScore): boolean {
+	if (a.cut !== b.cut) return a.cut < b.cut;
+	if (a.nextWhole !== b.nextWhole) return a.nextWhole > b.nextWhole;
+	return a.cost < b.cost;
+}
 /** The empty room a view may show past the drawing's room on an axis the
  *  course overflows: one topic and its gap, so a topic at the course's
  *  edge can sit clear of the fade with the one beside it wholly out of
@@ -264,25 +281,31 @@ export function slackOf(node: NodeSize): { x: number; y: number } {
  *  (wholly past the frame's edge), cut (part of it shows, the frame's edge
  *  cuts the rest off: never acceptable on a map, faded or not), faded
  *  (wholly in the frame, partly under the fade) or clear of the fade.
- *  One pixel of slack on each test, since cameras are rounded. Pure. */
+ *  `slack` px of tolerance on each test: a pixel by default, since cameras
+ *  and scrolls are whole pixels. Pure. */
 export type CardFit = "out" | "cut" | "faded" | "clear";
-export function cardFit(box: { left: number; top: number; right: number; bottom: number }, frame: Frame, fade: Room): CardFit {
+export function cardFit(box: { left: number; top: number; right: number; bottom: number }, frame: Frame, fade: Room, slack = 1): CardFit {
 	const { left: l, top: t, right: r, bottom: b } = box;
-	if (r <= 1 || l >= frame.width - 1 || b <= 1 || t >= frame.height - 1) return "out";
-	if (l < -1 || r > frame.width + 1 || t < -1 || b > frame.height + 1) return "cut";
-	if (l < fade.x - 1 || r > frame.width - fade.x + 1 || t < fade.y - 1 || b > frame.height - fade.y + 1) return "faded";
+	if (r <= slack || l >= frame.width - slack || b <= slack || t >= frame.height - slack) return "out";
+	if (l < -slack || r > frame.width + slack || t < -slack || b > frame.height + slack) return "cut";
+	if (l < fade.x - slack || r > frame.width - fade.x + slack || t < fade.y - slack || b > frame.height - fade.y + slack) return "faded";
 	return "clear";
 }
+/** The tolerance an opening view is judged with: half of `cardFit`'s pixel,
+ *  so a page that scrolls to it, rounding by up to half a pixel more (the
+ *  course page, `scrollOfCamera`), still cuts nothing. */
+const OPENING_SLACK = 0.5;
 
 /**
  * Where a map opens (spec: topic-map.md, Behaviour): the whole course
  * when it fits the frame at a readable scale (`READABLE_ZOOM`); else the
  * view that frames `focus` (the first topic when null) clear of the fade,
- * with its tag above it, and around it as many whole topics as it can, the
- * topics that need it (where he goes next) first, then its prerequisites,
- * cutting as few as it can at the frame's edge (`cardFit`): at full size,
- * or as near it as the readable floor allows when a smaller scale shows
- * more. It may look past the drawing's room by one topic (`slackOf`).
+ * with its tag above it, cutting as few cards as it can at the frame's
+ * edge (`cardFit`, `ViewScore`), none wherever the course allows, and
+ * around it as many whole topics as it can, the topics that need it (where
+ * he goes next) first, then its prerequisites: at full size, or as near it
+ * as the readable floor allows when a smaller scale shows more. It may
+ * look past the drawing's room by one topic (`slackOf`).
  * `fade` is how far the frame fades in from its sides and from its top and
  * bottom; `tag` the room the current topic's tag takes above its node;
  * `fitsDown` where a course shorter than the frame sits, framed or whole.
@@ -292,7 +315,7 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 	const room = { x: fade.x, y: fade.y + tag };
 	const whole = wholeZoom(layout, frame, room);
 	const middle: Point = [layout.width / 2, layout.height / 2];
-	const atTop = (camera: Camera): Camera => (fitsDown === "top" && (layout.height + room.y * 2) * camera.zoom <= frame.height ? { ...camera, y: room.y * camera.zoom } : camera);
+	const atTop = (camera: Camera): Camera => (fitsDown === "top" && layout.height * camera.zoom + room.y * 2 <= frame.height ? { ...camera, y: room.y } : camera);
 	if (whole >= READABLE_ZOOM) return atTop(cameraAt(layout, middle, whole, frame, room));
 	const target = (focus && layout.topics.get(focus)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
 	if (!target) return cameraAt(layout, middle, 1, frame, room);
@@ -301,7 +324,7 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 	const { width: w, height: h } = layout.node;
 	const placed = [...layout.topics.values()];
 	const slack = slackOf(layout.node);
-	let best: { camera: Camera; cost: number } | null = null;
+	let best: { camera: Camera; score: ViewScore } | null = null;
 	for (const zoom of FRAMED_ZOOMS) {
 		/** One axis's candidates: the focus at the middle, and each topic's edges on the fade's inner edge and on the
 		 *  frame's edge, from inside and from outside, so a topic sits clear, wholly in the fade or wholly out of view;
@@ -309,8 +332,10 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 		 *  that fits. */
 		const axis = (at: (p: PlacedTopic) => number, size: number, span: number, f: number, extent: number, pad: number, slack: number, mid: number, top = false) => {
 			const drawn = extent * zoom;
-			if (drawn + pad * 2 <= span) return [Math.round(top ? pad * zoom : (span - drawn) / 2)];
-			const clamp = (v: number) => Math.round(Math.min(pad + slack * zoom, Math.max(span - drawn - pad - slack * zoom, v)));
+			if (drawn + pad * 2 <= span) return [Math.round(top ? pad : (span - drawn) / 2)];
+			// Rounded inward, so a page that scrolls the course with its room and slack can reach every candidate.
+			const [low, high] = [Math.ceil(span - drawn - pad - slack * zoom), Math.floor(pad + slack * zoom)];
+			const clamp = (v: number) => Math.min(high, Math.max(low, Math.round(v)));
 			const edges = (lo: number, hi: number) => [f - lo, span - f - hi, f - hi, span - f - lo, -lo, -hi, span - hi, span - lo];
 			return [...new Set([span / 2 - mid * zoom, ...placed.flatMap((p) => edges(at(p) * zoom, (at(p) + size) * zoom))].map(clamp))];
 		};
@@ -325,17 +350,18 @@ export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, 
 				// The focus wholly clear of the fade, its tag too (to the pixel: candidates are rounded).
 				if (left < fade.x - 1 || left + w * zoom > frame.width - fade.x + 1 || top - tag < fade.y - 1 || top + h * zoom > frame.height - fade.y + 1) continue;
 				const past = Math.max(0, x - room.x) + Math.max(0, frame.width - room.x - (x + layout.width * zoom)) + Math.max(0, y - room.y) + Math.max(0, frame.height - room.y - (y + layout.height * zoom));
-				let cost = (1 - zoom) * VIEW_WORTH.zoom + past + (Math.abs(x - centred.x) + Math.abs(y - centred.y)) / 4;
+				const score: ViewScore = { cut: 0, nextWhole: 0, cost: (1 - zoom) * VIEW_WORTH.zoom + past + (Math.abs(x - centred.x) + Math.abs(y - centred.y)) / 4 };
 				for (const p of placed) {
 					if (p === target) continue;
 					const l = p.x * zoom + x;
 					const t = p.y * zoom + y;
-					const fit = cardFit({ left: l, top: t, right: l + w * zoom, bottom: t + h * zoom }, frame, fade);
-					if (fit === "cut") cost += VIEW_WORTH.cut;
-					else if (fit === "faded") cost += VIEW_WORTH.faded;
-					else if (fit === "clear") cost -= VIEW_WORTH.whole + (before.has(p.handle) ? VIEW_WORTH.before : next.has(p.handle) ? VIEW_WORTH.next : 0);
+					const fit = cardFit({ left: l, top: t, right: l + w * zoom, bottom: t + h * zoom }, frame, fade, OPENING_SLACK);
+					if (fit === "cut") score.cut += 1;
+					if ((fit === "clear" || fit === "faded") && next.has(p.handle)) score.nextWhole += 1;
+					if (fit === "faded") score.cost += VIEW_WORTH.faded;
+					else if (fit === "clear") score.cost -= VIEW_WORTH.whole + (before.has(p.handle) ? VIEW_WORTH.before : next.has(p.handle) ? VIEW_WORTH.next : 0);
 				}
-				if (!best || cost < best.cost) best = { camera: { x, y, zoom }, cost };
+				if (!best || ranksAbove(score, best.score)) best = { camera: { x, y, zoom }, score };
 			}
 		}
 	}

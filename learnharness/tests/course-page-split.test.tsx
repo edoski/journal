@@ -248,12 +248,12 @@ describe("the map pane's surface and where it scrolls", () => {
 		assert.equal(surfaceOf({ ...layout, width: 224, height: 2000 }, { width: 600, height: 700 }, room, 20).width, 600, "a narrow course in the pane's middle");
 	});
 
-	it("draws the course at the scale it opens at: the pane's width and the course's height where it fits, with nothing to scroll", () => {
+	it("draws the course at the scale it opens at, its room in the pane's pixels: the pane's width and the course's height where it fits, with nothing to scroll", () => {
 		const layout = { ...LAYOUT, width: 744, height: 304 };
 		const surface = surfaceOf(layout, { width: 696, height: 692 }, room, 20, 0.8);
-		assert.deepEqual(surface, { width: 696, height: Math.floor((304 + 104) * 0.8), zoom: 0.8 });
+		assert.deepEqual(surface, { width: 696, height: Math.floor(304 * 0.8 + 104), zoom: 0.8 });
 		const wide = surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20, 0.8);
-		assert.equal(wide.width, Math.ceil((2000 + 96 + slackOf(LAYOUT.node).x * 2) * 0.8), "too wide: the course and its slack at that scale, to scroll");
+		assert.equal(wide.width, Math.ceil(2000 * 0.8 + 96 + slackOf(LAYOUT.node).x * 2 * 0.8), "too wide: the course and its slack at that scale, and its room, to scroll");
 	});
 
 	it("scrolls the pane to show the course as the camera frames it, inside the surface", () => {

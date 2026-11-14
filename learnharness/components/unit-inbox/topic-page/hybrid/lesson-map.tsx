@@ -151,18 +151,20 @@ function Flow({
 		setOpening(stepsCamera(layout, current, { width: frameWidth, height: frameHeight }, FADE));
 	}, [layout, current, frameWidth, frameHeight]);
 
-	// The plan and its room, and whatever more the opening view shows around a plan smaller than the frame.
+	// The plan and its room (in the frame's pixels, so the most the drawing needs at the smallest scale), and whatever
+	// more the opening view shows around a plan smaller than the frame.
 	const extent = useMemo<CoordinateExtent>(() => {
+		const [x, y] = [MARGIN.x / minZoom, MARGIN.y / minZoom];
 		const base: CoordinateExtent = [
-			[-MARGIN.x, -MARGIN.y],
-			[layout.width + MARGIN.x, layout.height + MARGIN.y],
+			[-x, -y],
+			[layout.width + x, layout.height + y],
 		];
 		if (!opening || frameWidth <= 0 || frameHeight <= 0) return base;
 		return [
 			[Math.min(base[0][0], -opening.x / opening.zoom), Math.min(base[0][1], -opening.y / opening.zoom)],
 			[Math.max(base[1][0], (frameWidth - opening.x) / opening.zoom), Math.max(base[1][1], (frameHeight - opening.y) / opening.zoom)],
 		];
-	}, [layout, opening, frameWidth, frameHeight]);
+	}, [layout, minZoom, opening, frameWidth, frameHeight]);
 
 	// Set once the extent above holds the view, so the camera is not pulled back inside the plan's own room.
 	const [placed, setPlaced] = useState(false);
