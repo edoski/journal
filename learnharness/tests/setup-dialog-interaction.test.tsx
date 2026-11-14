@@ -110,7 +110,6 @@ describe("setup polish interactions", () => {
 		assert.equal(element('[data-slot="dialog-title"]').textContent, "Sign in to Claude");
 		assert.ok(element('[data-testid="setup-dialog"]').textContent!.includes(`Lessons run on ${CLAUDE_MODEL.name} through your Claude plan.`));
 		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] [data-testid="claude-connection"]'));
-		assert.equal(document.querySelector('[data-testid="chatgpt-connection"]'), null, "ChatGPT runs no lesson");
 		assert.equal(document.querySelector('[data-testid="setup-key-input"]'), null, "no key field");
 	});
 

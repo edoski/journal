@@ -37,11 +37,10 @@ import { SettingsGroup, SettingsRow, SettingsSection } from "./controls.tsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { SubscriptionConnections } from "./subscription-connections.tsx";
+import { ClaudeConnectionRow } from "./claude-connection.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
-import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
@@ -77,12 +76,12 @@ export function SettingsDialogProvider({
 		setShow(true);
 	}, []);
 	return (
-		<ChatGPTUIProvider><DialogContext.Provider value={{ open }}>
+		<DialogContext.Provider value={{ open }}>
 			{children}
 			{show && (
 				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} />
 			)}
-		</DialogContext.Provider></ChatGPTUIProvider>
+		</DialogContext.Provider>
 	);
 }
 
@@ -224,7 +223,7 @@ export function SettingsDialogBody({
 							{active === "keys" && (
 								<SettingsSection title="Accounts" testid="section-keys">
 									<SettingsGroup label="Subscriptions" testid="group-subscriptions">
-										<SubscriptionConnections />
+										<ClaudeConnectionRow />
 									</SettingsGroup>
 								</SettingsSection>
 							)}

@@ -45,7 +45,7 @@ describe("LH_DATA_DIR seam", () => {
 		}
 	});
 
-	it("unset in a plain dev process = the repo data/, and the ChatGPT sign-in in the repo root", () => {
+	it("unset in a plain dev process = the repo data/, and the old sign-in files in the repo root", () => {
 		const parsed = resolveInChild({});
 		assert.equal(parsed.data, path.join(REPO_ROOT, "data"));
 		assert.equal(parsed.chats, path.join(REPO_ROOT, "data", "chats"));

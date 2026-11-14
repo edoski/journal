@@ -188,7 +188,7 @@ flowchart LR
 
     subgraph DRIVEN["DRIVEN ADAPTERS — outbound"]
         FS["fs stores — src/store (data/)"]
-        LLM["LLM engines — Claude (claude CLI) / ChatGPT via piEngineForSpec"]
+        LLM["LLM engine — Claude (claude CLI) via claudeEngine"]
         HEAD["headless Chrome — demo verify · SVG render"]
         WEB["web tools — model-native search + Readability/Jina (researcher)"]
     end
@@ -384,11 +384,11 @@ Every session belongs to one course of the learner's `learning` engine, which ow
 ```mermaid
 flowchart LR
     subgraph DESKTOP["Electron app (production)"]
-        MAIN["Electron main (electron/main.cjs)<br/>launcher + credential/security owner<br/>origin-pinned controls · private child IPC"] -->|"spawn: ELECTRON_RUN_AS_NODE,<br/>loopback port, LH_DATA_DIR=userData/data"| NEXT["standalone Next server (child)<br/>ALL app logic: turns · extraction · jobs · graph"]
+        MAIN["Electron main (electron/main.cjs)<br/>launcher + security owner<br/>origin-pinned controls"] -->|"spawn: ELECTRON_RUN_AS_NODE,<br/>loopback port, LH_DATA_DIR=userData/data"| NEXT["standalone Next server (child)<br/>ALL app logic: turns · extraction · jobs · graph"]
         MAIN -->|"loadURL, sandboxed renderer"| REND["Browser renderer (components/)<br/>fetch/WebSocket to own origin only"]
     end
     subgraph OUTSIDE["outside the process"]
-        OR["Claude (user's own claude CLI) · ChatGPT (in-app sign-in)"]
+        OR["Claude (user's own claude CLI)"]
         GCSE["page fetch / Jina (researcher tools)"]
         CHROME["system Chrome (headless: demo verify · SVG render)"]
         DISK["data/ ledgers (via LH_DATA_DIR seam)"]
@@ -400,17 +400,13 @@ flowchart LR
     REND -->|"fetch /api/*"| NEXT
 ```
 
-The Electron main is a launcher + credential/security guard, never a host for teaching or inference logic: single-instance lock, deny-by-default permissions, origin-pinned navigation, sandboxed renderer. All Next.js code runs unchanged in a child process (`output: "standalone"`), relocated by the `LH_DATA_DIR` seam (also the test seam — `data-dir-seam.test.ts` covers it, including a fresh-child-process case). The build hard-fails if repo `data/` would leak into the bundle or if prompt assets fall out of the trace (`scripts/build-server.mjs`).
+The Electron main is a launcher + security guard, never a host for teaching or inference logic: single-instance lock, deny-by-default permissions, origin-pinned navigation, sandboxed renderer. All Next.js code runs unchanged in a child process (`output: "standalone"`), relocated by the `LH_DATA_DIR` seam (also the test seam — `data-dir-seam.test.ts` covers it, including a fresh-child-process case). The build hard-fails if repo `data/` would leak into the bundle or if prompt assets fall out of the trace (`scripts/build-server.mjs`).
 
 ---
 
-### 8.1 Subscription connection boundary
+### 8.1 Claude connection boundary
 
-`electron/chatgpt.cjs` owns the verified-account ChatGPT authentication, storage and revocation. In packaged desktop mode Electron main alone owns the durable OAuth credentials and serialized refresh; the renderer gets projected status and controls over origin-pinned IPC, and the privately launched server child receives credential-free catalogs and scoped request auth, never refresh tokens. The persisted route `chatgpt` never falls back to an API route.
-
-For ordinary Next web/dev, `src/server/web-subscriptions.ts` composes the same plain-Node controller into one lazy process-global credential owner in `CREDENTIALS_DIR`. The server injects the private transport through `src/agent/subscription-runtime.ts`; the agent layer never imports the server layer. Existing scoped leases, authority revisions and foreground/background abort listeners work through that transport, without exposing an HTTP token/lease operation. `src/server/web-subscription-http.ts` exposes only same-origin status/control operations. Generic `subscriptions-changed` notifications use the existing SSE notify→fetch channel; opaque one-use browser actions redirect to provider pages without putting authorization URLs in app JSON. Browser adapters preserve the UI bridge contracts; Electron dev uses the web owner with a narrow system-browser opener. Desktop markers fail closed rather than falling back to web credentials. This is the existing shared developer-server trust model, not user authentication or DNS-rebinding protection; LAN behavior is unchanged. Only one server process may own an auth directory. See [development](development.md#subscription-connections-in-webdev) for storage, browser locality and access limitations.
-
-`subscription-request-cycle.ts` is the shared admission/automatic-input recovery state machine; the old ChatGPT module is its compatibility export. Background consent is default ON, with foreground-preserving cancellation and queue ownership retained on no-dispatch. Native usage rejected before dispatch is transiently excluded from helper usage collectors, without adding persisted provenance fields. Catalogs and read-time pricing preserve the selected connection: subscription use displays compact provider labels, API dollars remain dollars, and mixed usage joins both without estimating subscription dollars or claiming detected tiers/allowances.
+Every agent runs on the user's Claude plan; there is no other connection. Background work (wakes, digests, map builds) asks no separate consent: `src/agent/subscription-connections.ts` allows every provider.
 
 The Claude subscription holds no app credential. `src/agent/claude-stream.ts` is a pi `StreamFunction` that runs the user's own `claude` CLI once per model call: it replays the transcript as one user message, declares the app's tools through an inline MCP server that never answers a call, and kills the CLI at the first tool_use so pi's loop still runs every tool. The child gets the user's environment minus every `ANTHROPIC_*`, `*_API_KEY` and `*_AUTH_TOKEN` variable and the Claude Code credential and provider switches. If Claude Code reports an API key source at startup, the CLI is killed (best effort: its first request may already be in flight). Connection status comes from `claude auth status` (`src/agent/claude-connection.ts`), so its "key present" is that sign-in.
 

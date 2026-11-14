@@ -6,7 +6,7 @@ Why LearnHarness keeps its own lesson records and its own compaction instead of 
 
 Each lesson is one JSON file, `data/chats/<id>.json` (under `LH_DATA_DIR`; in the desktop app, Electron's `userData/data`). `src/store/chats.ts` is its only writer and writes it atomically. The file holds the transcript as pi-agent-core messages (`LhMessage`: user, assistant, tool results, plus the app's markers for questions, plans, mode handoffs and compaction), the plan tree, and two usage logs (`turns`, `extractions`). Opening a lesson reads that file; every page (the lesson, the topic page, the sidebar, the calendar) derives its view from it.
 
-This is the app's own format, not Claude Code's. Claude Code writes `~/.claude/projects/<project>/<session>.jsonl`, and its docs call that format "internal to Claude Code and changes between versions, so scripts that parse these files directly can break on any release" (code.claude.com/docs/en/sessions). The Agent SDK reads the same files through `listSessions` and `getSessionMessages`. Neither stores the app's questions, plans or attempts, and neither covers the ChatGPT path. Keep the app's record as the one source of truth.
+This is the app's own format, not Claude Code's. Claude Code writes `~/.claude/projects/<project>/<session>.jsonl`, and its docs call that format "internal to Claude Code and changes between versions, so scripts that parse these files directly can break on any release" (code.claude.com/docs/en/sessions). The Agent SDK reads the same files through `listSessions` and `getSessionMessages`. Neither stores the app's questions, plans or attempts. Keep the app's record as the one source of truth.
 
 ## How a Claude reply runs today
 
@@ -19,7 +19,7 @@ Caching: Claude Code caches automatically, with a one-hour lifetime for `-p` run
 Possible, not clean. What the CLI offers: `--session-id`, `--resume <id>`, `--fork-session`; auto-compact in `-p` and the SDK with a `compact_boundary` event; the same one-hour cache. What moving would mean:
 
 1. **Tools.** A resumed session would end on the `tool_use` the app killed. The app would have to stop killing the CLI and answer tool calls through the MCP server (or stream-json input) instead of pi's loop: a rewrite of `claude-stream.ts` and of how every tool runs.
-2. **Two transcripts.** The app's record still drives every page and the ChatGPT path, so the lesson would live twice, and Claude Code's compaction summary would be invisible to the app's views.
+2. **Two transcripts.** The app's record still drives every page, so the lesson would live twice, and Claude Code's compaction summary would be invisible to the app's views.
 3. **Edit and retry.** The app rewrites history (retry a failed turn, recover a malformed question, dismiss a problem). The CLI has no resume-at-message; only the SDK's `resumeSessionAt` and `forkSession(upToMessageId)` can rewind, so each edit would fork a new session.
 4. **Model and prompt changes.** A resumed session keeps its system prompt until it compacts, and a model switch re-reads the whole history uncached (prompt-caching, "Switching models").
 5. **Usage.** `--resume` re-sends the full history each turn just as replay does (prompt-caching, "How the cache is organized"); only the cache match could differ.

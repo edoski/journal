@@ -56,8 +56,9 @@ if (exists(leakedData)) {
 // (the DEV BYOK key store, 0600) byte-identical into the DMG (caught in
 // the 2026-10-08 payload audit; excluded in next.config.ts — this guard
 // makes a regression loud instead of silent).
-const subscriptionSecrets = fs.readdirSync(STANDALONE).filter((name) => /^chatgpt-credentials\.json/.test(name));
-for (const secret of ["auth.json", ...subscriptionSecrets, ".env", ".env.local"]) {
+// The removed ChatGPT sign-in's file may still sit in the checkout.
+const retiredSignIn = fs.readdirSync(STANDALONE).filter((name) => /^chatgpt-credentials\.json/.test(name));
+for (const secret of ["auth.json", ...retiredSignIn, ".env", ".env.local"]) {
 	if (exists(path.join(STANDALONE, secret))) {
 		console.error(`[build-server] REFUSING: standalone contains ${secret} — dev secrets would ship in the app.`);
 		console.error("             Check outputFileTracingExcludes in next.config.ts.");

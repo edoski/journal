@@ -13,11 +13,7 @@ export interface SessionPricing {
 	turnCosts: Record<string, number | null>;
 }
 
-export function isChatGPTPlan(model: string | undefined): boolean {
-	return model?.startsWith("chatgpt:") === true;
-}
 export function subscriptionLabel(model: string | undefined): string | undefined {
-	if (isChatGPTPlan(model)) return "ChatGPT";
 	return model?.includes(":") && isClaudeProvider(model.slice(0, model.indexOf(":"))) ? CLAUDE_SUBSCRIPTION.label : undefined;
 }
 export function isSubscriptionModel(model: string | undefined): boolean { return subscriptionLabel(model) !== undefined; }
