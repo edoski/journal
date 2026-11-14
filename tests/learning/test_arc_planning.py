@@ -183,3 +183,32 @@ def test_the_final_review_is_as_long_as_the_topics_the_exam_examines() -> None:
     short = capacity.final_review_days(small, [], reviews, MONDAY)
     long = capacity.final_review_days(whole, [], reviews, MONDAY)
     assert short is not None and long is not None and short < long
+
+
+# --- a course that takes no questions ----------------------------------------
+
+BRANCHES = {
+    "gtm-site": {"arc": "gtm"},
+    "gtm-ops": {"arc": "gtm", "needs": ["gtm-site"]},
+    "eve-api": {"arc": "eve"},
+    "eve-ops": {"arc": "eve", "needs": ["eve-api"]},
+}
+
+
+def branches() -> dict[str, Any]:
+    patch = {
+        "preferences": {"questions": "none"},
+        "arcs": {"gtm": arc("GTM"), "eve": arc("Eve")},
+        "topics": BRANCHES,
+        "path": {"order": list(BRANCHES), "arcs": ["gtm", "eve"]},
+        "arc_change": REASON,
+    }
+    return save(schema.empty(), patch, MONDAY)
+
+
+def test_a_course_that_takes_no_questions_builds_on_what_was_taught() -> None:
+    record = taught(branches(), ["gtm-site"], MONDAY)
+    assert "review" not in record["topics"]["gtm-site"], "no first retrieval"
+    result = plan({"c": record}, on(1), 10, week(10, 1))
+    assert set(starts(result)) == {"gtm-ops", "eve-api", "eve-ops"}
+    assert all(not day["reviews"] for day in result.days["c"]), "nothing falls due"

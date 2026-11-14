@@ -129,6 +129,7 @@ class _Course:
     replayed: dict[str, progress.Replay]
     examined: frozenset[str] | None
     scope: frozenset[str] | None
+    asks: bool
     days: list[dict[str, Any]] = field(default_factory=list)
     introduced: set[str] = field(default_factory=set)
     projected: set[str] = field(default_factory=set)
@@ -159,6 +160,7 @@ class _Course:
             replayed,
             arc_rules.examined(record),
             progress.exam_topics(record, untaught),
+            progress.asks(record),
             gaps=_gaps(record, set(untaught)),
         )
 
@@ -197,8 +199,9 @@ class _Course:
         return str(self.record.get("title") or self.name)
 
     def due_items(self, day: date) -> list[dict[str, Any]]:
-        """The reviews due on ``day``, in the course's own order."""
-        if self.exam is not None and self.exam.day == day:
+        """The reviews due on ``day``, in the course's own order. A course that
+        takes no questions has none."""
+        if not self.asks or (self.exam is not None and self.exam.day == day):
             return []
         items = progress.due(
             self.record,
@@ -302,12 +305,23 @@ class _Course:
             and self.tier(topic, day) == EXAM_AHEAD
         )
 
+    def met(self, need: str) -> bool:
+        """A prerequisite he can build on: solid, or, in a course that takes no
+        questions, where nothing can show it solid, taught."""
+        if not self.asks:
+            return self.levels[need]["level"] != "new"
+        return solid(self.levels[need])
+
     def ready(self, topic: str) -> bool:
-        """Its prerequisites are solid, and no competing method is half-learned."""
+        """Its prerequisites are met, and no competing method is half-learned
+        (in a course that takes no questions, nothing can show one is)."""
         needs = progress.needs(self.record, topic)
-        return all(solid(self.levels[need]) for need in needs) and not any(
-            self.levels[other]["level"] != "new" and not solid(self.levels[other])
-            for other in self.partners[topic]
+        return all(self.met(need) for need in needs) and not (
+            self.asks
+            and any(
+                self.levels[other]["level"] != "new" and not solid(self.levels[other])
+                for other in self.partners[topic]
+            )
         )
 
     def _set_due(self, topic: str, base: date, days: int, *, solid: bool) -> None:
@@ -363,7 +377,8 @@ class _Course:
             "level": "introduced",
             "last": {"date": day.isoformat()},
         }
-        self._set_due(topic, day, progress.FIRST_RETRIEVAL_DAYS, solid=False)
+        if self.asks:
+            self._set_due(topic, day, progress.FIRST_RETRIEVAL_DAYS, solid=False)
 
     def related(self, topic: str, started: list[str]) -> bool:
         """Whether it belongs with one of the topics ``started`` today: one

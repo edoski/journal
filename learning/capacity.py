@@ -203,6 +203,7 @@ def _new_short(
     }
     order = progress.path_order(record)
     partners = progress.contrasts(record)
+    asks = progress.asks(record)
     short: set[date] = set()
     for day in days:
         if exam.day <= day:
@@ -219,6 +220,8 @@ def _new_short(
             continue
 
         def solid(key: str, day: date = day) -> bool:
+            if not asks:
+                return starts.get(key, day) < day
             return _solid_before(replayed[key], day)
 
         ready = [
@@ -266,7 +269,8 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
     for record, replays in zip(records, replayed, strict=True):
         exam_of = progress.examining(record)
         for key, replay in progress.replays({**record, "exam": {}}).items():
-            left |= _reviews_left(replay, exam_of(key), today)
+            if progress.asks(record):
+                left |= _reviews_left(replay, exam_of(key), today)
         short |= _new_short(record, replays, week.planned, week.study)
     return {
         day: Done(

@@ -159,6 +159,14 @@ def exam_topics(
     return frozenset(scope)
 
 
+def asks(record: dict[str, Any]) -> bool:
+    """Whether the course takes questions. One whose ``questions`` preference
+    is "none" is studied without being asked: no answer can show a topic
+    solid, so a taught topic is as far as it goes, and nothing falls due."""
+    choice: str | None = record["preferences"].get(preferences.QUESTIONS)
+    return choice != "none"
+
+
 def unplanned(record: dict[str, Any]) -> bool:
     """An exam whose final review the plan has yet to read: no course
     preference sets its length and it has not begun."""
@@ -818,6 +826,8 @@ def _first_retrievals(
     histories: dict[str, _History],
     scheduled: Scheduled,
 ) -> None:
+    if not asks(record):
+        return
     exam_of = examining(record)
     for key in changes.introduced:
         topic = record["topics"].get(key)
