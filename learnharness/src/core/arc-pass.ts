@@ -184,13 +184,17 @@ function settledNeeds(view: Pick<MapCourseView, "topics">, diffs: readonly EdgeD
 	return needs;
 }
 
+/** The reason the edges event in the arc log gives. */
+export const EDGES_REASON = "the prerequisite test, answered for every stored edge against the material, before the topics are grouped into arcs";
+
 /**
  * The save that applies `diffs` to the record as it is now (`view`, read at
  * save time): each touched topic's needs as stored now, less its drops, plus
  * its adds, so a need added since the agent read the course stays. A drop of
  * an edge already gone, or an add whose topic is gone, is skipped; so is an
- * add that would close a loop with what is stored now. Null when nothing
- * changes. Pure.
+ * add that would close a loop with what is stored now. Its `arc_change.edges`
+ * logs each applied change, with its reason, as one `edges` event. Null when
+ * nothing changes. Pure.
  */
 export function edgeChanges(diffs: readonly EdgeDiff[], view: Pick<MapCourseView, "topics">): { changes: Json; applied: EdgeDiff[]; skipped: EdgeDiff[] } | null {
 	const needs = new Map(Object.entries(view.topics).map(([k, t]) => [k, [...t.needs]]));
@@ -214,7 +218,14 @@ export function edgeChanges(diffs: readonly EdgeDiff[], view: Pick<MapCourseView
 	}
 	const touched = [...new Set(applied.map((d) => d.topic))];
 	if (touched.length === 0) return null;
-	return { changes: { topics: Object.fromEntries(touched.map((k) => [k, { needs: needs.get(k)! }])) }, applied, skipped };
+	return {
+		changes: {
+			topics: Object.fromEntries(touched.map((k) => [k, { needs: needs.get(k)! }])),
+			arc_change: { reason: EDGES_REASON, edges: applied.map((d) => ({ topic: d.topic, need: d.need, change: d.change, reason: d.reason })) },
+		},
+		applied,
+		skipped,
+	};
 }
 
 /** Each proposed edge change read against a cut: an added edge whose
@@ -228,10 +239,13 @@ export function againstCut(diffs: readonly EdgeDiff[], topicArc: Readonly<Record
 	});
 }
 
-/** The edge changes in one line, for the formation's reason: "dropped
- *  "riemann-sums" needs "derivative" (…); added …". */
-export function edgeWords(diffs: readonly EdgeDiff[]): string {
-	return diffs.map((d) => `${d.change === "drop" ? "dropped" : "added"} "${d.topic}" needs "${d.need}" (${d.reason})`).join("; ");
+/** The index in the record's arc log of its latest `edges` event: the one
+ *  a formation refers to as `edges_entry`. Pure. */
+export function lastEdgesEntry(record: unknown): number | undefined {
+	const log = obj(record).arc_log;
+	if (!Array.isArray(log)) return undefined;
+	const at = log.findLastIndex((e) => obj(e).kind === "edges");
+	return at < 0 ? undefined : at;
 }
 
 // ─── step 2: the cut ─────────────────────────────────────────────────────────
@@ -398,10 +412,10 @@ export interface Formation {
  *   ever: an edge the cut doubts goes in its note.
  * - `exam.arcs` and `exam.leaves_out` when the answer states the scope and
  *   the course has an exam date.
- * - `arc_change`: the basis, the edges settled first, and `asked` when his
- *   words are given.
+ * - `arc_change`: the basis, `edges_entry` naming the log's edges event the
+ *   cut ran on, and `asked` when his words are given.
  */
-export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { edges?: string; asked?: string; reason?: string } = {}): Formation | null {
+export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { edgesEntry?: number; asked?: string; reason?: string } = {}): Formation | null {
 	if (submit.none?.trim()) return null;
 	const exists = (t: string) => t in view.topics;
 	const arcs = submit.arcs.map((a) => ({ ...a, topics: a.topics.filter(exists) }));
@@ -434,7 +448,7 @@ export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { ed
 		const left = (submit.leavesOut ?? []).filter(exists);
 		if (left.length > 0) exam.leaves_out = left;
 	}
-	const reason = [extra.reason, submit.basis.trim(), extra.edges ? `edges settled first: ${extra.edges}` : ""].filter(Boolean).join("; ");
+	const reason = [extra.reason, submit.basis.trim()].filter(Boolean).join("; ");
 	const changes: Json = {
 		arcs: Object.fromEntries(
 			arcs.map((a) => {
@@ -445,7 +459,7 @@ export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { ed
 		topics,
 		path: { arcs: handles, order },
 		...(Object.keys(exam).length > 0 ? { exam } : {}),
-		arc_change: { reason, ...(extra.asked ? { asked: extra.asked } : {}) },
+		arc_change: { reason, ...(extra.edgesEntry !== undefined ? { edges_entry: extra.edgesEntry } : {}), ...(extra.asked ? { asked: extra.asked } : {}) },
 	};
 	return { changes, stripped, gone, placedByEngine: Object.keys(view.topics).filter((t) => !placed.has(t)) };
 }

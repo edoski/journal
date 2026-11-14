@@ -19,6 +19,7 @@ import {
 	arcPassChanges,
 	arcPassProblems,
 	doubtNote,
+	EDGES_REASON,
 	edgeChanges,
 	edgeDiffs,
 	edgeProblems,
@@ -109,7 +110,11 @@ describe("the edge step", () => {
 		const diffs = edgeDiffs(all);
 		const now = view({ ...CALC, riemann: topic("Riemann sums", ["limits", "chain", "continuity"]) });
 		const merged = edgeChanges(diffs, now)!;
-		assert.deepEqual(merged.changes, { topics: { riemann: { needs: ["limits", "continuity"] }, chain: { needs: ["derivative", "continuity"] } } });
+		assert.deepEqual(merged.changes.topics, { riemann: { needs: ["limits", "continuity"] }, chain: { needs: ["derivative", "continuity"] } });
+		assert.deepEqual(merged.changes.arc_change, {
+			reason: EDGES_REASON,
+			edges: merged.applied.map(({ topic, need, change, reason }) => ({ topic, need, change, reason })),
+		}, "the save logs each applied change, with its reason, as one edges event");
 		assert.deepEqual(
 			merged.applied.map((d) => `${d.change} ${d.topic}<-${d.need}`),
 			["drop riemann<-chain", "add chain<-continuity"],
@@ -195,12 +200,12 @@ describe("the cut's shape rules", () => {
 	it("re-derives on the record read at save time: a topic added since gets no arc, one gone is left out, and the path reads arc by arc", () => {
 		const now = { ...CALC, implicit: topic("Implicit differentiation", ["chain"]) };
 		delete (now as Partial<typeof now>).continuity;
-		const formation = arcPassChanges(good, view(now, { order: ["limits", "derivative", "implicit", "chain", "riemann"] }), { edges: 'dropped "riemann" needs "chain" (x)', asked: "copy run" })!;
+		const formation = arcPassChanges(good, view(now, { order: ["limits", "derivative", "implicit", "chain", "riemann"] }), { edgesEntry: 0, asked: "copy run" })!;
 		assert.deepEqual(formation.gone, ["continuity"]);
 		assert.deepEqual(formation.placedByEngine, ["implicit"]);
 		assert.deepEqual(Object.keys(formation.changes.topics as object), ["limits", "derivative", "chain", "riemann"]);
 		assert.deepEqual(formation.changes.path, { arcs: ["limits-continuity", "derivatives"], order: ["limits", "derivative", "chain", "riemann", "implicit"] });
-		assert.deepEqual(formation.changes.arc_change, { reason: 'the book\'s chapters 2 and 3; edges settled first: dropped "riemann" needs "chain" (x)', asked: "copy run" });
+		assert.deepEqual(formation.changes.arc_change, { reason: "the book's chapters 2 and 3", edges_entry: 0, asked: "copy run" });
 	});
 });
 
@@ -364,7 +369,13 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		);
 		const cutSave = log.find((e) => e.kind === "saved" && e.step === "cut") as { changes: { topics: Record<string, object> } };
 		for (const t of Object.values(cutSave.changes.topics)) assert.equal("needs" in t, false);
-		assert.match(r.arc_log[0].reason, /edges settled first: dropped "riemann" needs "chain"/);
+		assert.deepEqual(
+			r.arc_log.map((e: { kind: string }) => e.kind),
+			["edges", "formed"],
+		);
+		assert.deepEqual(r.arc_log[0].edges, [{ topic: "riemann", need: "chain", change: "drop", reason: "a Riemann sum needs no derivative" }]);
+		assert.equal(r.arc_log[1].edges_entry, 0, "the formation refers to the edges it was cut on");
+		assert.doesNotMatch(r.arc_log[1].reason, /riemann/, "the formation's reason carries no edges");
 		const report = result.status === "formed" ? (result.report as { backward: unknown[] }) : null;
 		assert.deepEqual(report?.backward, []);
 	});
@@ -379,6 +390,7 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		assert.deepEqual(record(dir).topics.riemann.needs, ["limits", "chain"], "proposed, not applied");
 		assert.equal(result.status === "formed" && result.edges.diffs.length, 1);
 		assert.deepEqual(result.status === "formed" && result.edges.applied, []);
+		assert.deepEqual(record(dir).arc_log.map((e: Record<string, unknown>) => [e.kind, "edges_entry" in e]), [["formed", false]], "nothing settled, nothing referred to");
 	});
 
 	it("a course he has studied takes arcs only with words in asked", async () => {
