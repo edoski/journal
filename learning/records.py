@@ -1,5 +1,9 @@
 """The course record: load it, save a patch (returning a receipt), forget items.
 
+A course is read with the plan: its exam's final review comes from his pace
+across every course as the records now show it (``capacity.final_reviews``),
+so a load and a save each read it from the other courses too.
+
 Writes run under the record lock on the latest content; two sessions editing the
 same field resolve as last writer wins. A save validates the patch before taking
 the lock, applies it, settles its arcs (placing new topics and guarding re-cuts),
@@ -13,7 +17,6 @@ of ``resume`` dropping entries later.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date
 from typing import Any
 
 from learning import arcs, capacity, clock, packing, preferences, progress
@@ -56,9 +59,58 @@ def _readable(workspace: Workspace, stored: dict[str, Any] | None) -> dict[str, 
         ) from error
 
 
-def load(workspace: Workspace) -> dict[str, Any]:
-    """The validated course; a missing ``course.json`` is an empty course."""
+def read(workspace: Workspace) -> dict[str, Any]:
+    """The validated stored course; a missing ``course.json`` is an empty course."""
     return _readable(workspace, storage.load(workspace.record))
+
+
+def courses(workspace: Workspace | None) -> list[Workspace]:
+    """Registered workspaces with a course, plus the selected one, by directory.
+
+    A selected workspace outside the registry, such as a private session over
+    registered material, stands in for the workspaces that study that material.
+    """
+    chosen = {str(item.directory): item for item in workspaces.registered()}
+    if workspace is not None and str(workspace.directory) not in chosen:
+        chosen = {
+            key: item
+            for key, item in chosen.items()
+            if item.sources != workspace.sources
+        }
+        chosen[str(workspace.directory)] = workspace
+    return [chosen[key] for key in sorted(chosen) if chosen[key].record.is_file()]
+
+
+def _others(workspace: Workspace) -> dict[str, dict[str, Any]]:
+    """Every other course's stored record that can be read, by directory: his
+    pace is learned from all of them, and a nearer exam's final review comes
+    first."""
+    others = {}
+    for other in courses(workspace):
+        if other.directory == workspace.directory:
+            continue
+        try:
+            others[str(other.directory)] = read(other)
+        except (ValueError, OSError):
+            continue
+    return others
+
+
+def planned(
+    workspace: Workspace,
+    record: dict[str, Any],
+    others: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """The course record read with the plan (``capacity.final_reviews``)."""
+    others = _others(workspace) if others is None else others
+    name = str(workspace.directory)
+    return capacity.final_reviews({**others, name: record}, clock.today())[name]
+
+
+def load(workspace: Workspace) -> dict[str, Any]:
+    """The validated course read with the plan; a missing ``course.json`` is
+    an empty course."""
+    return planned(workspace, read(workspace))
 
 
 def global_preferences() -> dict[str, str]:
@@ -131,30 +183,6 @@ def _placed(record: dict[str, Any], created: set[str]) -> dict[str, Any] | None:
     return placed or None
 
 
-def _others(workspace: Workspace) -> list[dict[str, Any]]:
-    """Every other registered course's record that can be read: his pace is
-    learned from all of them."""
-    others = []
-    for other in workspaces.registered():
-        if other.directory == workspace.directory or not other.record.is_file():
-            continue
-        try:
-            others.append(load(other))
-        except (ValueError, OSError):
-            continue
-    return others
-
-
-def _lead(
-    record: dict[str, Any], others: list[dict[str, Any]], today: date
-) -> int | None:
-    """The final review's length his pace asks for, with an exam date."""
-    if not record.get("exam", {}).get("date"):
-        return None
-    week = capacity.of([*others, record], today)
-    return capacity.final_review_days(record, others, week, today)
-
-
 def _reviewed(record: dict[str, Any], keys: list[str]) -> list[str]:
     """The topics whose due review the new answers counted as: the ones the
     engine had due when each was saved (``due_topics``). An answer on a topic
@@ -188,22 +216,26 @@ def save(workspace: Workspace, patch: Any, *, check: bool = False) -> dict[str, 
     final: dict[str, Any] = {}
     levels: dict[str, Any] = {}
     known: set[str] = set()
+    shown: dict[str, Any] = {}
     arcs_placed: dict[str, str] = {}
-    others = _others(workspace) if changes else []
+    others = _others(workspace) if changes else {}
 
     def transform(stored: dict[str, Any]) -> dict[str, Any]:
-        nonlocal outcome, scheduled, final, levels, known, arcs_placed
+        nonlocal outcome, scheduled, final, shown, levels, known, arcs_placed
         before = _readable(workspace, stored)
         known = set(before["topics"])
-        patched, outcome = schema.apply_patch(before, changes, today=today, now=now)
-        arcs_placed = arcs.settle(before, patched, changes, outcome, today)
-        lead = _lead(patched, others, today)
-        planned, scheduled = progress.schedule(patched, outcome, today, lead)
-        final = schema.validate_record(planned)
+        seen = planned(workspace, before, others)
+        patched, outcome = schema.apply_patch(seen, changes, today=today, now=now)
+        arcs_placed = arcs.settle(seen, patched, changes, outcome, today)
+        if outcome.exam_moved:
+            name = str(workspace.directory)
+            patched = capacity.replanned({**others, name: patched}, name, today)
+        shown, scheduled = progress.schedule(patched, outcome, today)
+        final = schema.validate_record(progress.begun(shown, today))
         _check_pinned(before, final)
         if final == before:
             return stored
-        levels = _levels(before, final)
+        levels = _levels(seen, shown)
         return final
 
     if check:
@@ -221,6 +253,7 @@ def save(workspace: Workspace, patch: Any, *, check: bool = False) -> dict[str, 
     else:
         record, changed = storage.load(workspace.record) or {}, False
         final = _readable(workspace, record)
+        shown = planned(workspace, final)
     if global_changes is not None:
         saved = _global(lambda: preferences.save_global(global_changes))
         changed = saved != previous or changed
@@ -235,7 +268,7 @@ def save(workspace: Workspace, patch: Any, *, check: bool = False) -> dict[str, 
         "levels": levels,
         "focus": final.get("focus"),
         "path_current": final.get("path", {}).get("current"),
-        "due_count": len(progress.due(final, today)),
+        "due_count": len(progress.due(shown, today)),
         "notes": scheduled.notes,
     }
     if placed := _placed(final, set(changes.get("topics") or ()) - known):

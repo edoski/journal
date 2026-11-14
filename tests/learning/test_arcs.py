@@ -104,8 +104,8 @@ def unreadable(workspace: Workspace, record: dict[str, Any], part: str) -> None:
 
 
 def set_by_him(exam: dict[str, Any]) -> dict[str, Any]:
-    """The exam's fields a save set, without the length the engine derives."""
-    return {k: v for k, v in exam.items() if k != "final_review_days"}
+    """The exam's fields a save set, without the final review the plan reads."""
+    return {k: v for k, v in exam.items() if k != "final_review"}
 
 
 def record_with(**changes: Any) -> dict[str, Any]:

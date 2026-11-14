@@ -12,7 +12,6 @@ from learning import workspace as workspaces
 from learning.retrieval import (
     DUE_LIMIT,
     compact,
-    every_course,
     exam,
     last_activity,
     last_studied,
@@ -204,7 +203,7 @@ def _course(
 
 def _load(workspace: Workspace) -> Loaded:
     try:
-        return workspace, records.load(workspace), None
+        return workspace, records.read(workspace), None
     except (ValueError, OSError) as error:
         return workspace, None, _failure(error)
 
@@ -237,16 +236,23 @@ def plan(
     if workspace is None and not everywhere:
         raise ValueError("plan needs a study workspace, or --all")
     today = clock.today()
-    loaded = [_load(target) for target in every_course(workspace)]
+    loaded = [_load(target) for target in records.courses(workspace)]
     if not everywhere:
         assert workspace is not None
         if not any(target.directory == workspace.directory for target, _, _ in loaded):
             loaded.append(_load(workspace))
-    readable = {
-        str(target.directory): record
-        for target, record, _ in loaded
-        if record is not None
-    }
+    readable = capacity.final_reviews(
+        {
+            str(target.directory): record
+            for target, record, _ in loaded
+            if record is not None
+        },
+        today,
+    )
+    loaded = [
+        (target, readable.get(str(target.directory)), error)
+        for target, _, error in loaded
+    ]
     ahead = [
         left
         for record in readable.values()

@@ -9,6 +9,14 @@ from learning.capacity import Capacity, Done, Limit, Weekday
 # pace (capacity.final_review_days), which other tests cover.
 LEAD = 6
 
+
+def planned(record: dict[str, Any]) -> dict[str, Any]:
+    """The record read with the final review these tests were written for."""
+    when = record.get("exam", {}).get("date")
+    start = date.fromisoformat(when) - timedelta(days=LEAD) if when else None
+    return progress.with_final_review(record, start)
+
+
 MONDAY = date(2026, 1, 5)
 WEEKDAYS = frozenset(range(5))
 
@@ -20,8 +28,8 @@ def on(offset: int) -> date:
 def save(record: dict[str, Any], patch: dict[str, Any], day: date) -> dict[str, Any]:
     now = f"{day.isoformat()}T09:00:00+00:00"
     patched, outcome = schema.apply_patch(record, patch, today=day, now=now)
-    planned, _ = progress.schedule(patched, outcome, day, LEAD)
-    return schema.validate_record(planned)
+    scheduled, _ = progress.schedule(planned(patched), outcome, day)
+    return schema.validate_record(scheduled)
 
 
 def course(
@@ -604,24 +612,48 @@ def test_a_nearer_exams_final_review_lengthens_a_later_one_it_overlaps() -> None
     assert alone == 4 and beside is not None and beside > alone
 
 
-def test_a_save_stores_the_final_review_his_pace_needs_and_keeps_it_once_begun() -> (
-    None
-):
-    record = save(course(1, exam=8), {"topics": {"t00": {"introduced": True}}}, on(-3))
-    record = save(record, {"observations": [answer("t00")]}, on(-2))
-    record = save(record, {"observations": [answer("t00")]}, on(1))
-    assert record["topics"]["t00"]["review"]["due"] == on(2).isoformat()
+def three_reviews_a_day() -> dict[str, Any]:
+    """A course with no exam whose record shows three reviews on each of the
+    last two weeks' days."""
+    record = course(3)
+    every = {key: {"introduced": True} for key in record["topics"]}
+    record = save(record, {"topics": every}, on(-15))
+    for offset in range(-14, 0):
+        answers = [answer(key) for key in record["topics"]]
+        record = save(record, {"observations": answers}, on(offset))
+    return record
 
-    def resaved(day: date, lead: int) -> tuple[dict[str, Any], progress.Scheduled]:
-        now = f"{day.isoformat()}T09:00:00+00:00"
-        patched, outcome = schema.apply_patch(
-            record, {"focus": None}, today=day, now=now
-        )
-        return progress.schedule(patched, outcome, day, lead)
 
-    later, moved = resaved(on(1), 4)
-    assert later["exam"]["final_review_days"] == 4
-    assert moved.reviews == {"t00": {"due": on(4).isoformat(), "by": "engine"}}
-    record = later
-    kept, _ = resaved(on(5), 2)
-    assert kept["exam"]["final_review_days"] == 4
+def test_an_exams_final_review_is_read_from_his_pace_without_a_save() -> None:
+    stored = progress.with_final_review(course(12, exam=20), None)
+    read = capacity.final_reviews(
+        {"free": three_reviews_a_day(), "exam": stored}, MONDAY
+    )
+    # Twelve topics at the three reviews he does a day: four days.
+    assert read["exam"]["exam"]["final_review"] == on(16).isoformat()
+    assert progress.begun(read["exam"], MONDAY)["exam"] == {"date": on(20).isoformat()}
+    begun = progress.with_final_review(stored, on(16))
+    assert progress.begun(begun, on(16))["exam"]["final_review"] == on(16).isoformat()
+
+
+def test_a_final_review_that_has_begun_keeps_its_start() -> None:
+    stored = progress.with_final_review(course(12, exam=20), on(16))
+    read = capacity.final_reviews({"exam": stored}, on(18))
+    assert read["exam"]["exam"]["final_review"] == on(16).isoformat()
+    unplanned = progress.with_final_review(stored, None)
+    read = capacity.final_reviews({"exam": unplanned}, on(19))
+    assert read["exam"]["exam"]["final_review"] == on(18).isoformat()
+
+
+def test_the_engines_dates_follow_the_final_review_as_read() -> None:
+    record = course(1, exam=20)
+    record = save(record, {"topics": {"t00": {"introduced": True}}}, on(-40))
+    for offset in (-39, -36, -29, -13):
+        record = save(record, {"observations": [answer("t00")]}, on(offset))
+    # Thirty-five days on would pass the exam: the final review, six days out.
+    assert record["topics"]["t00"]["review"] == {
+        "due": on(14).isoformat(),
+        "by": "engine",
+    }
+    read = progress.redated(progress.with_final_review(record, on(16)), MONDAY)
+    assert read["topics"]["t00"]["review"]["due"] == on(16).isoformat()

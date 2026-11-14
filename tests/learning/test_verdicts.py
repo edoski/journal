@@ -9,6 +9,14 @@ from learning import progress, schema
 # pace (capacity.final_review_days), which other tests cover.
 LEAD = 6
 
+
+def planned(record: dict[str, Any]) -> dict[str, Any]:
+    """The record read with the final review these tests were written for."""
+    when = record.get("exam", {}).get("date")
+    start = date.fromisoformat(when) - timedelta(days=LEAD) if when else None
+    return progress.with_final_review(record, start)
+
+
 DAY1 = date(2026, 1, 1)
 TOPICS = {"topics": {"a": {"title": "A"}, "b": {"title": "B"}}}
 
@@ -43,7 +51,9 @@ class Course:
         stamp = datetime(today.year, today.month, today.day, 8, tzinfo=None)
         now = (stamp + timedelta(minutes=self.minute)).isoformat() + "+00:00"
         patched, outcome = schema.apply_patch(self.record, patch, today=today, now=now)
-        self.record, self.scheduled = progress.schedule(patched, outcome, today, LEAD)
+        self.record, self.scheduled = progress.schedule(
+            planned(patched), outcome, today
+        )
         return self
 
     def attempts(self, day: int, *observations: dict[str, Any]) -> "Course":

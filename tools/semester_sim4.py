@@ -95,6 +95,7 @@ class Day:
 
 class Run:
     def __init__(self, engine: dict[str, ModuleType], learner: Learner, seed: int):
+        self.engine = engine
         self.schema, self.progress = engine["schema"], engine["progress"]
         self.agenda, self.capacity = engine["agenda"], engine.get("capacity")
         self.learner = learner
@@ -125,17 +126,18 @@ class Run:
 
     def save(self, course: Course, patch: dict[str, Any], n: int) -> None:
         now = f"{day(n).isoformat()}T20:00:00+00:00"
-        patched, outcome = self.schema.apply_patch(
-            course.record, patch, today=day(n), now=now
-        )
-        others = [
-            other.record
+        records = {
+            other.name: other.record
             for other in getattr(self, "courses", [])
             if other is not course
-        ]
-        lead = sim.final_review_days(self.capacity, patched, others, n)
-        planned, _ = self.progress.schedule(patched, outcome, day(n), *lead)
-        course.record = self.schema.validate_record(planned)
+        }
+        records[course.name] = course.record
+        course.record = sim.saved(self.engine, records, course.name, patch, day(n), now)
+
+    def read(self, n: int) -> dict[str, dict[str, Any]]:
+        """Every course as the app reads it (``semester_sim.read``)."""
+        records = {course.name: course.record for course in self.courses}
+        return sim.read(self.engine, records, day(n))
 
     def plan(self, n: int) -> dict[str, tuple[list[str], list[str]]]:
         if hasattr(self.agenda, "plan_days"):
@@ -151,8 +153,7 @@ class Run:
                 )[0]
                 result[course.name] = (list(entry["reviews"]), list(entry["new"]))
             return result
-        records = {course.name: course.record for course in self.courses}
-        together = self.agenda.plan(records, day(n), 1)
+        together = self.agenda.plan(self.read(n), day(n), 1)
         return {
             name: (list(days[0]["reviews"]), list(days[0]["new"]))
             for name, days in together.days.items()
@@ -184,10 +185,11 @@ class Run:
                 if room_new > 0:
                     new[course.name].append(topic)
                     room_new -= 1
+        read = self.read(n)
         for course in self.by_exam(n):
             if course.exam == n:
                 continue
-            for item in self.progress.due(course.record, day(n), limit=0):
+            for item in self.progress.due(read[course.name], day(n), limit=0):
                 if room_reviews <= 0:
                     break
                 if item["topic"] not in reviews[course.name]:
@@ -256,7 +258,7 @@ class Run:
         for n in range(END + 1):
             self.measure(n)
             if self.capacity is not None and n % 7 == 0:
-                week = self.capacity.of([c.record for c in self.courses], day(n))
+                week = self.capacity.of(self.read(n).values(), day(n))
                 rates = [week.weekdays[d] for d in sorted(self.learner.weekdays)]
                 self.estimates.append(
                     {

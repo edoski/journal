@@ -13,6 +13,14 @@ from learning.workspace import Workspace
 # pace (capacity.final_review_days), which other tests cover.
 LEAD = 6
 
+
+def planned(record: dict[str, Any]) -> dict[str, Any]:
+    """The record read with the final review these tests were written for."""
+    when = record.get("exam", {}).get("date")
+    start = date.fromisoformat(when) - timedelta(days=LEAD) if when else None
+    return progress.with_final_review(record, start)
+
+
 TODAY = date(2026, 10, 10)
 NOW = "2026-10-10T09:00:00+00:00"
 TOPICS = {"topics": {"rank": {"title": "Rank"}, "span": {"title": "Span"}}}
@@ -39,7 +47,7 @@ def build(*observations: dict[str, Any]) -> dict[str, Any]:
 
 def saved(record: dict[str, Any], patch: dict[str, Any], today: date) -> dict[str, Any]:
     patched, changes = schema.apply_patch(record, patch, today=today, now=NOW)
-    return progress.schedule(patched, changes, today, LEAD)[0]
+    return progress.schedule(planned(patched), changes, today)[0]
 
 
 @pytest.fixture

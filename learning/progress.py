@@ -9,10 +9,11 @@ An exam bounds the course's schedule: every review before it lands no later
 than the final review, and a review that would fall on or after the exam, or
 that follows a ``solid`` answer from the final review on, moves to its spaced
 date after the exam (at the earliest the day after it), where the course's
-reviews go on. The final review starts ``final_review_days`` before the exam:
-the course preference when the learner set one, else the lead a save derived
-from his pace and stored on the exam (``capacity.final_review_days``), else the
-shortest final review.
+reviews go on. The final review starts ``final_review_days`` before the exam
+when the learner set that course preference; otherwise on the day the plan
+reads from his pace whenever the record is read (``capacity.final_reviews``),
+which the exam keeps as ``final_review`` once that day has come
+(``begun``). A record read without the plan has no final review to go by.
 """
 
 from __future__ import annotations
@@ -95,17 +96,81 @@ def new_end(exam: Exam, day: date) -> date:
     return exam.day - timedelta(days=1)
 
 
+def _lead(record: dict[str, Any]) -> int:
+    """The course preference's final review length; 0 when unset."""
+    return preferences.count(record["preferences"], preferences.FINAL_REVIEW_DAYS, 0)
+
+
 def exam_plan(record: dict[str, Any]) -> Exam | None:
-    """The course's exam with its final review: the course preference, else
-    the lead a save derived from his pace, else the shortest final review."""
+    """The course's exam with its final review: ``final_review_days`` before
+    it by the course preference, else from the day the plan reads
+    (``capacity.final_reviews``)."""
     value = record.get("exam", {}).get("date")
     if not value:
         return None
     day = date.fromisoformat(value)
-    lead = preferences.count(
-        record["preferences"], preferences.FINAL_REVIEW_DAYS, 0
-    ) or record["exam"].get("final_review_days", SHORTEST_FINAL_REVIEW)
-    return Exam(day, day - timedelta(days=lead))
+    if lead := _lead(record):
+        return Exam(day, day - timedelta(days=lead))
+    start = record["exam"].get("final_review")
+    if start is None:
+        raise LookupError(
+            f"the final review before the exam on {value} is read with the plan "
+            "(capacity.final_reviews); this record was read without it"
+        )
+    return Exam(day, date.fromisoformat(start))
+
+
+def unplanned(record: dict[str, Any]) -> bool:
+    """An exam whose final review the plan has yet to read: no course
+    preference sets its length and it has not begun."""
+    exam = record.get("exam", {})
+    return "date" in exam and not _lead(record) and "final_review" not in exam
+
+
+def with_final_review(record: dict[str, Any], start: date | None) -> dict[str, Any]:
+    """The record with its final review starting on ``start``, or with none
+    read yet (``None``)."""
+    exam = {k: v for k, v in record.get("exam", {}).items() if k != "final_review"}
+    if start is not None:
+        exam["final_review"] = start.isoformat()
+    return {**record, "exam": exam}
+
+
+def begun(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record as a save stores it: the final review's start only once it
+    has come and no course preference sets it.
+
+    Until then the start is read from his pace on every read, so it follows
+    the evidence. Once a day of the final review has come, its start is
+    history: the plan never starts it before the day it reads it, and his
+    pace, the path and the other exams it is read from keep changing, so no
+    later read could find the day again; yet an answer given in it counts as
+    the final review's (a ``solid`` one sends the next review past the exam)
+    and must stay counted.
+    """
+    start = record.get("exam", {}).get("final_review")
+    if start is None or (not _lead(record) and start <= today.isoformat()):
+        return record
+    return with_final_review(record, None)
+
+
+def redated(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record with every date the engine set re-derived from its final
+    review as now read, while the exam is ahead: what each save would set.
+    A tutor's date stands."""
+    exam = exam_plan(record)
+    if exam is None or exam.day <= today:
+        return record
+    histories = _histories(record["observations"])
+    topics = dict(record["topics"])
+    for key, topic in topics.items():
+        review = topic.get("review", {})
+        if review.get("by") != "engine":
+            continue
+        due = replay(key, topic, histories.get(key, _History()).attempts, exam).due
+        if due is not None and due.isoformat() != review.get("due"):
+            topics[key] = {**topic, "review": {**review, "due": due.isoformat()}}
+    return {**record, "topics": topics}
 
 
 @dataclass
@@ -572,55 +637,31 @@ def _after_exam(key: str, replayed: Replay, exam: Exam | None) -> str | None:
     return f"{key}: next review {replayed.due.isoformat()}, after the exam"
 
 
-def _led(record: dict[str, Any], lead: int | None, today: date, moved: bool) -> bool:
-    """Store the final review's lead a save derived from his pace; whether it
-    changed. A final review under way keeps its start, so an answer it counted
-    stays counted, unless the exam itself moved."""
-    exam = record.get("exam")
-    if lead is None or not exam or "date" not in exam:
-        return False
-    stored = exam.get("final_review_days")
-    day = date.fromisoformat(exam["date"])
-    if stored == lead or (
-        stored is not None and day - timedelta(days=stored) <= today and not moved
-    ):
-        return False
-    record["exam"] = {**exam, "final_review_days": lead}
-    return True
-
-
 def _resync(
     record: dict[str, Any],
     histories: dict[str, _History],
     today: date,
     scheduled: Scheduled,
-    *,
-    moved: bool = True,
 ) -> None:
-    """Re-derive every engine date after the exam (``moved``) or only its
-    final review moved.
+    """Re-derive every engine date after the exam or its final review moved.
 
     Each engine date becomes the replayed one, so moving the exam and moving
-    it back restores the dates. When the exam moved, a tutor date on or after
-    an exam still ahead is handed to the engine.
+    it back restores the dates. A tutor date on or after an exam still ahead is
+    handed to the engine.
     """
     exam = exam_plan(record)
-    why = "after the exam moved" if moved else "after its final review moved"
     for key, topic in list(record["topics"].items()):
         review = topic.get("review", {})
         stored = review.get("due")
         if review.get("by") == "tutor" and not (
-            moved
-            and exam is not None
-            and exam.day > today
-            and stored >= exam.day.isoformat()
+            exam is not None and exam.day > today and stored >= exam.day.isoformat()
         ):
             continue
         target = replay(key, topic, histories.get(key, _History()).attempts, exam).due
         if target is not None and target.isoformat() != stored:
             scheduled.reviews[key] = _with_review(record, key, target, "engine")
             scheduled.notes.append(
-                f"{key}: review moved to {target.isoformat()}, {why}"
+                f"{key}: review moved to {target.isoformat()}, after the exam moved"
             )
 
 
@@ -777,16 +818,13 @@ def _stale_notes(
 
 
 def schedule(
-    record: dict[str, Any],
-    changes: PatchResult,
-    today: date,
-    lead: int | None = None,
+    record: dict[str, Any], changes: PatchResult, today: date
 ) -> tuple[dict[str, Any], Scheduled]:
     """Apply a save's engine consequences; returns the new record and what moved.
 
-    ``lead`` is the final review's length his pace asks for
-    (``capacity.final_review_days``); the save stores it on the exam. A save
-    that moves the exam or its final review re-derives every engine date.
+    The record is read with the plan (``capacity.final_reviews``), so its
+    final review is the one every view shows. A save that moves the exam or
+    its final review re-derives every engine date.
     Tutor-set dates on or after the exam move to the day before it. A topic whose
     verdicts this save created or changed is due on its next expected review day,
     unless the same patch dated its review; a practice day leaves the date alone
@@ -799,11 +837,8 @@ def schedule(
     _stamp_due(result, changes)
     scheduled = Scheduled()
     histories = _histories(result["observations"])
-    led = _led(result, lead, today, changes.exam_moved)
     if changes.exam_moved:
         _resync(result, histories, today, scheduled)
-    elif led:
-        _resync(result, histories, today, scheduled, moved=False)
     _clamp_tutor_dates(result, changes, today, scheduled)
     _reschedule(result, changes, histories, scheduled)
     _first_retrievals(result, changes, histories, scheduled)

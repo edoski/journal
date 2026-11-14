@@ -347,3 +347,48 @@ def test_pinned_knowledge_over_budget_may_shrink_but_not_grow(
     receipt = records.save(workspace, {"knowledge": {"a": {"pinned": None}}})
     assert records.PINNED_BYTES < receipt["pinned"]["bytes"]
     assert "pinned" not in records.load(workspace)["knowledge"]["a"]
+
+
+def test_an_answer_to_a_review_due_in_an_exam_course_is_saved_as_that_review(
+    workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records.save(
+        workspace,
+        {
+            **COURSE,
+            "exam": {"date": "2026-11-20"},
+            "topics": {**COURSE["topics"], "rank": {"introduced": True}},
+        },
+    )
+    monkeypatch.setenv("LEARNING_TODAY", "2026-10-11")
+    receipt = records.save(workspace, {"observations": [attempt()]})
+    stored = json.loads(workspace.record.read_text())
+    assert stored["observations"][receipt["saved"][0]]["due_topics"] == ["rank"]
+
+
+def test_a_final_review_is_stored_once_begun_and_moving_the_exam_drops_it(
+    workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def stored_exam() -> dict[str, Any]:
+        exam: dict[str, Any] = json.loads(workspace.record.read_text())["exam"]
+        return exam
+
+    records.save(workspace, {**COURSE, "exam": {"date": "2026-10-20"}})
+    assert stored_exam() == {"date": "2026-10-20"}
+    # No review on record yet: the shortest final review.
+    assert records.load(workspace)["exam"]["final_review"] == "2026-10-18"
+    monkeypatch.setenv("LEARNING_TODAY", "2026-10-18")
+    records.save(workspace, {"observations": [attempt()]})
+    assert stored_exam()["final_review"] == "2026-10-18"
+    monkeypatch.setenv("LEARNING_TODAY", "2026-10-19")
+    assert records.load(workspace)["exam"]["final_review"] == "2026-10-18"
+    records.save(workspace, {"exam": {"date": "2026-10-30"}})
+    assert stored_exam() == {"date": "2026-10-30"}
+    assert records.load(workspace)["exam"]["final_review"] == "2026-10-28"
+    # Begun on the 25th, as a save then stored it: read today, it would start
+    # no earlier than today.
+    stored = json.loads(workspace.record.read_text())
+    stored["exam"]["final_review"] = "2026-10-25"
+    storage.publish_text(workspace.record, storage.encode(stored))
+    monkeypatch.setenv("LEARNING_TODAY", "2026-10-28")
+    assert records.load(workspace)["exam"]["final_review"] == "2026-10-25"

@@ -46,11 +46,11 @@ the plan and a single skip does not turn it off.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 import math
-from typing import Any
+from typing import Any, TypeVar
 
 from learning import progress
 
@@ -62,6 +62,8 @@ PRIOR_WEIGHT = 1.0
 # Cold start: a course is begun one topic at a time.
 PRIOR_NEW = 1.0
 WEEK = 7
+
+Name = TypeVar("Name", bound=Hashable)
 
 
 @dataclass(frozen=True)
@@ -411,6 +413,64 @@ def of(records: Iterable[dict[str, Any]], today: date) -> Capacity:
 
 
 # --- the final review ---------------------------------------------------------
+
+
+def final_reviews(
+    records: Mapping[Name, dict[str, Any]], today: date
+) -> dict[Name, dict[str, Any]]:
+    """Every course read with the plan: each exam's final review from his pace
+    as the record now shows it (``final_review_days``), nearest exam first,
+    with the dates the engine set re-derived from it (``progress.redated``).
+    A final review a course preference sets, or one that has begun
+    (``progress.begun``), stands.
+
+    His pace is read with the final reviews still to come holding none of the
+    days he has studied: the reviews he does a day, and the days he studies,
+    are what sizes them, so they must not hang on the lengths they size, and
+    a final review not yet begun holds no day gone. An exam that has passed
+    with no start on record had no answer in its final review (a save in it
+    keeps its start), so its shortest form changes nothing.
+    """
+    unplanned = [name for name, record in records.items() if progress.unplanned(record)]
+    if not unplanned:
+        return dict(records)
+
+    def exam_day(name: Name) -> date:
+        return date.fromisoformat(records[name]["exam"]["date"])
+
+    result = {
+        name: progress.with_final_review(record, exam_day(name))
+        if name in unplanned
+        else record
+        for name, record in records.items()
+    }
+    week = of(result.values(), today)
+    for name in sorted(unplanned, key=exam_day):
+        record = records[name]
+        others = [other for key, other in result.items() if key != name]
+        lead = final_review_days(record, others, week, today)
+        assert lead is not None
+        start = exam_day(name) - timedelta(days=lead)
+        result[name] = progress.redated(
+            progress.with_final_review(record, start), today
+        )
+    return result
+
+
+def replanned(
+    records: Mapping[Name, dict[str, Any]], name: Name, today: date
+) -> dict[str, Any]:
+    """Course ``name`` after a save moved its exam: its final review read
+    again from his pace, its start kept before the move dropped. Its dates
+    stand as they were, for the save to re-derive (``progress.schedule``)
+    once it has recorded which reviews its answers were."""
+    record = progress.with_final_review(records[name], None)
+    start = final_reviews({**records, name: record}, today)[name]["exam"].get(
+        "final_review"
+    )
+    return progress.with_final_review(
+        record, date.fromisoformat(start) if start else None
+    )
 
 
 def final_review_days(

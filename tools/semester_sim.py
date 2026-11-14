@@ -160,9 +160,9 @@ class Run:
         preferences: dict[str, str],
         ease: float = 1.0,
     ) -> None:
+        self.engine = engine
         self.schema, self.progress = engine["schema"], engine["progress"]
         self.agenda = engine.get("agenda")
-        self.capacity = engine.get("capacity")
         self.scenario = scenario
         self.rng = random.Random(f"{scenario.learner}/{scenario.late}/{scenario.seed}")
         # Days off from their own stream, so every engine meets the same days.
@@ -184,12 +184,10 @@ class Run:
         self.save(patch, 0)
 
     def save(self, patch: dict[str, Any], n: int) -> None:
-        patched, outcome = self.schema.apply_patch(
-            self.record, patch, today=day(n), now=NOW
-        )
-        lead = final_review_days(self.capacity, patched, [], n)
-        planned, _ = self.progress.schedule(patched, outcome, day(n), *lead)
-        self.record = self.schema.validate_record(planned)
+        self.record = saved(self.engine, {"c": self.record}, "c", patch, day(n), NOW)
+
+    def read(self, n: int) -> dict[str, Any]:
+        return read(self.engine, {"c": self.record}, day(n))["c"]
 
     def untaught(self) -> list[str]:
         return [
@@ -200,7 +198,7 @@ class Run:
 
     def doctrine(self, n: int) -> tuple[list[str], list[str]]:
         """An engine with no plan, run as the tutor's doctrine says."""
-        due = [item["topic"] for item in self.progress.due(self.record, day(n))]
+        due = [item["topic"] for item in self.progress.due(self.read(n), day(n))]
         untaught = self.untaught()
         exam = self.record.get("exam", {}).get("date")
         left = (date.fromisoformat(exam) - day(n)).days if exam else None
@@ -222,7 +220,7 @@ class Run:
             settings = self.agenda.settings(self.record["preferences"])
             today = self.agenda.plan_days(self.record, day(n), settings, 1)[0]
         else:
-            today = self.agenda.plan({"c": self.record}, day(n), 1).days["c"][0]
+            today = self.agenda.plan({"c": self.read(n)}, day(n), 1).days["c"][0]
         return list(today["reviews"]), list(today["new"])
 
     def study(self, n: int, reviews: list[str], new: list[str]) -> None:
@@ -272,27 +270,51 @@ class Run:
         exam = day(EXAM_DAY).isoformat()
         dates = [
             topic["review"]["due"]
-            for topic in self.record["topics"].values()
+            for topic in self.read(EXAM_DAY)["topics"].values()
             if "due" in topic.get("review", {})
         ]
         self.outcome.stranded = sum(due > exam for due in dates)
         self.outcome.overdue = sum(due < exam for due in dates)
 
 
-def final_review_days(
-    capacity: ModuleType | None,
-    record: dict[str, Any],
-    others: list[dict[str, Any]],
-    n: int,
-) -> list[int]:
-    """The final review's length a save passes, as the app's saves do: from
-    his pace (``capacity.final_review_days``), on an engine that derives it;
-    none on one that does not."""
-    if capacity is None or not hasattr(capacity, "final_review_days"):
-        return []
-    week = capacity.of([*others, record], day(n))
-    lead = capacity.final_review_days(record, others, week, day(n))
-    return [] if lead is None else [lead]
+def read(
+    engine: dict[str, ModuleType], records: dict[str, dict[str, Any]], today: date
+) -> dict[str, dict[str, Any]]:
+    """Every course as the app reads it: with the plan, which reads each
+    exam's final review from his pace (``capacity.final_reviews``), on an
+    engine that does; as stored on one that does not."""
+    capacity = engine.get("capacity")
+    if capacity is None or not hasattr(capacity, "final_reviews"):
+        return dict(records)
+    result: dict[str, dict[str, Any]] = capacity.final_reviews(records, today)
+    return result
+
+
+def saved(
+    engine: dict[str, ModuleType],
+    records: dict[str, dict[str, Any]],
+    name: str,
+    patch: dict[str, Any],
+    today: date,
+    now: str,
+) -> dict[str, Any]:
+    """Course ``name`` after one save, as the app's saves store it: the patch
+    applied to the course read with the plan, its final review read again when
+    the exam moves (``capacity.replanned``), and a final review's start kept
+    only once it has begun (``progress.begun``)."""
+    schema, progress = engine["schema"], engine["progress"]
+    if not hasattr(progress, "begun"):
+        patched, outcome = schema.apply_patch(
+            records[name], patch, today=today, now=now
+        )
+        planned, _ = progress.schedule(patched, outcome, today)
+        return dict(schema.validate_record(planned))
+    seen = read(engine, records, today)[name]
+    patched, outcome = schema.apply_patch(seen, patch, today=today, now=now)
+    if outcome.exam_moved:
+        patched = engine["capacity"].replanned({**records, name: patched}, name, today)
+    planned, _ = progress.schedule(patched, outcome, today)
+    return dict(schema.validate_record(progress.begun(planned, today)))
 
 
 def load_engine(root: str | None) -> dict[str, ModuleType]:
