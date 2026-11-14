@@ -1,7 +1,7 @@
 /**
- * A Today line as a sidebar card (components/unit-inbox/now-card.tsx): the
- * lead topic's title, the line's reason in the status slot and the line's
- * action, or a waiting session's own card. Same tsx classic-JSX shim as the
+ * A Today line as a sidebar card (components/unit-inbox/now-card.tsx):
+ * Home's name for the line, the line's reason in the status slot and the
+ * line's action, on its lead topic, or a waiting session's own card. Same tsx classic-JSX shim as the
  * other render tests.
  */
 import React from "react";
@@ -26,7 +26,7 @@ describe("NowCard", () => {
 	const inbox = buildInbox(COURSES, CHATS, null);
 	const { lines } = needsYouNow(COURSES, CHATS, TODAY);
 
-	it("draws each line as its lead topic with Today's reason and the line's action", () => {
+	it("draws each line on its lead topic, under Home's name for it, with Today's reason and the line's action", () => {
 		const doc = render(
 			<>
 				{lines.map((line) => (
@@ -37,7 +37,7 @@ describe("NowCard", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence"],
+			["Eigenvalues lesson", "Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
@@ -45,7 +45,7 @@ describe("NowCard", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="row-action"]')?.getAttribute("aria-label")),
-			["Resume: Eigenvalues and eigenvectors", "Resume: Rank and the column space", "Review: Random variables and distributions", "Review: Linear independence"],
+			["Resume: Eigenvalues lesson", "Resume: Rank practice", "Review: Review Random variables and distributions, Law of total probability, Bayes' rule", "Review: Review Linear independence"],
 		);
 		assert.equal(cards[0]!.querySelector('[data-slot="row-action"]')?.getAttribute("href"), "/chat/chat_eigen");
 		assert.equal(cards[2]!.querySelector('[data-testid="unit-row"]')?.getAttribute("href")?.startsWith("/unit/"), true);

@@ -1,5 +1,6 @@
 import type { ChatListItem } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
+import { lessonTitle } from "@/components/study-home/agenda-rows/row-facts";
 import type { NeedsYou, NowLine } from "@/components/study-home/needs-you";
 import { sessionKey, topicUnit } from "@/components/unit-inbox/now-inbox";
 import { unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
@@ -65,7 +66,7 @@ function running(item: NowItem, inbox: UnitInbox, chats: readonly ChatListItem[]
 	const chat = chats.find((c) => c.id === row.chat.id);
 	if (!chat || sessionState(chat) !== "working") return null;
 	const listed = [...inbox.active, ...inbox.working, ...inbox.known].some((u) => u.sessions.some((c) => c.id === chat.id)) || inbox.other.some((c) => c.id === chat.id);
-	return listed ? { kind: "session", line: { ...item.line, row: { ...row, chat } }, chat } : null;
+	return listed ? { kind: "session", line: { ...item.line, row: { ...row, chat }, title: lessonTitle({ ...row, chat }) }, chat } : null;
 }
 
 /**

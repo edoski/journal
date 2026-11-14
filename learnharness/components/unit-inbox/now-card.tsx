@@ -64,9 +64,10 @@ export function NowAction({ line, title, className }: { line: NowLine; title: st
 }
 
 /**
- * One of Today's lines as a sidebar card (spec: now-card.md): the topic the
- * line leads with, the line's reason in its status slot and the line's
- * action over it. A click opens the topic's page. With no `unit` (a waiting
+ * One of Today's lines as a sidebar card (spec: now-card.md), under the
+ * line's one name (Home's lesson, `NowLine.title`), with the line's reason
+ * in its status slot and the line's action over it. A click opens the page
+ * of the topic the line leads with. With no `unit` (a waiting
  * session on no topic of its course's map, or on no course) it is the
  * session's card: its course or "No course", its title, Your turn (or
  * Working at 70% while the tutor writes in it), and a click opens the
@@ -88,7 +89,7 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 				mark={chat.course ? <CourseMark title={chat.course.title} /> : <CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
 				course={courseTitle(row)}
 				status={running ? <UnitStatusText status={{ kind: "working" }} /> : reason}
-				title={chat.title}
+				title={line.title}
 				recede={running}
 			/>
 		);
@@ -103,8 +104,8 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 			mark={<CourseMark title={unit.course.title} />}
 			course={unit.course.title}
 			status={working ? <UnitStatusText status={{ kind: "working" }} /> : reason}
-			title={unit.topic.title}
-			action={<NowAction line={line} title={unit.topic.title} className={CARD_ACTION_PLACE} />}
+			title={line.title}
+			action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} />}
 			recede={working}
 		/>
 	);

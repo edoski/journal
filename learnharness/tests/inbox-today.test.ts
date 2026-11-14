@@ -12,6 +12,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { lessonTitle } from "../components/study-home/agenda-rows/row-facts.ts";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
 import { nowFor, restShelves, sessionKey } from "../components/unit-inbox/now-inbox.ts";
 import type { NowListProps } from "../components/unit-inbox/now-list-props.ts";
@@ -42,7 +43,7 @@ describe("todayTop", () => {
 			needs.lines.map((l) => l.key),
 		);
 		assert.deepEqual(
-			top.map((i) => (i.kind === "topic" ? i.unit.topic.title : i.chat.title)),
+			top.map((i) => (i.kind === "topic" ? i.unit.topic.title : i.line.title)),
 			["Eigenvalues lesson", "Rank practice", "Random variables and distributions", "Linear independence"],
 		);
 		assert.ok(top.length <= 5);
@@ -271,7 +272,12 @@ describe("TodayList", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues lesson", "Rank practice", "Random variables and distributions", "Linear independence"],
+			["Eigenvalues lesson", "Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
+		);
+		assert.deepEqual(
+			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
+			needsYouNow(COURSES, CHATS, TODAY).lines.map((l) => lessonTitle(l.row)),
+			"each card under the name Home's line gives it",
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
