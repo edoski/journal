@@ -43,6 +43,9 @@ type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
 	const { rows, courses, busy, onContinue } = ready;
 	const [chosen, setChosen] = useState<Chosen | null>(null);
+	// The line under the pointer or holding focus, if any: only then does the line the map follows wear its fill, so
+	// no row has a card behind it at rest.
+	const [pointingAt, setPointingAt] = useState<string | null>(null);
 	const dwell = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	useEffect(() => () => clearTimeout(dwell.current), []);
 
@@ -55,6 +58,7 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 
 	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
 		clearTimeout(dwell.current);
+		setPointingAt(lineKey(row));
 		const pick = () => setChosen({ by: "line", key: lineKey(row) });
 		if (by === "focus") pick();
 		else dwell.current = setTimeout(pick, FOLLOW_DWELL_MS);
@@ -77,9 +81,12 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 					rows={rows}
 					busy={busy}
 					onContinue={onContinue}
-					pointed={followed ? lineKey(followed) : null}
+					pointed={followed && pointingAt === lineKey(followed) ? pointingAt : null}
 					onPoint={onPoint}
-					onPointEnd={() => clearTimeout(dwell.current)}
+					onPointEnd={() => {
+						clearTimeout(dwell.current);
+						setPointingAt(null);
+					}}
 				/>
 			)}
 		</>

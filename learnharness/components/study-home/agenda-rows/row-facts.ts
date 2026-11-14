@@ -17,8 +17,8 @@ export interface RowsProps {
 	onPointEnd?: () => void;
 }
 
-/** The handlers and mark that let a line tell Home's map he points at it;
- *  none when nothing follows. */
+/** The handlers and mark that let a line tell Home's map he points at it
+ *  (pointer or focus) and stops; none when nothing follows. */
 export function pointProps(row: TodayRow, { pointed, onPoint, onPointEnd }: Pick<RowsProps, "pointed" | "onPoint" | "onPointEnd">) {
 	if (!onPoint) return {};
 	return {
@@ -26,6 +26,7 @@ export function pointProps(row: TodayRow, { pointed, onPoint, onPointEnd }: Pick
 		onPointerEnter: () => onPoint(row, "pointer"),
 		onPointerLeave: onPointEnd,
 		onFocus: () => onPoint(row, "focus"),
+		onBlur: onPointEnd,
 	};
 }
 

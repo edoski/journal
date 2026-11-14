@@ -40,7 +40,8 @@ describe("a line reporting that he points at it", () => {
 		(props.onPointerEnter as () => void)();
 		(props.onFocus as () => void)();
 		(props.onPointerLeave as () => void)();
-		assert.deepEqual(seen, ["pr:pointer", "pr:focus", "end"]);
+		(props.onBlur as () => void)();
+		assert.deepEqual(seen, ["pr:pointer", "pr:focus", "end", "end"]);
 		assert.equal((pointProps(LA, { pointed: "pr", onPoint: () => {} }) as Record<string, unknown>)["data-pointed"], undefined);
 	});
 });
