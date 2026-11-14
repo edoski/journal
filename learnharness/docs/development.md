@@ -135,7 +135,7 @@ src/
                                server-side wake turns, crash recovery
   server/stores.ts              THE storage composition root — the one place adapters wire in
   server/turn-liveness.ts       per-chat turn registry (one turn per chat, ever)
-  server/observability.ts       the activity feed (running jobs + extraction, abort)
+  server/observability.ts       the activity feed (running jobs + background runs, abort)
   server/pi/                    the engine bridge: record-adapter (record → pi messages)
                                 · ui-stream (pi events → UIMessage SSE)
   server/index.ts               the server barrel (the only server import app/ may use)

@@ -82,7 +82,7 @@ export function UnitSidebar() {
 	const { open, toggle } = useSidebar();
 	const { open: openSettings } = useSettingsDialog();
 	const { feed } = useActivity();
-	const running = feed.jobs.length > 0 || feed.extractions.length > 0;
+	const running = feed.jobs.length > 0 || feed.runs.length > 0;
 	const s = useSessionsSidebar({ open, toggle });
 	const { state, scope, setScope, folded, fold } = useUnitInbox(s.chats);
 	const query = s.query.trim();

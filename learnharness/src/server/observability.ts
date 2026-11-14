@@ -42,9 +42,8 @@ export interface ActivityJob extends JobRecord {
 
 /** One background run (a lesson digest or a course-map build), title
  *  joined, oldest first. id is the registry key; chatId is the key's chat
- *  or course, which the dock's abort sends. The feed keeps the field name
- *  "extractions" the dock reads. */
-export interface ActivityExtraction {
+ *  or course, which the dock's abort sends. The feed's `runs`. */
+export interface ActivityRun {
 	id: string;
 	chatId: string;
 	title: string;
@@ -58,7 +57,7 @@ export interface ActivityExtraction {
  *  the server-side Pi pricing adapter; clients never reconstruct rates. */
 export function activityFeed(): {
 	jobs: ActivityJob[];
-	extractions: ActivityExtraction[];
+	runs: ActivityRun[];
 } {
 	const chats = chatStore.listChats();
 	const limits = catalogContextLimits();
@@ -75,7 +74,7 @@ export function activityFeed(): {
 			}
 		}
 	}
-	const extractions: ActivityExtraction[] = backgroundRuns().map((run) => ({
+	const runs: ActivityRun[] = backgroundRuns().map((run) => ({
 		id: run.id,
 		chatId: run.chatId,
 		// A map build names itself ("Mapping Linear algebra"); a digest
@@ -88,6 +87,6 @@ export function activityFeed(): {
 	jobs.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 	return {
 		jobs,
-		extractions: extractions.sort((a, b) => a.startedAt - b.startedAt),
+		runs: runs.sort((a, b) => a.startedAt - b.startedAt),
 	};
 }
