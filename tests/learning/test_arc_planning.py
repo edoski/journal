@@ -302,20 +302,20 @@ def windowed() -> dict[str, Any]:
     return evidence(save(schema.empty(), patch, MONDAY), ["a1"], "a3")
 
 
-def test_new_topics_come_from_the_earliest_arc_left_the_next_and_free() -> None:
+def test_new_topics_come_from_the_earliest_arc_left_and_the_next() -> None:
     result = plan({"c": windowed()}, MONDAY, 6, week(10, 1))
     days = {day["date"]: day["new"] for day in result.days["c"]}
     assert days[on(0).isoformat()] == ["b1"], "the next arc while A waits"
-    assert days[on(1).isoformat()] == ["d1"], "D needs nothing from another arc"
-    assert days[on(2).isoformat()] == [], "C is two arcs on: it waits"
+    assert days[on(1).isoformat()] == [], "C and D are two arcs on or more: they wait"
     assert days[on(3).isoformat()] == ["a2"]
     assert days[on(4).isoformat()] == ["c1"], "A is done, so C is the next arc"
+    assert days[on(5).isoformat()] == ["d1"], "D needs nothing, yet keeps its place"
     why = result.when("c", MONDAY, True).why
     early = {"kind": "early", "behind": "a", "waiting_on": ["a3"]}
     assert why["b1"] == {"arc": "b", **early}
-    assert why["d1"] == {"arc": "d", **early}
     assert why["a2"] == {"arc": "a", "kind": "after", "partners": ["a3"]}
     assert why["c1"] == {"arc": "c", "kind": "next"}
+    assert why["d1"] == {"arc": "d", "kind": "next"}
 
 
 def test_an_early_start_does_not_open_the_arc_after_it() -> None:
@@ -323,7 +323,7 @@ def test_an_early_start_does_not_open_the_arc_after_it() -> None:
     result = plan({"c": record}, MONDAY, 3, week(10, 1))
     assert "c1" not in starts(result), "A, with topics left, still bounds the window"
     assert arcs.current(record) == "b", "You are here: the arc he studies ahead in"
-    assert result.when("c", MONDAY, True).why["d1"]["behind"] == "a"
+    assert result.when("c", MONDAY, True).why["b1"]["behind"] == "a"
 
 
 def test_each_independent_branch_moves_while_the_others_wait() -> None:
@@ -445,6 +445,48 @@ def test_topics_outside_the_exam_read_the_window_from_where_he_is() -> None:
     assert days[0] == ["b1"] and why["b1"]["kind"] == "early"
     started = [topic for day in days for topic in day]
     assert started.index("a2") < started.index("c1"), "C waits while A has topics"
+
+
+# A graph algorithms course cut by its syllabus weeks: DFS is a chain, and the
+# last week, minimum spanning trees, needs nothing from the weeks before it.
+WEEKS: dict[str, dict[str, Any]] = {
+    "rep": {"arc": "w1"},
+    "bfs": {"arc": "w1", "needs": ["rep"]},
+    "dfs": {"arc": "w2", "needs": ["rep"]},
+    "parenthesis": {"arc": "w2", "needs": ["dfs"]},
+    "white-path": {"arc": "w2", "needs": ["parenthesis"]},
+    "cycles": {"arc": "w2", "needs": ["white-path"]},
+    "kahn": {"arc": "w3", "needs": ["rep"]},
+    "topo": {"arc": "w3", "needs": ["cycles"]},
+    "dijkstra": {"arc": "w4", "needs": ["rep"]},
+    "bellman-ford": {"arc": "w4", "needs": ["rep"]},
+    "cut": {"arc": "w5"},
+    "union-find": {"arc": "w5"},
+    "kruskal": {"arc": "w5", "needs": ["cut", "union-find"]},
+}
+
+
+def test_a_new_course_studies_its_weeks_in_order_before_the_exam() -> None:
+    names = ["w1", "w2", "w3", "w4", "w5"]
+    patch: dict[str, Any] = {
+        "arcs": {name: arc(name.upper()) for name in names},
+        "topics": WEEKS,
+        "path": {"order": list(WEEKS), "arcs": names},
+        "arc_change": REASON,
+        "exam": scoped(names, 40),
+    }
+    record = evidence(save(schema.empty(), patch, MONDAY), ["rep", "bfs"], "dfs")
+    result = plan({"c": record}, MONDAY, 40, week(10, 1))
+    started = starts(result)
+    assert set(started) == set(WEEKS) - {"rep", "bfs", "dfs"}, "everything starts"
+    week_of = {key: names.index(WEEKS[key]["arc"]) for key in started}
+    for index, key in enumerate(started):
+        front = min(week_of[later] for later in started[index:])
+        assert week_of[key] - front < progress.NEW_TOPIC_ARCS, (key, started)
+    exam = progress.exam_plan(read({"c": record}, MONDAY)["c"])
+    assert exam is not None
+    last = max(day["date"] for day in result.days["c"] if day["new"])
+    assert last <= progress.last_new_day(exam).isoformat(), "ready for the exam"
 
 
 def test_a_second_topic_on_one_day_keeps_the_window() -> None:

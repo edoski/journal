@@ -81,10 +81,12 @@ waits while other courses' new topics take the days names them
 
 New topics follow the material. The path runs arc by arc, and a start comes
 from the window: the earliest arc with topics left (the arc of the earliest
-untaught topic he may start), the next arc, and any arc that needs nothing
-from another (``progress.window``). That arc is not the current arc, the
-arc of "You are here" (``arcs.current``): the two differ once he studies
-ahead. Without arcs the path bounds it: a topic ahead of the
+untaught topic he may start) and the next arc; in a course whose arcs need
+nothing from each other, strands with no order between them, every arc
+(``progress.window``). Once one arc builds on another the arcs are chapters,
+and a later one that happens to need nothing still waits its place. That arc
+is not the current arc, the arc of "You are here" (``arcs.current``): the two
+differ once he studies ahead. Without arcs the path bounds it: a topic ahead of the
 earliest untaught one starts only when it builds on one, so a topic that
 needs nothing waits its place (``progress.opens``). An exam's pace passes the
 window only on a day when holding would raise the pace it needs. Each start
@@ -255,8 +257,8 @@ class _Course:
     def opens(self, topic: str, front: str | None) -> bool:
         """Whether ``topic`` is in the window new topics come from, read from
         ``front`` (``progress.opens``): the earliest arc with topics left, the
-        next and any arc that needs nothing from another; without arcs, the
-        path's own order."""
+        next, and every strand of a course whose arcs need nothing from each
+        other; without arcs, the path's own order."""
         window = progress.window(self.record, front, self.free)
         return progress.opens(self.record, topic, window, front)
 
@@ -803,7 +805,7 @@ def _new(
         taken = 0
         while taken < count:
             front = course.front(among if pool is None else pool)
-            # Ready topics go in path order, arc by arc, so a free arc later in
+            # Ready topics go in path order, arc by arc, so a strand later in
             # the path gives one only when no earlier arc in the window has one
             # ready, bar one related to today's start. capacity._opened mirrors
             # this order: change the two together.
