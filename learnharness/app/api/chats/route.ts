@@ -1,5 +1,5 @@
 import { derivePlanStatusesLh, newSessionModeMessage, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
-import { compactionInFlight, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
+import { compactionInFlight, courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
 /** The session picker's list: record-derived summaries (phase, pending
@@ -8,12 +8,14 @@ import type { ChatListItem } from "@/src/core";
  *  the merge point). Owner, minimal-color round: background jobs NO LONGER
  *  count — the sidebar's Background agents section is their channel now
  *  (a running spinner per row would double-signal them), so busy means
- *  exactly "a teach turn is in flight". */
+ *  exactly "a teach turn is in flight". A session whose course was deleted
+ *  says so (`courseDeleted`), as its lesson page does. */
 export async function GET() {
 	const chats: ChatListItem[] = listChats().map((c) => ({
 		...c,
 		busy: isTurnRunning(c.id),
 		compacting: compactionInFlight(c.id),
+		courseDeleted: courseGone(c.course),
 	}));
 	return Response.json({ chats });
 }

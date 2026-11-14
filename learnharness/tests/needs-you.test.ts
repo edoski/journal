@@ -43,6 +43,12 @@ describe("needsYouNow", () => {
 		assert.equal(earlier[0], "session chat_left", "one left on an earlier day keeps its line however long ago");
 	});
 
+	it("gives a lesson whose course was deleted no line: it is history", () => {
+		const gone = chat("chat_gone", { title: "Series tests", course: { workspace: "/s/graphs", title: "Graph Algorithms" }, ended: "left", courseDeleted: true, updatedAt: "2026-11-07T09:00:00" });
+		assert.ok(!needsYouNow(COURSES, [gone], TODAY).rows.some((r) => r.kind === "session"));
+		assert.equal(needsYouNow(COURSES, [{ ...gone, courseDeleted: false }], TODAY).rows[0]?.kind, "session", "the same lesson in a course still there keeps its line");
+	});
+
 	it("orders the courses after the sessions by urgency: the exam run-up, the nearest exam, then the most recent study", () => {
 		const { lines } = needsYouNow([CALCULUS, ANALYSIS, PROB], [], TODAY);
 		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Real Analysis", "Calculus I"]);

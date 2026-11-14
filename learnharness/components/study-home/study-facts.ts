@@ -275,9 +275,11 @@ export function withLessonHere(courses: readonly StudyCourse[], chats: readonly 
 	});
 }
 
-/** The sessions to pick up, most recent first. Pure. */
+/** The sessions to pick up, most recent first: never one whose course was
+ *  deleted, which is history (round 4: a deleted course's lesson stayed at
+ *  the top of Today). Pure. */
 export function openSessions(chats: readonly ChatListItem[]): ChatListItem[] {
 	return chats
-		.filter((c) => PICK_UP.has(sessionState(c)))
+		.filter((c) => !c.courseDeleted && PICK_UP.has(sessionState(c)))
 		.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 }
