@@ -266,6 +266,9 @@ export function Chat({
 		return sendInput(...args);
 	}, [sendInput, followAction]);
 	const steer = useCallback<typeof steerInput>((...args) => {
+		// His overtaken words go out as this steer: the line that says they
+		// wait in the box goes with them (round 3: it stayed, box empty).
+		setAnsweredElsewhere(false);
 		followAction();
 		return steerInput(...args);
 	}, [steerInput, followAction]);
@@ -623,6 +626,8 @@ export function Chat({
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
 		keepWords(composerScope, { text: v });
+		// An emptied box no longer holds the words another window overtook.
+		if (!v.trim()) setAnsweredElsewhere(false);
 	}, [composerScope]);
 	// What he typed before a reload comes back after mount, so the server's
 	// page and the first client render agree.
