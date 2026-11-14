@@ -203,7 +203,7 @@ describe("course records adapter (fake engine)", () => {
 			today: "2026-11-08",
 			revision: 12,
 			title: "Linear Algebra",
-			exam: { date: "2026-11-29", days_left: 21, final_review: "2026-11-23", unreviewed: ["basis", "gone"], does_not_fit: ["cramer"] },
+			exam: { date: "2026-11-29", days_left: 21, final_review: "2026-11-23", unreviewed: ["basis", "gone"], does_not_fit: ["cramer"], reasons: { basis: "full", gone: "full", cramer: "not_ready", rank: "busy" } },
 			current: "rank",
 			focus: "sheet-4",
 			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }],
@@ -225,7 +225,7 @@ describe("course records adapter (fake engine)", () => {
 		assert.ok(result.ok);
 		const { map } = result;
 		assert.equal(map.workspace, "/s/linalg");
-		assert.deepEqual(map.exam, { date: "2026-11-29", daysLeft: 21, finalReview: "2026-11-23", doesNotFit: ["cramer"], unreviewed: ["basis"] }, "the run-up, with topics the map lists");
+		assert.deepEqual(map.exam, { date: "2026-11-29", daysLeft: 21, finalReview: "2026-11-23", doesNotFit: ["cramer"], unreviewed: ["basis"], reasons: { basis: "full", cramer: "not_ready" } }, "the run-up, with topics the map lists and the reasons the engine knows");
 		assert.equal(map.current, "rank");
 		assert.deepEqual(map.tasks, [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }]);
 		assert.deepEqual(

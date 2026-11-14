@@ -113,15 +113,28 @@ export interface CourseMapTask {
 	updated: string | null;
 }
 
+/** Why the engine's plan leaves a topic out before the exam
+ *  (`agenda.Reason`). For one it cannot start (`doesNotFit`): no study day
+ *  is left before the exam, its prerequisites are not solid on any study
+ *  day before it (`not_ready`), or every day it could start is full at his
+ *  limit. For a taught one with no review in the final review
+ *  (`unreviewed`): no study day is left in the final review, it starts too
+ *  near the exam for its first review (`too_late`), or every day of the
+ *  final review is full at his limit. */
+export type ExamGapReason = "no_study_day" | "not_ready" | "full" | "too_late";
+export const EXAM_GAP_REASONS: readonly ExamGapReason[] = ["no_study_day", "not_ready", "full", "too_late"];
+
 /** The exam and its run-up, as the engine's `map` gives it: the final
  *  review's first day, the path topics the plan cannot start before the
- *  exam and the taught ones its final review has no room for. */
+ *  exam, the taught ones its final review has no room for, and why each
+ *  of those is left out. */
 export interface CourseExam {
 	date: string;
 	daysLeft: number;
 	finalReview?: string;
 	doesNotFit?: readonly TopicHandle[];
 	unreviewed?: readonly TopicHandle[];
+	reasons?: Readonly<Partial<Record<TopicHandle, ExamGapReason>>>;
 	/** The arcs it examines, in arc order; absent when it covers the whole
 	 *  course. Read it through `examCovers`. */
 	arcs?: readonly ArcHandle[];

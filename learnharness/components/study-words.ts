@@ -1,4 +1,4 @@
-import { currentArc, type ArcHandle, type ArcState, type CourseExam, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, type RightAnswer, type StartsWhy, type TopicHandle, type TopicSignals, type UnreadableProblem } from "@/src/core";
+import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, type RightAnswer, type StartsWhy, type TopicHandle, type TopicSignals, type UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -260,9 +260,9 @@ export const ARC_EXAM_WORDS = {
 
 /** The course head's line under its first, when the exam's plan leaves
  *  topics out (`examGaps`: the engine's `does_not_fit` and `unreviewed`):
- *  why, then a way in. "Today", since a press starts it now. */
+ *  why, in the engine's reasons (`EXAM_GAP_WHY`), then a way in. "Today",
+ *  since a press starts it now. */
 export const EXAM_GAP_WORDS = {
-	full: "Every day before the exam is full at your pace",
 	start: "Start it today",
 	review: "Review it today",
 	startOne: "Start one today",
@@ -271,6 +271,25 @@ export const EXAM_GAP_WORDS = {
 	startTopic: "Start",
 	reviewTopic: "Review",
 } as const;
+
+/** Each engine reason (`ExamGapReason`) a topic is left out, in his
+ *  words: for a topic with no room to start (`start`), and for a taught
+ *  one the final review has no room for (`review`). */
+export const EXAM_GAP_WHY: {
+	start: Readonly<Partial<Record<ExamGapReason, string>>>;
+	review: Readonly<Partial<Record<ExamGapReason, string>>>;
+} = {
+	start: {
+		no_study_day: "No study day is left before the exam",
+		not_ready: "What comes first won’t be solid before the exam",
+		full: "Every study day before the exam is full at your pace",
+	},
+	review: {
+		no_study_day: "No study day is left in the final review",
+		too_late: "Started too close to the exam for a review",
+		full: "Every day of the final review is full at your pace",
+	},
+};
 
 /** The taught topics the final review has no room for, standing alone
  *  (the calendar's "No room in it for" reads under its final review). */

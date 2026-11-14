@@ -12,10 +12,10 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
+import type { ChatListItem, CourseMapTopic, ExamGapReason, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
 import { examGaps, lastSessionOf, namesWords, paceOf } from "../components/course-page/course-head/head-facts.ts";
-import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
+import { EXAM_GAP_WHY, EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
 import { PaceHead } from "../components/course-page/course-head/pace-head.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
@@ -134,7 +134,8 @@ describe("a lesson that could not start", () => {
 });
 
 describe("what the final review leaves out (round 6: Variance had no word, Random variables showed only in the calendar)", () => {
-	const gapped = (doesNotFit: string[], unreviewed: string[]) => course({ exam: { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-14", doesNotFit: doesNotFit.map(h), unreviewed: unreviewed.map(h) } });
+	const gapped = (doesNotFit: string[], unreviewed: string[], reasons: Record<string, ExamGapReason> = {}) =>
+		course({ exam: { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-14", doesNotFit: doesNotFit.map(h), unreviewed: unreviewed.map(h), reasons } });
 
 	it("reads the engine's two facts: the topics it has no room to start, and the taught ones its final review has no room for", () => {
 		const gaps = examGaps(gapped(["variance"], ["binomial"]).map);
@@ -152,19 +153,24 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 	const gapLine = (c: StudyCourse, lead?: React.ReactNode) => render(<PaceHead view={viewOf(c)} busy={false} onContinue={() => {}} lead={lead} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
 
 	it("says why under the head's first line, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
-		const one = gapLine(gapped(["variance"], []))!;
-		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WORDS.full}.`);
+		const one = gapLine(gapped(["variance"], [], { variance: "full" }))!;
+		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WHY.start.full}.`);
 		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask]);
-		const review = gapLine(gapped([], ["binomial"]))!;
+		const review = gapLine(gapped([], ["binomial"], { binomial: "too_late" }))!;
+		assert.equal(review.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WHY.review.too_late}.`);
 		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.review, EXAM_GAP_WORDS.ask]);
-		const both = gapLine(gapped(["variance"], ["binomial"]))!;
-		assert.equal(both.querySelector("[data-slot=exam-gaps-why]")?.textContent, `No room in the final review for Binomial either. ${EXAM_GAP_WORDS.full}.`);
+		const both = gapLine(gapped(["variance", "geometric"], ["binomial"], { variance: "not_ready", geometric: "not_ready", binomial: "full" }))!;
+		assert.equal(
+			both.querySelector("[data-slot=exam-gaps-why]")?.textContent,
+			`${EXAM_GAP_WHY.start.not_ready}. No room in the final review for Binomial either. ${EXAM_GAP_WHY.review.full}.`,
+			"the engine's reason for each, each said once",
+		);
 		assert.deepEqual([...both.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.startOne, EXAM_GAP_WORDS.ask], "one press picks which, from a menu");
 		assert.doesNotMatch(both.textContent ?? "", /\d/, "no counts");
 	});
 
 	it("shows under either candidate's first line, and nothing when every topic fits", () => {
-		assert.ok(gapLine(gapped(["variance"], []), <p data-slot="course-ready">Ready line</p>), "the Exam & mistakes candidates keep it");
+		assert.ok(gapLine(gapped(["variance"], [], { variance: "no_study_day" }), <p data-slot="course-ready">Ready line</p>), "the Exam & mistakes candidates keep it");
 		assert.equal(gapLine(course()), null);
 	});
 

@@ -137,6 +137,18 @@ def test_new_topics_finish_before_the_final_review_and_the_rest_does_not_fit() -
     assert set(tight.does_not_fit["c"]).isdisjoint(started(tight.days["c"]))
 
 
+def test_the_plan_says_why_each_topic_it_cannot_start_does_not_fit() -> None:
+    full = plan({"c": course(20, exam=10)}, 10, week(10, 1))
+    late = full.does_not_fit["c"]
+    assert {t: full.reasons["c"][t] for t in late} == dict.fromkeys(late, "full")
+    chain = course(3, exam=2, needs={"t01": ["t00"], "t02": ["t01"]})
+    waits = plan({"c": chain}, 2, week(10, 1, shown=False))
+    assert waits.does_not_fit == {"c": ["t02"]}
+    assert waits.reasons["c"]["t02"] == "not_ready", "t01 is solid only on the eve"
+    monday_off = plan({"c": course(2, exam=1)}, 1, week(10, 1, frozenset({2, 3})))
+    assert monday_off.reasons == {"c": {"t00": "no_study_day", "t01": "no_study_day"}}
+
+
 def test_a_topic_waits_for_its_prerequisites_to_be_solid() -> None:
     record = course(3, needs={"t01": ["t00"], "t02": ["t01"]})
     days = plan({"c": record}, 7, week(5, 3, frozenset(range(7)))).days["c"]
@@ -487,6 +499,10 @@ def test_a_final_review_with_too_little_room_names_what_it_leaves() -> None:
     )
     together = plan({"c": record}, 4, week(1, 0, frozenset(range(7))))
     assert together.unreviewed == {"c": ["t03", "t04", "t05"]}
+    assert together.reasons == {"c": dict.fromkeys(["t03", "t04", "t05"], "full")}
+    eve = plan({"c": course(1, exam=1)}, 2, week(10, 1, shown=False))
+    assert eve.unreviewed == {"c": ["t00"]}
+    assert eve.reasons == {"c": {"t00": "too_late"}}, "its first review is the exam day"
 
 
 def test_a_course_with_no_exam_keeps_the_reviews_memory_needs_most() -> None:

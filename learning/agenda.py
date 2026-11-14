@@ -21,7 +21,7 @@ Reviews, when there are more than fit:
      topics come back as their short intervals ask. Every taught topic is due
      by the final review, so each is reviewed before the exam whenever his
      limit leaves room for it; the plan names those it leaves without one
-     (``Plan.unreviewed``).
+     (``Plan.unreviewed``), each with why (``Reason``).
   2. a review an exam's untaught topics wait on (a topic not yet solid that
      they need, or a competing method of theirs), nearest exam first: the
      rest of that exam's path cannot start before it is solid, so it carries
@@ -83,7 +83,7 @@ prerequisites) in the arc the plan is taking from, or his own rate that
 weekday holds two: two unrelated topics in
 one sitting split his attention, and nothing but a pace asks for them. A pace
 that needs two still takes two, related ones first. A topic a course cannot start before its exam does not
-fit. Before any pace, an untaught topic that a taught topic needs starts first,
+fit, and the plan says why (``Reason``). Before any pace, an untaught topic that a taught topic needs starts first,
 nearest exam first: what he has already started stands on it. A start that
 waits while other courses' new topics take the days names them
 (``When.starts_after``).
@@ -119,7 +119,7 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 import math
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from learning import arc_rules, capacity, progress
 from learning.capacity import Capacity
@@ -151,6 +151,20 @@ class Why(TypedDict, total=False):
     partners: list[str]
     waiting_on: list[str]
     exam: bool
+
+
+Reason = Literal["no_study_day", "not_ready", "full", "too_late"]
+"""Why the plan leaves a topic out before its exam, by its own rule.
+
+A topic it cannot start (``does_not_fit``): ``no_study_day``, no day he
+studies is left before the exam; ``not_ready``, on no study day before it
+were its prerequisites solid and its competing methods settled
+(``_Course.ready``); ``full``, it was ready, and every day it could start
+went to other topics at his limit. A taught topic with no review in the
+final review (``unreviewed``): ``no_study_day``, no day he studies is left
+in the final review; ``too_late``, the plan starts it so near the exam that
+its first review falls on the exam day or after; ``full``, every study day
+of the final review went to other reviews at his limit."""
 
 
 def waiting(
@@ -201,6 +215,8 @@ class _Course:
     why: dict[str, Why] = field(default_factory=dict)
     missed: list[str] | None = None
     began: date | None = None
+    ready_once: set[str] = field(default_factory=set)
+    """The exam's untaught topics ready on some study day before it."""
 
     @classmethod
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
@@ -577,6 +593,8 @@ class When:
     starts_after: Mapping[str, list[str]] = field(default_factory=dict)
     why: Mapping[str, Why] = field(default_factory=dict)
     """Why each start comes when it does (``Why``)."""
+    reasons: Mapping[str, Reason] = field(default_factory=dict)
+    """Why each topic of ``does_not_fit`` and ``unreviewed`` is left out."""
 
     def review(self, topic: str, stored: str | None) -> str | None:
         placed = self.reviews.get(topic)
@@ -604,6 +622,9 @@ class Plan:
     the days before it, by course and topic."""
     why: dict[str, dict[str, Why]] = field(default_factory=dict)
     """Why each start comes when it does, by course and topic (``Why``)."""
+    reasons: dict[str, dict[str, Reason]] = field(default_factory=dict)
+    """Why each topic of ``does_not_fit`` and ``unreviewed`` is left out, by
+    course and topic (``Reason``)."""
 
     def when(self, name: str, today: date, studies: bool) -> When:
         reviews: dict[str, date] = {}
@@ -625,6 +646,7 @@ class Plan:
             self.unreviewed.get(name, []),
             dict(self.starts_after.get(name, {})),
             {topic: self.why[name][topic] for topic in starts if name in self.why},
+            dict(self.reasons.get(name, {})),
         )
 
 
@@ -806,6 +828,8 @@ def _new(
     for course in courses:
         course.fresh.clear()
         course.watch(course.startable(day))
+        if week.studies(day) and course.ahead(day):
+            course.ready_once.update(t for t in course.scoped if course.ready(t))
 
     def take(
         course: _Course,
@@ -1064,23 +1088,69 @@ def plan(
                     "new": new[course.name],
                 }
             )
+    late = {
+        course.name: missed
+        for course in courses
+        if course.ahead(today)
+        and (missed := course.scoped if course.missed is None else course.missed)
+    }
+    unreviewed = {
+        course.name: missed
+        for course in courses
+        if (missed := _unreviewed(course, records[course.name], today))
+    }
     return Plan(
         {course.name: course.days for course in courses},
-        {
-            course.name: missed
-            for course in courses
-            if course.ahead(today)
-            and (missed := course.scoped if course.missed is None else course.missed)
-        },
+        late,
         {course.name: dict(course.held) for course in courses if course.held},
-        {
-            course.name: missed
-            for course in courses
-            if (missed := _unreviewed(course, records[course.name], today))
-        },
+        unreviewed,
         {course.name: course.starts_after for course in courses if course.starts_after},
         {course.name: course.why for course in courses},
+        {
+            course.name: reasons
+            for course in courses
+            if (
+                reasons := _reasons(
+                    course,
+                    week,
+                    today,
+                    late.get(course.name, []),
+                    unreviewed.get(course.name, []),
+                )
+            )
+        },
     )
+
+
+def _reasons(
+    course: _Course,
+    week: Capacity,
+    today: date,
+    late: list[str],
+    unreviewed: list[str],
+) -> dict[str, Reason]:
+    """Why the plan leaves each of ``late`` (``does_not_fit``) and
+    ``unreviewed`` out (``Reason``)."""
+    exam = course.exam
+    if exam is None:
+        return {}
+    eve = exam.day - timedelta(days=1)
+    reasons: dict[str, Reason] = {}
+    no_day = not _study_days(week, today, eve)
+    for topic in late:
+        if no_day:
+            reasons[topic] = "no_study_day"
+        else:
+            reasons[topic] = "full" if topic in course.ready_once else "not_ready"
+    starts = {t: date.fromisoformat(d["date"]) for d in course.days for t in d["new"]}
+    no_review_day = not _study_days(week, max(exam.final, today), eve)
+    for topic in unreviewed:
+        first = starts.get(topic)
+        if first and first + timedelta(days=progress.FIRST_RETRIEVAL_DAYS) >= exam.day:
+            reasons[topic] = "too_late"
+        else:
+            reasons[topic] = "no_study_day" if no_review_day else "full"
+    return reasons
 
 
 def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[str]:
