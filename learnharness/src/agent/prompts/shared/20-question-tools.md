@@ -24,7 +24,7 @@ His thinking is the most precise transfer of his understanding you get — read 
 
 ### `ask_user_question`
 
-Asks a single question and waits. He can always pick "Other" and type. If you recommend an option, list it first with "(Recommended)" appended. Multiple questions → multiple calls.
+Asks a single question and waits. He can always pick "Other" and type. An option's label becomes his answer when he picks it, so it holds only his words; if you recommend an option, list it first. Multiple questions → multiple calls.
 
 ### ONE question per turn
 

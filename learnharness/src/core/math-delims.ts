@@ -21,6 +21,16 @@ function blockPosition(text: string, i: number): boolean {
 	return /^[ \t]*$/.test(text.slice(text.lastIndexOf("\n", i - 1) + 1, i));
 }
 
+/** The container prefix of a line that holds nothing but the span at
+ * [start, end): "" or blockquote markers such as "> ". Null when the span
+ * shares its line with prose, or sits indented (a list continuation). */
+function lonePrefix(text: string, start: number, end: number): string | null {
+	const prefix = text.slice(text.lastIndexOf("\n", start - 1) + 1, start);
+	const eol = text.indexOf("\n", end);
+	const rest = text.slice(end, eol < 0 ? text.length : eol);
+	return /^(?:[ \t]{0,3}>[ \t]?)*$/.test(prefix) && /^[ \t]*$/.test(rest) ? prefix : null;
+}
+
 /** micromark closes native single-dollar spans at escaped dollars too.
  * Replace an intended literal dollar with equivalent dollar-free TeX before
  * tokenization. Code, prose, unbalanced spans and display dollars stay raw. */
@@ -42,6 +52,13 @@ export function transformMathDelimiters(markdown: string): string {
 		const start = offset; offset += span.raw.length;
 		if (span.kind !== "math") return span.raw;
 		if (span.open === "$") return "$" + replaceEscapedDollars(span.body) + span.close;
+		if (span.open === "$$" && !span.display) {
+			// A formula alone on its line is a display, though written as
+			// $$…$$ on one line, which remark-math reads as inline.
+			const prefix = lonePrefix(markdown, start, start + span.raw.length);
+			const body = span.body.trim();
+			return prefix === null || !body ? span.raw : `$$\n${prefix}${body}\n${prefix}$$`;
+		}
 		if (span.open !== "\\(" && span.open !== "\\[") return span.raw;
 		const body = span.body.trim();
 		if (!body) return span.raw;

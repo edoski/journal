@@ -11,6 +11,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
+import { studyNow } from "../core/day-words.ts";
 import type { ChatStore } from "../core/ports.ts";
 import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, SessionGoal, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
@@ -38,7 +39,7 @@ function chatFile(id: string): string {
  *  compaction) by record-changed, which the sidebar refetches on. Silence
  *  here is law, not oversight. */
 function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string): ChatRecord {
-	const now = new Date().toISOString();
+	const now = studyNow().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
 		title: title.trim() || "Untitled session",
@@ -143,7 +144,7 @@ function saveMessages(id: string, messages: LhMessage[]): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
 	record.messages = messages;
-	record.updatedAt = new Date().toISOString();
+	record.updatedAt = studyNow().toISOString();
 	writeChat(record);
 }
 

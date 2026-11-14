@@ -31,6 +31,8 @@ export interface CourseMapBuild {
 	at: string;
 	/** What the save changed, in one line, or why nothing was saved. */
 	outcome: string;
+	/** The material it could not read, each with why: "notes.pdf (scanned)". */
+	unread?: string[];
 	/** The notes of a save the engine refused and the builder salvaged:
 	 *  arc proposals set aside, and each refused prerequisite. */
 	salvaged?: string[];

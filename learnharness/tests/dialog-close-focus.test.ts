@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { landFocusAfterClose } from "../components/ui/overlay.ts";
+import { landFocusAfterClose, openerReturn } from "../components/ui/overlay.ts";
 
 function page(active: "body" | "opener" | "gone") {
 	const focused: string[] = [];
@@ -43,4 +43,33 @@ test("a caller that places focus itself keeps it", async () => {
 	landFocusAfterClose((e) => e.preventDefault(), () => doc)(new Event("focusout", { cancelable: true }));
 	await settle();
 	assert.deepEqual(focused, []);
+});
+
+test("a dialog gives focus back to what held it when it opened, though no trigger of its own opened it", async () => {
+	// Round 6: Settings and the cheat sheet open from a button or a shortcut,
+	// not a Radix DialogTrigger, so Radix's own return found nothing.
+	const focused: string[] = [];
+	const body = { isConnected: true };
+	const opener = { isConnected: true, focus: () => focused.push("opener") };
+	const doc = { body, activeElement: opener } as unknown as Document;
+	const returner = openerReturn(() => doc);
+	returner.onOpenAutoFocus();
+	(doc as { activeElement: unknown }).activeElement = body;
+	const close = new Event("focusout", { cancelable: true });
+	returner.onCloseAutoFocus(close);
+	await settle();
+	assert.deepEqual(focused, ["opener"]);
+	assert.equal(close.defaultPrevented, true, "Radix's own return stands down");
+});
+
+test("a dialog opened with focus on the page lands where he types on close", async () => {
+	const focused: string[] = [];
+	const body = { isConnected: true };
+	const field = { focus: () => focused.push("composer") };
+	const doc = { body, activeElement: body, querySelector: () => field } as unknown as Document;
+	const returner = openerReturn(() => doc);
+	returner.onOpenAutoFocus();
+	returner.onCloseAutoFocus(new Event("focusout", { cancelable: true }));
+	await settle();
+	assert.deepEqual(focused, ["composer"]);
 });

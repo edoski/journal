@@ -382,8 +382,8 @@ function ConfidenceMeter({ value }: { value: Confidence }) {
 }
 
 /** How sure he is, Guessing, Neutral or Confident, as the meter. Its words
- *  are in its tooltip; a press steps to the next of the three, ⌥↑ and ⌥↓
- *  move it from anywhere while it shows. */
+ *  are in its tooltip; a press steps to the next of the three and leaves
+ *  focus in his field, ⌥↑ and ⌥↓ move it from anywhere while it shows. */
 export function ConfidenceIcon({ value, onChange }: { value: Confidence; onChange: (next: Confidence) => void }) {
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -400,7 +400,16 @@ export function ConfidenceIcon({ value, onChange }: { value: Confidence; onChang
 	const next = CONFIDENCE_CHOICES[(at + 1) % CONFIDENCE_CHOICES.length]!.state;
 	return (
 		<Hint label={`How sure you are: ${label}. Press for ${CONFIDENCE_CHOICES.find((c) => c.state === next)?.label ?? "the next"}`} binding="alt+arrowup">
-			<ComposerIcon data-testid="confidence-choice" data-confidence={value} pressed={value !== DEFAULT_CONFIDENCE} aria-label={`How sure you are: ${label}`} onClick={() => onChange(next)}>
+			<ComposerIcon
+				data-testid="confidence-choice"
+				data-confidence={value}
+				pressed={value !== DEFAULT_CONFIDENCE}
+				aria-label={`How sure you are: ${label}`}
+				// His field keeps focus, so Enter right after sends with this
+				// confidence instead of pressing the meter again (round 6).
+				onMouseDown={(e) => e.preventDefault()}
+				onClick={() => onChange(next)}
+			>
 				<ConfidenceMeter value={value} />
 			</ComposerIcon>
 		</Hint>

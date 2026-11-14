@@ -25,12 +25,11 @@ export function doneToday(chats: readonly ChatListItem[], now: Date): string[] {
 }
 
 /** The part of the learner's day an hour falls in, in words: "this
- *  morning", "this afternoon", "this evening", else "today" (he studies in
- *  the daytime; never "tonight"). Pure. */
+ *  morning", "this afternoon", else "today" (he studies in the daytime,
+ *  until about 6pm; never "tonight" or "this evening"). Pure. */
 function partOfDay(hour: number): string {
 	if (hour >= 5 && hour < 12) return "this morning";
 	if (hour >= 12 && hour < 18) return "this afternoon";
-	if (hour >= 18 && hour < 22) return "this evening";
 	return "today";
 }
 

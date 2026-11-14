@@ -15,7 +15,8 @@ import { LearnerBubble, LearnerWords } from "@/components/lesson/prose/learner-b
 const SMALL_SIZE = "[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]";
 const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
 
-/** The quiet mark that ends the tutor's message when it hands him the turn. */
+/** The quiet mark that ends the tutor's message when it hands him the turn,
+ *  over the question's words or choices; never over nothing. */
 export function YourTurn() {
 	return (
 		<p data-slot="your-turn" className="mb-1 text-row text-muted-foreground">
@@ -69,7 +70,7 @@ function OpenQuestion({ spec, stepAnchor, repeat }: { spec: ProseQuestionSpec; s
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
 		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			<YourTurn />
+			{(!repeat || spec.mode !== "text") && <YourTurn />}
 			{!repeat && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows

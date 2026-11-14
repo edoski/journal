@@ -3,7 +3,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_MAP_CAP, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
-import { createTree, planMapTooBig, PlanTreeError } from "../../core/plan-tree.ts";
+import { createTree, planMapTooBig, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
 import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
@@ -151,6 +151,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				"Call once right after the probe concludes, then state the lesson's goal in one line and start teaching in the same turn: he sees the map live and needs to approve nothing. " +
 				"Re-call whenever the map is wrong (the new block replaces the old tree). " +
 				"A mermaid graph block (any direction): one node per line (`slug[Short Title]` — slugs are permanent lowercase ids: a-z, 0-9, hyphens/underscores), " +
+				"each title naming what the step teaches, never its result: he sees it before the step is taught. " +
 				"`-->` edges meaning 'from must be understood before to' (chains fine). " +
 				`One idea per step, and the map fits his lesson map on one screen: at most ${PLAN_MAP_CAP.steps} steps, no chain longer than ${PLAN_MAP_CAP.deep}; a bigger map is refused. ` +
 				"Every check you fire names the node it assesses via `nodeId`; where the lesson stands derives from those tags.",
@@ -171,7 +172,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					// createTree validates the structure (duplicate ids, missing
 					// edge endpoints, self-loops, cycles → PlanTreeError).
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
-					const tooBig = planMapTooBig(next);
+					const tooBig = planMapTooBig(next) ?? planTitlesGiveAway(next);
 					if (tooBig) return { ok: false, error: tooBig };
 					chatStore.saveTree(chatId, next);
 					if (goal && !record.tree) chatStore.nameSession(chatId, goal);

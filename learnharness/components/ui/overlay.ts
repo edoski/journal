@@ -53,3 +53,31 @@ export function landFocusAfterClose(handler?: (event: Event) => void, doc: () =>
     setTimeout(() => focusWhereHeTypes(doc()), 0)
   }
 }
+
+/** A dialog's focus return (round 6, 14 Nov 2026). Radix's modal dialog
+ *  gives focus back only to its own DialogTrigger, and the app's dialogs
+ *  open from a button, a menu or a shortcut, so focus fell to the page
+ *  (Settings, the cheat sheet). This remembers what held focus as the
+ *  dialog opened and gives it back on close; with nothing to give back to
+ *  (the page held it, or the opener has gone), focus lands where he types
+ *  (`landFocusAfterClose`). One per dialog instance. */
+export function openerReturn(doc: () => Document | undefined = () => globalThis.document) {
+  let opener: HTMLElement | null = null
+  return {
+    onOpenAutoFocus() {
+      const d = doc()
+      const active = d?.activeElement as HTMLElement | null | undefined
+      opener = active && active !== d?.body ? active : null
+    },
+    onCloseAutoFocus(event: Event) {
+      const back = opener
+      opener = null
+      if (back?.isConnected) {
+        event.preventDefault()
+        back.focus({ preventScroll: true })
+        return
+      }
+      landFocusAfterClose(undefined, doc)(event)
+    },
+  }
+}

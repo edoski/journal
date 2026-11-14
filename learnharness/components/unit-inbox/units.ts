@@ -99,7 +99,15 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
  *  (`ownTopics`), never one that only touched it on the way, so a lesson
  *  is "Your turn" on its own topic alone. Pure. */
 export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNow {
-	const states = sessions.filter((c) => (c.ownTopics ?? []).includes(handle)).map(sessionState);
+	return sessionsNow(sessions.filter((c) => (c.ownTopics ?? []).includes(handle)));
+}
+
+/** What any of these sessions is doing now: one waits on the learner, the
+ *  tutor writes in one, or one was left for next time. A topic read with
+ *  every session tied to it (`topicSessions`) says what its page's Now and
+ *  the session's card on Today's top say. Pure. */
+export function sessionsNow(sessions: readonly ChatListItem[]): UnitNow {
+	const states = sessions.map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	if (states.includes("working")) return "working";
 	return states.includes("left") ? "left" : null;
@@ -205,7 +213,9 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.slip) return { kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key };
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
-	if (topic.review?.kind === "scheduled") return { kind: "returns", words: reviewWords(topic.review, today) };
+	// A review held past memory's day is due already ("Due since 6 Nov"):
+	// a fact that needs him, which the map's card shows, never a date ahead.
+	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "returns", words: reviewWords(topic.review, today) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
 	if (at) return { kind: "studied", words: studiedWords(at, today) };
 	return topic.level === "new" ? { kind: "none", words: STANDING_WORDS[0] } : { kind: "none" };

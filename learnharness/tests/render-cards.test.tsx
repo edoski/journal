@@ -146,13 +146,15 @@ describe("math rendering (streamdown + KaTeX)", () => {
 		assert.ok(html.includes("katex-display"), "fenced display math should render as display KaTeX");
 	});
 
-	it("one-line $$...$$ renders inline (micromark behavior — the transform relies on it for \(...\))", () => {
+	it("one-line $$...$$ inside a sentence renders inline (micromark behavior — the transform relies on it for \(...\))", () => {
 		// micromark treats a one-line $$...$$ inside a paragraph as 2-dollar
 		// inline mathText, not flow math. That is exactly how the transformed
 		// \(...\) renders inline; pin the behavior so a renderer swap can't
-		// silently change it.
-		const html = renderToStaticMarkup(<MessageResponse>{"$$\\int_0^1 x^2\\,dx$$"}</MessageResponse>);
+		// silently change it. Alone on its line it is a display (math-delims.ts).
+		const html = renderToStaticMarkup(<MessageResponse>{"So $$\\int_0^1 x^2\\,dx$$ is small."}</MessageResponse>);
 		assert.ok(html.includes("katex") && !html.includes("katex-display"), "one-liner should render inline");
+		const inline = renderToStaticMarkup(<MessageResponse>{"So \\(\\int_0^1 x^2\\,dx\\)"}</MessageResponse>);
+		assert.ok(inline.includes("katex") && !inline.includes("katex-display"), "\\(...\\) stays inline");
 	});
 
 	it("does NOT eat escaped currency (\\$5 stays text)", () => {
