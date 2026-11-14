@@ -89,7 +89,7 @@ const PROB: StudyCourse = {
 		title: "Probability",
 		exam: { date: "2026-11-19", daysLeft: 11 },
 		current: "bayes" as TopicHandle,
-		topics: [topic("conditional", "Conditional probability", "independent", { review: { kind: "scheduled", date: "2026-11-09" } }), topic("bayes", "Bayes' rule", "independent")],
+		topics: [topic("conditional", "Conditional probability", "independent", { review: { kind: "scheduled", date: "2026-11-09" } }), topic("bayes", "Bayes' rule", "assisted")],
 	}),
 	unready: [],
 	due: [],
@@ -157,6 +157,25 @@ describe("study facts", () => {
 		assert.deepEqual(step.kind === "topic" && [step.topics, step.planned], [["bayes"], true]);
 		assert.equal(whyOf({ kind: "course", course: fresh, step })?.short, "Planned today");
 		assert.equal(stepWords(nextStepOf({ ...LINALG, newToday: ["span"] as TopicHandle[] })), "Review Linear independence, Rank, Span", "reviews still come first");
+	});
+
+	it("after a review leaves the current topic his own, next is the topic the plan starts next, not that topic again", () => {
+		const reviewed: StudyCourse = {
+			...PROB,
+			map: {
+				...PROB.map,
+				topics: [
+					topic("bayes", "Bayes' rule", "independent", { review: { kind: "scheduled", date: "2026-11-11" } }),
+					topic("geometric", "Geometric distribution", "new", { starts: "2026-11-11" }),
+					topic("poisson", "Poisson distribution", "new", { starts: "2026-11-09" }),
+				],
+			},
+		};
+		const step = nextStepOf(reviewed);
+		assert.equal(stepWords(step), "Start Poisson distribution");
+		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Next up");
+		const done: StudyCourse = { ...reviewed, map: { ...reviewed.map, topics: reviewed.map.topics.slice(0, 1) } };
+		assert.equal(nextStepOf(done).kind, "none", "nothing left to start: no Continue on a topic he has on his own");
 	});
 
 	it("puts a course in its exam run-up first, the nearest exam first", () => {
@@ -315,7 +334,7 @@ describe("what a line of Today reads", () => {
 
 	it("counts how much of a course he can do on his own, weak topics left out", () => {
 		assert.deepEqual(courseProgress(LINALG), { solid: 2, of: 5 });
-		assert.deepEqual(courseProgress(PROB), { solid: 2, of: 2 });
+		assert.deepEqual(courseProgress(PROB), { solid: 1, of: 2 });
 		assert.equal(courseProgress({ ...LINALG, map: { ...LINALG.map, topics: [] } }), null);
 	});
 

@@ -63,7 +63,7 @@ export interface UnitInbox {
 /** The shelves that fold under Today. */
 export type FoldedShelf = "working" | "learning" | "known" | "other";
 
-const SOLID = new Set(["independent", "retained", "transferred"]);
+export const SOLID: ReadonlySet<string> = new Set(["independent", "retained", "transferred"]);
 
 export const unitKey = (workspace: string, handle: string) => `${workspace}#${handle}`;
 
