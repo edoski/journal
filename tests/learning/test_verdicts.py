@@ -349,7 +349,7 @@ def dispute(result: str, *targets: str, **extra: Any) -> dict[str, Any]:
         result,
         corrects=list(targets),
         disputed=extra.pop("disputed", "My answer was right"),
-        ruling=extra.pop("ruling", "He is right: the answer holds"),
+        ruling=extra.pop("ruling", "You are right: the answer holds"),
         **extra,
     )
 

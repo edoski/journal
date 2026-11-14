@@ -555,7 +555,7 @@ def remark(*targets: str, **fields: Any) -> dict[str, Any]:
         text=fields.pop("text", "Worked an exercise"),
         corrects=list(targets),
         disputed=fields.pop("disputed", "My answer was right"),
-        ruling=fields.pop("ruling", "The rank is 2 as he said; the mark missed it"),
+        ruling=fields.pop("ruling", "The rank is 2 as you said; the mark missed it"),
         **fields,
     )
 
@@ -894,6 +894,43 @@ def test_text_the_learner_reads_is_written_to_them() -> None:
     )[0]
     assert asked["observations"]["o1"]["text"] == "He flips a coin twice"
     assert course({"tasks": {"t": {"title": "T", "help": "o3, 2026-11-08, he"}}})
+
+
+def test_a_ruling_shows_on_his_answer_so_it_is_written_to_him() -> None:
+    record = course(
+        {"topics": {"rank": {"title": "Rank"}}, "observations": [attempt("rank")]}
+    )
+    remark = attempt(
+        "rank", corrects=["o1"], disputed="My answer was right", result="incorrect"
+    )
+    fails(
+        record,
+        {
+            "observations": [
+                {**remark, "ruling": "His answer said guessing, which he didn't give"}
+            ]
+        },
+        "observations[0].ruling",
+        'as "His"',
+    )
+    fails(
+        record,
+        {"observations": [{**remark, "ruling": "The mark of o1 stands"}]},
+        "observations[0].ruling",
+        'names the observation "o1"',
+    )
+    saved = apply(
+        record,
+        {
+            "observations": [
+                {**remark, "ruling": "You wrote guessing, so the mark stands"}
+            ]
+        },
+    )[0]
+    assert (
+        saved["observations"]["o2"]["ruling"]
+        == "You wrote guessing, so the mark stands"
+    )
 
 
 def test_only_an_attempt_can_be_a_prediction() -> None:

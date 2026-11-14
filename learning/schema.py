@@ -634,15 +634,17 @@ def entry(
 # The recorded texts the learner reads in their study app, days later
 # (records.md, "What the learner reads"), and of those the ones written to the
 # learner: a topic's title names an idea and an attempt's text is the question
-# as asked, so a person in a word problem may be "he".
+# as asked, so a person in a word problem may be "he". A re-mark's ruling shows
+# on the answer it re-marks, so it speaks to the learner too.
 LEARNER_READS: dict[str, tuple[str, ...]] = {
     "topic": ("title", "gap", "note"),
     "task": ("title", "goal", "step"),
-    "observation": ("text",),
+    "observation": ("text", "ruling"),
 }
 WRITTEN_TO_LEARNER: dict[str, tuple[str, ...]] = {
     "topic": ("gap", "note"),
     "task": ("title", "goal", "step"),
+    "observation": ("ruling",),
 }
 _SHOWN_ID = re.compile(r"\bo[0-9]+\b")
 _SHOWN_DAY = re.compile(r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b")
