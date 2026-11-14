@@ -58,7 +58,6 @@ export interface ProseComposerProps {
 	/** Esc lands here while something is open: the lesson binds the switch. */
 	toggleRef: MutableRefObject<(() => void) | null>;
 	busy: boolean;
-	compacting: boolean;
 	chatId: string;
 	carryScope?: string;
 	initialDraft?: QuestionFormDraft;
@@ -77,7 +76,7 @@ export interface ProseComposerProps {
  *  Send answers. Esc or the toggle turns it into a message to the tutor
  *  until Esc or the toggle again. */
 export function ProseComposer(props: ProseComposerProps) {
-	const { open, answer, message, messageText, onAskInstead, toggleRef, chatId, compacting } = props;
+	const { open, answer, message, messageText, onAskInstead, toggleRef, chatId } = props;
 	const box = proseBox(chatId, open);
 	const asking = open !== null && answer.mode === "ask";
 	// Esc carries his words to the other side when that side holds none.
@@ -110,7 +109,7 @@ export function ProseComposer(props: ProseComposerProps) {
 				{...(open
 					? {
 							onSend: onAskInstead,
-							sendAllowed: !compacting,
+							sendAllowed: true,
 							nextProblem: false,
 							onEmptyEnter: undefined,
 							placeholder: `Ask anything. The ${open.kind} stays open.`,
@@ -129,7 +128,6 @@ function AnswerComposer({
 	box,
 	onAsk,
 	busy,
-	compacting,
 	carryScope,
 	initialDraft,
 	onSaveDraft,
@@ -143,7 +141,7 @@ function AnswerComposer({
 	const problem = open.kind === "problem";
 	const textMode = problem || spec?.mode === "text";
 	const { selection, confidence, setConfidence, toggle: pick } = answer;
-	const waiting = compacting || (problem && busy);
+	const waiting = problem && busy;
 	const [text, setText] = useState(() => (initialDraft ? initialDraft.text || initialDraft.other || initialDraft.thinking : ""));
 	const photos = usePhotoDraft(initialDraft?.photos, textMode ? box : undefined);
 	const restorePhotos = photos.restore;
@@ -231,7 +229,7 @@ function AnswerComposer({
 	// Hint on a check: a request, never an answer. The check comes back
 	// as a new question, and his work waits in the carry to fill it.
 	const hint = () => {
-		if (compacting || !spec || spec.kind !== "explain") return;
+		if (!spec || spec.kind !== "explain") return;
 		if (carryScope) carryWords(carryScope, spec.data.question, { form: keptForm(text, selection) }, photos.photos.map((p) => p.photo));
 		forgetBox();
 		onSubmitAnswer(proseHintRequest(spec, text));
@@ -283,7 +281,7 @@ function AnswerComposer({
 			<RequestIcon icon={BookOpenIcon} label="Explain instead" hint="Explain instead: leave this problem and be taught the idea" action="practice-explain" testId="practice-request-explain" disabled={waiting} onClick={() => request("explain")} />
 		</>
 	) : (
-		spec?.kind === "explain" && <RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={compacting} onClick={hint} />
+		spec?.kind === "explain" && <RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={waiting} onClick={hint} />
 	);
 	const toolbar = (
 		<>
@@ -300,7 +298,7 @@ function AnswerComposer({
 			onSend={submit}
 			onStop={message.onStop}
 			canSend={ready}
-			placeholder={compacting ? "Compacting the conversation…" : placeholder}
+			placeholder={placeholder}
 			leading={leading}
 			toolbar={toolbar}
 			answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}

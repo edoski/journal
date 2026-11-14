@@ -51,7 +51,6 @@ test("work on a problem refused at once comes back into the box", async () => {
 				onAskInstead={noop}
 				toggleRef={{ current: null }}
 				busy={false}
-				compacting={false}
 				chatId="c1"
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}

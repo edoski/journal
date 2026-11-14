@@ -127,7 +127,6 @@ async function mount(key: string, carryScope?: string, input: unknown = check, t
 				onAskInstead={noop}
 				toggleRef={{ current: null }}
 				busy={false}
-				compacting={false}
 				chatId="c1"
 				carryScope={carryScope}
 				onSaveDraft={noop}

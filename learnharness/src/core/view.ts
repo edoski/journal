@@ -220,7 +220,10 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 	for (const m of messages) {
 		const role = (m as { role?: string }).role;
 
-		if (compaction && m.id === compaction.details.firstKeptMessageId) {
+		// Claude Code's own compaction keeps no verbatim tail (an empty
+		// firstKeptMessageId): its cut is the marker itself.
+		const cutHere = compaction && (compaction.details.firstKeptMessageId === "" ? m === compaction : m.id === compaction.details.firstKeptMessageId);
+		if (compaction && cutHere) {
 			out.push({
 				id: `cut_${compaction.id}`,
 				role: "user",

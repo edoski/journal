@@ -729,23 +729,23 @@ export function Chat({
 	// a pending question still owns the interaction (the dock replaces the
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
-	// Compaction (owner round 14): the RUNNING state — compaction-changed
-	// flips it; the send paths, sendAllowed, and the docks gate on it (the
-	// server's registry mutex is the structural gate; this is the
-	// affordance).
+	// Compaction (owner round 14): the RUNNING state, flipped by
+	// compaction-changed. Nothing gates on it: the server holds any turn
+	// until the compaction ends, so his Enter goes through and the line
+	// below the transcript says why the reply waits (round 6).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
 	// recovers from it. Later compaction requires new input instead.
-	const retryable = (status === "ready" || status === "error") && !busy && !compacting && endsInFailedTurn(nativeMessages);
+	const retryable = (status === "ready" || status === "error") && !busy && endsInFailedTurn(nativeMessages);
 	const retryFailedTurn = () => retryFailedResponse(send, draftRef);
 	const failure = failedResponseAtEnd(nativeMessages);
 	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
 	// A turn that ended with no word after his input (a restart, a stop
 	// before the reply began) says so, with Try again (turn-cut.ts).
-	const replyCut = status === "ready" && !busy && !compacting && !error ? replyCutOf(nativeMessages) : null;
-	const sendAllowed = !pending && !activeProblem && !compacting;
+	const replyCut = status === "ready" && !busy && !error ? replyCutOf(nativeMessages) : null;
+	const sendAllowed = !pending && !activeProblem;
 	// Try again's key (round 3): Enter on the empty composer, from the field
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
@@ -762,12 +762,12 @@ export function Chat({
 	// again: the top bar says so, and has nothing left to stop.
 	const closedForToday = closedTonight(nativeMessages);
 	const sendTonight = useCallback(() => {
-		if (busy || compacting || doneTonight) return;
+		if (busy || doneTonight) return;
 		// His half-typed answer waits for the same question next time
 		// (kept-drafts.ts); the answer itself stays hidden.
 		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, (pending.input as { question?: string } | null)?.question ?? "");
 		void send({ type: "tonight" });
-	}, [busy, compacting, doneTonight, send, pending, carryScope, chatId]);
+	}, [busy, doneTonight, send, pending, carryScope, chatId]);
 	const sendTonightRef = useRef(sendTonight);
 	sendTonightRef.current = sendTonight;
 	useEffect(() => {
@@ -781,7 +781,7 @@ export function Chat({
 	// landed. ⌘⇧M disputes the newest one.
 	const marks = useAnswerMarks(chatId, busy ? null : nativeMessages.length);
 	const [disputing, setDisputing] = useState<string | null>(null);
-	const canDispute = !!course && !busy && !compacting;
+	const canDispute = !!course && !busy;
 	const disputeMark = marks[disputing ?? ""];
 	const sendDispute = (answerId: string, mark: AnswerMark, draft: DisputeDraft) => {
 		setDisputing(null);
@@ -803,7 +803,6 @@ export function Chat({
 		mode === "practice" &&
 		!pending &&
 		!activeProblem &&
-		!compacting &&
 		!busy &&
 		nativeMessages.some(
 			(m) => (m as { role?: string }).role === "assistant" &&
@@ -1232,7 +1231,7 @@ export function Chat({
 	}, [chatId]);
 
 	const onSend = () => {
-		if (pending || compacting) return;
+		if (pending) return;
 		doSteerOrSend();
 	};
 	// A refused send puts its photos back, as the refusal flow keeps the text.
@@ -1243,7 +1242,7 @@ export function Chat({
 		});
 	};
 	const doSend = () => {
-		if (busy || pending || compacting) return;
+		if (busy || pending) return;
 		const t = textRef.current.trim();
 		const withPhotos = composerPhotos.photos.length > 0;
 		if (!t && !withPhotos) return;
@@ -1269,7 +1268,7 @@ export function Chat({
 	 * time the send's POST resolved, so the steer lands. Idle takes the
 	 * plain send; a raced settle 409s and falls back to exactly that. */
 	const doSteerOrSend = () => {
-		if (pending || compacting) return;
+		if (pending) return;
 		const t = textRef.current.trim();
 		if (!t && composerPhotos.photos.length === 0) return;
 		if (busy) {
@@ -1287,7 +1286,6 @@ export function Chat({
 	 * again as it was, and his answer so far waits for it in the carry. A
 	 * problem stays open and his message reaches the tutor beside it. */
 	const askInstead = async () => {
-		if (compacting) return;
 		const t = textRef.current.trim();
 		if (!t && composerPhotos.photos.length === 0) return;
 		if (unconnected) {
@@ -1436,7 +1434,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone || courseGone} />}
+						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || doneTonight || gone || courseGone} />}
 					/>
 				</TopBar>
 
@@ -1561,7 +1559,7 @@ export function Chat({
 													case "tool-explain":
 													case "tool-recall": {
 														const malformed = !busy && malformedQuestions.find(call => call.messageId === part.sourceMessageId && call.contentIndex === part.sourceContentIndex && call.toolCallId === part.toolCallId);
-														if (malformed) return <MalformedQuestion key={pi} disabled={!!pending || compacting}
+														if (malformed) return <MalformedQuestion key={pi} disabled={!!pending}
 															reason={pending ? "Answer or discard the remaining question first." : undefined}
 															onRetry={() => {
 																draftRef.current = null;
@@ -1632,12 +1630,11 @@ export function Chat({
 							    entered by external discovery (wake) / the poll
 							    fallback. Never collapsible itself. */}
 							{/* Compaction (owner round 15): the same register as the
-						    thinking placeholder — a visible session-wide state while
-						    the summarizer holds the model gate. Mutually exclusive with
-						    the THINKING placeholder by construction (the gate sits
-						    BEFORE beginTurn; the settle kick runs after endTurn). */}
+						    thinking placeholder, a visible session-wide state while
+						    the summarizer holds the model gate. It stands in for
+						    Thinking while his sent input waits on it (round 6). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{!compacting && showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
 							{replyCut && !courseGone && !gone && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
@@ -1698,7 +1695,6 @@ export function Chat({
 							onAskInstead={() => void askInstead()}
 							toggleRef={proseToggleRef}
 							busy={busy}
-							compacting={compacting}
 							chatId={chatId}
 							carryScope={carryScope}
 							initialDraft={pending ? questionDraft(pending.key)?.form : undefined}

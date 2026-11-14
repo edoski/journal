@@ -82,7 +82,6 @@ test("the composer answering a question reports what he types as he types it", a
 					onAskInstead={noop}
 					toggleRef={{ current: null }}
 					busy={false}
-					compacting={false}
 					chatId="c1"
 					onSaveDraft={noop}
 					onSubmitAnswer={noop}
