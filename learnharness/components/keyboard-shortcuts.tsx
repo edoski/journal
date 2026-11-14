@@ -172,31 +172,34 @@ export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }
 	})).filter((section) => section.actions.length > 0);
 }
 
-/** The ? overlay: the dialog anatomy (dialog.md) with a two-column list,
- *  the action, then its keys as plain glyphs (kbd.md), in the app's own
- *  words. */
+/** The ? overlay: the dialog anatomy (dialog.md), its sections in two
+ *  balanced columns so every shortcut shows at once with nothing to
+ *  scroll, each row the action, then its keys as plain glyphs (kbd.md),
+ *  in the app's own words. */
 function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 	if (!open) return null;
 	return (
 		<Dialog open onOpenChange={(next) => !next && onClose()}>
-			<DialogContent aria-describedby={undefined} data-testid="cheat-sheet" className="max-h-[80vh] max-w-xl overflow-y-auto">
+			<DialogContent aria-describedby={undefined} data-testid="cheat-sheet" className="max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Keyboard shortcuts</DialogTitle>
 				</DialogHeader>
 				<Hint label="Close" binding="escape" side="left">
 					<DialogClose aria-label="Close shortcuts" />
 				</Hint>
-				{cheatSheetSections().map(({ label, actions }) => (
-					<section key={label} aria-label={label} className="flex flex-col">
-						<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
-						{actions.map((a) => (
-							<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
-								<span className="truncate text-foreground">{a.label}</span>
-								<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
-							</div>
-						))}
-					</section>
-				))}
+				<div data-slot="cheat-sheet-columns" className="columns-2 gap-8">
+					{cheatSheetSections().map(({ label, actions }) => (
+						<section key={label} aria-label={label} className="flex break-inside-avoid flex-col pb-4 last:pb-0">
+							<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
+							{actions.map((a) => (
+								<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
+									<span className="truncate text-foreground">{a.label}</span>
+									<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
+								</div>
+							))}
+						</section>
+					))}
+				</div>
 			</DialogContent>
 		</Dialog>
 	);
