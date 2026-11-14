@@ -183,6 +183,13 @@ function memoryLedgers(): CourseMapLedgers & { all: Map<string, CourseMapLedger>
 	return { all, get: (w) => all.get(w), save: (w, l) => void all.set(w, structuredClone(l)), workspaces: () => [...all.keys()] };
 }
 
+/** Resolves once `done` holds after a build ends: the builder's own signal, not a clock. */
+function settled(ledgers: ReturnType<typeof memoryLedgers>, dir: string, builds: number) {
+	let resolve!: () => void;
+	const ended = new Promise<void>((r) => (resolve = r));
+	return { onStatus: () => (ledgers.all.get(dir)?.done.length ?? 0) >= builds && resolve(), ended };
+}
+
 /** A model that reads every source it is told to read now, then submits
  *  `answers` in turn (the next one after a refusal). */
 function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): PiEngine & { reads: string[] } {
@@ -300,7 +307,8 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		let release!: () => void;
 		const gate = new Promise<void>((r) => (release = r));
 		const model = scriptedModel([FIRST, { topics: [{ handle: "cv", title: "Cross-validation", needs: ["ols"], refs: [{ source: "sheet" }] }], order: ["ols", "cv"] }], gate);
-		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: model });
+		const done = settled(ledgers, dir, 2);
+		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: model, onStatus: done.onStatus });
 		const first = builder.buildMap(dir);
 		fs.writeFileSync(path.join(dir, "material", "sheet.md"), "Ex. 1\n");
 		engine(["--workspace", dir, "sources", "--add", "material/sheet.md"]);
@@ -308,7 +316,7 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		assert.deepEqual(await builder.buildMap(dir), { status: "busy" }, "a third request folds into the same rerun");
 		release();
 		await first;
-		for (let waited = 0; (builder.status(dir).state === "building" || ledgers.all.get(dir)!.done.length < 2) && waited < 250; waited++) await new Promise((r) => setTimeout(r, 20));
+		await done.ended;
 		assert.equal(ledgers.all.get(dir)!.done.length, 2, "exactly one more build");
 		assert.deepEqual(model.reads, ["notes", "sheet"], "each build read only its own material");
 		assert.deepEqual(Object.keys(record(dir).topics).sort(), ["cv", "ols", "ridge"]);
@@ -337,7 +345,8 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		let release!: () => void;
 		const gate = new Promise<void>((r) => (release = r));
 		const model = scriptedModel([FIRST, { topics: [{ handle: "cv", title: "Cross-validation", refs: [{ source: "sheet" }] }], order: ["cv"] }], gate);
-		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: model });
+		const done = settled(ledgers, dir, 2);
+		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: model, onStatus: done.onStatus });
 		const first = builder.buildMap(dir);
 		await builder.adopt(dir, ["material/sheet.md"]);
 		fs.writeFileSync(path.join(dir, "material", "sheet.md"), "Ex. 1\n");
@@ -345,7 +354,7 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		void builder.buildMap(dir);
 		release();
 		await first;
-		for (let waited = 0; ledgers.all.get(dir)!.done.length < 2 && waited < 250; waited++) await new Promise((r) => setTimeout(r, 20));
+		await done.ended;
 		assert.deepEqual(ledgers.all.get(dir)!.done.map((d) => d.outcome.startsWith("material the course had") ? "adopted" : "built"), ["built", "built"]);
 		assert.deepEqual(model.reads, ["notes", "sheet"]);
 	});
