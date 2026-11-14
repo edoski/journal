@@ -489,6 +489,7 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		const done = settled(ledgers, dir, 2);
 		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: model, onStatus: done.onStatus });
 		const first = builder.buildMap(dir);
+		while (model.reads.length === 0) await new Promise((r) => setTimeout(r, 10));
 		fs.writeFileSync(path.join(dir, "material", "sheet.md"), "Ex. 1\n");
 		engine(["--workspace", dir, "sources", "--add", "material/sheet.md"]);
 		assert.deepEqual(await builder.buildMap(dir), { status: "busy" });
