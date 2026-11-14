@@ -561,6 +561,21 @@ body {
 .lh-electron[data-lh-platform="darwin"] .lh-rail {
 	width: calc(92px / var(--lh-zoom));
 }
+/* The rail's open button sits in a head as tall as a page's top bar
+   (52px), its rule on the head's bottom edge, level with the top bar's
+   bottom line. In the Mac app the lights' band already fills those 52px
+   above the head, so the rule moves to the head's top edge, the band's
+   bottom: the same line. */
+.lh-rail-head {
+	height: 52px;
+}
+.lh-rail-rule {
+	bottom: 0;
+}
+.lh-electron[data-lh-platform="darwin"] .lh-rail-rule {
+	top: -1px;
+	bottom: auto;
+}
 
 /* Windows/Linux Window Controls Overlay: Chromium publishes the usable
    titlebar rectangle in CSS coordinates (including resize/zoom changes).
