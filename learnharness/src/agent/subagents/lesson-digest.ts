@@ -212,13 +212,29 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 			knowledge,
 			reached: reachedSteps(record.tree, record.messages),
 		};
-		const submit = await withBgLlmSlot(signal, () =>
+		// The save runs at the submit call, so a patch the engine refuses
+		// (a learner-facing text naming an id, a date or "he") goes back to
+		// the agent to rewrite instead of losing the digest.
+		let patch = null as ReturnType<typeof digestChanges>;
+		let failure = null as string | null;
+		const stopped = () => signal.aborted || !chatStore.getChat(chatId);
+		const save = async (answer: DigestSubmit): Promise<string | null> => {
+			const changes = digestChanges(answer, view);
+			if (!changes || stopped()) return null;
+			const saved = await courseRecords.run(workspace, { verb: "save", changes: changes.changes });
+			if (saved.ok) patch = changes;
+			else if (saved.kind === "validation") return `The course record refused it and nothing was saved: ${saved.message}`;
+			else failure = `save refused (${saved.kind}): ${saved.message}`;
+			return null;
+		};
+		await withBgLlmSlot(signal, () =>
 			runSubmitAgent<DigestSubmit>({
 				role: "teacher",
 				toolName: SUBMIT_TOOL,
 				toolDescription: "Submit what the lesson adds to the course record.",
 				parameters: digestSchema,
 				fill: (input: Static<typeof digestSchema>) => ({ ...input, topics: input.topics ?? [], knowledge: input.knowledge ?? [] }),
+				validate: save,
 				systemPrompt: DIGEST_INSTRUCTIONS,
 				prompt: digestPrompt(record, window, map, view),
 				engine,
@@ -229,12 +245,8 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 				neverSubmitted: "The digest agent never submitted.",
 			}),
 		);
-		if (signal.aborted || !chatStore.getChat(chatId)) throw Object.assign(new Error("digest aborted"), { name: "AbortError" });
-		const patch = digestChanges(submit, view);
-		if (patch) {
-			const saved = await courseRecords.run(workspace, { verb: "save", changes: patch.changes });
-			if (!saved.ok) throw new Error(`save refused (${saved.kind}): ${saved.message}`);
-		}
+		if (stopped()) throw Object.assign(new Error("digest aborted"), { name: "AbortError" });
+		if (failure) throw new Error(failure);
 		const outcome = patch?.summary ?? "nothing new to save";
 		updateLedger(chatStore, chatId, ({ done }) => ({
 			done: [...done, { throughMessageId: window.throughMessageId, fingerprint: window.fingerprint, at: new Date().toISOString(), outcome }],
