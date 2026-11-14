@@ -24,12 +24,15 @@ Object.defineProperty(globalThis, "localStorage", { value: storage, configurable
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
-const { carriedForm, forgetClosedBoxes, formToKept, keepWords, keptWords } = await import("../components/lesson/kept-drafts.ts");
+const { carriedForm, forgetClosedBoxes, formToKept, keepWords, keptWords, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
 const { ProseComposer } = await import("../components/lesson/prose/prose-composer.tsx");
 const { StickToBottom } = await import("use-stick-to-bottom");
 const { emptyDockSelection } = await import("../src/core/index.ts");
 
-beforeEach(() => storage.clear());
+beforeEach(() => {
+	storage.clear();
+	setKeptWindow("w-one", { live: ["w-one"] });
+});
 
 describe("keepWords", () => {
 	it("keeps a box's words and forgets an empty box", () => {
@@ -54,6 +57,44 @@ describe("keepWords", () => {
 		assert.equal(keptWords("c1:q:open")?.text, "b");
 		assert.equal(keptWords("c2:q:other")?.text, "c");
 		assert.equal(keptWords("c1:composer")?.text, "d");
+	});
+});
+
+describe("a box belongs to its window", () => {
+	it("words typed in another open window never fill this window's box", () => {
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		keepWords("c1:composer", { text: "draft in tab two: det of A-4I is" });
+		setKeptWindow("w-one", { live: ["w-one", "w-two"] });
+		assert.equal(keptWords("c1:composer"), undefined, "window one's box stays empty");
+		keepWords("c1:composer", { text: "my own question" });
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		assert.equal(keptWords("c1:composer")?.text, "draft in tab two: det of A-4I is", "and window two keeps its own words");
+	});
+
+	it("a reload keeps the window, so its words come back", () => {
+		keepWords("c1:q:k", { text: "half a thought" });
+		setKeptWindow("w-one", { live: ["w-one"] });
+		assert.equal(keptWords("c1:q:k")?.text, "half a thought");
+	});
+
+	it("after a restart the new window takes the words of a window that is gone, once", () => {
+		setKeptWindow("w-old", { live: ["w-old"] });
+		keepWords("c1:composer", { text: "typed before the restart" });
+		setKeptWindow("w-new", { live: ["w-new"] });
+		assert.equal(keptWords("c1:composer")?.text, "typed before the restart");
+		setKeptWindow("w-other", { live: ["w-new", "w-other"] });
+		assert.equal(keptWords("c1:composer"), undefined, "a second window does not take them too");
+	});
+
+	it("closing a question forgets only this window's box for it", () => {
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		keepWords("c1:q:old", { text: "window two's work" });
+		setKeptWindow("w-one", { live: ["w-one", "w-two"] });
+		keepWords("c1:q:old", { text: "window one's work" });
+		forgetClosedBoxes("c1", []);
+		assert.equal(keptWords("c1:q:old"), undefined);
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		assert.equal(keptWords("c1:q:old")?.text, "window two's work");
 	});
 });
 

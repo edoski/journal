@@ -1,5 +1,5 @@
 /**
- * His typed work and waiting photos, kept on this Mac per box (round 3,
+ * His typed work and waiting photos, kept on this Mac per box and window (round 3,
  * 14 Nov 2026): a reload, a restart, Hint or Done for today never empties
  * a box he was writing in. Words live in localStorage, read at once when
  * a box mounts; photos live in IndexedDB, too large for localStorage, and
@@ -40,6 +40,85 @@ function storage(): Storage | null {
 	}
 }
 
+/* ── Whose box (round 5, 14 Nov 2026) ───────────────────────────────────
+ * A box belongs to the window it was typed in: words typed in one window
+ * never fill a box in another. Each window has an id that survives its
+ * reloads (sessionStorage) and holds a Web Lock named after it while it
+ * lives, so the others can tell a closed window from an open one. A box's
+ * key is `lh.kept.<window>|<scope>`. A window opening after another has
+ * gone (an app restart) takes the gone window's words for a box it has
+ * none in, once; words of a window still open are never taken. */
+
+const WINDOW_KEY = "lh.window";
+const LOCK_PREFIX = "lh.window:";
+const SEP = "|";
+
+interface KeptWindow {
+	id: string;
+	/** Ids of windows known to be open; null until the locks answer, when
+	 *  nothing is taken from another window. */
+	live: Set<string> | null;
+}
+
+let current: KeptWindow | null = null;
+
+function newWindowId(): string {
+	return `w-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+}
+
+function thisWindow(): KeptWindow {
+	if (current) return current;
+	let id: string | null = null;
+	try {
+		id = globalThis.sessionStorage?.getItem(WINDOW_KEY) ?? null;
+		if (!id) {
+			id = newWindowId();
+			globalThis.sessionStorage?.setItem(WINDOW_KEY, id);
+		}
+	} catch {
+		id ??= newWindowId();
+	}
+	const win: KeptWindow = { id, live: null };
+	current = win;
+	const locks = (globalThis.navigator as Navigator | undefined)?.locks;
+	if (locks) {
+		// Held until the window closes: the promise never settles.
+		void locks.request(LOCK_PREFIX + id, () => new Promise<void>(() => {})).catch(() => {});
+		void locks.query().then((state) => {
+			const live = new Set<string>([id]);
+			for (const lock of [...(state.held ?? []), ...(state.pending ?? [])]) {
+				if (lock.name?.startsWith(LOCK_PREFIX)) live.add(lock.name.slice(LOCK_PREFIX.length));
+			}
+			if (current === win) win.live = live;
+		}).catch(() => {});
+	}
+	return win;
+}
+
+/** Tests name the window and the open ones; the app learns both itself. */
+export function setKeptWindow(id: string, others: { live: readonly string[] }): void {
+	current = { id, live: new Set([id, ...others.live]) };
+}
+
+function keyFor(windowId: string, scope: string): string {
+	return `${PREFIX}${windowId}${SEP}${scope}`;
+}
+
+/** A stored key's window and scope; a key from before windows had ids
+ *  belongs to no open window. */
+function parseKey(key: string): { window: string | null; scope: string } | null {
+	if (!key.startsWith(PREFIX)) return null;
+	const rest = key.slice(PREFIX.length);
+	const at = rest.indexOf(SEP);
+	if (rest.startsWith("w-") && at > 0) return { window: rest.slice(0, at), scope: rest.slice(at + 1) };
+	return { window: null, scope: rest };
+}
+
+/** Whether a box's words were left by a window that has closed. */
+function orphaned(window: string | null, win: KeptWindow): boolean {
+	return window !== win.id && win.live !== null && (window === null || !win.live.has(window));
+}
+
 /** Whether a kept value holds anything he typed or chose. */
 function holdsWork(words: KeptWords): boolean {
 	if (words.text?.trim()) return true;
@@ -51,24 +130,48 @@ function holdsWork(words: KeptWords): boolean {
 export function keepWords(scope: string, words: KeptWords | null): void {
 	const store = storage();
 	if (!store) return;
+	const key = keyFor(thisWindow().id, scope);
 	try {
-		if (!words || !holdsWork(words)) store.removeItem(PREFIX + scope);
-		else store.setItem(PREFIX + scope, JSON.stringify(words));
+		if (!words || !holdsWork(words)) store.removeItem(key);
+		else store.setItem(key, JSON.stringify(words));
 	} catch {
 		// Storage full or refused: the box still works, it just won't survive a reload.
 	}
 }
 
-/** A box's kept words, if any. */
-export function keptWords(scope: string): KeptWords | undefined {
+function parseWords(raw: string | null): KeptWords | undefined {
+	if (!raw) return undefined;
 	try {
-		const raw = storage()?.getItem(PREFIX + scope);
-		if (!raw) return undefined;
 		const value = JSON.parse(raw) as KeptWords;
 		return value && typeof value === "object" ? value : undefined;
 	} catch {
 		return undefined;
 	}
+}
+
+/** A box's kept words in this window, if any; else a closed window's
+ *  words for the same box, taken over by this window. */
+export function keptWords(scope: string): KeptWords | undefined {
+	const store = storage();
+	if (!store) return undefined;
+	const win = thisWindow();
+	try {
+		const own = parseWords(store.getItem(keyFor(win.id, scope)));
+		if (own) return own;
+		for (let i = 0; i < store.length; i++) {
+			const key = store.key(i);
+			const parsed = key ? parseKey(key) : null;
+			if (!key || !parsed || parsed.scope !== scope || !orphaned(parsed.window, win)) continue;
+			const words = parseWords(store.getItem(key));
+			store.removeItem(key);
+			if (!words) continue;
+			store.setItem(keyFor(win.id, scope), JSON.stringify(words));
+			return words;
+		}
+	} catch {
+		// Storage refused: nothing kept.
+	}
+	return undefined;
 }
 
 /** A question form as kept words. */
@@ -114,8 +217,9 @@ export function carriedForm(carry: KeptWords, textMode: boolean): QuestionFormDr
 export function forgetClosedBoxes(chatId: string, open: readonly string[]): void {
 	const store = storage();
 	if (!store) return;
-	const keep = new Set(open.map((scope) => PREFIX + scope));
-	const boxes = [`${PREFIX}${chatId}:q:`, `${PREFIX}${chatId}:p:`];
+	const win = thisWindow().id;
+	const keep = new Set(open.map((scope) => keyFor(win, scope)));
+	const boxes = [keyFor(win, `${chatId}:q:`), keyFor(win, `${chatId}:p:`)];
 	try {
 		const stale: string[] = [];
 		for (let i = 0; i < store.length; i++) {
@@ -164,15 +268,35 @@ function run<T>(mode: IDBTransactionMode, act: (store: IDBObjectStore) => IDBReq
 	}));
 }
 
-/** Keeps a box's waiting photos; none forgets them. */
-export async function keepPhotos(scope: string, photos: readonly Photo[]): Promise<void> {
-	await run<unknown>("readwrite", (store) => (photos.length ? store.put([...photos], scope) : store.delete(scope)) as IDBRequest<unknown>);
+/** A box's photos key: its window and scope, as its words' key. */
+function photoKey(windowId: string, scope: string): string {
+	return `${windowId}${SEP}${scope}`;
 }
 
-/** A box's kept photos. */
+/** Keeps a box's waiting photos; none forgets them. */
+export async function keepPhotos(scope: string, photos: readonly Photo[]): Promise<void> {
+	const key = photoKey(thisWindow().id, scope);
+	await run<unknown>("readwrite", (store) => (photos.length ? store.put([...photos], key) : store.delete(key)) as IDBRequest<unknown>);
+}
+
+/** A box's kept photos in this window; else a closed window's photos for
+ *  the same box, taken over by this window. */
 export async function keptPhotos(scope: string): Promise<Photo[]> {
-	const value = await run<unknown>("readonly", (store) => store.get(scope));
-	return Array.isArray(value) ? (value as Photo[]) : [];
+	const win = thisWindow();
+	const own = await run<unknown>("readonly", (store) => store.get(photoKey(win.id, scope)));
+	if (Array.isArray(own) && own.length) return own as Photo[];
+	const keys = await run<IDBValidKey[]>("readonly", (store) => store.getAllKeys());
+	for (const key of keys ?? []) {
+		if (typeof key !== "string") continue;
+		const parsed = parseKey(PREFIX + key);
+		if (!parsed || parsed.scope !== scope || !orphaned(parsed.window, win)) continue;
+		const value = await run<unknown>("readonly", (store) => store.get(key));
+		await run<unknown>("readwrite", (store) => store.delete(key) as IDBRequest<unknown>);
+		if (!Array.isArray(value) || !value.length) continue;
+		await keepPhotos(scope, value as Photo[]);
+		return value as Photo[];
+	}
+	return [];
 }
 
 /** Takes a box's kept photos once: read and forgotten. */
@@ -184,9 +308,11 @@ export async function takeKeptPhotos(scope: string): Promise<Photo[]> {
 
 async function forgetClosedPhotos(chatPrefix: string, open: readonly string[]): Promise<void> {
 	const keys = await run<IDBValidKey[]>("readonly", (store) => store.getAllKeys());
-	const keep = new Set(open);
+	const win = thisWindow().id;
+	const keep = new Set(open.map((scope) => photoKey(win, scope)));
+	const boxes = [photoKey(win, `${chatPrefix}q:`), photoKey(win, `${chatPrefix}p:`)];
 	for (const key of keys ?? []) {
-		if (typeof key !== "string" || !key.startsWith(chatPrefix) || keep.has(key)) continue;
-		if (key.startsWith(`${chatPrefix}q:`) || key.startsWith(`${chatPrefix}p:`)) await keepPhotos(key, []);
+		if (typeof key !== "string" || keep.has(key) || !boxes.some((box) => key.startsWith(box))) continue;
+		await run<unknown>("readwrite", (store) => store.delete(key) as IDBRequest<unknown>);
 	}
 }
