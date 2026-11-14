@@ -122,23 +122,15 @@ describe("the sidebar's cards", () => {
 describe("the topic page", () => {
 	const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
 
-	it("links the course and the arc in its head, the arc to its place on the course page", () => {
-		const facts = topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null });
-		assert.deepEqual(facts.arc, { handle: "systems", title: "Linear systems" });
-		const doc = render(<TopicHead facts={facts} />);
-		assert.equal(doc.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), courseHref("/s/linalg"));
-		const link = doc.querySelector('[data-slot="topic-arc-link"]')!;
-		assert.equal(link.textContent, "Linear systems");
-		assert.equal(link.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
-		assert.equal(arcHref("/s/linalg", "systems"), link.getAttribute("href"));
-	});
-
-	it("has only the course link without arcs", () => {
-		const facts = topicFacts({ course: LINALG, topic: rank, chats: [], read: null });
-		assert.equal(facts.arc, null);
-		const doc = render(<TopicHead facts={facts} />);
-		assert.equal(doc.querySelector('[data-slot="topic-arc-link"]'), null);
-		assert.equal(doc.querySelector('[data-slot="page-eyebrow"]')?.textContent, "Linear Algebra");
+	it("keeps the course link alone above the title, never Course · Arc (Edo, 14 Nov 2026)", () => {
+		for (const course of [LINALG_ARCS, LINALG]) {
+			const doc = render(<TopicHead facts={topicFacts({ course, topic: rank, chats: [], read: null })} />);
+			const eyebrow = doc.querySelector('[data-slot="page-eyebrow"]')!;
+			assert.equal(eyebrow.textContent, "Linear Algebra");
+			assert.deepEqual([...eyebrow.querySelectorAll("a")].map((a) => a.getAttribute("href")), [courseHref("/s/linalg")]);
+		}
+		assert.deepEqual(topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null }).arc, { handle: "systems", title: "Linear systems" });
+		assert.equal(topicFacts({ course: LINALG, topic: rank, chats: [], read: null }).arc, null);
 	});
 
 	it("says why a topic not started comes when it does, under its planned first lesson", () => {
