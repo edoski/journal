@@ -29,22 +29,10 @@ export function revealOf(pointed: Pointed | null): TopicHandle | null {
 	return pointed?.from === "list" ? pointed.handle : null;
 }
 
-const waits = (row: CourseTopic) => row.fact?.kind === "your-turn";
-
-/**
- * The groups the left pane shows: the four in their order, an empty one
- * left out so no header reads 0, and every topic a session waits on him
- * for ("Your turn") at the top of Needs you, so Learning holds only the
- * topics he is learning and a full pie never sits under it.
- */
+/** The groups the left pane shows: the four in their order, an empty one
+ *  left out so no header reads 0. */
 export function shownGroups(groups: readonly CourseGroup[]): CourseGroup[] {
-	const waiting = groups.flatMap((g) => g.topics.filter(waits));
-	return groups
-		.map((g) => {
-			const rest = g.topics.filter((row) => !waits(row));
-			return { ...g, topics: g.id === "needs-you" ? [...waiting, ...rest] : rest };
-		})
-		.filter((g) => g.topics.length > 0);
+	return groups.filter((g) => g.topics.length > 0);
 }
 
 /** Which groups show their rows when the page opens (Edo, 14 Nov 2026):

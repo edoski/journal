@@ -27,6 +27,19 @@ One form each, wherever it shows.
 | a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first (`reviewWords`): Due since 21 Oct |
 | a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started |
 
+### Which one a topic says
+
+A topic often has more than one reason, and a row says one. Every surface takes them in the same order (`unitStatus` in `unit-inbox/units.ts`, the map card's `statusOf`, Home's `whyOf`), so a topic says the same thing wherever it shows (Edo's brief, 14 Nov 2026: one fact per topic across surfaces):
+
+1. a session on it waits on him, or the tutor writes in it (Your turn, Working);
+2. a slip;
+3. a review come due (Due today, 3d overdue): the engine dates it today;
+4. unfinished work that holds it (Left off 2d ago);
+5. when its review comes back (Back in 5d), a review the plan holds back included (Due since 21 Oct): the engine dates that review on a later day, so the work he left comes first;
+6. how long since he studied it.
+
+Both "left off" and "due" are true at once, and neither is wrong: a review due today is today's work, so it leads; a review the plan has moved to a later day is not, so the unfinished work leads until that day. A topic Home's Today takes up says Today's reason instead, wherever it shows (the sidebar's card, the course page's Needs you).
+
 Home's line names the lapsed topic when the line is about another one ("Not right last time: Chain rule", `lapsedOnWords`, `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Not right: `ATTEMPT_WORDS`) is not a reason and keeps its own words.
 
 ## In a lesson

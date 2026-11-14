@@ -12,7 +12,7 @@ The page is the list and the map side by side in the app's linked columns (`spli
 | `course-frame.tsx` | what the page wraps itself in, as Home wraps itself in `HomeFrame`: the chrome, the read with its states, each in the shared page frame (`../page-frame/page-frame.md`), the lesson start behind the head's press (its failure shows in the head, course-head/course-head.md). The page fits the window with no bar showing (`ScrollArea bar={false}`) |
 | `course-chrome.tsx` | the 52px band, the window's drag region (the folded sidebar's rail holds the open button) |
 | `use-course.ts` | the read: `useStudyHome` (Home's read of `/api/study` and `/api/chats`, once per visit) with the sessions started on a topic's page linked to it, as the sidebar does |
-| `course-model.ts` | the pure model: `courseGroups`, `courseNext`, `courseFacts`, `courseRead` and the types the page uses (`CourseView`, `CourseGroup`, `CourseTopic`, `TopicFact`) |
+| `course-model.ts` | the pure model: `courseGroups` (the sidebar's model, read for one course), `courseNext`, `courseFacts`, `courseRead` and the types the page uses (`CourseView`, `CourseGroup`, `CourseTopic`, `TopicFact`) |
 | `course-head/pace-head.tsx` | the head, the shared `PageHead` (course-head/course-head.md) |
 | `course-topic-row.tsx` | one topic as a row (course-topic-row.md) |
 | `course-group.tsx` | a group's header over its rows, with folding and Show more (course-group.md) |
@@ -21,18 +21,18 @@ The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directl
 
 ## The groups
 
-`courseGroups(course, chats)` sorts every topic once, always into the same four groups in this order, an empty one included. It is built on the sidebar's classifier (`buildInbox`, `shelfOf`) and the topic map's words (`standingOf`, `needOf`, in `components/study-words.ts`), so the sidebar, the map and the page cannot disagree.
+`courseGroups(course, chats, courses)` sorts every topic once, always into the same four groups in this order, an empty one included. It reads the sidebar's own model (`../unit-inbox/now-inbox.ts`, `../unit-inbox/today/today-top.ts`), so a topic sits in the group the sidebar puts it in and ends in the words the sidebar says for it (Edo's brief, 14 Nov 2026: one fact per topic across surfaces; round 4 found Kernel under Learning in the sidebar and Needs you here, and Basis and dimension "Left off 2d ago" there and "Due since 29 Oct" here).
 
 | Group | Holds | Order | Row's fact |
 |---|---|---|---|
-| Needs you | every topic the map gives a reason (`needOf`): a slip, or a topic he can do on his own whose review is due | slips first, a wrong answer he was sure of on top (Butterfield and Metcalfe 2001: confident errors are the most corrected), then the longest overdue | the map's reason: "Not right last time", "Mistake to fix", "Mixed up with …", "Sure, but wrong", "3d overdue" |
-| Learning | the sidebar's Learning shelf less those | the sidebar's: a turn that waits first, then the latest studied | "You are here" on the current topic, else where an open task holding it was left ("At part (c): …"), else nothing. A topic still being learned never says its review is due (the sidebar's rule) |
-| Not started | what the sidebar leaves out | the engine's path order | "You are here" if it is the current topic, else nothing |
-| On your own | the sidebar's Known shelf | the soonest back first | when it comes back, as the sidebar and the topic page say it (`reviewWords`): "Back in 5d", or "Due since 21 Oct" for a review held past its day |
+| Needs you | what Home's Today takes up in this course: the sidebar's top (`todayTop` over every course, each line's claimed topics, `claimedKeys`) | Today's | Today's reason for it, as the sidebar's card says it (`slotWords`): "Your turn", "1w overdue", "Left off 2d ago", "Planned today" |
+| Learning | the sidebar's Working and Learning shelves: taught and not solid, or solid but weak | Working first, then the shelf's: a turn that waits, then the latest studied | the sidebar row's fact (`shelfStatus`): a slip ("Sure, but wrong"), a review in today's plan, where an open task was left, when it comes back, else how long since he studied it |
+| Not started | what the sidebar leaves out | the engine's path order | nothing, except "You are here" on the current topic |
+| On your own | the sidebar's On your own shelf: solid and not weak | the shelf's: the due ones first, then the soonest back | the sidebar row's fact: "3d overdue", "Left off 2d ago", "Back in 5d", "Due since 21 Oct" |
 
-A session on the topic that waits on him says "Your turn" (in the accent) and one the tutor writes in says "Working", whatever the group, as the sidebar's rows do.
+The current topic says "You are here" in place of when it comes back or when he last studied it, never in place of a reason that needs him. Which reason a topic says when it has several is the app's one order (`../study-words.md`, "Which one a topic says"): unfinished work before a review the plan dates later.
 
-The head's progress words ("Some topics on your own", `courseShareWords`) follow Home's progress ring, which also takes in the topics he can do on his own whose review is due; those sit in Needs you, so the words can run ahead of the On your own group (decided for him: the words follow the ring, as Home does).
+"Needs you" means one thing in the app: what Today puts in front of him. A slip Today does not take up stays in Learning with its slip's words, as on the sidebar's Learning shelf; the map card and the pie's warning ink still show it.
 
 ## States
 
