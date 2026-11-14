@@ -8,10 +8,8 @@ import {
 	type TeachingAgent,
 } from "../agent/teacher-agent.ts";
 import { claudeEngine, type PiEngine } from "../agent/models.ts";
-import { connectionBackgroundAllowed, connectionScopeCurrent, isSubscriptionProvider } from "../agent/subscription-connections.ts";
+import { connectionBackgroundAllowed } from "../agent/subscription-connections.ts";
 import { CLAUDE_MODEL_MISSING, claudeTurnError } from "../agent/claude-stream.ts";
-import { SubscriptionRequestCycle } from "../agent/subscription-request-cycle.ts";
-import { reconstructRequestCause } from "../core/native-messages.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createLessonDigest } from "../agent/subagents/lesson-digest.ts";
 import { onLessonEvents, resumeCutDigests } from "./lesson-finish.ts";
@@ -20,7 +18,6 @@ import {
 	noteSteersDurable,
 	reconcileUserSteers,
 	registerLiveAgent,
-	restoreUncommittedAutomatic,
 	setJobRespawn,
 	setTurnRunner,
 	settleSteers,
@@ -228,9 +225,6 @@ export async function handleChatInput(
 	const effective = effectiveSettings();
 	const account = effective.claude.account;
 	await refreshClaudeConnections();
-	if (isSubscriptionProvider(account) && input.type === "steers" && !connectionBackgroundAllowed(account)) {
-		return Response.json({ error: "Background use is off for this connection. Automatic follow-up remains deferred in its queue." }, { status: 403 });
-	}
 	if (!providerKeyPresent(account)) {
 		const envelope = providerKeyMissingEnvelope(account);
 		console.info(`[chat ${chatId}] turn refused — ${JSON.stringify(envelope)}`);
@@ -246,8 +240,6 @@ export async function handleChatInput(
 	// placement mirrors the connection gate — BEFORE appends and
 	// beginTurn, no liveness effects — and the record re-reads after
 	// because compaction appends the marker.
-	const callPurpose = { background: input.type === "steers" || (input.type === "continue" && reconstructRequestCause(record.messages) !== "foreground") };
-	let requestCycle: SubscriptionRequestCycle | undefined;
 	let conversationEngine: PiEngine;
 	try { conversationEngine = claudeEngine(account); }
 	catch { return Response.json({ error: CLAUDE_MODEL_MISSING }, { status: 503 }); }
@@ -361,10 +353,9 @@ export async function handleChatInput(
 	// failures only. Count that SAME temporary prefix at settlement, or the
 	// retained failures would make persistTurn skip genuinely new output.
 	const agentMessages = input.type === "retry" ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
-	const stagedAutomatic = isSubscriptionProvider(account) && input.type === "steers";
-	let persistBaseCount = stagedAutomatic ? record.messages.length : agentMessages.length;
+	const persistBaseCount = agentMessages.length;
 	try {
-		if (!stagedAutomatic) stores.chatStore.saveMessages(chatId, merged);
+		stores.chatStore.saveMessages(chatId, merged);
 	} catch (err) {
 		console.error(`[chat ${chatId}] write-ahead persist failed:`, err);
 		endTurn(chatId);
@@ -373,16 +364,13 @@ export async function handleChatInput(
 	// Visibility bookkeeping is not the canonical save. Its failure must
 	// neither misreport a saved input as lost nor prevent the turn running.
 	try {
-		if (!stagedAutomatic) noteSteersDurable(chatId, merged);
+		noteSteersDurable(chatId, merged);
 	} catch (err) {
 		console.error(`[chat ${chatId}] input visibility bookkeeping failed:`, err);
 	}
 	// A wake's markers land in the record after turn-started, so a view that
 	// attached on it would miss them until settle: announce the write.
-	const announceMarkers = () => {
-		if (input.type === "steers" && appends.length > 0) emit("record-changed", { chatId });
-	};
-	if (!stagedAutomatic) announceMarkers();
+	if (input.type === "steers" && appends.length > 0) emit("record-changed", { chatId });
 
 	// MONEY CHANNEL (wave 4): one collector per request, fed by the agent's
 	// message_end events. Every model call's usage lands in the chat record's
@@ -423,24 +411,8 @@ export async function handleChatInput(
 	// enabled). The definitive toggleable set is TOGGLEABLE_TOOLS — the
 	// sub-agent JOB tools (research/demo/visual/pdf; adjudicated with the
 	// user: quiz/ask/fs/plan/probe_done are always-on).
-	if (isSubscriptionProvider(account)) requestCycle = new SubscriptionRequestCycle({
-		initialMessages: asAgentMessages(agentMessages),
-		staged: stagedAutomatic ? asAgentMessages(appends) : undefined,
-		foregroundOwed: !callPurpose.background,
-		purpose: callPurpose,
-		scopeCurrent: (scope) => connectionScopeCurrent(account, scope),
-		commitStaged: () => {
-			stores.chatStore.saveMessages(chatId, merged);
-			persistBaseCount = merged.length;
-			noteSteersDurable(chatId, merged);
-			announceMarkers();
-		},
-		restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
-	});
 	const agentOpts: AgentBuildOptions = {
 		engine,
-		callPurpose,
-		requestCycle,
 		messages: asAgentMessages(agentMessages),
 		onUsage: collectUsage,
 		toolToggles: effective.agent.tools,
@@ -524,7 +496,6 @@ export async function handleChatInput(
 		providerEventNote(chatId, "turn", `run start (base: ${agentMessages.length} messages)`);
 		const handle = runPiTurn({
 			agent: constructed,
-			requestCycle,
 			// The coalescing window seam (COMPACTION LAW, 2026-10-09): tests
 			// tighten it via LH_UPDATE_FLUSH_MS; production rides the 100ms
 			// default in ui-stream.
@@ -611,7 +582,7 @@ export async function handleChatInput(
 				// beneath-threshold record is a silent no-op. Skipped under
 				// tests (scripted chats are fixtures; the service itself is
 				// pinned directly).
-				if (process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
+				if (process.env.NODE_ENV !== "test")
 					kickCompaction(() => {
 						const kickAccount = effectiveSettings().claude.account;
 						if (!connectionBackgroundAllowed(kickAccount)) return null;
@@ -649,7 +620,6 @@ export async function handleChatInput(
 		// must cost zero permanently-held slots beyond the one live view. The
 		// turn itself is a server-side process (ruling 2026-09-25) — it never
 		// needed this connection, only a view did.
-		if (stagedAutomatic && requestCycle && !(await requestCycle.admission)) return Response.json({ error: "Automatic follow-up remains deferred in its queue." }, { status: 403 });
 		return Response.json({ ok: true });
 	} catch (err) {
 		// The stream never started, so no onFinish will fire — clear the registry

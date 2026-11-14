@@ -94,11 +94,10 @@ export type ModelRole =
 export const SETTINGS_FILE = path.join(DATA_ROOT, "settings.json");
 
 /**
- * Where the web/dev server keeps the ChatGPT sign-in
- * (chatgpt-credentials.json, owner-only): the project directory, or
- * LH_CREDENTIALS_DIR. The packaged desktop app keeps it in Electron's
- * userData instead, owned by the main process. No API key is stored
- * anywhere: the app runs only on subscriptions.
+ * Where older versions kept sign-in files (auth.json, chatgpt-credentials.json):
+ * the project directory, or LH_CREDENTIALS_DIR. Nothing reads or writes them
+ * now (every agent runs on the user's Claude plan), but a copy may remain,
+ * so the agent's file tools refuse them (src/agent/tools/fs-shared.ts).
  */
 export const CREDENTIALS_DIR = process.env.LH_CREDENTIALS_DIR
 	? path.resolve(process.env.LH_CREDENTIALS_DIR)
