@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext } from "react";
-import { ArrowRightIcon, CalendarIcon, ClockIcon } from "lucide-react";
+import { createContext, useContext, useState } from "react";
+import { ArrowRightIcon, CalendarIcon, ClockIcon, FilePlusIcon } from "lucide-react";
+import { AddMaterialDialog } from "@/components/course-manage-dialogs";
+import { Button } from "@/components/ui/button";
 import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import { ProgressPie } from "@/components/study-home/agenda-rows/progress-pie";
 import { LessonButton } from "@/components/study-home/lesson-button";
@@ -25,8 +27,8 @@ function Fact({ icon, children }: { icon: React.ReactNode; children: React.React
 
 /**
  * The course page's header (spec: course-header.md), the same on every
- * candidate: the course's name with its one button (Home's lesson button
- * for this course: Resume, Review, Continue or Start), the facts line (how
+ * candidate: the course's name with Add material and its one primary button
+ * (Home's lesson button for this course: Resume, Review, Continue or Start), the facts line (how
  * many topics he can do on his own, the exam, when he last studied), then
  * what the button takes up and why it is next, in Today's words.
  */
@@ -34,15 +36,22 @@ export function CourseHeader({ view, busy, onContinue, className }: { view: Cour
 	const { course, facts, next } = view;
 	const error = useContext(CourseLessonError);
 	const WhyIcon = next.why ? WHY_ICON[next.why.kind] : ArrowRightIcon;
+	const [adding, setAdding] = useState(false);
 	return (
 		<header data-slot="course-header" className={cn("flex shrink-0 flex-col gap-2", className)}>
 			<div className="flex h-8 items-center justify-between gap-4">
 				<h1 data-slot="course-title" className="min-w-0 truncate text-xl font-semibold text-foreground">
 					{course.map.title}
 				</h1>
-				<LessonButton lesson={next.lesson} busy={busy} onContinue={onContinue} size="sm" data-slot="course-action" className="shrink-0 text-row">
-					{next.action}
-				</LessonButton>
+				<div className="flex shrink-0 items-center gap-2">
+					<Button variant="outline" size="sm" data-slot="course-add-material" className="text-row" onClick={() => setAdding(true)}>
+						<FilePlusIcon aria-hidden />
+						Add material
+					</Button>
+					<LessonButton lesson={next.lesson} busy={busy} onContinue={onContinue} size="sm" data-slot="course-action" className="shrink-0 text-row">
+						{next.action}
+					</LessonButton>
+				</div>
 			</div>
 			<p data-slot="course-facts" className="flex h-5 min-w-0 items-center gap-x-4 overflow-hidden text-row text-muted-foreground tabular-nums">
 				{facts.progress && <Fact icon={<ProgressPie course={course} />}>{facts.progress}</Fact>}
@@ -65,6 +74,7 @@ export function CourseHeader({ view, busy, onContinue, className }: { view: Cour
 					{error}
 				</p>
 			)}
+			{adding && <AddMaterialDialog course={{ workspace: course.map.workspace, title: course.map.title }} onClose={() => setAdding(false)} />}
 		</header>
 	);
 }
