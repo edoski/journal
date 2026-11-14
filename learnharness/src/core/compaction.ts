@@ -100,6 +100,9 @@ export function estimateMessageTokens(message: LhMessage | AgentMessage): number
 		}
 	} else {
 		chars += textCharsOfContent(content);
+		// A practice submission's photos ride the marker beside its text.
+		const images = (message as { images?: unknown }).images;
+		if (Array.isArray(images)) chars += images.length * ESTIMATED_IMAGE_CHARS;
 		if (message.role === "system") {
 			const system = message as SystemMessage;
 			for (const section of Object.values(system.sections ?? {})) chars += section?.length ?? 0;
@@ -306,12 +309,25 @@ export function keptIndexFor(messages: readonly LhMessage[], marker: LhMarkerMes
 /** Serialize a message span as labeled text for the summarizer. Tool
  * results truncate at ~2k chars (the kept tail carries them verbatim for
  * the model; the SUMMARY only needs their gist). */
+const SUMMARY_PHOTO = "(a photo of his handwritten working)";
+const SUMMARY_IMAGE = "(an image)";
+
+/** A question's answer: its images are his photos; any other tool's are files it read. */
+function isQuestionAnswer(result: ToolResultMessage): boolean {
+	return result.toolName === "explain" || result.toolName === "recall" || result.toolName === "ask_user_question";
+}
+
 export function serializeForSummary(messages: readonly LhMessage[]): string {
 	const lines: string[] = [];
 	for (const m of messages) {
 		const role = (m as { role?: string }).role;
 		if (role === "user") {
-			lines.push(`[LEARNER] ${(m as { content: string }).content}`);
+			// A photo of his working reads as the fact of it: the summary
+			// carries no image.
+			const content = (m as { content: unknown }).content;
+			const said = typeof content === "string" ? content
+				: Array.isArray(content) ? content.map((c: { type?: string; text?: string }) => (c.type === "text" ? c.text ?? "" : SUMMARY_PHOTO)).join("\n") : "";
+			lines.push(`[LEARNER] ${said}`);
 		} else if (role === "assistant") {
 			const assistant = m as AssistantMessage;
 			const blocks: string[] = [];
@@ -325,7 +341,7 @@ export function serializeForSummary(messages: readonly LhMessage[]): string {
 		} else if (role === "toolResult") {
 			const result = m as ToolResultMessage;
 			const text = result.content
-				.map((c) => (c.type === "text" ? c.text : JSON.stringify(c)))
+				.map((c) => (c.type === "text" ? c.text : isQuestionAnswer(result) ? SUMMARY_PHOTO : SUMMARY_IMAGE))
 				.join("\n");
 			lines.push(
 				`[RESULT for ${result.toolName}${result.isError ? " (error)" : ""}] ${
@@ -335,7 +351,7 @@ export function serializeForSummary(messages: readonly LhMessage[]): string {
 		} else if (role === "custom") {
 			const marker = m as LhMarkerMessage;
 			if (marker.customType === "plan-block" || marker.customType === "session-mode") continue; // UI-only
-			lines.push(`[SYSTEM NOTE] ${marker.content}`);
+			lines.push(`[SYSTEM NOTE] ${marker.content}${marker.images?.length ? `\n${SUMMARY_PHOTO}` : ""}`);
 		}
 	}
 	return lines.join("\n\n");

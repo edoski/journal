@@ -52,6 +52,7 @@ import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.
 import type { Confidence } from "./contracts/course.ts";
 import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
+import { PHOTO_ONLY_TEXT, WORKING_PHOTO_NOTE, type Photo } from "./photos.ts";
 
 /** The hard-invariant wording for an aborted turn's unanswered calls —
  *  carried over verbatim from the pre-native era so the model's view
@@ -95,6 +96,10 @@ export interface LhMarkerMessage {
 	display: boolean;
 	/** The UI payload — per-customType, never model-visible. */
 	details: unknown;
+	/** Photos of his handwritten working (photos.ts), model-facing like
+	 *  `content`: toLlmMessages sends them after it. A practice
+	 *  submission's only. */
+	images?: Photo[];
 	timestamp: number;
 }
 
@@ -173,13 +178,20 @@ export function newMessageId(): string {
 //     core/input-events.ts; steers in core/contracts/jobs.ts) ─────────────────
 
 /** A learner-authored user message (text input, verdict note). */
-export function newUserMessage(text: string): LhMessage & UserMessage {
+export function newUserMessage(text: string, photos?: readonly Photo[]): LhMessage & UserMessage {
 	return {
 		id: newMessageId(),
 		role: "user",
-		content: text,
+		content: withPhotos(text, photos),
 		timestamp: Date.now(),
 	};
+}
+
+/** A user message's content: the plain string, or with photos his words
+ *  (when he typed any) followed by the image parts. */
+function withPhotos(text: string, photos?: readonly Photo[]): UserMessage["content"] {
+	if (!photos?.length) return text;
+	return [...(text.trim() ? [{ type: "text" as const, text }] : []), ...photos.map((p) => ({ type: "image" as const, data: p.data, mimeType: p.mimeType }))];
 }
 
 /** A steered user message (mid-turn composer steering, owner 2026-10-03):
@@ -187,8 +199,8 @@ export function newUserMessage(text: string): LhMessage & UserMessage {
  *  rides agent.steer(), the live stream's message events, and the settled
  *  record, so the optimistic queued indicator and the transcript card
  *  upsert by one identity. */
-export function newUserSteer(text: string, id: string): LhMessage & UserMessage {
-	return { id, role: "user", content: text, timestamp: Date.now() };
+export function newUserSteer(text: string, id: string, photos?: readonly Photo[]): LhMessage & UserMessage {
+	return { id, role: "user", content: withPhotos(text, photos), timestamp: Date.now() };
 }
 
 /** The learner's answer — the question call's tool result (fork 1).
@@ -201,13 +213,18 @@ export function newAnswerResult(
 	toolCallId: string,
 	toolName: string,
 	answer: unknown,
+	photos?: readonly Photo[],
 ): LhMessage & ToolResultMessage {
+	// A photo of his working rides the result as image parts after the
+	// answer, and the answer says it is there.
+	const compact = compactAnswerForModel(answer as QuestionAnswerData);
+	if (photos?.length) compact.photo = WORKING_PHOTO_NOTE;
 	return {
 		id: newMessageId(),
 		role: "toolResult",
 		toolCallId,
 		toolName,
-		content: [{ type: "text", text: JSON.stringify(compactAnswerForModel(answer as QuestionAnswerData)) }],
+		content: [{ type: "text", text: JSON.stringify(compact) }, ...(photos ?? []).map((p) => ({ type: "image" as const, data: p.data, mimeType: p.mimeType }))],
 		// 0.87.1 narrowed ToolResultMessage.details to JsonRepresentation —
 		// our payloads are JSON-safe answer structures, so the cast is honest.
 		details: answer as ToolResultMessage["details"],
@@ -397,14 +414,16 @@ export function hintsAsked(messages: readonly LhMessage[], problemCallId: string
  *  payload for the transcript card. One problem may carry many
  *  submissions. `confidence` is the learner's one-tap read of the
  *  submission; the dock always sends one. */
-export function newThinkingMessage(problemCallId: string, text: string, confidence?: Confidence): LhMarkerMessage {
+export function newThinkingMessage(problemCallId: string, text: string, confidence?: Confidence, photos?: readonly Photo[]): LhMarkerMessage {
+	const typed = text.trim() ? text : photos?.length ? PHOTO_ONLY_TEXT : text;
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-thinking",
-		content: `${THINKING_LABEL}:\n${text}${confidence ? `\n\nConfidence: ${confidence}` : ""}`,
+		content: `${THINKING_LABEL}:\n${typed}${photos?.length ? `\n\n${WORKING_PHOTO_NOTE}` : ""}${confidence ? `\n\nConfidence: ${confidence}` : ""}`,
 		display: true,
 		details: { problemCallId, text, ...(confidence ? { confidence } : {}) },
+		...(photos?.length ? { images: photos.map((p) => ({ type: "image" as const, data: p.data, mimeType: p.mimeType })) } : {}),
 		timestamp: Date.now(),
 	};
 }
@@ -861,7 +880,7 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			if (marker.customType === "compaction" && head !== null) continue;
 			out.push({
 				role: "user",
-				content: [{ type: "text", text: marker.content }],
+				content: [{ type: "text", text: marker.content }, ...(marker.images ?? [])],
 			timestamp: marker.timestamp,
 			});
 			continue;

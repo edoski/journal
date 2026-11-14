@@ -31,6 +31,8 @@ export * from "./math-delims.ts";
 export * from "./native-messages.ts";
 export * from "./compaction.ts";
 export * from "./input-events.ts";
+// photos.ts: photos of his handwritten working (pure, browser-safe).
+export * from "./photos.ts";
 // Wave D (owner-approved 2026-09-26): the client view model — the grouping
 // canon (one continuous assistant document, step separators) ported from
 // the deleted server projection to the client side. Pure, browser-safe.

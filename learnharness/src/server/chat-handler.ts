@@ -57,6 +57,7 @@ import {
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
 import { listenForCourseMaps } from "./course-map.ts";
+import { preparePhotos } from "./photos.ts";
 import type {CallUsage} from "../core/contracts.ts";
 
 /**
@@ -175,7 +176,7 @@ export async function handleChatRequest(
 	if (!chatId) return Response.json({ error: "Unknown chat" }, { status: 404 });
 	let input: TurnInput;
 	try {
-		input = parseChatInput(body.input);
+		input = await preparePhotos(parseChatInput(body.input));
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });

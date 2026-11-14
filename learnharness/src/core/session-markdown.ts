@@ -19,6 +19,19 @@ import {
 	userFacingTextOf,
 } from "./native-messages.ts";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import { photosOf, photoSrc, type Photo } from "./photos.ts";
+
+/** How photos of his working render: `embed` puts each image in the file
+ *  (the export), `note` says one is there (the lesson digest, whose
+ *  reader needs the fact, not the bytes). */
+export type MarkdownPhotos = "embed" | "note";
+
+/** The photo lines for one message. */
+function photoLines(photos: readonly Photo[], mode: MarkdownPhotos): string[] {
+	if (photos.length === 0) return [];
+	if (mode === "note") return ["*(with a photo of his handwritten working)*"];
+	return photos.map((p, i) => `![Photo of the learner's working${photos.length > 1 ? ` ${i + 1}` : ""}](${photoSrc(p)})`);
+}
 
 /** The practice join context (owner-approved, 2026-10-06 export round):
  *  practice tool RESULTS are acks — the statement, outcome, and verdict
@@ -28,6 +41,7 @@ import type { ToolResultMessage } from "@earendil-works/pi-ai";
  *  and renders nothing before this join is ever reached). */
 export interface MarkdownContext {
 	messages: ReadonlyArray<LhMessage>;
+	photos?: MarkdownPhotos;
 	/** toolCallId → the call part's name + arguments. */
 	calls: Map<string, { name: string; args: Record<string, unknown> | undefined }>;
 	failedOutputCalls?: ReadonlySet<string>;
@@ -80,6 +94,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		else if (out?.dismissed === true) body.push("The learner skipped this check.");
 		else if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered in his own words: ${out.text.trim()}`);
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
+		body.push(...photoLines(photosOf(result.content), ctx?.photos ?? "note"));
 		return { heading, body };
 	}
 
@@ -118,6 +133,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		else if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for tonight before answering.");
 		else if (out?.dismissed === true) body.push("The learner skipped this question.");
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
+		body.push(...photoLines(photosOf(result.content), ctx?.photos ?? "note"));
 		return { heading: "Question", body };
 	}
 
@@ -141,9 +157,17 @@ export function messageMarkdown(
 	const parts: string[] = [];
 
 	if (role === "user") {
-		for (const text of userFacingTextOf((message as { content: unknown }).content)) {
-			parts.push(`### Learner${anchor}\n\n${text.trim()}`);
-		}
+		const content = (message as { content: unknown }).content;
+		const texts = userFacingTextOf(content).map((text) => text.trim());
+		const photos = photoLines(photosOf(content), ctx?.photos ?? "note");
+		if (photos.length > 0) parts.push(`### Learner${anchor}\n\n${[...texts, ...photos].join("\n\n")}`);
+		else for (const text of texts) parts.push(`### Learner${anchor}\n\n${text}`);
+	} else if (role === "custom" && (message as { customType?: string }).customType === "practice-thinking" && (message as { images?: Photo[] }).images?.length) {
+		// A practice submission with photos: the photo needs its words
+		// beside it. Submissions without one stay invisible, as markers are.
+		const text = ((message as { details?: { text?: unknown } }).details?.text ?? "") as string;
+		const body = [...(typeof text === "string" && text.trim() ? [text.trim()] : []), ...photoLines((message as { images: Photo[] }).images, ctx?.photos ?? "note")];
+		parts.push(`### Learner's working${anchor}\n\n${body.join("\n\n")}`);
 	} else if (role === "assistant") {
 		for (const text of userFacingTextOf((message as { content: unknown }).content, ctx?.failedOutputCalls ?? failedOutputCallIds([message]))) {
 			parts.push(`### Teacher${anchor}\n\n${text.trim()}`);
@@ -167,11 +191,11 @@ export function messageMarkdown(
  */
 export function sessionMarkdown(
 	messages: ReadonlyArray<LhMessage>,
-	opts: { title?: string; anchors?: boolean } = {},
+	opts: { title?: string; anchors?: boolean; photos?: MarkdownPhotos } = {},
 ): string {
 	const blocks: string[] = [];
 	if (opts.title !== undefined && opts.title.length > 0) blocks.push(`# ${opts.title}`);
-	const ctx = markdownContext(messages);
+	const ctx = { ...markdownContext(messages), photos: opts.photos ?? "note" };
 	for (const message of messages) {
 		const block = messageMarkdown(message, (message as { id?: string }).id ?? "", opts.anchors ?? true, ctx);
 		if (block !== null) blocks.push(block);

@@ -32,6 +32,7 @@
  */
 
 import { dismissedAnswer, type QuestionAnswerData } from "./question-core.ts";
+import { parsePhotos, type Photo } from "./photos.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type { SessionMode } from "./contracts/chat.ts";
@@ -60,8 +61,10 @@ import { isPracticeRequest, PRACTICE_REQUESTS, type PracticeRequest } from "./co
 
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
-	| { type: "text"; text: string }
-	| { type: "answer"; toolCallId: string; answer: QuestionAnswerData }
+	/** `photos`: his handwritten working (photos.ts). With a photo, the
+	 *  text may be empty. */
+	| { type: "text"; text: string; photos?: Photo[] }
+	| { type: "answer"; toolCallId: string; answer: QuestionAnswerData; photos?: Photo[] }
 	| { type: "continue" }
 	/** The failed-turn retry (issue #110): the banner's Retry button. */
 	| { type: "retry" }
@@ -71,7 +74,7 @@ export type ChatInput =
 	 *  thinking on the ACTIVE problem — one lane (owner 2026-10-05):
 	 *  whether it claims an answer is read from the text. One
 	 *  problem may carry many submissions; each is its own turn. */
-	| { type: "thinking"; problemCallId: string; text: string; confidence?: Confidence }
+	| { type: "thinking"; problemCallId: string; text: string; confidence?: Confidence; photos?: Photo[] }
 	/** The practice dock's request buttons (Hint, Show me, Explain
 	 *  instead) on the ACTIVE problem: a request, never an answer. `text`
 	 *  is the work in the field when he pressed it, if any. */
@@ -138,7 +141,7 @@ export function parseDismissInput(input: unknown): DismissInput {
  *  (a send with no live turn is a plain text send, which already exists).
  *  The id is client-minted (steer_<localid>): the queued indicator keys on
  *  it, and the drain's message events upsert the real card by the same id. */
-export type UserSteerInput = { type: "steer"; id: string; text: string };
+export type UserSteerInput = { type: "steer"; id: string; text: string; photos?: Photo[] };
 
 /** Parse and validate a steer event off a request body. */
 export function parseUserSteerInput(input: unknown): UserSteerInput {
@@ -148,10 +151,11 @@ export function parseUserSteerInput(input: unknown): UserSteerInput {
 	if (typeof i.id !== "string" || i.id.length === 0) {
 		throw new ChatInputError("steer input requires a client-minted id");
 	}
-	if (typeof i.text !== "string" || i.text.trim().length === 0) {
-		throw new ChatInputError("steer input requires non-empty text");
+	const photos = photosOrThrow(i.photos);
+	if (typeof i.text !== "string" || (i.text.trim().length === 0 && photos.length === 0)) {
+		throw new ChatInputError("steer input requires non-empty text or a photo");
 	}
-	return { type: "steer", id: i.id, text: i.text };
+	return { type: "steer", id: i.id, text: i.text, ...(photos.length ? { photos } : {}) };
 }
 
 /** The native appends a dismissal makes (pure — same orphan discipline
@@ -178,16 +182,25 @@ export function dismissAppends(record: { messages: LhMessage[] }, input: Dismiss
 /** A malformed input event (the honest 400 — the orphan-trap discipline). */
 export class ChatInputError extends Error {}
 
+function photosOrThrow(raw: unknown): Photo[] {
+	const photos = parsePhotos(raw);
+	if (typeof photos === "string") throw new ChatInputError(photos);
+	return photos;
+}
+
 /** Parse and validate an input event off a request body. */
 export function parseChatInput(input: unknown): ChatInput {
 	if (typeof input !== "object" || input === null) throw new ChatInputError("input must be an object");
 	const i = input as Record<string, unknown>;
 	switch (i.type) {
-		case "text":
-			if (typeof i.text !== "string" || (i.text as string).trim().length === 0) {
-				throw new ChatInputError("text input requires non-empty text");
+		case "text": {
+			// A photo alone is a message (his working, no words).
+			const photos = photosOrThrow(i.photos);
+			if (typeof i.text !== "string" || ((i.text as string).trim().length === 0 && photos.length === 0)) {
+				throw new ChatInputError("text input requires non-empty text or a photo");
 			}
-			return { type: "text", text: i.text };
+			return { type: "text", text: i.text, ...(photos.length ? { photos } : {}) };
+		}
 		case "answer":
 			if (typeof i.toolCallId !== "string" || i.toolCallId.length === 0) {
 				throw new ChatInputError("answer input requires toolCallId");
@@ -201,7 +214,13 @@ export function parseChatInput(input: unknown): ChatInput {
 					throw new ChatInputError(`answer confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
 				}
 			}
-			return { type: "answer", toolCallId: i.toolCallId, answer: i.answer as QuestionAnswerData };
+			{
+				const photos = photosOrThrow(i.photos);
+				if (photos.length && (i.answer as { dismissed?: unknown }).dismissed === true) {
+					throw new ChatInputError("a skipped question carries no photo");
+				}
+				return { type: "answer", toolCallId: i.toolCallId, answer: i.answer as QuestionAnswerData, ...(photos.length ? { photos } : {}) };
+			}
 		case "continue":
 			return { type: "continue" };
 		case "retry":
@@ -216,18 +235,23 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
 				throw new ChatInputError("thinking input requires problemCallId");
 			}
-			if (typeof i.text !== "string" || i.text.trim().length === 0) {
-				throw new ChatInputError("thinking input requires non-empty text");
+			{
+				// A photo of the working alone is a submission.
+				const photos = photosOrThrow(i.photos);
+				if (typeof i.text !== "string" || (i.text.trim().length === 0 && photos.length === 0)) {
+					throw new ChatInputError("thinking input requires non-empty text or a photo");
+				}
+				if (i.confidence !== undefined && !isConfidence(i.confidence)) {
+					throw new ChatInputError(`thinking input confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
+				}
+				return {
+					type: "thinking",
+					problemCallId: i.problemCallId,
+					text: i.text,
+					...(i.confidence !== undefined ? { confidence: i.confidence } : {}),
+					...(photos.length ? { photos } : {}),
+				};
 			}
-			if (i.confidence !== undefined && !isConfidence(i.confidence)) {
-				throw new ChatInputError(`thinking input confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
-			}
-			return {
-				type: "thinking",
-				problemCallId: i.problemCallId,
-				text: i.text,
-				...(i.confidence !== undefined ? { confidence: i.confidence } : {}),
-			};
 		case "request":
 			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
 				throw new ChatInputError("request input requires problemCallId");
@@ -266,13 +290,13 @@ export function inputAppends(
 ): LhMessage[] {
 	switch (input.type) {
 		case "text":
-			return [...dismissalConclusion(record), newUserMessage(input.text)];
+			return [...dismissalConclusion(record), newUserMessage(input.text, input.photos)];
 		case "answer": {
 			const pending = danglingQuestionOf(record.messages);
 			if (!pending || pending.toolCallId !== input.toolCallId) {
 				throw new ChatInputError("answer input targets no pending question call");
 			}
-			return [newAnswerResult(input.toolCallId, pending.tool, input.answer)];
+			return [newAnswerResult(input.toolCallId, pending.tool, input.answer, input.photos)];
 		}
 		case "continue":
 			return dismissalConclusion(record);
@@ -287,7 +311,7 @@ export function inputAppends(
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("thinking input targets no active problem");
 			}
-			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, input.confidence)];
+			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, input.confidence, input.photos)];
 		}
 		case "request": {
 			const active = activeProblemOf(record.messages);

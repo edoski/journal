@@ -73,7 +73,12 @@ export function claudeTranscriptBlocks(messages: readonly Message[]): AnthropicB
 	for (const message of messages) {
 		if (message.role === "user") {
 			const parts: (TextContent | ImageContent)[] = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
-			for (const part of parts) blocks.push(part.type === "image" ? image(part) : { type: "text", text: `<user>\n${part.text}\n</user>` });
+			// A photo of his working is his too: the tags keep it his, apart
+			// from the images tool results return.
+			for (const part of parts) {
+				if (part.type === "image") blocks.push({ type: "text", text: "<user_photo>" }, image(part), { type: "text", text: "</user_photo>" });
+				else blocks.push({ type: "text", text: `<user>\n${part.text}\n</user>` });
+			}
 		} else if (message.role === "assistant") {
 			// Errored or aborted turns are incomplete; pi drops them for every provider.
 			if (message.stopReason === "error" || message.stopReason === "aborted") continue;

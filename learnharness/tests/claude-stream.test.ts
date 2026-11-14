@@ -262,7 +262,7 @@ const assistant = (content: AssistantMessage["content"], stopReason: AssistantMe
 });
 const toolResult = (content: ToolResultMessage["content"], isError = false): ToolResultMessage => ({ role: "toolResult", toolCallId: "toolu_a", toolName: "plan_init", content, isError, timestamp: 0 });
 
-test("transcript blocks lead with the intro, skip system messages and thinking, and keep images in place", () => {
+test("transcript blocks lead with the intro, skip system messages and thinking, and keep images in place, his own tagged as his", () => {
 	const blocks = claudeTranscriptBlocks([
 		{ role: "system", content: "You are a tutor.", timestamp: 0 },
 		user([{ type: "text", text: "Teach me hash tables." }, { type: "image", data: "AAAA", mimeType: "image/png" }]),
@@ -272,7 +272,10 @@ test("transcript blocks lead with the intro, skip system messages and thinking, 
 	assert.deepEqual(blocks, [
 		{ type: "text", text: CLAUDE_TRANSCRIPT_INTRO },
 		{ type: "text", text: "<user>\nTeach me hash tables.\n</user>" },
+		// His photo is tagged his, apart from the image a tool returns below.
+		{ type: "text", text: "<user_photo>" },
 		{ type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } },
+		{ type: "text", text: "</user_photo>" },
 		{ type: "text", text: "<you_said>\nSure.\n</you_said>" },
 		{ type: "text", text: "<you_called tool=\"plan_init\" id=\"toolu_a\">\n{\"nodes\":[\"a\"]}\n</you_called>" },
 		{ type: "text", text: "<tool_result tool=\"plan_init\" id=\"toolu_a\">\nPlan created\n</tool_result>" },
