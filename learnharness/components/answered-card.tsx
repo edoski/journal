@@ -2,7 +2,8 @@
 
 import { ThinkingBlock } from "@/components/thinking-block";
 import { cn } from "@/lib/utils";
-import { MessageResponse, ToolContentResponse } from "@/components/ai-elements/message";
+import { ToolContentResponse } from "@/components/ai-elements/message";
+import { TypedText } from "@/components/typed-text";
 import type { Photo, QuestionAnswerData } from "@/src/core";
 import { SentPhotos } from "@/components/photos";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
@@ -80,12 +81,12 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 						{answer.other && (
 							<li data-testid="answered-other" className="flex items-start gap-3">
 								<span aria-hidden className="mt-[9px] size-2 shrink-0 rounded-full bg-primary" />
-								<MessageResponse className="min-w-0">{`“${answer.other}”`}</MessageResponse>
+								<TypedText className="min-w-0">{`“${answer.other}”`}</TypedText>
 							</li>
 						)}
 					</ul>
 				)}
-				{answer.text && <MessageResponse className="mt-3">{`“${answer.text}”`}</MessageResponse>}
+				{answer.text && <TypedText className="mt-3">{`“${answer.text}”`}</TypedText>}
 				<SentPhotos photos={photos} className="mt-3" />
 				{(answer.thinking ?? answer.note) && (
 					<ThinkingBlock testId="your-thinking" label="YOUR THINKING" text={answer.thinking ?? answer.note ?? ""} inCard />
