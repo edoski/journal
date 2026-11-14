@@ -845,9 +845,10 @@ def _new(
         room = max(room, sum(paces.values()) - begun)
     others = [course for course in courses if course.new_end(day) is None]
     for course in [*exams, *others]:
-        gaps = course.gaps.intersection(course.startable(day))
+        startable = course.startable(day)
+        gaps = course.gaps.intersection(startable)
         if room > 0 and gaps:
-            room -= take(course, room, gaps, bound=False)
+            room -= take(course, room, gaps, pool=startable, bound=False)
     for course in exams:
         if room > 0 and course.name in paces:
             pace = paces[course.name]
