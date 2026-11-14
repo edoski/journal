@@ -240,13 +240,14 @@ describe("lessons", () => {
 describe("the study read", () => {
 	it("joins the map with plan's run-up, today's review and last activity, dropping handles the map does not list", () => {
 		const plan = {
-			courses: [{ runup: { days_left: 21, unready: ["span", "gone"] }, due: [{ topic: "rank" }, { topic: "gone" }, { topic: "span" }], last_activity: { days_ago: 2 } }],
+			courses: [{ runup: { days_left: 21, unready: ["span", "gone"] }, due: [{ topic: "rank" }, { topic: "gone" }, { topic: "span" }], last_activity: { days_ago: 0 }, last_studied: { days_ago: 2 } }],
 		};
 		const course = studyCourseOf(LINALG.map, plan);
 		assert.deepEqual(course.unready, ["span"]);
 		assert.deepEqual(course.due, ["rank", "span"]);
 		assert.equal(course.lastActiveDaysAgo, 2);
 		assert.deepEqual(studyCourseOf(LINALG.map, { courses: [{}] }), { map: LINALG.map, unready: null, due: [], lastActiveDaysAgo: null, newToday: [] });
+		assert.equal(studyCourseOf(LINALG.map, { courses: [{ last_activity: { days_ago: 0 } }] }).lastActiveDaysAgo, null, "a course saved today but never studied is not studied today");
 		assert.equal(studyCourseOf(LINALG.map, null).due, null);
 	});
 

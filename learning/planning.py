@@ -14,6 +14,7 @@ from learning.retrieval import (
     every_course,
     exam,
     last_activity,
+    last_studied,
     selected_task,
 )
 from learning.workspace import Workspace
@@ -161,6 +162,7 @@ def _course(
             else None,
             "open_tasks": len(record["tasks"]),
             "last_activity": last_activity(record, today),
+            "last_studied": last_studied(record, today),
             "journal": _effort(record.get("journal"), journal),
             "week": _week(record, today, week_journal),
             "runup": _runup(record, today, order, levels, week),

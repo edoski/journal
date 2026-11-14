@@ -44,8 +44,8 @@ describe("course records adapter (fake engine)", () => {
 		const { engine, calls } = fakeEngine({
 			today: "2026-11-07",
 			courses: [
-				{ workspace: "/s/smm", title: "SMM", due: [{ topic: "a" }, { topic: "b" }], due_more: 3, current: "rank", current_title: "Rank", task: { key: "t", title: "Exercise 5" }, last_activity: { date: "2026-11-05", days_ago: 2 } },
-				{ workspace: "/s/bare" },
+				{ workspace: "/s/smm", title: "SMM", due: [{ topic: "a" }, { topic: "b" }], due_more: 3, current: "rank", current_title: "Rank", task: { key: "t", title: "Exercise 5" }, last_activity: { date: "2026-11-07", days_ago: 0 }, last_studied: { date: "2026-11-05", days_ago: 2 } },
+				{ workspace: "/s/bare", last_activity: { date: "2026-11-07", days_ago: 0 } },
 				{ title: "no workspace, skipped" },
 				{ workspace: "/s/broken", error: "course.json is not valid JSON" },
 			],

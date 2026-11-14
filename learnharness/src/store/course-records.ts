@@ -155,7 +155,7 @@ function summaryOf(entry: unknown): CourseSummary | null {
 		task: str(task.title),
 		step: str(task.step),
 		exam: examOf(e.exam),
-		lastActiveDaysAgo: daysAgoOf(e.last_activity),
+		lastActiveDaysAgo: daysAgoOf(e.last_studied),
 	};
 }
 

@@ -176,6 +176,32 @@ def test_plan_of_a_new_course_and_invalid_windows(tmp_path: Path) -> None:
         plan(None, tmp_path, everywhere=False, days=7)
 
 
+def test_a_course_is_studied_on_the_days_its_record_shows_study(
+    tmp_path: Path,
+) -> None:
+    fresh = course(tmp_path / "fresh", {"title": "Graph theory"})
+    entry = plan(fresh, tmp_path / "vault", everywhere=False, days=1)["courses"][0]
+    assert entry["last_activity"] == {"date": TODAY.isoformat(), "days_ago": 0}
+    assert "last_studied" not in entry
+    studied = course(
+        tmp_path / "studied",
+        {
+            "topics": {"walks": {"introduced": day(-3)}},
+            "observations": [
+                {
+                    "topics": ["walks"],
+                    "text": "Named a walk",
+                    "result": "correct",
+                    "help": "none",
+                    "date": day(-1),
+                }
+            ],
+        },
+    )
+    entry = plan(studied, tmp_path / "vault", everywhere=False, days=1)["courses"][0]
+    assert entry["last_studied"] == {"date": day(-1), "days_ago": 1}
+
+
 def test_upcoming_schedule_resolves_overrides_and_excludes_lunch(
     tmp_path: Path,
 ) -> None:
