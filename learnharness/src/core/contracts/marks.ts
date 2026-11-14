@@ -20,6 +20,25 @@ export type MarkGrade = "solid" | "helped" | "missed";
 /** The engine's `sure`: the confidence it recorded with the attempt. */
 export type MarkSure = "guess" | "neutral" | "confident";
 
+/** The confidence a mark shows: the one he chose. `neutral` is the meter
+ *  left alone, never a choice he made (round 5), so it shows as none. */
+export function chosenSure(value: unknown): Exclude<MarkSure, "neutral"> | null {
+	return value === "guess" || value === "confident" ? value : null;
+}
+
+/** How an attempt counted, the one rule the answer card and the topic
+ *  page's Earlier both read (round 5: a prediction's card said "Counted as
+ *  helped" where Earlier said it never counts, and a give-up's card said
+ *  "With help" where Earlier said "Gave up"). */
+export type MarkHow = "predicted" | "gaveUp" | "withHelp" | "countedHelped" | "ownWork";
+
+export function markHow(attempt: { predicted: boolean; gaveUp: boolean; helped: boolean; grade: MarkGrade }): MarkHow {
+	if (attempt.predicted) return "predicted";
+	if (attempt.gaveUp) return "gaveUp";
+	if (attempt.helped) return "withHelp";
+	return attempt.grade === "helped" ? "countedHelped" : "ownWork";
+}
+
 /** One attempt that stands for an answer. An answer usually has one; a
  *  practice problem has two when his first unaided try differs from the
  *  final one, and one per result when its topics went differently. */
@@ -34,7 +53,12 @@ export interface MarkRow {
 	grade: MarkGrade;
 	/** True when the attempt records help (`help` other than "none"). */
 	helped: boolean;
-	sure: MarkSure | null;
+	/** A prediction before its step was taught: kept, never counted. */
+	predicted: boolean;
+	/** He gave up on it without an answer. */
+	gaveUp: boolean;
+	/** The confidence he chose (`chosenSure`). */
+	sure: Exclude<MarkSure, "neutral"> | null;
 }
 
 export interface AnswerMark {

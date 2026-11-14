@@ -20,7 +20,7 @@ describe("a concluded practice problem as engine observations", () => {
 		);
 		assert.deepEqual(observations.map((o) => [o.help, o.result, o.response, o.sure]), [
 			["none", "incorrect", "No", "confident"],
-			["Hint R3: named the idea to use", "correct", "Yes, additive and homogeneous", "neutral"],
+			["Hint R3: named the idea to use", "correct", "Yes, additive and homogeneous", undefined],
 		]);
 	});
 

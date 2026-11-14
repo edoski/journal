@@ -57,6 +57,7 @@ import {
 	pendingProblemDismissalOf,
 	newUngradedAnswerMessage,
 	ungradedAnswerOf,
+	newAskedMessage,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
 import { markLinks } from "./answer-marks.ts";
@@ -68,7 +69,7 @@ import { isPracticeRequest, PRACTICE_REQUESTS, type PracticeRequest } from "./co
 export type ChatInput =
 	/** `photos`: his handwritten working (photos.ts). With a photo, the
 	 *  text may be empty. */
-	| { type: "text"; text: string; photos?: Photo[] }
+	| { type: "text"; text: string; photos?: Photo[]; asked?: true }
 	| { type: "answer"; toolCallId: string; answer: QuestionAnswerData; photos?: Photo[] }
 	| { type: "continue" }
 	/** The failed-turn retry (issue #110): the banner's Retry button. */
@@ -208,7 +209,7 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (typeof i.text !== "string" || ((i.text as string).trim().length === 0 && photos.length === 0)) {
 				throw new ChatInputError("text input requires non-empty text or a photo");
 			}
-			return { type: "text", text: i.text, ...(photos.length ? { photos } : {}) };
+			return { type: "text", text: i.text, ...(photos.length ? { photos } : {}), ...(i.asked === true ? { asked: true as const } : {}) };
 		}
 		case "answer":
 			if (typeof i.toolCallId !== "string" || i.toolCallId.length === 0) {
@@ -317,7 +318,7 @@ export function inputAppends(
 ): LhMessage[] {
 	switch (input.type) {
 		case "text":
-			return [...dismissalConclusion(record), ...ungradedNote(record), newUserMessage(input.text, input.photos)];
+			return [...dismissalConclusion(record), ...ungradedNote(record), ...askedNote(record, input), newUserMessage(input.text, input.photos)];
 		case "answer": {
 			const pending = danglingQuestionOf(record.messages);
 			if (!pending || pending.toolCallId !== input.toolCallId) {
@@ -367,10 +368,13 @@ export function inputAppends(
 	}
 }
 
-/** The question an answer answered: a graded question's text, or the
- *  statement of the problem a conclude ended. Null when the record holds
- *  no such answer. Pure. */
+/** The question an answer answered: a graded question's text, the
+ *  statement of the problem a conclude ended, or for an answer he gave in
+ *  words what the tutor asked before it. Null when the record holds no
+ *  such answer. Pure. */
 export function answeredQuestionText(messages: readonly LhMessage[], answerId: string): string | null {
+	const said = messages.findIndex((m) => m.role === "user" && m.id === answerId);
+	if (said >= 0) return askedBefore(messages, said);
 	const at = messages.findIndex((m) => m.role === "toolResult" && m.toolCallId === answerId && !m.isError);
 	if (at < 0) return null;
 	const result = messages[at] as LhMessage & { role: "toolResult" };
@@ -386,6 +390,18 @@ export function answeredQuestionText(messages: readonly LhMessage[], answerId: s
 		const args = typeof pose.arguments === "string" ? (JSON.parse(pose.arguments) as unknown) : pose.arguments;
 		const statement = (args as { statement?: unknown } | null)?.statement;
 		return typeof statement === "string" ? statement : "";
+	}
+	return "";
+}
+
+/** What the tutor asked before an answer he gave in words: the last
+ *  paragraph of its newest words before his message ("" when none). */
+function askedBefore(messages: readonly LhMessage[], at: number): string {
+	for (let i = at - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const words = m.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();
+		if (words) return words.split(/\n\s*\n/).at(-1)!.trim();
 	}
 	return "";
 }
@@ -424,6 +440,13 @@ export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMo
 /** The note an answer cut off before its grade rides his next input
  *  with (`ungradedAnswerOf`), so the record holds it however he goes on:
  *  Try again resumes that turn by itself. */
+/** A message he sent from Ask goes to the tutor marked as a question:
+ *  beside the open problem, or after the question it set aside. */
+function askedNote(record: { messages: LhMessage[] }, input: Extract<ChatInput, { type: "text" }>): LhMessage[] {
+	if (!input.asked) return [];
+	return [newAskedMessage(activeProblemOf(record.messages) && !pendingProblemDismissalOf(record.messages) ? "problem" : "question")];
+}
+
 function ungradedNote(record: { messages: LhMessage[] }): LhMessage[] {
 	const question = ungradedAnswerOf(record.messages);
 	return question === null ? [] : [newUngradedAnswerMessage(question)];

@@ -20,7 +20,7 @@
 import type { Photo } from "./photos.ts";
 import { Type, type Static } from "typebox";
 import { stripModelValueDebris } from "./value-debris.ts";
-import { DEFAULT_CONFIDENCE, type Confidence } from "./contracts/course.ts";
+import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 
 // ─── shared types ───────────────────────────────────────────────────────────
 
@@ -292,7 +292,7 @@ export interface AnswerRequest {
 	text?: string; // ask/explain text-mode
 	thinking?: string; // the reasoning-on-the-question channel (was `note`)
 	readingThinking?: string; // the thinking-while-reading channel (check answers)
-	confidence?: Confidence; // explain only; defaults to neutral
+	confidence?: Confidence; // explain only; sent only when he chose one (chosenConfidence)
 	hint?: boolean; // explain only: a hint request, never an answer
 }
 
@@ -413,7 +413,8 @@ export function buildAnswer(qd: QuestionData, req: AnswerRequest, tool?: string)
 	} else if (qd.kind === "explain") {
 		// The commitment snapshots for the reveal + rendering.
 		base.committed = qd.committedAnswer;
-		base.confidence = req.confidence ?? DEFAULT_CONFIDENCE;
+		const chosen = chosenConfidence(req.confidence);
+		if (chosen) base.confidence = chosen;
 	}
 	return base;
 }
@@ -460,7 +461,8 @@ export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, un
 		out.answers = ad.answers.map((a) => ({ index: a.index, label: a.label }));
 	if (ad.text) out.text = ad.text;
 	if (ad.other) out.other = ad.other;
-	if (ad.confidence !== undefined) out.confidence = ad.confidence;
+	const chosen = chosenConfidence(ad.confidence);
+	if (chosen) out.confidence = chosen;
 	// Two DISTINCT thinking channels, clearly keyed so the model never
 	// conflates them (owner 2026-10-03): reasoning on the question vs
 	// thinking while reading the teaching. `note` is the pre-rename key —

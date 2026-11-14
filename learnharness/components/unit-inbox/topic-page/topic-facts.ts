@@ -1,6 +1,6 @@
-import type { ArcHandle, ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StartsWhy, StudyCourse, TopicAttempt, TopicHandle, TopicRecord, TopicRef } from "@/src/core";
+import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, heldWords, LESSON_WORDS, MARK_HOW_WORDS, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -316,14 +316,13 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
  *  one). */
 export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "wrong"; words: string | null } {
 	const result = attempt.result === "correct" ? "right" : attempt.result === "partial" ? "partly" : "wrong";
-	if (attempt.predicted) return { result, words: ATTEMPT_HOW_WORDS.predicted };
-	if (attempt.gaveUp) return { result, words: ATTEMPT_HOW_WORDS.gaveUp };
+	const how = markHow({ ...attempt, helped: !attempt.unaided, grade: attempt.grade ?? (attempt.unaided ? "solid" : "helped") });
+	if (how === "predicted" || how === "gaveUp") return { result, words: MARK_HOW_WORDS[how] };
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
 	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : null };
 	// How a right or partly right answer counted, in the answer card's words;
 	// his own work says nothing, so the ones that differ stand out.
-	const counted = countedWords({ helped: !attempt.unaided, grade: attempt.grade ?? (attempt.unaided ? "solid" : "helped") });
-	return { result, words: counted === MARK_WORDS.ownWork ? null : counted };
+	return { result, words: how === "ownWork" ? null : MARK_HOW_WORDS[how] };
 }
 
 /** The arc a topic lies in, by handle and title, with the share of its

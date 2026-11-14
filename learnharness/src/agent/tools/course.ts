@@ -65,7 +65,7 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
 		if (!answers.has(named) && refused === null) {
 			refused =
 				`observations[${i}].question: ${JSON.stringify(question)} is not an answer of this session. ` +
-				'Copy the "question" id his answer carried, or leave the field out for an answer he gave in words.';
+				'Copy the "question" id his answer carried, or name "his-message" for an answer he gave in words in his message.';
 		}
 		questions.push(named || null);
 		return rest;
@@ -127,7 +127,7 @@ const saveInput = Type.Object({
 	changes: Type.Record(Type.String(), Type.Unknown(), {
 		description:
 			"One JSON merge patch for the course record: only what changed. `observations` is a list of new entries; " +
-			"an attempt that records his answer to a question names it with `question`, the id that answer carried, so his answer shows its mark (a re-mark names none: `corrects` links it); " +
+			"an attempt that records his answer to a question names it with `question`, the id that answer carried, so his answer shows its mark; an answer he gave in words in his message names `\"his-message\"` (a re-mark names none: `corrects` links it); " +
 			"`topics`, `tasks`, `knowledge` merge by handle (a null entry removes it); `path`, `exam`, `preferences` merge by field; `focus` names the task to continue. " +
 			"Texts the learner reads later (topic titles, gaps and notes, task titles, goals and steps, observation texts) put every piece of math in `$…$` LaTeX, never bare (`$\\sin(x^2)$`, not sin(x^2)).",
 	}),

@@ -1,15 +1,15 @@
 "use client";
 
 import { createContext, useContext, useRef, useState, type KeyboardEvent } from "react";
-import { CircleCheckIcon, CircleMinusIcon, CircleXIcon, FlagIcon, GaugeIcon, HandHelpingIcon, ScaleIcon, UserIcon, type LucideIcon } from "lucide-react";
-import type { AnswerMark, DisputeDetails, MarkResult, MarkRow } from "@/src/core";
+import { CircleCheckIcon, CircleDashedIcon, CircleMinusIcon, CircleXIcon, FlagIcon, FlagOffIcon, GaugeIcon, HandHelpingIcon, ScaleIcon, UserIcon, type LucideIcon } from "lucide-react";
+import { markHow, type AnswerMark, type DisputeDetails, type MarkHow, type MarkResult, type MarkRow } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { countedWords, MARK_WORDS } from "@/components/study-words";
+import { MARK_HOW_WORDS, MARK_WORDS } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,6 +41,14 @@ const RESULT_ICON: Record<MarkResult, LucideIcon> = {
 	incorrect: CircleXIcon,
 };
 
+const HOW_ICON: Record<MarkHow, LucideIcon> = {
+	predicted: CircleDashedIcon,
+	gaveUp: FlagOffIcon,
+	withHelp: HandHelpingIcon,
+	countedHelped: HandHelpingIcon,
+	ownWork: UserIcon,
+};
+
 function Fact({ icon: Icon, children, className }: { icon: LucideIcon; children: React.ReactNode; className?: string }) {
 	return (
 		<span className={cn("inline-flex items-center gap-1.5", className)}>
@@ -50,14 +58,16 @@ function Fact({ icon: Icon, children, className }: { icon: LucideIcon; children:
 	);
 }
 
-/** One mark row's facts: its label, the result, how it counted, the
- *  confidence recorded. The card's foot and the lesson's mark line share it. */
+/** One mark row's facts: its label, the result, how it counted (`markHow`,
+ *  the words Earlier says too), the confidence he chose. The card's foot
+ *  and the lesson's mark line share it. */
 export function RowFacts({ row }: { row: MarkRow }) {
+	const how = markHow(row);
 	return (
 		<span data-testid="mark-row" data-result={row.result} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
 			{row.label && <span className="text-muted-foreground">{row.label}</span>}
 			<Fact icon={RESULT_ICON[row.result]} className="text-foreground">{MARK_WORDS.result[row.result]}</Fact>
-			<Fact icon={row.helped || row.grade === "helped" ? HandHelpingIcon : UserIcon}>{countedWords(row)}</Fact>
+			<Fact icon={HOW_ICON[how]}>{MARK_HOW_WORDS[how]}</Fact>
 			{row.sure && <Fact icon={GaugeIcon}>{MARK_WORDS.sure[row.sure]}</Fact>}
 		</span>
 	);

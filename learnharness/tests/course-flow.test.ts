@@ -365,6 +365,40 @@ describe("a course-linked turn", () => {
 		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
 	});
 
+	it("practice: a message sent from Ask concludes nothing and carries no confidence (round 5)", async () => {
+		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: LINALG } })).json()) as { id: string };
+		const pose = { statement: "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.", mode: "recall", topics: ["rank"], modelSolution: "Row 2 is twice row 1, so the rank is 1." };
+		const engine = scripted([
+			() => fauxAssistantMessage([fauxToolCall("problem", pose, { id: "p1" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("Look at the rows.")]),
+			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right.", rung: null, missClass: null, retest: false, result: "correct", response: "1, the rows are dependent" }, { id: "c1" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("Send it as your answer when you're ready.")]),
+			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "surrendered", verdict: "Given up.", rung: null, missClass: null, retest: false, result: "incorrect", response: "no answer" }, { id: "c2" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("Here is the solution.")]),
+		]);
+		const factory: Factory = (opts) => createPracticeAgent({ chatId: id, chatStore }, { ...opts, engine });
+		const saves = () => engineCalls().filter((c) => c.args[2] === "save");
+		const before = saves().length;
+		await turn(id, { type: "text", text: "practice rank" }, factory);
+		await turn(id, { type: "thinking", problemCallId: "p1", text: "maybe 2?", confidence: "guessing" }, factory);
+		await turn(id, { type: "text", text: "it's 1, the rows are dependent", asked: true }, factory);
+
+		const messages = chatStore.getChat(id)!.messages;
+		const asked = messages.findIndex((m) => (m as { customType?: string }).customType === "asked");
+		assert.ok(asked >= 0 && messages[asked + 1]?.role === "user", "an Ask message reaches the tutor marked as a question");
+		assert.match(String((messages[asked] as { content: string }).content), /not his answer/);
+		const refused = messages.find((m) => (m as { toolCallId?: string }).toolCallId === "c1") as { isError: boolean; content: Array<{ text: string }> };
+		assert.equal(refused.isError, true, "a solved conclusion from an Ask message is refused");
+		assert.match(refused.content[0]!.text, /Ask/);
+		assert.equal(saves().length, before, "nothing was recorded from it");
+
+		await turn(id, { type: "text", text: "just show me", asked: true }, factory);
+		const save = saves()[before]!;
+		const [observation] = JSON.parse(save.stdin).observations as Record<string, unknown>[];
+		assert.equal(observation!.gave_up, true);
+		assert.equal("sure" in observation!, false, "the Guessing of an earlier note is not this give-up's confidence");
+	});
+
 	it("a course session's file search defaults to the course folder", async () => {
 		const agent = createPracticeAgent(
 			{ chatId: "chat_files", chatStore },

@@ -25,7 +25,7 @@ import { teachHandoffTool } from "./handoff.ts";
 import { nameSessionTool } from "./name-session.ts";
 import type { ChatStore } from "../../core/ports.ts";
 import type { SteerMessage } from "../../core/contracts/jobs.ts";
-import { activeProblemOf, seenBeforeAsked } from "../../core/native-messages.ts";
+import { activeProblemOf, finalSubmissionOf, seenBeforeAsked } from "../../core/native-messages.ts";
 import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
@@ -176,7 +176,7 @@ export const concludeInputObject = Type.Object({
 	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
 	result: Type.Union([attemptResult("correct, partial or incorrect"), Type.Null()], {
 		description:
-			"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
+			"REQUIRED — the attempt's result for his course record: correct, partial (part of it right: some of its parts right and others not, or a right answer reached by reasoning that does not hold; a verdict that names a part he got right is never incorrect) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
 	}),
 	response: Type.String({ description: "REQUIRED — his final answer, in a short line, with math in `$…$` LaTeX (it is recorded as the attempt the learner reads later)." }),
 	chose: Type.Optional(
@@ -217,17 +217,6 @@ export interface ConcludeRecording {
 	course: CourseToolContext;
 }
 
-/** The confidence of the last submission on one problem: the one the
- *  final answer came with. */
-function lastSubmissionConfidence(messages: readonly LhMessage[], problemCallId: string): string | undefined {
-	const states = messages
-		.filter((m): m is LhMessage & LhMarkerMessage => (m as { customType?: string }).customType === "practice-thinking")
-		.map((m) => m.details as { problemCallId?: unknown; confidence?: unknown } | null)
-		.filter((d) => d?.problemCallId === problemCallId)
-		.map((d) => (typeof d?.confidence === "string" ? d.confidence : undefined));
-	return states[states.length - 1];
-}
-
 /** True when he pressed Explain instead on this problem before submitting
  *  any work on it: he asked to be taught, so nothing was attempted. */
 function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: string): boolean {
@@ -266,13 +255,19 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 	};
 	const problem = conclusionProblem(conclusion, topics);
 	if (problem) return { refused: problem, text: "" };
+	// His newest message came from Ask: a question, never his answer, and
+	// the confidence of an earlier note is not its (round 5).
+	const final = finalSubmissionOf(record.messages, active.toolCallId);
+	if (final?.kind === "asked" && conclusion.result !== null && input.outcome !== "surrendered") {
+		return { refused: "his newest message came from Ask: a question to you, not his answer, so it concludes nothing. Answer his question; his answer comes as his work", text: "" };
+	}
 	if (conclusion.result === null) {
 		return { text: "No attempt recorded: he claimed no answer." };
 	}
 	const observations = practiceObservations(
 		{ statement: pose.statement, topics },
 		conclusion,
-		lastSubmissionConfidence(record.messages, active.toolCallId),
+		final?.kind === "work" ? final.confidence : undefined,
 	);
 	// The same problem posed again after its solution was shown: his
 	// answer repeats what he saw (shown-help.ts).

@@ -94,13 +94,13 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 
 ## An answer's mark
 
-`MARK_WORDS` and `countedWords`: the record's mark on an answered card (answer-mark.md).
+`MARK_WORDS` and `MARK_HOW_WORDS`: the record's mark on an answered card (answer-mark.md). How an attempt counted is `markHow` (`src/core/contracts/marks.ts`), the one rule the card and the topic page's Earlier both read.
 
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right |
-| counted | On your own; With help; Counted as helped (a right guess, an unsure or a partly right answer with no help) |
-| confidence recorded | Guessing, Neutral, Confident |
+| counted | Prediction, not counted; Gave up; With help; Counted as helped (a right guess, an unsure or a partly right answer with no help); On your own |
+| confidence he chose | Guessing, Confident; none when he left the meter alone (Neutral is never shown as his choice) |
 | a dispute | Dispute; Disputed: and the tutor's ruling; in the transcript, You disputed the mark, You think: Partly right |
 
 ## Counts

@@ -133,11 +133,20 @@ export function courseLabel(course: { workspace: string; title: string | null })
 }
 
 /** The learner's one-tap read of his own answer (Edoardo, 7 Nov 2026):
- *  three discrete states, no slider and no percentage. It rides every
- *  graded free-response answer and every practice submission. */
+ *  three discrete states, no slider and no percentage. The one he chose
+ *  rides a graded free-response answer or a practice submission
+ *  (`chosenConfidence`). */
 export const CONFIDENCE_STATES = ["guessing", "neutral", "confident"] as const;
 export type Confidence = (typeof CONFIDENCE_STATES)[number];
 export const DEFAULT_CONFIDENCE: Confidence = "neutral";
+
+/** The confidence he chose, or none: Neutral is the meter left alone, not
+ *  a choice (round 5: "Neutral" showed as his confidence when he had chosen
+ *  none), so it never reaches the tutor or the record. The one gate every
+ *  answer, submission and saved attempt passes through. */
+export function chosenConfidence(state: unknown): Exclude<Confidence, "neutral"> | undefined {
+	return state === "guessing" || state === "confident" ? state : undefined;
+}
 
 /** The control's choices, in display order. */
 export const CONFIDENCE_CHOICES: readonly { state: Confidence; label: string }[] = [

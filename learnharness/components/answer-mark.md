@@ -4,7 +4,7 @@
 
 ## Where the mark comes from
 
-Never the app's judgement, and never a guess at which attempt is whose. `core/answer-marks.ts` links each answer to the attempts that name it: the tutor saves each attempt with `question`, the id the answer carried to it, and the save's receipt gives each attempt's id in order (`saved`); a problem's are its `conclude` receipt. An answer no attempt names shows no mark (round 4: a late save of an earlier check showed on the next card). Then `GET /api/chats/:id/marks` reads them whole from the engine with `show`, following `corrected_by` to the attempts that stand. The session reads the marks again whenever a turn settles.
+Never the app's judgement, and never a guess at which attempt is whose. `core/answer-marks.ts` links each answer to the attempts that name it: the tutor saves each attempt with `question`, the id the answer carried to it, and the save's receipt gives each attempt's id in order (`saved`); a problem's are its `conclude` receipt. An answer he gave in words, in a message of his rather than through a question, is named `his-message` by the save, which stands for his newest message before it (round 5: such answers were recorded and showed no mark, after Explain instead and on a same-day return); his bubble then carries the mark like any answer. An answer no attempt names shows no mark (round 4: a late save of an earlier check showed on the next card). Then `GET /api/chats/:id/marks` reads them whole from the engine with `show`, following `corrected_by` to the attempts that stand. The session reads the marks again whenever a turn settles.
 
 ## The line
 
@@ -13,8 +13,8 @@ The card's foot, under a hairline, 13px muted, icons with a few words:
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right (the result in `foreground`) |
-| counted | On your own; With help (the attempt records help); Counted as helped (no help, but a guess, an unsure answer or a partly right one) |
-| confidence recorded | Guessing, Neutral, Confident. Once a mark is shown the card's label row drops the confidence he picked: a dispute may have corrected it |
+| counted | `markHow`, the rule Earlier reads too, so both say the same: Prediction, not counted (`predicted`); Gave up (`gave_up`); With help (the attempt records help); Counted as helped (no help, but a guess, an unsure answer or a partly right one); On your own |
+| confidence he chose | Guessing, Confident (`chosenSure`); a recorded `neutral` is the meter left alone and shows nothing. Once a mark is shown the card's label row drops the confidence he picked: a dispute may have corrected it |
 | disputed | Disputed: and the tutor's ruling, math rendered |
 
 A practice problem with two attempts reads two rows, First try and Then; rows split by topic carry the topic's title. Dispute sits at the right: a quiet 32px button with a flag, its tooltip "Dispute this mark ⌘⇧M", off while a turn runs.

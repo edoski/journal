@@ -497,6 +497,8 @@ export function Chat({
 		box: proseBox(chatId, proseOpen),
 		carry: course ? `carry:${course.workspace}` : undefined,
 		draft: pending ? questionDraft(pending.key)?.form : undefined,
+		replying: status === "submitted" || status === "streaming" || turnInFlight,
+		askDraft: () => textRef.current,
 	});
 	// The Prose composer swaps between the message field and the answer
 	// field: focus follows to where he types next (focus-home.ts).
@@ -1317,7 +1319,7 @@ export function Chat({
 		}
 		draftRef.current = t;
 		applyText("");
-		sendWithPhotos((photos) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }));
+		sendWithPhotos((photos) => send({ type: "text", text: t, asked: true, ...(photos ? { photos } : {}) }));
 	};
 
 	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
@@ -1513,8 +1515,9 @@ export function Chat({
 							) : (
 									<Fragment key={m.id || `m-${mi}`}>
 									{m.role === "user" ? (
-										// His words: a bubble on the right.
-										<LearnerBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} photos={m.parts.filter((p) => p.type === "photos").flatMap((p) => p.data as Photo[])} />
+										// His words: a bubble on the right, with the mark of an
+										// answer he gave in words (HIS_MESSAGE) under it.
+										<LearnerBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} photos={m.parts.filter((p) => p.type === "photos").flatMap((p) => p.data as Photo[])} markId={m.id} />
 									) : (
 									<Message from="assistant" className="max-w-full">
 									{/* Visible overflow: a quiet row's hover fill reaches past the
