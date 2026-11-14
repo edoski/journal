@@ -192,8 +192,9 @@ export function arcStandingOf(json: unknown): ArcStanding {
 }
 
 /** The view, from the engine's `show --all` (the whole record) and, in a
- *  course with arcs, where he stands (`arcStandingOf`). Pure. */
-export function courseView(record: unknown, standing: ArcStanding = NO_STANDING): MapCourseView {
+ *  course with arcs, where he stands (`arcStandingOf`; `NO_STANDING` without
+ *  arcs). Required, so a caller cannot forget the arcs he holds. Pure. */
+export function courseView(record: unknown, standing: ArcStanding): MapCourseView {
 	const r = obj(record);
 	const topics: Record<string, ViewTopic> = {};
 	for (const [handle, value] of Object.entries(obj(r.topics))) {
