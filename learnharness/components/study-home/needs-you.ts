@@ -67,8 +67,10 @@ export function slotWords(why: Why | null, lead: CourseMapTopic | null): string 
  * reason name the same topic: a session's own topic, the one it belongs
  * to, fixed for its life (none when it has none on the map), never the
  * topic its lesson is on now; a lapse's lapsed topic; an open task's
- * current topic when the task holds it; else the line's first topic.
- * `whyOf` picks the lapsed topic the same way. Pure.
+ * current topic when the task holds it, else none, since the record does
+ * not say which of its topics the task is at (round 5: "Continue Problem
+ * sheet 4" opened the Basis page, its first topic); else the line's
+ * first topic. `whyOf` picks the lapsed topic the same way. Pure.
  */
 export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Why | null): CourseMapTopic | null {
 	if (row.kind === "session") {
@@ -80,10 +82,7 @@ export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Wh
 		const lapsed = row.course?.map.topics.find((t) => held.has(t.handle) && t.signals.lapsed);
 		if (lapsed) return lapsed;
 	}
-	if (row.kind === "course" && row.step.kind === "task") {
-		const current = topics.find((t) => t.handle === row.course.map.current);
-		if (current) return current;
-	}
+	if (row.kind === "course" && row.step.kind === "task") return topics.find((t) => t.handle === row.course.map.current) ?? null;
 	return topics[0] ?? null;
 }
 
