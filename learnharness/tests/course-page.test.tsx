@@ -21,7 +21,8 @@ import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
 import { CourseGroup } from "../components/course-page/course-group.tsx";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { courseHref, unitHref, workspaceOf } from "../components/unit-inbox/unit-href.ts";
-import { buildInbox } from "../components/unit-inbox/units.ts";
+import { buildInbox, unitStatus } from "../components/unit-inbox/units.ts";
+import { headMarks } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -145,6 +146,20 @@ describe("every topic once, in the group he would act on it from", () => {
 		const own = groupOf(groups, "on-your-own");
 		assert.deepEqual(handles(own), ["vectors", "basis"]);
 		assert.deepEqual(own.topics[0]!.fact, { kind: "back", words: "Back in 5d" });
+	});
+
+	it("says since when a review held past its day was due, in the words the sidebar and the topic page use", () => {
+		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
+		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held } : t)) });
+		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
+		assert.deepEqual(row.fact, { kind: "back", words: "Due since 21 Oct" });
+		const unit = buildInbox([map], [], WS).known.find((u) => u.topic.handle === "basis")!;
+		assert.deepEqual(unitStatus(unit, "2026-11-08"), { kind: "returns", words: row.fact!.words }, "the sidebar's row says the same");
+		assert.deepEqual(
+			headMarks(unit.topic, (handle) => handle, "2026-11-08").map((m) => m.words),
+			[row.fact!.words],
+			"the topic page's head says the same",
+		);
 	});
 
 	it("agrees with the sidebar: Needs you and Learning together are its listed topics outside Known, Not started is what it leaves out", () => {

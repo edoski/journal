@@ -5,8 +5,8 @@ import { examWords, todayRows, type TodayRow } from "@/components/study-home/stu
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { buildInbox, daysBetween, taskWords as leftOff, type Unit, type UnitNow } from "@/components/unit-inbox/units";
-import { courseShareWords, returnWords } from "@/components/study-words";
+import { buildInbox, taskWords as leftOff, type Unit, type UnitNow } from "@/components/unit-inbox/units";
+import { courseShareWords, reviewWords } from "@/components/study-words";
 
 /**
  * The course page's model (spec: course-page.md): one course's topics, each
@@ -98,7 +98,7 @@ function factOf(course: StudyCourse, topic: CourseMapTopic, group: GroupId, now:
 		case "not-started":
 			return current ? { kind: "here", words: CURRENT_TAG } : null;
 		case "on-your-own":
-			return topic.review?.kind === "scheduled" ? { kind: "back", words: returnWords(Math.max(1, daysBetween(course.map.today, topic.review.date))) } : null;
+			return topic.review?.kind === "scheduled" ? { kind: "back", words: reviewWords(topic.review, course.map.today) } : null;
 	}
 }
 
