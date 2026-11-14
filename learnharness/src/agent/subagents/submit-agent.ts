@@ -1,6 +1,6 @@
 /**
- * runSubmitAgent — the shared single-submit agent seam (moved verbatim from
- * extraction.ts): one TypeBox-validated submit
+ * runSubmitAgent — the shared single-submit agent seam (the lesson digest
+ * and the course-map builder): one TypeBox-validated submit
  * call is the whole deliverable (a pi agent purely so the model can retry a
  * schema-invalid call). The submitted value is captured from the execute
  * seam, which only fires on a schema-valid call — the ??-fill (the old zod
@@ -17,9 +17,8 @@ import { runSubagent } from "./pi-run.ts";
 import { healToolRecord } from "../tools/heal.ts";
 import { healEncodedArguments } from "../../core/argument-heal.ts";
 
-// ── the weak-model string-heal (owner, 2026-09-28; moved here from
-// extraction.ts with the digest-aware redesign, 2026-09-30 — the heal
-// is wire-format medicine shared by every submit agent) ──
+// ── the weak-model string-heal (owner, 2026-09-28 — wire-format medicine
+// for any submit agent that opts in through prepareArguments) ──
 //
 // OpenRouter log evidence: weak models under a big submit payload often
 // emit a whole array as ONE JSON-STRING instead of a native array
@@ -59,17 +58,17 @@ export async function runSubmitAgent<T>(opts: {
 	signal: AbortSignal | undefined;
 	onStep: (usage: Usage, model: string, step: number, finishReason: string, tools: string) => void;
 	neverSubmitted: string;
-	/** Extra tools beside the submit call (the auditor's graph-exploration
-	 *  set, 2026-09-27): a small agentic loop instead of a bare retry. */
+	/** Extra tools beside the submit call (the course-map builder's material
+	 *  readers): a small agentic loop instead of a bare retry. */
 	extraTools?: Record<string, AgentTool<any>>;
-	/** Turn budget for the loop (default 4 = retry-only; the auditor runs
-	 *  an exploration loop instead — 16). */
+	/** Turn budget for the loop (default 4 = retry-only; a builder with
+	 *  extra tools sets its own). */
 	maxTurns?: number;
 	/** Debug: raw provider-event recording key (LH_PROVIDER_EVENTS=1). */
 	chatId?: string;
 	/** Weak-model argument heal at pi's prepareArguments seam (runs BEFORE
 	 *  TypeBox validation — the sanctioned shim point). Identity by
-	 *  default; extraction wires healStringifiedArrays here. */
+	 *  default; healStringifiedArrays fits here. */
 	prepareArguments?: (args: unknown) => unknown;
 	/** Semantic validation at the submit seam: the value is schema-valid
 	 *  but may violate a PIPELINE law (coverage, echo-equality). Returning
@@ -81,7 +80,7 @@ export async function runSubmitAgent<T>(opts: {
 	const result = await runSubagent(
 		[
 			// healToolRecord (owner, 2026-10-09): the standard argument heal
-		// over the extra tools (the auditor's graph set) — same as every
+		// over the extra tools — same as every
 		// registry.
 		...(opts.extraTools ? Object.values(healToolRecord(opts.extraTools)) : []),
 			{
