@@ -845,7 +845,7 @@ def _golden(name: str, value: Any) -> None:
     assert text == path.read_text(encoding="utf-8"), f"{path.name} changed"
 
 
-@pytest.mark.parametrize("course", ["linear-algebra"])
+@pytest.mark.parametrize("course", ["linear-algebra", "linear-algebra-arcs"])
 def test_the_demo_courses_read_as_their_goldens(
     course: str, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -854,3 +854,351 @@ def test_the_demo_courses_read_as_their_goldens(
     workspace.record.write_bytes((GOLDEN / f"{course}.course.json").read_bytes())
     _golden(f"{course}.map", retrieval.course_map(workspace))
     _golden(f"{course}.resume", retrieval.resume(workspace))
+    _golden(f"{course}.arcs", retrieval.course_arcs(workspace, report=True))
+
+
+# --- arcs -------------------------------------------------------------------
+
+
+def _arc(title: str) -> dict[str, str]:
+    return {
+        "title": title,
+        "question": f"What is {title.lower()} for?",
+        "purpose": f"Use {title.lower()}.",
+    }
+
+
+ARCS = {
+    "limits": _arc("Limits and continuity"),
+    "derivatives": _arc("Derivatives"),
+    "integrals": _arc("Integrals"),
+}
+ARC_TOPICS = {
+    "limit": {"title": "Limits", "arc": "limits"},
+    "continuity": {"title": "Continuity", "needs": ["limit"], "arc": "limits"},
+    "derivative": {"title": "The derivative", "needs": ["limit"], "arc": "derivatives"},
+    "chain-rule": {
+        "title": "Chain rule",
+        "needs": ["derivative"],
+        "arc": "derivatives",
+    },
+    "riemann": {"title": "Riemann sums", "needs": ["limit"], "arc": "integrals"},
+    "substitution": {
+        "title": "Substitution",
+        "needs": ["riemann", "chain-rule"],
+        "contrasts": ["chain-rule", "parts"],
+        "arc": "integrals",
+    },
+    "parts": {
+        "title": "Integration by parts",
+        "needs": ["riemann"],
+        "arc": "integrals",
+    },
+}
+ARC_ORDER = ["limits", "derivatives", "integrals"]
+
+
+def with_arcs(workspace: Workspace, **extra: Any) -> None:
+    records.save(
+        workspace,
+        {
+            "arcs": ARCS,
+            "topics": ARC_TOPICS,
+            "path": {"arcs": ARC_ORDER},
+            "arc_change": {"reason": "Chapters 2, 3 and 5"},
+            **extra,
+        },
+    )
+
+
+def taught(workspace: Workspace, on: int, *topics: str) -> None:
+    records.save(
+        workspace, {"topics": {topic: {"introduced": day(on)} for topic in topics}}
+    )
+
+
+def answered(workspace: Workspace, on: int, *topics: str, **fields: Any) -> None:
+    records.save(
+        workspace,
+        {"observations": [attempt(topic, date=day(on), **fields) for topic in topics]},
+    )
+
+
+def states(workspace: Workspace) -> dict[str, str]:
+    return {arc["arc"]: arc["state"] for arc in retrieval.course_map(workspace)["arcs"]}
+
+
+def test_an_arc_is_ready_after_a_solid_answer_on_a_later_day_than_its_teaching(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    assert states(workspace) == dict.fromkeys(ARC_ORDER, "new")
+    taught(workspace, -10, "limit", "continuity")
+    answered(workspace, -10, "limit", "continuity")
+    assert states(workspace)["limits"] == "learning", "a teaching day's answer"
+    answered(workspace, -5, "limit")
+    assert states(workspace)["limits"] == "learning", "every topic rests on one"
+    answered(workspace, -5, "continuity")
+    assert states(workspace) == {
+        "limits": "ready",
+        "derivatives": "new",
+        "integrals": "new",
+    }
+
+
+def test_an_arc_is_checked_when_each_topics_latest_check_item_stands_solid(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    taught(workspace, -10, "limit", "continuity")
+    answered(workspace, -10, "limit", "continuity")
+    answered(workspace, -5, "limit", "continuity")
+    answered(workspace, -2, "limit", checkpoint="limits")
+    assert states(workspace)["limits"] == "ready", "one topic still unchecked"
+    answered(workspace, -2, "continuity", checkpoint="limits")
+    assert states(workspace)["limits"] == "checked"
+    remarked = attempt(
+        "continuity",
+        date=day(-2),
+        result="incorrect",
+        corrects=["o6"],
+        disputed="The limit was wrong",
+        ruling="The limit at 0 is 1, not 0",
+    )
+    records.save(workspace, {"observations": [remarked]})
+    assert states(workspace)["limits"] == "ready", "a superseded item counts no more"
+    answered(workspace, -1, "continuity", checkpoint="limits")
+    assert states(workspace)["limits"] == "checked", "a fresh item rechecks it"
+    taught(workspace, 0, "limit")
+    answered(workspace, 0, "limit", checkpoint="limits")
+    assert states(workspace)["limits"] == "ready", "never on a teaching day"
+
+
+def test_a_course_that_takes_no_questions_reads_new_learning_or_taught(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace, preferences={"questions": "none"})
+    taught(workspace, -3, "limit")
+    assert states(workspace) == {
+        "limits": "learning",
+        "derivatives": "new",
+        "integrals": "new",
+    }
+    taught(workspace, -2, "continuity")
+    assert states(workspace)["limits"] == "taught"
+    assert "arcs_ready" not in retrieval.resume(workspace)
+
+
+def test_an_arcs_entry_is_what_it_needs_from_earlier_arcs_lapsed_first(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    taught(workspace, -20, "limit", "derivative", "chain-rule")
+    answered(workspace, -15, "limit", "derivative", "chain-rule")
+    answered(workspace, -10, "chain-rule", result="incorrect")
+    arcs = {arc["arc"]: arc for arc in retrieval.course_map(workspace)["arcs"]}
+    assert arcs["integrals"]["entry"] == ["chain-rule", "limit"]
+    assert arcs["derivatives"]["entry"] == ["limit"]
+    assert arcs["limits"]["entry"] == []
+    records.save(
+        workspace,
+        {
+            "topics": {
+                key: {"excluded": "Not examined"}
+                for key in ("riemann", "substitution", "parts")
+            }
+        },
+    )
+    hidden = retrieval.course_map(workspace)["arcs"][2]
+    assert (hidden["hidden"], hidden["entry"]) == (True, [])
+    assert [arc for arc, *_ in retrieval.resume(workspace)["path"]["arcs"]] == [
+        "limits",
+        "derivatives",
+    ], "a hidden arc is drawn nowhere"
+
+
+def test_the_current_arc_follows_the_lesson_in_progress(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace, path={"arcs": ARC_ORDER, "current": "derivative"})
+    mapped = retrieval.course_map(workspace)
+    assert mapped["current_arc"] == "derivatives"
+    assert [arc["arc"] for arc in mapped["arcs"] if arc["current"]] == ["derivatives"]
+    assert [topic["arc"] for topic in mapped["topics"]][:3] == [
+        "limits",
+        "limits",
+        "derivatives",
+    ]
+    assert retrieval.course_map(workspace, here="parts")["current_arc"] == "integrals"
+    brief = retrieval.resume(workspace, here="parts")
+    assert brief["arc"] == {
+        "arc": "integrals",
+        "title": "Integrals",
+        "question": "What is integrals for?",
+        "purpose": "Use integrals.",
+        "state": "new",
+        "entry": ["limit", "chain-rule"],
+        "first": True,
+    }
+    assert brief["path"]["topics"][0] == ["limit", "new", "limits"]
+
+
+def test_the_brief_offers_each_ready_arcs_check_with_its_pairs(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    every = [*ARC_TOPICS]
+    taught(workspace, -10, *every)
+    answered(workspace, -10, *every)
+    answered(workspace, -5, *every)
+    ready = retrieval.resume(workspace)["arcs_ready"]
+    assert [arc["arc"] for arc in ready] == ARC_ORDER
+    assert ready[2] == {
+        "arc": "integrals",
+        "title": "Integrals",
+        "question": "What is integrals for?",
+        "topics": ["riemann", "parts", "substitution"],
+        "pairs": [["parts", "substitution"], ["substitution", "chain-rule"]],
+    }
+    assert ready[1]["pairs"] == [], "a pair reaching a later arc is that arc's"
+
+
+def test_the_brief_lists_arc_notes_since_the_last_formation_or_replan(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    records.save(workspace, {"arc_change": {"reason": "Sheet 3 orders it otherwise"}})
+    assert retrieval.resume(workspace)["arc_notes"] == [
+        {"day": TODAY.isoformat(), "reason": "Sheet 3 orders it otherwise"}
+    ]
+    records.save(
+        workspace,
+        {
+            "topics": {"continuity": {"arc": "derivatives"}},
+            "arc_change": {
+                "reason": "He studies continuity with derivatives",
+                "asked": "Move continuity next to the derivative",
+            },
+        },
+    )
+    assert "arc_notes" not in retrieval.resume(workspace)
+
+
+def test_where_he_stands_counts_his_open_lessons(workspace: Workspace) -> None:
+    with_arcs(workspace, path={"arcs": ARC_ORDER, "current": "continuity"})
+    answered(workspace, -3, "limit", result="incorrect", chose="derivative")
+    standing = retrieval.course_arcs(workspace)
+    assert standing["current_arc"] == "limits"
+    assert standing["studied"] == ["limit", "continuity", "derivative"]
+    assert standing["held"] == ["limits", "derivatives"]
+    opened = retrieval.course_arcs(workspace, here="parts", lessons=["parts", "ghost"])
+    assert opened["current_arc"] == "integrals"
+    assert opened["studied"] == ["limit", "continuity", "derivative", "parts"]
+    assert opened["held"] == ARC_ORDER
+    listed = opened["arcs"][2]
+    assert listed["topics"] == ["riemann", "parts", "substitution"]
+    assert (listed["question"], listed["state"], listed["current"]) == (
+        "What is integrals for?",
+        "new",
+        True,
+    )
+    assert opened["arc_log"][0]["kind"] == "formed"
+
+
+def test_a_course_without_arcs_has_no_arc_blocks(workspace: Workspace) -> None:
+    records.save(workspace, {"topics": {"rank": {"title": "Rank"}}})
+    answered(workspace, -1, "rank")
+    assert retrieval.course_arcs(workspace, report=True) == {
+        "studied": ["rank"],
+        "held": [],
+        "arcs": [],
+    }
+    mapped = retrieval.course_map(workspace, here="rank")
+    assert not {"arcs", "current_arc"} & mapped.keys()
+    assert "arc" not in mapped["topics"][0]
+    assert retrieval.resume(workspace)["path"]["topics"] == [["rank", "assisted"]]
+
+
+def test_the_report_computes_the_rubrics_structural_checks(
+    workspace: Workspace,
+) -> None:
+    with_arcs(
+        workspace,
+        exam={"date": day(30), "arcs": ["limits", "derivatives"]},
+        path={"arcs": ARC_ORDER, "current": "limit"},
+    )
+    records.save(
+        workspace,
+        {
+            "exam": {
+                "date": day(30),
+                "arcs": ["derivatives"],
+                "leaves_out": ["chain-rule"],
+            }
+        },
+    )
+
+    def report() -> dict[str, Any]:
+        found: dict[str, Any] = retrieval.course_arcs(workspace, report=True)["report"]
+        return found
+
+    mixed = ["limit", "continuity", "derivative", "riemann", "chain-rule"]
+    records.save(workspace, {"path": {"order": [*mixed, "parts", "substitution"]}})
+    assert report()["path"]["stored"] == ["chain-rule"]
+    arc_major = ["limit", "continuity", "derivative", "chain-rule", "riemann"]
+    records.save(workspace, {"path": {"order": [*arc_major, "parts", "substitution"]}})
+    checks = report()
+    assert checks["partition"] == {"unplaced": [], "empty": []}
+    assert checks["backward"] == []
+    assert checks["path"] == {"stored": [], "derived": []}
+    assert checks["arcs"][2] == {
+        "arc": "integrals",
+        "topics": 3,
+        "pieces": [["riemann", "parts", "substitution"]],
+        "roots": ["riemann"],
+        "entry": ["limit", "chain-rule"],
+        "entry_arcs": ["limits", "derivatives"],
+    }
+    assert checks["long_skips"] == [{"topic": "riemann", "needs": "limit", "arcs": 2}]
+    assert checks["split_contrasts"] == [["chain-rule", "substitution"]]
+    assert checks["sizes"] == {"arcs": 3, "live": 3, "one_topic": []}
+    assert checks["scope"] == [
+        {
+            "arc": "derivatives",
+            "examined": ["derivative"],
+            "not_examined": ["chain-rule"],
+            "leaves_out": True,
+            "held": False,
+        }
+    ]
+
+
+def test_show_search_and_the_run_up_read_arcs(workspace: Workspace) -> None:
+    with_arcs(workspace, exam={"date": day(30), "arcs": ["limits"]})
+    shown = retrieval.show(workspace, ["integrals"])["items"]["integrals"]
+    assert shown == {
+        "kind": "arc",
+        **ARCS["integrals"],
+        "topics": ["riemann", "parts", "substitution"],
+        "standing": {
+            "state": "new",
+            "current": False,
+            "hidden": False,
+            "entry": ["limit", "chain-rule"],
+        },
+        "log": [
+            {
+                "day": TODAY.isoformat(),
+                "kind": "formed",
+                "reason": "Chapters 2, 3 and 5",
+            }
+        ],
+    }
+    hits = retrieval.search(workspace, "derivatives")["hits"]
+    assert hits[0] == {
+        "kind": "arc",
+        "handle": "derivatives",
+        "title": "Derivatives",
+        "excerpt": "Derivatives",
+    }
+    assert retrieval.course_map(workspace)["exam"]["arcs"] == ["limits"]

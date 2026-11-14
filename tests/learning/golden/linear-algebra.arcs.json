@@ -1,0 +1,17 @@
+{
+  "studied": [
+    "vectors",
+    "span",
+    "independence",
+    "basis",
+    "matmul",
+    "elimination",
+    "rank",
+    "kernel",
+    "determinant",
+    "cramer",
+    "eigen"
+  ],
+  "held": [],
+  "arcs": []
+}

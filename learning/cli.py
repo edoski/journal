@@ -50,7 +50,7 @@ def _directories(workspace: Workspace) -> dict[str, Any]:
 
 
 def resume(args: argparse.Namespace) -> dict[str, Any]:
-    return retrieval.resume(_workspace(args), task=args.task)
+    return retrieval.resume(_workspace(args), task=args.task, here=args.here)
 
 
 def show(args: argparse.Namespace) -> dict[str, Any]:
@@ -60,7 +60,13 @@ def show(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def course_map(args: argparse.Namespace) -> dict[str, Any]:
-    return retrieval.course_map(_workspace(args))
+    return retrieval.course_map(_workspace(args), here=args.here)
+
+
+def course_arcs(args: argparse.Namespace) -> dict[str, Any]:
+    return retrieval.course_arcs(
+        _workspace(args), here=args.here, lessons=args.open, report=args.report
+    )
 
 
 def search(args: argparse.Namespace) -> dict[str, Any]:
@@ -191,9 +197,32 @@ def _positive(value: str) -> int:
     return number
 
 
+def _add_here(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--here",
+        metavar="TOPIC",
+        help="The topic of a lesson in progress; default: path.current",
+    )
+
+
 def _build_resume(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--task", help="Task to resume; default: focus, else the only task"
+    )
+    _add_here(parser)
+
+
+def _build_arcs(parser: argparse.ArgumentParser) -> None:
+    _add_here(parser)
+    parser.add_argument(
+        "--open",
+        nargs="+",
+        default=[],
+        metavar="TOPIC",
+        help="The topics of every open lesson; they count as studied",
+    )
+    parser.add_argument(
+        "--report", action="store_true", help="Add the rubric's computable checks"
     )
 
 
@@ -311,7 +340,13 @@ COMMANDS: tuple[Command, ...] = (
         "map",
         "Every topic with its edges, level, review and weak verdict",
         course_map,
-        _build_nothing,
+        _add_here,
+    ),
+    Command(
+        "arcs",
+        "Every arc with its topics and standing, and where the learner stands",
+        course_arcs,
+        _build_arcs,
     ),
     Command(
         "search",

@@ -71,6 +71,8 @@ def test_save_then_read_through_every_read_verb(
     _, mapped = run(capsys, monkeypatch, workspace, "map")
     assert mapped["current"] == "rank"
     assert mapped["topics"][0]["level"] == "assisted"
+    _, arcs = run(capsys, monkeypatch, workspace, "arcs", "--report")
+    assert arcs == {"studied": ["rank"], "held": [], "arcs": []}
     _, found = run(capsys, monkeypatch, workspace, "search", "Rango")
     assert found["hits"][0]["handle"] == "rank"
     _, words = run(capsys, monkeypatch, workspace, "search", "found", "rank")
@@ -321,3 +323,33 @@ def test_init_and_link_configure_codex_and_report_claude_code_reach(
     _, linked = run(capsys, monkeypatch, course, "link", str(material))
     assert linked["hosts"]["codex"] == "unchanged"
     assert not install.course_codex_config(material).exists()
+
+
+def test_the_arc_reads_take_the_lesson_he_is_in(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, workspace: Path
+) -> None:
+    def arc(title: str) -> dict[str, str]:
+        return {"title": title, "question": f"Why {title}?", "purpose": f"Do {title}."}
+
+    formed = {
+        "arcs": {"systems": arc("Linear systems"), "spectra": arc("Eigenvalues")},
+        "topics": {
+            "rank": {"title": "Rank", "arc": "systems"},
+            "eigen": {"title": "Eigen", "needs": ["rank"], "arc": "spectra"},
+        },
+        "path": {"arcs": ["systems", "spectra"], "current": "rank"},
+        "arc_change": {"reason": "Chapters 4 and 6"},
+    }
+    assert run(capsys, monkeypatch, workspace, "save", stdin=formed)[0] == 0
+    _, mapped = run(capsys, monkeypatch, workspace, "map", "--here", "eigen")
+    assert mapped["current_arc"] == "spectra"
+    _, brief = run(capsys, monkeypatch, workspace, "resume", "--here", "eigen")
+    assert brief["arc"]["arc"] == "spectra"
+    _, standing = run(
+        capsys, monkeypatch, workspace, "arcs", "--here", "eigen", "--open", "eigen"
+    )
+    assert (standing["current_arc"], standing["studied"], standing["held"]) == (
+        "spectra",
+        ["rank", "eigen"],
+        ["systems", "spectra"],
+    )
