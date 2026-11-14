@@ -14,6 +14,7 @@ import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { LEARNING_ENGINE } from "../config.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
+import { subscribe } from "../src/core/events.ts";
 import { courseTools } from "../src/agent/tools/course.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
 import { createFauxCore } from "@earendil-works/pi-ai";
@@ -130,6 +131,20 @@ describe("course records adapter (fake engine)", () => {
 		const call = calls()[0]!;
 		assert.deepEqual(call.args, ["--workspace", "/s/linalg", "save"]);
 		assert.deepEqual(JSON.parse(call.stdin), changes);
+	});
+
+	it("a check runs the patch through save --check and announces no write", async () => {
+		const { engine, calls } = fakeEngine();
+		const changes = { topics: { pivots: { title: "Pivots" } } };
+		const seen: string[] = [];
+		const stop = subscribe((e) => void seen.push(e.type));
+		const result = await createCourseRecords(engine).run("/s/linalg", { verb: "check", changes });
+		stop();
+		assert.equal(result.ok, true);
+		const call = calls()[0]!;
+		assert.deepEqual(call.args, ["--workspace", "/s/linalg", "save", "--check"]);
+		assert.deepEqual(JSON.parse(call.stdin), changes);
+		assert.equal(seen.includes("course-changed"), false);
 	});
 
 	it("operands follow -- so a query or handle that looks like a flag stays an operand", async () => {

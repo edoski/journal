@@ -1,5 +1,5 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { LESSON_WORDS, leftOffWords, overdueWords, reviewWords, slipMark, slipWords, type SlipKey } from "@/components/study-words";
+import { LESSON_WORDS, leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
@@ -173,7 +173,9 @@ export type UnitStatus =
 	| { kind: "working" }
 	| { kind: "slip"; words: string; slip: SlipKey }
 	| { kind: "review" | "task" | "returns" | "studied"; words: string }
-	| { kind: "none" };
+	/** Nothing to say; `words` names a topic he has not started ("Not
+	 *  started"), which search lists beside the topics he has. */
+	| { kind: "none"; words?: string };
 
 /** When an open task was left, in the app's words ("Left off 3d ago"):
  *  the engine's day it last changed, never its step, which the tutor
@@ -205,7 +207,8 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
 	if (topic.review?.kind === "scheduled") return { kind: "returns", words: reviewWords(topic.review, today) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
-	return at ? { kind: "studied", words: studiedWords(at, today) } : { kind: "none" };
+	if (at) return { kind: "studied", words: studiedWords(at, today) };
+	return topic.level === "new" ? { kind: "none", words: STANDING_WORDS[0] } : { kind: "none" };
 }
 
 const TWIN_DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });

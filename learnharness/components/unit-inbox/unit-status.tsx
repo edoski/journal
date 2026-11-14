@@ -27,7 +27,12 @@ const ICON: Record<Exclude<UnitStatus["kind"], "working" | "studied" | "none">, 
 export function UnitStatusText({ status }: { status: UnitStatus }) {
 	switch (status.kind) {
 		case "none":
-			return null;
+			return status.words ? (
+				<span data-slot="unit-status" data-kind="unstarted" className="contents">
+					<span className="sr-only">, </span>
+					<span className="whitespace-nowrap">{status.words}</span>
+				</span>
+			) : null;
 		case "working":
 			return (
 				<span data-slot="unit-status" data-kind="working" className="contents">

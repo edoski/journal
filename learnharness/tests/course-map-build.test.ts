@@ -19,19 +19,40 @@ import { createCourseMapBuilder } from "../src/agent/subagents/course-map-builde
 import { abortRuns } from "../src/agent/subagents/background-runs.ts";
 import type { PiEngine } from "../src/agent/models.ts";
 import type { CourseMapLedgers } from "../src/core/ports.ts";
+import type { ChatSummary } from "../src/core/contracts/chat.ts";
 import {
 	answerProblems,
+	arcStandingOf,
 	buildWindow,
-
+	courseView,
+	dropRefusedEdge,
 	duplicateOf,
 	mapChanges,
+	openLessonsOf,
+	withoutArcs,
 	sameName,
 	type CourseMapLedger,
 	type MapCourseView,
 	type MapSubmit,
+	type OpenLessons,
 } from "../src/core/course-map-build.ts";
 
-const view = (over: Partial<MapCourseView> = {}): MapCourseView => ({ topics: {}, order: [], current: null, basis: null, exam: {}, sources: ["notes", "sheet"], taken: [], ...over });
+const view = (over: Partial<MapCourseView> = {}): MapCourseView => ({
+	topics: {},
+	order: [],
+	current: null,
+	basis: null,
+	exam: {},
+	sources: ["notes", "sheet"],
+	taken: [],
+	arcs: [],
+	topicArc: {},
+	examArcs: [],
+	studied: [],
+	held: [],
+	currentArc: null,
+	...over,
+});
 const topic = (title: string, over: Partial<MapCourseView["topics"][string]> = {}) => ({ title, needs: [], contrasts: [], refs: [], aliases: [], ...over });
 
 describe("course map merge", () => {
@@ -172,6 +193,161 @@ describe("the material a build reads", () => {
 	});
 });
 
+describe("a course with arcs", () => {
+	const ARCS: MapCourseView["arcs"] = [
+		{ handle: "spaces", title: "Vector spaces", question: "What can vectors build?", purpose: "Span and bases.", refs: [] },
+		{ handle: "systems", title: "Linear systems", question: "When does a system have a solution?", purpose: "Solve systems.", refs: [] },
+		{ handle: "spectra", title: "Eigenvalues", question: "Which directions does a map keep?", purpose: "Find eigenvectors.", refs: [] },
+	];
+	const withArcs = view({
+		topics: { vectors: topic("Vectors"), span: topic("Span", { needs: ["vectors"] }), elimination: topic("Gaussian elimination"), rank: topic("Rank", { needs: ["elimination"] }), eigen: topic("Eigenvalues", { needs: ["rank"] }), trace: topic("Trace") },
+		order: ["vectors", "span", "elimination", "rank", "eigen", "trace"],
+		current: "span",
+		arcs: ARCS,
+		topicArc: { vectors: "spaces", span: "spaces", elimination: "systems", rank: "systems", eigen: "spectra", trace: "spectra" },
+		studied: ["vectors", "span"],
+		held: ["spaces"],
+		currentArc: "spaces",
+	});
+	const ORTHO = { handle: "orthogonality", title: "Orthogonality", question: "When are vectors perpendicular?", purpose: "Project onto subspaces.", after: "systems", unit: "Chapter 7 Orthogonality" };
+	const answer = (over: Partial<MapSubmit> = {}): MapSubmit => ({
+		topics: [
+			{ handle: "inner", title: "Inner products", needs: ["vectors"], arc: "orthogonality" },
+			{ handle: "projection", title: "Orthogonal projection", needs: ["inner", "span"], arc: "orthogonality" },
+		],
+		order: ["inner", "projection"],
+		newArcs: [ORTHO],
+		...over,
+	});
+
+	it("the soft check: a new arc names its unit and holds two new topics, and an arc named must exist", () => {
+		assert.equal(answerProblems(answer(), withArcs), null);
+		const problems = (over: Partial<MapSubmit>) => answerProblems(answer(over), withArcs) ?? "";
+		assert.match(problems({ newArcs: [{ ...ORTHO, unit: "" }] }), /new arc "orthogonality" has no unit/);
+		assert.match(problems({ topics: [{ handle: "inner", title: "Inner products", arc: "orthogonality" }, { handle: "projection", title: "Orthogonal projection", needs: ["inner"] }] }), /holds one of this answer's new topics/);
+		assert.match(problems({ newArcs: [{ ...ORTHO, handle: "systems" }] }), /never send an arc it has/);
+		assert.match(problems({ newArcs: [{ ...ORTHO, after: "nowhere" }] }), /follows "nowhere", which is no arc listed before it/);
+		assert.match(problems({ topics: [{ handle: "inner", title: "Inner products", arc: "geometry" }] , newArcs: [] }), /names arc "geometry", which is neither an arc of the course nor in newArcs/);
+		assert.match(problems({ moves: [{ topic: "ghost", arc: "systems", reason: "Chapter 4" }] }), /moves names "ghost", which is no topic of the course/);
+		assert.equal(answerProblems(answer({ moves: [{ topic: "span", arc: "systems", reason: "Chapter 4 uses it" }] }), withArcs), null, "a move he must ask for is no problem: the merge keeps it as a note");
+	});
+
+	it("a twin by name folds only into an arc the new topic could join; elsewhere the agent tells them apart", () => {
+		const near = answerProblems({ topics: [{ handle: "eigenvalues", title: "Eigenvalue", needs: ["rank"] }], order: [] }, withArcs);
+		assert.match(near ?? "", /is the course's existing topic eigen/);
+		const far = { ...withArcs, topics: { ...withArcs.topics, gauss: topic("Gaussian elimination") }, topicArc: { ...withArcs.topicArc, gauss: "systems" } };
+		const problems = answerProblems({ topics: [{ handle: "elim-spectral", title: "Gaussian elimination", needs: ["eigen"] }], order: [] }, far);
+		assert.match(problems ?? "", /has the name of the course's topic (elimination|gauss) \("Gaussian elimination"\) in "Linear systems", an arc its prerequisites do not put it in/);
+		const merged = mapChanges({ topics: [{ handle: "elim-spectral", title: "Gaussian elimination", needs: ["eigen"] }], order: [] }, withArcs);
+		assert.deepEqual(Object.keys(merged?.changes.topics as object), ["elim-spectral"], "never folded into a topic of an earlier arc");
+	});
+
+	it("the merge splices new arcs after the arc each follows and never sends an existing arc's title, question or purpose", () => {
+		const merged = mapChanges(
+			answer({
+				topics: [...answer().topics, { handle: "gram", title: "Gram–Schmidt", needs: ["projection"], arc: "least-squares" }, { handle: "lsq", title: "Least squares", needs: ["projection"], arc: "least-squares" }, { handle: "pivots", title: "Pivots", needs: ["elimination"], arc: "systems" }],
+				newArcs: [ORTHO, { ...ORTHO, handle: "least-squares", title: "Least squares fitting", after: "orthogonality", unit: "Chapter 8" }, { ...ORTHO, handle: "systems", title: "Systems, renamed" }],
+			}),
+			withArcs,
+		);
+		assert.ok(merged);
+		assert.deepEqual(Object.keys(merged.changes.arcs as object), ["orthogonality", "least-squares"]);
+		assert.deepEqual((merged.changes.arcs as Record<string, unknown>).orthogonality, { title: "Orthogonality", question: "When are vectors perpendicular?", purpose: "Project onto subspaces." });
+		assert.deepEqual((merged.changes.path as { arcs: string[] }).arcs, ["spaces", "systems", "orthogonality", "least-squares", "spectra"]);
+		const topics = merged.changes.topics as Record<string, { arc?: string }>;
+		assert.equal(topics.inner?.arc, "orthogonality");
+		assert.equal(topics.pivots?.arc, "systems", "a new topic joins an existing arc");
+		assert.match(String((merged.changes.arc_change as { reason: string }).reason), /new arc "Orthogonality" for the material's unit "Chapter 7 Orthogonality"/);
+		assert.equal(merged.summary, "5 new topics, 6 prerequisites, new arcs");
+	});
+
+	it("a new topic with no arc carries none, and the engine places it", () => {
+		const merged = mapChanges({ topics: [{ handle: "pivots", title: "Pivots", needs: ["elimination"] }], order: ["pivots"] }, withArcs);
+		assert.deepEqual(merged?.changes.topics, { pivots: { title: "Pivots", needs: ["elimination"] } });
+		assert.equal("arc_change" in (merged?.changes ?? {}), false);
+	});
+
+	it("moves go ahead only between arcs he is not in; a held or studied move is dropped and kept as a note", () => {
+		const merged = mapChanges(
+			{
+				topics: [],
+				order: [],
+				moves: [
+					{ topic: "trace", arc: "systems", reason: "Sheet 4 treats the trace" },
+					{ topic: "span", arc: "systems", reason: "Chapter 4 opens with span" },
+					{ topic: "elimination", arc: "spaces", reason: "Chapter 1 shows elimination" },
+				],
+			},
+			withArcs,
+		);
+		assert.ok(merged);
+		assert.deepEqual(merged.changes.topics, { trace: { arc: "systems" } });
+		const reason = (merged.changes.arc_change as { reason: string }).reason;
+		assert.match(reason, /moved "trace" to "Linear systems": Sheet 4 treats the trace/);
+		assert.match(reason, /kept "span" in "Vector spaces", since "span" has evidence/);
+		assert.match(reason, /kept "elimination" in "Linear systems", since "Vector spaces" is an arc he is in or has studied/);
+		assert.equal(merged.summary, "a topic moved to another arc");
+		const onlyHeld = mapChanges({ topics: [], order: [], moves: [{ topic: "span", arc: "systems", reason: "Chapter 4" }] }, withArcs);
+		assert.deepEqual(Object.keys(onlyHeld?.changes ?? {}), ["arc_change"], "a held move alone saves only its note");
+	});
+
+	it("a course without arcs merges exactly as before: every arc field of the answer is ignored", () => {
+		const plain = view({ topics: { vectors: topic("Vectors"), span: topic("Span", { needs: ["vectors"] }) }, order: ["vectors", "span"], current: "span" });
+		const full = answer({ moves: [{ topic: "span", arc: "orthogonality", reason: "x" }], arcNote: "a note" });
+		assert.deepEqual(mapChanges(full, plain), mapChanges(withoutArcs({ ...full, arcNote: undefined }), plain));
+		assert.equal(JSON.stringify(mapChanges(full, plain)?.changes).match(/"arc/g), null);
+		assert.equal(answerProblems(full, plain), null);
+	});
+
+	it("the salvage ladder drops only a new edge the refusal names, and keeps it in a note", () => {
+		const changes = { topics: { pivots: { title: "Pivots", needs: ["elimination", "eigen"] }, span: { needs: ["vectors", "pivots"] } }, arc_change: { reason: "new arc" } };
+		const backward = 'topics.span.needs: "span" (in "Vector spaces") needs "pivots", which sits in the later arc "Linear systems"; no topic may need a later arc.';
+		const one = dropRefusedEdge(changes, backward, withArcs);
+		assert.deepEqual(one?.changes.topics, { pivots: { title: "Pivots", needs: ["elimination", "eigen"] } }, "span keeps only what it had, so its patch goes");
+		assert.equal((one?.changes.arc_change as { reason: string }).reason, `new arc; proposed need: "span" needs "pivots"; refused: ${backward}`);
+		const range = 'topics.pivots: its prerequisite "eigen" sits in "Eigenvalues" and "span" in the earlier "Vector spaces" needs it; drop the need that fails the prerequisite test, or place it with "arc"';
+		assert.deepEqual((dropRefusedEdge(changes, range, withArcs)?.changes.topics as Record<string, unknown>).pivots, { title: "Pivots", needs: ["elimination"] });
+		assert.equal(dropRefusedEdge(changes, 'topics.span.needs: "span" (in "Vector spaces") needs "vectors", which sits in the later arc "X"', withArcs), null, "an edge the course already had is never dropped");
+		assert.equal(dropRefusedEdge(changes, "arcs.x.title: required", withArcs), null);
+	});
+});
+
+describe("where he stands in the arcs", () => {
+	const record = (over: Record<string, unknown> = {}) => ({
+		arcs: { spaces: { title: "Vector spaces", question: "Q1", purpose: "P1" }, systems: { title: "Linear systems", question: "Q2", purpose: "P2" }, spectra: { title: "Eigenvalues", question: "Q3", purpose: "P3" } },
+		path: { arcs: ["spaces", "systems", "spectra"], current: "span" },
+		topics: { vectors: { title: "Vectors", arc: "spaces" }, span: { title: "Span", arc: "spaces" }, rank: { title: "Rank", arc: "systems" }, eigen: { title: "Eigen", arc: "spectra" }, trace: { title: "Trace", arc: "spectra", excluded: "not examined" } },
+		standings: { vectors: { level: "retained" }, span: { level: "new" }, rank: { level: "new" }, eigen: { level: "new" }, trace: { level: "new" } },
+		observations: {},
+		...over,
+	});
+
+	it("the view carries where the engine says he stands, in a course with arcs only", () => {
+		const said = arcStandingOf({ current_arc: "spectra", studied: ["vectors", "eigen"], held: ["spaces", "spectra"], arcs: [] });
+		assert.deepEqual(said, { studied: ["vectors", "eigen"], held: ["spaces", "spectra"], currentArc: "spectra" });
+		assert.deepEqual(arcStandingOf({ studied: [], held: [], arcs: [] }), { studied: [], held: [], currentArc: null }, "no current_arc in a course without arcs");
+		assert.deepEqual([courseView(record(), said).currentArc, courseView(record(), said).held], ["spectra", ["spaces", "spectra"]]);
+		assert.deepEqual(courseView(record()).held, [], "told nothing, it holds nothing");
+	});
+
+	it("a record with a broken arc entry reads as a course without arcs", () => {
+		const broken = courseView(record({ arcs: { spaces: { title: "Vector spaces" } }, path: { arcs: ["spaces"] } }), { studied: ["span"], held: ["spaces"], currentArc: "spaces" });
+		assert.deepEqual([broken.arcs, broken.held, broken.currentArc, broken.topicArc], [[], [], null, {}]);
+	});
+
+	it("open lessons: every session he picks up counts; the newest lesson in progress says where he is", () => {
+		const chat = (id: string, over: Partial<ChatSummary>): ChatSummary => ({ id, title: id, createdAt: "2026-11-01", updatedAt: "2026-11-01", kind: "teach", messageCount: 4, phase: "teach", pendingQuestion: false, pendingProblem: false, course: { workspace: "/c" }, ...over }) as ChatSummary;
+		const chats = [
+			chat("done", { ownTopics: ["vectors"], ended: "closed", updatedAt: "2026-11-01" }),
+			chat("left", { ownTopics: ["rank"], ended: "left", updatedAt: "2026-11-02" }),
+			chat("now", { ownTopics: ["ghost", "eigen"], ended: "mid-lesson", updatedAt: "2026-11-03" }),
+			chat("other", { ownTopics: ["span"], ended: "mid-lesson", course: { workspace: "/d" } as ChatSummary["course"], updatedAt: "2026-11-04" }),
+		];
+		assert.deepEqual(openLessonsOf(chats, "/c", record()), { topics: ["rank", "eigen"], here: "eigen" });
+		assert.equal(openLessonsOf(chats.slice(0, 2), "/c", record()).here, null, "a lesson left for next time is not where he is now");
+	});
+});
+
 // ─── the runner, on the real engine ─────────────────────────────────────────
 
 const realEngine = fs.existsSync(LEARNING_ENGINE.python);
@@ -192,8 +368,9 @@ function settled(ledgers: ReturnType<typeof memoryLedgers>, dir: string, builds:
 
 /** A model that reads every source it is told to read now, then submits
  *  `answers` in turn (the next one after a refusal). */
-function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): PiEngine & { reads: string[] } {
+function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): PiEngine & { reads: string[]; refusals: string[] } {
 	const reads: string[] = [];
+	const refusals: string[] = [];
 	const faux = createFauxCore({});
 	let submitted = 0;
 	const step: FauxResponseStep = async (context) => {
@@ -205,11 +382,13 @@ function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): PiEngine & {
 			return fauxAssistantMessage(fresh.map((source, i) => fauxToolCall("read_material", { source }, { id: `read-${i}` })), { stopReason: "toolUse" });
 		}
 		await gate;
+		const refused = last as { role: string; toolName?: string; isError?: boolean; content?: Array<{ text?: string }> };
+		if (refused.role === "toolResult" && refused.toolName === "submit_map" && refused.isError) refusals.push(refused.content?.map((c) => c.text ?? "").join("") ?? "");
 		const answer = answers[Math.min(submitted++, answers.length - 1)]!;
 		return fauxAssistantMessage([fauxToolCall("submit_map", answer as unknown as ToolCall["arguments"], { id: `submit-${submitted}` })], { stopReason: "toolUse" });
 	};
 	faux.setResponses(Array.from({ length: 20 }, () => step));
-	return Object.assign({ model: faux.getModel(), streamFn: faux.streamSimple }, { reads });
+	return Object.assign({ model: faux.getModel(), streamFn: faux.streamSimple }, { reads, refusals });
 }
 
 describe("course map builder (real engine, scripted model)", { skip: !realEngine && "learning engine not installed" }, () => {
@@ -310,6 +489,7 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		const done = settled(ledgers, dir, 2);
 		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: model, onStatus: done.onStatus });
 		const first = builder.buildMap(dir);
+		while (model.reads.length === 0) await new Promise((r) => setTimeout(r, 10));
 		fs.writeFileSync(path.join(dir, "material", "sheet.md"), "Ex. 1\n");
 		engine(["--workspace", dir, "sources", "--add", "material/sheet.md"]);
 		assert.deepEqual(await builder.buildMap(dir), { status: "busy" });
@@ -357,6 +537,148 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		await done.ended;
 		assert.deepEqual(ledgers.all.get(dir)!.done.map((d) => d.outcome.startsWith("material the course had") ? "adopted" : "built"), ["built", "built"]);
 		assert.deepEqual(model.reads, ["notes", "sheet"]);
+	});
+
+	/** A course grouped into three arcs, he studied least squares and stands on it. */
+	function arcCourse(name: string): string {
+		const dir = course(name);
+		engine(["--workspace", dir, "save"], {
+			arcs: {
+				fit: { title: "Least squares", question: "How do we fit a line?", purpose: "Fit linear models." },
+				shrink: { title: "Regularisation", question: "How do we tame a large model?", purpose: "Penalise coefficients." },
+				choose: { title: "Model selection", question: "Which model do we keep?", purpose: "Compare models fairly." },
+			},
+			topics: {
+				ols: { title: "Ordinary least squares", arc: "fit", refs: [{ source: "notes", locator: "§1" }] },
+				gls: { title: "Generalised least squares", needs: ["ols"], arc: "fit" },
+				ridge: { title: "Ridge regression", needs: ["ols"], arc: "shrink" },
+				lasso: { title: "Lasso", needs: ["ols"], arc: "shrink" },
+				cv: { title: "Cross-validation", needs: ["ols"], arc: "choose" },
+				aic: { title: "Information criteria", needs: ["cv"], arc: "choose" },
+			},
+			path: { arcs: ["fit", "shrink", "choose"], order: ["ols", "gls", "ridge", "lasso", "cv", "aic"] },
+			arc_change: { reason: "The notes' three chapters" },
+		});
+		engine(["--workspace", dir, "save"], { topics: { ols: { introduced: true } }, path: { current: "ols" } });
+		fs.writeFileSync(path.join(dir, "material", "sheet.md"), "Sheet 2: elastic net\n");
+		engine(["--workspace", dir, "sources", "--add", "material/sheet.md"]);
+		return dir;
+	}
+	const adoptNotes = (ledgers: ReturnType<typeof memoryLedgers>, dir: string) =>
+		ledgers.save(dir, { done: [{ sources: ["notes\u0000material/notes.md"], fingerprint: "x", at: "", outcome: "built" }] });
+
+	it("with arcs: the merged answer is checked by the engine first, a refusal goes back to the agent, and only the final save writes", async () => {
+		const dir = arcCourse("arcs-check");
+		const ledgers = memoryLedgers();
+		adoptNotes(ledgers, dir);
+		const before = record(dir);
+		const model = scriptedModel([
+			{ topics: [{ handle: "elastic", title: "Elastic net", needs: ["ridge", "lasso"], arc: "fit", refs: [{ source: "sheet" }] }], order: ["elastic"] },
+			{
+				topics: [{ handle: "elastic", title: "Elastic net", needs: ["ridge", "lasso"], arc: "shrink", refs: [{ source: "sheet" }] }],
+				order: ["ridge", "lasso", "elastic"],
+				moves: [{ topic: "gls", arc: "choose", reason: "Sheet 2 compares GLS fits" }],
+			},
+		]);
+		const outcome = await createCourseMapBuilder({ courseRecords: records, ledgers, engine: model }).buildMap(dir);
+		assert.deepEqual(outcome, { status: "saved", summary: "1 new topic, 2 prerequisites, 1 reference" });
+		assert.equal(model.refusals.length, 1);
+		assert.match(model.refusals[0]!, /The engine refused the merged save: topics\.elastic\.needs: .*no topic may need a later arc/);
+		const after_ = record(dir);
+		assert.equal(after_.revision, before.revision + 1, "the check wrote nothing; one save did");
+		assert.equal(after_.topics.elastic.arc, "shrink");
+		assert.equal(after_.topics.gls.arc, "fit", "a move out of the arc he is in waits for his words");
+		assert.match(after_.arc_log.at(-1).reason, /kept "gls" in "Least squares", since "Least squares" is an arc he is in or has studied/);
+		assert.equal(after_.arc_log.at(-1).kind, "note");
+	});
+
+	it("with arcs: a save the engine keeps refusing is salvaged: arcs set aside, then each refused new edge dropped and noted, never a topic", async () => {
+		const dir = arcCourse("arcs-salvage");
+		const ledgers = memoryLedgers();
+		adoptNotes(ledgers, dir);
+		const model = scriptedModel([
+			{
+				topics: [
+					{ handle: "elastic", title: "Elastic net", needs: ["aic"], arc: "shrink", refs: [{ source: "sheet" }] },
+					{ handle: "lasso", title: "Lasso", needs: ["elastic"] },
+				],
+				order: ["elastic", "lasso"],
+			},
+		]);
+		const outcome = await createCourseMapBuilder({ courseRecords: records, ledgers, engine: model }).buildMap(dir);
+		assert.equal(outcome.status, "saved");
+		assert.ok(model.refusals.length >= 1, "every check went back to the agent until its turns ran out");
+		const after_ = record(dir);
+		assert.deepEqual(Object.keys(after_.topics).sort(), ["aic", "cv", "elastic", "gls", "lasso", "ols", "ridge"], "every topic is mapped");
+		assert.equal(after_.topics.elastic.needs, undefined, "the refused edge is gone");
+		assert.deepEqual(after_.topics.lasso.needs, ["ols", "elastic"], "the edges that passed are kept");
+		assert.equal(after_.topics.elastic.arc, "fit", "the engine placed it nearest where he is");
+		const note = after_.arc_log.at(-1);
+		assert.equal(note.kind, "note");
+		assert.match(note.reason, /the proposed arc changes were set aside; refused: .*; proposed need: "elastic" needs "aic"; refused: topics\.elastic: its prerequisite "aic"/);
+		const salvaged = ledgers.all.get(dir)!.done.at(-1)!.salvaged ?? [];
+		assert.equal(salvaged.length, 2);
+	});
+
+	describe("where he stands in the arcs, as the engine says it", () => {
+		const arc = (title: string) => ({ title, question: `Why ${title}?`, purpose: `Do ${title}.` });
+		function standingCourse(name: string, extra: Record<string, unknown> = {}): string {
+			const dir = course(name);
+			engine(["--workspace", dir, "save"], {
+				arcs: { spaces: arc("Vector spaces"), systems: arc("Linear systems"), spectra: arc("Eigenvalues") },
+				topics: { vectors: { title: "Vectors", arc: "spaces", introduced: true }, span: { title: "Span", arc: "spaces" }, rank: { title: "Rank", arc: "systems" }, eigen: { title: "Eigen", arc: "spectra" }, trace: { title: "Trace", arc: "spectra", excluded: "not examined" } },
+				path: { arcs: ["spaces", "systems", "spectra"], current: "span" },
+				arc_change: { reason: "Chapters 1 to 3" },
+				...extra,
+			});
+			return dir;
+		}
+		const standing = async (dir: string, lessons: OpenLessons = { topics: [], here: null }) => {
+			const said = await records.run(dir, { verb: "arcs", here: lessons.here, open: lessons.topics });
+			assert.ok(said.ok);
+			return arcStandingOf(said.json);
+		};
+
+		it("the current arc is the arc of You are here: the lesson in progress, else path.current", async () => {
+			const dir = standingCourse("stand-here");
+			assert.equal((await standing(dir)).currentArc, "spaces");
+			assert.equal((await standing(dir, { topics: ["eigen"], here: "eigen" })).currentArc, "spectra");
+			assert.equal((await standing(dir, { topics: [], here: "trace" })).currentArc, "spaces", "an excluded topic is no place to stand");
+		});
+
+		it("with no topic to stand on: the earliest arc with an untaught live topic, else the last", async () => {
+			const dir = standingCourse("stand-none");
+			engine(["--workspace", dir, "save"], { topics: { span: { introduced: true } }, path: { current: null } });
+			assert.equal((await standing(dir)).currentArc, "systems");
+			engine(["--workspace", dir, "save"], { topics: { rank: { introduced: true }, eigen: { introduced: true } } });
+			assert.equal((await standing(dir)).currentArc, "spectra");
+		});
+
+		it("studied counts taught topics, chosen methods, path.current and open lessons; held is their arcs and the current one", async () => {
+			const dir = standingCourse("stand-studied");
+			assert.deepEqual((await standing(dir)).held, ["spaces"]);
+			engine(["--workspace", dir, "save"], { observations: [{ topics: ["vectors"], text: "Picked rank", help: "none", result: "incorrect", chose: "rank" }] });
+			const v = await standing(dir, { topics: ["eigen"], here: null });
+			assert.deepEqual(new Set(v.studied), new Set(["vectors", "span", "rank", "eigen"]));
+			assert.deepEqual(v.held, ["spaces", "systems", "spectra"]);
+		});
+
+		it("a build keeps clear of the arc of the lesson he has open, which only the app sees", async () => {
+			const lesson = { id: "now", title: "now", createdAt: "2026-11-07", updatedAt: "2026-11-07", kind: "teach", messageCount: 4, phase: "teach", pendingQuestion: false, pendingProblem: false, ended: "mid-lesson", ownTopics: ["aic"] } as unknown as ChatSummary;
+			const move: MapSubmit = { topics: [], order: [], moves: [{ topic: "ridge", arc: "choose", reason: "Sheet 2 selects the penalty" }] };
+			const build = async (name: string, sessions: readonly ChatSummary[]) => {
+				const dir = arcCourse(name);
+				const ledgers = memoryLedgers();
+				adoptNotes(ledgers, dir);
+				const mine = sessions.map((c) => ({ ...c, course: { workspace: dir } }) as ChatSummary);
+				await createCourseMapBuilder({ courseRecords: records, ledgers, engine: scriptedModel([move]), sessions: () => mine }).buildMap(dir);
+				return record(dir);
+			};
+			assert.equal((await build("arcs-free", [])).topics.ridge.arc, "choose", "with no lesson open, neither arc is held");
+			const held = await build("arcs-open", [lesson]);
+			assert.equal(held.topics.ridge.arc, "shrink");
+			assert.match(held.arc_log.at(-1).reason, /kept "ridge" in "Regularisation", since "Model selection" is an arc he is in or has studied/);
+		});
 	});
 
 	it("material added to a course from before the builder: only the new material is read", async () => {

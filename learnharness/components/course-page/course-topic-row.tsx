@@ -1,31 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarClockIcon, MapPinIcon, type LucideIcon } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { Hint } from "@/components/ui/hint";
-import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
-import type { CourseTopic, TopicFact } from "@/components/course-page/course-model";
+import { FACT_ICON } from "@/components/unit-inbox/fact-icon";
+import type { CourseTopic } from "@/components/course-page/course-model";
+import type { TopicFact } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
 import { MathText } from "@/components/ui/math-text";
 import { MathLine } from "@/components/ui/math-line";
-
-/** The icon each kind of fact leads with: the one the sidebar's row and
- *  Today's card use for the same fact (`WHY_ICON`), a calendar for when a
- *  topic comes back, the map's pin for where he is. When he last studied
- *  it has no icon, as on the sidebar. */
-const FACT_ICON: Record<Exclude<TopicFact["kind"], "working" | "studied">, LucideIcon> = {
-	"your-turn": WHY_ICON.reply,
-	stopped: WHY_ICON.stopped,
-	slip: WHY_ICON.missed,
-	review: WHY_ICON.review,
-	task: WHY_ICON.task,
-	next: WHY_ICON.next,
-	back: CalendarClockIcon,
-	here: MapPinIcon,
-};
 
 /** A hairline above every row but the first, across the column. */
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";

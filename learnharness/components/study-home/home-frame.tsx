@@ -11,7 +11,7 @@ import { needsYouNow } from "@/components/study-home/needs-you";
 import { courseMove, todayCourses, type TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
-import type { StudyCourse } from "@/src/core";
+import type { ChatListItem, StudyCourse } from "@/src/core";
 
 /** What a study home draws once the courses are read. */
 export interface HomeReady {
@@ -22,6 +22,8 @@ export interface HomeReady {
 	/** The courses, in Today's order, each once (two sessions waiting in
 	 *  one course are two lines of one course). */
 	courses: readonly StudyCourse[];
+	/** Every session, newest first. */
+	chats: readonly ChatListItem[];
 	/** What he finished today, by title, oldest first (`doneToday`). */
 	done: readonly string[];
 	busy: boolean;
@@ -110,6 +112,7 @@ function HomeBody({
 						rows,
 						lessons: rows.map(lessonOf),
 						courses: todayCourses(rows, state.courses),
+						chats: state.chats,
 						done: doneToday(state.chats, new Date()),
 						busy,
 						onContinue: (workspace) => {

@@ -14,7 +14,17 @@ import re
 from typing import Any
 import unicodedata
 
-from learning import agenda, capacity, clock, packing, progress, records, schema
+from learning import (
+    agenda,
+    arc_rules,
+    arcs,
+    capacity,
+    clock,
+    packing,
+    progress,
+    records,
+    schema,
+)
 from learning.workspace import Workspace
 
 EVIDENCE_BYTES = 6144
@@ -36,7 +46,7 @@ EXCERPT_CHARS = 160
 EXCERPT_LEAD = 40
 STEM_KEEP = 4
 STEM_ENDINGS = frozenset("saeiou")
-SEARCH_KINDS = ("topic", "knowledge", "task", "source", "observation")
+SEARCH_KINDS = ("topic", "arc", "knowledge", "task", "source", "observation")
 ITEM_KINDS = {"knowledge": "knowledge", "tasks": "task", "sources": "source"}
 _WORD = re.compile(r"[^\W_]+")
 
@@ -344,6 +354,12 @@ def tonight(
     return today, later
 
 
+def _arc_of(record: dict[str, Any], topic: str) -> list[str]:
+    """The topic's arc, as a list to splice: empty in a course without arcs."""
+    arc = record["topics"][topic].get("arc")
+    return [] if arc is None else [arc]
+
+
 def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
     return compact(
         {
@@ -355,8 +371,59 @@ def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
     )
 
 
-def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
-    """The session opener: where the learner is and what to do next."""
+def _arc_brief(
+    record: dict[str, Any],
+    levels: dict[str, dict[str, Any]],
+    order: list[str],
+    here: str | None,
+) -> dict[str, Any]:
+    """The arc blocks of the session opener: the current arc with its
+    question, purpose and entry (``first`` while none of its topics is
+    introduced, whatever was attempted before teaching), each ready arc's
+    check (``arcs_ready``), and the arc notes."""
+    if not record["arcs"]:
+        return {}
+    found = arcs.standing(record, levels, here)
+    now = arcs.current(record, here)
+    assert now is not None
+
+    def told(arc: str, *names: str) -> dict[str, Any]:
+        return {"arc": arc, **{name: record["arcs"][arc][name] for name in names}}
+
+    def check(arc: str) -> dict[str, Any]:
+        keys = arcs.live_topics(record, arc, order)
+        return {
+            **told(arc, "title", "question"),
+            "topics": keys,
+            "pairs": arcs.pairs(record, arc, keys),
+        }
+
+    ready = [check(arc) for arc, item in found.items() if item["state"] == "ready"]
+    return {
+        "arcs": [
+            [arc, arc_rules.title(record, arc), standing["state"]]
+            for arc, standing in found.items()
+            if not standing["hidden"]
+        ],
+        "arc": {
+            **told(now, "title", "question", "purpose"),
+            "state": found[now]["state"],
+            "entry": found[now]["entry"],
+            "first": not any(
+                "introduced" in record["topics"][key]
+                for key in arcs.live_topics(record, now, order)
+            ),
+        },
+        "arcs_ready": ready or None,
+        "arc_notes": arcs.notes(record) or None,
+    }
+
+
+def resume(
+    workspace: Workspace, task: str | None = None, here: str | None = None
+) -> dict[str, Any]:
+    """The session opener: where the learner is and what to do next. ``here``
+    is the topic of a lesson in progress, which only the app sees."""
     record = records.load(workspace)
     today = clock.today()
     levels = progress.standings(record)
@@ -377,6 +444,7 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
         for topic in active
     }
     path = record.get("path", {})
+    arc_brief = _arc_brief(record, levels, order, here)
     cited: list[dict[str, Any]] = [
         record.get("exam", {}),
         chosen,
@@ -401,18 +469,26 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
             for topic, day in sorted(planned.starts.items(), key=lambda item: item[1])
         }
         or None,
+        "starts_why": dict(planned.why) or None,
         "does_not_fit": planned.does_not_fit or None,
         "path": compact(
             {
                 "current": path.get("current"),
                 "basis": path.get("basis"),
-                "topics": [[topic, levels[topic]["level"]] for topic in order],
+                "arcs": arc_brief.get("arcs"),
+                "topics": [
+                    [topic, levels[topic]["level"], *_arc_of(record, topic)]
+                    for topic in order
+                ],
                 "excluded": sorted(progress.excluded(record)) or None,
             }
         )
         if record["topics"]
         else None,
         "path_health": progress.path_health(record) or None,
+        "arc": arc_brief.get("arc"),
+        "arcs_ready": arc_brief.get("arcs_ready"),
+        "arc_notes": arc_brief.get("arc_notes"),
         "weak": _weak(record, levels, order, topics),
         "task": {"key": key, **chosen} if key else None,
         "tasks": _other_tasks(record, key),
@@ -467,6 +543,29 @@ def _graded(item: dict[str, Any]) -> dict[str, Any]:
     return {**item, "grade": progress.grade(item)}
 
 
+def _arc_item(
+    record: dict[str, Any], arc: str, standing: arcs.Standing
+) -> dict[str, Any]:
+    """An arc with its topics in path order, its standing and the log events
+    that name it."""
+    log = [
+        event
+        for event in record.get("arc_log", ())
+        if event["kind"] == "formed"
+        or arc in (event.get("arc"), event.get("from"), event.get("to"))
+    ]
+    every = progress.path_order(record, everything=True)
+    return compact(
+        {
+            "kind": "arc",
+            **record["arcs"][arc],
+            "topics": [key for key in every if record["topics"][key].get("arc") == arc],
+            "standing": standing,
+            "log": log,
+        }
+    )
+
+
 def show(
     workspace: Workspace, handles: list[str], limit: int = SHOW_LIMIT, all: bool = False
 ) -> dict[str, Any]:
@@ -482,15 +581,17 @@ def show(
         }
     if not handles:
         raise ValueError(
-            "show needs handles (topics, observations such as o12, knowledge, "
-            "tasks or sources), or --all"
+            "show needs handles (topics, arcs, observations such as o12, "
+            "knowledge, tasks or sources), or --all"
         )
     if type(limit) is not int or limit < 1:
         raise ValueError("--limit must be a positive number of observations")
     located = {handle: schema.locate(record, handle) for handle in handles}
     observations = record["observations"]
-    levels = progress.standings(record) if "topics" in located.values() else {}
-    planned = when(workspace, record, clock.today()) if levels else None
+    wanted = set(located.values())
+    levels = progress.standings(record) if wanted & {"topics", "arcs"} else {}
+    planned = when(workspace, record, clock.today()) if "topics" in wanted else None
+    standings = arcs.standing(record, levels) if "arcs" in wanted else {}
     newest = _newest(observations) if levels else []
     corrected_by: dict[str, list[str]] = defaultdict(list)
     for key, item in observations.items():
@@ -506,6 +607,8 @@ def show(
             items[handle] = _topic_item(record, handle, levels[handle], ids, planned)
             shown.update(dict.fromkeys(ids[:limit]))
             related.update(ids)
+        elif where == "arcs":
+            items[handle] = _arc_item(record, handle, standings[handle])
         elif where == "observations":
             item = observations[handle]
             items[handle] = compact(
@@ -535,12 +638,23 @@ def _runup(
 ) -> dict[str, Any]:
     """The exam and its run-up: when the final review starts, the path topics
     the plan cannot start before it (``does_not_fit``), and the taught ones
-    its final review has no room for (``unreviewed``)."""
+    its final review has no room for (``unreviewed``); with a scope of arcs,
+    its ``arcs``, the topics of theirs it ``leaves_out``, and the untaught
+    earlier topics it ``needed`` started first (``progress.exam_topics``),
+    in path order."""
     plan = progress.exam_plan(record)
+    examined = arc_rules.examined(record)
+    needed: list[str] = []
+    if examined is not None:
+        scope = progress.exam_topics(record, arcs.untaught(record)) or frozenset()
+        needed = [key for key in progress.path_order(record) if key in scope - examined]
     return compact(
         {
             "date": countdown["date"],
             "days_left": countdown["days_left"],
+            "arcs": countdown.get("arcs"),
+            "leaves_out": countdown.get("leaves_out"),
+            "needed": needed or None,
             "final_review": plan.final.isoformat() if plan else None,
             "does_not_fit": planned.does_not_fit,
             "unreviewed": planned.unreviewed,
@@ -560,7 +674,7 @@ def _held(
     return {"held": True, "held_for": planned.held[key], "due": stored}
 
 
-def course_map(workspace: Workspace) -> dict[str, Any]:
+def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     """Every topic with its edges, level, review and weak verdict, in path order.
 
     The whole course at once and nothing capped, with no observation text: the
@@ -570,9 +684,15 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
     memory asks because full days left it out (``held_for`` names the course
     whose final review came first, ``due`` is memory's day), and ``starts``
     is the day it starts an untaught topic, ``starts_after`` the courses
-    whose new topics take the days before that start. ``exam`` carries the
+    whose new topics take the days before that start, and ``starts_why``
+    why it comes then in the material (``agenda.Why``). ``exam`` carries the
     run-up: the final review's first day, the topics that do not fit before
     the exam and those its final review has no room for.
+
+    In a course with arcs, each topic names its ``arc``, ``arcs`` holds each
+    arc's title and standing in study order, and ``current_arc`` is the arc
+    of "You are here": ``here``, the topic of a lesson in progress, else
+    ``path.current``.
     """
     record = records.load(workspace)
     today = clock.today()
@@ -594,6 +714,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
         entry = {
             "topic": key,
             "title": topic.get("title"),
+            "arc": topic.get("arc"),
             "needs": topic.get("needs", []),
             "contrasts": partners[key],
             "level": standing["level"],
@@ -603,6 +724,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             **_held(key, planned, overdue, stored),
             "starts": starts.isoformat() if starts else None,
             "starts_after": planned.starts_after.get(key) if starts else None,
+            "starts_why": planned.why.get(key) if starts else None,
             "weak": _is_weak(topic, standing),
             "right": standing.get("right"),
             "gap": topic.get("gap"),
@@ -627,6 +749,8 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             if countdown and "date" in countdown
             else None,
             "current": record.get("path", {}).get("current"),
+            "current_arc": arcs.current(record, here),
+            "arcs": arcs.map_block(record, levels, here),
             "focus": record.get("focus"),
             "tasks": [
                 compact(
@@ -642,6 +766,55 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "topics": topics,
         },
         keep=("topics",),
+    )
+
+
+def course_arcs(
+    workspace: Workspace,
+    here: str | None = None,
+    lessons: Collection[str] = (),
+    report: bool = False,
+) -> dict[str, Any]:
+    """Every arc with its question, purpose, refs, topics and standing, the
+    arc log, and where the learner stands: the topics he has ``studied``,
+    the arcs ``held`` (only his words re-cut them) and the ``current_arc``.
+    ``here`` is the topic of a lesson in progress and ``lessons`` the topics
+    of every open lesson, which only the app sees. ``report`` adds the
+    rubric's computable checks."""
+    record = records.load(workspace)
+    levels = progress.standings(record)
+    found = arcs.standing(record, levels, here)
+    held = arcs.held(record, here, lessons)
+    studied = arcs.studied(record, lessons)
+    order = progress.path_order(record)
+    every = progress.path_order(record, everything=True)
+    listed = [
+        compact(
+            {
+                "arc": arc,
+                **record["arcs"][arc],
+                "topics": arcs.live_topics(record, arc, order),
+                "excluded": [
+                    key
+                    for key in every
+                    if key not in order and record["topics"][key].get("arc") == arc
+                ],
+                **standing,
+            },
+            keep=("topics", "entry"),
+        )
+        for arc, standing in found.items()
+    ]
+    return compact(
+        {
+            "current_arc": arcs.current(record, here),
+            "studied": [key for key in every if key in studied],
+            "held": [arc for arc in arc_rules.order(record) if arc in held],
+            "arcs": listed,
+            "arc_log": record.get("arc_log"),
+            "report": arcs.report(record, held) if report and record["arcs"] else None,
+        },
+        keep=("studied", "held", "arcs"),
     )
 
 
@@ -744,6 +917,10 @@ def _documents(record: dict[str, Any]) -> Iterator[_Document]:
         texts = _values(topic, ("title", "aliases", "gap", "note"))
         texts += _values(topic.get("review", {}), ("prompt",))
         yield _Document("topic", key, topic.get("title"), (*texts, key))
+    for key in arc_rules.order(record):
+        arc = record["arcs"][key]
+        texts = _values(arc, ("title", "question"))
+        yield _Document("arc", key, arc["title"], (*texts, key))
     for key in sorted(record["knowledge"]):
         entry = record["knowledge"][key]
         texts = _values(entry, ("text", "aliases", "uncertain"))

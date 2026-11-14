@@ -31,10 +31,13 @@ export interface TopicPageProps {
  */
 export function TopicPage({
 	course,
+	courses,
 	topic,
 	chats,
 }: {
 	course: StudyCourse;
+	/** Every course, for what the sidebar says on the map's cards. */
+	courses: readonly StudyCourse[];
 	topic: CourseMapTopic;
 	chats: readonly ChatListItem[];
 }) {
@@ -51,7 +54,7 @@ export function TopicPage({
 	const start = (opening: string, from?: string) => lesson.start(opening, workspace, { topics: [topic.handle], from });
 	const press = (does: Press) => ("open" in does ? router.push(`/chat/${does.open.id}`) : start(does.opening, does.from));
 	if (topicRead.status === "loading") return <TopicNotice>Loading…</TopicNotice>;
-	const facts = topicFacts({ course, topic, chats, read: topicRead.read });
+	const facts = topicFacts({ course, courses, topic, chats, read: topicRead.read });
 	const act = () => {
 		const { action } = facts;
 		if ("chat" in action) router.push(`/chat/${action.chat.id}`);

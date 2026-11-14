@@ -1,6 +1,6 @@
 /**
- * The topic map's card (topic-map.md, Node): what it says about a topic,
- * from the engine's fields, and that it draws Home's own pie. Same tsx
+ * The topic map's card (topic-map.md, Node): its line, the sidebar's fact
+ * when it needs him, else where he stands, and Home's own pie. Same tsx
  * classic-JSX shim as the other render tests.
  */
 import React from "react";
@@ -10,66 +10,64 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import type { CourseMapTask, CourseMapTopic, TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
+import type { CourseMapTopic, TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
 import { NodeBody } from "../components/course-map/topic-map/topic-node.tsx";
 import { Pie } from "../components/ui/pie.tsx";
-import { standingOf, statusOf } from "../components/course-map/topic-map/topic-standing.ts";
+import { cardLine, standingOf, type CardFact } from "../components/course-map/topic-map/topic-standing.ts";
+import type { TopicFact } from "../components/unit-inbox/sidebar-says.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET: TopicSignals = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
-const titleOf = (handle: TopicHandle) => ({ cramer: "Cramer's rule" })[handle as string] ?? handle;
-const TODAY = "2026-11-08";
-const TASKS: CourseMapTask[] = [{ key: "sheet-4", title: "Problem sheet 4", step: "Pending question, not yet answered: part (c). Then pose the owed retest", updated: "2026-11-05" }];
 
 function topic(over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 	return { handle: h("t"), title: "Rank and the column space", level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...over };
 }
 
-describe("a card's status", () => {
-	it("says a slip first, in the app's one wording", () => {
-		const status = (signals: Partial<TopicSignals>) => statusOf(topic({ level: "attempted", weak: true, signals: { ...QUIET, ...signals } }), TASKS, titleOf, TODAY);
-		assert.deepEqual(status({ lapsed: true }), { kind: "slip", words: "Not right last time", slip: "lapsed" });
-		assert.equal(status({ gap: "sign error" })!.words, "Mistake to fix");
-		assert.deepEqual(status({ choiceErrors: { cramer: 2 } }), { kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" });
-		assert.equal(status({ confidentErrors: 1 })!.words, "Sure, but wrong");
-		assert.equal(status({})!.words, "Look again");
+describe("a card's line", () => {
+	const said = (fact: TopicFact | null) => ({ place: "learning" as const, fact });
+
+	it("says the sidebar's fact when it needs him: a waiting turn, the tutor writing, a slip, a due review, an open task, Today's plan", () => {
+		const needs: TopicFact[] = [
+			{ kind: "your-turn", words: "Your turn" },
+			{ kind: "working", words: "Working" },
+			{ kind: "stopped", words: "Stopped" },
+			{ kind: "slip", words: "Mistake to fix" },
+			{ kind: "review", words: "3d overdue" },
+			{ kind: "task", words: "Left off 3d ago" },
+			{ kind: "next", words: "Planned today" },
+		];
+		for (const fact of needs) assert.deepEqual(cardLine(said(fact)), fact, fact.kind);
 	});
 
-	it("says a due review as Home does, only for a topic he can do on his own", () => {
-		const review = (overdue: number) => statusOf(topic({ level: "independent", review: due(overdue) }), [], titleOf, TODAY)!.words;
-		assert.deepEqual([review(0), review(3), review(10), review(16)], ["Due today", "3d overdue", "10d overdue", "16d overdue"]);
-		assert.equal(statusOf(topic({ level: "attempted", review: due(4) }), [], titleOf, TODAY), null, "a topic still being learned is nearly always due");
-	});
-
-	it("says when an open task holding the topic was left, never the tutor's step, after a slip and a review", () => {
-		assert.deepEqual(statusOf(topic({ level: "attempted", tasks: ["sheet-4"] }), TASKS, titleOf, TODAY), { kind: "task", words: "Left off 3d ago" });
-		assert.equal(statusOf(topic({ level: "attempted", tasks: ["sheet-4"] }), [{ ...TASKS[0]!, updated: TODAY }], titleOf, TODAY)!.words, "Left off today");
-		assert.equal(statusOf(topic({ level: "attempted", tasks: ["gone"] }), TASKS, titleOf, TODAY)!.words, "Unfinished");
-		assert.equal(statusOf(topic({ level: "independent", review: due(0), tasks: ["sheet-4"] }), TASKS, titleOf, TODAY)!.kind, "review");
-		assert.equal(statusOf(topic(), TASKS, titleOf, TODAY), null);
+	it("leaves the line to where he stands when the sidebar says only when it comes back or when he last studied it, or has no row for it", () => {
+		assert.equal(cardLine(said({ kind: "back", words: "Back in 5d" })), null);
+		assert.equal(cardLine(said({ kind: "studied", words: "3d ago" })), null);
+		assert.equal(cardLine(said(null)), null);
+		assert.equal(cardLine(undefined), null);
 	});
 });
 
 describe("the card", () => {
-	const render = (t: CourseMapTopic) =>
-		parseHTML(`<html><body>${renderToStaticMarkup(<NodeBody topic={t} standing={standingOf(t)} status={statusOf(t, TASKS, titleOf, TODAY)} />)}</body></html>`).document;
+	const render = (t: CourseMapTopic, line: CardFact | null = null) =>
+		parseHTML(`<html><body>${renderToStaticMarkup(<NodeBody topic={t} standing={standingOf(t)} line={line} />)}</body></html>`).document;
 	const weak = (level: CourseMapTopic["level"], signals: Partial<TopicSignals>) => topic({ level, weak: true, signals: { ...QUIET, ...signals } });
-	/** Every state a card draws, and its line under the title: the status, else the standing in words. */
-	const STATES: { name: string; topic: CourseMapTopic; line: string }[] = [
+	/** Every state a card draws, and its line under the title: the sidebar's fact, else the standing in words. */
+	const STATES: { name: string; topic: CourseMapTopic; fact?: CardFact; line: string }[] = [
 		{ name: "not started", topic: topic(), line: "Not started" },
 		{ name: "learning", topic: topic({ level: "attempted" }), line: "Tried, not right yet" },
 		{ name: "on his own, resting", topic: topic({ level: "retained", review: { kind: "scheduled", date: "2026-11-20" } }), line: "On your own" },
-		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), line: "9d overdue" },
-		{ name: "missed after he had it", topic: weak("retained", { lapsed: true }), line: "Not right last time" },
-		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), line: "Mixed up with Cramer's rule" },
-		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), line: "Left off 3d ago" },
+		{ name: "a turn that waits on him", topic: weak("assisted", { gap: "sign error" }), fact: { kind: "your-turn", words: "Your turn" }, line: "Your turn" },
+		{ name: "the tutor writing", topic: topic({ level: "attempted" }), fact: { kind: "working", words: "Working" }, line: "Working" },
+		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), fact: { kind: "review", words: "9d overdue" }, line: "9d overdue" },
+		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), fact: { kind: "slip", words: "Mixed up with Cramer's rule" }, line: "Mixed up with Cramer's rule" },
+		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), fact: { kind: "task", words: "Left off 3d ago" }, line: "Left off 3d ago" },
 	];
 	const line = (doc: Document) => (doc.querySelector('[data-slot="topic-need"]') ?? doc.querySelector('[data-slot="topic-standing"]'))!.textContent;
 
 	for (const state of STATES) {
 		it(`says it for ${state.name}`, () => {
-			const card = render(state.topic);
+			const card = render(state.topic, state.fact ?? null);
 			assert.equal(line(card), state.line);
 			assert.ok(card.body.textContent!.includes(state.topic.title), "the title");
 		});

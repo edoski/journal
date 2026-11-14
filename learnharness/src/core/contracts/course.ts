@@ -89,6 +89,14 @@ export type CourseVerb =
 	| { verb: "show"; handles: string[] | "all" }
 	| { verb: "search"; query: string }
 	| { verb: "save"; changes: unknown }
+	/** Run a patch through every step of a save and write nothing: the
+	 *  refusal a save would give, or ok. */
+	| { verb: "check"; changes: unknown }
+	/** Every arc with its standing, and where the learner stands: the
+	 *  topics he has studied, the arcs held and the current arc. `here` is
+	 *  the topic of the lesson in progress, `open` every open lesson's
+	 *  topics, which only the app sees. */
+	| { verb: "arcs"; here?: string | null; open?: readonly string[] }
 	| { verb: "plan"; days?: number }
 	/** Register files as the course's material; paths are relative to the
 	 *  course folder. */

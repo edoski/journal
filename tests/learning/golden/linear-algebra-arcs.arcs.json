@@ -1,0 +1,332 @@
+{
+  "current_arc": "eigenvalues",
+  "studied": [
+    "vectors",
+    "span",
+    "independence",
+    "basis",
+    "matmul",
+    "elimination",
+    "rank",
+    "kernel",
+    "determinant",
+    "cramer",
+    "eigen"
+  ],
+  "held": [
+    "spaces",
+    "systems",
+    "determinants",
+    "eigenvalues"
+  ],
+  "arcs": [
+    {
+      "arc": "spaces",
+      "title": "Vector spaces",
+      "question": "How do a few vectors build a whole space, and how many does it take?",
+      "purpose": "Tell whether vectors span a space, are independent, and form a basis.",
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Chapters 1 to 3"
+        }
+      ],
+      "topics": [
+        "vectors",
+        "span",
+        "independence",
+        "basis",
+        "matmul"
+      ],
+      "state": "ready",
+      "current": false,
+      "hidden": false,
+      "entry": []
+    },
+    {
+      "arc": "systems",
+      "title": "Linear systems",
+      "question": "When does a linear system have a solution, and how many?",
+      "purpose": "Solve a system by elimination and read its solutions from rank and kernel.",
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Chapter 4"
+        }
+      ],
+      "topics": [
+        "elimination",
+        "rank",
+        "kernel"
+      ],
+      "state": "learning",
+      "current": false,
+      "hidden": false,
+      "entry": [
+        "basis"
+      ]
+    },
+    {
+      "arc": "determinants",
+      "title": "Determinants",
+      "question": "What does one number say about a matrix and the volume it scales?",
+      "purpose": "Compute determinants and use them to decide invertibility and solve small systems.",
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Chapter 5"
+        }
+      ],
+      "topics": [
+        "determinant",
+        "cramer",
+        "invertibility"
+      ],
+      "state": "learning",
+      "current": false,
+      "hidden": false,
+      "entry": [
+        "matmul",
+        "rank"
+      ]
+    },
+    {
+      "arc": "eigenvalues",
+      "title": "Eigenvalues and diagonalization",
+      "question": "Which directions does a matrix only stretch, and what basis makes it simple?",
+      "purpose": "Find eigenvalues and eigenvectors and diagonalize a matrix by a change of basis.",
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Chapter 6"
+        }
+      ],
+      "topics": [
+        "change-basis",
+        "eigen",
+        "diagonalization"
+      ],
+      "state": "learning",
+      "current": true,
+      "hidden": false,
+      "entry": [
+        "matmul",
+        "basis",
+        "rank",
+        "kernel",
+        "determinant",
+        "invertibility"
+      ]
+    },
+    {
+      "arc": "orthogonality",
+      "title": "Orthogonality",
+      "question": "How do angles and lengths let us find the closest vector in a subspace?",
+      "purpose": "Use inner products to test orthogonality and project onto a subspace.",
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Chapter 7"
+        }
+      ],
+      "topics": [
+        "inner-product",
+        "projection"
+      ],
+      "state": "new",
+      "current": false,
+      "hidden": false,
+      "entry": [
+        "vectors",
+        "basis"
+      ]
+    }
+  ],
+  "arc_log": [
+    {
+      "day": "2026-11-08",
+      "kind": "formed",
+      "reason": "The lecture notes' chapters 1 to 7 on settled edges; chapter 3's one topic joins chapters 1 and 2, whose spaces it maps",
+      "asked": "Edo approved this hand cut for the E2 golden (sandbox copy)"
+    }
+  ],
+  "report": {
+    "partition": {
+      "unplaced": [],
+      "empty": []
+    },
+    "backward": [],
+    "path": {
+      "stored": [],
+      "derived": []
+    },
+    "arcs": [
+      {
+        "arc": "spaces",
+        "topics": 5,
+        "pieces": [
+          [
+            "vectors",
+            "span",
+            "independence",
+            "basis",
+            "matmul"
+          ]
+        ],
+        "roots": [
+          "vectors"
+        ],
+        "entry": [],
+        "entry_arcs": []
+      },
+      {
+        "arc": "systems",
+        "topics": 3,
+        "pieces": [
+          [
+            "elimination",
+            "rank",
+            "kernel"
+          ]
+        ],
+        "roots": [
+          "elimination"
+        ],
+        "entry": [
+          "basis"
+        ],
+        "entry_arcs": [
+          "spaces"
+        ]
+      },
+      {
+        "arc": "determinants",
+        "topics": 3,
+        "pieces": [
+          [
+            "determinant",
+            "cramer",
+            "invertibility"
+          ]
+        ],
+        "roots": [
+          "determinant"
+        ],
+        "entry": [
+          "matmul",
+          "rank"
+        ],
+        "entry_arcs": [
+          "spaces",
+          "systems"
+        ]
+      },
+      {
+        "arc": "eigenvalues",
+        "topics": 3,
+        "pieces": [
+          [
+            "change-basis",
+            "eigen",
+            "diagonalization"
+          ]
+        ],
+        "roots": [
+          "change-basis",
+          "eigen"
+        ],
+        "entry": [
+          "basis",
+          "matmul",
+          "rank",
+          "kernel",
+          "determinant",
+          "invertibility"
+        ],
+        "entry_arcs": [
+          "spaces",
+          "systems",
+          "determinants"
+        ]
+      },
+      {
+        "arc": "orthogonality",
+        "topics": 2,
+        "pieces": [
+          [
+            "inner-product",
+            "projection"
+          ]
+        ],
+        "roots": [
+          "inner-product"
+        ],
+        "entry": [
+          "vectors",
+          "basis"
+        ],
+        "entry_arcs": [
+          "spaces"
+        ]
+      }
+    ],
+    "long_skips": [
+      {
+        "topic": "determinant",
+        "needs": "matmul",
+        "arcs": 2
+      },
+      {
+        "topic": "change-basis",
+        "needs": "basis",
+        "arcs": 3
+      },
+      {
+        "topic": "change-basis",
+        "needs": "matmul",
+        "arcs": 3
+      },
+      {
+        "topic": "eigen",
+        "needs": "rank",
+        "arcs": 2
+      },
+      {
+        "topic": "eigen",
+        "needs": "kernel",
+        "arcs": 2
+      },
+      {
+        "topic": "diagonalization",
+        "needs": "basis",
+        "arcs": 3
+      },
+      {
+        "topic": "inner-product",
+        "needs": "vectors",
+        "arcs": 4
+      },
+      {
+        "topic": "projection",
+        "needs": "basis",
+        "arcs": 4
+      }
+    ],
+    "split_contrasts": [
+      [
+        "elimination",
+        "cramer"
+      ],
+      [
+        "rank",
+        "determinant"
+      ]
+    ],
+    "sizes": {
+      "arcs": 5,
+      "live": 5,
+      "one_topic": []
+    },
+    "scope": []
+  }
+}

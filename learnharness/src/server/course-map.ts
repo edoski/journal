@@ -44,6 +44,7 @@ export function courseMapBuilder(): CourseMapBuilder {
 		courseRecords: stores.courseRecords,
 		ledgers: stores.courseMapLedgers,
 		engineFor: defaultEngine,
+		sessions: () => stores.chatStore.listChats(),
 		onSaved: () => emit("courses-changed", {}),
 		onStatus: () => emit("courses-changed", {}),
 	}));

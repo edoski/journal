@@ -16,14 +16,23 @@ import fs from "node:fs";
 import path from "node:path";
 import { Type, type Static } from "typebox";
 import type { CourseMapLedgers, CourseRecords } from "../../core/ports.ts";
+import type { ChatSummary } from "../../core/contracts/chat.ts";
 import {
 	answerProblems,
+	arcStandingOf,
 	buildWindow,
 	courseView,
+	dropRefusedEdge,
 	ledgerSources,
 	mapChanges,
+	openLessonsOf,
+	proposesArcs,
 	sourcesOf,
+	summaryOf,
+	withArcNote,
+	withoutArcs,
 	type CourseMapLedger,
+	type MapCounts,
 	type MapCourseView,
 	type MapSubmit,
 } from "../../core/course-map-build.ts";
@@ -37,6 +46,7 @@ import { finishRun, setRunPhase } from "./background-runs.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
 
 const SUBMIT_TOOL = "submit_map";
+const NEVER_SUBMITTED = "The map builder never submitted.";
 /** Model rounds beyond reading: one to look at the course, one to submit,
  *  and the submit seam's own retry budget for an answer it refuses
  *  (runSubmitAgent's default of 4). */
@@ -47,18 +57,17 @@ const refSchema = Type.Object({
 	locator: Type.Optional(Type.String({ description: "Where in it: page, slide, section or exercise." })),
 });
 
-const mapSchema = Type.Object({
-	topics: Type.Array(
-		Type.Object({
-			handle: Type.String({ description: "A short lowercase handle; an existing topic's handle when it is the same idea." }),
-			title: Type.String({ description: "The topic's name as a heading reads, every piece of math in it as $…$ LaTeX." }),
-			needs: Type.Optional(Type.Array(Type.String(), { description: "Handles of its true, direct prerequisites." })),
-			contrasts: Type.Optional(Type.Array(Type.String(), { description: "Handles of methods it competes with." })),
-			refs: Type.Optional(Type.Array(refSchema, { description: "Every place the material teaches it." })),
-			aliases: Type.Optional(Type.Array(Type.String(), { description: "Other names the material uses." })),
-			excluded: Type.Optional(Type.String({ description: "Only when the material says the exam leaves it out: why, in one line." })),
-		}),
-	),
+const topicFields = {
+	handle: Type.String({ description: "A short lowercase handle; an existing topic's handle when it is the same idea." }),
+	title: Type.String({ description: "The topic's name as a heading reads, every piece of math in it as $…$ LaTeX." }),
+	needs: Type.Optional(Type.Array(Type.String(), { description: "Handles of its true, direct prerequisites." })),
+	contrasts: Type.Optional(Type.Array(Type.String(), { description: "Handles of methods it competes with." })),
+	refs: Type.Optional(Type.Array(refSchema, { description: "Every place the material teaches it." })),
+	aliases: Type.Optional(Type.Array(Type.String(), { description: "Other names the material uses." })),
+	excluded: Type.Optional(Type.String({ description: "Only when the material says the exam leaves it out: why, in one line." })),
+};
+
+const answerFields = {
 	order: Type.Array(Type.String(), { description: "Every topic's handle in study order: prerequisites first, then the material's order." }),
 	current: Type.Optional(Type.String({ description: "Where to start." })),
 	basis: Type.Optional(Type.String({ description: "Where the order comes from, in one line." })),
@@ -69,6 +78,40 @@ const mapSchema = Type.Object({
 		}),
 	),
 	unread: Type.Optional(Type.Array(Type.Object({ source: Type.String(), reason: Type.String() }), { description: "Sources you could not read, each with why." })),
+};
+
+const mapSchema = Type.Object({ topics: Type.Array(Type.Object(topicFields)), ...answerFields });
+
+/** The answer in a course with arcs: where new topics go, as arcs.md's
+ *  "Placing a new topic" says. */
+const arcMapSchema = Type.Object({
+	topics: Type.Array(
+		Type.Object({
+			...topicFields,
+			arc: Type.Optional(Type.String({ description: "Only for a new topic: the arc it joins, an arc of the course or of newArcs, when the material says where it belongs; leave it out and the engine places it." })),
+		}),
+	),
+	...answerFields,
+	newArcs: Type.Optional(
+		Type.Array(
+			Type.Object({
+				handle: Type.String({ description: "A new lowercase handle." }),
+				title: Type.String({ description: "The arc's name, in the material's words." }),
+				question: Type.String({ description: "The focus question every topic in it helps answer." }),
+				purpose: Type.String({ description: "One sentence on what it lets the learner do." }),
+				refs: Type.Optional(Type.Array(refSchema, { description: "Where the material holds the unit." })),
+				after: Type.String({ description: "The handle of the arc it follows in the arc order." }),
+				unit: Type.String({ description: "The material's own heading for the unit: a chapter, a syllabus unit, a numbered part." }),
+			}),
+			{ description: "Only for a new unit of the material with at least two new topics that no arc's question fits; give its topics this arc." },
+		),
+	),
+	moves: Type.Optional(
+		Type.Array(Type.Object({ topic: Type.String(), arc: Type.String(), reason: Type.String({ description: "Why the material puts it there." }) }), {
+			description: "Only topics the course already has, which the material puts in another arc; a new topic takes its arc from its own arc field.",
+		}),
+	),
+	arcNote: Type.Optional(Type.String({ description: "Where the material and the arcs disagree, kept as a note; the arcs stay as they are." })),
 });
 
 export const COURSE_MAP_INSTRUCTIONS = `You build a course's topic map from its material, following the recipe below. You answer with one ${SUBMIT_TOOL} call; the app saves it to the course record.
@@ -112,19 +155,30 @@ function mapPrompt(title: string, view: MapCourseView, files: readonly MaterialF
 		for (const [handle, entry] of knowledge) lines.push(`- ${handle}: ${String(obj(entry).text ?? "").split("\n")[0]}`);
 	}
 	const topics = Object.entries(view.topics);
+	const line = ([handle, t]: (typeof topics)[number]) => {
+		const facts = [
+			t.needs.length > 0 ? `needs ${t.needs.join(", ")}` : "",
+			t.contrasts.length > 0 ? `contrasts ${t.contrasts.join(", ")}` : "",
+			t.excluded ? `left out: ${t.excluded}` : "",
+			t.refs.length > 0 ? `refs ${t.refs.map((r) => `${r.source}${r.locator ? ` ${r.locator}` : ""}`).join("; ")}` : "",
+			view.studied.includes(handle) ? "studied" : "",
+		].filter(Boolean);
+		return `- ${handle}: ${t.title ?? "(no title)"}${facts.length > 0 ? ` (${facts.join("; ")})` : ""}`;
+	};
 	if (topics.length === 0) {
 		lines.push("", "The course has no map yet: build it whole.");
+	} else if (view.arcs.length > 0) {
+		lines.push("", "## The arcs so far (keep them; place new topics in them; a new arc only for a new unit)");
+		for (const arc of view.arcs) {
+			const marks = [arc.handle === view.currentArc ? "he is in it" : view.held.includes(arc.handle) ? "he has studied in it" : "", view.examArcs.includes(arc.handle) ? "on the next exam" : ""].filter(Boolean);
+			lines.push("", `### ${arc.handle}: ${arc.title}${marks.length > 0 ? ` (${marks.join("; ")})` : ""}`, `Question: ${arc.question}`);
+			if (arc.refs.length > 0) lines.push(`Material: ${arc.refs.map((r) => `${r.source}${r.locator ? ` ${r.locator}` : ""}`).join("; ")}`);
+			lines.push(...topics.filter(([handle]) => view.topicArc[handle] === arc.handle).map(line));
+		}
+		if (view.order.length > 0) lines.push("", `Order: ${view.order.join(", ")}`);
 	} else {
 		lines.push("", "## The map so far (extend it; keep these handles)");
-		for (const [handle, t] of topics) {
-			const facts = [
-				t.needs.length > 0 ? `needs ${t.needs.join(", ")}` : "",
-				t.contrasts.length > 0 ? `contrasts ${t.contrasts.join(", ")}` : "",
-				t.excluded ? `left out: ${t.excluded}` : "",
-				t.refs.length > 0 ? `refs ${t.refs.map((r) => `${r.source}${r.locator ? ` ${r.locator}` : ""}`).join("; ")}` : "",
-			].filter(Boolean);
-			lines.push(`- ${handle}: ${t.title ?? "(no title)"}${facts.length > 0 ? ` (${facts.join("; ")})` : ""}`);
-		}
+		lines.push(...topics.map(line));
 		if (view.order.length > 0) lines.push("", `Order: ${view.order.join(", ")}`);
 	}
 	return lines.join("\n");
@@ -163,6 +217,9 @@ export interface CourseMapBuilderDeps {
 	onSaved?: (workspace: string) => void;
 	/** A build started or ended (the dialog refetches its status). */
 	onStatus?: (workspace: string) => void;
+	/** The app's sessions: a course's open lessons count as studied, and the
+	 *  one in progress says which arc he is in. */
+	sessions?: () => readonly ChatSummary[];
 }
 
 export interface CourseMapBuilder {
@@ -215,7 +272,7 @@ export function failureWords(err: unknown, aborted: boolean): string {
 	const message = err instanceof Error ? err.message : String(err);
 	if (message.startsWith(CLAUDE_LIMIT_TEXT)) return "your Claude plan's usage limit was reached";
 	if (message.startsWith("save refused")) return "the course record refused the map";
-	if (message === "The map builder never submitted.") return "the model finished without proposing a map";
+	if (message === NEVER_SUBMITTED) return "the model finished without proposing a map";
 	if (message.startsWith("course record:")) return "the course record could not be read";
 	return "the model stopped with an error";
 }
@@ -229,6 +286,16 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		const shown = await courseRecords.run(workspace, { verb: "show", handles: "all" });
 		if (!shown.ok) throw new Error(`course record: ${shown.message}`);
 		return shown.json;
+	}
+
+	/** The course as the build sees it. In a course with arcs, the engine
+	 *  says where he stands, told the lessons only the app has open. */
+	async function viewOf(workspace: string, record: unknown): Promise<MapCourseView> {
+		if (!recordHasArcs(record)) return courseView(record);
+		const lessons = openLessonsOf(deps.sessions?.() ?? [], workspace, record);
+		const standing = await courseRecords.run(workspace, { verb: "arcs", here: lessons.here, open: lessons.topics });
+		if (!standing.ok) throw new Error(`course record: ${standing.message}`);
+		return courseView(record, arcStandingOf(standing.json));
 	}
 
 	async function build(workspace: string, start: (title: string) => AbortSignal): Promise<MapOutcome> {
@@ -256,19 +323,30 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 			return { status: "nothing" };
 		}
 		const folders = new Set(sourcesOf(record).filter((s) => isFolder(s.path, directory)).map((s) => s.handle));
-		const view = courseView(record);
+		const view = await viewOf(workspace, record);
+		const arcs = view.arcs.length > 0;
 		const examDate = typeof obj(obj(record).exam).date === "string" ? (obj(obj(record).exam).date as string) : null;
+		// The last answer whose shape passed: when the engine keeps refusing
+		// it until the turns run out, the salvage saves it all the same.
+		let shaped: MapSubmit | undefined;
 		const submit = await withBgLlmSlot(signal, () =>
 			runSubmitAgent<MapSubmit>({
 				role: "teacher",
 				toolName: SUBMIT_TOOL,
 				toolDescription: "Submit the course's topic map.",
-				parameters: mapSchema,
-				fill: (input: Static<typeof mapSchema>) => ({ ...input, topics: input.topics ?? [], order: input.order ?? [] }),
-				validate: (answer) => {
+				parameters: arcs ? arcMapSchema : mapSchema,
+				fill: (input: Static<typeof arcMapSchema>) => ({ ...input, topics: input.topics ?? [], order: input.order ?? [] }),
+				validate: async (answer) => {
 					const problems = answerProblems(answer, view);
 					if (problems) console.info(`[course-map ${workspace}] answer refused: ${problems.replace(/\n/g, " | ")}`);
-					return problems;
+					if (problems || !arcs) return problems;
+					shaped = answer;
+					const merged = mapChanges(answer, view);
+					if (!merged) return null;
+					const checked = await courseRecords.run(workspace, { verb: "check", changes: merged.changes });
+					if (checked.ok || checked.kind !== "validation") return null;
+					console.info(`[course-map ${workspace}] merged save refused: ${checked.message}`);
+					return `The engine refused the merged save: ${checked.message}`;
 				},
 				systemPrompt: COURSE_MAP_INSTRUCTIONS + courseMapDoctrine({ arcs: recordHasArcs(record) }),
 				prompt: mapPrompt(title, view, files, examDate, record, folders),
@@ -278,23 +356,56 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 				maxTurns: readingRounds(files) + SUBMIT_ROUNDS,
 				onStep: (usage, model, step, finish, tools) =>
 					console.info(`[course-map ${workspace}] step ${step} ${model}: ${usage.input} in, ${usage.output} out, ${finish}, ${tools}`),
-				neverSubmitted: "The map builder never submitted.",
+				neverSubmitted: NEVER_SUBMITTED,
+			}).catch((err: unknown) => {
+				if (shaped && !signal.aborted && err instanceof Error && err.message === NEVER_SUBMITTED) return shaped;
+				throw err;
 			}),
 		);
 		if (signal.aborted) throw Object.assign(new Error("course map aborted"), { name: "AbortError" });
 		// A lesson may have saved while the agent read: merge into the record as it is now.
-		const patch = mapChanges(submit, courseView(await readRecord(workspace)));
+		const now = await viewOf(workspace, await readRecord(workspace));
 		if (signal.aborted) throw Object.assign(new Error("course map aborted"), { name: "AbortError" });
-		if (patch) {
-			const saved = await courseRecords.run(workspace, { verb: "save", changes: patch.changes });
-			if (!saved.ok) throw new Error(`save refused (${saved.kind}): ${saved.message}`);
-			deps.onSaved?.(workspace);
-		}
+		const { patch, salvaged } = await saveSalvaging(workspace, submit, now);
+		if (patch) deps.onSaved?.(workspace);
 		const unread = (submit.unread ?? []).map((u) => `${u.source} (${u.reason})`);
 		const outcome = [patch?.summary ?? "nothing new to save", unread.length > 0 ? `could not read ${unread.join(", ")}` : ""].filter(Boolean).join("; ");
-		update(workspace, ({ done }) => ({ done: [...done, { sources, fingerprint: window.fingerprint, at: new Date().toISOString(), outcome }] }));
+		update(workspace, ({ done }) => ({ done: [...done, { sources, fingerprint: window.fingerprint, at: new Date().toISOString(), outcome, ...(salvaged.length > 0 ? { salvaged } : {}) }] }));
 		console.info(`[course-map ${workspace}] ${outcome}`);
 		return patch ? { status: "saved", summary: outcome } : { status: "nothing" };
+	}
+
+	/**
+	 * The build's one save. In a course with arcs a refusal never throws the
+	 * upload away: the save goes again with the arc proposals set aside, so
+	 * the engine places every new topic, then without each new prerequisite
+	 * the engine refuses, one per try, each kept in a note. Topics are never
+	 * dropped. A course without arcs saves once, as it always has.
+	 */
+	async function saveSalvaging(workspace: string, submit: MapSubmit, view: MapCourseView): Promise<{ patch: ReturnType<typeof mapChanges>; salvaged: string[] }> {
+		let patch = mapChanges(submit, view);
+		const salvaged: string[] = [];
+		if (!patch) return { patch, salvaged };
+		const save = (changes: unknown) => courseRecords.run(workspace, { verb: "save", changes });
+		let saved = await save(patch.changes);
+		if (!saved.ok && saved.kind === "validation" && view.arcs.length > 0 && proposesArcs(submit)) {
+			const note = `the proposed arc changes were set aside; refused: ${saved.message}`;
+			const stripped = mapChanges(withoutArcs(submit), view);
+			patch = { ...(stripped ?? { counts: patch.counts, summary: "nothing new to save" }), changes: withArcNote(stripped?.changes ?? {}, note) };
+			salvaged.push(note);
+			saved = await save(patch.changes);
+		}
+		while (!saved.ok && saved.kind === "validation" && view.arcs.length > 0) {
+			const rung = dropRefusedEdge(patch.changes, saved.message, view);
+			if (!rung) break;
+			const counts: MapCounts = { ...patch.counts, needs: patch.counts.needs - 1 };
+			patch = { changes: rung.changes, counts, summary: summaryOf(counts) };
+			salvaged.push(rung.note);
+			saved = await save(patch.changes);
+		}
+		if (!saved.ok) throw new Error(`save refused (${saved.kind}): ${saved.message}`);
+		if (salvaged.length > 0) console.info(`[course-map ${workspace}] salvaged: ${salvaged.join(" | ")}`);
+		return { patch, salvaged };
 	}
 
 	/** The sources a skipped build would have read, for its ledger line. */

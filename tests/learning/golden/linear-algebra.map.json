@@ -1,0 +1,314 @@
+{
+  "today": "2026-11-08",
+  "revision": 24,
+  "title": "Linear Algebra",
+  "exam": {
+    "date": "2026-12-03",
+    "days_left": 25,
+    "final_review": "2026-11-14"
+  },
+  "current": "eigen",
+  "focus": "sheet-4",
+  "tasks": [
+    {
+      "key": "sheet-4",
+      "title": "Problem sheet 4: rank and nullity",
+      "step": "Part (c): show $\\dim \\ker A = 2$ for the $3 \\times 5$ matrix $A$",
+      "updated": "2026-11-06"
+    }
+  ],
+  "topics": [
+    {
+      "topic": "vectors",
+      "title": "Vectors and linear combinations",
+      "needs": [],
+      "contrasts": [],
+      "level": "retained",
+      "introduced": "2026-09-28",
+      "review": "2026-11-23",
+      "held": true,
+      "due": "2026-10-12",
+      "weak": false,
+      "tasks": []
+    },
+    {
+      "topic": "span",
+      "title": "Span",
+      "needs": [
+        "vectors"
+      ],
+      "contrasts": [],
+      "level": "retained",
+      "introduced": "2026-09-30",
+      "review": "2026-11-23",
+      "held": true,
+      "due": "2026-10-12",
+      "weak": false,
+      "tasks": []
+    },
+    {
+      "topic": "independence",
+      "title": "Linear independence",
+      "needs": [
+        "span"
+      ],
+      "contrasts": [],
+      "level": "independent",
+      "introduced": "2026-10-05",
+      "review": "2026-11-16",
+      "held": true,
+      "due": "2026-10-28",
+      "weak": true,
+      "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
+      "lapsed": true,
+      "stale": true,
+      "confident_errors": 1,
+      "repaired": true,
+      "repaired_with_help": true,
+      "tasks": []
+    },
+    {
+      "topic": "basis",
+      "title": "Basis and dimension",
+      "needs": [
+        "independence"
+      ],
+      "contrasts": [],
+      "level": "retained",
+      "introduced": "2026-10-07",
+      "review": "2026-11-25",
+      "held": true,
+      "due": "2026-10-29",
+      "weak": false,
+      "tasks": [
+        "sheet-4"
+      ]
+    },
+    {
+      "topic": "matmul",
+      "title": "Matrix multiplication as composition",
+      "needs": [
+        "vectors"
+      ],
+      "contrasts": [],
+      "level": "retained",
+      "introduced": "2026-10-12",
+      "review": "2026-11-09",
+      "held": true,
+      "due": "2026-11-06",
+      "weak": true,
+      "lapsed": true,
+      "tasks": []
+    },
+    {
+      "topic": "elimination",
+      "title": "Gaussian elimination",
+      "needs": [],
+      "contrasts": [
+        "cramer"
+      ],
+      "level": "retained",
+      "introduced": "2026-10-15",
+      "review": "2026-11-14",
+      "held": true,
+      "due": "2026-11-06",
+      "weak": true,
+      "lapsed": true,
+      "choice_errors": {
+        "cramer": 1
+      },
+      "tasks": []
+    },
+    {
+      "topic": "rank",
+      "title": "Rank and the column space",
+      "needs": [
+        "basis",
+        "elimination"
+      ],
+      "contrasts": [
+        "determinant"
+      ],
+      "level": "assisted",
+      "introduced": "2026-11-03",
+      "review": "2026-11-11",
+      "held": true,
+      "due": "2026-11-06",
+      "weak": true,
+      "right": "helped",
+      "gap": "You count nonzero entries instead of pivots, and mix up rank with the number of rows",
+      "stale": true,
+      "repaired": true,
+      "repaired_with_help": true,
+      "tasks": [
+        "sheet-4"
+      ]
+    },
+    {
+      "topic": "kernel",
+      "title": "Kernel and rank-nullity",
+      "needs": [
+        "rank"
+      ],
+      "contrasts": [],
+      "level": "attempted",
+      "introduced": "2026-11-06",
+      "review": "2026-11-18",
+      "held": true,
+      "due": "2026-11-07",
+      "weak": true,
+      "confident_errors": 1,
+      "tasks": [
+        "sheet-4"
+      ]
+    },
+    {
+      "topic": "determinant",
+      "title": "Determinants as volume scaling",
+      "needs": [
+        "matmul"
+      ],
+      "contrasts": [
+        "rank"
+      ],
+      "level": "assisted",
+      "introduced": "2026-11-04",
+      "review": "2026-11-12",
+      "held": true,
+      "due": "2026-11-09",
+      "weak": false,
+      "right": "helped",
+      "tasks": []
+    },
+    {
+      "topic": "cramer",
+      "title": "Cramer's rule",
+      "needs": [
+        "determinant"
+      ],
+      "contrasts": [
+        "elimination"
+      ],
+      "level": "introduced",
+      "introduced": "2026-11-05",
+      "review": "2026-11-14",
+      "held": true,
+      "due": "2026-11-06",
+      "weak": false,
+      "tasks": []
+    },
+    {
+      "topic": "invertibility",
+      "title": "Invertible matrices",
+      "needs": [
+        "rank",
+        "determinant"
+      ],
+      "contrasts": [],
+      "level": "new",
+      "starts": "2026-11-12",
+      "starts_why": {
+        "kind": "after",
+        "needs": [
+          "determinant"
+        ]
+      },
+      "weak": false,
+      "tasks": []
+    },
+    {
+      "topic": "change-basis",
+      "title": "Change of basis",
+      "needs": [
+        "basis",
+        "matmul",
+        "invertibility"
+      ],
+      "contrasts": [],
+      "level": "new",
+      "starts": "2026-11-19",
+      "starts_why": {
+        "kind": "after",
+        "needs": [
+          "invertibility"
+        ]
+      },
+      "weak": false,
+      "tasks": []
+    },
+    {
+      "topic": "eigen",
+      "title": "Eigenvalues and eigenvectors",
+      "needs": [
+        "determinant",
+        "rank",
+        "invertibility",
+        "kernel"
+      ],
+      "contrasts": [],
+      "level": "assisted",
+      "introduced": "2026-11-08",
+      "review": "2026-11-09",
+      "weak": false,
+      "right": "partial",
+      "tasks": []
+    },
+    {
+      "topic": "diagonalization",
+      "title": "Diagonalization",
+      "needs": [
+        "eigen",
+        "basis",
+        "change-basis"
+      ],
+      "contrasts": [],
+      "level": "new",
+      "starts": "2026-11-20",
+      "starts_why": {
+        "kind": "after",
+        "needs": [
+          "change-basis"
+        ]
+      },
+      "weak": false,
+      "tasks": []
+    },
+    {
+      "topic": "inner-product",
+      "title": "Inner products and orthogonality",
+      "needs": [
+        "vectors"
+      ],
+      "contrasts": [],
+      "level": "new",
+      "starts": "2026-11-11",
+      "starts_why": {
+        "kind": "early",
+        "waiting_on": [
+          "determinant"
+        ]
+      },
+      "weak": false,
+      "tasks": []
+    },
+    {
+      "topic": "projection",
+      "title": "Orthogonal projection",
+      "needs": [
+        "inner-product",
+        "basis"
+      ],
+      "contrasts": [],
+      "level": "new",
+      "starts": "2026-11-13",
+      "starts_why": {
+        "kind": "early",
+        "waiting_on": [
+          "invertibility"
+        ]
+      },
+      "weak": false,
+      "tasks": []
+    }
+  ]
+}

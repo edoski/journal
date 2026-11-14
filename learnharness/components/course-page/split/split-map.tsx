@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import type { CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
+import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { framedCamera, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
@@ -59,6 +60,7 @@ function reducedMotion(): boolean {
  */
 export function SplitMap({
 	map,
+	said,
 	layout,
 	lit,
 	aim,
@@ -68,6 +70,8 @@ export function SplitMap({
 	ref,
 }: {
 	map: CourseMap;
+	/** What the sidebar says for each topic (`sidebarSays`), for the cards. */
+	said: ReadonlyMap<TopicHandle, Said>;
 	/** The map's layout (`layoutTopicMap`), which sizes the surface. */
 	layout: TopicMapLayout;
 	lit: ReadonlySet<TopicHandle> | null;
@@ -271,7 +275,7 @@ export function SplitMap({
 				<div ref={scroller} data-slot="course-split-map-scroller" className={`size-full overflow-auto overscroll-contain ${NO_BAR}`}>
 					{/* The surface's size, from the course's layout: the map fits it whole. */}
 					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-						<TopicMap map={map} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
+						<TopicMap map={map} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
 					</div>
 				</div>
 			</div>

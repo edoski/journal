@@ -1,24 +1,20 @@
-import type { ChatListItem, CourseMapTopic, StudyCourse, UnreadableCourse } from "@/src/core";
+import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, UnreadableCourse } from "@/src/core";
 import { CURRENT_TAG, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { courseProgress, lastStudied, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
 import { examWords, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
-import { slotWords } from "@/components/study-home/needs-you";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { nowFor, plannedKeys, restShelves, shelfStatus } from "@/components/unit-inbox/now-inbox";
-import { claimedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
-import { buildInbox, unitKey, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
-import { courseShareWords, TUTOR_WRITING } from "@/components/study-words";
+import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
+import { courseShareWords } from "@/components/study-words";
 import { lastSessionOf } from "@/components/course-page/course-head/head-facts";
 
 /**
  * The course page's model (spec: course-page.md): one course's topics, each
  * in the group the sidebar puts it in, ending in the fact the sidebar's row
- * says, and the header's facts and next lesson. It reads the sidebar's own
- * model (Home's Today on top, `todayTop`; the shelves under it,
- * `restShelves`; a row's fact, `shelfStatus`), so a topic is in one group
- * with one fact wherever it shows. Engine fields only. Pure.
+ * says, and the header's facts and next lesson. It reads what the sidebar
+ * says for each topic (`sidebarSays`), as every map card does, so a topic
+ * is in one group with one fact wherever it shows. Engine fields only. Pure.
  */
 
 /** The page's groups, in the order he would act on them. */
@@ -33,30 +29,6 @@ export const GROUP_WORDS: Record<GroupId, string> = {
 	"not-started": "Not started",
 	"on-your-own": "On your own",
 };
-
-/** The one fact a topic's row ends with, in the words the sidebar's row or
- *  Today's card says for it. `kind` picks its icon. */
-export type TopicFact =
-	/** A session on the topic waits on him: "Your turn". */
-	| { kind: "your-turn"; words: string }
-	/** The tutor is writing in a session on it: "Tutor writing". */
-	| { kind: "working"; words: string }
-	/** The tutor stopped mid-reply in a session on it. */
-	| { kind: "stopped"; words: string }
-	/** The engine calls it weak, and why: "Not right last time", "Sure, but wrong". */
-	| { kind: "slip"; words: string }
-	/** Its review is due: "Due today", "3d overdue". */
-	| { kind: "review"; words: string }
-	/** An open task holds it, and when he left it: "Left off 3d ago". */
-	| { kind: "task"; words: string }
-	/** Today's plan starts it: "Planned today", "Next up". */
-	| { kind: "next"; words: string }
-	/** When its next review comes: "Back in 5d", "Due since 21 Oct". */
-	| { kind: "back"; words: string }
-	/** When he last studied it: "3d ago". */
-	| { kind: "studied"; words: string }
-	/** The course's current topic: "You are here". */
-	| { kind: "here"; words: string };
 
 /** One topic as the page lists it. */
 export interface CourseTopic {
@@ -77,33 +49,8 @@ export interface CourseGroup {
 	topics: readonly CourseTopic[];
 }
 
-const WHY_FACT: Record<Why["kind"], TopicFact["kind"]> = { reply: "your-turn", working: "working", stopped: "stopped", missed: "slip", review: "review", task: "task", next: "next" };
-
-/** A topic Today takes up says Today's reason, as the sidebar's card for
- *  its line does (`slotWords`). Pure. */
-function todayFact(item: NowItem, topic: CourseMapTopic): TopicFact | null {
-	const { why } = item.line;
-	const words = slotWords(why, topic);
-	return why && words ? { kind: WHY_FACT[why.kind], words } : null;
-}
-
-/** A shelf row's fact (`shelfStatus`), the current topic saying "You are
- *  here" in place of when it comes back or was studied. Pure. */
-function shelfFact(status: UnitStatus, current: boolean): TopicFact | null {
-	if (current && (status.kind === "returns" || status.kind === "studied" || status.kind === "none")) return { kind: "here", words: CURRENT_TAG };
-	switch (status.kind) {
-		case "none":
-			return null;
-		case "your-turn":
-			return { kind: "your-turn", words: "Your turn" };
-		case "working":
-			return { kind: "working", words: TUTOR_WRITING };
-		case "returns":
-			return { kind: "back", words: status.words };
-		default:
-			return { kind: status.kind, words: status.words };
-	}
-}
+const GROUP_OF: Record<SidebarPlace, GroupId> = { today: "needs-you", learning: "learning", known: "on-your-own" };
+const HERE: TopicFact = { kind: "here", words: CURRENT_TAG };
 
 /**
  * Every topic of the course once, in four groups, each the sidebar's own
@@ -115,42 +62,31 @@ function shelfFact(status: UnitStatus, current: boolean): TopicFact | null {
  *     them (`starts`), those it has no day for last, in the engine's path
  *     order;
  *   - On your own: the sidebar's On your own shelf, in its order.
- * Each shelf row ends in the sidebar row's fact (`shelfStatus`). `chats`
+ * Each row ends in the sidebar's fact for it (`sidebarSays`). `chats`
  * are every session (with those started on a topic's page linked to it);
  * `courses` every course, since Today weighs them together. Always the
  * four groups, an empty one included. Pure.
  */
 export function courseGroups(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): CourseGroup[] {
 	const { map } = course;
-	const inbox = buildInbox(courses, chats, null);
-	const top = todayTop(nowFor(courses, chats, null, map.today), inbox, chats);
-	const today = new Map<string, NowItem>();
-	for (const item of top) for (const key of claimedKeys(item)) if (!today.has(key)) today.set(key, item);
-	const shelves = restShelves(inbox, new Set(today.keys()));
-	const planned = plannedKeys(courses);
-	const shelved = new Map<string, { group: GroupId; unit: Unit }>([
-		...[...shelves.working, ...shelves.learning].map((unit) => [unit.key, { group: "learning" as const, unit }] as const),
-		...shelves.known.map((unit) => [unit.key, { group: "on-your-own" as const, unit }] as const),
-	]);
-	const order = [...today.keys(), ...shelved.keys()];
+	const said = sidebarSays(courses, chats, map.workspace);
+	const order = [...said.keys()];
 
-	const rows = map.topics.map((topic): CourseTopic & { key: string } => {
-		const key = unitKey(map.workspace, topic.handle);
+	const rows = map.topics.map((topic): CourseTopic => {
 		const current = map.current === topic.handle;
-		const item = today.get(key);
-		const shelf = shelved.get(key);
-		const base = { key, topic, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
-		if (item) return { ...base, group: "needs-you", fact: todayFact(item, topic) };
-		if (shelf) return { ...base, group: shelf.group, fact: shelfFact(shelfStatus(shelf.unit, map.today, planned), current) };
-		return { ...base, group: "not-started", fact: current ? { kind: "here", words: CURRENT_TAG } : null };
+		const { place, fact = null } = said.get(topic.handle) ?? {};
+		const group = place ? GROUP_OF[place] : "not-started";
+		// "You are here" in place of when it comes back or was studied, never in place of what needs him.
+		const here = current && group !== "needs-you" && (fact === null || fact.kind === "back" || fact.kind === "studied");
+		return { topic, group, fact: here ? HERE : fact, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
-	const at = (key: string) => order.indexOf(key);
+	const at = (row: CourseTopic) => order.indexOf(row.topic.handle);
 	const NEVER = "9999-12-31";
 	const byStart = (a: CourseTopic, b: CourseTopic) => (a.topic.starts ?? NEVER).localeCompare(b.topic.starts ?? NEVER);
 	return GROUP_IDS.map((id) => {
 		const mine = rows.filter((row) => row.group === id);
-		const sorted = id === "not-started" ? mine.sort(byStart) : mine.sort((a, b) => at(a.key) - at(b.key));
-		return { id, title: GROUP_WORDS[id], topics: sorted.map(({ key: _, ...row }) => row) };
+		const sorted = id === "not-started" ? mine.sort(byStart) : mine.sort((a, b) => at(a) - at(b));
+		return { id, title: GROUP_WORDS[id], topics: sorted };
 	});
 }
 
@@ -201,10 +137,12 @@ export function courseFacts(course: StudyCourse, chats: readonly ChatListItem[] 
 }
 
 /** Everything a course page candidate draws: the engine's course, its
- *  topics in their groups, the header's facts and its next lesson. */
+ *  topics in their groups, what the sidebar says for each (the map's
+ *  cards), the header's facts and its next lesson. */
 export interface CourseView {
 	course: StudyCourse;
 	groups: readonly CourseGroup[];
+	said: ReadonlyMap<TopicHandle, Said>;
 	facts: CourseFacts;
 	next: CourseNext;
 }
@@ -237,7 +175,13 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 			}
 			return {
 				status: "ready",
-				view: { course, groups: courseGroups(course, state.chats, state.courses), facts: courseFacts(course, state.chats), next: courseNext(course, state.open) },
+				view: {
+					course,
+					groups: courseGroups(course, state.chats, state.courses),
+					said: sidebarSays(state.courses, state.chats, workspace),
+					facts: courseFacts(course, state.chats),
+					next: courseNext(course, state.open),
+				},
 			};
 		}
 	}

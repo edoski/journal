@@ -20,8 +20,11 @@ import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/pl
 import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
 import { sessionMarkdown } from "../../core/session-markdown.ts";
 import {
+	digestArcs,
 	digestChanges,
+	digestProblems,
 	digestible,
+	placedIn,
 	digestWindow,
 	planFinished,
 	reachedSteps,
@@ -143,6 +146,13 @@ function recordOf(json: unknown): { notes: Map<string, string>; knowledge: Diges
 	return { notes, knowledge };
 }
 
+/** The receipt's `arcs_placed`: the arc the engine gave each new topic. */
+function arcsPlacedOf(receipt: unknown): Record<string, string> {
+	const placed = (receipt as { arcs_placed?: unknown } | null)?.arcs_placed;
+	if (typeof placed !== "object" || placed === null) return {};
+	return Object.fromEntries(Object.entries(placed).filter((e): e is [string, string] => typeof e[1] === "string"));
+}
+
 export interface LessonDigestDeps {
 	chatStore: ChatStore;
 	courseRecords: CourseRecords;
@@ -208,6 +218,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 		const whole = await courseRecords.run(workspace, { verb: "show", handles: "all" });
 		if (!whole.ok) throw new Error(`course record: ${whole.message}`);
 		const { notes, knowledge } = recordOf(whole.json);
+		const arcs = digestArcs(whole.json, record.topics ?? []);
 		const view: DigestCourseView = {
 			topics: map.topics.map((t) => ({
 				handle: t.handle,
@@ -221,6 +232,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 			planFinished: planFinished(record.tree, record.messages),
 			knowledge,
 			reached: reachedSteps(record.tree, record.messages),
+			...(arcs ? { arcs } : {}),
 		};
 		// The save runs at the submit call, so a patch the engine refuses
 		// (a learner-facing text naming an id, a date or "he") goes back to
@@ -229,10 +241,12 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 		let failure = null as string | null;
 		const stopped = () => signal.aborted || !chatStore.getChat(chatId);
 		const save = async (answer: DigestSubmit): Promise<string | null> => {
+			const problems = digestProblems(answer, view);
+			if (problems) return problems;
 			const changes = digestChanges(answer, view);
 			if (!changes || stopped()) return null;
 			const saved = await courseRecords.run(workspace, { verb: "save", changes: changes.changes });
-			if (saved.ok) patch = changes;
+			if (saved.ok) patch = { ...changes, summary: placedIn(changes.summary, arcsPlacedOf(saved.json), view) };
 			else if (saved.kind === "validation") return `The course record refused it and nothing was saved: ${saved.message}`;
 			else failure = `save refused (${saved.kind}): ${saved.message}`;
 			return null;

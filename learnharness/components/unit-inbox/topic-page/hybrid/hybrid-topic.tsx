@@ -66,7 +66,7 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 					map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />}
 				/>
 			) : starting ? (
-				<LinkedColumns data-slot="topic-panes" list={side("flex-1")} map={<BuildsOnMap map={starting} topic={facts.topic.handle} pointed={pointed} />} />
+				<LinkedColumns data-slot="topic-panes" list={side("flex-1")} map={<BuildsOnMap map={starting} said={facts.said} topic={facts.topic.handle} pointed={pointed} />} />
 			) : (
 				side("flex-1")
 			)}

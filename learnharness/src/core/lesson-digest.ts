@@ -17,6 +17,7 @@ import { derivePlanStatusesLh } from "./contracts/plan.ts";
 import { sessionMarkdown } from "./session-markdown.ts";
 import { sessionModeOf, type LhMessage } from "./native-messages.ts";
 import { closedTonight } from "./session-end.ts";
+import { duplicateOf, placementRange, type NamedTopic } from "./course-map-build.ts";
 
 /** The part of a session one digest reads. */
 export interface DigestWindow {
@@ -120,6 +121,79 @@ export interface DigestCourseView {
 	knowledge: ReadonlyArray<{ handle: string; text: string; topics: readonly string[] }>;
 	/** reachedSteps for the lesson. */
 	reached: readonly string[] | null;
+	/** In a course with arcs; absent in one without, which the digest
+	 *  treats exactly as before arcs. */
+	arcs?: DigestArcs;
+}
+
+/** What a digest reads of a course's arcs. */
+export interface DigestArcs {
+	/** The arcs in `path.arcs` order. */
+	order: ReadonlyArray<{ handle: string; title: string }>;
+	/** Each topic's arc. */
+	topicArc: Readonly<Record<string, string>>;
+	/** The arc of the lesson's own topics, the topic it belongs to first. */
+	ownArc: string | null;
+	/** The names each topic answers to, for the duplicate check. */
+	names: Readonly<Record<string, NamedTopic>>;
+}
+
+type Json = Record<string, unknown>;
+const obj = (v: unknown): Json => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Json) : {});
+const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+/** The course's arcs from `show --all`, with the arc of the session's own
+ *  topics; undefined in a course without arcs. Pure. */
+export function digestArcs(record: unknown, ownTopics: readonly string[]): DigestArcs | undefined {
+	const r = obj(record);
+	const arcs = obj(r.arcs);
+	const order = strs(obj(r.path).arcs).flatMap((handle) => (typeof obj(arcs[handle]).title === "string" ? [{ handle, title: obj(arcs[handle]).title as string }] : []));
+	if (order.length === 0 || order.length !== Object.keys(arcs).length) return undefined;
+	const topics = Object.entries(obj(r.topics));
+	const topicArc = Object.fromEntries(topics.flatMap(([k, t]) => (typeof obj(t).arc === "string" ? [[k, obj(t).arc as string]] : [])));
+	const names = Object.fromEntries(topics.map(([k, t]) => [k, { ...(typeof obj(t).title === "string" ? { title: obj(t).title as string } : {}), aliases: strs(obj(t).aliases) }]));
+	const ownArc = ownTopics.map((k) => topicArc[k]).find((a) => a !== undefined) ?? null;
+	return { order, topicArc, ownArc, names };
+}
+
+/** The existing topic a new one of the answer duplicates, and whether its
+ *  arc is one the new topic could join: the lesson's arc, or an arc no
+ *  earlier than its prerequisites. Null in a course without arcs, or when
+ *  it has no twin. */
+function twinOf(t: DigestTopic, arcs: DigestArcs): { twin: string; within: boolean } | null {
+	const twin = duplicateOf({ handle: t.handle, ...(t.title ? { title: t.title } : {}) }, arcs.names);
+	if (!twin) return null;
+	const handles = arcs.order.map((a) => a.handle);
+	const [lo, hi] = placementRange(t.needs ?? [], [], (k) => arcs.topicArc[k], handles);
+	const arc = arcs.topicArc[twin];
+	const at = arc === undefined ? -1 : handles.indexOf(arc);
+	return { twin, within: arc === undefined || arc === arcs.ownArc || (at >= lo && at <= hi) };
+}
+
+const proposesNew = (t: DigestTopic, view: DigestCourseView) => validHandle(t.handle) && !view.topics.some((k) => k.handle === t.handle) && !!t.title?.trim();
+
+/** What the agent must resolve before the save, in a course with arcs: a
+ *  new topic named like a topic in an arc it could not join, which may be
+ *  another topic sharing a name, never folded in silence. Null when there
+ *  is nothing. Pure. */
+export function digestProblems(submit: DigestSubmit, view: DigestCourseView): string | null {
+	const arcs = view.arcs;
+	if (!arcs) return null;
+	const problems = submit.topics.flatMap((t) => {
+		const found = proposesNew(t, view) ? twinOf(t, arcs) : null;
+		if (!found || found.within) return [];
+		const other = arcs.names[found.twin]?.title ?? found.twin;
+		const arc = arcs.order.find((a) => a.handle === arcs.topicArc[found.twin])?.title ?? "";
+		return [`${t.handle} ("${t.title}") has the name of the course's topic ${found.twin} ("${other}") in "${arc}": if the lesson taught that topic, use the handle ${found.twin}; if not, give the new topic a title that tells the two apart.`];
+	});
+	return problems.length > 0 ? problems.join("\n") : null;
+}
+
+/** The digest's summary with the arc the engine placed each new topic in
+ *  (the receipt's `arcs_placed`): "new topic composition in Derivatives". */
+export function placedIn(summary: string, arcsPlaced: Readonly<Record<string, string>>, view: DigestCourseView): string {
+	const title = (a: string) => view.arcs?.order.find((x) => x.handle === a)?.title ?? a;
+	return Object.entries(arcsPlaced).reduce((s, [topic, arc]) => s.replace(new RegExp(`new topic ${topic}(?=;|$)`), `new topic ${topic} in ${title(arc)}`), summary);
 }
 
 const HANDLE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -147,13 +221,41 @@ function sameText(a: string, b: string): boolean {
 	return plain(a) === plain(b);
 }
 
+/** The answer with each new topic that duplicates a course topic, in an
+ *  arc it could join, read as that topic: the handle, every prerequisite,
+ *  knowledge link and `current` naming it. In a course without arcs the
+ *  answer is as it came. */
+function folded(submit: DigestSubmit, view: DigestCourseView): DigestSubmit {
+	const arcs = view.arcs;
+	if (!arcs) return submit;
+	const twins = new Map(
+		submit.topics.flatMap((t) => {
+			const found = proposesNew(t, view) ? twinOf(t, arcs) : null;
+			return found?.within ? [[t.handle, found.twin] as const] : [];
+		}),
+	);
+	if (twins.size === 0) return submit;
+	const h = (k: string) => twins.get(k) ?? k;
+	return {
+		...submit,
+		topics: submit.topics.map((t) => {
+			if (!twins.has(t.handle)) return { ...t, ...(t.needs ? { needs: t.needs.map(h) } : {}) };
+			const { title: _title, needs: _needs, ...rest } = t;
+			return { ...rest, handle: h(t.handle), introduced: t.introduced ?? true };
+		}),
+		knowledge: submit.knowledge.map((k) => ({ ...k, topics: k.topics.map(h) })),
+		...(submit.current ? { current: h(submit.current) } : {}),
+	};
+}
+
 /** The engine patch for an answer, and one line saying what it changes;
  *  null when it changes nothing. It drops whatever names a step the lesson
  *  did not reach. A topic the course lacks is created only with a title,
  *  and takes its place in the path right after its last prerequisite. A
  *  knowledge entry given by handle is replaced; a new one is added only
  *  when no entry has its text. Pure. */
-export function digestChanges(submit: DigestSubmit, view: DigestCourseView): { changes: Record<string, unknown>; summary: string } | null {
+export function digestChanges(input: DigestSubmit, view: DigestCourseView): { changes: Record<string, unknown>; summary: string } | null {
+	const submit = folded(input, view);
 	const shown = ({ step }: { step: string }) => view.reached === null || view.reached.includes(step);
 	const submitTopics = submit.topics.filter(shown);
 	const known = new Map(view.topics.map((t) => [t.handle, t]));
@@ -162,6 +264,24 @@ export function digestChanges(submit: DigestSubmit, view: DigestCourseView): { c
 		submitTopics.filter((t) => validHandle(t.handle) && !known.has(t.handle) && t.title?.trim()).map((t) => t.handle),
 	);
 	const exists = (h: string) => known.has(h) || created.has(h);
+	const arcs = view.arcs;
+	const ownArc = arcs?.ownArc ?? null;
+	const ownAt = ownArc === null ? -1 : (arcs?.order.findIndex((a) => a.handle === ownArc) ?? -1);
+	const inOwnArc = new Map<string, boolean>();
+	/** A new topic joins the lesson's arc when every prerequisite sits no
+	 *  later; one that cannot is left to the engine, which places it nearest
+	 *  where he is. */
+	const joinsOwnArc = (handle: string, seen: ReadonlySet<string> = new Set()): boolean => {
+		if (!arcs || ownAt < 0 || seen.has(handle)) return false;
+		if (inOwnArc.has(handle)) return inOwnArc.get(handle)!;
+		const needs = submitTopics.find((t) => t.handle === handle)?.needs ?? [];
+		const ok = needs.every((n) =>
+			created.has(n) ? joinsOwnArc(n, new Set([...seen, handle])) : !known.has(n) || arcs.order.findIndex((a) => a.handle === arcs.topicArc[n]) <= ownAt,
+		);
+		inOwnArc.set(handle, ok);
+		return ok;
+	};
+	const arcTitle = arcs?.order[ownAt]?.title;
 	const said: string[] = [];
 	const topics: Record<string, Record<string, unknown>> = {};
 	for (const t of submitTopics) {
@@ -171,9 +291,10 @@ export function digestChanges(submit: DigestSubmit, view: DigestCourseView): { c
 		if (!current) {
 			if (topics[t.handle]) continue;
 			const needs = (t.needs ?? []).filter((n) => n !== t.handle && exists(n));
-			Object.assign(patch, { title: t.title!.trim(), introduced: true, ...(needs.length > 0 ? { needs } : {}) });
+			const joins = joinsOwnArc(t.handle);
+			Object.assign(patch, { title: t.title!.trim(), introduced: true, ...(needs.length > 0 ? { needs } : {}), ...(joins ? { arc: ownArc } : {}) });
 			order.splice(Math.max(-1, ...needs.map((n) => order.indexOf(n))) + 1, 0, t.handle);
-			said.push(`new topic ${t.handle}`);
+			said.push(joins ? `new topic ${t.handle} in ${arcTitle}` : `new topic ${t.handle}`);
 		} else if (t.introduced === true && !current.introduced) {
 			patch.introduced = true;
 			said.push(`introduced ${t.handle}`);
