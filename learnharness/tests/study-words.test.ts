@@ -69,9 +69,11 @@ describe("why a review needs him", () => {
 
 describe("counts in plain words", () => {
 	it("says a course's share with its noun, and none or all in words", () => {
-		assert.equal(courseShareWords(5, 16), "5 of 16 topics on your own");
+		assert.equal(courseShareWords(5, 16), "Some topics on your own");
+		assert.equal(courseShareWords(9, 16), "Most topics on your own");
+		assert.equal(courseShareWords(8, 16), "Some topics on your own", "half is not most");
 		assert.equal(courseShareWords(0, 16), "No topics on your own yet");
-		assert.equal(courseShareWords(16, 16), "All 16 topics on your own");
+		assert.equal(courseShareWords(16, 16), "Every topic on your own");
 	});
 
 	it("says what Show does without a number", () => {

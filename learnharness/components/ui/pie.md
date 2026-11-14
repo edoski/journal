@@ -17,6 +17,6 @@
 | track | r 6.25, stroke 2.5, `currentColor` at 40%: firm, so a part-way ring never reads as a spinner |
 | arc | the same circle in full ink from twelve o'clock clockwise for the share, square ends; closed at one; none at zero |
 
-Callers: `ProgressRing` (`../study-home/agenda-rows/progress-ring.tsx`: a course, the share of topics he can do on his own, with "5 of 16 topics on your own" on hover, `data-slot` `today-progress`) and `TopicGlyph` (`../course-map/topic-map/topic-glyph.tsx`: a topic's standing, `data-slot` `topic-glyph`). Decorative unless the caller names it (`role="img"` and an `aria-label`).
+Callers: `ProgressRing` (`../study-home/agenda-rows/progress-ring.tsx`: a course, the share of topics he can do on his own, with "Some topics on your own" on hover, `data-slot` `today-progress`) and `TopicGlyph` (`../course-map/topic-map/topic-glyph.tsx`: a topic's standing, `data-slot` `topic-glyph`). Decorative unless the caller names it (`role="img"` and an `aria-label`).
 
 Source: Things' project pie; Harvey balls; Apple's Activity rings for a whole's progress.

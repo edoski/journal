@@ -170,7 +170,7 @@ describe("every topic once, in the group he would act on it from", () => {
 
 describe("the header's facts and next lesson", () => {
 	it("counts what Home's pie counts, names the exam once and when he last studied", () => {
-		assert.deepEqual(courseFacts(course()), { progress: "3 of 10 topics on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago" });
+		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago" });
 	});
 
 	it("leaves out an exam that is not set and a count for a course with no topics", () => {
@@ -242,7 +242,7 @@ describe("the course header", () => {
 		assert.equal(document.querySelector('[data-slot="course-action"]')!.textContent, "Review");
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="page-fact"]')].map((f) => f.textContent),
-			["3 of 10 topics on your own", "Exam in 21 days", "Studied 2 days ago"],
+			["Some topics on your own", "Exam in 21 days", "Studied 2 days ago"],
 		);
 		assert.equal(document.querySelector('[data-slot="course-next"]')!.textContent, "Review Span1w overdue");
 		assert.deepEqual(
