@@ -364,10 +364,10 @@ def test_the_path_runs_arc_by_arc_in_prerequisite_order(
 NAMES = ("Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta")
 
 
-@settings(max_examples=60, deadline=None)
-@given(arc_cut_courses(), st.integers(1, 3), st.booleans())
+@settings(max_examples=120, deadline=None)
+@given(arc_cut_courses(), st.sampled_from([1, 1.5, 2, 3]), st.data())
 def test_new_topics_never_run_past_the_next_arc_and_say_when_they_are_early(
-    cut: dict[str, Any], rate: int, exam: bool
+    cut: dict[str, Any], rate: float, data: st.DataObject
 ) -> None:
     from hypothesis import assume
 
@@ -384,28 +384,43 @@ def test_new_topics_never_run_past_the_next_arc_and_say_when_they_are_early(
         "path": cut["path"],
         "arc_change": {"reason": "random cut"},
     }
-    if exam:
-        patch["exam"] = {"date": on(30).isoformat(), "arcs": None}
+    kind = data.draw(st.sampled_from(["none", "whole", "arcs"]))
+    exam_day = on(data.draw(st.integers(3, 25)))
+    examined: list[str] | None = None
+    if kind == "arcs":
+        first = data.draw(st.integers(0, len(names) - 1))
+        last = data.draw(st.integers(first, len(names) - 1))
+        examined = names[first : last + 1]
+    if kind != "none":
+        patch["exam"] = {"date": exam_day.isoformat(), "arcs": examined}
+    after = kind != "none" and data.draw(st.booleans())
+    begin = exam_day + timedelta(days=1) if after else START
     now = f"{START.isoformat()}T09:00:00+00:00"
     empty = schema.empty()
     record, outcome = schema.apply_patch(empty, patch, today=START, now=now)
     arcs.settle(empty, record, patch, outcome, START)
     record = capacity.final_reviews({"c": record}, START)["c"]
     record, _ = progress.schedule(record, outcome, START)
-    record = capacity.final_reviews({"c": schema.validate_record(record)}, START)["c"]
-    rates = every_day(10, rate)
-    result = agenda.plan({"c": record}, START, 30, rates)
-    when = result.when("c", START, True)
+    record = capacity.final_reviews({"c": schema.validate_record(record)}, begin)["c"]
+    result = agenda.plan({"c": record}, begin, 30, every_day(10, rate))
+    when = result.when("c", begin, True)
     free = progress.free_arcs(record)
     untaught = progress.path_order(record)
+    scope = progress.exam_topics(record, untaught)
     for day in result.days["c"]:
+        paced = kind != "none" and date.fromisoformat(day["date"]) < exam_day
         for topic in day["new"]:
-            front = cut["topics"][untaught[0]]["arc"]
+            own = paced and scope is not None and topic in scope
+            pool = [key for key in untaught if not own or key in (scope or ())]
+            front = cut["topics"][pool[0]]["arc"]
             arc = cut["topics"][topic]["arc"]
             why = when.why[topic]
             ahead = names.index(arc) - names.index(front)
             assert (
                 ahead <= progress.NEW_TOPIC_ARCS - 1 or arc in free or why.get("exam")
-            ), (topic, why)
-            assert (why["kind"] == "early") == (ahead > 0), (topic, why)
+            ), (topic, why, front)
+            assert (why["kind"] == "early") == (ahead > 0), (topic, why, front)
+            assert why.get("behind") == (front if ahead > 0 else None), (topic, why)
             untaught.remove(topic)
+    if kind == "arcs" and after:
+        assert result.days["c"][0]["new"], "a passed exam over named arcs holds none"
