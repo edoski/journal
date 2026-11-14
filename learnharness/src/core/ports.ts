@@ -56,10 +56,11 @@ export interface ChatStore {
 	 * Like saveTree: a rename is NOT conversation activity — updatedAt
 	 * stays put, so sidebar order never churns on a rename. */
 	renameChat(id: string, title: string): ChatRecord;
-	/** Name a session by its first plan's goal: a session started on no
-	 *  topic takes the goal's topic as its own and, unless the learner
-	 *  renamed it, the goal's title. A no-op for a session started on a
-	 *  topic. Announced like a rename; never conversation activity. */
+	/** Name a session, once: its first turn's name or its first plan's
+	 *  goal. A session started on no topic takes the goal's topic as its own
+	 *  while it has none and, unless the learner renamed it or it was named
+	 *  already, the goal's title. A no-op for a session started on a topic.
+	 *  Announced like a rename; never conversation activity. */
 	nameSession(id: string, goal: SessionGoal): void;
 	/** Delete the session record entirely (session-deletion wave 6, owner
 	 *  2026-09-22). False when the id is unknown. Job cleanup is the

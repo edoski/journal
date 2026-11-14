@@ -190,17 +190,18 @@ function renameChat(id: string, title: string): ChatRecord {
 	return record;
 }
 
-/** Name a session by its first plan's goal (the port's rule): only a
- *  session started on no topic, and its title only while the learner has
- *  not renamed it. Like a rename, announced and not conversation
- *  activity. */
+/** Name a session once (the port's rule): only a session started on no
+ *  topic, its topic while it has none, and its title only while the
+ *  learner has not renamed it and nothing named it before. Like a rename,
+ *  announced and not conversation activity. */
 function nameSession(id: string, goal: SessionGoal): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
 	if ((record.topics ?? []).length > 0) return;
 	const topic = goal.topic?.trim();
 	if (topic) record.topics = [topic];
-	if (!record.renamed && goal.title.trim()) record.title = goal.title.trim();
+	if (!record.renamed && !record.named && goal.title.trim()) record.title = goal.title.trim();
+	record.named = true;
 	writeChat(record);
 	emit("chats-changed", { named: { id, title: record.title } });
 }

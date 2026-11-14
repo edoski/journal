@@ -15,6 +15,7 @@ import { after, describe, it } from "node:test";
 import { derivePlanStatuses, derivedNodeStatus, type PlanTree, type PlanToolResult } from "../src/core/contracts.ts";
 import { createTree, emptyTree, PlanTreeError } from "../src/core/plan-tree.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
+import { nameSessionTool } from "../src/agent/tools/name-session.ts";
 import { parseMermaidPlan } from "../src/agent/tools/mermaid-plan.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { PATHS } from "../config.ts";
@@ -153,6 +154,40 @@ describe("plan_init names a lesson once, by its goal", () => {
 		await exec(planTools({ chatId: renamed, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
 		const own = chatStore.listChats().find((c) => c.id === renamed)!;
 		assert.deepEqual([own.title, own.ownTopics], ["My eigen night", ["eigen"]]);
+	});
+});
+
+describe("name_session names a session on its first turn, once", () => {
+	const name = (chatId: string, input: unknown) => nameSessionTool({ chatId, chatStore }).name_session!.execute("test", input);
+	const PLAN = "graph TD\n  setup[Write out A - lambda I] --> solve[Solve the kernel]\n";
+
+	it("names a focused question that never gets a plan, its title and topic everywhere", async () => {
+		const chatId = newChat("can you explain why det(AB) equals det A times det B, I never got that in the lecture");
+		await name(chatId, { title: "Why det(AB) = det A det B", topic: "determinant" });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Why det(AB) = det A det B", ["determinant"]]);
+	});
+
+	it("keeps the first name: a later call and the first plan's goal leave it", async () => {
+		const chatId = newChat("teach me eigenvalues");
+		await name(chatId, { title: "Eigenvalues" });
+		await name(chatId, { title: "Something else", topic: "rank" });
+		await exec(planTools({ chatId, chatStore }), "plan_init", { mermaid: PLAN, goal: { title: "Eigenvalues by hand", topic: "eigen" } });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Eigenvalues", ["eigen"]], "the plan only gives the topic it lacked");
+	});
+
+	it("never renames a session opened on a topic or renamed by him", async () => {
+		const onTopic = chatStore.createChat("Review Rank and the column space", undefined, ["rank"]);
+		createdChats.push(onTopic.id);
+		const result = await name(onTopic.id, { title: "Rank review", topic: "eigen" });
+		assert.match(JSON.stringify(result.content), /keeps its name/);
+		const renamed = newChat("first words");
+		chatStore.renameChat(renamed, "My eigen night");
+		await name(renamed, { title: "Eigenvalues", topic: "eigen" });
+		const [kept, own] = [onTopic.id, renamed].map((id) => chatStore.listChats().find((c) => c.id === id)!);
+		assert.deepEqual([kept!.title, kept!.ownTopics], ["Review Rank and the column space", ["rank"]]);
+		assert.deepEqual([own!.title, own!.ownTopics], ["My eigen night", ["eigen"]], "his name stays; the topic it is about is set");
 	});
 });
 
