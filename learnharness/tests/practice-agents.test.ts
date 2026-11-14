@@ -314,6 +314,8 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		// no approval step before a lesson (Edo, 14 Nov 2026)
 		assert.match(teacher, /he is not asked to approve a map/);
 		assert.ok(!/confirm the plan|once he's on board|Presenting ends your turn/.test(teacher), "no plan confirmation");
+		// demos and figures are built unasked when they help (Edo, 14 Nov 2026)
+		assert.match(teacher, /\*\*Just build it\.\*\* When a demo or a figure would help him understand, dispatch it in that turn, unasked/);
 		assert.match(teacher, /never rush the repair/);
 		assert.match(teacher, /one and only pace/);
 		assert.match(teacher, /nothing to rush/, "the goal reiteration composes");
