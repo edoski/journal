@@ -489,6 +489,21 @@ def test_a_new_course_studies_its_weeks_in_order_before_the_exam() -> None:
     assert last <= progress.last_new_day(exam).isoformat(), "ready for the exam"
 
 
+def test_a_second_topic_on_one_day_stays_in_the_first_ones_arc() -> None:
+    topics = {
+        "a1": {"arc": "a"},
+        "a2": {"arc": "a", "needs": ["a1"]},
+        "b1": {"arc": "b", "needs": ["a1"]},
+        "b2": {"arc": "b"},
+        "c1": {"arc": "c", "needs": ["a1"]},
+    }
+    record = spread(topics, "a2")
+    result = plan({"c": record}, MONDAY, 1, week(10, 2))
+    assert result.days["c"][0]["new"] == ["b1", "b2"], "C1 shares B1's needs only"
+    lighter = plan({"c": record}, MONDAY, 1, week(10, 1.5))
+    assert lighter.days["c"][0]["new"] == ["b1"], "B2 is not related, C1 waits"
+
+
 def test_a_second_topic_on_one_day_keeps_the_window() -> None:
     topics = {
         "a1": {"arc": "a"},
