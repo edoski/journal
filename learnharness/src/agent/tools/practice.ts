@@ -28,7 +28,7 @@ import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
-import type { CourseToolContext } from "./course.ts";
+import { markShown, saveCourse, type CourseToolContext } from "./course.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
 import { CONFIDENCE_STATES } from "../../core/contracts/course.ts";
@@ -247,10 +247,11 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	if (!record || !active || !pose) {
 		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
 	}
+	const topics = pose.topics;
 	if (explainedBeforeAnyWork(record.messages, active.toolCallId)) {
+		markShown(rec.course, topics);
 		return { text: "No attempt recorded: he asked to be taught before submitting any work on this problem." };
 	}
-	const topics = pose.topics;
 	const conclusion: PracticeConclusion = {
 		outcome: input.outcome,
 		rung: input.rung,
@@ -263,13 +264,16 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	};
 	const problem = conclusionProblem(conclusion, topics);
 	if (problem) return { refused: problem, text: "" };
-	if (conclusion.result === null) return { text: "No attempt recorded: he claimed no answer." };
+	if (conclusion.result === null) {
+		markShown(rec.course, topics);
+		return { text: "No attempt recorded: he claimed no answer." };
+	}
 	const observations = practiceObservations(
 		{ statement: pose.statement, topics },
 		conclusion,
 		lastSubmissionConfidence(record.messages, active.toolCallId),
 	);
-	const saved = await rec.course.records.run(rec.course.course.workspace, { verb: "save", changes: { observations } });
+	const saved = await saveCourse(rec.course, { observations });
 	if (saved.ok) return { text: `Course record: ${JSON.stringify(saved.json)}` };
 	// The problem still concludes: a pose's topics cannot change after the
 	// fact, so holding the problem open would lock the session.

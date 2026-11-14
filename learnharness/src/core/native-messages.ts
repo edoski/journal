@@ -34,6 +34,7 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { afterAnswer } from "./shown-help.ts";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
@@ -634,6 +635,45 @@ export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
 		}
 	}
 	return [...topics];
+}
+
+/** A JSON array the tutor may send as its text, as a list of strings. */
+function stringList(value: unknown): string[] {
+	if (typeof value !== "string") return strings(value);
+	try {
+		return strings(JSON.parse(value));
+	} catch {
+		return [];
+	}
+}
+
+/** The topics whose solution the session has shown him since his last
+ *  answer on each (shown-help.ts): a concluded problem on a topic he did
+ *  not answer right, or a saved answer that was not right, whose answer
+ *  the question revealed. Only calls that went through count; a problem
+ *  dismissed for today revealed nothing. Pure. */
+export function shownTopicsOf(messages: readonly LhMessage[]): Set<string> {
+	const clean = cleanToolCallIds(messages);
+	let shown = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
+			const args = (block.arguments ?? {}) as Record<string, unknown>;
+			if (block.name === PRACTICE_CONCLUDE_TOOL && args.outcome !== "dismissed") {
+				const byTopic = (typeof args.byTopic === "object" && args.byTopic !== null ? args.byTopic : {}) as Record<string, unknown>;
+				for (const topic of stringList(problemInputForConclude(messages, block.id)?.topics)) {
+					const result = byTopic[topic] ?? args.result;
+					shown = afterAnswer(shown, { topics: [topic], result: typeof result === "string" ? result : null });
+				}
+			}
+			const changes = block.name === "course_save" ? saveChanges(args) : null;
+			for (const o of Array.isArray(changes?.observations) ? changes.observations : []) {
+				if (typeof o === "object" && o !== null) shown = afterAnswer(shown, o as Record<string, unknown>);
+			}
+		}
+	}
+	return shown;
 }
 
 /** The course saves a session made that went through, each as the changes
