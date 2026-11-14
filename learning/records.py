@@ -97,7 +97,7 @@ def _placed(record: dict[str, Any], created: set[str]) -> dict[str, Any] | None:
     stored = set(record.get("path", {}).get("order", ()))
     if not stored:
         return None
-    order = progress.path_order(record, everything=True)
+    order = progress.path_order(record)
     placed = {}
     for index, key in enumerate(order):
         if key in created and key in record["topics"] and key not in stored:
