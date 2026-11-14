@@ -322,6 +322,17 @@ def test_an_accepted_dispute_days_later_moves_the_level_and_the_review() -> None
     assert course.due == on(13).isoformat()
 
 
+def test_a_re_mark_days_later_keeps_the_tags_the_engine_stamped_on_the_attempt() -> (
+    None
+):
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", text="the review"))
+    assert course.record["observations"]["o2"]["due_topics"] == ["a"]
+    course.attempts(9, dispute("correct", "o2", text="the review"))
+    assert course.record["observations"]["o3"]["due_topics"] == ["a"]
+    assert progress.replays(course.record)["a"].days[on(5).isoformat()] == "probe"
+
+
 def test_a_rejected_dispute_keeps_the_verdicts_and_the_review() -> None:
     course = started(att("correct"))
     course.attempts(5, att("incorrect", text="the review"))
