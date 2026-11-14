@@ -130,6 +130,11 @@ const purposeSchema = Type.Object({
 		Type.Object({ topic: Type.String({ description: "The topic's id: t1, t2, …" }), why: Type.String({ description: "What the purpose line claims that this topic does not give." }) }),
 		{ description: "Each topic its arc's purpose line is false of; an empty list when every line is true of every topic." },
 	),
+	lines: Type.Optional(
+		Type.Array(Type.Object({ arc: Type.String({ description: "The arc's name, exactly as listed." }), why: Type.String({ description: "What fails: the term, the promise, or the missing thing to do." }) }), {
+			description: "Each purpose line that fails as a sentence; leave out or send an empty list when none does.",
+		}),
+	),
 });
 
 const arcSchema = Type.Object({
@@ -199,7 +204,10 @@ How this differs from the text below:
 
 export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the names of its arcs, in no particular order, and its topic titles, shuffled. For each topic, say which arc's name it reads as part of, from the names alone: nothing else about the course is given, and nothing else counts. List a second name only when it fits the topic exactly as well as the first. Answer with one ${SORT_TOOL} call.`;
 
-export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student does. Each arc below has a purpose line, one sentence on what the arc lets the student do, and its topics. For each arc, read the purpose line against each of its topics in turn: is it true of that topic, so that studying the topic is part of what the line promises? List each topic a line is false of, with what the line claims that the topic does not give. A line that is broad but true is fine. Answer with one ${PURPOSE_TOOL} call.`;
+export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student does. Each arc below has a purpose line, one sentence on what the arc lets the student do, and its topics. For each arc:
+- Read the purpose line against each of its topics in turn: is it true of that topic, so that studying the topic is part of what the line promises? Under false, list each topic a line is false of, with what the line claims that the topic does not give.
+- Read the line as a sentence. Under lines, list it when it uses a term that none of its arc's topic titles use and a student would not know, when it promises something none of its topics teaches, or when it names no thing the student will be able to do (it restates the arc's name, or only lists its topics).
+A line that is broad but true, plain and concrete is fine. Answer with one ${PURPOSE_TOOL} call.`;
 
 function purposePrompt(quiz: PurposeQuiz): string {
 	return quiz.arcs.flatMap((a) => [`## ${a.title}`, `Purpose: ${a.purpose}`, ...a.topics.map((t) => `- ${t.id}: ${t.title}`), ""]).join("\n");
@@ -501,7 +509,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 				toolName: PURPOSE_TOOL,
 				toolDescription: "Submit the topics a purpose line is false of.",
 				parameters: purposeSchema,
-				fill: (input: Json) => ({ false: (input.false as PurposeAnswer["false"] | undefined) ?? [] }),
+				fill: (input: Json) => ({ false: (input.false as PurposeAnswer["false"] | undefined) ?? [], lines: (input.lines as PurposeAnswer["lines"] | undefined) ?? [] }),
 				validate: (answer) => purposeAnswerProblems(answer, purposes),
 				systemPrompt: PURPOSE_INSTRUCTIONS,
 				prompt: purposePrompt(purposes),

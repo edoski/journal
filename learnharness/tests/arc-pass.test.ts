@@ -31,6 +31,8 @@ import {
 	type EdgeSubmit,
 	type SortAnswer,
 	mergeMisses,
+	purposeAnswerProblems,
+	purposeProblems,
 	sortAnswerProblems,
 	sortMisses,
 	sortProblems,
@@ -515,6 +517,10 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		const model = scriptedModel(EDGES, [CUT], undefined, {}, [], ["Chain rule"]);
 		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" }), /never submitted/);
 		assert.match(model.refusals[0]!, /"Derivatives": its purpose line is not true of "Chain rule" \(chain\): the line promises nothing of it/);
+		const quiz = { arcs: [{ title: "Derivatives", purpose: "Differentiate.", topics: [{ id: "t1", handle: "chain", title: "Chain rule" }] }] };
+		assert.match(purposeProblems({ false: [], lines: [{ arc: "Derivatives", why: "it restates the name" }] }, quiz)!, /- "Derivatives": it restates the name/);
+		assert.match(purposeAnswerProblems({ false: [], lines: [{ arc: "Integrals", why: "x" }] }, quiz)!, /"Integrals" is no arc name/);
+		assert.equal(purposeProblems({ false: [], lines: [] }, quiz), null);
 		const fine = scriptedModel(EDGES, [CUT]);
 		assert.equal((await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: fine }).run(course("purpose-fine"), { edges: "apply" })).status, "formed");
 		assert.equal(fine.purposes, 1);

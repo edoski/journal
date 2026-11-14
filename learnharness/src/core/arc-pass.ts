@@ -650,9 +650,12 @@ export interface PurposeQuiz {
 	arcs: { title: string; purpose: string; topics: { id: string; handle: string; title: string }[] }[];
 }
 
-/** The topics a reader found a purpose line false of. */
+/** What a reader found wrong with the purpose lines: the topics a line is
+ *  false of, and lines that fail as sentences (a term no topic title uses,
+ *  a promise no topic keeps, or no thing the learner can do). */
 export interface PurposeAnswer {
 	false: { topic: string; why: string }[];
+	lines?: { arc: string; why: string }[];
 }
 
 /** The quiz for a formation. Pure. */
@@ -665,7 +668,11 @@ export function purposeQuiz(submit: ArcSubmit, view: ArcPassView, formation: For
 /** What is wrong with the reader's answer, for it to fix. Pure. */
 export function purposeAnswerProblems(answer: PurposeAnswer, quiz: PurposeQuiz): string | null {
 	const ids = new Set(quiz.arcs.flatMap((a) => a.topics.map((t) => t.id)));
-	const problems = answer.false.flatMap((f) => [...(ids.has(f.topic) ? [] : [`"${f.topic}" is no topic id.`]), ...(f.why?.trim() ? [] : [`say why the purpose line is false of "${f.topic}".`])]);
+	const names = new Set(quiz.arcs.map((a) => a.title));
+	const problems = [
+		...answer.false.flatMap((f) => [...(ids.has(f.topic) ? [] : [`"${f.topic}" is no topic id.`]), ...(f.why?.trim() ? [] : [`say why the purpose line is false of "${f.topic}".`])]),
+		...(answer.lines ?? []).flatMap((l) => [...(names.has(l.arc) ? [] : [`"${l.arc}" is no arc name; use the names exactly as listed.`]), ...(l.why?.trim() ? [] : [`say what is wrong with the purpose line of "${l.arc}".`])]),
+	];
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
 
@@ -677,11 +684,12 @@ export function purposeProblems(answer: PurposeAnswer, quiz: PurposeQuiz): strin
 		const topic = arc?.topics.find((t) => t.id === f.topic);
 		return arc && topic ? [`- "${arc.title}": its purpose line is not true of "${topic.title}" (${topic.handle}): ${f.why.trim()}`] : [];
 	});
+	for (const l of answer.lines ?? []) if (quiz.arcs.some((a) => a.title === l.arc)) lines.push(`- "${l.arc}": ${l.why.trim()}`);
 	if (lines.length === 0) return null;
 	return [
-		"A fresh reader read each purpose line against its arc's topics (rule 8) and found these false:",
+		"A fresh reader read each purpose line against its arc's topics (rule 8) and found these faults:",
 		...lines,
-		"Write each such line again at the level of the arc's question, so it is true of every topic in the arc, in words its topic titles use.",
+		"Write each such line again: one sentence on the one thing the arc lets the learner do, at the level of the arc's question, true of every topic in it, promising only what its topics teach, in words its topic titles use.",
 	].join("\n");
 }
 
