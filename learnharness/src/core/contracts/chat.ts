@@ -173,7 +173,7 @@ export const HANDOFF_TEXT =
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away; I'll interrupt if I want something else.";
+	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans
