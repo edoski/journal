@@ -9,7 +9,7 @@ import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
 import { monogram, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
-import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_TITLE, RowCard, rowSurface, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
+import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, ROW_TITLE, RowCard, rowSurface, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MathText, mathPlain } from "@/components/ui/math-text";
@@ -17,8 +17,8 @@ import { MathText, mathPlain } from "@/components/ui/math-text";
 export { rowSurface };
 
 /** Where a shelf row's action sits: over its status slot, on the row's
- *  last line, where the status always is (`ROW_BODY`). */
-export const SLIM_ACTION_PLACE = "right-2.5 bottom-1.5 h-6";
+ *  last line, where the status always is (`ROW_FRAME`). */
+export const SLIM_ACTION_PLACE = "right-2.5 bottom-2.5 h-5";
 
 /** A course's 16px mark, T3 Code's project monogram: its initials in a
  *  rounded tile tinted 14% by its own ink, in SF Pro at 500. The letters
@@ -85,9 +85,9 @@ export function isUnitOpen(unit: Unit, pathname: string): boolean {
 }
 
 /**
- * A topic on the list, a two-line card (60px): the course's mark and name
- * with the status slot, then the topic's title at 14/500. A click opens
- * the topic's page; a topic the tutor writes in recedes until hovered.
+ * A topic on the list, a card (`RowCard`): the course's mark and name with
+ * the status slot, then the topic's title at 14/500. A click opens the
+ * topic's page; a topic the tutor writes in recedes until hovered.
  */
 export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
 	return (
@@ -107,11 +107,10 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 }
 
 /**
- * A known topic on its shelf, T3 Code's one-line shelf row (36px): the
- * course's mark, greyed until hovered, the title, and when it comes back.
- * The title and the status share the line when both fit; else the title
- * takes the line and the status, words and all, drops under it
- * (`ROW_BODY`). Nothing is cut.
+ * A known topic on its shelf, under the sidebar's one row rule
+ * (`ROW_FRAME`): the course's mark, greyed until hovered, beside the
+ * title, two lines at most, then when it comes back on a line of its own,
+ * right-aligned, so every shelf row keeps one pitch whatever its title.
  * A click opens the topic's page; the action starts a review now.
  * `status` and `action` replace the slot's fact and the action (the
  * shelves under Today).
@@ -132,7 +131,7 @@ export function TopicSlimRow({
 	action?: React.ReactNode;
 }) {
 	return (
-		<li data-slot="unit-slim" className="group/sidebar-row relative list-none">
+		<li data-slot="unit-slim" className={ROW_ITEM}>
 			<Link
 				href={unitHref(unit.course.workspace, unit.topic.handle)}
 				onClick={blurAfterPointerClick}
@@ -140,19 +139,19 @@ export function TopicSlimRow({
 				data-sidebar-row={unit.key}
 				data-sidebar-parent={parent}
 				data-testid="unit-row"
-				className={cn(rowSurface(active), "flex min-h-9 items-start gap-2 px-2.5 py-1.5")}
+				className={cn(rowSurface(active), ROW_FRAME)}
 			>
-				<CourseMark
-					title={unit.course.title}
-					className={cn("mt-1", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
-				/>
 				<span className={ROW_BODY}>
-					<span className={cn(ROW_TITLE, active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}>
+					<CourseMark
+						title={unit.course.title}
+						className={cn("mt-0.5", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
+					/>
+					<span data-slot="unit-row-title" className={cn(ROW_TITLE, active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}>
 						<MathText>{unit.topic.title}</MathText>
 					</span>
-					<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-6 py-1")}>
-						{status ?? <UnitStatusText status={unitStatus(unit, today)} />}
-					</span>
+				</span>
+				<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, STATUS_LINE, "mt-1")}>
+					{status ?? <UnitStatusText status={unitStatus(unit, today)} />}
 				</span>
 			</Link>
 			{action ?? <RowAction unit={unit} className={SLIM_ACTION_PLACE} />}
@@ -161,7 +160,7 @@ export function TopicSlimRow({
 }
 
 /**
- * A session as a one-line shelf row, in the shelf row's anatomy: its
+ * A session as a shelf row, in the shelf row's anatomy: its
  * course's mark (a dashed circle for a session older than courses), its
  * title, and the topic rows' status: Your turn, the spinner, or how long
  * ago in Home's words. A title another listed session shares carries its
@@ -202,18 +201,19 @@ export function SessionSlimRow({
 				onOpen();
 				blurAfterPointerClick(e);
 			}}
-			className={cn(rowSurface(active), "h-auto min-h-9 items-start gap-2 px-2.5 py-1.5 whitespace-normal", active && "hover:bg-fill-selected", highlighted && "bg-fill-hover")}
+			className={cn(rowSurface(active), ROW_FRAME, "h-auto items-stretch gap-0 whitespace-normal", active && "hover:bg-fill-selected", highlighted && "bg-fill-hover")}
 		>
-			{chat.course ? (
-				<CourseMark
-					title={chat.course.title}
-					className={cn("mt-1", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
-				/>
-			) : (
-				<CircleDashedIcon aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
-			)}
 			<span className={ROW_BODY}>
+				{chat.course ? (
+					<CourseMark
+						title={chat.course.title}
+						className={cn("mt-0.5", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
+					/>
+				) : (
+					<CircleDashedIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+				)}
 				<span
+					data-slot="unit-row-title"
 					className={cn(
 						ROW_TITLE,
 						active || state === "your-turn" ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground",
@@ -228,11 +228,15 @@ export function SessionSlimRow({
 						</span>
 					)}
 				</span>
-				<span data-testid={state === "your-turn" ? "session-waiting" : undefined} className={cn(TRAILING_SLOT, "h-6 py-1")}>
-					<UnitStatusText
-						status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
-					/>
-				</span>
+			</span>
+			<span
+				data-slot="unit-status-slot"
+				data-testid={state === "your-turn" ? "session-waiting" : undefined}
+				className={cn(TRAILING_SLOT, STATUS_LINE, "mt-1 self-end")}
+			>
+				<UnitStatusText
+					status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
+				/>
 			</span>
 		</Button>
 	);
