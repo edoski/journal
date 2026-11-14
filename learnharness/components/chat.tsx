@@ -101,6 +101,7 @@ import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
 import { CourseGoneLine } from "@/components/lesson/course-gone";
+import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 
 /** The chat routes' answer for a deleted lesson: TurnError reads it as
  *  "This lesson was deleted." with Go to Home. */
@@ -1716,6 +1717,7 @@ export function Chat({
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine />}
+							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}

@@ -224,6 +224,7 @@ export const LESSON_WORDS = {
 	leftForTonight: "Left for next time",
 	skippedProblem: "You skipped this problem.",
 	unreadableCourse: "Couldn't read this course's record",
+	unreadableNotSaved: "What you answer here isn't saved until it can be read again.",
 	courseDeleted: "This course was deleted. Its lessons stay as history.",
 	startLesson: "Start a new lesson",
 } as const;
