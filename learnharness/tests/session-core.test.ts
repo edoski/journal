@@ -354,6 +354,17 @@ describe("send (one input event, verbatim consumption)", () => {
 		);
 	});
 
+	it("work on a problem refused at once leaves the transcript as it was, so the box can take it back", async () => {
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ error: "refused", code: "provider_key_missing", provider: "claude" }), { status: 503 })) as typeof globalThis.fetch;
+		const m = model();
+		const before = m.getState().nativeMessages.length;
+		const accepted = await m.send({ type: "thinking", problemCallId: "problem1", text: "rank 2, nullity 3", confidence: "neutral" });
+		assert.equal(accepted, false, "the caller learns it was refused");
+		assert.equal(m.getState().nativeMessages.length, before, "his work is not left in the transcript as if sent");
+		assert.equal(m.getState().status, "error");
+	});
+
 	it("the optimistic answer result attaches to the pending question part at once", async () => {
 		const quizCall = {
 			id: "call-1",

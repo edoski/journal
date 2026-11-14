@@ -6,7 +6,7 @@
  *  route's JSON body (`{"error":"Unknown chat"}`), and read as what
  *  happened. */
 
-export type TurnErrorKind = "key" | "busy" | "offline" | "gone" | "failed" | "written";
+export type TurnErrorKind = "signed-out" | "key" | "busy" | "offline" | "gone" | "failed" | "written";
 
 export interface TurnErrorText {
 	kind: TurnErrorKind;
@@ -22,6 +22,8 @@ const KEY_STATUSES = new Set([401, 403]);
 const BUSY_STATUSES = new Set([429, 529]);
 /** The browser's own words when the request never reached the app: Chrome, Safari, Firefox. */
 const UNREACHABLE = /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?)$/i;
+import { isProviderKeyRefusal, PROVIDER_KEY_MISSING_CODE } from "@/src/core";
+
 /** The chat routes' answer for a session that no longer exists. */
 const UNKNOWN_CHAT = "Unknown chat";
 
@@ -42,10 +44,25 @@ function routeError(text: string): string | null {
 	}
 }
 
+/** The signed-out refusal: the server's 503 body, thrown verbatim by the
+ *  send, matched by the envelope's own wording so it never drifts. */
+export function parseProviderKeyRefusal(message: string | undefined): boolean {
+	if (!message) return false;
+	try {
+		const body = JSON.parse(message) as { code?: unknown; error?: unknown };
+		return body.code === PROVIDER_KEY_MISSING_CODE && typeof body.error === "string" && isProviderKeyRefusal(body.error);
+	} catch {
+		return false;
+	}
+}
+
 export function turnErrorText(message: string): TurnErrorText {
 	const raw = message.trim();
 	if (UNREACHABLE.test(raw)) {
 		return { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then send again.", details: null };
+	}
+	if (parseProviderKeyRefusal(raw)) {
+		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null };
 	}
 	const route = routeError(raw);
 	if (route === UNKNOWN_CHAT) return { kind: "gone", sentence: "This lesson was deleted.", details: null };
