@@ -27,7 +27,7 @@ import {
 	edgeChanges,
 	edgeDiffs,
 	edgeProblems,
-	edgeWords,
+	lastEdgesEntry,
 	formationWords,
 	liveTopics,
 	passDue,
@@ -359,10 +359,11 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		}
 
 		const cut = await viewNow(workspace);
+		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;
 		const answer = await agent<ArcSubmit>("cut", ARCS_TOOL, arcSchema, composeDoctrine(ARC_CUT_DOCTRINE), ARC_CUT_INSTRUCTIONS, cutPrompt(title, cut.view, cut.record, files), async (a) => {
 			const problems = arcPassProblems(a, cut.view);
 			if (problems) return problems;
-			const formation = arcPassChanges(a, cut.view, { edges: edgeWords(edges.applied), asked: options.asked, reason: options.reason });
+			const formation = arcPassChanges(a, cut.view, { edgesEntry, asked: options.asked, reason: options.reason });
 			if (!formation) return null;
 			const checked = await courseRecords.run(workspace, { verb: "check", changes: formation.changes });
 			if (checked.ok || checked.kind !== "validation") return null;
@@ -373,7 +374,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 
 		const now = await viewNow(workspace);
 		if (recordHasArcs(now.record)) return { status: "failed", reason: "the course got arcs while the pass read it", edges, answer };
-		const formation = arcPassChanges(answer, now.view, { edges: edgeWords(edges.applied), asked: options.asked, reason: options.reason });
+		const formation = arcPassChanges(answer, now.view, { edgesEntry, asked: options.asked, reason: options.reason });
 		if (!formation) return { status: "none", reason: "the answer formed no arcs", edges, answer };
 		const saved = await save("cut", formation.changes);
 		if (!saved.ok) return { status: "failed", reason: `the course record refused the arcs: ${saved.message}`, edges, answer, patch: formation.changes };

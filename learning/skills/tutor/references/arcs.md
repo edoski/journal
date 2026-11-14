@@ -13,7 +13,7 @@ A course has arcs when its record has `arcs`; in a course without them, none of 
 - `path.arcs`: the arcs in study order, each exactly once, sent whole like every list.
 - `exam.arcs` and `exam.leaves_out`: the next exam's scope (*Changing arcs*).
 - `checkpoint` on an observation: the arc whose check this attempt is an item of (*Teaching with arcs*).
-- `arc_change`: `{"reason": "…", "asked": "…"}`, why a save changes arcs, and the learner's own words when the change needs them (*Changing arcs*). The engine stores it only as events in `arc_log`, which is never patched.
+- `arc_change`: `{"reason": "…", "asked": "…"}`, why a save changes arcs, and the learner's own words when the change needs them (*Changing arcs*). The engine stores it only as events in `arc_log`, which is never patched. Its `edges`, `[{"topic", "need", "change": "add" or "drop", "reason"}]`, logs needs the same save adds or drops as one `edges` event, in a course with or without arcs; the save's arc changes, or a later save's through `edges_entry` (that event's index in `arc_log`), refer to it.
 - `questions` in course `preferences`: `"asked"` (the default) or `"none"`, for a course that takes no questions.
 - `arcs_placed` in the receipt: the arc the engine gave each new topic saved without one.
 
