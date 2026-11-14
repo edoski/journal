@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from learning import agenda, capacity, clock, progress, records
+from learning import workspace as workspaces
 from learning.retrieval import (
     DUE_LIMIT,
     compact,
@@ -20,7 +21,8 @@ from learning.workspace import Workspace
 from sync.study.context import journal_summary
 
 MAX_DAYS = 366
-Loaded = tuple[Workspace, dict[str, Any] | None, str | None]
+Failure = dict[str, str]
+Loaded = tuple[Workspace, dict[str, Any] | None, Failure | None]
 
 
 def _journal(vault: Path, days: int, today: date, horizon: int) -> dict[str, Any]:
@@ -179,7 +181,21 @@ def _load(workspace: Workspace) -> Loaded:
     try:
         return workspace, records.load(workspace), None
     except (ValueError, OSError) as error:
-        return workspace, None, str(error)
+        return workspace, None, _failure(error)
+
+
+def _failure(error: ValueError | OSError) -> Failure:
+    """A course that cannot be read: the error, and what stopped it as
+    ``denied`` (no permission), ``damaged`` (not a valid record) or
+    ``unreadable`` (any other I/O failure)."""
+    reason = error.__cause__ if isinstance(error.__cause__, OSError) else error
+    if isinstance(reason, PermissionError):
+        problem = "denied"
+    elif isinstance(reason, OSError) and not isinstance(reason, ValueError):
+        problem = "unreadable"
+    else:
+        problem = "damaged"
+    return {"error": str(error), "problem": problem}
 
 
 def plan(
@@ -231,6 +247,24 @@ def plan(
             if workspace is not None and item[0].directory == workspace.directory
         ]
     )
+    courses = [
+        _course(
+            target,
+            record,
+            today,
+            days,
+            (journal, week_journal),
+            (together, week),
+        )
+        if record is not None
+        else {"workspace": str(target.directory), **(error or {})}
+        for target, record, error in targets
+    ]
+    if everywhere:
+        courses += [
+            {"workspace": str(directory), **_failure(error)}
+            for directory, error in workspaces.unreadable()
+        ]
     titles = {
         str(target.directory): record.get("title")
         for target, record, _ in loaded
@@ -240,19 +274,7 @@ def plan(
         {
             "today": today.isoformat(),
             "capacity": week.summary(),
-            "courses": [
-                _course(
-                    target,
-                    record,
-                    today,
-                    days,
-                    (journal, week_journal),
-                    (together, week),
-                )
-                if record is not None
-                else {"workspace": str(target.directory), "error": error}
-                for target, record, error in targets
-            ],
+            "courses": sorted(courses, key=lambda entry: str(entry["workspace"])),
             "does_not_fit": [
                 {"workspace": name, "title": titles.get(name), "topics": topics}
                 for name, topics in together.does_not_fit.items()

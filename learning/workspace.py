@@ -157,13 +157,24 @@ def _exists(directory: str) -> bool:
     return (Path(directory) / ".study/workspace.json").exists()
 
 
+def _gone(directory: str) -> bool:
+    """Whether the manifest is missing; one the app may not open is still there."""
+    try:
+        (Path(directory) / ".study/workspace.json").stat()
+    except (FileNotFoundError, NotADirectoryError):
+        return True
+    except OSError:
+        return False
+    return False
+
+
 def _write_registry(entries: Registry) -> None:
     """Publish schema 2, pruning workspaces whose manifest is gone; caller holds the lock."""
     path = registry_path()
     kept = {
         directory: entries[directory]
         for directory in sorted(entries)
-        if _exists(directory)
+        if not _gone(directory)
     }
     content = (
         json.dumps({"schema": _REGISTRY_SCHEMA, "workspaces": kept}, indent=2) + "\n"
@@ -192,15 +203,25 @@ def register(workspace: Workspace) -> None:
 
 def registered() -> list[Workspace]:
     """Valid registered workspaces, sorted by directory; stale entries are ignored."""
-    result = []
+    return _registry()[0]
+
+
+def unreadable() -> list[tuple[Path, ValueError]]:
+    """Registered workspaces that are still there but cannot be opened, with why."""
+    return _registry()[1]
+
+
+def _registry() -> tuple[list[Workspace], list[tuple[Path, ValueError]]]:
+    readable = []
+    failed = []
     for directory in sorted(_read_registry()):
-        if not _exists(directory):
+        if _gone(directory):
             continue
         try:
-            result.append(_load(Path(directory)))
-        except ValueError:
-            continue
-    return result
+            readable.append(_load(Path(directory)))
+        except ValueError as error:
+            failed.append((Path(directory), error))
+    return readable, failed
 
 
 # --- discovery ---------------------------------------------------------------
