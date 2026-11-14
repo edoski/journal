@@ -46,7 +46,7 @@ function linalg(exam: string | null): CalendarCourse {
 			current: null,
 			focus: null,
 			tasks: [],
-			topics: [topic("span", "Span", { kind: "due", date: "2026-10-29", overdue: 10 }), topic("vectors", "Vectors", { kind: "scheduled", date: "2026-11-13" })],
+			topics: [topic("span", "Span", { kind: "due", date: TODAY, overdue: 10 }), topic("vectors", "Vectors", { kind: "scheduled", date: "2026-11-13" })],
 			edges: [],
 		},
 		unready: null,
@@ -159,6 +159,7 @@ describe("the calendar page", () => {
 		await press(overdue);
 		const detail = document.querySelector("[data-slot=calendar-entry-detail]");
 		assert.ok(detail, "its panel opens");
+		// The engine dates a due review on today and counts its days overdue (round 4: it read today's date).
 		assert.match(detail.textContent ?? "", /SpanOverdueWas due Thursday 29 October/);
 		assert.equal(detail.querySelector("a")?.getAttribute("href"), "/unit/L3N0dWR5L2xpbmFsZw/span");
 		await press(detail.querySelector("[data-slot=calendar-entry-start]")!);

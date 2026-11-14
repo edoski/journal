@@ -401,6 +401,10 @@ export interface ChatListItem extends ChatSummary {
 	 *  route attaches it from the compaction registry — never
 	 *  record-derived (the marker persists, the RUN is ephemeral). */
 	compacting: boolean;
+	/** Its course was deleted (the record is gone, `courseDeleted` on the
+	 *  server): the session is history, off Today, kept in search and the
+	 *  calendar. The route attaches it; absent reads as not deleted. */
+	courseDeleted?: boolean;
 }
 
 // ─── Artifact renderer registry (client extension point) ────────────────────

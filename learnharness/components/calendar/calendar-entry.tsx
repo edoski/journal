@@ -151,8 +151,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 		if (misfit) lines.push(misfit);
 		if (entry.allStarted) lines.push("Every topic started");
 	} else if (entry.kind === "review") {
-		const date = entry.topic.review?.date ?? entry.day;
-		lines.push(entry.overdue ? `Was due ${longDayWords(date)}` : entry.day === today ? overdueWords(0) : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		lines.push(entry.overdue ? `Was due ${longDayWords(entry.dueOn ?? entry.day)}` : entry.day === today ? overdueWords(0) : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
 		if (entry.since) lines.push(entry.since);
 		if (entry.waits) lines.push(entry.waits);
 	} else if (entry.kind === "new") {

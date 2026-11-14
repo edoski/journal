@@ -27,7 +27,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 | Continue a task | the task's title | its step, "Part (c)" |
 | Start | First lesson (the head already says Not started) | the day the plan starts it (`plannedWords`): Planned today, Planned Wed 11 Nov, then the courses whose new topics come first ("Planned Wed 11 Nov, after Probability's new topics"); nothing when the plan has no day for it |
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |
-| Study | Nothing due (Scheduled holds the date) | |
+| Study | Nothing due (Scheduled holds the date); "Nothing planned today" when the plan holds a review memory asked for already, which Scheduled says ("Due since 6 Nov") | |
 
 The press is the head button's word. The step after it is the map's Next, beside the list, so Now does not repeat it. The hybrid's head drops its review mark and "Studied yesterday" (`HybridTopic`), which Now, Scheduled and Earlier say. A step may hold TeX (`MathText`); a session or task title may hold markdown and TeX, drawn on one line (`LineText`, components/line-text.md).
 

@@ -28,7 +28,6 @@ export type KeyAction =
 	| "rename-session"
 	| "cheat-sheet"
 	| "find"
-	| "question-focus"
 	| "question-next-row"
 	| "question-prev-row"
 	| "question-pick-row"
@@ -107,7 +106,7 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "practice-show", label: "Problem · show me", scope: "lesson", binding: "mod+shift+s" },
 	{ id: "practice-explain", label: "Problem · explain instead", scope: "lesson", binding: "mod+shift+e" },
 	{ id: "jump-latest", label: "Go to the newest reply", scope: "lesson", binding: "mod+arrowdown" },
-	{ id: "done-tonight", label: "Done for tonight", scope: "lesson", binding: "mod+shift+d" },
+	{ id: "done-tonight", label: "Done for today", scope: "lesson", binding: "mod+shift+d" },
 	// The newest answer's mark: the dialog opens on it (answer-mark.tsx).
 	{ id: "dispute-mark", label: "Dispute the newest answer's mark", scope: "lesson", binding: "mod+shift+m" },
 	// The answer field on show (composer, check or problem) opens its picker.
@@ -116,10 +115,11 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "dialog-confirm", label: "Confirm a stop or skip (← → pick a button)", scope: "lesson", binding: "mod+enter", displayOnly: true },
 	// The question dock's row machine (wave B) — displayOnly: the dock owns
 	// the keys while a question is open; the registry never dispatches
-	// them, so bare arrows stay free everywhere else.
-	{ id: "question-focus", label: "Move between the choices and your thinking", scope: "question", binding: "tab", displayOnly: true },
-	{ id: "question-next-row", label: "Next choice", scope: "question", binding: "arrowdown", displayOnly: true },
-	{ id: "question-prev-row", label: "Previous choice", scope: "question", binding: "arrowup", displayOnly: true },
+	// them, so bare arrows stay free everywhere else. Tab is dead (Edo, 17
+	// Sep 2026), so ↓ past the last choice reaches his thinking and ↑ at
+	// its start comes back (round 4: the sheet still listed ⇥).
+	{ id: "question-next-row", label: "Next choice, then your thinking", scope: "question", binding: "arrowdown", displayOnly: true },
+	{ id: "question-prev-row", label: "Previous choice, or back from your thinking", scope: "question", binding: "arrowup", displayOnly: true },
 	{ id: "question-pick-row", label: "Choose", scope: "question", binding: "space", displayOnly: true },
 	{ id: "question-submit", label: "Send your answer", scope: "question", binding: "enter", displayOnly: true },
 	// Keyboard reach (13 Nov 2026): the page's own arrows (spatial-arrows.ts)

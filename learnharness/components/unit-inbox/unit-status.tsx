@@ -3,6 +3,7 @@
 import { CalendarClockIcon, type LucideIcon } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
+import { TUTOR_WRITING } from "@/components/study-words";
 import type { UnitStatus } from "@/components/unit-inbox/units";
 import { cn } from "@/lib/utils";
 
@@ -31,10 +32,10 @@ export function UnitStatusText({ status }: { status: UnitStatus }) {
 			return (
 				<span data-slot="unit-status" data-kind="working" className="contents">
 					<span className="flex h-4 shrink-0 items-center">
-						<BrailleSpinner />
+						<BrailleSpinner label={TUTOR_WRITING} />
 					</span>
 					<span className="sr-only">, </span>
-					<span className="whitespace-nowrap">Working</span>
+					<span className="whitespace-nowrap">{TUTOR_WRITING}</span>
 				</span>
 			);
 		case "studied":

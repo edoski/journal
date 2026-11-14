@@ -9,7 +9,7 @@ import { unitHref } from "@/components/unit-inbox/unit-href";
 import { nowFor, plannedKeys, restShelves, shelfStatus } from "@/components/unit-inbox/now-inbox";
 import { claimedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
 import { buildInbox, unitKey, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
-import { courseShareWords } from "@/components/study-words";
+import { courseShareWords, TUTOR_WRITING } from "@/components/study-words";
 import { lastSessionOf } from "@/components/course-page/course-head/head-facts";
 
 /**
@@ -39,7 +39,7 @@ export const GROUP_WORDS: Record<GroupId, string> = {
 export type TopicFact =
 	/** A session on the topic waits on him: "Your turn". */
 	| { kind: "your-turn"; words: string }
-	/** The tutor is writing in a session on it: "Working". */
+	/** The tutor is writing in a session on it: "Tutor writing". */
 	| { kind: "working"; words: string }
 	/** The tutor stopped mid-reply in a session on it. */
 	| { kind: "stopped"; words: string }
@@ -97,7 +97,7 @@ function shelfFact(status: UnitStatus, current: boolean): TopicFact | null {
 		case "your-turn":
 			return { kind: "your-turn", words: "Your turn" };
 		case "working":
-			return { kind: "working", words: "Working" };
+			return { kind: "working", words: TUTOR_WRITING };
 		case "returns":
 			return { kind: "back", words: status.words };
 		default:

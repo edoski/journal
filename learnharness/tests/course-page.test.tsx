@@ -156,7 +156,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 
 	it("puts what Home's Today takes up in Needs you, with Today's reason", () => {
 		assert.deepEqual(handles(groupOf(groups, "needs-you")), ["span"]);
-		assert.deepEqual(groupOf(groups, "needs-you").topics[0]!.fact, { kind: "review", words: "1w overdue" });
+		assert.deepEqual(groupOf(groups, "needs-you").topics[0]!.fact, { kind: "review", words: "10d overdue" });
 	});
 
 	it("keeps a weak topic Today does not take up in Learning, as the sidebar's Learning shelf does, saying why it is weak", () => {
@@ -236,7 +236,7 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(next.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
-		assert.equal(next.why?.short, "1w overdue");
+		assert.equal(next.why?.short, "10d overdue");
 	});
 
 	it("resumes a session in this course that has waited on him since yesterday, and ignores one in another course", () => {
@@ -355,5 +355,16 @@ describe("the sidebar's search", () => {
 			["Linear Algebra"],
 		);
 		assert.deepEqual(searchInbox(inbox, [], "lin").courses, []);
+	});
+
+	it("finds a topic not started yet on a course's map, which the inbox does not list (round 4: Poisson, Geometric, Variance)", () => {
+		const inbox = buildInbox([course()], [], null);
+		assert.ok(![...inbox.active, ...inbox.working, ...inbox.known].some((u) => u.topic.handle === "eigen"), "the inbox lists only started topics");
+		assert.deepEqual(
+			searchInbox(inbox, [], "eigen", [course()]).units.map((u) => u.topic.title),
+			["Eigenvalues"],
+		);
+		const scoped = buildInbox([course()], [], "/elsewhere");
+		assert.deepEqual(searchInbox(scoped, [], "eigen", [course()]).units, [], "under the course filter, only that course's topics");
 	});
 });

@@ -21,9 +21,9 @@ One form each, wherever it shows.
 | Reason | Words |
 |---|---|
 | a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Look again (a magnifier). A repair made only with help (`repairedWithHelp`) is not "Fixed": the next signal shows. |
-| a review come due | Due today, 3d overdue (under a week), 1w overdue, 2w overdue |
-| a review dated ahead | Back in 5d, Back in 3w, Back in 2mo |
-| unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 2w ago; Unfinished when no day is known. Never the tutor's step text. |
+| a review come due | Due today, 3d overdue, 16d overdue (always days, round 4) |
+| a review dated ahead | Back in 5d, Back in 21d, Back in 60d |
+| unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 20d ago; Unfinished when no day is known. Never the tutor's step text. |
 | a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first (`reviewWords`): Due since 21 Oct |
 | a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started; under it the day the plan starts it, once (Planned today, Planned Wed 11 Nov) |
 

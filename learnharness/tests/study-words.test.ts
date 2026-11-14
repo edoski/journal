@@ -71,11 +71,11 @@ describe("why a slip needs him", () => {
 
 describe("why a review needs him", () => {
 	it("says a due review in days under a week, then whole weeks", () => {
-		assert.deepEqual([0, 1, 3, 6, 7, 13, 14, 30].map(overdueWords), ["Due today", "1d overdue", "3d overdue", "6d overdue", "1w overdue", "1w overdue", "2w overdue", "4w overdue"]);
+		assert.deepEqual([0, 1, 3, 6, 7, 13, 14, 30].map(overdueWords), ["Due today", "1d overdue", "3d overdue", "6d overdue", "7d overdue", "13d overdue", "14d overdue", "30d overdue"]);
 	});
 
 	it("says when a dated review comes back in days, then weeks, then months", () => {
-		assert.deepEqual([1, 5, 13, 14, 21, 59, 60, 90].map(returnWords), ["Back in 1d", "Back in 5d", "Back in 13d", "Back in 2w", "Back in 3w", "Back in 8w", "Back in 2mo", "Back in 3mo"]);
+		assert.deepEqual([1, 5, 13, 14, 21, 59, 60, 90].map(returnWords), ["Back in 1d", "Back in 5d", "Back in 13d", "Back in 14d", "Back in 21d", "Back in 59d", "Back in 60d", "Back in 90d"]);
 	});
 });
 
@@ -108,9 +108,9 @@ describe("why a review waits", () => {
 		assert.equal(heldWords({ kind: "due", date: "2026-11-08", overdue: 0 }), null);
 		assert.equal(heldWords(null), null);
 	});
-	it("says since when a held review was due, so weeks late never reads as 'Back in 4w'", () => {
+	it("says since when a held review was due, so weeks late never reads as 'Back in 25d'", () => {
 		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct");
-		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back in 4w");
+		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back in 25d");
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back in 12d", "memory's day is still ahead");
 		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
 	});

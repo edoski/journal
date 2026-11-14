@@ -142,7 +142,7 @@ describe("why a topic needs him", () => {
 	it("says how overdue the review of a topic he can do on his own is, in Home's words", () => {
 		const overdue = (days: number) => needOf(topic("t", { level: "retained", review: due(days) }), titleOf)!;
 		assert.deepEqual(overdue(0), { kind: "review", words: "Due today" });
-		assert.deepEqual([1, 3, 10, 16].map((d) => overdue(d).words), ["1d overdue", "3d overdue", "1w overdue", "2w overdue"]);
+		assert.deepEqual([1, 3, 10, 16].map((d) => overdue(d).words), ["1d overdue", "3d overdue", "10d overdue", "16d overdue"]);
 	});
 
 	it("says nothing for a topic still being learned, one resting until its review, or one not started", () => {
@@ -398,7 +398,7 @@ describe("topic map drawing", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
-			["1w overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Look again", "Sure, but wrong"],
+			["10d overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Look again", "Sure, but wrong"],
 		);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-need"]'), null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");

@@ -38,7 +38,7 @@ describe("a card's status", () => {
 
 	it("says a due review as Home does, only for a topic he can do on his own", () => {
 		const review = (overdue: number) => statusOf(topic({ level: "independent", review: due(overdue) }), [], titleOf, TODAY)!.words;
-		assert.deepEqual([review(0), review(3), review(10), review(16)], ["Due today", "3d overdue", "1w overdue", "2w overdue"]);
+		assert.deepEqual([review(0), review(3), review(10), review(16)], ["Due today", "3d overdue", "10d overdue", "16d overdue"]);
 		assert.equal(statusOf(topic({ level: "attempted", review: due(4) }), [], titleOf, TODAY), null, "a topic still being learned is nearly always due");
 	});
 
@@ -60,7 +60,7 @@ describe("the card", () => {
 		{ name: "not started", topic: topic(), line: "Not started" },
 		{ name: "learning", topic: topic({ level: "attempted" }), line: "Tried, not right yet" },
 		{ name: "on his own, resting", topic: topic({ level: "retained", review: { kind: "scheduled", date: "2026-11-20" } }), line: "On your own" },
-		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), line: "1w overdue" },
+		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), line: "9d overdue" },
 		{ name: "missed after he had it", topic: weak("retained", { lapsed: true }), line: "Not right last time" },
 		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), line: "Mixed up with Cramer's rule" },
 		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), line: "Left off 3d ago" },

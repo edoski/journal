@@ -96,6 +96,15 @@ function order(document: Document): string[] {
 }
 
 describe("Now", () => {
+	it("says nothing is planned today, not Nothing due, on a review the plan holds past its due day (round 4)", () => {
+		const held = topic("binomial", { title: "Binomial distribution", level: "assisted", introduced: "2026-11-05", review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-06" } } });
+		const { now, scheduled } = pickupSections(factsOf(held));
+		assert.equal(now.words, "Nothing planned today");
+		assert.equal(scheduled?.kind, "review");
+		const ahead = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-09" } } });
+		assert.equal(pickupSections(factsOf(ahead)).now.words, "Nothing due", "a review memory asks for later is not due yet");
+	});
+
 	it("holds every row of the action table: what to pick up, where it stands in a few words, the press and the session it opens", () => {
 		assert.deepEqual(
 			ROWS.map(([, facts]) => {

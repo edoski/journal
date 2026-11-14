@@ -2,7 +2,7 @@ import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-fact
 import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import type { TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { FIRST_LESSON, LESSON_WORDS, overdueWords, startsAfterWords } from "@/components/study-words";
+import { FIRST_LESSON, LESSON_WORDS, TUTOR_WRITING, overdueWords, startsAfterWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -69,6 +69,18 @@ export function plannedWords(facts: TopicFacts): string | null {
 	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
 }
 
+/** Now's words on a topic with nothing to take up today: nothing is due,
+ *  or, for a review memory asked for already that the plan holds for a
+ *  later day, nothing is planned today, since Scheduled says since when it
+ *  was due (round 4: "Nothing due" sat above "Due since 6 Nov"). */
+export const NOTHING_DUE = "Nothing due";
+export const NOTHING_TODAY = "Nothing planned today";
+
+/** A review the plan holds past the day memory asked for it. */
+function heldPastDue(review: TopicFacts["topic"]["review"], today: string): boolean {
+	return review?.kind === "scheduled" && !!review.held && review.held.since <= today;
+}
+
 /** The step a lesson stopped on, when its tutor planned. */
 function stoppedOn(entry: SessionEntry | undefined): string | null {
 	if (!entry || !isPlanned(entry)) return null;
@@ -92,7 +104,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				...base,
 				icon: action.kind === "open" ? "writing" : left ? "task" : "reply",
 				words: stoppedOn(entry) ?? action.chat.title,
-				note: action.kind === "open" ? "Tutor writing" : left ? LESSON_WORDS.leftForTonight : "Your turn",
+				note: action.kind === "open" ? TUTOR_WRITING : left ? LESSON_WORDS.leftForTonight : "Your turn",
 				chat: action.chat.id,
 			};
 		}
@@ -113,7 +125,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 		case "start":
 			return { ...base, icon: "standing", words: FIRST_LESSON, note: plannedWords(facts) };
 		case "study":
-			return { ...base, icon: "review", words: "Nothing due" };
+			return { ...base, icon: "review", words: heldPastDue(facts.topic.review, facts.today) ? NOTHING_TODAY : NOTHING_DUE };
 	}
 }
 

@@ -77,7 +77,8 @@ function rangeTitle(view: string, start: Date, end: Date): string {
 /** A day's More, in words of what it folds away (`moreWords`): the day
  *  grid gives only how many it hides, so the day is read from the cell it
  *  sits in, and the hidden entries are that day's last, in the grid's
- *  order. */
+ *  order. The words wrap onto a second line rather than end in "…"
+ *  (round 4: "Also a review, unfinished …" hid what it folds). */
 function MoreLabel({ hidden, entries }: { hidden: number; entries: readonly CalendarEntry[] }) {
 	const ref = useRef<HTMLSpanElement>(null);
 	const [day, setDay] = useState<string | null>(null);
@@ -85,7 +86,7 @@ function MoreLabel({ hidden, entries }: { hidden: number; entries: readonly Cale
 	const words = day ? moreWords(entries.filter((entry) => entry.day === day).slice(-hidden)) : "More";
 	return (
 		<Hint label="Show everything on this day">
-			<span ref={ref} data-slot="calendar-more" className="block truncate">
+			<span ref={ref} data-slot="calendar-more" className="line-clamp-2 block whitespace-normal text-left">
 				{words}
 			</span>
 		</Hint>

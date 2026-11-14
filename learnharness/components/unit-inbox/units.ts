@@ -50,6 +50,9 @@ export interface Unit {
 export interface UnitInbox {
 	/** The engine's study day. */
 	today: string;
+	/** The course the inbox keeps, null for every course; absent reads as
+	 *  every course. */
+	scope?: string | null;
 	/** What waits on the learner first, then topics being learned, the most
 	 *  recently studied first, then due reviews, the weak first. */
 	active: readonly Unit[];
@@ -136,6 +139,7 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 	const resting = units.filter((u) => u.now !== "working");
 	return {
 		today: scoped[0]?.map.today ?? courses[0]?.map.today ?? "",
+		scope,
 		active: [...resting.filter((u) => u.shelf === "learning").sort(byLearning), ...resting.filter((u) => u.shelf === "review").sort(byReview)],
 		working: units.filter((u) => u.now === "working").sort((a, b) => lastAt(b).localeCompare(lastAt(a))),
 		known: resting.filter((u) => u.shelf === "known").sort((a, b) => returns(a).localeCompare(returns(b))),
