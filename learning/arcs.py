@@ -121,19 +121,20 @@ def _state(
     checked: set[str],
 ) -> str:
     """``new`` while every topic is; in a course that takes no questions,
-    ``taught`` once every topic is; else ``checked`` when every topic's
-    check stands, ``ready`` when every topic rests on an unaided answer,
-    and ``learning`` otherwise."""
+    ``taught`` once every topic is; else ``ready`` when every topic rests on
+    an unaided answer, ``checked`` when it is also ready and every topic's
+    check stands, and ``learning`` otherwise. A check never counts ahead of
+    the topics' own standing (the engine owner's ruling, 14 Nov 2026), so a
+    solid check on a practice day leaves an arc of assisted topics
+    learning, and the states only climb."""
     found = [levels[key]["level"] for key in keys]
     if all(level == "new" for level in found):
         return "new"
     if record["preferences"].get(preferences.QUESTIONS) == "none":
         taught = all("introduced" in record["topics"][key] for key in keys)
         return "taught" if taught else "learning"
-    if set(keys) <= checked:
-        return "checked"
     if all(level in progress.SECURE for level in found):
-        return "ready"
+        return "checked" if set(keys) <= checked else "ready"
     return "learning"
 
 

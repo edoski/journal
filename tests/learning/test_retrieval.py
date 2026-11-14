@@ -975,6 +975,17 @@ def test_an_arc_is_checked_when_each_topics_latest_check_item_stands_solid(
     assert states(workspace)["limits"] == "ready", "never on a teaching day"
 
 
+def test_an_arc_is_checked_only_once_it_is_ready(workspace: Workspace) -> None:
+    with_arcs(workspace)
+    taught(workspace, -10, "limit", "continuity")
+    answered(workspace, -9, "limit", "continuity", help="Hint")
+    answered(workspace, -8, "limit", "continuity", checkpoint="limits")
+    path = retrieval.resume(workspace)["path"]["topics"]
+    levels = {topic[0]: topic[1] for topic in path}
+    assert levels["limit"] == levels["continuity"] == "assisted"
+    assert states(workspace)["limits"] == "learning", "a practice day's check"
+
+
 def test_a_course_that_takes_no_questions_reads_new_learning_or_taught(
     workspace: Workspace,
 ) -> None:
