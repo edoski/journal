@@ -24,11 +24,12 @@ New topics come only from the ready set: topics whose prerequisites are all
 solid and not lapsed, and that no taught but not yet solid competing method
 (``contrasts``) would interfere with. A course with an exam ahead first gets
 its pace, the topics it has left over the study days it has left before its
-new topics should end, nearest exam first, past the pace he has shown until he
-has shown a limit; spare new-topic capacity then goes
-to the nearest exam with topics left, even within its final review, since a
-topic started late is better known at the exam than one never started; then to
-courses with no exam. A topic a course cannot start before its exam does not
+new topics should end (``progress.new_end``: within its final review, the day
+before the exam), nearest exam first, past the pace he has shown until he has
+shown a limit; so a nearer exam's last topics come before a later exam's pace,
+since a topic started late is better known at the exam than one never started.
+Spare new-topic capacity then goes to the nearest exam with topics left; then
+to courses with no exam. A topic a course cannot start before its exam does not
 fit.
 """
 
