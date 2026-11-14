@@ -170,6 +170,19 @@ export function edgeProblems(submit: EdgeSubmit, view: Pick<MapCourseView, "topi
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
 
+/** The edge answer with the missing-prerequisite check's adds joined to its
+ *  own, each edge once. Pure. */
+export function withMissing(submit: EdgeSubmit, add: readonly EdgeAdd[]): EdgeSubmit {
+	const listed = new Set(submit.add.map((a) => edgeKey(a.topic, a.need)));
+	return { ...submit, add: [...submit.add, ...add.filter((a) => !listed.has(edgeKey(a.topic, a.need)))] };
+}
+
+/** Every topic's needs once an edge answer is applied to the view's, for
+ *  the missing-prerequisite check to read. Pure. */
+export function answeredNeeds(view: Pick<MapCourseView, "topics">, submit: EdgeSubmit): Map<string, string[]> {
+	return settledNeeds(view, edgeDiffs(submit));
+}
+
 /** The changes an edge answer makes: each drop, then each add. Pure. */
 export function edgeDiffs(submit: EdgeSubmit): EdgeDiff[] {
 	return [

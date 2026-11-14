@@ -20,6 +20,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
 	ARC_PASS_MIN_TOPICS,
+	answeredNeeds,
 	arcPassChanges,
 	arcPassProblems,
 	arcPassView,
@@ -45,6 +46,8 @@ import {
 	type SortAnswer,
 	type SortMiss,
 	type SortQuiz,
+	type EdgeAdd,
+	withMissing,
 	withProposed,
 } from "../../core/arc-pass.ts";
 import { courseView, NO_STANDING, openLessonsOf, sourcesOf, type MapCourseView } from "../../core/course-map-build.ts";
@@ -60,6 +63,7 @@ import { failureWords, mapRuns } from "./course-map-builder.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
 
 const EDGES_TOOL = "submit_edges";
+const MISSING_TOOL = "submit_missing";
 const ARCS_TOOL = "submit_arcs";
 const SORT_TOOL = "submit_sort";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
@@ -93,6 +97,16 @@ const edgeSchema = Type.Object({
 		}),
 		{ description: "True, direct prerequisites the graph misses; an empty list when none." },
 	),
+});
+
+const addSchema = Type.Object({
+	topic: Type.String({ description: "B, the topic that needs." }),
+	need: Type.String({ description: "A, the topic it needs." }),
+	reason: Type.String({ description: "The step of an exercise on B that uses A." }),
+});
+
+const missingSchema = Type.Object({
+	add: Type.Array(addSchema, { description: "Direct prerequisites the graph misses; an empty list when none." }),
 });
 
 const sortSchema = Type.Object({
@@ -139,6 +153,17 @@ export const ARC_EDGES_INSTRUCTIONS = `You settle a course's prerequisites befor
 - Look for missing prerequisites as hard as for false ones. For each topic, read what its material works with that another topic of the course teaches (a definition, a result, a method, a tool or service it runs on: a deploy runbook that ships through a hosting platform needs the topic that teaches that platform; a distribution whose section computes its mean needs expectation; a formula written with an operation another topic defines, such as a transpose or a norm, needs that topic; an overview of how parts connect needs the topics on those parts, unless it is the opening sketch the parts build on), and test each. Under add, list every such prerequisite the graph misses, direct and passing the same test as a kept edge, each with its reason; send an empty list when there are none.
 - The material is registered: read it with read_material, search_material and render_pages where a test needs it. You need not read every source whole.
 - Each handle is its own topic. Two topics whose names share words are still two topics: never treat one as the other.
+
+`;
+
+export const ARC_MISSING_INSTRUCTIONS = `You check a course's prerequisites for what they miss, following the test below. Another check has judged every stored edge; you look only for true prerequisites the graph does not hold. You answer with one ${MISSING_TOOL} call.
+
+- Go through every topic in turn. Picture a typical exercise on it from its material, and list what each step uses: a definition, a result, a method, a notation, a tool or a service.
+- For each thing another topic of the course teaches, the topic needs that topic, unless its listed needs already lead there (through a need of a need). List each such missing prerequisite under add, with the exercise step that uses it as its reason.
+- Never list a need the graph holds or implies, one that only a proof of the topic's theorem uses, or one that only the material's order suggests.
+- The material is registered: read it with read_material, search_material and render_pages where a topic's exercises are unclear. A topic listed with no refs is judged from its title and the topics around it.
+- Each handle is its own topic. Two topics whose names share words are still two topics.
+- Send an empty list when the graph misses nothing.
 
 `;
 
@@ -219,6 +244,19 @@ function edgesPrompt(title: string, view: MapCourseView, record: unknown, files:
 	].join("\n");
 }
 
+function missingPrompt(title: string, view: MapCourseView, record: unknown, files: readonly MaterialFile[], needs: ReadonlyMap<string, readonly string[]>): string {
+	const name = (k: string) => view.topics[k]?.title ?? k;
+	return [
+		...courseHead(title, record, files),
+		"",
+		"## Topics",
+		...topicLines(view, false),
+		"",
+		"## The graph as judged: each topic and the topics it needs",
+		...[...needs].map(([k, ns]) => `- "${k}" (${name(k)}): ${ns.length > 0 ? ns.map((n) => `"${n}"`).join(", ") : "nothing"}`),
+	].join("\n");
+}
+
 function cutPrompt(title: string, view: ArcPassView, record: unknown, files: readonly MaterialFile[]): string {
 	const exam = obj(obj(record).exam);
 	const lines = courseHead(title, record, files);
@@ -255,9 +293,9 @@ export type ArcPassResult =
 /** One entry of a run's transcript: a model message, an answer the app or
  *  the engine refused, or a save. */
 export type TranscriptEntry =
-	| { at: string; step: "edges" | "cut" | "sort"; kind: "message"; message: AssistantMessage }
+	| { at: string; step: "edges" | "missing" | "cut" | "sort"; kind: "message"; message: AssistantMessage }
 	| { at: string; step: "sort"; kind: "sorted"; misses: SortMiss[] }
-	| { at: string; step: "edges" | "cut"; kind: "refused"; problems: string }
+	| { at: string; step: "edges" | "missing" | "cut"; kind: "refused"; problems: string }
 	| { at: string; step: "edges" | "cut" | "note"; kind: "saved" | "save refused"; changes: unknown; message?: string };
 
 export interface ArcPassOptions {
@@ -341,14 +379,14 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		const files = (await measureMaterial(directory, sourcesOf(first), deps.fetchPage)).filter((f) => f.kind !== "folder");
 		const title = typeof obj(first).title === "string" ? (obj(first).title as string) : workspace;
 		const signal = options.signal;
-		const agent = <T>(step: "edges" | "cut", tool: string, parameters: typeof edgeSchema | typeof arcSchema, doctrine: string, instructions: string, prompt: string, validate: (answer: T) => Promise<string | null>) =>
+		const agent = <T>(step: "edges" | "missing" | "cut", tool: string, parameters: typeof edgeSchema | typeof missingSchema | typeof arcSchema, doctrine: string, instructions: string, prompt: string, validate: (answer: T) => Promise<string | null>) =>
 			withBgLlmSlot(signal, () =>
 				runSubmitAgent<T>({
 					role: "teacher",
 					toolName: tool,
-					toolDescription: step === "edges" ? "Submit the verdict on every prerequisite." : "Submit the course's arcs.",
+					toolDescription: step === "edges" ? "Submit the verdict on every prerequisite." : step === "missing" ? "Submit the prerequisites the graph misses." : "Submit the course's arcs.",
 					parameters,
-					fill: (input: Json) => (step === "edges" ? { verdicts: input.verdicts ?? [], add: input.add ?? [] } : { ...input, arcs: input.arcs ?? [] }) as T,
+					fill: (input: Json) => (step === "edges" ? { verdicts: input.verdicts ?? [], add: input.add ?? [] } : step === "missing" ? { add: input.add ?? [] } : { ...input, arcs: input.arcs ?? [] }) as T,
 					validate: async (answer) => {
 						const problems = await validate(answer);
 						if (problems) {
@@ -375,10 +413,21 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		};
 
 		const before = await viewNow(workspace);
-		const edgeAnswer = await agent<EdgeSubmit>("edges", EDGES_TOOL, edgeSchema, composeDoctrine(ARC_EDGES_DOCTRINE), ARC_EDGES_INSTRUCTIONS, edgesPrompt(title, before.view, before.record, files), async (a) =>
+		const judged = await agent<EdgeSubmit>("edges", EDGES_TOOL, edgeSchema, composeDoctrine(ARC_EDGES_DOCTRINE), ARC_EDGES_INSTRUCTIONS, edgesPrompt(title, before.view, before.record, files), async (a) =>
 			edgeProblems(a, before.view),
 		);
 		if (signal?.aborted) throw aborted();
+		const missing = await agent<{ add: EdgeAdd[] }>(
+			"missing",
+			MISSING_TOOL,
+			missingSchema,
+			composeDoctrine(ARC_EDGES_DOCTRINE),
+			ARC_MISSING_INSTRUCTIONS,
+			missingPrompt(title, before.view, before.record, files, answeredNeeds(before.view, judged)),
+			async (a) => edgeProblems(withMissing(judged, a.add), before.view),
+		);
+		if (signal?.aborted) throw aborted();
+		const edgeAnswer = withMissing(judged, missing.add);
 		const diffs = edgeDiffs(edgeAnswer);
 		const edges: EdgeRun = { mode: options.edges, submit: edgeAnswer, diffs, applied: [], skipped: [] };
 		if (options.edges === "apply" && diffs.length > 0) {

@@ -368,18 +368,30 @@ function memoryLedgers(): ArcPassLedgers & { all: Map<string, ArcPassLedger> } {
 	return { all, get: (w) => all.get(w), save: (w, l) => void all.set(w, structuredClone(l)), workspaces: () => [...all.keys()], forget: (w) => void all.delete(w) };
 }
 
-/** A model that answers the edge step with `edges`, the cut with each of
- *  `cuts` in turn (the next one after a refusal), and the blind sort with
- *  `readsAs` for a title it names, else every arc name; it counts the
- *  edge and cut calls apart from the sort's. */
-function scriptedModel(edges: EdgeSubmit, cuts: ArcSubmit[], hook?: () => void, readsAs: Record<string, string> = {}): PiEngine & { calls: number; sorts: number; refusals: string[] } {
+/** A model that answers the edge step with `edges`, the missing-prerequisite
+ *  check with `missing`, the cut with each of `cuts` in turn (the next one
+ *  after a refusal), and the blind sort with `readsAs` for a title it names,
+ *  else every arc name; it counts the edge and cut calls apart from the
+ *  check's and the sort's. */
+function scriptedModel(
+	edges: EdgeSubmit,
+	cuts: ArcSubmit[],
+	hook?: () => void,
+	readsAs: Record<string, string> = {},
+	missing: EdgeSubmit["add"] = [],
+): PiEngine & { calls: number; sorts: number; checks: number; refusals: string[] } {
 	const faux = createFauxCore({});
-	const state = { calls: 0, sorts: 0, refusals: [] as string[] };
+	const state = { calls: 0, sorts: 0, checks: 0, refusals: [] as string[] };
 	let cut = 0;
 	const step: FauxResponseStep = async (context) => {
 		const last = context.messages.at(-1) as { role: string; isError?: boolean; content?: Array<{ text?: string }> };
 		const asked = (context.messages.find((m) => m.role === "user") as { content: string | Array<{ text?: string }> } | undefined)?.content ?? "";
 		const body = typeof asked === "string" ? asked : asked.map((c) => c.text ?? "").join("");
+		if (body.includes("## The graph as judged")) {
+			state.checks++;
+			if (last.role === "toolResult" && last.isError) state.refusals.push(last.content?.map((c) => c.text ?? "").join("") ?? "");
+			return fauxAssistantMessage([fauxToolCall("submit_missing", { add: missing } as unknown as ToolCall["arguments"], { id: `missing-${state.checks}` })], { stopReason: "toolUse" });
+		}
 		if (body.startsWith("## Arc names")) {
 			state.sorts++;
 			const [names, topics] = body.split("## Topics");
@@ -473,6 +485,23 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		assert.equal(result.status === "formed" && result.edges.diffs.length, 1);
 		assert.deepEqual(result.status === "formed" && result.edges.applied, []);
 		assert.deepEqual(record(dir).arc_log.map((e: Record<string, unknown>) => [e.kind, "edges_entry" in e]), [["formed", false]], "nothing settled, nothing referred to");
+	});
+
+	it("a second fresh check adds the prerequisites the edge step missed, each once, and the cut holds them", async () => {
+		const dir = course("missing");
+		const model = scriptedModel(EDGES, [CUT], undefined, {}, [
+			{ topic: "chain", need: "continuity", reason: "a chain-rule exercise checks the inner function is continuous" },
+			{ topic: "riemann", need: "limits", reason: "stored already, refused" },
+		]);
+		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" }), /never submitted/, "a check that lists a stored edge is sent back until it stops");
+		assert.match(model.refusals.join("\n"), /"riemann" needs "limits", which is stored already/);
+		const dir2 = course("missing-2");
+		const good = scriptedModel(EDGES, [CUT], undefined, {}, [{ topic: "chain", need: "continuity", reason: "a chain-rule exercise checks the inner function is continuous" }]);
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: good }).run(dir2, { edges: "apply" });
+		assert.equal(result.status, "formed", JSON.stringify(result));
+		assert.deepEqual(record(dir2).topics.chain.needs, ["derivative", "continuity"]);
+		assert.deepEqual(result.status === "formed" && result.edges.diffs.map((d) => `${d.change} ${d.topic}<-${d.need}`), ["drop riemann<-chain", "add chain<-continuity"]);
+		assert.equal(good.checks, 1);
 	});
 
 	it("a blind reader sorts the titles into the arc names alone; two topics that read as another arc send the cut back, naming them", async () => {
