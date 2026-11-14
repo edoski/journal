@@ -360,9 +360,10 @@ class _Allowance:
 
 def _gaps(record: dict[str, Any], untaught: set[str]) -> set[str]:
     """Untaught topics that a taught topic needs, directly or through others:
-    what he has already started stands on them."""
+    what he has already started stands on them. A topic the course leaves out
+    is off the plan, so nothing he would study stands on what it needs."""
     gaps: set[str] = set()
-    stack = [key for key in record["topics"] if key not in untaught]
+    stack = [key for key in progress.path_order(record) if key not in untaught]
     seen = set(stack)
     while stack:
         for need in progress.needs(record, stack.pop()):

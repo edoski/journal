@@ -465,6 +465,15 @@ def test_a_topic_taught_topics_need_starts_before_the_rest() -> None:
     assert together.days["near"][0]["new"] == []
 
 
+def test_a_topic_only_a_left_out_chapter_needs_waits_its_place_in_the_path() -> None:
+    record = course(4, exam=40, needs={"t03": ["t02"]})
+    record = save(record, {"topics": {"t03": {"excluded": "not examined"}}}, MONDAY)
+    near = course(6, exam=10)
+    together = plan({"c": record, "near": near}, 1, week(5, 1, frozenset(range(7))))
+    assert together.days["c"][0]["new"] == []
+    assert together.days["near"][0]["new"] == ["t00"]
+
+
 def test_a_start_that_waits_for_nearer_exams_says_which() -> None:
     near = titled(course(4, exam=10), "Probability")
     far = course(4, exam=40)
