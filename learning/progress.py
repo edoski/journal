@@ -65,11 +65,16 @@ def last_new_day(exam: Exam) -> date:
 
 def new_end(exam: Exam, day: date) -> date:
     """The last day the course takes new topics, seen from ``day`` before its
-    exam: the last new-topic day, or once that has passed, the day before the
-    final review, since a topic started late is better known at the exam than
-    one never started."""
+    exam: the last new-topic day; once that has passed, the day before the
+    final review; once that has passed too, the day before the exam, since a
+    topic started late is better known at the exam than one never started, and
+    a nearer exam's last topics come before a later exam's pace."""
     last = last_new_day(exam)
-    return last if day <= last else exam.final - timedelta(days=1)
+    if day <= last:
+        return last
+    if day < exam.final:
+        return exam.final - timedelta(days=1)
+    return exam.day - timedelta(days=1)
 
 
 def exam_plan(record: dict[str, Any]) -> Exam | None:

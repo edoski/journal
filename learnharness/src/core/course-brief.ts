@@ -6,7 +6,8 @@
  * with the course tools.
  *
  * The brief's key is the part that changes the lesson's opening move: the
- * study day, the due topics and backlog, the open tasks (with their steps
+ * study day, the due topics and backlog, the reviews the daily plan puts
+ * on later days and the days it starts each new topic, the open tasks (with their steps
  * when none is in focus) and the current path topic. A new brief enters the transcript only when the key changes, so
  * the cached prompt prefix holds between saves; level changes in between
  * reach the agent through the save receipts.
@@ -128,6 +129,16 @@ function runupLine(plan: unknown, workspace: string): string | null {
 
 const handles = (v: unknown): string[] => list(v).filter((h): h is string => typeof h === "string");
 
+/** `resume.starts`, the daily plan's day for each untaught topic, as one
+ *  entry per day: "2026-11-09 (Monday): poisson, geometric". */
+function startsByDay(starts: unknown): string[] {
+	const days = new Map<string, string[]>();
+	for (const [topic, day] of Object.entries(obj(starts))) {
+		if (typeof day === "string") days.set(day, [...(days.get(day) ?? []), topic]);
+	}
+	return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, topics]) => `${dayWithWeekday(day)}: ${topics.join(", ")}`);
+}
+
 /** What the engine's `path_health` lists, in the brief's words: the gaps a
  *  half-built path still has. Null when the path has none. */
 const HEALTH_WORDS: ReadonlyArray<[string, string]> = [
@@ -181,6 +192,17 @@ export function projectCourseBrief(
 	} else {
 		lines.push("Due today: nothing.");
 	}
+	const later = list(r.due_later).map(obj);
+	if (later.length > 0) {
+		const more = typeof r.due_later_more === "number" && r.due_later_more > 0 ? `, and ${r.due_later_more} more` : "";
+		lines.push(
+			`Planned for later days, not overdue: ${later.map((d) => `${str(d.topic) ?? "?"} (${dayWithWeekday(str(d.planned))})`).join(", ")}${more}`,
+		);
+	}
+	const road = startsByDay(r.starts);
+	if (road.length > 0) lines.push(`New topics on the days the daily plan starts them: ${road.join("; ")}`);
+	const misfits = handles(r.does_not_fit);
+	if (misfits.length > 0) lines.push(`No room before the exam to start: ${misfits.join(", ")}`);
 	const weak = list(r.weak);
 	if (weak.length > 0) lines.push("Weak:", ...weak.map((w) => weakLine(withDetail(w, detail), role)));
 	lines.push(...taskLines(r));
@@ -196,6 +218,9 @@ export function projectCourseBrief(
 		task ? [task.key ?? null, task.step ?? null] : null,
 		r.due_more ?? null,
 		obj(r.due_oldest).topic ?? null,
+		list(r.due_later).map((d) => [obj(d).topic ?? null, obj(d).planned ?? null]),
+		r.starts ?? null,
+		handles(r.does_not_fit),
 		list(r.tasks)
 			.map((t) => [str(obj(t).key) ?? "", task ? null : (obj(t).step ?? null)])
 			.sort(([a], [b]) => String(a).localeCompare(String(b))),

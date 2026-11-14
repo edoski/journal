@@ -2,6 +2,7 @@ import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, Plann
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
+import { courseMove, nextStepOf, stepWords, type CourseMove } from "@/components/study-home/study-facts";
 
 /**
  * What the calendar draws (spec: calendar.md): the engine's dates and the
@@ -22,11 +23,18 @@ export interface CourseRef {
 export type SessionType = "check-in" | "plan" | "lesson" | "practice";
 
 export type CalendarEntry =
-	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; road: readonly RoadWeek[]; finalReview: string | null; doesNotFit: readonly string[]; allStarted: boolean }
+	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; road: readonly RoadWeek[]; finalReview: string | null; doesNotFit: readonly string[]; allStarted: boolean; next: NextMove | null }
 	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; action: TopicAction }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
 	| { kind: "session"; id: string; day: string; title: string; course: CourseRef | null; chat: ChatListItem; type: SessionType; waits: boolean; topic: CourseMapTopic | null };
+
+/** The next step toward an exam: the course's step as Home's line takes it
+ *  up (`nextStepOf`, `courseMove`), in Home's words. */
+export interface NextMove {
+	words: string;
+	move: CourseMove;
+}
 
 /** One week of the road to an exam: the days in it that start new topics
  *  in the engine's daily plan, and those topics' titles in plan order. */
@@ -115,7 +123,8 @@ function sessionTopic(chat: ChatListItem, courses: readonly CalendarCourse[]): C
 
 /**
  * Every entry on the calendar, by day and then by look:
- *   - each exam on its date;
+ *   - each exam on its date, with the course's next step toward it while
+ *     it is ahead;
  *   - today's review as `plan` made it, each overdue when past its date,
  *     and today's new topics from `plan`'s daily plan;
  *   - each later day's reviews and new topics as the daily plan proposes;
@@ -137,13 +146,16 @@ export function calendarEntries({
 	const shown = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const today = courses[0]?.map.today ?? "";
 	const entries: CalendarEntry[] = [];
-	for (const { map, due, planned, doesNotFit, finalReview } of shown) {
+	for (const studied of shown) {
+		const { map, due, planned, doesNotFit, finalReview } = studied;
 		const course = { workspace: map.workspace, title: map.title };
 		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 		if (map.exam) {
 			const road = roadOf(planned, map.exam.date, titleOf);
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
-			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), allStarted });
+			const step = nextStepOf(studied);
+			const next = map.exam.date > today && step.kind !== "none" ? { words: stepWords(step), move: courseMove(studied, chats) } : null;
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) =>
@@ -198,12 +210,14 @@ function windowWords({ start, end }: { start: string; end: string }): string {
 	return `${short(start)} to ${short(end)}`;
 }
 
-/** What a day's head says of its study time: "Day off", the windows
- *  ("9:00 to 12:30, 13:30 to 18:00"), or null when the Journal schedules
- *  nothing for it. */
+/** What a day's head says of its study time: "Day off", "Day off in your
+ *  Journal" for a day the Journal rests but the plan studies (his record
+ *  shows he studies that weekday), the windows ("9:00 to 12:30, 13:30 to
+ *  18:00"), or null when the Journal schedules nothing for it. */
 export function studyTimeWords(day: ScheduledDay | undefined): string | null {
 	if (!day) return null;
 	if (day.off) return "Day off";
+	if (day.journalOff) return "Day off in your Journal";
 	return day.windows.length > 0 ? `Study ${day.windows.map(windowWords).join(", ")}` : null;
 }
 

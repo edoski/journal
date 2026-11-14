@@ -50,13 +50,21 @@ ALGEBRA = {
     "exam": {"date": day(23), "format": "Written"},
     "journal": "SMM",
     "topics": {
-        "systems": {"review": {"due": day(-2), "prompt": "Solve unaided"}},
+        "systems": {
+            "introduced": day(-10),
+            "review": {"due": day(-2), "prompt": "Solve unaided"},
+        },
         "rank": {
             "title": "Rank",
             "needs": ["systems"],
+            "introduced": day(-10),
             "review": {"due": day(3)},
         },
-        "eigen": {"needs": ["rank"], "review": {"due": day(12)}},
+        "eigen": {
+            "needs": ["rank"],
+            "introduced": day(-10),
+            "review": {"due": day(12)},
+        },
     },
     "path": {"current": "rank"},
     "tasks": {
@@ -84,32 +92,28 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
                 "topic": "systems",
                 "due": day(-2),
                 "overdue": 2,
-                "level": "new",
+                "level": "introduced",
                 "prompt": "Solve unaided",
             }
         ],
-        "upcoming": [{"topic": "rank", "due": day(3)}],
+        "upcoming": [{"topic": "rank", "planned": day(3)}],
         "current": "rank",
         "current_title": "Rank",
         "task": {"key": "ex5", "title": "Exercise 5", "step": "Why unique?"},
         "open_tasks": 2,
         "last_activity": {"date": TODAY.isoformat(), "days_ago": 0},
+        "last_studied": {"date": (TODAY - timedelta(days=10)).isoformat(), "days_ago": 10},
         "journal": {"activity": "SMM", "study_minutes": 140, "sessions": 2},
         "week": {"minutes": 140},
         "plan": {
             "final_review_days": 6,
             "days": [
-                {"date": day(0), "reviews": [], "new": ["systems"]},
-                {"date": day(1), "reviews": ["systems"], "new": ["rank"]},
-                {"date": day(2), "reviews": ["rank"], "new": ["eigen"]},
-                {"date": day(3), "reviews": ["eigen"], "new": []},
-                {"date": day(4), "reviews": ["systems"], "new": []},
-                {"date": day(5), "reviews": ["rank"], "new": []},
-                {"date": day(6), "reviews": ["eigen"], "new": []},
+                {"date": day(0), "reviews": ["systems"], "new": []},
+                {"date": day(3), "reviews": ["rank", "systems"], "new": []},
             ],
         },
     }
-    assert result["capacity"]["evidence_days"] == 0
+    assert result["capacity"]["evidence_days"] == 1
     assert "daily" not in result["journal"]
     assert result["journal"]["by_activity"]["Other"]["study_minutes"] == 30
     wider = plan(workspace, vault, everywhere=False, days=14)

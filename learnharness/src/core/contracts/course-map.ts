@@ -16,7 +16,10 @@ export function isTopicLevel(value: unknown): value is TopicLevel {
 	return (TOPIC_LEVELS as readonly unknown[]).includes(value);
 }
 
-/** The topic's review as the engine scheduled it: `due` exactly when the engine counts it due today. */
+/** The topic's review on the day the engine's daily plan puts it: `due`
+ *  exactly when that day is today, with the days since memory asked for
+ *  it; a review the plan moves to a later day is `scheduled` for that day,
+ *  not overdue. */
 export type TopicReview = { kind: "due"; date: string; overdue: number } | { kind: "scheduled"; date: string };
 
 /** Why the engine calls a topic weak: each its own engine field, shown as is. */
@@ -57,6 +60,10 @@ export interface CourseMapTopic {
 	/** Why the course leaves the topic out (off the exam): the engine keeps
 	 *  it off the plan and keeps its history. */
 	excluded?: string;
+	/** The day the engine's daily plan, made with every course, starts
+	 *  this untaught topic; absent once taught or when the plan has no
+	 *  room for it. */
+	starts?: string;
 }
 
 /** `needs`: the prerequisite comes before the topic that needs it.

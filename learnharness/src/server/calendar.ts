@@ -110,8 +110,9 @@ export function scheduleOf(plan: unknown): ScheduledDay[] {
 		journal.size > 0 ? [...journal.keys()] : studies && typeof today === "string" ? Array.from({ length: CALENDAR_DAYS }, (_, n) => addDays(today, n)) : [];
 	return dates.map((date) => {
 		const scheduled = journal.get(date);
-		const off = studies ? !studies.has(weekday(date)) : (scheduled?.off ?? false);
-		return { date, off, windows: off ? [] : (scheduled?.windows ?? []) };
+		const journalOff = scheduled?.off ?? false;
+		const off = studies ? !studies.has(weekday(date)) : journalOff;
+		return { date, off, journalOff, windows: off ? [] : (scheduled?.windows ?? []) };
 	});
 }
 

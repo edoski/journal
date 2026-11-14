@@ -61,7 +61,7 @@ function realResumes(): { open: Resume; focused: Resume; plan: Resume } {
 			pivots: {},
 			rank: { title: "Rank", needs: ["systems"], gap: "counts vectors, not independent ones" },
 			eigen: { gap: "confuses eigenvalue with eigenvector" },
-			t1: {}, t2: {}, t3: {}, t4: {},
+			t1: { introduced: "2026-11-04" }, t2: { introduced: "2026-11-04" }, t3: { introduced: "2026-11-04" }, t4: { introduced: "2026-11-04" },
 		},
 		path: { current: "rank", order: ["systems", "pivots", "rank", "eigen", "t1", "t2", "t3", "t4"] },
 		tasks: {
@@ -128,9 +128,13 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 
 	it("the due backlog shows its total and the most overdue review past the five", () => {
 		const { text } = projectCourseBrief(RESUME, "teach");
-		assert.match(text, /Due: 6 topics; today's review is the 5 below, 1 more wait:/, "in the run-up the overdue unready review is among today's five");
-		const hidden = projectCourseBrief({ ...RESUME, due_oldest: { topic: "t4", overdue: 9 } }, "teach").text;
-		assert.match(hidden, /Due: 6 topics; today's review is the 5 below, 1 more wait, the most overdue among them t4 \(9 days overdue\):/);
+		assert.match(
+			text,
+			/Due: 6 topics; today's review is the 5 below, 1 more wait, the most overdue among them systems \(9 days overdue\):/,
+			"in the run-up the unready topics come before the overdue solid one",
+		);
+		const shown = projectCourseBrief({ ...RESUME, due_oldest: undefined }, "teach").text;
+		assert.match(shown, /Due: 6 topics; today's review is the 5 below, 1 more wait:/);
 	});
 
 	it("practice adds the current topic's review prompt, points and gap, and its wrongly chosen method", () => {
@@ -244,5 +248,36 @@ describe("course brief injection", () => {
 		const chat = chatStore.createChat("plain");
 		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
 		assert.equal(await fetchCourseBrief(chatStore.getChat(chat.id)!), null);
+	});
+});
+
+describe("the brief's review days are the daily plan's", () => {
+	it("a review the plan puts on a later day shows with that day, not as due or overdue", () => {
+		const resume = {
+			today: "2026-11-08",
+			due: [{ topic: "rank", due: "2026-11-08", overdue: 0, level: "independent" }],
+			due_later: [{ topic: "sequences", planned: "2026-11-26" }],
+		};
+		const { text, key } = projectCourseBrief(resume, "teach");
+		assert.match(text, /Due today:\n- rank \(independent\)\nPlanned for later days, not overdue: sequences \(2026-11-26 \(Thursday\)\)/);
+		assert.doesNotMatch(text, /sequences \(.*overdue/);
+		const moved = projectCourseBrief({ ...resume, due_later: [{ topic: "sequences", planned: "2026-11-27" }] }, "teach").key;
+		assert.notEqual(moved, key, "a review the plan moves re-sends the brief");
+	});
+});
+
+describe("the brief's road is the daily plan's", () => {
+	it("the days the plan starts each new topic, and what does not fit, by day", () => {
+		const resume = {
+			today: "2026-11-08",
+			starts: { poisson: "2026-11-09", geometric: "2026-11-11", expectation: "2026-11-11" },
+			does_not_fit: ["covariance"],
+		};
+		const { text, key } = projectCourseBrief(resume, "teach");
+		assert.match(
+			text,
+			/New topics on the days the daily plan starts them: 2026-11-09 \(Monday\): poisson; 2026-11-11 \(Wednesday\): geometric, expectation\nNo room before the exam to start: covariance/,
+		);
+		assert.notEqual(projectCourseBrief({ ...resume, starts: { poisson: "2026-11-10" } }, "teach").key, key, "a moved start re-sends the brief");
 	});
 });

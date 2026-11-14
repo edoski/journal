@@ -243,6 +243,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 		},
 		tasks: strings(e.tasks),
 		...(str(e.excluded) ? { excluded: str(e.excluded)! } : {}),
+		...(str(e.starts) ? { starts: str(e.starts)! } : {}),
 		needs: strings(e.needs),
 		contrasts: strings(e.contrasts),
 	};

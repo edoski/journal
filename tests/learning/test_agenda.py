@@ -283,6 +283,18 @@ def test_a_day_he_left_owed_work_is_a_day_he_stopped_short() -> None:
     assert not capacity.activity([every], on(3))[on(2)].reviews_short
 
 
+def test_a_day_he_answered_no_review_shows_no_review_limit() -> None:
+    record = course(4, exam=20)
+    record = save(record, {"topics": {"t00": {"introduced": True}}}, MONDAY)
+    record = save(record, {"topics": {"t01": {"introduced": True}}}, on(2))
+    record = save(record, {"topics": {"t02": {"introduced": True}}}, on(3))
+    done = capacity.activity([record], on(4))
+    assert done[on(2)].reviews == 0 and not done[on(2)].reviews_short
+    week = capacity.of([record], on(4))
+    assert not week.on(on(4)).reviews.shown
+    assert plan_for(record, on(4))["reviews"]
+
+
 def test_doing_exactly_what_the_plan_proposes_never_shows_a_limit() -> None:
     record = course(12, exam=40, needs={"t03": ["t02"]})
     for offset in range(21):
@@ -329,3 +341,11 @@ def test_a_day_off_stays_off_until_he_studies_on_it() -> None:
     assert 2 not in off.study_weekdays
     back = study(wednesdays - {max(wednesdays)}, weeks=10)
     assert 2 in capacity.estimate(back, MONDAY).study_weekdays
+
+
+def test_a_nearer_exam_keeps_its_topics_ahead_of_a_later_exams_pace() -> None:
+    chain = {f"t{index:02d}": [f"t{index - 1:02d}"] for index in range(1, 5)}
+    near, far = course(5, exam=8, needs=chain), course(20, exam=40)
+    together = plan({"near": near, "far": far}, 40, week(10, 1, frozenset(range(7))))
+    assert "near" not in together.does_not_fit
+    assert max(started(together.days["near"]).values()) < on(8).isoformat()

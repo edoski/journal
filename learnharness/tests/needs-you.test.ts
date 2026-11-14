@@ -131,7 +131,7 @@ describe("lineTopics", () => {
 		assert.deepEqual(lineTopics(todayRows([held], [], TODAY)[0]!), ["independence", "det"]);
 		const unheld: StudyCourse = { ...held, map: { ...held.map, topics: LINALG.map.topics } };
 		assert.deepEqual(lineTopics(todayRows([unheld], [], TODAY)[0]!), ["rank"]);
-		const next: StudyCourse = { ...PROB, due: [] };
+		const next: StudyCourse = { ...PROB, due: [], map: { ...PROB.map, topics: PROB.map.topics.map((t) => (t.handle === "bayes" ? { ...t, level: "assisted" as const } : t)) } };
 		assert.deepEqual(lineTopics(todayRows([next], [], TODAY)[0]!), ["bayes"]);
 		const none: StudyCourse = { ...PROB, due: [], map: map({ workspace: "/s/none", title: "None" }) };
 		assert.deepEqual(lineTopics(todayRows([none], [], TODAY)[0]!), []);

@@ -24,11 +24,12 @@ New topics come only from the ready set: topics whose prerequisites are all
 solid and not lapsed, and that no taught but not yet solid competing method
 (``contrasts``) would interfere with. A course with an exam ahead first gets
 its pace, the topics it has left over the study days it has left before its
-new topics should end, nearest exam first, past the pace he has shown until he
-has shown a limit; spare new-topic capacity then goes
-to the nearest exam with topics left, even within its final review, since a
-topic started late is better known at the exam than one never started; then to
-courses with no exam. A topic a course cannot start before its exam does not
+new topics should end (``progress.new_end``: within its final review, the day
+before the exam), nearest exam first, past the pace he has shown until he has
+shown a limit; so a nearer exam's last topics come before a later exam's pace,
+since a topic started late is better known at the exam than one never started.
+Spare new-topic capacity then goes to the nearest exam with topics left; then
+to courses with no exam. A topic a course cannot start before its exam does not
 fit.
 """
 
@@ -43,6 +44,9 @@ from typing import Any
 from learning import capacity, progress
 from learning.capacity import Capacity
 
+# The longest plan the engine makes: a year from today, so every review on
+# the spacing ladder and every exam of the year falls inside it.
+MAX_DAYS = 366
 SECURE = frozenset({"independent", "retained", "transferred"})
 NOT_YET_SOLID = frozenset({"introduced", "attempted", "assisted"})
 RELEARNING, EXAM_AHEAD, NO_EXAM, EXAM_PASSED = range(4)
@@ -190,6 +194,31 @@ class _Course:
         return progress.new_end(self.exam, day)
 
 
+@dataclass(frozen=True)
+class When:
+    """The day the plan next puts each of one course's topics: a taught
+    topic's next review, an untaught one's start. This is the one date a
+    review has wherever it is read; the stored ``review.due`` is the day
+    memory asks for it, which the plan may move later when other work comes
+    first. With no study day ahead (``studies`` false) the plan puts nothing
+    anywhere, and memory's dates stand."""
+
+    today: date
+    reviews: dict[str, date]
+    starts: dict[str, date]
+    studies: bool
+    does_not_fit: list[str]
+
+    def review(self, topic: str, stored: str | None) -> str | None:
+        placed = self.reviews.get(topic)
+        return placed.isoformat() if placed else stored
+
+    def tonight(self, topic: str) -> bool:
+        """Of the reviews memory asks for by today, one the plan puts today:
+        a review it moves to a later day is not due, nor overdue, tonight."""
+        return self.reviews.get(topic) == self.today if self.studies else True
+
+
 @dataclass
 class Plan:
     """Each course's days (``{date, reviews, new}``) and the path topics it
@@ -197,6 +226,18 @@ class Plan:
 
     days: dict[str, list[dict[str, Any]]]
     does_not_fit: dict[str, list[str]]
+
+    def when(self, name: str, today: date, studies: bool) -> When:
+        reviews: dict[str, date] = {}
+        starts: dict[str, date] = {}
+        for day in self.days[name]:
+            on = date.fromisoformat(day["date"])
+            for topic in day["reviews"]:
+                if topic not in starts:
+                    reviews.setdefault(topic, on)
+            for topic in day["new"]:
+                starts.setdefault(topic, on)
+        return When(today, reviews, starts, studies, self.does_not_fit.get(name, []))
 
 
 class _Allowance:

@@ -20,6 +20,7 @@ import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { calendarEntries } from "../components/calendar/calendar-facts.ts";
 import { CalendarView } from "../components/calendar/calendar-view.tsx";
+import type { StartSession } from "../components/calendar/calendar-entry.tsx";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -86,7 +87,7 @@ afterEach(async () => {
 	host = null;
 });
 
-async function mount(courses: CalendarCourse[], chats: ChatListItem[], onStart: (opening: string, workspace: string, handle: string | null) => void = () => {}) {
+async function mount(courses: CalendarCourse[], chats: ChatListItem[], onStart: StartSession = () => {}) {
 	host = document.createElement("div");
 	document.body.appendChild(host);
 	root = createRoot(host);
@@ -94,7 +95,7 @@ async function mount(courses: CalendarCourse[], chats: ChatListItem[], onStart: 
 	await act(async () => {
 		root!.render(
 			<AppRouterContext.Provider value={router as never}>
-				<CalendarView courses={courses} entries={entries} schedule={[{ date: TODAY, off: false, windows: [{ start: "09:00", end: "12:30" }] }]} today={TODAY} scope={null} onScopeChange={() => {}} busy={false} onStart={onStart} />
+				<CalendarView courses={courses} entries={entries} schedule={[{ date: TODAY, off: false, journalOff: false, windows: [{ start: "09:00", end: "12:30" }] }]} today={TODAY} scope={null} onScopeChange={() => {}} busy={false} onStart={onStart} />
 			</AppRouterContext.Provider>,
 		);
 	});
@@ -136,6 +137,20 @@ describe("the calendar page", () => {
 		assert.equal(first, "Linear Algebra examLAExam, today");
 	});
 
+	it("gives an exam's panel the course's next step toward it, the one Home's line takes", async () => {
+		const started: unknown[] = [];
+		await mount([linalg("2026-11-12")], [], (...args) => started.push(args));
+		await press(document.querySelector('[aria-label="Next week"]')!);
+		await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+		const exam = document.querySelector("[data-slot=calendar-entry][data-look=exam]");
+		assert.ok(exam, "the exam");
+		await press(exam);
+		const next = document.querySelector("[data-slot=calendar-entry-detail] [data-slot=exam-next] [data-slot=calendar-entry-start]");
+		assert.equal(next?.textContent, "Review Span");
+		await press(next!);
+		assert.deepEqual(started, [["Review Span", "/study/linalg", { topics: ["span"] }]]);
+	});
+
 	it("opens an overdue review's panel, which starts the topic page's session or opens the topic", async () => {
 		const started: unknown[] = [];
 		await mount([linalg(null)], [], (...args) => started.push(args));
@@ -147,6 +162,6 @@ describe("the calendar page", () => {
 		assert.match(detail.textContent ?? "", /SpanOverdueWas due Thursday 29 October/);
 		assert.equal(detail.querySelector("a")?.getAttribute("href"), "/unit/L3N0dWR5L2xpbmFsZw/span");
 		await press(detail.querySelector("[data-slot=calendar-entry-start]")!);
-		assert.deepEqual(started, [["Review Span", "/study/linalg", "span"]]);
+		assert.deepEqual(started, [["Review Span", "/study/linalg", { topics: ["span"] }]]);
 	});
 });

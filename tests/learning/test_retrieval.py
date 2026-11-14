@@ -432,6 +432,7 @@ def test_evidence_takes_the_newest_few_per_task_and_topic(
     assert all("recorded" not in item for item in result["evidence"].values())
 
 
+@pytest.mark.usefixtures("every_day")
 def test_due_and_weak_entries_do_not_repeat_shown_topics(workspace: Workspace) -> None:
     records.save(
         workspace,
@@ -440,9 +441,15 @@ def test_due_and_weak_entries_do_not_repeat_shown_topics(workspace: Workspace) -
                 "rank": {
                     "title": "Rank",
                     "gap": "Counts vectors",
+                    "introduced": day(-20),
                     "review": {"due": day(-1), "prompt": "Unaided rank"},
                 },
-                "span": {"title": "Span", "gap": "Spans", "review": {"due": day(0)}},
+                "span": {
+                    "title": "Span",
+                    "gap": "Spans",
+                    "introduced": day(-20),
+                    "review": {"due": day(0)},
+                },
             },
             "path": {"current": "rank"},
         },
@@ -450,25 +457,29 @@ def test_due_and_weak_entries_do_not_repeat_shown_topics(workspace: Workspace) -
     result = retrieval.resume(workspace)
     assert list(result["topics"]) == ["rank"]
     assert result["due"] == [
-        {"topic": "rank", "due": day(-1), "overdue": 1, "level": "new"},
+        {"topic": "rank", "due": day(-1), "overdue": 1, "level": "introduced"},
         {
             "topic": "span",
             "title": "Span",
             "due": day(0),
             "overdue": 0,
-            "level": "new",
+            "level": "introduced",
             "gap": "Spans",
         },
     ]
     assert result["weak"] == [
-        {"topic": "rank", "level": "new"},
-        {"topic": "span", "level": "new", "gap": "Spans"},
+        {"topic": "rank", "level": "introduced"},
+        {"topic": "span", "level": "introduced", "gap": "Spans"},
     ]
 
 
+@pytest.mark.usefixtures("every_day")
 def test_weak_due_and_preferences(workspace: Workspace) -> None:
     preferences.save_global({"language": "Italian", "pace": "Slow"})
-    topics = {f"t{index}": {"review": {"due": day(-index)}} for index in range(10)}
+    topics = {
+        f"t{index}": {"introduced": day(-20), "review": {"due": day(-index)}}
+        for index in range(10)
+    }
     topics["t1"]["gap"] = "Mixes up rows and columns"
     records.save(
         workspace,
@@ -479,7 +490,7 @@ def test_weak_due_and_preferences(workspace: Workspace) -> None:
     assert result["due_more"] == 5
     assert result["due"][0]["topic"] == "t9"
     assert result["weak"] == [
-        {"topic": "t1", "level": "new", "gap": "Mixes up rows and columns"}
+        {"topic": "t1", "level": "introduced", "gap": "Mixes up rows and columns"}
     ]
     assert result["preferences"] == {"language": "Italian", "pace": "Fast"}
 
@@ -602,6 +613,7 @@ def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
         "needs": ["step-7"],
         "contrasts": ["step-0"],
         "level": "new",
+        "starts": day(0),
         "weak": False,
         "tasks": [],
     }

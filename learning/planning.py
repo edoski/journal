@@ -17,11 +17,12 @@ from learning.retrieval import (
     last_activity,
     last_studied,
     selected_task,
+    tonight,
 )
 from learning.workspace import Workspace
 from sync.study.context import journal_summary
 
-MAX_DAYS = 366
+MAX_DAYS = agenda.MAX_DAYS
 Failure = dict[str, str]
 Loaded = tuple[Workspace, dict[str, Any] | None, Failure | None]
 
@@ -124,6 +125,21 @@ def _days(
     )
 
 
+def _upcoming(
+    planned: agenda.When, today: date, days: int, order: list[str]
+) -> list[dict[str, Any]]:
+    """Reviews the daily plan puts after today and within ``days`` days."""
+    end = today + timedelta(days=days)
+    rank = {key: index for index, key in enumerate(order)}
+    items = [
+        {"topic": key, "planned": day.isoformat()}
+        for key, day in planned.reviews.items()
+        if today < day <= end
+    ]
+    items.sort(key=lambda item: (item["planned"], rank.get(item["topic"], len(rank))))
+    return items
+
+
 def _course(
     workspace: Workspace,
     record: dict[str, Any],
@@ -137,7 +153,8 @@ def _course(
     name = str(workspace.directory)
     order = progress.path_order(record)
     levels = progress.standings(record)
-    due = progress.due(record, today, levels=levels, order=order)
+    planned = together.when(name, today, bool(week.study_weekdays))
+    due, _ = tonight(progress.due(record, today, levels=levels, order=order), planned)
     key, task = selected_task(record)
     countdown = exam(record, today)
     current = record.get("path", {}).get("current")
@@ -152,7 +169,7 @@ def _course(
             else None,
             "due": due[:DUE_LIMIT],
             "due_more": max(0, len(due) - DUE_LIMIT) or None,
-            "upcoming": progress.upcoming(record, today, days, order=order),
+            "upcoming": _upcoming(planned, today, days, order),
             "current": current,
             "current_title": record["topics"][current].get("title")
             if current
