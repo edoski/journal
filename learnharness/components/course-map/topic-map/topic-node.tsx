@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { TopicGlyph } from "./topic-glyph";
 import { CURRENT_TAG, type Standing, type Status } from "./topic-standing";
 import { MathText } from "@/components/ui/math-text";
+import { MathLine } from "@/components/ui/math-line";
 
 /** What the map hands each node: the topic, what the card says, and where
  *  a click goes. */
@@ -71,9 +72,7 @@ export function NodeBody({ topic, standing, status }: { topic: CourseMapTopic; s
 		<span className="flex w-full min-w-0 items-center gap-4">
 			<TopicGlyph standing={standing} />
 			<span className="flex min-w-0 flex-1 flex-col gap-1">
-				<span className={cn("block h-4.5 truncate text-row font-medium", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>
-					<MathText>{topic.title}</MathText>
-				</span>
+				<MathLine className={cn("h-4.5 text-row font-medium", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{topic.title}</MathLine>
 				{status ? (
 					<StatusMark status={status} />
 				) : (

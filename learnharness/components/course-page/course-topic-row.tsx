@@ -9,6 +9,7 @@ import { Hint } from "@/components/ui/hint";
 import type { CourseTopic, TopicFact } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
 import { MathText } from "@/components/ui/math-text";
+import { MathLine } from "@/components/ui/math-line";
 
 /** The icon each kind of fact leads with: the sidebar's for a turn that
  *  waits and a topic coming back, the map's for a slip and a review,
@@ -96,8 +97,8 @@ export function CourseTopicRow({
 			>
 				<TopicGlyph standing={row.standing} className={detail ? "mt-px" : undefined} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span data-slot="course-topic-title" className={cn("truncate text-row font-medium", started ? "text-foreground" : "text-muted-foreground")}>
-						<MathText>{row.topic.title}</MathText>
+					<span data-slot="course-topic-title" className={cn("flex min-w-0 text-row font-medium", started ? "text-foreground" : "text-muted-foreground")}>
+						<MathLine className="min-w-0">{row.topic.title}</MathLine>
 						<span className="sr-only">, {row.standing.words}</span>
 					</span>
 					{detail && (
