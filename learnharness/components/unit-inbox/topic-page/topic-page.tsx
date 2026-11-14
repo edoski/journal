@@ -30,13 +30,10 @@ export interface TopicPageProps {
  * answered, so nothing shifts in afterwards.
  */
 export function TopicPage({
-	connected,
 	course,
 	topic,
 	chats,
 }: {
-	/** The Link switch: whether a line ties the lesson's row to its step. */
-	connected?: boolean;
 	course: StudyCourse;
 	topic: CourseMapTopic;
 	chats: readonly ChatListItem[];
@@ -62,7 +59,7 @@ export function TopicPage({
 	};
 	return (
 		<>
-			<HybridTopic facts={facts} busy={lesson.busy} error={lesson.error} onAct={act} onTask={press} connected={connected} />
+			<HybridTopic facts={facts} busy={lesson.busy} error={lesson.error} onAct={act} onTask={press} />
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</>
 	);

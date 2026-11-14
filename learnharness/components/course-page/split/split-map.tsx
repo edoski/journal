@@ -5,8 +5,7 @@ import type { CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { framedCamera, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
-import { besideRow, boxesOf, fadeAcross, scrollOfCamera, scrollOn, surfaceOf, topicAt, type Scroll, type Size } from "@/components/course-page/split/split-tie";
-import { useTieAnchor } from "@/components/linked-columns/linked-columns";
+import { boxesOf, fadeAcross, scrollOfCamera, scrollOn, surfaceOf, topicAt, type Scroll, type Size } from "@/components/course-page/split/split-tie";
 
 /** What the page asks of the map: focus a topic's node. */
 export interface SplitMapHandle {
@@ -72,7 +71,6 @@ export function SplitMap({
 }) {
 	const root = useRef<HTMLElement>(null);
 	const scroller = useRef<HTMLDivElement>(null);
-	const tieAnchor = useTieAnchor();
 	const pointed = useRef<TopicHandle | null>(null);
 	const glide = useRef(0);
 	const [pane, setPane] = useState<Size>({ width: 0, height: 0 });
@@ -80,8 +78,7 @@ export function SplitMap({
 	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, layout.node), y: FADE.y }), [pane.width, layout.node]);
 	/** How the course opens in the pane: its scale and where it sits. */
 	const opening = useMemo(() => (pane.width > 0 ? framedCamera(layout, aim, pane, fade, TAG_ROOM, "top") : null), [layout, aim, pane, fade]);
-	const tied = tieAnchor !== null;
-	const surface = useMemo(() => surfaceOf(layout, pane, FADE, TAG_ROOM, tied, opening?.zoom), [layout, pane, tied, opening?.zoom]);
+	const surface = useMemo(() => surfaceOf(layout, pane, FADE, TAG_ROOM, opening?.zoom), [layout, pane, opening?.zoom]);
 	const boxes = useMemo(() => boxesOf(layout, { width: surface.width, height: surface.height, zoom: surface.zoom }), [layout, surface.width, surface.height, surface.zoom]);
 
 	const point = (handle: TopicHandle | null) => {
@@ -90,16 +87,13 @@ export function SplitMap({
 		onPoint(handle);
 	};
 
-	/** Glides the pane over 200ms (at once under reduced motion) to show a topic he points at or reaches, beside the row
-	 *  pointing at it when the tie's line would otherwise have no clear route. */
+	/** Glides the pane over 200ms (at once under reduced motion) to show a topic he points at or reaches. */
 	const show = useCallback(
 		(handle: TopicHandle) => {
 			const el = scroller.current;
 			if (!el || el.clientWidth === 0) return;
 			const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
-			let to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade);
-			const anchor = tieAnchor?.();
-			if (anchor) to = besideRow(boxes, handle, anchor, to ?? view, { ...view, maxTop: el.scrollHeight - el.clientHeight }, fade, map.current) ?? to;
+			const to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade);
 			cancelAnimationFrame(glide.current);
 			if (!to) return;
 			if (reducedMotion()) return el.scrollTo(to);
@@ -113,7 +107,7 @@ export function SplitMap({
 			};
 			glide.current = requestAnimationFrame(step);
 		},
-		[boxes, fade, tieAnchor, map.current],
+		[boxes, fade],
 	);
 
 	// The pane's size sets the surface's width and where it opens.

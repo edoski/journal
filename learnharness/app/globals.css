@@ -602,19 +602,6 @@ body {
 	}
 }
 
-/* The linked columns' tie (components/linked-columns/linked-columns.md)
-   draws itself in from the row to its node once per new pair: its path
-   has pathLength 1 and a dash of 1, so the dash's offset runs it out.
-   Reduced motion draws it whole (motion-safe only). */
-@keyframes lh-tie-draw {
-	from {
-		stroke-dashoffset: 1;
-	}
-	to {
-		stroke-dashoffset: 0;
-	}
-}
-
 /* Source-message arrival: a brief, static theme-colored spotlight. */
 .lh-source-passage {
 	scroll-margin-top: 1rem;

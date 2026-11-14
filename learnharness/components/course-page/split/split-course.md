@@ -1,6 +1,6 @@
 # Split course page
 
-The course page (course-page.md): the list and the map side by side in the app's linked columns (`../../linked-columns/linked-columns.md`), tied together. Thesis: the list says what to do, the map says where it sits, and pointing at one shows it in the other. `split-course.tsx` (the page), `split-list.tsx` (left pane), `split-map.tsx` (right pane), `split-tie.ts` (what ties them and where the map scrolls, pure; tests in `tests/course-page-split.test.tsx`). `data-slot` `course-split` (the linked columns), `course-split-list` and `course-split-list-scroller`, `course-split-map` and `course-split-map-scroller`; the rows, groups and header keep their shared slots.
+The course page (course-page.md): the list and the map side by side in the app's linked columns (`../../linked-columns/linked-columns.md`), with no line between them (Edo picked Current, 14 Nov 2026). Thesis: the list says what to do, the map says where it sits, and pointing at one shows it in the other. `split-course.tsx` (the page), `split-list.tsx` (left pane), `split-map.tsx` (right pane), `split-tie.ts` (what ties them and where the map scrolls, pure; tests in `tests/course-page-split.test.tsx`). `data-slot` `course-split` (the linked columns), `course-split-list` and `course-split-list-scroller`, `course-split-map` and `course-split-map-scroller`; the rows, groups and header keep their shared slots.
 
 ## Layout
 
@@ -19,16 +19,15 @@ The map sits on a surface the pane scrolls (`surfaceOf`), sized so `TopicMap` fi
 
 - It opens as every course map does (`framedCamera`, topic-map.md): the whole course when it fits at 80% or more, else framed on where he is ("You are here", the map's current topic), else the first topic the header's button takes up that is on the map, else the list's first row (`aimOf`), with the topics it leads to whole and as few topics cut as it can, at full size or down to 80% (Probability at Edo's 1512x982: 80% on Random variables, with Binomial, Expectation, Poisson and Variance whole and nothing cut; round 3 found it aimed at the header's review and "You are here" off the pane). The pane scrolls to that view (`scrollOfCamera`) and returns there when the window grows or shrinks.
 - On an axis the course fits at that scale, the surface is the pane's width (the course in its middle), or the course's height from the pane's top; on one it overflows, the course, its room and one topic and gap of empty room on each side (`slackOf`), so the pane can always scroll a topic at the course's edge wholly out of view.
-- While the Link switch is on, the surface keeps the pane's height of room above and below the course, so the pane can bring any topic beside the row pointing at it (`besideRow`).
 - A topic he points at or reaches comes into view (`scrollOn`) clear of the fade, cutting as few other topics at the pane's edges as it can (a topic cut where it shows reads as overflow), moving as little as it can.
 - Wheel and trackpad scroll the pane; a drag on the background scrolls it too; a pinch stays the map's (its zoom is fixed at the surface's scale).
 
-## The tie
+## Pointing
 
 | He does | The page answers |
 |---|---|
-| rests on or focuses a row (120ms) | the map lights that topic with its whole prerequisite chain, the other topics at 60% (the map's `highlight`), and, when the topic is not already clear of the fade, the pane glides it into view in 200ms (at once under reduced motion), beside the row when the line would otherwise have no clear route. A line in the map's edge ink runs from the row to the topic's card (the linked columns' connector) |
-| points at or focuses a node | the map lights its chain itself; the topic's row holds the hover fill (`highlighted`) and comes into view in the list if it is out of it, moving the pane as little as it can; the line ties them |
+| rests on or focuses a row (120ms) | the map lights that topic with its whole prerequisite chain, the other topics at 60% (the map's `highlight`), and, when the topic is not already clear of the fade, the pane glides it into view in 200ms (at once under reduced motion) |
+| points at or focuses a node | the map lights its chain itself; the topic's row holds the hover fill (`highlighted`) and comes into view in the list if it is out of it, moving the pane as little as it can |
 | clicks either | the topic's page opens |
 | leaves a pane | only that pane's pointing clears; the map stays where it is |
 

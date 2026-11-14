@@ -8,11 +8,9 @@ import { MIN_ZOOM, type Camera, cameraAt, centreOf, chainOf, isWalkKey, neighbou
 import { TopicMapContext, type TopicMapState } from "@/components/course-map/topic-map/topic-node";
 import { mapFade } from "@/components/study-home/map-frame";
 import { StepNode, type StepFlowNode } from "@/components/unit-inbox/topic-page/steps/step-node";
-import { STEP_SIZE, TAG_ROOM, shiftsWithin, stepsCamera, stepsLayout, stepsShiftRange, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
+import { STEP_SIZE, TAG_ROOM, stepsCamera, stepsLayout, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
-import { useTieAnchor } from "@/components/linked-columns/linked-columns";
-import { clearShift, tieShifts, type Box } from "@/components/linked-columns/tie-route";
 import { mathPlain } from "@/components/ui/math-text";
 
 const nodeTypes = { step: StepNode };
@@ -40,11 +38,7 @@ function reducedMotion(): boolean {
  * whole plan clear of the fade when that fits at three quarters size or
  * more, else at three quarters size on the step the lesson stopped on
  * (`stepsCamera`). That step is ringed, the steps
- * right after it say Next, and every step opens the lesson. In the linked
- * columns, while a line ties the lesson's row to that step, the plan opens
- * moved up or down so the step sits beside its row whenever the line
- * would otherwise have no clear route (`clearShift`), never so far that
- * a step it framed meets the fade (`stepsShiftRange`).
+ * right after it say Next, and every step opens the lesson.
  */
 export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string }) {
 	const { plan } = entry;
@@ -147,7 +141,6 @@ function Flow({
 	const links = useRef(new Map<TopicHandle, HTMLAnchorElement>());
 	const lit = useMemo(() => (active ? chainOf(active, needs) : null), [active, needs]);
 
-	const tieAnchor = useTieAnchor();
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
 	const minZoom = frame ? Math.max(MIN_ZOOM, Math.min(1, wholeZoom(layout, frame, MARGIN))) : 1;
 
@@ -155,26 +148,10 @@ function Flow({
 	const [opening, setOpening] = useState<Camera | null>(null);
 	useEffect(() => {
 		if (frameWidth <= 0 || frameHeight <= 0) return;
-		const frame = { width: frameWidth, height: frameHeight };
-		const camera = stepsCamera(layout, current, frame, FADE);
-		const at = current ? layout.topics.get(current) : undefined;
-		const anchor = tieAnchor?.();
-		if (anchor && at) {
-			// The step its row is tied to moves beside the row when that gives the line a clear route, keeping what the view frames clear of the fade.
-			const onScreen = (x: number, y: number, width: number, height: number): Box => ({ left: x * camera.zoom + camera.x, top: y * camera.zoom + camera.y, right: (x + width) * camera.zoom + camera.x, bottom: (y + height) * camera.zoom + camera.y });
-			const to = onScreen(at.x, at.y, NODE_WIDTH, NODE_HEIGHT);
-			const obstacles = nodes.flatMap((node) => {
-				const box = node.id === current ? [] : [onScreen(node.position.x, node.position.y, NODE_WIDTH, NODE_HEIGHT)];
-				return node.data.tag || node.data.status === "current" ? [...box, onScreen(node.position.x, node.position.y - TAG_ROOM, NODE_WIDTH / 2, 14)] : box;
-			});
-			const range = stepsShiftRange(layout, current, camera, frame, FADE);
-			const dy = clearShift({ ...anchor, to, obstacles }, shiftsWithin(tieShifts(anchor.from, to), range));
-			if (dy) camera.y += dy;
-		}
-		setOpening(camera);
-	}, [layout, current, frameWidth, frameHeight, tieAnchor, nodes]);
+		setOpening(stepsCamera(layout, current, { width: frameWidth, height: frameHeight }, FADE));
+	}, [layout, current, frameWidth, frameHeight]);
 
-	// The plan and its room, and whatever more the opening view shows around a plan smaller than the frame or moved beside its row.
+	// The plan and its room, and whatever more the opening view shows around a plan smaller than the frame.
 	const extent = useMemo<CoordinateExtent>(() => {
 		const base: CoordinateExtent = [
 			[-MARGIN.x, -MARGIN.y],

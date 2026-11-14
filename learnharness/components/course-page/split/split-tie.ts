@@ -1,8 +1,6 @@
 import type { CourseMapEdge, TopicHandle } from "@/src/core";
 import { NODE_GAP, NODE_SIZE, cardFit, chainOf, slackOf, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import type { CourseGroup, CourseTopic } from "@/components/course-page/course-model";
-import type { Tie, TieAnchor } from "@/components/linked-columns/linked-columns";
-import { clearShift, tieShifts, type Box as TieBox } from "@/components/linked-columns/tie-route";
 
 /**
  * What ties the split page's two panes (spec: split-course.md): the topic
@@ -12,13 +10,6 @@ import { clearShift, tieShifts, type Box as TieBox } from "@/components/linked-c
 export interface Pointed {
 	handle: TopicHandle;
 	from: "list" | "map";
-}
-
-/** The row and node the linked columns tie for the topic he points at, in
- *  either pane: its row in the list and its card on the map. */
-export function tieOf(handle: TopicHandle): Tie {
-	const id = JSON.stringify(handle);
-	return { key: handle, row: `[data-slot="course-topic-row"][data-topic=${id}]`, node: `.react-flow__node[data-id=${id}] [data-slot="course-map-node"]` };
 }
 
 /** The topics the map lights for what he points at: a row lights its
@@ -122,7 +113,6 @@ export interface Surface extends Size {
 	zoom: number;
 }
 
-
 /**
  * The map's drawing surface in the map pane, which the map fits whole at
  * `zoom` (the scale `framedCamera` opens the course at), so it never moves
@@ -131,19 +121,15 @@ export interface Surface extends Size {
  * room the map keeps for its "You are here" tag) fits the pane at that
  * scale, the surface is the pane's width, or the course's height from the
  * pane's top, with nothing to scroll; on one it overflows, the course and
- * `slackOf` its node on each side, at that scale. `tied` (the linked
- * columns draw the tie) adds the pane's height above and below, so the
- * pane can bring any topic beside the row pointing at it. Pure.
+ * `slackOf` its node on each side, at that scale. Pure.
  */
-export function surfaceOf(layout: TopicMapLayout, pane: Size, room: { x: number; y: number }, tag: number, tied = false, zoom = 1): Surface {
+export function surfaceOf(layout: TopicMapLayout, pane: Size, room: { x: number; y: number }, tag: number, zoom = 1): Surface {
 	const width = (layout.width + room.x * 2) * zoom;
 	const height = (layout.height + (room.y + tag) * 2) * zoom;
 	const slack = slackOf(layout.node);
-	// With the tie drawn, room above and below so any topic can scroll beside its row (`besideRow`).
-	const beside = tied ? pane.height * 2 : 0;
 	return {
 		width: width > pane.width ? Math.ceil(width + slack.x * 2 * zoom) : pane.width,
-		height: (height > pane.height ? Math.ceil(height + slack.y * 2 * zoom) : Math.floor(height)) + beside,
+		height: height > pane.height ? Math.ceil(height + slack.y * 2 * zoom) : Math.floor(height),
 		zoom,
 	};
 }
@@ -233,40 +219,4 @@ export function scrollOn(boxes: ReadonlyMap<TopicHandle, Box>, target: TopicHand
 		}
 	}
 	return best;
-}
-
-/** The current topic's tag over its node: 20px above its left edge, 14 tall. */
-const TAG = { above: 20, height: 14 };
-
-/**
- * Where the map pane scrolls so the topic a row points at sits beside that
- * row, when at `at` (where it would scroll to show the topic anyway) the
- * tie's line would have no clear route: the least vertical scroll from
- * there that gives it one, keeping the topic clear of the fade (`tieShifts`,
- * `clearShift`). Null when `at` is already clear or nothing within the
- * pane's reach is. `anchor` is the row's end in the pane's own pixels. Pure.
- */
-export function besideRow(
-	boxes: ReadonlyMap<TopicHandle, Box>,
-	target: TopicHandle,
-	anchor: TieAnchor,
-	at: Scroll,
-	view: Size & { maxTop: number },
-	fade: { x: number; y: number },
-	/** The topic the map tags "You are here", whose tag the line keeps clear of too. */
-	tagged: TopicHandle | null,
-): Scroll | null {
-	const box = boxes.get(target);
-	if (!box) return null;
-	const onScreen = (b: Box): TieBox => ({ left: b.x - at.left, top: b.y - at.top, right: b.x + b.width - at.left, bottom: b.y + b.height - at.top });
-	const to = onScreen(box);
-	const obstacles = [...boxes].flatMap(([handle, b]) => {
-		const node = onScreen(b);
-		const tag = handle === tagged ? [{ left: node.left, top: node.top - TAG.above, right: node.left + b.width / 2, bottom: node.top - TAG.above + TAG.height }] : [];
-		return handle === target ? tag : [node, ...tag];
-	});
-	// A scroll moves the drawing the other way: up by `dy` is a scroll down by `dy`.
-	const reachable = (dy: number) => at.top - dy >= 0 && at.top - dy <= view.maxTop && to.top + dy >= fade.y + TAG.above && to.bottom + dy <= view.height - fade.y;
-	const dy = clearShift({ ...anchor, to, obstacles }, tieShifts(anchor.from, to).filter(reachable));
-	return dy ? { left: at.left, top: Math.round(at.top - dy) } : null;
 }

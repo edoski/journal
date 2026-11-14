@@ -16,7 +16,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap, NODE_WIDTH, slackOf } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { aimOf, besideRow, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
+import { aimOf, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
@@ -210,9 +210,9 @@ describe("the map pane's surface and where it scrolls", () => {
 
 	it("draws the course at the scale it opens at: the pane's width and the course's height where it fits, with nothing to scroll", () => {
 		const layout = { ...LAYOUT, width: 744, height: 304 };
-		const surface = surfaceOf(layout, { width: 696, height: 692 }, room, 20, false, 0.8);
+		const surface = surfaceOf(layout, { width: 696, height: 692 }, room, 20, 0.8);
 		assert.deepEqual(surface, { width: 696, height: Math.floor((304 + 104) * 0.8), zoom: 0.8 });
-		const wide = surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20, false, 0.8);
+		const wide = surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20, 0.8);
 		assert.equal(wide.width, Math.ceil((2000 + 96 + slackOf(LAYOUT.node).x * 2) * 0.8), "too wide: the course and its slack at that scale, to scroll");
 	});
 
@@ -226,27 +226,6 @@ describe("the map pane's surface and where it scrolls", () => {
 		const at = layout.topics.get(h("vectors"))!;
 		assert.equal(boxes.get(h("vectors"))!.x - to.left, at.x + camera.x, "a topic sits where the camera puts it across");
 		assert.deepEqual(scrollOfCamera(layout, surface, pane, { x: 5000, y: 0 }).left, 0, "never past the surface");
-	});
-
-	it("keeps the pane's height of room above and below while the tie is drawn, so any topic can scroll beside its row", () => {
-		const layout = { ...LAYOUT, width: 744, height: 304 };
-		const plain = surfaceOf(layout, { width: 696, height: 692 }, room, 20);
-		assert.equal(surfaceOf(layout, { width: 696, height: 692 }, room, 20, true).height, plain.height + 692 * 2);
-	});
-
-	it("scrolls a pointed topic beside its row only when the line would have no clear route, by the least it can", () => {
-		// Two topics side by side on one layer; the row points at the right one from level with them, so the left one blocks the left edge.
-		const boxes = new Map<TopicHandle, Box>([
-			[h("left"), { x: 100, y: 600, width: 248, height: 56 }],
-			[h("right"), { x: 372, y: 600, width: 248, height: 56 }],
-		]);
-		const view = { left: 0, top: 400, width: 700, height: 700, maxTop: 2000 };
-		const anchor = { from: { x: -12, y: 228 }, gutter: { left: -24, right: 0 } };
-		const to = besideRow(boxes, h("right"), anchor, view, view, { x: 48, y: 32 }, null)!;
-		assert.ok(to, "it moves");
-		const top = boxes.get(h("right"))!.y - to.top;
-		assert.ok(Math.abs(top - (228 + 38)) < 1 || Math.abs(top + 56 - (228 - 18)) < 1, `the row in the channel just above or below the topic, at ${top}`);
-		assert.equal(besideRow(new Map([[h("right"), boxes.get(h("right"))!]]), h("right"), anchor, view, view, { x: 48, y: 32 }, null), null, "already clear: it stays");
 	});
 
 	it("places each topic where the map draws it: the course in the surface's middle", () => {

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { useServerEvent } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
-import { useLinkVariant } from "@/components/design-variant";
 import { TopicNotice, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
@@ -45,14 +44,13 @@ function useUnitRead(workspace: string): Read {
  */
 export function UnitPage({ workspace, handle }: { workspace: string; handle: string }) {
 	const read = useUnitRead(workspace);
-	const link = useLinkVariant();
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<div aria-hidden className="h-13 shrink-0" />
 			{read.status === "ready" && topic ? (
-				<TopicPage connected={link === "connected"} course={read.course} topic={topic} chats={read.chats} />
+				<TopicPage course={read.course} topic={topic} chats={read.chats} />
 			) : (
 				<TopicNotice>{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}</TopicNotice>
 			)}

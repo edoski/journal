@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { LinkedColumns, type Tie } from "@/components/linked-columns/linked-columns";
-import { useLinkVariant } from "@/components/design-variant";
+import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import type { TopicHandle } from "@/src/core";
 import { TOPIC_NODE_SIZE, layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
 import { CourseFrame } from "@/components/course-page/course-frame";
@@ -11,12 +10,12 @@ import { CourseHeader } from "@/components/course-page/course-header";
 import type { CourseView } from "@/components/course-page/course-model";
 import { SplitList, type SplitListHandle } from "@/components/course-page/split/split-list";
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
-import { aimOf, litOf, markedOf, revealOf, shownGroups, tieOf, type Pointed } from "@/components/course-page/split/split-tie";
+import { aimOf, litOf, markedOf, revealOf, shownGroups, type Pointed } from "@/components/course-page/split/split-tie";
 
 /**
  * The course page (spec: split-course.md), in the shared page frame: the
  * head across the column, then the course's topics in their groups on the
- * left and its topic map filling the right, tied together. Pointing at a
+ * left and its topic map filling the right. Pointing at a
  * row lights its topic and prerequisites on the map and brings it into
  * view; pointing at a node marks its row. A click on either opens the
  * topic's page. The page fits the window; each pane scrolls inside itself.
@@ -36,9 +35,6 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, TOPIC_NODE_SIZE), [map.topics, map.edges]);
 	const aim = useMemo(() => aimOf(map.current, view.next.lesson.topics, groups, layout), [map.current, view.next.lesson.topics, groups, layout]);
 	const lit = useMemo(() => litOf(pointed, map.edges), [pointed, map.edges]);
-	const handle = pointed?.handle ?? null;
-	const tie = useMemo<Tie | null>(() => (handle ? tieOf(handle) : null), [handle]);
-	const connected = useLinkVariant() === "connected";
 	const headerBox = useRef<HTMLDivElement>(null);
 	const list = useRef<SplitListHandle>(null);
 	const drawing = useRef<SplitMapHandle>(null);
@@ -72,8 +68,6 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 			) : (
 				<LinkedColumns
 					data-slot="course-split"
-					connected={connected}
-					tie={tie}
 					list={
 						<SplitList
 							ref={list}
