@@ -21,27 +21,33 @@ Reviews, when there are more than fit:
      by the final review, so each is reviewed before the exam whenever his
      limit leaves room for it; the plan names those it leaves without one
      (``Plan.unreviewed``).
-  2. re-teaching, relearning and first retrievals (a topic not yet solid):
-     such a review is part of learning the topic, and the topics that need
-     it wait on it. One that an exam's untaught topics need comes first,
-     nearest exam first: the rest of that exam's path cannot start before
-     it is solid, so it carries the exam's deadline.
-  3. every other review.
-  4. reviews of courses whose exam has passed, on their spaced dates.
-Within 2 and 3, by memory's own need: how far past its day a review is, as a
-share of the interval that set the day (``progress.late_share``). Each step of
-the ladder is set for the same recall, and forgetting runs with the gap as a
-share of the interval, so ranking by that share keeps the courses' recall
-alike: a course with no exam is not starved by the exam courses, a later
-exam's first retrievals do not wait on a nearer exam's, and a backlog is
-worked off from the most forgotten. The rule needs no share of the day and no
-constant: the reviews he completes set the room, memory sets the order. On
-equal shares, courses with an exam ahead come first, nearest first. The
-nearer exam needs no more: its final review is the deadline, and comes first.
-Then the course's own order (``progress.due``). A review left out of a
-full day goes on to the next; the plan says why it waits past the day memory
-asks for it (``When.held``): another course's final review came first, or
-the days before were full.
+  2. a review an exam's untaught topics wait on (a topic not yet solid that
+     they need, or a competing method of theirs), nearest exam first: the
+     rest of that exam's path cannot start before it is solid, so it carries
+     the exam's deadline.
+  3. every other review, but for those of 4 and 5, by memory's own need: how far
+     past its day a review is, as a share of the interval that set the day
+     (``progress.late_share``). Each step of the ladder is set for the same
+     recall, and forgetting runs with the gap as a share of the interval, so
+     ranking by that share keeps the courses' recall alike and works a
+     backlog off from the most forgotten. On equal shares a topic not yet
+     solid comes first (it is still being learned), then courses with an
+     exam ahead, nearest first.
+  4. a review of a course with an exam ahead that its final review would
+     repeat: answered solid today, its next step falls within the final
+     review, which brings it back before the exam anyway. A course with no
+     exam has no final review to catch up what waits, so its reviews come
+     before these. Ranking these by need alone starved the courses with no
+     exam: a one-day interval gains a whole share each day it waits, and
+     each exam's pace adds such reviews daily, so a review weeks late on a
+     month's interval never had the larger share.
+  5. reviews of courses whose exam has passed, on their spaced dates.
+The rule needs no share of the day and no constant: the reviews he
+completes set the room, memory and the exam set the order. Then the
+course's own order (``progress.due``). A review left out of a full day goes
+on to the next; the plan says why it waits past the day memory asks for it
+(``When.held``): another course's final review came first, or the days
+before were full.
 
 An exam day is planned like any other day of its weekday, less the examined
 course. Whether he does less on a day he sits an exam is his to show, as on
@@ -178,13 +184,25 @@ class _Course:
         )
 
     def gates(self, day: date) -> set[str]:
-        """With the exam ahead, the topics its untaught topics need: until
-        they are solid the rest of its path cannot start."""
+        """With the exam ahead, the topics its untaught topics wait on: what
+        they need, and their competing methods (``ready``). Until those are
+        solid the rest of its path cannot start."""
         if not self.ahead(day):
             return set()
         return {
-            need for key in self.untaught for need in progress.needs(self.record, key)
+            other
+            for key in self.untaught
+            for other in (*progress.needs(self.record, key), *self.partners[key])
         }
+
+    def caught(self, topic: str, day: date) -> bool:
+        """A review its final review would repeat: answered solid today, its
+        next step falls within the final review, which brings it back anyway."""
+        if not self.ahead(day):
+            return False
+        assert self.exam is not None
+        step = progress.interval("solid", self.streaks.get(topic, 0) + 1)
+        return day + timedelta(days=step) >= self.exam.final
 
     def reviewing(self, day: date) -> bool:
         """Within its final review: from the final-review day to the exam."""
@@ -420,10 +438,11 @@ def _reviews(
             key = (
                 1,
                 tier == EXAM_PASSED,
-                not learning,
                 not gating,
                 distance if gating else 0.0,
+                course.caught(item["topic"], day),
                 -course.need(item),
+                not learning,
                 distance,
                 rank,
             )

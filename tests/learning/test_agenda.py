@@ -456,6 +456,26 @@ def test_no_course_starves_another_of_reviews_while_its_exam_is_weeks_away() -> 
     assert placed == set(free["topics"])
 
 
+def test_a_review_the_final_review_repeats_waits_behind_a_course_with_no_exam() -> None:
+    free = solid(course(1), on(-1))
+    near = solid(course(1, exam=12), on(-2))
+    near = save(near, {"preferences": {"final_review_days": "6"}}, MONDAY)
+    together = plan({"exam": near, "free": free}, 1, week(1, 0, frozenset(range(7))))
+    assert together.days["free"][0]["reviews"] == ["t00"]
+    far = solid(course(1, exam=60), on(-2))
+    together = plan({"exam": far, "free": free}, 1, week(1, 0, frozenset(range(7))))
+    assert together.days["exam"][0]["reviews"] == ["t00"]
+
+
+def test_a_review_a_competing_methods_start_waits_on_comes_first() -> None:
+    exam = course(3, exam=40, contrasts={"t01": ["t00"]})
+    exam = save(exam, {"topics": {"t00": {"introduced": True}}}, on(-3))
+    exam = save(exam, {"topics": {"t00": {"review": {"due": on(-1).isoformat()}}}}, MONDAY)
+    free = solid(course(1), on(-30))
+    together = plan({"exam": exam, "free": free}, 1, week(1, 0, frozenset(range(7))))
+    assert together.days["exam"][0]["reviews"] == ["t00"]
+
+
 def test_a_topic_taught_topics_need_starts_before_the_rest() -> None:
     record = course(4, exam=40, needs={"t01": ["t00"], "t03": ["t02"]})
     record = save(record, {"topics": {"t03": {"introduced": True}}}, on(-3))
