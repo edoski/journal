@@ -180,9 +180,10 @@ describe("calendar entries", () => {
 
 describe("calendar words", () => {
 	it("says a day's study time from the Journal, or Day off, or nothing", () => {
-		assert.equal(studyTimeWords({ date: TODAY, off: false, windows: [{ start: "09:00", end: "12:30" }, { start: "13:30", end: "18:00" }] }), "Study 9:00 to 12:30, 13:30 to 18:00");
-		assert.equal(studyTimeWords({ date: TODAY, off: true, windows: [] }), "Day off");
-		assert.equal(studyTimeWords({ date: TODAY, off: false, windows: [] }), null);
+		assert.equal(studyTimeWords({ date: TODAY, off: false, journalOff: false, windows: [{ start: "09:00", end: "12:30" }, { start: "13:30", end: "18:00" }] }), "Study 9:00 to 12:30, 13:30 to 18:00");
+		assert.equal(studyTimeWords({ date: TODAY, off: true, journalOff: true, windows: [] }), "Day off");
+		assert.equal(studyTimeWords({ date: TODAY, off: false, journalOff: true, windows: [] }), "Day off in your Journal", "a Journal day off the plan studies says so");
+		assert.equal(studyTimeWords({ date: TODAY, off: false, journalOff: false, windows: [] }), null);
 		assert.equal(studyTimeWords(undefined), null);
 	});
 
@@ -246,9 +247,9 @@ describe("the calendar's read of plan", () => {
 			},
 		};
 		assert.deepEqual(scheduleOf(plan), [
-			{ date: "2026-11-08", off: false, windows: [{ start: "09:00", end: "12:30" }, { start: "13:30", end: "18:00" }] },
-			{ date: "2026-11-09", off: true, windows: [] },
-			{ date: "2026-11-10", off: false, windows: [] },
+			{ date: "2026-11-08", off: false, journalOff: false, windows: [{ start: "09:00", end: "12:30" }, { start: "13:30", end: "18:00" }] },
+			{ date: "2026-11-09", off: true, journalOff: true, windows: [] },
+			{ date: "2026-11-10", off: false, journalOff: false, windows: [] },
 		]);
 		assert.deepEqual(scheduleOf({ journal: { error: "no vault" } }), []);
 	});
@@ -262,8 +263,8 @@ describe("the calendar's read of plan", () => {
 		};
 		const capacity = { study_days: ["mon", "tue"] };
 		assert.deepEqual(scheduleOf({ journal, capacity }), [
-			{ date: "2026-11-08", off: true, windows: [] },
-			{ date: "2026-11-09", off: false, windows: [] },
+			{ date: "2026-11-08", off: true, journalOff: false, windows: [] },
+			{ date: "2026-11-09", off: false, journalOff: true, windows: [] },
 		]);
 		const alone = scheduleOf({ today: "2026-11-08", capacity });
 		assert.equal(alone.length, 42);

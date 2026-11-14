@@ -95,7 +95,7 @@ function DayHead({ info, schedule }: { info: DayHeaderInfo; schedule: ReadonlyMa
 			</div>
 			{words && (
 				<span className="flex min-w-0 items-center gap-1 text-label text-muted-foreground">
-					{day?.off ? <MoonIcon aria-hidden className="size-3.5 shrink-0" /> : <ClockIcon aria-hidden className="size-3.5 shrink-0" />}
+					{day?.off || day?.journalOff ? <MoonIcon aria-hidden className="size-3.5 shrink-0" /> : <ClockIcon aria-hidden className="size-3.5 shrink-0" />}
 					<span className="truncate">{words}</span>
 				</span>
 			)}
