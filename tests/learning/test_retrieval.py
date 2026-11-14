@@ -1057,6 +1057,16 @@ def test_the_current_arc_follows_the_lesson_in_progress(
     assert brief["path"]["topics"][0] == ["limit", "new", "limits"]
 
 
+def test_an_arc_stays_first_until_one_of_its_topics_is_taught(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    answered(workspace, -2, "riemann", result="incorrect")
+    assert retrieval.resume(workspace, here="parts")["arc"]["first"] is True
+    taught(workspace, -1, "riemann")
+    assert retrieval.resume(workspace, here="parts")["arc"]["first"] is False
+
+
 def test_the_brief_offers_each_ready_arcs_check_with_its_pairs(
     workspace: Workspace,
 ) -> None:

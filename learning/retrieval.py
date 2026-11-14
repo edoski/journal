@@ -379,7 +379,8 @@ def _arc_brief(
 ) -> dict[str, Any]:
     """The arc blocks of the session opener: the current arc with its
     question, purpose and entry (``first`` while none of its topics is
-    started), each ready arc's check (``arcs_ready``), and the arc notes."""
+    introduced, whatever was attempted before teaching), each ready arc's
+    check (``arcs_ready``), and the arc notes."""
     if not record["arcs"]:
         return {}
     found = arcs.standing(record, levels, here)
@@ -408,7 +409,10 @@ def _arc_brief(
             **told(now, "title", "question", "purpose"),
             "state": found[now]["state"],
             "entry": found[now]["entry"],
-            "first": found[now]["state"] == "new",
+            "first": not any(
+                "introduced" in record["topics"][key]
+                for key in arcs.live_topics(record, now, order)
+            ),
         },
         "arcs_ready": ready or None,
         "arc_notes": arcs.notes(record) or None,
