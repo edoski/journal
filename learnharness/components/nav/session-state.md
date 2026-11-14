@@ -7,9 +7,9 @@ The one model of where a session stands. Home, the topic page, the calendar and 
 | State | When | What a surface says |
 |---|---|---|
 | `working` | a turn or a compaction runs (`busy`, `compacting`) | sidebar: Working; Home: "Tutor writing", the line stays where it was; topic page: Open |
-| `your-turn` | a question or problem the tutor posed is unanswered (`pendingQuestion`, `pendingProblem`), or `ended` is `mid-lesson`: the plan waits for his go-ahead, he dismissed its question, a lesson it picked up reached no step yet, or its last words ask him something (end in a question mark) while plan steps remain | "Your turn"; topic page: Resume |
+| `your-turn` | a question or problem the tutor posed is unanswered (`pendingQuestion`, `pendingProblem`), or `ended` is `mid-lesson`: the plan waits for his go-ahead, he dismissed its question, a lesson it picked up reached no step yet, its last words ask him something (end in a question mark) while plan steps remain, or a lesson moved to practice waits on Next problem with plan steps left | "Your turn"; topic page: Resume |
 | `paused` | the tutor's turn stopped before it finished (`ended` `cut`): it owes the next word | Home: "Stopped mid-reply"; topic page: Resume |
-| `finished` | anything else: the lesson closed, a practice round concluded, a one-off answer, and a sign-off in words such as "Good place to stop" even with plan steps left | nothing waits; no Your turn, no Home line, never resumed |
+| `finished` | anything else: the lesson closed, a practice round concluded with no plan steps left, a one-off answer, and a sign-off in words such as "Good place to stop" even with plan steps left | nothing waits; no Your turn, no Home line, never resumed |
 
 `ended` is the record's fold (`sessionEndOf`, `src/core/session-end.ts`).
 
