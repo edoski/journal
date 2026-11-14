@@ -43,8 +43,8 @@ second pillar of input).
 | Lesson details | ⌘K | `lh:kbd-open-model-picker` (lesson-top-bar.tsx; the id predates the details panel and stays, since saved rebinds key on it) |
 | Toggle sidebar | ⌘B | `lh:toggle-sidebar` (sidebar.tsx) |
 | Sessions search | ⌘⇧F | `lh:kbd-sessions-search` (sidebar.tsx) |
-| Walk search results | ↑ / ↓ *in the search field* | sidebar.tsx (cycles the filtered rows, wraps) |
-| Open search result | Enter *in the search field* | sidebar.tsx (walked row, else the first match) |
+| Walk search results | ↑ / ↓ *in the search field* | sidebar-state.ts: focus goes to the first (↓) or last (↑) result row, course, topic or lesson, and the list's own arrows walk on (sidebar-tree.ts) |
+| Open search result | Enter *in the search field* (the first result shown), or on a walked row | sidebar-state.ts |
 | ~~Cycle session~~ | ~~⌥↑ / ⌥↓~~ | RETIRED (owner, 2026-10-10) — the search walk above replaces it |
 | ~~Open selected session~~ | ~~⌥Enter~~ | RETIRED (owner, 2026-10-10) — the search Enter above replaces it |
 | Jump to graph (home) | ⌘G | router.push in keyboard-shortcuts.tsx |
