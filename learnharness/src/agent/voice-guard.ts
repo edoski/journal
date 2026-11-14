@@ -22,6 +22,10 @@ type Family = "message" | "question";
 
 const PROBE_DONE_TOOL = "probe_done";
 
+/** His question is about the plan: when something comes back, is due or
+ *  overdue, the exam, the days ahead. */
+const PLAN_QUESTION = /\b(?:reviews?|plan(?:ned)?|overdue|due|exam|when|days?|schedule|calendar|week|tomorrow)\b/i;
+
 /** What the turn's input asks of the replies to it: the kind of turn its
  *  first message is (no kind: no length budget), and his words when it
  *  answers something of his, which a reply must not hand back. */
@@ -293,7 +297,9 @@ export class VoiceGuard {
 	}
 
 	private messageBreaks(text: string, kind: TurnKind | undefined): VoiceBreak[] {
-		const out = voiceBreaks(text, kind);
+		// The plan's days are the answer to his question about the plan.
+		const asksPlan = kind === "direct" && PLAN_QUESTION.test(this.input.words ?? "");
+		const out = voiceBreaks(text, kind).filter((b) => !(asksPlan && b.rule === "plan"));
 		if (!out.some((b) => b.rule === "questions")) {
 			const asked = [...this.asked, ...sentences(text).filter((s) => s.trim().endsWith("?"))];
 			if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });

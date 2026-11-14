@@ -133,6 +133,11 @@ describe("turns within the voice pass untouched", () => {
 		],
 		["a lesson's first step", [newUserMessage("Poisson")], send("Today: the exact probability of $k$ events when they arrive independently at an average rate, derived by taking your slot model to its limit.")],
 		["a two-sentence close", [newUserMessage("Rank"), assistant([send("A step.")]), newDoneTonightMessage("practice") as LhMessage], send("Next time you pick up with part (c) of sheet 4. Your rank review comes back on Friday 13 November.")],
+		[
+			"a planned day, in answer to his question about the plan",
+			[newUserMessage("Poisson"), assistant([send("A step.")]), newUserMessage("And how many overdue reviews do I have in each of my courses right now?")],
+			send("| Course | Overdue reviews |\n| --- | --- |\n| Probability | 1 (Law of total probability, planned Sat 14 Nov) |\n| Calculus I | 20 |\n\nThe most overdue is Monotonicity in Calculus I, 37 days late. It is planned for Thu 19 November, after your Probability exam."),
+		],
 		["a check question", answering("rank 2"), ask("Calls arrive at an average of $\\lambda$ per minute, and the minute is split into $n$ slots. Write $P(X_n = k)$ in terms of $n$, $\\lambda$ and $k$.")],
 		["a correction that starts with the right value", answering("the product is AB"), send("That's not right: the product is $BA$, since $B$ acts first.")],
 	];
