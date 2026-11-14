@@ -76,7 +76,7 @@ This is the grouping pass's job: it forms the arcs of a course that has topics a
    - A name names the arc's one idea, never a list of its topics: "Sorting", not "Heapsort, quicksort and counting sort". Two phrases joined by "and" pass only as one idea the material names so ("Limits and continuity"). When only a list fits, the arc holds several ideas: find the one question they serve, or cut it (rule 3).
    - Use the material's chapter title when it fits the topics and passes the sort below.
    - Test the names as the learner will read them, before you submit: sort every topic title, shuffled, into the arc names alone. A topic that lands in another arc than its own means its place or a name is wrong. Move the topic to the arc it lands in when rule 2 allows; rename only when rule 2 holds it where it is. At most one topic may stay a borderline miss, with its reason in the basis.
-   - A purpose line says the one thing the arc lets the learner do, true of every topic in it ("Find the slope of any curve built from familiar functions"), never a list of its topics' tasks.
+   - A purpose line says the one thing the arc lets the learner do, true of every topic in it ("Find the slope of any curve built from familiar functions"), never a list of its topics' tasks. It uses no term the topic titles do not, and promises nothing the material does not teach.
 
 Edge cases:
 - A topic that fits two arcs goes where rule 2 forces, else where rule 3 fits best, else with its material locator; never in both.
