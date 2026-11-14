@@ -19,6 +19,7 @@ import type { CourseMapLedgers, CourseRecords } from "../../core/ports.ts";
 import type { ChatSummary } from "../../core/contracts/chat.ts";
 import {
 	answerProblems,
+	arcStandingOf,
 	buildWindow,
 	courseView,
 	dropRefusedEdge,
@@ -287,6 +288,16 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		return shown.json;
 	}
 
+	/** The course as the build sees it. In a course with arcs, the engine
+	 *  says where he stands, told the lessons only the app has open. */
+	async function viewOf(workspace: string, record: unknown): Promise<MapCourseView> {
+		if (!recordHasArcs(record)) return courseView(record);
+		const lessons = openLessonsOf(deps.sessions?.() ?? [], workspace, record);
+		const standing = await courseRecords.run(workspace, { verb: "arcs", here: lessons.here, open: lessons.topics });
+		if (!standing.ok) throw new Error(`course record: ${standing.message}`);
+		return courseView(record, arcStandingOf(standing.json));
+	}
+
 	async function build(workspace: string, start: (title: string) => AbortSignal): Promise<MapOutcome> {
 		const record = await readRecord(workspace);
 		const window = buildWindow(sourcesOf(record), ledgers.get(workspace));
@@ -312,8 +323,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 			return { status: "nothing" };
 		}
 		const folders = new Set(sourcesOf(record).filter((s) => isFolder(s.path, directory)).map((s) => s.handle));
-		const viewOf = (r: unknown) => courseView(r, openLessonsOf(deps.sessions?.() ?? [], workspace, r));
-		const view = viewOf(record);
+		const view = await viewOf(workspace, record);
 		const arcs = view.arcs.length > 0;
 		const examDate = typeof obj(obj(record).exam).date === "string" ? (obj(obj(record).exam).date as string) : null;
 		// The last answer whose shape passed: when the engine keeps refusing
@@ -354,7 +364,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		);
 		if (signal.aborted) throw Object.assign(new Error("course map aborted"), { name: "AbortError" });
 		// A lesson may have saved while the agent read: merge into the record as it is now.
-		const now = viewOf(await readRecord(workspace));
+		const now = await viewOf(workspace, await readRecord(workspace));
 		if (signal.aborted) throw Object.assign(new Error("course map aborted"), { name: "AbortError" });
 		const { patch, salvaged } = await saveSalvaging(workspace, submit, now);
 		if (patch) deps.onSaved?.(workspace);

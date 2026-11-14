@@ -22,6 +22,7 @@ import type { CourseMapLedgers } from "../src/core/ports.ts";
 import type { ChatSummary } from "../src/core/contracts/chat.ts";
 import {
 	answerProblems,
+	arcStandingOf,
 	buildWindow,
 	courseView,
 	dropRefusedEdge,
@@ -33,6 +34,7 @@ import {
 	type CourseMapLedger,
 	type MapCourseView,
 	type MapSubmit,
+	type OpenLessons,
 } from "../src/core/course-map-build.ts";
 
 const view = (over: Partial<MapCourseView> = {}): MapCourseView => ({
@@ -320,28 +322,16 @@ describe("where he stands in the arcs", () => {
 		...over,
 	});
 
-	it("the current arc is the arc of You are here: the lesson in progress, else path.current", () => {
-		assert.equal(courseView(record()).currentArc, "spaces");
-		assert.equal(courseView(record(), { topics: ["eigen"], here: "eigen" }).currentArc, "spectra");
-		assert.equal(courseView(record(), { topics: [], here: "trace" }).currentArc, "spaces", "an excluded topic is no place to stand");
-	});
-
-	it("with no topic to stand on: the earliest arc with an untaught live topic, else the last", () => {
-		const noHere = record({ path: { arcs: ["spaces", "systems", "spectra"] }, standings: { vectors: { level: "retained" }, span: { level: "assisted" }, rank: { level: "new" }, eigen: { level: "new" }, trace: { level: "new" } } });
-		assert.equal(courseView(noHere).currentArc, "systems");
-		const allTaught = record({ path: { arcs: ["spaces", "systems", "spectra"] }, standings: { vectors: { level: "retained" }, span: { level: "retained" }, rank: { level: "retained" }, eigen: { level: "retained" }, trace: { level: "new" } } });
-		assert.equal(courseView(allTaught).currentArc, "spectra");
-	});
-
-	it("studied counts taught topics, chosen methods, path.current and open lessons; held is their arcs and the current one", () => {
-		const v = courseView(record({ observations: { o1: { topics: ["vectors"], chose: "rank" } } }), { topics: ["eigen"], here: null });
-		assert.deepEqual(new Set(v.studied), new Set(["vectors", "span", "rank", "eigen"]));
-		assert.deepEqual(v.held, ["spaces", "systems", "spectra"]);
-		assert.deepEqual(courseView(record()).held, ["spaces"]);
+	it("the view carries where the engine says he stands, in a course with arcs only", () => {
+		const said = arcStandingOf({ current_arc: "spectra", studied: ["vectors", "eigen"], held: ["spaces", "spectra"], arcs: [] });
+		assert.deepEqual(said, { studied: ["vectors", "eigen"], held: ["spaces", "spectra"], currentArc: "spectra" });
+		assert.deepEqual(arcStandingOf({ studied: [], held: [], arcs: [] }), { studied: [], held: [], currentArc: null }, "no current_arc in a course without arcs");
+		assert.deepEqual([courseView(record(), said).currentArc, courseView(record(), said).held], ["spectra", ["spaces", "spectra"]]);
+		assert.deepEqual(courseView(record()).held, [], "told nothing, it holds nothing");
 	});
 
 	it("a record with a broken arc entry reads as a course without arcs", () => {
-		const broken = courseView(record({ arcs: { spaces: { title: "Vector spaces" } }, path: { arcs: ["spaces"] } }));
+		const broken = courseView(record({ arcs: { spaces: { title: "Vector spaces" } }, path: { arcs: ["spaces"] } }), { studied: ["span"], held: ["spaces"], currentArc: "spaces" });
 		assert.deepEqual([broken.arcs, broken.held, broken.currentArc, broken.topicArc], [[], [], null, {}]);
 	});
 
@@ -627,6 +617,67 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		assert.match(note.reason, /the proposed arc changes were set aside; refused: .*; proposed need: "elastic" needs "aic"; refused: topics\.elastic: its prerequisite "aic"/);
 		const salvaged = ledgers.all.get(dir)!.done.at(-1)!.salvaged ?? [];
 		assert.equal(salvaged.length, 2);
+	});
+
+	describe("where he stands in the arcs, as the engine says it", () => {
+		const arc = (title: string) => ({ title, question: `Why ${title}?`, purpose: `Do ${title}.` });
+		function standingCourse(name: string, extra: Record<string, unknown> = {}): string {
+			const dir = course(name);
+			engine(["--workspace", dir, "save"], {
+				arcs: { spaces: arc("Vector spaces"), systems: arc("Linear systems"), spectra: arc("Eigenvalues") },
+				topics: { vectors: { title: "Vectors", arc: "spaces", introduced: true }, span: { title: "Span", arc: "spaces" }, rank: { title: "Rank", arc: "systems" }, eigen: { title: "Eigen", arc: "spectra" }, trace: { title: "Trace", arc: "spectra", excluded: "not examined" } },
+				path: { arcs: ["spaces", "systems", "spectra"], current: "span" },
+				arc_change: { reason: "Chapters 1 to 3" },
+				...extra,
+			});
+			return dir;
+		}
+		const standing = async (dir: string, lessons: OpenLessons = { topics: [], here: null }) => {
+			const said = await records.run(dir, { verb: "arcs", here: lessons.here, open: lessons.topics });
+			assert.ok(said.ok);
+			return arcStandingOf(said.json);
+		};
+
+		it("the current arc is the arc of You are here: the lesson in progress, else path.current", async () => {
+			const dir = standingCourse("stand-here");
+			assert.equal((await standing(dir)).currentArc, "spaces");
+			assert.equal((await standing(dir, { topics: ["eigen"], here: "eigen" })).currentArc, "spectra");
+			assert.equal((await standing(dir, { topics: [], here: "trace" })).currentArc, "spaces", "an excluded topic is no place to stand");
+		});
+
+		it("with no topic to stand on: the earliest arc with an untaught live topic, else the last", async () => {
+			const dir = standingCourse("stand-none");
+			engine(["--workspace", dir, "save"], { topics: { span: { introduced: true } }, path: { current: null } });
+			assert.equal((await standing(dir)).currentArc, "systems");
+			engine(["--workspace", dir, "save"], { topics: { rank: { introduced: true }, eigen: { introduced: true } } });
+			assert.equal((await standing(dir)).currentArc, "spectra");
+		});
+
+		it("studied counts taught topics, chosen methods, path.current and open lessons; held is their arcs and the current one", async () => {
+			const dir = standingCourse("stand-studied");
+			assert.deepEqual((await standing(dir)).held, ["spaces"]);
+			engine(["--workspace", dir, "save"], { observations: [{ topics: ["vectors"], text: "Picked rank", help: "none", result: "incorrect", chose: "rank" }] });
+			const v = await standing(dir, { topics: ["eigen"], here: null });
+			assert.deepEqual(new Set(v.studied), new Set(["vectors", "span", "rank", "eigen"]));
+			assert.deepEqual(v.held, ["spaces", "systems", "spectra"]);
+		});
+
+		it("a build keeps clear of the arc of the lesson he has open, which only the app sees", async () => {
+			const lesson = { id: "now", title: "now", createdAt: "2026-11-07", updatedAt: "2026-11-07", kind: "teach", messageCount: 4, phase: "teach", pendingQuestion: false, pendingProblem: false, ended: "mid-lesson", ownTopics: ["aic"] } as unknown as ChatSummary;
+			const move: MapSubmit = { topics: [], order: [], moves: [{ topic: "ridge", arc: "choose", reason: "Sheet 2 selects the penalty" }] };
+			const build = async (name: string, sessions: readonly ChatSummary[]) => {
+				const dir = arcCourse(name);
+				const ledgers = memoryLedgers();
+				adoptNotes(ledgers, dir);
+				const mine = sessions.map((c) => ({ ...c, course: { workspace: dir } }) as ChatSummary);
+				await createCourseMapBuilder({ courseRecords: records, ledgers, engine: scriptedModel([move]), sessions: () => mine }).buildMap(dir);
+				return record(dir);
+			};
+			assert.equal((await build("arcs-free", [])).topics.ridge.arc, "choose", "with no lesson open, neither arc is held");
+			const held = await build("arcs-open", [lesson]);
+			assert.equal(held.topics.ridge.arc, "shrink");
+			assert.match(held.arc_log.at(-1).reason, /kept "ridge" in "Regularisation", since "Model selection" is an arc he is in or has studied/);
+		});
 	});
 
 	it("material added to a course from before the builder: only the new material is read", async () => {

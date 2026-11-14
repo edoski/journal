@@ -90,6 +90,8 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 			return { args: ["save"], stdin: JSON.stringify(verb.changes) };
 		case "check":
 			return { args: ["save", "--check"], stdin: JSON.stringify(verb.changes) };
+		case "arcs":
+			return { args: ["arcs", ...(verb.here ? ["--here", verb.here] : []), ...(verb.open?.length ? ["--open", ...verb.open] : [])], stdin: "" };
 		case "plan":
 			return { args: ["plan", "--days", String(verb.days ?? 1)], stdin: "" };
 		case "sources":

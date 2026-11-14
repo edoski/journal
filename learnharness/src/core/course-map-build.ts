@@ -96,9 +96,10 @@ export interface ViewArc {
 }
 
 /** Where the learner stands in the arcs, for the builder to keep clear of:
- *  only his words re-cut what he is in. */
+ *  only his words re-cut what he is in. The engine's `arcs` verb says it,
+ *  told the app's open lessons (`arcStandingOf`). */
 export interface ArcStanding {
-	/** Topics with evidence: the engine's taught or attempted topics,
+	/** Topics with evidence: taught, named by an attempt that stands,
 	 *  `path.current`, and the topics of every lesson still open. */
 	studied: string[];
 	/** Arcs holding a studied topic, plus the current arc. */
@@ -115,7 +116,7 @@ export interface OpenLessons {
 	here: string | null;
 }
 
-export const NO_OPEN_LESSONS: OpenLessons = { topics: [], here: null };
+export const NO_STANDING: ArcStanding = { studied: [], held: [], currentArc: null };
 
 /** A session he picks up from: it waits on him, the tutor stopped
  *  mid-reply, or he left it for next time (`PICK_UP` in study-facts.ts). */
@@ -184,39 +185,15 @@ function arcsOf(r: Json): ViewArc[] {
 	return read.length === Object.keys(arcs).length && read.every((a) => a !== null) ? (read as ViewArc[]) : [];
 }
 
-/**
- * Where the learner stands in the arcs, from `show --all` and the app's open
- * lessons. Studied topics are those the engine levels other than `new`, a
- * method an attempt chose, `path.current`, and every open lesson's topics.
- * The current arc is the arc of "You are here" (the lesson in progress, else
- * `path.current`); when that topic is missing, excluded or has no arc, the
- * earliest arc holding an untaught live topic, else the last arc. This is
- * the engine's `arcs.studied`, `held` and `current` read from what `show`
- * prints today, with every attempt counted, corrected ones too, so it errs
- * toward holding more. Once the engine prints these itself, this reads them. Pure.
- */
-export function arcStanding(record: unknown, lessons: OpenLessons, arcs: readonly string[]): ArcStanding {
-	if (arcs.length === 0) return { studied: [], held: [], currentArc: null };
-	const r = obj(record);
-	const topics = obj(r.topics);
-	const levels = obj(r.standings);
-	const untaught = (k: string) => obj(levels[k]).level === "new";
-	const live = (k: string) => k in topics && !text(obj(topics[k]).excluded);
-	const arcOf = (k: string) => text(obj(topics[k]).arc);
-	const chosen = Object.values(obj(r.observations)).flatMap((o) => (text(obj(o).chose) ? [text(obj(o).chose)!] : []));
-	const current = text(obj(r.path).current);
-	const studied = new Set([...Object.keys(topics).filter((k) => k in levels && !untaught(k)), ...chosen, ...(current ? [current] : []), ...lessons.topics].filter((k) => k in topics));
-	const here = lessons.here && live(lessons.here) ? lessons.here : current;
-	const hereArc = here && live(here) ? arcOf(here) : undefined;
-	const waiting = new Set(Object.keys(topics).filter((k) => live(k) && untaught(k)).map(arcOf));
-	const currentArc = hereArc && arcs.includes(hereArc) ? hereArc : (arcs.find((a) => waiting.has(a)) ?? arcs.at(-1)!);
-	const held = arcs.filter((a) => a === currentArc || [...studied].some((k) => arcOf(k) === a));
-	return { studied: [...studied], held, currentArc };
+/** Where the learner stands, from the engine's `arcs` verb. Pure. */
+export function arcStandingOf(json: unknown): ArcStanding {
+	const r = obj(json);
+	return { studied: strs(r.studied), held: strs(r.held), currentArc: text(r.current_arc) ?? null };
 }
 
-/** The view, from the engine's `show --all` (the whole record) and the
- *  lessons the app has open on the course. Pure. */
-export function courseView(record: unknown, lessons: OpenLessons = NO_OPEN_LESSONS): MapCourseView {
+/** The view, from the engine's `show --all` (the whole record) and, in a
+ *  course with arcs, where he stands (`arcStandingOf`). Pure. */
+export function courseView(record: unknown, standing: ArcStanding = NO_STANDING): MapCourseView {
 	const r = obj(record);
 	const topics: Record<string, ViewTopic> = {};
 	for (const [handle, value] of Object.entries(obj(r.topics))) {
@@ -248,7 +225,7 @@ export function courseView(record: unknown, lessons: OpenLessons = NO_OPEN_LESSO
 		arcs,
 		topicArc: arcs.length > 0 ? Object.fromEntries(Object.entries(obj(r.topics)).flatMap(([k, t]) => (text(obj(t).arc) ? [[k, text(obj(t).arc)!]] : []))) : {},
 		examArcs: arcs.length > 0 ? strs(exam.arcs) : [],
-		...arcStanding(record, lessons, arcs.map((a) => a.handle)),
+		...(arcs.length > 0 ? standing : NO_STANDING),
 	};
 }
 
