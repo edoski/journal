@@ -30,6 +30,7 @@ import {
 	type ArcSubmit,
 	type EdgeSubmit,
 	type SortAnswer,
+	mergeMisses,
 	sortAnswerProblems,
 	sortMisses,
 	sortProblems,
@@ -240,6 +241,12 @@ describe("the cut's shape rules", () => {
 
 	it("the merge never sends needs: a doubted edge is a note, kept", () => {
 		const formation = arcPassChanges({ ...good, doubts: [{ topic: "riemann", need: "chain", reason: "no derivative in a sum" }] }, view(CALC))!;
+	it("two blind readers: a topic either sorts away from its arc is a miss, with every arc it read as", () => {
+		const m = (topic: string, readsAs: string[]) => ({ topic, title: topic, arc: "A", readsAs });
+		assert.deepEqual(mergeMisses([m("x", ["B"])], [m("x", ["C"]), m("y", ["B"])]), [m("x", ["B", "C"]), m("y", ["B"])]);
+		assert.deepEqual(mergeMisses([], []), []);
+	});
+
 		for (const t of Object.values(formation.changes.topics as Record<string, object>)) assert.equal("needs" in t, false);
 		assert.deepEqual(doubtNote({ ...good, doubts: [{ topic: "riemann", need: "chain", reason: "no derivative in a sum" }] }), {
 			arc_change: { reason: 'prerequisites the grouping pass doubts, kept as they are: "riemann" needs "chain" (no derivative in a sum)' },
@@ -479,7 +486,7 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" });
 		assert.equal(result.status, "formed", JSON.stringify(result));
 		assert.deepEqual(result.status === "formed" && result.sort?.map((m) => m.topic), ["continuity"]);
-		assert.equal(model.sorts, 1);
+		assert.equal(model.sorts, 2, "two blind readers");
 	});
 
 	it("a course he has studied takes arcs only with words in asked", async () => {

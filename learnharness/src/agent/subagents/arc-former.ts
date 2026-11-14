@@ -30,6 +30,7 @@ import {
 	lastEdgesEntry,
 	formationWords,
 	liveTopics,
+	mergeMisses,
 	passDue,
 	sortAnswerProblems,
 	sortMisses,
@@ -62,6 +63,9 @@ const EDGES_TOOL = "submit_edges";
 const ARCS_TOOL = "submit_arcs";
 const SORT_TOOL = "submit_sort";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
+/** Blind readers per cut: the rubric scores with two fresh scorers and
+ *  takes the lower, so a name passes only when both place every topic. */
+const SORT_READERS = 2;
 /** Model rounds beyond reading, as the map builder counts them: one to look
  *  at the course, one to submit, and the submit seam's retries. */
 const SUBMIT_ROUNDS = 6;
@@ -397,7 +401,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		let sorted: SortMiss[] | null = null;
 		const blindSort = async (a: ArcSubmit, formation: Formation): Promise<string | null> => {
 			const quiz = sortQuiz(a, cut.view, formation);
-			const read = await runSubmitAgent<SortAnswer>({
+			const reader = () => runSubmitAgent<SortAnswer>({
 				role: "teacher",
 				toolName: SORT_TOOL,
 				toolDescription: "Submit the arc each topic reads as part of.",
@@ -413,11 +417,12 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 				neverSubmitted: "The blind sort never submitted.",
 			}).catch((err: unknown) => {
 				if (signal?.aborted) throw aborted();
-				console.info(`[arc-pass ${workspace}] blind sort skipped: ${err instanceof Error ? err.message : String(err)}`);
+				console.info(`[arc-pass ${workspace}] a blind reader skipped: ${err instanceof Error ? err.message : String(err)}`);
 				return null;
 			});
-			if (!read) return null;
-			sorted = sortMisses(quiz, read, a);
+			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
+			if (reads.length === 0) return null;
+			sorted = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
 			log({ step: "sort", kind: "sorted", misses: sorted });
 			return sortProblems(sorted, a);
 		};

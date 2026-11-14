@@ -548,6 +548,18 @@ export interface SortMiss {
 	topic: string;
 	title: string;
 	arc: string;
+/** Each topic either reader sorted away from its arc, once, with every arc
+ *  name it read as: the rubric takes the lower of two blind scorers, so a
+ *  name passes only when both readers place the topic home. Pure. */
+export function mergeMisses(...readings: readonly SortMiss[][]): SortMiss[] {
+	const merged = new Map<string, SortMiss>();
+	for (const m of readings.flat()) {
+		const seen = merged.get(m.topic);
+		merged.set(m.topic, seen ? { ...seen, readsAs: [...new Set([...seen.readsAs, ...m.readsAs])] } : m);
+	}
+	return [...merged.values()];
+}
+
 	readsAs: string[];
 }
 
