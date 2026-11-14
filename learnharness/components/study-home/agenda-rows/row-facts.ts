@@ -1,6 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
 import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedOnWords, overdueWords, startsWhyShort, studiedDaysWords } from "@/components/study-words";
-import { lessonOf } from "@/components/study-home/lesson-facts";
 import { sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -57,18 +56,6 @@ export function lineKey(row: TodayRow): string {
 export function courseTitle(row: TodayRow): string {
 	if (row.course) return row.course.map.title;
 	return row.kind === "session" && row.chat.course ? courseLabel(row.chat.course) : "No course";
-}
-
-/** A course line with the arc its lesson sits in: "Calculus I ·
- *  Derivatives"; the course alone when no one arc holds it. Pure. */
-export function courseLine(course: string, arc: string | null | undefined): string {
-	return arc ? `${course} · ${arc}` : course;
-}
-
-/** A line's course, then the arc every topic of its lesson lies in
- *  (`arcPlace`): "Linear Algebra · Linear systems". Pure. */
-export function placeOf(row: TodayRow): string {
-	return courseLine(courseTitle(row), lessonOf(row).place);
 }
 
 /** A line's lesson in words: the waiting session's title, or the course's

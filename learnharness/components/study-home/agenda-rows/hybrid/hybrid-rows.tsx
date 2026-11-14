@@ -1,12 +1,12 @@
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
-import { foldLines, lessonTitle, lineKey, placeOf, pointProps, studiedAgo, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
+import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedAgo, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { MathLine } from "@/components/ui/math-line";
 
-/** The pie beside both lines; the course line, with the arc its lesson
- *  sits in, and when he last studied it at its end, then the lesson line with why now at its end. The ends
+/** The pie beside both lines; the course line with when he last studied
+ *  it at its end, then the lesson line with why now at its end. The ends
  *  sit flush right, so each lines up down the list. */
 const ROW =
 	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-cols-[1rem_minmax(0,1fr)_auto] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-lg px-3 text-left font-normal whitespace-normal data-[pointed]:bg-fill-hover";
@@ -28,9 +28,7 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 				<li key={lineKey(row)} className={HAIRLINE}>
 					<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={ROW} {...pointProps(row, point)}>
 						<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
-						<MathLine data-slot="today-course" className="text-label text-muted-foreground">
-							{placeOf(row)}
-						</MathLine>
+						<MathLine className="text-label text-muted-foreground">{courseTitle(row)}</MathLine>
 						<span data-slot="today-when" className="justify-self-end text-label text-muted-foreground tabular-nums">
 							{studiedAgo(row)}
 						</span>

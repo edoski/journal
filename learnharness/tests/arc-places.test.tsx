@@ -1,10 +1,10 @@
 /**
- * Arcs carried through the rest of the app: Home's rows name the arc a
- * lesson sits in and why a new topic starts now, the sidebar's cards show
- * no arc (Edo kept them as they were), the topic page's head links its
- * course and its arc and says why a topic not started comes when it does,
- * and search finds arcs by name. A course without arcs reads as it did. Linear Algebra
- * cut into three arcs (`LINALG_ARCS`), engine day 2026-11-08.
+ * Arcs carried through the rest of the app: Home's rows keep the course
+ * alone on their course line, the sidebar's cards show no arc (Edo kept
+ * both as they were), the topic page's head links its course and its arc
+ * and says why a topic not started comes when it does, and search finds
+ * arcs by name. A course without arcs reads as it did. Linear Algebra cut
+ * into three arcs (`LINALG_ARCS`), engine day 2026-11-08.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -17,7 +17,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { ArcHandle, CourseMapTopic, StartsWhy, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { arcPlace, lessonOf } from "../components/study-home/lesson-facts.ts";
 import { nextStepOf, todayRows, type TodayRow } from "../components/study-home/study-facts.ts";
-import { placeOf, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
+import { whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
 import { NowCard } from "../components/unit-inbox/now-card.tsx";
@@ -57,19 +57,16 @@ describe("Home's rows", () => {
 		assert.equal(arcPlace(LINALG.map, h("rank", "det")), null, "a course without arcs has no place");
 	});
 
-	it("put the arc on the course line, for a course's step and for a waiting session", () => {
-		const [review] = todayRows([LINALG_ARCS], [], TODAY);
-		assert.deepEqual(lessonOf(review!).topics, ["independence"]);
-		assert.equal(placeOf(review!), "Linear Algebra · Vector spaces");
+	it("keep the course alone on the course line, never its arc (Edo, 14 Nov 2026)", () => {
 		const waiting = chat("q", { pendingQuestion: true, updatedAt: `${TODAY}T09:00:00.000Z`, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
-		const [session] = todayRows([LINALG_ARCS], [waiting], TODAY);
-		assert.equal(placeOf(session!), "Linear Algebra · Eigenvalues");
-		assert.equal(placeOf(todayRows([LINALG], [], TODAY)[0]!), "Linear Algebra", "the course alone without arcs");
-		const doc = render(<HybridRows rows={[review!, session!]} busy={false} onContinue={() => {}} />);
-		assert.deepEqual(
-			[...doc.querySelectorAll('[data-slot="today-course"]')].map((line) => line.textContent),
-			["Linear Algebra · Vector spaces", "Linear Algebra · Eigenvalues"],
-		);
+		const rows = todayRows([LINALG_ARCS], [waiting], TODAY);
+		const doc = render(<HybridRows rows={rows} busy={false} onContinue={() => {}} />);
+		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((line) => line.textContent ?? "");
+		assert.equal(lines.length, 2);
+		for (const line of lines) {
+			assert.ok(line.startsWith("Linear Algebra"), line);
+			assert.ok(!/Vector spaces|Linear systems|Eigenvalues ·| · /.test(line), `no arc on the row: ${line}`);
+		}
 	});
 
 	it("give a planned new topic its reason with its own icon, cut to fit the row", () => {
