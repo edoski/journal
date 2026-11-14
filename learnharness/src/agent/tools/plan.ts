@@ -49,9 +49,10 @@ async function introduceLessonTopics(course: CourseToolContext, candidates: read
  * WRITES the map and never tracks progress. One tool, plan_init, takes the
  * whole dependency map as a mermaid `graph TD` block:
  *
- *   - call it ONCE right after the probe concludes, to present the map (the
- *     LEARNER'S ACCEPTANCE of the presented plan, not this call, ends
- *     planning — docs/probe-teach-split.md §4)
+ *   - call it ONCE right after the probe concludes; the tutor states the
+ *     lesson's goal in one line and starts teaching in the same turn (Edo,
+ *     14 Nov 2026: no approval of a map of material he doesn't know yet —
+ *     he interrupts when he wants)
  *   - statuses (current / visited / upcoming) are DERIVED from the quiz
  *     nodeId tags the teacher fires (contracts.ts derivePlanStatuses) — the
  *     teacher never declares them, and there is no "done" bookkeeping
@@ -121,7 +122,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 			label: "plan_init",
 			description:
 				"Write or REWRITE this session's plan map — the dependency graph the learner follows live in the plan window. " +
-				"Call once right after the probe concludes, to present the map; re-call whenever the map is wrong (the new block replaces the old tree). " +
+				"Call once right after the probe concludes, then state the lesson's goal in one line and start teaching in the same turn: he sees the map live and needs to approve nothing. " +
+				"Re-call whenever the map is wrong (the new block replaces the old tree). " +
 				"A mermaid graph block (any direction): one node per line (`slug[Short Title]` — slugs are permanent lowercase ids: a-z, 0-9, hyphens/underscores), " +
 				"`-->` edges meaning 'from must be understood before to' (chains fine). 5–15 nodes: a map, not a syllabus — one reasoning step per node, compress. " +
 				"Every check you fire names the node it assesses via `nodeId`; where the lesson stands derives from those tags.",

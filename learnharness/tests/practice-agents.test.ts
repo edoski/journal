@@ -308,6 +308,9 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		// no size ceilings, and the detour keeps the pace (owner round, 2026-10-07)
 		assert.ok(!teacher.includes("Typically 5–15 nodes"), "the node-count cap is dead");
 		assert.match(teacher, /No size ceiling/);
+		// no approval step before a lesson (Edo, 14 Nov 2026)
+		assert.match(teacher, /he is not asked to approve a map/);
+		assert.ok(!/confirm the plan|once he's on board|Presenting ends your turn/.test(teacher), "no plan confirmation");
 		assert.match(teacher, /never rush the repair/);
 		assert.match(teacher, /one and only pace/);
 		assert.match(teacher, /nothing to rush/, "the goal reiteration composes");

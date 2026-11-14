@@ -5,7 +5,7 @@ import type { ChatListItem } from "@/src/core";
  * and the sidebar read (spec: session-state.md). Pure.
  *   - working: the tutor is writing (a turn or a compaction runs);
  *   - your-turn: the tutor waits on the learner: a question or a practice
- *     problem it posed, its plan waiting for his go-ahead, or its last
+ *     problem it posed, a plan it wrote but taught no step of, or its last
  *     words asking him something partway through a lesson;
  *   - paused: the tutor's turn stopped before it finished, so the tutor
  *     owes the next word and picks the turn back up when it is opened;

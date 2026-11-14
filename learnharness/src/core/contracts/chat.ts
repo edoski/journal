@@ -158,16 +158,16 @@ export interface TurnUsage {
  *  ("author now") and the teacher skipped the deliberation the planning
  *  fragment asks for. So the wake paces it: reason out the optimal way to
  *  teach THIS person THIS thing BEFORE plan_init. Honest to the machinery
- *  — plan_init is still the first tool, the plan map still the first
- *  artifact, and presenting still ends the turn (the verdict death,
- *  2026-09-26: the learner's next message is a natural reply — a change
- *  request or the go-ahead). */
+ *  — plan_init is still the first tool and the plan map the first
+ *  artifact; then the goal in one line and the first step, in the same
+ *  turn (Edo, 14 Nov 2026: no approval of a map of material he doesn't
+ *  know yet; he interrupts when he wants). */
 export const HANDOFF_TEXT =
 	"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
+	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away; I'll interrupt if I want something else.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans
@@ -303,8 +303,8 @@ export interface SessionGoal {
 }
 
 /** How the tutor's last turn left a session that waits on no question or
- *  problem it posed: its words asked him something, or its plan waits for
- *  his go-ahead, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
+ *  problem it posed: its words asked him something, or it wrote the plan
+ *  but taught no step, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
  *  the tutor's ("cut"), his Done for today stopped it with work still open
  *  ("left", left for next time), or it ended the lesson, a practice round
  *  or a one-off answer ("closed"). */
