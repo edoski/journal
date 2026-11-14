@@ -37,6 +37,7 @@
  */
 
 import { POSITION_QUESTION_TOOLS } from "./question-core.ts";
+import { QUESTION_TOOLS } from "./pending.ts";
 
 /** The three phases of a session, as the picker / header / dividers see them. */
 export type Phase3 = "probe" | "plan" | "teach";
@@ -156,6 +157,17 @@ export function phaseTimeline(messages: readonly PhaseMessage[]): Phase3[] {
 		out.push(phase);
 	}
 	return out;
+}
+
+/** The phase the header chip names, or null for none: a session still in
+ *  its opening that has posed no question yet is answering, not quizzing
+ *  (a focused question gets a direct answer, prober/05-opening.md), so it
+ *  shows no phase until the first question is asked. */
+export function chipPhase(messages: readonly PhaseMessage[], timeline: readonly Phase3[] = phaseTimeline(messages)): Phase3 | null {
+	const phase = timeline.at(-1) ?? "probe";
+	if (phase !== "probe") return phase;
+	const asked = messages.some((m) => m.parts.some((p) => p.type.startsWith("tool-") && (QUESTION_TOOLS as readonly string[]).includes(p.type.slice("tool-".length))));
+	return asked ? phase : null;
 }
 
 // ─── the native fold (Wave D: record-side phase over LhMessage[]) ───────────

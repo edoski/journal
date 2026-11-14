@@ -1,4 +1,4 @@
-import type { Phase3, SessionMode } from "@/src/core";
+import { chipPhase, type Phase3, type PhaseMessage, type SessionMode } from "@/src/core";
 import { SectionBreak } from "@/components/lesson/section-break";
 
 /**
@@ -17,6 +17,13 @@ export const CHIP_LABEL: Record<Phase3, string> = {
 	plan: "Planning",
 	teach: "Teaching",
 };
+
+/** The top bar's phase word: none while the opening has asked nothing
+ *  (a direct answer is not a quiz). */
+export function chipLabel(messages: readonly PhaseMessage[], timeline: readonly Phase3[]): string {
+	const phase = chipPhase(messages, timeline);
+	return phase ? CHIP_LABEL[phase] : "";
+}
 
 /** The transcript boundary at the message where the session enters
  *  `phase`. Null for probe (defensive — the fold never emits a probe

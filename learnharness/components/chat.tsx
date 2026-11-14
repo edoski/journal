@@ -54,7 +54,7 @@ import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, JobRecord, PracticeRequest, PracticeRequestDetails, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
-import { CHIP_LABEL, ModeDivider, PhaseDivider } from "@/components/phase-divider";
+import { chipLabel, ModeDivider, PhaseDivider } from "@/components/phase-divider";
 import { CompactionCutDivider } from "@/components/compaction-divider";
 import {
 	activeProblemOf,
@@ -1362,7 +1362,7 @@ export function Chat({
 						}
 						course={course?.title}
 						courseHref={course ? courseHref(course.workspace) : undefined}
-						phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
+						phase={mode === "practice" ? "Practice" : chipLabel(messages, phases)}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
 						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
 						details={

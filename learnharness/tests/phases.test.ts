@@ -13,7 +13,7 @@
 import assert from "node:assert";
 import test from "node:test";
 import type { LhViewMessage } from "../src/core/view.ts";
-import { phaseAt3, phaseTimeline, type Phase3 } from "../src/core/phases.ts";
+import { chipPhase, phaseAt3, phaseTimeline, type Phase3 } from "../src/core/phases.ts";
 
 /** Text-only user message. */
 function user(text: string): LhViewMessage {
@@ -228,4 +228,12 @@ test("phaseAt3 + phaseAt3Lh: a tagged explain CALL is the plan→teach seam too"
 		]),
 		"the two folds agree on the explain mechanic",
 	);
+});
+
+test("the header names no phase while the opening has only answered: a direct answer is not a quiz", () => {
+	const answered: LhViewMessage[] = [user("What is a kernel?"), { id: "a_answer", role: "assistant", parts: [{ type: "text", text: "The kernel of $A$ is every $x$ with $Ax = 0$." }] }];
+	assert.equal(chipPhase(answered), null, "an answer alone shows no phase");
+	assert.equal(chipPhase([...answered, user("quick check please"), assistantTool("recall", "input-available")]), "probe", "the first question shows it");
+	assert.equal(chipPhase([user("teach me eigenvalues"), assistantTool("ask_user_question", "input-available")]), "probe");
+	assert.equal(chipPhase([user("go"), assistantTool("probe_done", "output-available", { ok: true })]), "plan", "a later phase always shows");
 });
