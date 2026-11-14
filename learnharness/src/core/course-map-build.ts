@@ -128,14 +128,19 @@ const openSession = (c: ChatSummary) => c.pendingQuestion || c.pendingProblem ||
  *  `withLessonHere` reads it. Pure. */
 export function openLessonsOf(chats: readonly ChatSummary[], workspace: string, record: unknown): OpenLessons {
 	const topics = obj(obj(record).topics);
-	const mine = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0);
-	const open = mine.filter(openSession);
-	const newest = [...mine].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-	const inProgress = newest && newest.kind === "teach" && openSession(newest) && newest.ended !== "left";
+	const open = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0 && openSession(c));
 	return {
 		topics: [...new Set(open.flatMap((c) => [...(c.ownTopics ?? []), ...(c.topics ?? [])]))].filter((k) => k in topics),
-		here: (inProgress && (newest.ownTopics ?? []).find((k) => k in topics)) || null,
+		here: lessonTopics(chats, workspace).find((k) => k in topics) ?? null,
 	};
+}
+
+/** The topics of the course's lesson in progress, as `withLessonHere`
+ *  reads it: its newest session, when that is a lesson still open and not
+ *  left for next time; empty otherwise. Pure. */
+export function lessonTopics(chats: readonly ChatSummary[], workspace: string): readonly string[] {
+	const newest = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+	return newest && newest.kind === "teach" && openSession(newest) && newest.ended !== "left" ? (newest.ownTopics ?? []) : [];
 }
 
 /** What the course record holds that a build's patch is merged into. */

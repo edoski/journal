@@ -218,6 +218,8 @@ describe("course records adapter (fake engine)", () => {
 		const records = createCourseRecords({ ...engine, env: { ...engine.env, FAKE_ENGINE_MAP: JSON.stringify(output) } });
 		const result = await records.map("/s/linalg");
 		assert.deepEqual(calls()[0]!.args, ["--workspace", "/s/linalg", "map"]);
+		await records.map("/s/linalg", "eigen");
+		assert.deepEqual(calls()[1]!.args, ["--workspace", "/s/linalg", "map", "--here", "eigen"], "the lesson in progress goes to the engine as --here");
 		assert.ok(result.ok);
 		const { map } = result;
 		assert.equal(map.workspace, "/s/linalg");
@@ -559,6 +561,25 @@ describe("course records adapter (the real engine, throwaway course)", { skip: !
 			mapped.map.topics.map((t) => [t.handle, t.title, t.level]),
 			[["rank", "Rank of a matrix", "assisted"]],
 		);
+	});
+
+	it("the golden course with arcs reads its arcs from the real engine, and --here moves the current arc to the lesson's topic", async () => {
+		const home = fs.mkdtempSync(path.join(TMP, "home-"));
+		const workspace = fs.mkdtempSync(path.join(TMP, "course-"));
+		const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-08" };
+		execFileSync(ENGINE_PYTHON, ["-m", "learning", "--workspace", workspace, "init"], { cwd: ENGINE_ROOT, env: { ...env, PYTHONPATH: ENGINE_ROOT } });
+		fs.copyFileSync(path.join(GOLDEN, "linear-algebra-arcs.course.json"), path.join(workspace, ".study", "course.json"));
+		const records = createCourseRecords({ python: ENGINE_PYTHON, root: ENGINE_ROOT, env });
+
+		const mapped = await records.map(workspace);
+		assert.ok(mapped.ok, !mapped.ok ? mapped.message : "");
+		assert.deepEqual(mapped.map, { ...parsed(goldenMap("linear-algebra-arcs")), workspace }, "the engine's map today is its golden, parsed");
+		assert.equal(currentArc(mapped.map), "eigenvalues");
+
+		const here = await records.map(workspace, "projection");
+		assert.ok(here.ok, !here.ok ? here.message : "");
+		assert.equal(here.map.current, "eigen", "path.current stays");
+		assert.equal(here.map.currentArc, "orthogonality", "the engine counts the lesson in progress");
 	});
 
 	it("create makes a new folder a course with its exam day and material; rename and delete go through the engine", async () => {

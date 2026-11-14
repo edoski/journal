@@ -390,8 +390,8 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 			if (writes(verb) && (result.ok || result.kind === "io")) emit("course-changed", { workspace });
 			return result;
 		},
-		async map(workspace) {
-			const result = toResult(await exec(engine, ["--workspace", workspace, "map"], ""), "map");
+		async map(workspace, here) {
+			const result = toResult(await exec(engine, ["--workspace", workspace, "map", ...(here ? ["--here", here] : [])], ""), "map");
 			if (!result.ok) return result;
 			const map = courseMapOf(workspace, result.json);
 			return map ? { ok: true, map } : { ok: false, kind: "io", message: "map printed an unexpected shape" };
