@@ -174,7 +174,7 @@ def settle(
     outcome: schema.PatchResult,
     today: date,
 ) -> dict[str, str]:
-    """Place new topics, guard and log the save's arc changes, and mark the
+    """Place new topics, guard, check and log the save's arc changes, and mark the
     exam as moved when topics move into or out of its scope. Changes
     ``record`` in place; returns the arc each new topic was placed in."""
     placed = _place(before, record)
@@ -186,6 +186,7 @@ def settle(
     change = changes.get("arc_change")
     _guard(before, record, found, change)
     arc_rules.names(before, record)
+    arc_rules.check_placed(before, record)
     day = today.isoformat()
     log = [
         *record.get("arc_log", ()),

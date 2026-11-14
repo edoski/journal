@@ -295,6 +295,37 @@ def test_the_exam_names_a_run_of_live_arcs(workspace: Workspace) -> None:
     )
 
 
+def test_an_exclusion_an_arc_rule_refuses_is_named_in_the_refusal(
+    workspace: Workspace,
+) -> None:
+    formed(workspace, exam={"date": "2026-12-20", "arcs": ["integrals"]})
+    out = {"excluded": "Not in this year's syllabus"}
+    refused(
+        workspace,
+        {"topics": {"riemann": out, "ftc": out}},
+        'excluding "riemann", "ftc": exam.arcs: every topic of "integrals" is excluded',
+    )
+    records.save(workspace, {"exam": {"arcs": None}})
+    refused(
+        workspace,
+        {
+            "topics": {
+                key: out for key in ("riemann", "ftc", "derivative", "chain-rule")
+            }
+        },
+        'excluding "derivative", "chain-rule", "riemann", "ftc": arcs: one live arc '
+        "equal to the course adds nothing to orient by",
+    )
+    with pytest.raises(ValueError, match="^exam.arcs must be a run"):
+        records.save(
+            workspace,
+            {
+                "topics": {"riemann": out},
+                "exam": {"date": "2026-12-21", "arcs": ["limits", "integrals"]},
+            },
+        )
+
+
 def test_leaves_out_holds_topics_of_the_named_arcs_without_emptying_one(
     workspace: Workspace,
 ) -> None:

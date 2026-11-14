@@ -119,7 +119,8 @@ def check(record: dict[str, Any], *, placing: bool = False) -> None:
     """Refuse a record that breaks a structural arc rule, naming the fix.
 
     ``placing`` is a save's state before the engine places its new topics:
-    a topic may still lack an arc, and an arc may still be empty.
+    a topic may still lack an arc, and the size and exam rules (H4, H6, H8)
+    wait for ``check_placed``.
     """
     _check_topics(record, placing)
     _check_order(record)
@@ -131,8 +132,7 @@ def check(record: dict[str, Any], *, placing: bool = False) -> None:
                 raise ValueError(f"arcs.{arc}.{name}: required; {why}")
     _check_needs(record)
     if not placing:
-        _check_sizes(record)
-    _check_exam(record)
+        _check_placed(record)
 
 
 def _check_topics(record: dict[str, Any], placing: bool) -> None:
@@ -195,6 +195,48 @@ def _check_needs(record: dict[str, Any]) -> None:
                 "evidence, keep the arcs and the need, and record the conflict in "
                 "arc_change.reason; only he can ask for a re-plan"
             )
+
+
+def _check_placed(record: dict[str, Any]) -> None:
+    _check_sizes(record)
+    _check_exam(record)
+
+
+def check_placed(before: dict[str, Any], after: dict[str, Any]) -> None:
+    """H4, H6 and H8 on a save's record once its new topics are placed. The
+    rules name arcs, so a refusal that the save's new exclusions alone cause
+    names them too."""
+    if not after["arcs"]:
+        return
+    try:
+        _check_placed(after)
+    except ValueError as error:
+        old = before["topics"]
+        newly = [
+            key
+            for key, topic in after["topics"].items()
+            if "excluded" in topic and "excluded" not in old.get(key, {})
+        ]
+        kept = {
+            **after,
+            "topics": {
+                key: {k: v for k, v in topic.items() if k != "excluded"}
+                if key in newly
+                else topic
+                for key, topic in after["topics"].items()
+            },
+        }
+        if not newly or _fails(kept):
+            raise
+        raise ValueError(f"excluding {_listed(newly)}: {error}") from None
+
+
+def _fails(record: dict[str, Any]) -> bool:
+    try:
+        _check_placed(record)
+    except ValueError:
+        return True
+    return False
 
 
 def _check_sizes(record: dict[str, Any]) -> None:

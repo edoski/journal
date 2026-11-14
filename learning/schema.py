@@ -988,7 +988,8 @@ def validate_record(record: Any, *, placing: bool = False) -> dict[str, Any]:
     """Check a whole stored course record and return its canonical form.
 
     ``placing`` is a save's record before the engine places its new topics
-    in arcs (``arcs.settle``); every other rule holds.
+    in arcs (``arcs.settle``), which then runs the arc rules that read
+    placement (``arc_rules.check_placed``); every other rule holds.
     """
     if not isinstance(record, dict):
         raise ValueError("the course record must be a JSON object")
