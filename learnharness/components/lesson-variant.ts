@@ -35,6 +35,21 @@ function readLesson(): LessonVariant {
 	return LESSON_OPTIONS.find((option) => option === value) ?? "current";
 }
 
+/** Whether the guide has registered the switch (development): until then
+ *  every option reads as Current. The host imports this module, so the
+ *  listener is in place before it registers. */
+let hostKnown = false;
+if (DEV && typeof window !== "undefined") window.addEventListener("polish:host", () => { hostKnown = true; }, { once: true });
+const readKnown = () => hostKnown;
+const readUnknown = () => false;
+
+/** Development only: whether the switch is known yet. A lesson drawn as
+ *  Current for the moment before then mounted Current's docks, whose first
+ *  effects rewrite his kept answer, and then the candidate's. */
+export function useLessonVariantKnown(): boolean {
+	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readKnown : () => true, DEV ? readUnknown : () => true);
+}
+
 /** Which lesson to draw. Production builds draw Current until one ships. */
 export function useLessonVariant(): LessonVariant {
 	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readLesson : readCurrent, readCurrent);
