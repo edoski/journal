@@ -16,6 +16,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../
 import { courseRead } from "../components/course-page/course-model.ts";
 import { aheadWords, lastSessionOf, namesWords, nextStartOf, paceOf } from "../components/course-page/course-head/head-facts.ts";
 import { PaceHead } from "../components/course-page/course-head/pace-head.tsx";
+import { BriefHead } from "../components/course-page/course-head/brief-head.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -114,7 +115,7 @@ function viewOf(c: StudyCourse, chats: ChatListItem[] = []) {
 }
 
 describe("every candidate head", () => {
-	for (const [name, Head] of [["Pace", PaceHead]] as const) {
+	for (const [name, Head] of [["Pace", PaceHead], ["Brief", BriefHead]] as const) {
 		it(`${name}: the title and the press stay, Context replaces Add material, no progress words, no line repeating the rows, Studied opens the last session`, () => {
 			const document = render(<Head view={viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")])} busy={false} onContinue={() => {}} />);
 			const text = document.body.textContent ?? "";

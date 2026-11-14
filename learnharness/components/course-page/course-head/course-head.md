@@ -7,5 +7,6 @@ Shared parts (`head-parts.tsx`): `ContextButton`; `ExamFact`, "Exam in 11 days" 
 | Option | Thesis | Under the title | Arcs, once the engine has them |
 |---|---|---|---|
 | Pace | Will I be ready? (Linear's project health) | the topics the plan has no room for before the exam, in the warning ink; inside the run-up the ones not yet solid; else "Every topic fits before the exam" or "Every topic started"; "No exam day set" without one | "In <arc>" leads the standing line |
+| Brief | The course in his words (a Claude project's instructions, a Linear project's description) | the description from Context, two lines at most, or "Say what this course is, for the tutor and the map", which opens Context; the standing line adds the linked folders and websites, two of them, then More in Context | "In <arc>" above the title |
 
 Every line is words and icons: no counts, levels or percentages. The lead keeps its 20px row while the plan is read, so nothing below moves.
