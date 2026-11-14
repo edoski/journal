@@ -176,7 +176,8 @@ export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }
 /** The ? overlay: the dialog anatomy (dialog.md), its sections in two
  *  balanced columns so every shortcut shows at once with nothing to
  *  scroll, each row the action, then its keys as plain glyphs (kbd.md),
- *  in the app's own words. */
+ *  in the app's own words. A label too long for its column wraps under
+ *  itself rather than losing its end. */
 function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 	if (!open) return null;
 	return (
@@ -193,8 +194,8 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 						<section key={label} aria-label={label} className="flex break-inside-avoid flex-col pb-4 last:pb-0">
 							<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
 							{actions.map((a) => (
-								<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
-									<span className="truncate text-foreground">{a.label}</span>
+								<div key={a.id} data-slot="cheat-sheet-row" className="flex min-h-8 items-center justify-between gap-4 py-1.5 text-row">
+									<span className="min-w-0 text-pretty text-foreground">{a.label}</span>
 									<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
 								</div>
 							))}

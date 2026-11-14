@@ -121,6 +121,24 @@ describe("calendar entries", () => {
 		assert.equal(misfitWords([]), null);
 	});
 
+	it("says why a review waits on the day the plan holds it to, and only there", () => {
+		const FREE = course(
+			"/study/calc",
+			"Calculus",
+			{ topics: [topic("limits", { title: "Limits", review: { kind: "scheduled", date: "2026-12-03", held: true } })] },
+			{ planned: [{ date: "2026-12-03", reviews: ["limits" as TopicHandle], new: [] }, { date: "2026-12-20", reviews: ["limits" as TopicHandle], new: [] }] },
+		);
+		const reviews = calendarEntries({ courses: [FREE, PROB], chats: [], scope: null }).filter((e) => e.kind === "review");
+		assert.deepEqual(
+			reviews.map((e) => e.kind === "review" && [e.title, e.day, e.waits]),
+			[
+				["Bayes' rule", "2026-11-09", null],
+				["Limits", "2026-12-03", "Waits for your exams"],
+				["Limits", "2026-12-20", null],
+			],
+		);
+	});
+
 	it("gives a review the topic page's action and an open task its opening and topic", () => {
 		const entries = calendarEntries({ courses: [LINALG], chats: [], scope: null });
 		const span = entries.find((e) => e.kind === "review" && e.title === "Span");

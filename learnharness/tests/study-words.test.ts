@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { courseShareWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
+import { courseShareWords, heldWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
 
 // The app's one wording for where he stands and why a topic needs him
 // (study-words.ts), which every surface reads.
@@ -79,5 +79,21 @@ describe("counts in plain words", () => {
 	it("says what Show does without a number", () => {
 		assert.equal(moreWords(23, 25), "Show the rest");
 		assert.equal(moreWords(40, 25), "Show more");
+	});
+});
+
+describe("why a review waits", () => {
+	const held = { kind: "scheduled", date: "2026-12-03", held: true } as const;
+	it("says a course with no exam ahead of the review waits for the exam courses", () => {
+		assert.equal(heldWords(held, null), "Waits for your exams");
+		assert.equal(heldWords(held, "2026-11-19"), "Waits for your exams", "its own exam is past by the review");
+	});
+	it("says a course whose own exam is still ahead waits for a nearer one", () => {
+		assert.equal(heldWords(held, "2026-12-10"), "Waits for a nearer exam");
+	});
+	it("says nothing for a review the plan does not hold back", () => {
+		assert.equal(heldWords({ kind: "scheduled", date: "2026-12-03" }, null), null);
+		assert.equal(heldWords({ kind: "due", date: "2026-11-08", overdue: 0 }, null), null);
+		assert.equal(heldWords(null, null), null);
 	});
 });

@@ -2,7 +2,7 @@
 
 The topic page's body (`../topic-page.md`), which Edo picked. Thesis: Steps and Trail in one page that fits the window, each with one job. The history, sorted by relevance into Pick up's sections, says what to pick up and what happened, and holds the page's action (`../pickup/pickup.md`); the map says where one lesson stands and what comes next.
 
-Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN`), `history.tsx` (`HistoryPane` and its rows), `lesson-map.tsx` (`LessonMap`), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
+Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps` and the start's `error`), `history.tsx` (`HistoryPane` and its rows), `lesson-map.tsx` (`LessonMap`), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
 
 ## Roles
 
@@ -13,11 +13,11 @@ Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN
 
 ## Anatomy
 
-Column `max-w-[60rem]` (`HYBRID_COLUMN`, which the error line under it shares), `px-6 pt-6 pb-6`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls.
+The shared page frame (`PageFrame`, `../../../page-frame/page-frame.md`), the course page's: centred up to 72rem, `px-6 pt-6 pb-6`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls. A start that fails says so under the head (`data-slot="topic-lesson-error"`), where the course page says it.
 
 | Block | Shown when | Size |
 |---|---|---|
-| `TopicHead` (shared), no button: Now holds the action | always | its own height |
+| `TopicHead` (the shared `PageHead`), no button: Now holds the action | always | its own height |
 | `data-slot="topic-panes"`: the app's linked columns (`../../../linked-columns/linked-columns.md`, which the course page shares), the full height under the head, the history on the left up to 24rem, the map filling the rest on the right, 24px apart, nothing around them, and a line in the map's edge ink from the lesson on the map's row to the step it stopped on (the Link switch, Connected unless he picks Current). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
 | The history alone, the column's width | no session planned | fills |
 

@@ -384,8 +384,7 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.equal(view.parts.length, 2, "text (teacher-facing) + the data-subagent-aborted marker part");
 		const html = renderToStaticMarkup(<SubagentSteerCard message={view as never} />);
 		assert.match(html, /job-aborted-badge/);
-		assert.match(html, /research/, "the job's kind, lower-cased like the complete-badge idiom");
-		assert.match(html, /stopped by you/);
+		assert.match(html, /<span>Research stopped by you<\/span>/, "one sentence naming the job, one space between its words");
 		assert.doesNotMatch(html, /learner/);
 		// the teacher-facing protocol text never renders for the learner
 		assert.ok(!html.includes("no brief is coming"), "no protocol glue in the chip");

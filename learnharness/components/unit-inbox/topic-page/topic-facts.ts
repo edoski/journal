@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { overdueWords, returnWords } from "@/components/study-words";
+import { heldWords, overdueWords, returnWords } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -80,6 +80,9 @@ export interface TopicFacts {
 	/** The engine's diagnosed mistake, else the last attempt of a topic it
 	 *  calls weak when that attempt was not right, in the tutor's words. */
 	mistake: string | null;
+	/** Why its next review waits past the day memory asks for it
+	 *  (`heldWords`); null when nothing holds it back. */
+	waits: string | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
 	/** Every session of the topic, newest first. */
@@ -273,6 +276,7 @@ export function topicFacts({ course, topic, chats, read }: { course: StudyCourse
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
+		waits: heldWords(topic.review, map.exam?.date ?? null),
 		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,

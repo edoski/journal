@@ -8,6 +8,7 @@ import { DemoOutputCard } from "@/components/artifacts/demo-card";
 import { PdfBriefCard, ResearchBriefCard } from "@/components/artifacts/job-card";
 import { VisualOutputCard } from "@/components/artifacts/visual-card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { STOPPED_WORDS } from "@/components/study-words";
 
 /**
  * The sub-agent result delivery card (contracts.ts "THE ASYNC PROTOCOL" §4).
@@ -36,7 +37,7 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 		const aborted = message.parts.find((p) => p.type === "data-subagent-aborted") as
 			| { data?: { kind?: string } }
 			| undefined;
-		if (aborted?.data) return <AbortedBadge kind={aborted.data.kind ?? "job"} />;
+		if (aborted?.data) return <AbortedBadge kind={aborted.data.kind} />;
 		return (
 				<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
 				A sub-agent finished, but its result could not be displayed.
@@ -66,12 +67,12 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 /** The aborted-job chip: mirrors the complete-badge one-liner — the
  * teacher's wake turn acknowledges the abort in the lesson itself,
  * this just marks what happened. */
-function AbortedBadge({ kind }: { kind: string }) {
+function AbortedBadge({ kind }: { kind?: string }) {
+	const words = kind && kind in STOPPED_WORDS ? STOPPED_WORDS[kind as keyof typeof STOPPED_WORDS] : STOPPED_WORDS.unknown;
 	return (
 		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-row text-muted-foreground">
-			<CircleX className="size-4" />
-			<span className="first-letter:uppercase">{kind}</span>
-			<span>stopped by you</span>
+			<CircleX aria-hidden className="size-4" />
+			<span>{words}</span>
 		</div>
 	);
 }

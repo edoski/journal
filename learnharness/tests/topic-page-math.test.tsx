@@ -121,7 +121,7 @@ describe("math in the topic page's head and Next", () => {
 	).document;
 
 	it("typesets the title and the mistake under it", () => {
-		const head = page.querySelector('[data-slot="topic-head"]')!;
+		const head = page.querySelector('[data-slot="page-head"]')!;
 		assert.ok(head.querySelector("h1 .katex"), "the title");
 		assert.ok(head.querySelector('[data-slot="unit-gap"] .katex'), "the mistake");
 		assert.doesNotMatch(head.textContent!, /\$/);

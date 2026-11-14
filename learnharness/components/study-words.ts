@@ -1,4 +1,4 @@
-import type { CourseMapTopic, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import type { CourseMapTopic, JobKind, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -92,6 +92,22 @@ export function returnWords(days: number): string {
 	return `Back in ${Math.round(days / 30)}mo`;
 }
 
+/** Why a review waits past the day memory asks for it, when the engine's
+ *  plan says a nearer exam's reviews filled the evenings before it
+ *  (`held`): a course with no exam ahead of the review waits for the exam
+ *  courses, one whose own exam is still ahead waits for a nearer one. */
+export const HELD_WORDS = {
+	exams: "Waits for your exams",
+	nearer: "Waits for a nearer exam",
+} as const;
+
+/** The words for a review the plan holds back (`HELD_WORDS`); null for one
+ *  it does not. `exam` is the course's exam day, null with none. */
+export function heldWords(review: CourseMapTopic["review"], exam: string | null): string | null {
+	if (review?.kind !== "scheduled" || !review.held) return null;
+	return exam !== null && exam > review.date ? HELD_WORDS.nearer : HELD_WORDS.exams;
+}
+
 /** The lesson's words for what just happened to his work (round 2, 14 Nov
  *  2026): a reply below the fold, a reply that never came, a draft another
  *  window overtook, stopping for the night, and a course whose record
@@ -105,6 +121,16 @@ export const LESSON_WORDS = {
 	leftForTonight: "Left for next time",
 	unreadableCourse: "Couldn't read this course's record",
 } as const;
+
+/** The lesson's mark for a helper he stopped, one sentence per kind;
+ *  `stopped` when the kind is unknown. */
+export const STOPPED_WORDS: Record<JobKind | "unknown", string> = {
+	research: "Research stopped by you",
+	demo: "Demo stopped by you",
+	visual: "Figure stopped by you",
+	pdf: "PDF reading stopped by you",
+	unknown: "Stopped by you",
+};
 
 /** What stops a course's record being read, after
  *  `LESSON_WORDS.unreadableCourse`, in a student's words. */

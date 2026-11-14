@@ -526,8 +526,9 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
     The whole course at once and nothing capped, with no observation text: the
     projection a map of the course draws from. ``review`` is the day the daily
     plan puts the topic's next review (``when``), ``overdue`` is present
-    exactly when that day is today, and ``starts`` is the day it starts an
-    untaught topic.
+    exactly when that day is today, ``held`` when the plan put it later than
+    memory asks because a nearer exam's reviews filled the evenings before
+    it, and ``starts`` is the day it starts an untaught topic.
     """
     record = records.load(workspace)
     today = clock.today()
@@ -555,6 +556,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "introduced": topic.get("introduced"),
             "review": planned.review(key, stored),
             "overdue": overdue.get(key),
+            "held": key in planned.held and key not in overdue or None,
             "starts": starts.isoformat() if starts else None,
             "weak": _is_weak(topic, standing),
             "right": standing.get("right"),

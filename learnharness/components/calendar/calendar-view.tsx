@@ -10,7 +10,6 @@ import { Hint } from "@/components/ui/hint";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EventCalendarViews } from "@/components/ui/event-calendar-views";
 import { EventCalendarCloseIcon } from "@/components/event-calendar-icons";
-import { SidebarToggle } from "@/components/sidebar";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
 import { CalendarEntryView, type StartSession } from "@/components/calendar/calendar-entry";
 import { quietBetween, studyTimeWords, type CalendarEntry } from "@/components/calendar/calendar-facts";
@@ -104,8 +103,7 @@ function DayHead({ info, schedule }: { info: DayHeaderInfo; schedule: ReadonlyMa
 }
 
 /**
- * The calendar (spec: calendar.md): a toolbar (the sidebar's toggle,
- * Today, back and forward, the range, the course filter and Week or
+ * The calendar (spec: calendar.md): a toolbar (Today, back and forward, the range, the course filter and Week or
  * Month, the last one picked) over FullCalendar's day grid, every entry drawn by
  * CalendarEntryView. Week shows each day's study time in its head; the
  * day grid fills the window and folds what does not fit under More.
@@ -163,7 +161,6 @@ export function CalendarView({
 		<div data-slot="calendar" className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<header data-slot="calendar-toolbar" className="relative z-10 flex h-13 shrink-0 items-center gap-3 px-3">
-				<SidebarToggle />
 				<div className="lh-no-drag flex items-center gap-1">
 					<Button variant="quiet" size="sm" onClick={() => controller.today()} className="text-foreground">
 						Today

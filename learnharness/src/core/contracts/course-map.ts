@@ -19,8 +19,9 @@ export function isTopicLevel(value: unknown): value is TopicLevel {
 /** The topic's review on the day the engine's daily plan puts it: `due`
  *  exactly when that day is today, with the days since memory asked for
  *  it; a review the plan moves to a later day is `scheduled` for that day,
- *  not overdue. */
-export type TopicReview = { kind: "due"; date: string; overdue: number } | { kind: "scheduled"; date: string };
+ *  not overdue, and `held` when it moved because a nearer exam's reviews
+ *  filled the evenings before it (the engine's `held`). */
+export type TopicReview = { kind: "due"; date: string; overdue: number } | { kind: "scheduled"; date: string; held?: true };
 
 /** Why the engine calls a topic weak: each its own engine field, shown as is. */
 export interface TopicSignals {

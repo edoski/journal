@@ -1,6 +1,6 @@
 # Page frame
 
-One frame for every page with a head over a body (`page-frame.tsx`): the course page uses it, and the topic page is to adopt it, so the two read as one family (Edo's ruling, 13 Nov 2026: both pages share one linked-columns layout; the round-2 evaluation found them in different frames, title weights and action styles). Tests: `tests/page-frame.test.tsx`.
+One frame for every page with a head over a body (`page-frame.tsx`): the course page and the topic page use it, so the two read as one family (Edo's ruling, 13 Nov 2026: both pages share one linked-columns layout; the round-2 evaluation found them in different frames, title weights and action styles). Tests: `tests/page-frame.test.tsx`.
 
 ## Parts
 

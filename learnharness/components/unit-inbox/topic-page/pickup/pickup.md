@@ -12,7 +12,7 @@ Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and 
 |---|---|---|
 | Now | The page's action (`topicAction`, all seven rows): what to pick up, where it stands in a few words, the press, and the session it opens | always |
 | Next | Every other place that waits on him, most pressing first: another session whose turn is his, one the tutor is writing in, a due review the action does not already start, each open task the action does not continue | not empty |
-| Scheduled | The engine's next review when dated ahead: Review, its day ("Fri 13 Nov") in the date column. A date, not a control | dated |
+| Scheduled | The engine's next review when dated ahead: Review, then why it waits that long when the plan held it back for a nearer exam's reviews (`heldWords` in `components/study-words.ts`: "Waits for your exams", or "Waits for a nearer exam" while the course's own exam is still ahead; `data-slot="pickup-scheduled-waits"`, 12 muted), its day ("Fri 13 Nov") in the date column. A date, not a control | dated |
 | Earlier | Every session neither Now nor Next holds, and every scored attempt, newest first on the history's line (`trailDays`), each day's words ("Yesterday", "Tue 3 Nov") in a trailing date column on its first row | not empty |
 
 Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a few words, no sentences), what on top and where under it:
