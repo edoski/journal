@@ -10,9 +10,10 @@ owed shows only that he can do at least that much; a day he stopped while
 something owed was left shows where he stops. Owed is what the plan proposes
 whatever his pace: every review due that day (memory needs it), except within
 a course's final review, which the plan spreads to the exam, and each exam
-course's pace of new topics (those left over the study days left, as many as
-are ready). So the plan proposes everything owed until he stops short of it,
-and a learner who does exactly what the plan asks is never limited by it.
+course's pace of new topics (those left over the study days left, as whole
+topics a day (``pace``), as many as are ready). So the plan proposes
+everything owed until he stops short of it, and a learner who does exactly
+what the plan asks is never limited by it.
 
 His limit for each kind is the recency-weighted mean of the days that say
 something about it: every day he stopped short, and every finished day at or
@@ -46,7 +47,7 @@ the plan and a single skip does not turn it off.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Hashable, Iterable, Mapping
+from collections.abc import Callable, Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 import math
@@ -148,6 +149,33 @@ class Capacity:
             ],
             "evidence_days": round(self.evidence, 1),
         }
+
+
+def whole(day: date, rate: Callable[[date], float]) -> int:
+    """A day's whole items from a fractional daily ``rate``: the rates of its
+    calendar week through ``day``, summed and rounded, less the same through
+    the day before. The fractions carry from day to day within the week, so a
+    day never takes more than its own rate rounded up, and a date gets the
+    same count whichever day the plan is made on: a plan made tomorrow keeps
+    the days today's plan put things on."""
+    monday = day - timedelta(days=day.weekday())
+
+    def through(last: date) -> float:
+        days = (monday + timedelta(days=n) for n in range((last - monday).days + 1))
+        return sum(rate(other) for other in days)
+
+    return math.floor(through(day) + 0.5) - math.floor(
+        through(day - timedelta(days=1)) + 0.5
+    )
+
+
+def pace(rest: int, left: int, day: date, studies: Callable[[date], bool]) -> int:
+    """The topics an exam's pace starts on ``day``: its ``rest`` over the
+    ``left`` study days, today included, as whole topics (``whole``). A pace
+    of half a topic a day starts one every other day, and leaves the days
+    between to other courses, instead of one every day until its topics run
+    out; its last study day takes all that is left, so the deadline holds."""
+    return whole(day, lambda other: rest / left if studies(other) else 0.0)
 
 
 # --- what each day shows ------------------------------------------------------
@@ -264,13 +292,13 @@ def _new_short(
                 for other in partners[key]
             )
         ]
-        pace = math.ceil(len(untaught) / left)
-        opened = _opened(record, untaught, ready, pace, free)
-        if len(opened) < pace and not progress.holding_raises(
-            left, len(untaught) - len(opened), pace
+        owed = pace(len(untaught), left, day, lambda other: other.weekday() in studies)
+        opened = _opened(record, untaught, ready, owed, free)
+        if len(opened) < owed and not progress.holding_raises(
+            left, len(untaught) - len(opened), len(untaught)
         ):
             ready = opened
-        owed = min(len(ready), pace)
+        owed = min(len(ready), owed)
         if sum(starts.get(key) == day for key in untaught) < owed:
             short.add(day)
     return short
