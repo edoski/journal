@@ -38,7 +38,7 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 
 ## Math
 
-A step title, a session's title and an attempt's sentence may hold TeX; each is drawn through the shared `MathText` (`../../../ui/math-text.md`) in the map's nodes (`StepNode`) and the history's rows, and `mathPlain` gives a node's label and the map's caption plain words. A title with no formula stays plain text. Tested in `tests/topic-page-math.test.tsx`.
+A step title, a session's title and an attempt's sentence may hold TeX; each is drawn through the shared `MathText` (`../../../ui/math-text.md`) in the map's nodes (`StepNode`) and the history's rows, and `mathPlain` gives a node's label and the map's caption plain words. A title with no formula stays plain text. KaTeX's fonts have no medium face, so a step's title strokes its math by a hairline (0.015em) to sit at the title's medium weight. Tested in `tests/topic-page-math.test.tsx`.
 
 ## Facts (`hybrid-facts.ts`)
 
