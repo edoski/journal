@@ -1,6 +1,6 @@
 import type { ArcHandle, ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StartsWhy, StudyCourse, TopicAttempt, TopicHandle, TopicRecord, TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -112,8 +112,9 @@ export interface TopicFacts {
 	 *  topics, which (`startsAfterWords`); null otherwise. */
 	starts: { day: string; waits: string | null } | null;
 	/** Why the plan starts a topic not started then ("After Expectation
-	 *  and linearity, which it needs"), in a course with arcs; null once
-	 *  taught, with no plan for it, and in a course without arcs. */
+	 *  and linearity, which it needs", "Early, ahead of its place, while
+	 *  earlier topics wait on Change of basis"); null once taught and with
+	 *  no plan for it. */
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
@@ -378,7 +379,7 @@ export function topicFacts({
 		mistake: mistakeOf(topic, attempts),
 		waits: waitsWords(topic.review, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,
-		startsWhy: topic.level === "new" && topic.startsWhy && map.arcs ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null,
+		startsWhy: topic.level === "new" && topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null,
 		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,

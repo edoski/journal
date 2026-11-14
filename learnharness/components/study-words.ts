@@ -246,6 +246,14 @@ export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "t
 	return `Next in ${arc ?? map.title}`;
 }
 
+/** Whether a start's reason tells him anything its planned day does not:
+ *  every reason but "next" in a course without arcs, which would only say
+ *  "Next in Linear Algebra" beside the course's own name. Pure. */
+export function startsWhyTells(why: StartsWhy): boolean {
+	if (why.arc !== undefined || why.kind === "early") return true;
+	return why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0);
+}
+
 /** `startsWhyWords` cut to fit a row's reason beside its icon, where the
  *  topic page keeps the whole sentence: "Next in Matrices"; "After
  *  Expectation"; "After Separable equations"; "Early, from Orthogonality"

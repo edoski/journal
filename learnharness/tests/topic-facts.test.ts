@@ -300,6 +300,19 @@ describe("what went wrong", () => {
 describe("when a topic comes up", () => {
 	const factsOf = (t: CourseMapTopic) => topicFacts({ course: { ...COURSE, map: { ...COURSE.map, topics: [...COURSE.map.topics, t] } }, topic: t, chats: [], read: null });
 
+	it("says why the plan starts a topic not started then, in a course without arcs too", () => {
+		const early = topic("inner-product", { title: "Inner products", starts: "2026-11-15", startsWhy: { kind: "early", waitingOn: [h("rank")], exam: false } });
+		assert.equal(COURSE.map.arcs ?? null, null, "a course without arcs");
+		assert.deepEqual(factsOf(early).startsWhy, { kind: "early", words: "Early, ahead of its place, while earlier topics wait on Rank and the column space" });
+		const after = topic("projection", { title: "Projection", starts: "2026-11-16", startsWhy: { kind: "after", needs: [h("rank")], partners: [] } });
+		assert.equal(factsOf(after).startsWhy?.words, "After Rank and the column space, which it needs");
+	});
+
+	it("says nothing for plain next in a course without arcs, which would only name the course", () => {
+		const next = topic("projection", { starts: "2026-11-16", startsWhy: { kind: "next" } });
+		assert.equal(factsOf(next).startsWhy, null);
+	});
+
 	it("says from when a review moved past the day memory asked for it, and why", () => {
 		const moved = topic("series", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-22", held: { exam: null, since: "2026-11-09" } } });
 		assert.equal(factsOf(moved).waits, "Moved from 9 Nov, earlier days are full");

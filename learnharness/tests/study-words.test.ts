@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, movedWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, movedWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -178,6 +178,13 @@ describe("why a topic starts then", () => {
 	it("says next in its arc, else in the course", () => {
 		assert.equal(startsWhyWords({ kind: "next", arc: "systems" as ArcHandle }, arcs), "Next in Linear systems");
 		assert.equal(startsWhyWords({ kind: "next" }, plain), "Next in Linear Algebra");
+	});
+	it("is worth saying in every course but as plain next in a course without arcs, which only repeats the course beside it", () => {
+		assert.equal(startsWhyTells({ kind: "early", waitingOn: ["change-basis" as TopicHandle], exam: false }), true, "early in a course without arcs");
+		assert.equal(startsWhyTells({ kind: "after", needs: ["expectation" as TopicHandle], partners: [] }), true);
+		assert.equal(startsWhyTells({ kind: "next", arc: "systems" as ArcHandle }), true);
+		assert.equal(startsWhyTells({ kind: "next" }), false);
+		assert.equal(startsWhyTells({ kind: "after", needs: [], partners: [] }), false);
 	});
 	it("names a method it competes with, beside what it needs", () => {
 		const [rank, kernel, cramer] = ["rank", "kernel", "cramer"].map((h) => arcs.topics.find((t) => t.handle === h)!.handle);

@@ -166,8 +166,8 @@ describe("the topic page", () => {
 		const withSession = topicFacts({ course, topic: diag, chats: [chat("d", { topics: ["diag"], pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })], read: null });
 		assert.deepEqual(pickupSections(withSession).scheduled?.why, facts.startsWhy, "Scheduled's first lesson says it too, when Now does not start it");
 		const plain = topicFacts({ course: { ...LINALG, map: { ...LINALG.map, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? diag : t)) } }, topic: diag, chats: [], read: null });
-		assert.equal(plain.startsWhy, null, "a course without arcs says what it said before");
-		assert.equal(pickupSections(plain).now.why, null);
+		assert.deepEqual(plain.startsWhy, facts.startsWhy, "a course without arcs says why too");
+		assert.deepEqual(pickupSections(plain).now.why, facts.startsWhy);
 	});
 });
 
