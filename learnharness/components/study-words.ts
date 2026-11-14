@@ -91,6 +91,14 @@ export const ATTEMPT_WORDS = {
 	wrong: "Not right",
 } as const;
 
+/** What an attempt in a topic's history says under it when it is not a
+ *  plain answer: he gave up without one, or it was a prediction before its
+ *  step was taught, which never counts. */
+export const ATTEMPT_HOW_WORDS = {
+	gaveUp: "Gave up",
+	predicted: "Prediction, not counted",
+} as const;
+
 /** A review come due: "Due today", "3d overdue", "2w overdue". */
 export function overdueWords(overdue: number): string {
 	if (overdue <= 0) return "Due today";

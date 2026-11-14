@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { heldWords, LESSON_WORDS, reviewWords, startsAfterWords, type SlipKey } from "@/components/study-words";
+import { ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, reviewWords, SLIP_WORDS, startsAfterWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -258,14 +258,21 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
 	return [...session, ...tasks];
 }
 
-/** How an attempt went, and the one thing worth saying about it: the
- *  method he reached for in its place, that he was sure and wrong, or
- *  that he had a hint. */
+/** How an attempt went, and the one thing worth saying about it: a
+ *  prediction that never counted, that he gave up, the method he reached
+ *  for in its place, that he was sure and wrong, or how a right answer
+ *  counted when not as his own (round 4: a helped ✓ read as an unaided
+ *  one). */
 export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "wrong"; words: string | null } {
 	const result = attempt.result === "correct" ? "right" : attempt.result === "partial" ? "partly" : "wrong";
+	if (attempt.predicted) return { result, words: ATTEMPT_HOW_WORDS.predicted };
+	if (attempt.gaveUp) return { result, words: ATTEMPT_HOW_WORDS.gaveUp };
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
-	if (attempt.result === "incorrect" && attempt.sure === "confident") return { result, words: "Sure, but wrong" };
-	return { result, words: attempt.unaided ? null : "With a hint" };
+	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : null };
+	// How a right or partly right answer counted, in the answer card's words;
+	// his own work says nothing, so the ones that differ stand out.
+	const counted = countedWords({ helped: !attempt.unaided, grade: attempt.grade ?? (attempt.unaided ? "solid" : "helped") });
+	return { result, words: counted === MARK_WORDS.ownWork ? null : counted };
 }
 
 /** Everything the page draws, from the course, the topic, every

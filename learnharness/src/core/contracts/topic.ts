@@ -17,6 +17,14 @@ export interface TopicAttempt {
 	result: "correct" | "partial" | "incorrect";
 	/** The engine's rule: an exam, or help "none". */
 	unaided: boolean;
+	/** The engine's grade of it (`solid`, `helped`, `missed`), null when it
+	 *  gave none: how it counted, as the answer card says it. */
+	grade: "solid" | "helped" | "missed" | null;
+	/** He gave up on it without an answer. */
+	gaveUp: boolean;
+	/** A prediction made before its step was taught: kept as what happened,
+	 *  never counted. */
+	predicted: boolean;
 	sure: "guess" | "neutral" | "confident" | null;
 	/** The method he reached for in its place (a topic handle), when the tutor recorded one. */
 	chose: string | null;

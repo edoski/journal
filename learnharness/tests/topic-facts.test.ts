@@ -107,7 +107,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 }
 
 function attempt(over: Partial<TopicAttempt> = {}): TopicAttempt {
-	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", ...over };
+	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, grade: null, gaveUp: false, predicted: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", ...over };
 }
 
 const EIGEN_PLAN: SessionPlan = {
@@ -367,7 +367,12 @@ describe("the topic's sessions", () => {
 describe("how an attempt went", () => {
 	it("says right, partly or wrong (never missed, which reads as skipped), and the one thing worth saying about it", () => {
 		assert.deepEqual(attemptMark(attempt(), titleOf), { result: "right", words: null });
-		assert.deepEqual(attemptMark(attempt({ result: "partial", unaided: false }), titleOf), { result: "partly", words: "With a hint" });
+		assert.deepEqual(attemptMark(attempt({ result: "partial", unaided: false }), titleOf), { result: "partly", words: "With help" });
+		assert.deepEqual(attemptMark(attempt({ grade: "helped", sure: "guess" }), titleOf), { result: "right", words: "Counted as helped" });
+		assert.deepEqual(attemptMark(attempt({ grade: "solid" }), titleOf), { result: "right", words: null });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", gaveUp: true, unaided: false }), titleOf), { result: "wrong", words: "Gave up" });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", predicted: true, sure: "confident" }), titleOf), { result: "wrong", words: "Prediction, not counted" });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", unaided: false }), titleOf), { result: "wrong", words: null });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false }), titleOf), { result: "wrong", words: "Sure, but wrong" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false, chose: "cramer" }), titleOf), { result: "wrong", words: "Mixed up with Cramer's rule" });
 	});

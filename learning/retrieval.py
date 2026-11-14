@@ -458,6 +458,14 @@ def _topic_item(
     )
 
 
+def _graded(item: dict[str, Any]) -> dict[str, Any]:
+    """An observation with its ``grade`` when it is scored, so a reader shows
+    how each answer counted without judging it again."""
+    if item["kind"] not in progress.SCHEDULING_KINDS:
+        return item
+    return {**item, "grade": progress.grade(item)}
+
+
 def show(
     workspace: Workspace, handles: list[str], limit: int = SHOW_LIMIT, all: bool = False
 ) -> dict[str, Any]:
@@ -499,18 +507,13 @@ def show(
             related.update(ids)
         elif where == "observations":
             item = observations[handle]
-            scored = item["kind"] in progress.SCHEDULING_KINDS
             items[handle] = compact(
-                {
-                    **item,
-                    "grade": progress.grade(item) if scored else None,
-                    "corrected_by": corrected_by.get(handle),
-                }
+                {**_graded(item), "corrected_by": corrected_by.get(handle)}
             )
         else:
             items[handle] = {"kind": ITEM_KINDS[where], **record[where][handle]}
     evidence = {
-        key: observations[key]
+        key: _graded(observations[key])
         for key in _newest({key: observations[key] for key in shown})
         if key not in items
     }
