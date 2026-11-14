@@ -282,7 +282,7 @@ export interface QuestionAnswerData {
 	 *  committed answer is revealed and no confidence is read. */
 	hintRequested?: boolean;
 	dismissed?: boolean;
-	/** Why a dismissal happened: "tonight" when Done for tonight closed the
+	/** Why a dismissal happened: "tonight" when Done for today closed the
 	 *  session with this question open. Set only through dismissedAnswer,
 	 *  so it never rides an answer. */
 	reason?: DismissReason;
@@ -442,9 +442,9 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string, reason
 	};
 }
 
-/** What the agent reads for a question left open by Done for tonight. */
+/** What the agent reads for a question left open by Done for today. */
 export const LEFT_FOR_TONIGHT_TEXT =
-	"He stopped for tonight with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
+	"He stopped for today with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
 
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):

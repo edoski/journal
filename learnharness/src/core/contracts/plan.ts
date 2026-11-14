@@ -80,7 +80,7 @@ export function derivedNodeStatus(statuses: DerivedPlanStatuses, nodeId: string)
 }
 
 /** The teacher's progress tool: marks plan steps done and closes the
- *  session for tonight. Its calls feed the same fold as the question tags. */
+ *  session for today. Its calls feed the same fold as the question tags. */
 export const LESSON_PROGRESS_TOOL = "lesson_progress";
 
 export const lessonProgressInput = Type.Object({
@@ -90,7 +90,7 @@ export const lessonProgressInput = Type.Object({
 	}),
 	close: Type.Optional(
 		Type.Boolean({
-			description: "true when this turn ends the session for tonight (your close). Omit otherwise.",
+			description: "true when this turn ends the session for today (your close). Omit otherwise.",
 		}),
 	),
 });

@@ -222,18 +222,18 @@ export const CONCLUDE_ACK_TEXT =
 export const NEXT_PROBLEM_TEXT =
 	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or wrap the session in text if the arc is complete.";
 
-/** What the agent reads when he presses Done for tonight: the
+/** What the agent reads when he presses Done for today: the
  *  done-tonight marker's content, per answering agent (only the teacher
  *  has `lesson_progress`). Anything he left open arrives just before it
  *  already resolved: a question as a dismissal with reason "tonight", a
  *  problem as a dismissed conclude. */
 export const DONE_TONIGHT_TEXT = {
 	prober:
-		"[DONE FOR TONIGHT] — the learner pressed Done for tonight. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more tonight. Close in two or three short lines: what you learned about where he stands, and where the lesson will start next time.",
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close in two or three short lines: what you learned about where he stands, and where the lesson will start next time.",
 	teacher:
-		"[DONE FOR TONIGHT] — the learner pressed Done for tonight. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more tonight. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished), then two or three short lines naming where to start next time.",
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished), then two or three short lines naming where to start next time.",
 	practice:
-		"[DONE FOR TONIGHT] — the learner pressed Done for tonight. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more tonight. Close the session in two lines: what went well, and what to pick up next time.",
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more today. Close the session in two lines: what went well, and what to pick up next time.",
 } as const;
 
 /** The practice dock's request buttons: a hint, the rest of the

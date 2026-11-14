@@ -90,7 +90,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		const heading = result.toolName === "recall" ? "Recall" : "Recall check"; // explain — the teach free-recall name
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
-		if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for tonight before answering; the answer was not shown.");
+		if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for today before answering; the answer was not shown.");
 		else if (out?.dismissed === true) body.push("The learner skipped this check.");
 		else if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered in his own words: ${out.text.trim()}`);
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
@@ -130,7 +130,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		];
 		if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered: ${out.text.trim()}`);
 		else if (chosen.length > 0) body.push(`The learner chose: ${chosen.join(", ")}`);
-		else if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for tonight before answering.");
+		else if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for today before answering.");
 		else if (out?.dismissed === true) body.push("The learner skipped this question.");
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
 		body.push(...photoLines(photosOf(result.content), ctx?.photos ?? "note"));

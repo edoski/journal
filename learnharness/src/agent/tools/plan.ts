@@ -100,7 +100,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 			name: LESSON_PROGRESS_TOOL,
 			label: LESSON_PROGRESS_TOOL,
 			description:
-				"Mark plan steps done on his map, and say when you close the session for tonight. Call it in the turn that finishes a step, " +
+				"Mark plan steps done on his map, and say when you close the session for today. Call it in the turn that finishes a step, " +
 				"with that step's node id in `done`; in the turn that ends the session, add `close: true` before your closing words.",
 			parameters: lessonProgressInput,
 			execute: serverExecute(LESSON_PROGRESS_TOOL, lessonProgressInput, async ({ done, close }) => {

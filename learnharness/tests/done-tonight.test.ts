@@ -1,5 +1,5 @@
 /**
- * Done for tonight: one learner action stops the session whatever is open.
+ * Done for today: one learner action stops the session whatever is open.
  * A check he left resolves unanswered with its answer withheld, never
  * graded; an active problem drops with nothing recorded; the agent reads
  * a marker telling it to close. Scripted faux engines: no real provider.
@@ -79,7 +79,7 @@ describe("the tonight input", () => {
 		assert.equal(withheld.details.reason, "tonight");
 		assert.equal(withheld.details.committed, undefined, "the answer is never carried");
 		assert.equal(withheld.details.confidence, undefined, "nothing to grade");
-		assert.match(JSON.stringify(withheld.content), /stopped for tonight/);
+		assert.match(JSON.stringify(withheld.content), /stopped for today/);
 		assert.equal(last(appends).customType, "done-tonight");
 		assert.equal(last(appends).content, DONE_TONIGHT_TEXT.prober, "the prober answers before the probe concludes");
 		assert.equal(pendingQuestionOf([...pendingChecks("q1"), ...appends]), null);
@@ -115,19 +115,19 @@ describe("the tonight input", () => {
 		assert.deepEqual(appends.map((m) => m.role === "custom" ? m.customType : m.role), ["assistant", "toolResult", "done-tonight"]);
 	});
 
-	it("projects a quiet Done for tonight line", () => {
+	it("projects a quiet Done for today line", () => {
 		const appends = inputAppends({ messages: [] }, { type: "tonight" });
 		assert.ok(projectView(appends).some((m) => m.parts.some((p) => p.type === "data-done-tonight")));
 	});
 });
 
-describe("a session he closed for tonight", () => {
+describe("a session he closed for today", () => {
 	const practice = (): LhMessage[] => {
 		const record = { messages: problemPose(), kind: "practice" as const };
 		return [...record.messages, ...inputAppends(record, { type: "tonight" })];
 	};
 
-	it("reads done while his Done for tonight is his latest input", () => {
+	it("reads done while his Done for today is his latest input", () => {
 		const closed = [...practice(), assistant("a_bye", [{ type: "text", text: "Good work tonight. Next time: the second lemma." }], "stop")];
 		assert.equal(doneTonightAtEnd(closed), true);
 		assert.equal(closedTonight(closed), true, "a practice session closed by him reads closed");
@@ -169,13 +169,13 @@ async function turn(engine: PiEngine, chatId: string, input: unknown): Promise<R
 	return ack;
 }
 
-describe("Done for tonight on the server", () => {
+describe("Done for today on the server", () => {
 	it("withholds a pending check's answer, never grades it, and runs the closing turn", async () => {
 		const { engine, histories } = scripted([
 			() => fauxAssistantMessage([fauxToolCall("explain", CHECK, { id: "call-1" })], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxText("Good place to stop. Next time we start from Mercury's orbit.")]),
 		]);
-		const chat = chatStore.createChat("Test: done for tonight");
+		const chat = chatStore.createChat("Test: done for today");
 		chatStore.saveTree(chat.id, { nodes: [{ id: "planet-order", title: "Planet order" }], edges: [], version: 1 });
 
 		await turn(engine, chat.id, { type: "text", text: "teach me the planets" });
@@ -189,8 +189,8 @@ describe("Done for tonight on the server", () => {
 		assert.ok(saved.some((m) => m.role === "custom" && m.customType === "done-tonight"), "the marker is saved");
 		assert.match(JSON.stringify(saved.at(-1)), /Good place to stop/, "the closing turn ran");
 		assert.equal(histories.length, 2);
-		assert.match(histories[1]!, /stopped for tonight/, "the model reads the check as left, not answered");
-		assert.match(histories[1]!, /DONE FOR TONIGHT/);
+		assert.match(histories[1]!, /stopped for today/, "the model reads the check as left, not answered");
+		assert.match(histories[1]!, /DONE FOR TODAY/);
 		assert.equal(doneTonightAtEnd(saved), true);
 	});
 });

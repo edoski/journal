@@ -73,7 +73,7 @@ const close = (done: string[] = ["rank-picture"]): LhMessage[] => [
 	result("lp", "lesson_progress", { ok: true }),
 	assistant([text(FINISHED)], "stop"),
 ];
-/** A lesson the tutor closed for tonight. */
+/** A lesson the tutor closed for today. */
 const closedLesson = (): LhMessage[] => [...lesson("Pivots it is."), ...close()];
 
 /** A tutor turn that ends on a quiz question he has not answered yet, its
@@ -89,7 +89,7 @@ const Q1 = "What does rank count?";
 const Q2 = "What is the rank of $\\begin{pmatrix} 1 & 2 \\\\ 2 & 4 \\end{pmatrix}$?";
 const Q3 = "How many free variables does a rank-1 2x2 system have?";
 /** A lesson as its turns settle: a right answer, then a wrong one, then
- *  "stop for tonight" and the tutor's close. Each entry is the record when
+ *  "stop for today" and the tutor's close. Each entry is the record when
  *  a turn settles. */
 function lessonTurns(): LhMessage[][] {
 	const opening: LhMessage[] = [
@@ -104,7 +104,7 @@ function lessonTurns(): LhMessage[][] {
 	const turn1 = [...opening, ...asks("q1", Q1)];
 	const turn2 = [...turn1, answers("q1", Q1, "Pivots."), ...asks("q2", Q2)];
 	const turn3 = [...turn2, answers("q2", Q2, "2, because both rows are nonzero."), ...asks("q3", Q3)];
-	const turn4 = [...turn3, newUserMessage("I have to stop for tonight, sorry."), ...close([])];
+	const turn4 = [...turn3, newUserMessage("I have to stop for today, sorry."), ...close([])];
 	return [turn1, turn2, turn3, turn4];
 }
 

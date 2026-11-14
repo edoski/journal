@@ -117,7 +117,7 @@ export const LESSON_WORDS = {
 	stoppedBeforeReply: "The tutor stopped before replying.",
 	tryAgain: "Try again",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
-	doneTonight: "Done for tonight",
+	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
 	unreadableCourse: "Couldn't read this course's record",
 } as const;
