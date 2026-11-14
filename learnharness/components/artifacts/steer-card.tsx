@@ -7,6 +7,7 @@ import { isSubagentFailure } from "@/src/core";
 import { DemoOutputCard } from "@/components/artifacts/demo-card";
 import { PdfBriefCard, ResearchBriefCard } from "@/components/artifacts/job-card";
 import { VisualOutputCard } from "@/components/artifacts/visual-card";
+import { InlineDemo, InlineVisual } from "@/components/artifacts/inline-figure";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { STOPPED_WORDS } from "@/components/study-words";
 
@@ -27,7 +28,12 @@ import { STOPPED_WORDS } from "@/components/study-words";
  *     The sub-agent's verification notes are model-facing glue and do NOT
  *     render; only a failure note does.
  */
-export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
+export function SubagentSteerCard({ message, figures = "card" }: {
+	message: LhViewMessage;
+	/** How a demo or figure shows: today's cards, or in the reply's flow
+	 *  (inline-figure.tsx), as the reading lessons draw them. */
+	figures?: "card" | "inline";
+}) {
 	const artifactPart = message.parts.find((p) => p.type === "data-subagent-artifact");
 	const data = artifactPart?.data as SubagentArtifactData | undefined;
 	// The abort steer (2026-09 dock semantics): its message-type part is
@@ -58,8 +64,10 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 				<PdfCompleteBadge result={data.result as PdfResult} />
 			);
 		case "demo":
+			if (figures === "inline") return <InlineDemo output={data.result} messageId={message.id} initialInverted={data.ui?.inverted} />;
 			return <DemoOutputCard output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? false} />;
 		case "visual":
+			if (figures === "inline") return <InlineVisual output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? true} />;
 			return <VisualOutputCard output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? true} />;
 	}
 }

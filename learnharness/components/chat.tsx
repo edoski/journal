@@ -23,6 +23,8 @@ import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { ChatSessionComposer } from "@/components/composer";
+import { LessonSessionComposer } from "@/components/lesson/lesson-composer";
+import type { LessonVariant } from "@/components/lesson-variant";
 import { SentPhotos, sentPhotos, usePhotoDraft, type PendingPhoto } from "@/components/photos";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { dockStateKey } from "@/components/dock-state-key";
@@ -89,7 +91,7 @@ import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
-import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
+import { LESSON_COLUMN, READING_COLUMN } from "@/components/lesson/lesson-column";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
@@ -198,7 +200,12 @@ export function Chat({
 	startedIn,
 	course,
 	initiallyCourseDeleted = false,
+	lesson = "current",
 }: {
+	/** How the lesson reads (lesson-variant.ts): Current, or one of the
+	 *  reading candidates, which share the T3-style composer, the reading
+	 *  column and figures in the flow. */
+	lesson?: LessonVariant;
 	chatId: string;
 	title: string;
 	/** The session's course. Absent on sessions older than the rule that
@@ -238,6 +245,9 @@ export function Chat({
 	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
+	// The reading candidates share one base (lesson-variant.ts).
+	const reading = lesson !== "current";
+	const column = reading ? READING_COLUMN : LESSON_COLUMN;
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
 
@@ -1489,7 +1499,7 @@ export function Chat({
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef} targetScrollTop={followTargetScrollTop}>
 					<SessionMessageNavigation />
 					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-						<div data-session-find-root="" data-transcript-column="" className={`${LESSON_COLUMN} flex flex-1 flex-col gap-4 pt-6`}>
+						<div data-session-find-root="" data-transcript-column="" className={`${column} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="New session"
@@ -1504,7 +1514,7 @@ export function Chat({
 									// and centered like the teacher's artifacts (contracts.ts "THE ASYNC
 									// PROTOCOL" §4). Key fallback: legacy transcripts (pre id-hygiene)
 									// can still hold empty ids — the index keeps keys unique for them.
-									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} />
+									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} figures={reading ? "inline" : "card"} />
 								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume") ? (
 								// A session that picks up an earlier lesson opens teaching:
 								// the plan carried over, so no probe or planning came first.
@@ -1762,7 +1772,23 @@ export function Chat({
 					setupCta={
 						unconnected && <SignInPill onOpen={() => setSetupOpen(true)} />
 					}
-					composer={
+					column={column}
+					composer={reading ? (
+						<LessonSessionComposer
+							busy={busy}
+							value={textRef.current}
+							revision={composerDraftRevision}
+							onChange={recordComposerText}
+							onSend={onSend}
+							onStop={() => setAbortAsk("turn")}
+							sendAllowed={sendAllowed}
+							nextProblem={nextReady}
+							onNext={sendNext}
+							onEmptyEnter={tryAgain}
+							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
+							photos={composerPhotos}
+						/>
+					) : (
 						<ChatSessionComposer
 							// Stop aborts ANY in-flight turn (stream-reattach wave): the
 							// square renders while a reattached/wake turn runs too — the
@@ -1786,7 +1812,7 @@ export function Chat({
 							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
 							photos={composerPhotos}
 						/>
-					}
+					)}
 					onSubmitAnswer={(output, photos) => {
 						if (!pending) return;
 						// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
@@ -1955,6 +1981,7 @@ export function shouldStampGeometryMute(nextH: number, prevH: number, pending: b
 }
 
 function DockOverlay({
+	column,
 	pending,
 	initialQuestionDraft,
 	onSaveQuestionDraft,
@@ -1981,6 +2008,8 @@ function DockOverlay({
 	setupCta,
 	queuedSteers,
 }: {
+	/** The reading column the dock sits in (lesson-column.ts). */
+	column: string;
 	pending: ReturnType<typeof pendingQuestionOf>;
 	initialQuestionDraft?: QuestionFormDraft;
 	onSaveQuestionDraft: (draft: QuestionFormDraft) => void;
@@ -2404,7 +2433,7 @@ function DockOverlay({
 		<div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ right: sbInset }}>
 			<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 			<div ref={blockRef} className="relative bg-background pb-5">
-				<div className={LESSON_COLUMN}>
+				<div className={column}>
 					<div ref={viewportRef} data-dock-viewport="" className="pointer-events-auto">
 					<div ref={bodyRef}>
 					{setupCta}
