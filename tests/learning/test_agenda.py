@@ -283,6 +283,18 @@ def test_a_day_he_left_owed_work_is_a_day_he_stopped_short() -> None:
     assert not capacity.activity([every], on(3))[on(2)].reviews_short
 
 
+def test_a_day_he_answered_no_review_shows_no_review_limit() -> None:
+    record = course(4, exam=20)
+    record = save(record, {"topics": {"t00": {"introduced": True}}}, MONDAY)
+    record = save(record, {"topics": {"t01": {"introduced": True}}}, on(2))
+    record = save(record, {"topics": {"t02": {"introduced": True}}}, on(3))
+    done = capacity.activity([record], on(4))
+    assert done[on(2)].reviews == 0 and not done[on(2)].reviews_short
+    week = capacity.of([record], on(4))
+    assert not week.on(on(4)).reviews.shown
+    assert plan_for(record, on(4))["reviews"]
+
+
 def test_doing_exactly_what_the_plan_proposes_never_shows_a_limit() -> None:
     record = course(12, exam=40, needs={"t03": ["t02"]})
     for offset in range(21):
