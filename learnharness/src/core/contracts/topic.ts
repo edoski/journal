@@ -25,7 +25,8 @@ export interface TopicAttempt {
 	/** A prediction made before its step was taught: kept as what happened,
 	 *  never counted. */
 	predicted: boolean;
-	sure: "guess" | "neutral" | "confident" | null;
+	/** The confidence he chose (`chosenSure`: never the meter left alone). */
+	sure: "guess" | "confident" | null;
 	/** The method he reached for in its place (a topic handle), when the tutor recorded one. */
 	chose: string | null;
 	/** The tutor's sentence: what happened, or the question asked. */

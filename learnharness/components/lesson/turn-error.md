@@ -6,6 +6,7 @@ A failed reply, under the learner's message. `data-testid="turn-error"`, `role="
 |---|---|
 | sentence | 13/18 (`text-row`) in `danger`: one plain sentence the learner can act on |
 | Retry | quiet 32px button, `foreground` at 500; shown while the failed turn can be retried |
+| Sign in | quiet, `foreground` at 500; only when the turn was refused because Claude is signed out; opens the sign-in dialog |
 | Open Settings | quiet, `muted-foreground`; only when the provider rejected the key; opens Settings on Providers |
 | Go to Home | quiet, `foreground` at 500; only when the lesson was deleted elsewhere, which also drops Retry |
 | Details | quiet, `muted-foreground`, `aria-expanded`; shown when the sentence replaces the provider's own text |
@@ -15,6 +16,7 @@ A failed reply, under the learner's message. `data-testid="turn-error"`, `role="
 
 | Kind | When | Sentence |
 |---|---|---|
+| signed-out | the server refused the turn before it started (`provider_key_missing`: Claude isn't signed in); his words went back into the box | Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box. |
 | key | status 401 or 403, or the text says the key is invalid | The provider rejected your API key. |
 | busy | status 429 or 529, or a rate limit or overload | The provider is busy. Wait a moment, then retry. |
 | offline | the browser never reached the app (`Failed to fetch`, `Load failed`, Firefox's `NetworkError…`) | Couldn't reach the app. Check it's running, then send again. |

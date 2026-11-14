@@ -9,9 +9,9 @@ import { LESSON_WORDS } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 import { proseQuestionSpec, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
 import { useProseAnswerContext } from "@/components/lesson/prose/prose-answer";
-import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
+import { LearnerBubble, LearnerWords } from "@/components/lesson/prose/learner-bubble";
 
-/** Small prose: a choice's description, a question's details. */
+/** Small prose: a choice's description, his note on an answer. */
 const SMALL_SIZE = "[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]";
 const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
 
@@ -29,7 +29,7 @@ export function YourTurn() {
  *  digit while the composer takes his words. Answered, the question stays
  *  as the tutor asked it, his answer becomes his bubble with the record's
  *  mark under it, and the committed answer waits behind "The answer". */
-export function ProseQuestion({ tool, toolCallId, input, output, photos, open }: {
+export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor }: {
 	tool: string;
 	toolCallId: string;
 	input: unknown;
@@ -38,31 +38,34 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open }:
 	photos?: readonly Photo[];
 	/** This is the question waiting for him. */
 	open: boolean;
+	/** The plan step this question first taught, when the roadmap opens
+	 *  the transcript here (roadmap-facts.ts). */
+	stepAnchor?: string;
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
 	if (!spec) return null;
-	if (open) return <OpenQuestion spec={spec} />;
+	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} />;
 	if (!output) return null;
-	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} />;
+	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} />;
 }
 
-/** The question's words: the question, its details, and "Select all that
- *  apply" for a choice of many. Shared with the composer's quote. */
+/** The question's words: the question, and "Select all that apply" for a
+ *  choice of many; nothing under them (Edo, 14 Nov 2026: a helper line
+ *  under a question is visual bloat). Shared with the composer's quote. */
 export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSpec; compact?: boolean }) {
 	return (
 		<>
 			<ToolContentResponse className={compact ? SMALL_SIZE : undefined}>{spec.data.question}</ToolContentResponse>
-			{spec.data.context && <ToolContentResponse className={cn("mt-1", SMALL)}>{spec.data.context}</ToolContentResponse>}
 			{spec.mode === "multi-select" && !compact && <p className="mt-1 text-row text-muted-foreground">Select all that apply.</p>}
 		</>
 	);
 }
 
-function OpenQuestion({ spec }: { spec: ProseQuestionSpec }) {
+function OpenQuestion({ spec, stepAnchor }: { spec: ProseQuestionSpec; stepAnchor?: string }) {
 	const answer = useProseAnswerContext();
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
-		<div data-testid="prose-question" data-slot="prose-question" data-open="" className="mt-2">
+		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-step-anchor={stepAnchor} className="mt-2">
 			<YourTurn />
 			<QuestionWords spec={spec} />
 			{spec.mode !== "text" && (
@@ -130,16 +133,17 @@ export function ChoiceRows({ options, multi, selected, onPick, compact = false }
 	);
 }
 
-function AnsweredQuestion({ spec, toolCallId, input, output, photos }: {
+function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor }: {
 	spec: ProseQuestionSpec;
 	toolCallId: string;
 	input: unknown;
 	output: QuestionAnswerData;
 	photos?: readonly Photo[];
+	stepAnchor?: string;
 }) {
 	const answer = answerForPresentation(output, input);
 	const question = (
-		<div data-testid="prose-question" data-slot="prose-question" className="mt-2">
+		<div data-testid="prose-question" data-slot="prose-question" data-step-anchor={stepAnchor} className="mt-2">
 			<QuestionWords spec={spec} />
 			{spec.mode !== "text" && <ChoiceRows options={spec.data.options} multi={spec.mode === "multi-select"} selected={new Set()} />}
 		</div>
@@ -167,7 +171,7 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos }: {
 			) : (
 				<>
 					<LearnerBubble testId="prose-answer" text={words} photos={photos} markId={toolCallId}>
-						{added && <ToolContentResponse className={cn(words && "mt-1", SMALL)}>{added}</ToolContentResponse>}
+						{added && <LearnerWords className={cn(words && "mt-1", SMALL)}>{added}</LearnerWords>}
 					</LearnerBubble>
 					{answer.kind === "explain" && answer.committed && <Disclosure label="The answer">{answer.committed}</Disclosure>}
 				</>

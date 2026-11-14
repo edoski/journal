@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { TopicHandle } from "@/src/core";
 import { CourseGroup } from "@/components/course-page/course-group";
 import { CourseArc } from "@/components/course-page/course-arc";
@@ -56,8 +56,14 @@ export function SplitList({
 	onPoint,
 	onEnterMap,
 	onExitTop,
+	arcExam,
+	after,
 	ref,
 }: {
+	/** What an arc's line says about the exam in place of its exam words. */
+	arcExam?: (section: CourseArcSection) => ReactNode;
+	/** A section under the groups or arcs, inside the scrolling pane. */
+	after?: ReactNode;
 	groups: readonly Group[];
 	/** The course's arcs, which the list shows in place of its groups. */
 	arcs?: readonly CourseArcSection[] | null;
@@ -256,6 +262,7 @@ export function SplitList({
 										if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) walk({ kind: "check", id: section.arc.handle }, e);
 									}}
 									renderItem={row}
+									exam={arcExam?.(section)}
 								/>
 							))
 						: groups.map((group) => (
@@ -273,6 +280,7 @@ export function SplitList({
 								/>
 							))}
 				</div>
+				{after}
 			</div>
 		</section>
 	);

@@ -32,7 +32,7 @@ describe("a card's line", () => {
 			{ kind: "your-turn", words: "Your turn" },
 			{ kind: "working", words: "Working" },
 			{ kind: "stopped", words: "Stopped" },
-			{ kind: "slip", words: "Mistake to fix" },
+			{ kind: "slip", words: "Mistake to fix", slip: "gap" },
 			{ kind: "review", words: "3d overdue" },
 			{ kind: "task", words: "Left off 3d ago" },
 			{ kind: "next", words: "Planned today" },
@@ -60,7 +60,7 @@ describe("the card", () => {
 		{ name: "a turn that waits on him", topic: weak("assisted", { gap: "sign error" }), fact: { kind: "your-turn", words: "Your turn" }, line: "Your turn" },
 		{ name: "the tutor writing", topic: topic({ level: "attempted" }), fact: { kind: "working", words: "Working" }, line: "Working" },
 		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), fact: { kind: "review", words: "9d overdue" }, line: "9d overdue" },
-		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), fact: { kind: "slip", words: "Mixed up with Cramer's rule" }, line: "Mixed up with Cramer's rule" },
+		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), fact: { kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" }, line: "Mixed up with Cramer's rule" },
 		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), fact: { kind: "task", words: "Left off 3d ago" }, line: "Left off 3d ago" },
 	];
 	const line = (doc: Document) => (doc.querySelector('[data-slot="topic-need"]') ?? doc.querySelector('[data-slot="topic-standing"]'))!.textContent;
@@ -73,14 +73,14 @@ describe("the card", () => {
 		});
 	}
 
-	it("draws Home's pie, the shared one: as full as the topic, dashed and empty before he starts, the warning ink on a slip", () => {
+	it("draws Home's pie, the shared one: as full as the topic, the outline alone before he starts, the warning ink on a slip", () => {
 		const pie = (t: CourseMapTopic) => render(t).querySelector('[data-slot="topic-glyph"]')!;
 		const home = renderToStaticMarkup(<Pie share={0.5} />);
 		assert.equal(pie(topic({ level: "attempted" })).getAttribute("data-fill"), "0.5");
 		assert.equal(pie(topic({ level: "attempted" })).querySelector("path")!.getAttribute("d"), parseHTML(home).document.querySelector("path")!.getAttribute("d"), "the wedge Home's rows draw");
 		assert.match(pie(topic({ level: "attempted" })).getAttribute("class")!, /size-4/);
 		assert.ok(pie(topic({ level: "retained" })).querySelector("circle[r='5']"), "full once he can do it on his own");
-		assert.ok(pie(topic()).querySelector("circle[stroke-dasharray]"));
+		assert.ok(pie(topic()).querySelector('[data-part="outline"]:not([stroke-dasharray])'), "a solid outline, never a dashed spinner");
 		assert.equal(pie(topic()).querySelector("path, circle[r='5']"), null, "empty before he starts");
 		assert.match(pie(weak("attempted", { lapsed: true })).getAttribute("class")!, /text-warning/);
 	});

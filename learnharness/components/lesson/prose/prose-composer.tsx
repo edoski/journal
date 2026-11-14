@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MutableRefObject } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
+import { BookOpenIcon, EyeIcon, LightbulbIcon, MessageCircleQuestionIcon, PenLineIcon, type LucideIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Hint } from "@/components/ui/hint";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { stepConfidence } from "@/components/confidence-choice";
 import { usePhotoDraft, sentPhotos } from "@/components/photos";
-import { ComposerChip, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
+import { ComposerIcon, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
 import { carriedForm, formToKept, keepPhotos, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import {
 	CONFIDENCE_CHOICES,
@@ -42,7 +44,7 @@ export function proseBox(chatId: string, open: ProseOpen | null): string | null 
 	return open.kind === "question" ? `${chatId}:q:${open.key}` : `${chatId}:p:${open.toolCallId}`;
 }
 
-type MessageComposerProps = Omit<ComponentProps<typeof LessonSessionComposer>, "toolbar" | "answer" | "head">;
+type MessageComposerProps = Omit<ComponentProps<typeof LessonSessionComposer>, "toolbar" | "leading" | "answer" | "head">;
 
 export interface ProseComposerProps {
 	open: ProseOpen | null;
@@ -70,9 +72,10 @@ export interface ProseComposerProps {
 /** The Prose lesson's one composer (spec: prose.md). With nothing open it
  *  is the lesson's composer. While the tutor waits on a question or a
  *  problem it is the answer field: its placeholder says what is wanted,
- *  quiet chips (Hint, Show me, Explain instead, confidence, Ask instead)
- *  sit in its toolbar, and Send answers. Esc or Ask instead turns it back
- *  into a message to the tutor until Esc again. */
+ *  the requests sit as icons beside attach (Hint, Show me, Explain
+ *  instead), how sure he is and the Answer or Ask toggle beside Send, and
+ *  Send answers. Esc or the toggle turns it into a message to the tutor
+ *  until Esc or the toggle again. */
 export function ProseComposer(props: ProseComposerProps) {
 	const { open, answer, message, messageText, onAskInstead, toggleRef, chatId, compacting } = props;
 	const box = proseBox(chatId, open);
@@ -100,13 +103,7 @@ export function ProseComposer(props: ProseComposerProps) {
 	toggleRef.current = open ? toggle : null;
 
 	if (!open || asking) {
-		const back = open && (
-			<Hint label={open.kind === "question" ? "Back to the question" : "Back to the problem"} binding="escape">
-				<ComposerChip data-testid="prose-back" onClick={toggle}>
-					Back to answering
-				</ComposerChip>
-			</Hint>
-		);
+		const back = open && <ModeToggle mode="ask" kind={open.kind} onToggle={toggle} />;
 		return (
 			<LessonSessionComposer
 				{...message}
@@ -209,8 +206,12 @@ function AnswerComposer({
 			setText("");
 			setConfidence(DEFAULT_CONFIDENCE);
 			const taken = photos.take();
+			// A send refused at once gives his work back, words and photos,
+			// unless he has started writing again.
 			void onSubmitThinking(words, confidence, sentPhotos(taken)).then((accepted) => {
-				if (!accepted) restorePhotos(taken);
+				if (accepted) return;
+				restorePhotos(taken);
+				setText((now) => (now.trim() ? now : words));
 			});
 			return;
 		}
@@ -280,23 +281,19 @@ function AnswerComposer({
 	}, [optionCount, multi, pick]);
 
 	const takesConfidence = problem || spec?.kind === "explain";
+	const leading = problem ? (
+		<>
+			<RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="practice-request-hint" disabled={waiting} onClick={() => request("hint")} />
+			<RequestIcon icon={EyeIcon} label="Show me" hint="Show me: stop here and see the solution" action="practice-show" testId="practice-request-show" disabled={waiting} onClick={() => request("show")} />
+			<RequestIcon icon={BookOpenIcon} label="Explain instead" hint="Explain instead: leave this problem and be taught the idea" action="practice-explain" testId="practice-request-explain" disabled={waiting} onClick={() => request("explain")} />
+		</>
+	) : (
+		spec?.kind === "explain" && <RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={compacting} onClick={hint} />
+	);
 	const toolbar = (
 		<>
-			{problem ? (
-				<>
-					<RequestChip label="Hint" hint="Get a nudge, not the answer" action="practice-hint" testId="practice-request-hint" disabled={waiting} onClick={() => request("hint")} />
-					<RequestChip label="Show me" hint="Stop here and see the solution" action="practice-show" testId="practice-request-show" disabled={waiting} onClick={() => request("show")} />
-					<RequestChip label="Explain instead" hint="Leave this problem and be taught the idea" action="practice-explain" testId="practice-request-explain" disabled={waiting} onClick={() => request("explain")} />
-				</>
-			) : (
-				spec?.kind === "explain" && <RequestChip label="Hint" hint="Get a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={compacting} onClick={hint} />
-			)}
-			{takesConfidence && <ConfidenceChip value={confidence} onChange={setConfidence} />}
-			<Hint label="Ask the tutor something instead" binding="escape">
-				<ComposerChip data-testid="prose-ask" onClick={onAsk}>
-					Ask instead
-				</ComposerChip>
-			</Hint>
+			{takesConfidence && <ConfidenceIcon value={confidence} onChange={setConfidence} />}
+			<ModeToggle mode="answer" kind={open.kind} onToggle={onAsk} />
 		</>
 	);
 	const placeholder = problem ? "Work here, think out loud." : spec ? prosePlaceholder(spec, open.kind === "question" ? open.input : null, selection.selected.size > 0) : undefined;
@@ -309,6 +306,7 @@ function AnswerComposer({
 			onStop={message.onStop}
 			canSend={ready}
 			placeholder={compacting ? "Compacting the conversation…" : placeholder}
+			leading={leading}
 			toolbar={toolbar}
 			answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
 			head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
@@ -317,20 +315,76 @@ function AnswerComposer({
 	);
 }
 
-/** A request chip (Hint, Show me, Explain instead) with its shortcut. */
-function RequestChip({ label, hint, action, testId, disabled, onClick }: { label: string; hint: string; action: KeyAction; testId: string; disabled: boolean; onClick: () => void }) {
+/** A request (Hint, Show me, Explain instead) as an icon, its words and
+ *  shortcut in its tooltip. */
+function RequestIcon({ icon: Icon, label, hint, action, testId, disabled, onClick }: { icon: LucideIcon; label: string; hint: string; action: KeyAction; testId: string; disabled: boolean; onClick: () => void }) {
 	return (
 		<Hint label={hint} action={action}>
-			<ComposerChip data-testid={testId} disabled={disabled} onClick={onClick}>
-				{label}
-			</ComposerChip>
+			<ComposerIcon data-testid={testId} aria-label={label} disabled={disabled} onClick={onClick}>
+				<Icon />
+			</ComposerIcon>
 		</Hint>
 	);
 }
 
-/** How sure he is, as one chip: a press steps to the next of the three,
- *  ⌥↑ and ⌥↓ move it from anywhere while it shows. */
-export function ConfidenceChip({ value, onChange }: { value: Confidence; onChange: (next: Confidence) => void }) {
+/** Answering or asking, as one two-state control beside Send (spec:
+ *  prose.md): the pen while his words answer, the question bubble while
+ *  they go to the tutor as a message. A click or Esc switches; ← → move
+ *  between the two when it has focus. */
+export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; kind: ProseOpen["kind"]; onToggle: () => void }) {
+	const answerWords = kind === "question" ? "Answer the question" : "Work on the problem";
+	const askWords = kind === "question" ? "Ask the tutor instead. Sending skips this question" : "Ask the tutor instead. The problem stays open";
+	return (
+		<ToggleGroup
+			type="single"
+			variant="segmented"
+			value={mode}
+			onValueChange={(next) => {
+				if (next && next !== mode) onToggle();
+			}}
+			aria-label="Answer or ask"
+			data-slot="composer-mode"
+			data-testid="prose-mode"
+			data-mode={mode}
+		>
+			<Hint label={answerWords} binding="escape">
+				<ToggleGroupItem value="answer" aria-label={answerWords} data-testid="prose-answer-mode" className="h-[26px] px-2">
+					<PenLineIcon />
+				</ToggleGroupItem>
+			</Hint>
+			<Hint label={askWords} binding="escape">
+				<ToggleGroupItem value="ask" aria-label="Ask the tutor instead" data-testid="prose-ask" className="h-[26px] px-2">
+					<MessageCircleQuestionIcon />
+				</ToggleGroupItem>
+			</Hint>
+		</ToggleGroup>
+	);
+}
+
+/** How sure he is as a meter of three rising bars, drawn on lucide's 24px
+ *  grid and 2px stroke so it sits with the toolbar's icons: Guessing lights
+ *  one, Neutral two, Confident three; the rest stay at 30%. */
+const LIT: Record<Confidence, number> = { guessing: 1, neutral: 2, confident: 3 };
+
+function ConfidenceMeter({ value }: { value: Confidence }) {
+	const lit = LIT[value] ?? 2;
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden data-lit={lit}>
+			{[
+				{ x: 6, top: 14 },
+				{ x: 12, top: 9 },
+				{ x: 18, top: 4 },
+			].map((bar, i) => (
+				<line key={bar.x} x1={bar.x} x2={bar.x} y1={bar.top} y2={20} strokeOpacity={i < lit ? 1 : 0.3} />
+			))}
+		</svg>
+	);
+}
+
+/** How sure he is, Guessing, Neutral or Confident, as the meter. Its words
+ *  are in its tooltip; a press steps to the next of the three, ⌥↑ and ⌥↓
+ *  move it from anywhere while it shows. */
+export function ConfidenceIcon({ value, onChange }: { value: Confidence; onChange: (next: Confidence) => void }) {
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			const delta = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
@@ -345,10 +399,10 @@ export function ConfidenceChip({ value, onChange }: { value: Confidence; onChang
 	const label = CONFIDENCE_CHOICES[at]?.label ?? "Neutral";
 	const next = CONFIDENCE_CHOICES[(at + 1) % CONFIDENCE_CHOICES.length]!.state;
 	return (
-		<Hint label="How sure you are" binding="alt+arrowup">
-			<ComposerChip data-testid="confidence-choice" data-confidence={value} pressed={value !== DEFAULT_CONFIDENCE} aria-label={`How sure you are: ${label}`} onClick={() => onChange(next)}>
-				{label}
-			</ComposerChip>
+		<Hint label={`How sure you are: ${label}. Press for ${CONFIDENCE_CHOICES.find((c) => c.state === next)?.label ?? "the next"}`} binding="alt+arrowup">
+			<ComposerIcon data-testid="confidence-choice" data-confidence={value} pressed={value !== DEFAULT_CONFIDENCE} aria-label={`How sure you are: ${label}`} onClick={() => onChange(next)}>
+				<ConfidenceMeter value={value} />
+			</ComposerIcon>
 		</Hint>
 	);
 }

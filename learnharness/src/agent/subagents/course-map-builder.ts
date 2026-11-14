@@ -70,7 +70,6 @@ const topicFields = {
 
 const answerFields = {
 	order: Type.Array(Type.String(), { description: "Every topic's handle in study order: prerequisites first, then the material's order." }),
-	current: Type.Optional(Type.String({ description: "Where to start." })),
 	basis: Type.Optional(Type.String({ description: "Where the order comes from, in one line." })),
 	exam: Type.Optional(
 		Type.Object({

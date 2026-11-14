@@ -24,10 +24,15 @@ Object.defineProperty(globalThis, "localStorage", { value: storage, configurable
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
-const { carriedForm, forgetClosedBoxes, formToKept, keepWords, keptWords } = await import("../components/lesson/kept-drafts.ts");
-const { QuestionDock } = await import("../components/question-dock.tsx");
+const { carriedForm, forgetClosedBoxes, formToKept, keepWords, keptWords, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
+const { ProseComposer } = await import("../components/lesson/prose/prose-composer.tsx");
+const { StickToBottom } = await import("use-stick-to-bottom");
+const { emptyDockSelection } = await import("../src/core/index.ts");
 
-beforeEach(() => storage.clear());
+beforeEach(() => {
+	storage.clear();
+	setKeptWindow("w-one", { live: ["w-one"] });
+});
 
 describe("keepWords", () => {
 	it("keeps a box's words and forgets an empty box", () => {
@@ -55,6 +60,44 @@ describe("keepWords", () => {
 	});
 });
 
+describe("a box belongs to its window", () => {
+	it("words typed in another open window never fill this window's box", () => {
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		keepWords("c1:composer", { text: "draft in tab two: det of A-4I is" });
+		setKeptWindow("w-one", { live: ["w-one", "w-two"] });
+		assert.equal(keptWords("c1:composer"), undefined, "window one's box stays empty");
+		keepWords("c1:composer", { text: "my own question" });
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		assert.equal(keptWords("c1:composer")?.text, "draft in tab two: det of A-4I is", "and window two keeps its own words");
+	});
+
+	it("a reload keeps the window, so its words come back", () => {
+		keepWords("c1:q:k", { text: "half a thought" });
+		setKeptWindow("w-one", { live: ["w-one"] });
+		assert.equal(keptWords("c1:q:k")?.text, "half a thought");
+	});
+
+	it("after a restart the new window takes the words of a window that is gone, once", () => {
+		setKeptWindow("w-old", { live: ["w-old"] });
+		keepWords("c1:composer", { text: "typed before the restart" });
+		setKeptWindow("w-new", { live: ["w-new"] });
+		assert.equal(keptWords("c1:composer")?.text, "typed before the restart");
+		setKeptWindow("w-other", { live: ["w-new", "w-other"] });
+		assert.equal(keptWords("c1:composer"), undefined, "a second window does not take them too");
+	});
+
+	it("closing a question forgets only this window's box for it", () => {
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		keepWords("c1:q:old", { text: "window two's work" });
+		setKeptWindow("w-one", { live: ["w-one", "w-two"] });
+		keepWords("c1:q:old", { text: "window one's work" });
+		forgetClosedBoxes("c1", []);
+		assert.equal(keptWords("c1:q:old"), undefined);
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		assert.equal(keptWords("c1:q:old")?.text, "window two's work");
+	});
+});
+
 describe("carriedForm", () => {
 	it("a typed answer fills the next answer box, or Your thinking beside choices", () => {
 		const carry = { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "v is in the kernel", confidence: "neutral" }) };
@@ -64,21 +107,45 @@ describe("carriedForm", () => {
 	});
 });
 
-const check = (question: string) => ({ question, correctAnswer: "hidden", type: "check" }) as never;
+const noop = () => {};
+const check = { question: "Why?", correctAnswer: "hidden", type: "check" };
 
-async function mount(props: Record<string, unknown>) {
+/** The Prose composer answering the check `key`, kept in box `c1:q:<key>`. */
+async function mount(key: string, carryScope?: string) {
 	const host = document.createElement("div");
 	document.body.append(host);
 	const root = createRoot(host);
-	await act(async () => root.render(<QuestionDock toolName="explain" toolCallId="q2" input={check("Why?")} expanded onExpand={() => {}} onSubmit={() => {}} {...props} />));
-	return { host, done: async () => { await act(async () => root.unmount()); host.remove(); } };
+	const answer = { openKey: key, selection: emptyDockSelection(), confidence: "neutral" as const, mode: "answer" as const, toggle: noop, setConfidence: noop, setMode: noop };
+	await act(async () => root.render(
+		<StickToBottom>
+			<ProseComposer
+				open={{ kind: "question", key, tool: "explain", toolCallId: "q2", input: check }}
+				answer={answer}
+				message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
+				messageText={{ read: () => "", write: noop }}
+				onAskInstead={noop}
+				toggleRef={{ current: null }}
+				busy={false}
+				compacting={false}
+				chatId="c1"
+				carryScope={carryScope}
+				onSaveDraft={noop}
+				onSubmitAnswer={noop}
+				onSubmitThinking={async () => true}
+				onRequest={noop}
+				onDraftChange={noop}
+			/>
+		</StickToBottom>,
+	));
+	const field = () => host.querySelector<HTMLTextAreaElement>("textarea")!;
+	return { field, done: async () => { await act(async () => root.unmount()); host.remove(); } };
 }
 
 test("a check asked again after Hint opens with the work he had typed, and takes it once", async () => {
 	keepWords("carry:la", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "Av = λv gives (A − λI)v = 0", confidence: "neutral" }) });
-	const { host, done } = await mount({ keepAs: "c1:q:new", carryAs: "carry:la" });
+	const { field, done } = await mount("new", "carry:la");
 	try {
-		assert.equal(host.querySelector<HTMLTextAreaElement>('[data-testid="answer-field"]')!.value, "Av = λv gives (A − λI)v = 0");
+		assert.equal(field().value, "Av = λv gives (A − λI)v = 0");
 		assert.equal(keptWords("carry:la"), undefined, "the carry is taken once");
 		assert.equal(keptWords("c1:q:new")?.form?.text, "Av = λv gives (A − λI)v = 0", "and now kept in its own box");
 	} finally {
@@ -88,9 +155,9 @@ test("a check asked again after Hint opens with the work he had typed, and takes
 
 test("after a reload a check opens with what he typed in it", async () => {
 	keepWords("c1:q:k", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "the trace check", confidence: "guessing" }) });
-	const { host, done } = await mount({ keepAs: "c1:q:k" });
+	const { field, done } = await mount("k");
 	try {
-		assert.equal(host.querySelector<HTMLTextAreaElement>('[data-testid="answer-field"]')!.value, "the trace check");
+		assert.equal(field().value, "the trace check");
 	} finally {
 		await done();
 	}

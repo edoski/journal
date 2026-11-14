@@ -1,4 +1,4 @@
-import type { ArcState, CourseMap, CourseMapTopic, JobKind, MarkResult, MarkRow, MarkSure, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import type { ArcState, CourseMap, CourseMapTopic, JobKind, MarkHow, MarkResult, MarkRow, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -22,9 +22,11 @@ export const STANDING_WORDS: Record<Fill, string> = {
 
 /** A topic he cannot yet do on his own, by how he has best answered it
  *  (the engine's `right`): the 3/4 pie's words when help is what kept it
- *  there. */
+ *  there. Right unaided only on the day it was taught says what is left, a
+ *  check on another day, never a count: "once" read false after three
+ *  unaided answers that day (round 5). */
 export const RIGHT_WORDS: Record<RightAnswer, string> = {
-	unaided: "Right on your own once",
+	unaided: "Right on your own, check another day",
 	helped: STANDING_WORDS[0.75],
 	guess: "Right, but a guess",
 	uncertain: "Right, not yet confirmed",
@@ -59,11 +61,13 @@ export type SlipKey = keyof typeof SLIP_WORDS | "mixed";
 /** Why the engine calls a topic weak, its first signal: a mistake he has
  *  answered right on his own since, a miss after he had it, a diagnosed
  *  mistake, a method chosen in its place, a wrong answer he was sure of,
- *  else none of those. A repair made only with help is not shown fixed:
- *  help may have carried it, so the signal under it shows. */
+ *  else none of those. A repair made only with help is not shown fixed,
+ *  since help may have carried it, and is still a mistake to fix: the
+ *  signals under it describe answers before that right one, so "Not right
+ *  last time" or "Sure, but wrong" would contradict it (round 5). */
 export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } {
 	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp } = signals;
-	if (repaired && !repairedWithHelp) return { key: "repaired", words: SLIP_WORDS.repaired };
+	if (repaired) return repairedWithHelp ? { key: "gap", words: SLIP_WORDS.gap } : { key: "repaired", words: SLIP_WORDS.repaired };
 	if (lapsed) return { key: "lapsed", words: SLIP_WORDS.lapsed };
 	if (gap) return { key: "gap", words: SLIP_WORDS.gap };
 	const [method] = Object.keys(choiceErrors);
@@ -91,13 +95,18 @@ export const ATTEMPT_WORDS = {
 	wrong: "Not right",
 } as const;
 
-/** What an attempt in a topic's history says under it when it is not a
- *  plain answer: he gave up without one, or it was a prediction before its
- *  step was taught, which never counts. */
-export const ATTEMPT_HOW_WORDS = {
-	gaveUp: "Gave up",
+/** How an attempt counted (`markHow`), in the words the answer card and
+ *  the topic page's Earlier both say: a prediction before its step was
+ *  taught never counts; he gave up without an answer; help was given; no
+ *  help, but a guess, an unsure or a partly right answer counts as helped
+ *  all the same; or his own work. */
+export const MARK_HOW_WORDS: Record<MarkHow, string> = {
 	predicted: "Prediction, not counted",
-} as const;
+	gaveUp: "Gave up",
+	withHelp: "With help",
+	countedHelped: "Counted as helped",
+	ownWork: "On your own",
+};
 
 /*
  * Every distance in time counts whole days, one scheme wherever it shows:
@@ -169,6 +178,15 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
 }
 
+/** A review the plan moved past the day memory asked for it, from when:
+ *  "Due since 1 Oct" once that day has passed, else "Moved from 9 Nov", so
+ *  a day the tutor named that a later review took never changes in
+ *  silence (round 5); null for a review the plan does not hold. */
+export function movedWords(review: CourseMapTopic["review"], today: string): string | null {
+	if (review?.kind !== "scheduled" || !review.held) return null;
+	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : `Moved from ${shortDay(review.held.since)}`;
+}
+
 /** A review that is due: "Due today", "3d overdue"; one the plan holds
  *  past a day memory asked for already says since when, "Due since 1 Oct",
  *  so a review weeks late never reads as spacing; any other dated review
@@ -192,6 +210,35 @@ export function startsAfterWords(courses: readonly string[] | undefined): string
 	if (!courses || courses.length === 0) return null;
 	return `After ${listWords(courses.map((course) => `${course}'s`))} new topics`;
 }
+
+/** What the plan does for a course with no exam, in place of a bare "No
+ *  exam day set" (round 5: Calculus' reviews waited weeks and its head
+ *  said only that): its reviews wait for other courses' exams, whose final
+ *  reviews come first, or for room on earlier days; else they come back
+ *  when memory asks for them. Pure. */
+export function noExamWords(topics: readonly Pick<CourseMapTopic, "review">[]): string {
+	const held = topics.flatMap((t) => (t.review?.kind === "scheduled" && t.review.held ? [t.review.held] : []));
+	const exams = [...new Set(held.flatMap((h) => (h.exam ? [h.exam] : [])))];
+	if (exams.length > 0) return `No exam: reviews wait for your ${listWords(exams)} ${exams.length === 1 ? "exam" : "exams"}`;
+	if (held.length > 0) return `No exam: reviews wait, ${HELD_WORDS.full.toLowerCase()}`;
+	return "No exam: reviews come back when memory asks";
+}
+
+/** When a course he has not studied yet gives its first lesson and why
+ *  then, the plan's day for its earliest start (round 5: a new course had
+ *  nothing in Today and its first lesson 11 days out, with no word why):
+ *  "First lesson today", "First lesson Thu 19 Nov, after Probability's new
+ *  topics"; null when the plan starts none. Pure. */
+export function firstLessonWords(topics: readonly Pick<CourseMapTopic, "starts" | "startsAfter">[], today: string): string | null {
+	const first = topics.filter((t) => t.starts).sort((a, b) => a.starts!.localeCompare(b.starts!))[0];
+	if (!first?.starts) return null;
+	if (first.starts <= today) return "First lesson today";
+	const after = startsAfterWords(first.startsAfter);
+	const day = `First lesson ${SHORT_WEEKDAY.format(new Date(`${first.starts}T00:00:00Z`)).replace(",", "")}`;
+	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
+}
+
+const SHORT_WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
 /** Where an arc stands, in the engine's own states: no count, since the
  *  pie beside it draws the share. `taught` is a course that takes no
@@ -231,6 +278,14 @@ export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "t
 		return `After ${[needs, apart].filter(Boolean).join(", and ")}`;
 	}
 	return `Next in ${arc ?? map.title}`;
+}
+
+/** Whether a start's reason tells him anything its planned day does not:
+ *  every reason but "next" in a course without arcs, which would only say
+ *  "Next in Linear Algebra" beside the course's own name. Pure. */
+export function startsWhyTells(why: StartsWhy): boolean {
+	if (why.arc !== undefined || why.kind === "early") return true;
+	return why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0);
 }
 
 /** `startsWhyWords` cut to fit a row's reason beside its icon, where the
@@ -293,36 +348,12 @@ export const LESSON_WORDS = {
 	startLesson: "Start a new lesson",
 } as const;
 
-/** What a lesson's top bar says it is doing: asking its opening questions
- *  (the same word as their label), planning, teaching, practice, or
- *  stopped for the day. A lesson is never called a quiz (round 3). */
-export const PHASE_WORDS = {
-	probe: "Recall",
-	plan: "Planning",
-	teach: "Teaching",
-	practice: "Practice",
-	done: LESSON_WORDS.doneTonight,
-} as const;
-
-/** A question's label on its card and folded bar, by what it asks: a
- *  check of what was just taught, a prediction before it, a recall of
- *  what he knows, else a plain question. */
-export const QUESTION_WORDS = {
-	check: "Check",
-	predict: "Prediction",
-	recall: "Recall",
-	question: "Question",
-} as const;
-
 /** An answer's mark as the record keeps it (Edo, 14 Nov 2026): the
  *  result, whether it counted as his own or as helped, the confidence
  *  recorded, and a dispute. */
 export const MARK_WORDS = {
 	result: { correct: "Right", partial: "Partly right", incorrect: "Not right" } satisfies Record<MarkResult, string>,
-	sure: { guess: "Guessing", neutral: "Neutral", confident: "Confident" } satisfies Record<MarkSure, string>,
-	ownWork: "On your own",
-	withHelp: "With help",
-	countedHelped: "Counted as helped",
+	sure: { guess: "Guessing", confident: "Confident" } satisfies Record<NonNullable<MarkRow["sure"]>, string>,
 	disputed: "Disputed",
 	dispute: "Dispute",
 	disputeTitle: "Dispute this mark",
@@ -333,13 +364,6 @@ export const MARK_WORDS = {
 	youThink: "You think",
 } as const;
 
-/** Whether an attempt counted as his own or as helped, from the engine's
- *  grade and the help it records: a right guess, an unsure answer or a
- *  partly right one with no help counts as helped all the same. */
-export function countedWords(row: Pick<MarkRow, "grade" | "helped">): string {
-	if (row.helped) return MARK_WORDS.withHelp;
-	return row.grade === "helped" ? MARK_WORDS.countedHelped : MARK_WORDS.ownWork;
-}
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
  *  `stopped` when the kind is unknown. */
@@ -422,24 +446,34 @@ export const CHOICE_NOTE = "Anything to add?";
 export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
 }
-
-/** The lesson's details panel, in his words: which tutor, how much room
- *  the lesson has before the tutor sums it up, and what it has cost. */
-export const DETAIL_WORDS = {
-	tutor: "Tutor",
-	room: "Room left",
-	cost: "Cost so far",
-	unmeasured: "Not measured yet",
-	plenty: "Plenty",
-	filling: "Over half used. When it fills, the tutor sums up the lesson so far",
-	plan: "Included in your Claude plan",
+/** How ready he is for the exam, in the engine's own sorting (its
+ *  `standing`): every part solid, not yet, or not all of it fits. "Not
+ *  ready yet in" leads the bubbles of the arcs that are not. */
+export const READY_WORDS = {
+	ready: "Ready for the exam",
+	notYet: "Not ready for the exam yet",
+	notYetIn: "Not ready yet in",
 } as const;
 
-/** How much room the lesson has before the tutor sums it up (`used` of
- *  `room`, both in the model's own units, never shown): plenty until half
- *  is used, since half is the one split that needs no tuning, then a
- *  warning of what happens when it fills. */
-export function roomWords(used: number | null, room: number): string {
-	if (used === null) return DETAIL_WORDS.unmeasured;
-	return used * 2 < room ? DETAIL_WORDS.plenty : DETAIL_WORDS.filling;
+/** Where one arc stands for the exam, on its line beside its name, so a
+ *  few words: never "ready", which its check's state already says. */
+export const PART_WORDS = {
+	ready: "Solid for the exam",
+	notYet: "Not solid yet",
+	short: "Won't all fit",
+} as const;
+
+/** A course without arcs, not ready: the topics not yet solid, else those
+ *  still to start. "Not yet solid for the exam: Basis and Rank". */
+export function notReadyWords(kind: "notYet" | "toStart", names: string): string {
+	return kind === "notYet" ? `Not yet solid for the exam: ${names}` : `Still to start before the exam: ${names}`;
 }
+
+/** The mistakes still open in a course: the list's name, the head's press,
+ *  a mistake made with help, and a list with nothing in it. */
+export const MISTAKE_WORDS = {
+	title: "Mistakes to fix",
+	press: "Mistakes",
+	helped: "With help",
+	none: "No mistakes to fix",
+} as const;

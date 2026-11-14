@@ -14,6 +14,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
+import { INK_SWATCHES } from "../components/settings/controls.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
 import { KEYBOARD_ACTIONS } from "../src/core/index.ts";
@@ -63,8 +64,10 @@ describe("AppearanceSection (thin SSR)", () => {
 		const html = renderToStaticMarkup(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />);
 		const size = tagOf(html, "input-prose-size");
 		assert.match(size, /^<button/, "Text size is a menu, not a field");
+		// Round 5: the swatches were native colour inputs, the system picker's look.
+		assert.doesNotMatch(html, /type="color"/, "no native colour input");
 		for (const ink of ["input-bold-color", "input-italic-color"]) {
-			assert.match(tagOf(html, ink), /type="color"/, `${ink} opens the system colour picker`);
+			assert.match(tagOf(html, ink), /^<button[^>]*aria-haspopup="dialog"/, `${ink} opens the app's swatch panel`);
 			assert.match(tagOf(html, `${ink}-default`), /disabled=""/, `${ink}'s Default is off while the default is in use`);
 		}
 		assert.equal(html.match(/Same as the text/g)?.length, 2, "an unset ink says it follows the text");
@@ -76,7 +79,7 @@ describe("AppearanceSection (thin SSR)", () => {
 		const html = renderToStaticMarkup(
 			<AppearanceSection appearance={{ mdRendering: { boldColor: "#abc" }, proseFontSize: 18 }} onSectionChange={(next) => changes.push(next)} />,
 		);
-		assert.ok(tagOf(html, "input-bold-color").includes(`value="#aabbcc"`), "a short hex grows to the picker's form");
+		assert.match(html, /data-slot="color-swatch"[^>]*style="background:#aabbcc"/, "the swatch shows the stored ink, a short hex grown to its long form");
 		assert.doesNotMatch(tagOf(html, "input-bold-color-default"), /disabled=""/);
 		assert.equal(html.match(/Same as the text/g)?.length, 1, "only the unset ink follows the text");
 	});
@@ -108,6 +111,65 @@ describe("AppearanceSection (thin SSR)", () => {
 		assert.equal(changes.at(-1)?.mdRendering?.boldColor, null);
 		await act(async () => root.unmount());
 		host.remove();
+	});
+});
+
+describe("the colour field's swatch panel", () => {
+	const keyOn = async (el: Element, key: string) => {
+		await act(async () => {
+			const event = new dom.window.Event("keydown", { bubbles: true, cancelable: true });
+			Object.assign(event, { key });
+			el.dispatchEvent(event);
+			// Radix's roving focus moves on the next task.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+	};
+
+	it("opens a grid of the app's inks, which the arrows walk, a row at a time on up and down, and Enter picks", async () => {
+		const changes: { mdRendering?: { boldColor?: string | null } }[] = [];
+		const host = dom.document.createElement("div");
+		dom.document.body.appendChild(host);
+		const root = createRoot(host);
+		await act(async () => {
+			root.render(<AppearanceSection appearance={undefined} onSectionChange={(next) => changes.push(next)} />);
+		});
+		const trigger = host.querySelector<HTMLButtonElement>('[data-testid="input-bold-color"]')!;
+		await act(async () => {
+			trigger.dispatchEvent(new dom.window.Event("pointerdown", { bubbles: true, cancelable: true }));
+			trigger.click();
+		});
+		const grid = dom.document.querySelector('[data-slot="swatch-grid"]');
+		assert.ok(grid, "the swatch panel opens");
+		assert.equal(grid.getAttribute("aria-label"), "Bold color");
+		const swatches = [...grid.querySelectorAll<HTMLButtonElement>('[data-slot="swatch"]')];
+		assert.deepEqual(swatches.map((s) => s.getAttribute("aria-label")), INK_SWATCHES.map((s) => s.name), "each swatch is named");
+		assert.equal(dom.document.querySelector('input[type="text"], input[type="color"]'), null, "nothing is typed");
+		const columns = Number(grid.getAttribute("data-columns"));
+		swatches[0]!.focus();
+		await keyOn(swatches[0]!, "ArrowRight");
+		assert.equal(dom.document.activeElement, swatches[1], "→ moves along the row");
+		await keyOn(swatches[1]!, "ArrowDown");
+		assert.equal(dom.document.activeElement, swatches[1 + columns], "↓ moves down a row");
+		await keyOn(swatches[1 + columns]!, "ArrowUp");
+		assert.equal(dom.document.activeElement, swatches[1], "↑ moves back up");
+		assert.equal(changes.length, 0, "moving never picks");
+		await act(async () => swatches[1]!.click());
+		assert.equal(changes.at(-1)?.mdRendering?.boldColor, INK_SWATCHES[1]!.color, "Enter or a click picks the swatch's ink");
+		assert.equal(dom.document.querySelector('[data-slot="swatch-grid"]'), null, "picking closes the panel");
+		await act(async () => root.unmount());
+		host.remove();
+	});
+
+	it("offers only inks that read on the app's dark background", () => {
+		const luminance = (hex: string) => {
+			const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+			return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+		};
+		const background = luminance("#121212");
+		for (const { name, color } of INK_SWATCHES) {
+			const ratio = (luminance(color) + 0.05) / (background + 0.05);
+			assert.ok(ratio >= 4.5, `${name} ${color} reads at ${ratio.toFixed(2)}:1, under WCAG's 4.5:1 for text`);
+		}
 	});
 });
 

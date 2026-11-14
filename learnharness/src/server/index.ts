@@ -13,6 +13,8 @@ export { addMaterial, courseContexts, courseMapStatus, startCourseMap } from "./
 export * from "./study.ts";
 export * from "./calendar.ts";
 export * from "./topic.ts";
+export { lessonPlace } from "./lesson-place.ts";
+export * from "./course-standing.ts";
 export { answerMarks } from "./marks.ts";
 export { convertPdf } from "../agent/subagents/pdf-ops.ts";
 export { joinPages } from "../agent/subagents/pdf-markdown.ts";

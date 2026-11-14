@@ -18,6 +18,7 @@ The page is the list and the map side by side in the app's linked columns (`spli
 | `course-group.tsx` | a group's header over its rows, with folding and Show more (course-group.md) |
 | `course-arc.tsx` | an arc's folded line over its rows (course-arc.md) |
 | `what-next.tsx` | Pick up and Then above the arcs ("What next") |
+| `standing/` | exam readiness and open mistakes, two candidates behind the Exam & mistakes switch (standing/standing.md) |
 
 The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directly, with its `highlight` prop to light a group's topics.
 

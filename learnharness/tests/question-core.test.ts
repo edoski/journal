@@ -123,8 +123,9 @@ describe("buildAnswer: explain", () => {
 		assert.equal(ad.text, "Something about light speed being constant?");
 	});
 
-	it("always carries a confidence state, neutral unless the learner chose another", () => {
-		assert.equal(buildAnswer(explainQD(), { text: "x" }).confidence, "neutral");
+	it("carries the confidence he chose, and none when he left the meter at Neutral", () => {
+		assert.equal(buildAnswer(explainQD(), { text: "x" }).confidence, undefined);
+		assert.equal(buildAnswer(explainQD(), { text: "x", confidence: "neutral" }).confidence, undefined);
 		assert.equal(buildAnswer(explainQD(), { text: "x", confidence: "guessing" }).confidence, "guessing");
 		assert.equal(buildAnswer(explainQD(), { text: "x", confidence: "confident" }).confidence, "confident");
 	});
@@ -163,9 +164,9 @@ describe("compactAnswerForModel (the model-visible diet, owner 2026-10-02)", () 
 		assert.ok(!raw.includes("Michelson"), "no questionText");
 	});
 
-	it("explain: the default answer still says neutral", () => {
+	it("explain: an answer with no confidence chosen says none", () => {
 		const compact = compactAnswerForModel(buildAnswer(explainQD(), { text: "It killed the aether." }));
-		assert.equal(compact.confidence, "neutral");
+		assert.equal(compact.confidence, undefined);
 	});
 
 	it("ask: selection or text, no confidence", () => {
@@ -259,9 +260,9 @@ describe("dock selection (toggleOption / toggleOther)", () => {
 // ─── the explain tool: the commitment contract ─────────────────────────────
 
 describe("explainInputBase / explainInputProblems (the commitment contract)", () => {
-	it("has ONE authoring field — no explanation remnant (owner ruling 2026-09-27)", () => {
+	it("has ONE authoring field — no explanation remnant (owner ruling 2026-09-27), and no details line under the question (Edo, 14 Nov 2026)", () => {
 		const keys = Object.keys(explainInputBase.properties);
-		assert.deepEqual(keys, ["question", "correctAnswer", "details"]);
+		assert.deepEqual(keys, ["question", "correctAnswer"]);
 	});
 
 	it("the teach object LEADS with the required pair (type, nodeId) — base fields follow", () => {

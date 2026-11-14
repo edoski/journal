@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -29,7 +29,7 @@ describe("where he stands", () => {
 describe("where he stands, true to the record", () => {
 	it("says how a topic he cannot yet do on his own was best answered, never help he was not given", () => {
 		const assisted = (right?: "unaided" | "helped" | "guess" | "uncertain" | "partial") => standingWords(0.75, { level: "assisted", ...(right ? { right } : {}) });
-		assert.equal(assisted("unaided"), "Right on your own once", "right unaided on the day he learned it");
+		assert.equal(assisted("unaided"), "Right on your own, check another day", "right unaided only on the day he learned it, however many times: never 'once'");
 		assert.equal(assisted("partial"), "Partly right");
 		assert.equal(assisted("guess"), "Right, but a guess");
 		assert.equal(assisted("uncertain"), "Right, not yet confirmed");
@@ -59,9 +59,11 @@ describe("why a slip needs him", () => {
 		assert.equal(slip({ confidentErrors: 1, choiceErrors: {} }), "Sure, but wrong");
 	});
 
-	it("never calls a mistake fixed when only help repaired it: the signal under it shows", () => {
+	it("never calls a mistake fixed when only help repaired it, nor contradicts the right answer since with words about the ones before it", () => {
 		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Counts nonzero rows" }), "Mistake to fix");
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true }), "Not right last time");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true }), "Mistake to fix", "not 'Not right last time' after a right answer");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, confidentErrors: 1 }), "Mistake to fix", "not 'Sure, but wrong' after a right answer");
+		assert.equal(slipMark({ ...QUIET, repaired: true, repairedWithHelp: true, confidentErrors: 1 }, titleOf).key, "gap", "its icon is a mistake's");
 	});
 
 	it("gives each slip its own icon, so a fix never wears the mistake's", () => {
@@ -120,6 +122,17 @@ describe("why a review waits", () => {
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back in 12d", "memory's day is still ahead");
 		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
 	});
+	it("says from when a held review moved, so a day the tutor named never moves in silence", () => {
+		assert.equal(movedWords(behind, "2026-11-08"), "Moved from 13 Nov", "memory's day is still ahead");
+		assert.equal(movedWords(late, "2026-11-08"), "Due since 1 Oct");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), null);
+		assert.equal(movedWords({ kind: "due", date: "2026-11-08", overdue: 0 }, "2026-11-08"), null);
+	});
+	it("says what the plan does for a course with no exam, never only that no exam is set", () => {
+		assert.equal(noExamWords([{ review: behind }, { review: late }]), "No exam: reviews wait for your Probability exam");
+		assert.equal(noExamWords([{ review: late }]), "No exam: reviews wait, earlier days are full");
+		assert.equal(noExamWords([{ review: { kind: "scheduled", date: "2026-11-20" } }, { review: null }]), "No exam: reviews come back when memory asks");
+	});
 	it("says which courses' new topics a first lesson waits behind", () => {
 		assert.equal(startsAfterWords(["Probability"]), "After Probability's new topics");
 		assert.equal(startsAfterWords(["Probability", "Linear Algebra"]), "After Probability's and Linear Algebra's new topics");
@@ -170,6 +183,13 @@ describe("why a topic starts then", () => {
 	it("says next in its arc, else in the course", () => {
 		assert.equal(startsWhyWords({ kind: "next", arc: "systems" as ArcHandle }, arcs), "Next in Linear systems");
 		assert.equal(startsWhyWords({ kind: "next" }, plain), "Next in Linear Algebra");
+	});
+	it("is worth saying in every course but as plain next in a course without arcs, which only repeats the course beside it", () => {
+		assert.equal(startsWhyTells({ kind: "early", waitingOn: ["change-basis" as TopicHandle], exam: false }), true, "early in a course without arcs");
+		assert.equal(startsWhyTells({ kind: "after", needs: ["expectation" as TopicHandle], partners: [] }), true);
+		assert.equal(startsWhyTells({ kind: "next", arc: "systems" as ArcHandle }), true);
+		assert.equal(startsWhyTells({ kind: "next" }), false);
+		assert.equal(startsWhyTells({ kind: "after", needs: [], partners: [] }), false);
 	});
 	it("names a method it competes with, beside what it needs", () => {
 		const [rank, kernel, cramer] = ["rank", "kernel", "cramer"].map((h) => arcs.topics.find((t) => t.handle === h)!.handle);

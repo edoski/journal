@@ -34,8 +34,11 @@ export interface LessonComposerProps {
 	/** The field's placeholder; a host names what it wants here, such as
 	 *  the answer an open question asks for. */
 	placeholder?: string;
-	/** Quiet chips at the toolbar's right, before the send (Hint, confidence):
-	 *  each a ComposerChip, 2px apart. */
+	/** Controls at the toolbar's left, after attach (Hint, Show me, Explain
+	 *  instead): each a ComposerIcon, 2px apart. */
+	leading?: ReactNode;
+	/** Controls at the toolbar's right, before the send (how sure he is,
+	 *  answering or asking), 4px apart. */
 	toolbar?: ReactNode;
 	/** While set, Send and Enter submit an answer (ComposerAnswer). */
 	answer?: ComposerAnswer;
@@ -71,6 +74,7 @@ export function LessonComposer({
 	canSend,
 	autoFocus,
 	placeholder = "Ask, answer, or steer the lesson…",
+	leading,
 	toolbar,
 	answer,
 	head,
@@ -129,12 +133,11 @@ export function LessonComposer({
 				/>
 			</div>
 			<div data-slot="composer-toolbar" className="flex min-w-0 items-center px-2 pb-2">
-				{photos && (
-					<div className="me-2">
-						<PhotoAttachButton draft={photos} />
-					</div>
-				)}
-				<div data-slot="composer-chips" className="flex min-w-0 flex-1 items-center justify-end gap-0.5">
+				<div data-slot="composer-leading" className="flex min-w-0 flex-1 items-center gap-0.5">
+					{photos && <PhotoAttachButton draft={photos} />}
+					{leading}
+				</div>
+				<div data-slot="composer-controls" className="flex shrink-0 items-center gap-1">
 					{toolbar}
 				</div>
 				{next && !busy && !canSend ? (
@@ -196,17 +199,19 @@ export function LessonSessionComposer({
 	return <LessonComposer {...rest} value={draft} onChange={applyDraft} canSend={canSend} photos={photos} />;
 }
 
-/** One quiet chip for the toolbar (Hint, a confidence pick): a 32px pill in
- *  13px muted text that fills on hover, and reads selected while `pressed`. */
-export function ComposerChip({ pressed, className, ...props }: ComponentProps<typeof Button> & { pressed?: boolean }) {
+/** One quiet icon control for the toolbar (Hint, Show me, Explain
+ *  instead, how sure he is): a 32px circle, the attach button's size and
+ *  ink, the hover fill; `pressed` reads selected. Its words live in its
+ *  Hint and its aria-label. */
+export function ComposerIcon({ pressed, className, ...props }: ComponentProps<typeof Button> & { pressed?: boolean }) {
 	return (
 		<Button
 			type="button"
 			variant="quiet"
-			size="pill"
-			data-slot="composer-chip"
+			size="icon-row"
+			data-slot="composer-control"
 			aria-pressed={pressed}
-			className={cn("px-3 font-normal has-[>svg]:px-2.5", pressed && "bg-fill-selected text-foreground hover:bg-fill-selected", className)}
+			className={cn("rounded-full", pressed && "bg-fill-selected text-foreground hover:bg-fill-selected", className)}
 			{...props}
 		/>
 	);

@@ -34,6 +34,14 @@ describe("turnErrorText", () => {
 		assert.equal(turnErrorText(claude).kind, "written");
 	});
 
+	it("reads a turn refused because Claude is signed out as one plain sentence that says his words are kept", () => {
+		const refusal = JSON.stringify({ error: "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts", code: "provider_key_missing", provider: "claude" });
+		assert.deepEqual(turnErrorText(refusal), { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null });
+		const html = renderToStaticMarkup(<TurnError message={refusal} onOpenSettings={() => {}} onSignIn={() => {}} />);
+		const { document } = parseHTML(html);
+		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in");
+	});
+
 	it("says the app could not be reached when the browser's request never left, with no raw text", () => {
 		for (const raw of ["Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource."]) {
 			assert.deepEqual(turnErrorText(raw), { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then send again.", details: null }, raw);

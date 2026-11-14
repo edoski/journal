@@ -95,6 +95,8 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 			return { args: ["arcs", ...(verb.here ? ["--here", verb.here] : []), ...(verb.open?.length ? ["--open", ...verb.open] : []), ...(verb.report ? ["--report"] : [])], stdin: "" };
 		case "plan":
 			return { args: ["plan", "--days", String(verb.days ?? 1)], stdin: "" };
+		case "standing":
+			return { args: ["standing"], stdin: "" };
 		case "sources":
 			return { args: "scan" in verb ? ["sources", "--scan"] : ["sources", "--add", ...verb.add], stdin: "" };
 		case "forget-course":

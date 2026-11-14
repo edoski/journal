@@ -69,6 +69,10 @@ def course_arcs(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def course_standing(args: argparse.Namespace) -> dict[str, Any]:
+    return retrieval.course_standing(_workspace(args))
+
+
 def search(args: argparse.Namespace) -> dict[str, Any]:
     return retrieval.search(
         _optional_workspace(args),
@@ -347,6 +351,12 @@ COMMANDS: tuple[Command, ...] = (
         "Every arc with its topics and standing, and where the learner stands",
         course_arcs,
         _build_arcs,
+    ),
+    Command(
+        "standing",
+        "Exam readiness by part and each topic's open mistakes",
+        course_standing,
+        _build_nothing,
     ),
     Command(
         "search",

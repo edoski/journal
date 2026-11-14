@@ -1,12 +1,12 @@
 import { currentArc, examCovers, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapArc, type CourseMapTopic, type StudyCourse, type TopicHandle, type UnreadableCourse } from "@/src/core";
 import { CURRENT_TAG, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { courseProgress, lastStudied, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
-import { examWords, todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { examWords, nextStepOf, planDay, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { ARC_EXAM_WORDS, courseShareWords, startsWhyWords } from "@/components/study-words";
+import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, startsWhyWords } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -95,7 +95,9 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		const group = place ? GROUP_OF[place] : "not-started";
 		// "You are here" in place of when it comes back or was studied, never in place of what needs him.
 		const here = current && group !== "needs-you" && (fact === null || fact.kind === "back" || fact.kind === "studied");
-		return { topic, group, fact: here ? HERE : fact, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
+		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5).
+		const planned: TopicFact | null = group === "not-started" && fact === null && topic.starts ? { kind: "next", words: topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` } : null;
+		return { topic, group, fact: here ? HERE : (planned ?? fact), standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };
 }
@@ -227,10 +229,13 @@ export interface CourseNext {
 
 /** What the course's button takes up, exactly as Home's line for it would:
  *  a session in this course to pick up since yesterday, else the course's
- *  next step. `open` are the sessions to pick up (`openSessions`). Pure. */
+ *  next step. Home has no line for a course whose lesson he ended today
+ *  with Done for today (`todayRows`); its page still has its one button,
+ *  on the course's next step, which the press takes up (`courseMove`).
+ *  `open` are the sessions to pick up (`openSessions`). Pure. */
 export function courseNext(course: StudyCourse, open: readonly ChatListItem[]): CourseNext {
 	const mine = open.filter((c) => c.course?.workspace === course.map.workspace);
-	const row = todayRows([course], mine, course.map.today)[0]!;
+	const row: TodayRow = todayRows([course], mine, course.map.today)[0] ?? { kind: "course", course, step: nextStepOf(course) };
 	const lesson = lessonOf(row);
 	return { row, lesson, why: whyOf(row), action: lesson.action === "Open" ? "Resume" : lesson.action };
 }
@@ -241,7 +246,9 @@ export interface CourseFacts {
 	progress: string | null;
 	/** "Exam in 21 days", "Exam tomorrow", "Exam today". */
 	exam: string | null;
-	/** "Studied 2 days ago", "Studied today", "Not studied yet". */
+	/** "Studied 2 days ago", "Studied today"; a course not studied yet,
+	 *  when its first lesson comes and why ("First lesson Thu 19 Nov, after
+	 *  Probability's new topics"), else "Not studied yet". */
 	studied: string | null;
 	/** His latest session in the course, which "Studied" opens. */
 	lastSession: { id: string; title: string } | null;
@@ -253,7 +260,7 @@ export function courseFacts(course: StudyCourse, chats: readonly ChatListItem[] 
 	return {
 		progress: progress ? courseShareWords(progress.solid, progress.of) : null,
 		exam: examWords(course),
-		studied: lastStudied({ kind: "course", course, step: { kind: "none" } }),
+		studied: (course.lastActiveDaysAgo === null ? firstLessonWords(course.map.topics, course.map.today) : null) ?? lastStudied({ kind: "course", course, step: { kind: "none" } }),
 		lastSession: lastSessionOf(course.map.workspace, chats),
 	};
 }
@@ -271,6 +278,8 @@ export interface CourseView {
 	said: ReadonlyMap<TopicHandle, Said>;
 	facts: CourseFacts;
 	next: CourseNext;
+	/** Every session, those started on a topic's page linked to it. */
+	chats: readonly ChatListItem[];
 }
 
 /** The course page's read: still reading; the engine not answering; the
@@ -309,6 +318,7 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 					said: sidebarSays(state.courses, state.chats, workspace),
 					facts: courseFacts(course, state.chats),
 					next: courseNext(course, state.open),
+					chats: state.chats,
 				},
 			};
 		}

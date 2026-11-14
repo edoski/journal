@@ -7,6 +7,7 @@
  */
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
+import { chosenSure } from "../core/contracts/marks.ts";
 import { derivePlanStatusesLh } from "../core/contracts/plan.ts";
 import type { SessionPlan, TopicAttempt, TopicReadResponse, TopicRecord, TopicRef } from "../core/contracts/topic.ts";
 import { listCourses } from "./courses.ts";
@@ -17,7 +18,6 @@ export const TOPIC_READ_SESSIONS = 20;
 
 const SESSION_ID = /^[A-Za-z0-9_-]+$/;
 const RESULTS = ["correct", "partial", "incorrect"] as const;
-const SURE = ["guess", "neutral", "confident"] as const;
 const GRADES = ["solid", "helped", "missed"] as const;
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -51,7 +51,7 @@ function attemptOf(id: string, entry: unknown): { attempt: TopicAttempt; correct
 			grade: GRADES.find((g) => g === e.grade) ?? null,
 			gaveUp: e.gave_up === true,
 			predicted: e.predicted === true,
-			sure: SURE.find((s) => s === e.sure) ?? null,
+			sure: chosenSure(e.sure),
 			chose: str(e.chose),
 			text,
 		},

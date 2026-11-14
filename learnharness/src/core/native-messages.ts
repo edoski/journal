@@ -51,7 +51,7 @@ import {
 	disputeText,
 } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
-import type { Confidence } from "./contracts/course.ts";
+import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 import type { MarkResult } from "./contracts/marks.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import { PHOTO_ONLY_TEXT, WORKING_PHOTO_NOTE, type Photo } from "./photos.ts";
@@ -88,7 +88,8 @@ export interface LhMarkerMessage {
 		| "problem-dismissed"
 		| "compaction"
 		| "session-resume"
-		| "ungraded-answer";
+		| "ungraded-answer"
+		| "asked";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -413,8 +414,9 @@ export function hintsAsked(messages: readonly LhMessage[], problemCallId: string
  *  content label is the single "Your thinking"; `details` keeps the raw
  *  payload for the transcript card. One problem may carry many
  *  submissions. `confidence` is the learner's one-tap read of the
- *  submission; the dock always sends one. */
-export function newThinkingMessage(problemCallId: string, text: string, confidence?: Confidence, photos?: readonly Photo[]): LhMarkerMessage {
+ *  submission, kept only when he chose one (`chosenConfidence`). */
+export function newThinkingMessage(problemCallId: string, text: string, picked?: Confidence, photos?: readonly Photo[]): LhMarkerMessage {
+	const confidence = chosenConfidence(picked);
 	const typed = text.trim() ? text : photos?.length ? PHOTO_ONLY_TEXT : text;
 	return {
 		id: newMessageId(),
@@ -523,6 +525,43 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
 		details: {},
 		timestamp: Date.now(),
 	};
+}
+
+/** The note riding a message he sent from Ask (round 5: an answer typed
+ *  while Ask stayed on was graded, with an earlier note's confidence):
+ *  what follows is a question to the tutor, never an answer. Model-facing
+ *  only. */
+export function newAskedMessage(open: "question" | "problem"): LhMarkerMessage {
+	const beside = open === "problem" ? "while the problem stays open" : "after setting the question aside";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "asked",
+		content: `[ASKED] He sent his next message from Ask, ${beside}: a question to you, not his answer. Answer it. Never grade it, save it as an attempt or conclude a problem from it as solved; his answer comes as his work.`,
+		display: false,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** What he sent last on a problem: his work, with the confidence he chose
+ *  for it, or a message from Ask (any message of his while the problem is
+ *  open, a question by the composer's rule); null before either. A request
+ *  (Hint, Show me, Explain instead) is neither. Pure. */
+export function finalSubmissionOf(messages: readonly LhMessage[], problemCallId: string): { kind: "work"; confidence?: Confidence } | { kind: "asked" } | null {
+	const posed = messages.findIndex((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.id === problemCallId));
+	if (posed < 0) return null;
+	for (let i = messages.length - 1; i > posed; i--) {
+		const m = messages[i]!;
+		if (m.role === "user") return { kind: "asked" };
+		if (m.role === "custom" && m.customType === "practice-thinking") {
+			const details = m.details as { problemCallId?: unknown; confidence?: unknown } | null;
+			if (details?.problemCallId !== problemCallId) continue;
+			const confidence = chosenConfidence(details.confidence);
+			return { kind: "work", ...(confidence ? { confidence } : {}) };
+		}
+	}
+	return null;
 }
 
 /** His Done for tonight: he stops now. The content tells the agent that
@@ -733,14 +772,20 @@ function stringList(value: unknown): string[] {
 /** A question he answered in this session, or a practice problem that
  *  ended: what a saved attempt names as its `question`. */
 export interface AnsweredQuestion {
-	/** The tool the answer came through: `explain`, `recall`, or a
-	 *  problem's `conclude`. */
+	/** The tool the answer came through: `explain`, `recall`, a problem's
+	 *  `conclude`, or `message` for an answer in words (`HIS_MESSAGE`). */
 	tool: string;
 	/** Its solution was shown to him before it was asked: the same words
 	 *  were asked earlier in the session and answered, or posed as a
 	 *  problem that ended (shown-help.ts). */
 	seenBefore: boolean;
 }
+
+/** The name a save gives an answer he gave in words, in a message of his
+ *  rather than through a question (round 5: such an answer was recorded
+ *  and showed no mark). It stands for his newest message before the save:
+ *  the message the turn answers. */
+export const HIS_MESSAGE = "his-message";
 
 /** The graded question tools: an answer to one is an attempt. */
 export const GRADED_QUESTION_TOOLS: readonly string[] = ["explain", "recall"];
@@ -754,8 +799,9 @@ export function isRealAnswer(details: unknown): boolean {
 
 /** Every question he answered and every problem that ended, keyed by the
  *  call a saved attempt names: the graded question's call, or the
- *  problem's `conclude`. Only calls that went through count; a problem
- *  left for today ended unseen. Pure. */
+ *  problem's `conclude`; and `HIS_MESSAGE` once he has sent a message.
+ *  Only calls that went through count; a problem left for today ended
+ *  unseen. Pure. */
 export function answeredQuestionsOf(messages: readonly LhMessage[]): Map<string, AnsweredQuestion> {
 	return questionScan(messages).answered;
 }
@@ -772,13 +818,15 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 	const posed = new Map<string, { key: string; seen: boolean }>();
 	const answered = new Map<string, AnsweredQuestion>();
 	let problem: string | null = null;
+	let said = false;
 	const pose = (callId: string, text: unknown) => {
 		if (typeof text !== "string") return;
 		const key = sameQuestionKey(text);
 		posed.set(callId, { key, seen: revealed.has(key) });
 	};
 	for (const m of messages) {
-		if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
+		if (m.role === "user") said = true;
+		else if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
 		else if (m.role === "assistant") {
 			for (const block of m.content) {
 				if (block.type !== "toolCall") continue;
@@ -802,6 +850,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen });
 		}
 	}
+	if (said) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false });
 	return { posed, answered };
 }
 

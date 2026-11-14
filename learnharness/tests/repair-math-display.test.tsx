@@ -8,14 +8,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { problemInputObject } from "../src/agent/tools/practice.ts";
-import { PracticeDock } from "../components/practice-dock.tsx";
-import { QuestionDock } from "../components/question-dock.tsx";
-import { ProblemCard, ConcludeCard } from "../components/practice-cards.tsx";
+import { ProseConclude, ProseProblem } from "../components/lesson/prose/prose-practice.tsx";
+import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
 import { MessageResponse, ToolContentResponse } from "../components/ai-elements/message.tsx";
 import {
 	repairMathForDisplay, healOverescapedCommands, restoreMathEscapes,
 	parseAskInput, parseExplainInput, activeProblemOf, projectView,
-	type LhMessage, type ArtifactPartProps,
+	type LhMessage,
 } from "../src/core/index.ts";
 
 const tex = String.raw`\nabla f(x) \in \mathbb{R}^{m \times n}`;
@@ -26,12 +25,13 @@ const debris = "$\forall x \\in \\mathbb{R}$"; // JSON's form feed consumed the 
 const repairedDebris = String.raw`\forall x \in \mathbb{R}`;
 const matrix = "$$\n" + String.raw`\\begin{pmatrix}1 & 2 \\ 3 & 4\\end{pmatrix}` + "\n$$";
 const repairedMatrix = String.raw`\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}`;
-const part = (input: unknown, over: Partial<ArtifactPartProps["part"]> = {}): ArtifactPartProps["part"] => ({
-	type: "tool-problem", state: "input-available", toolCallId: "call_math", input, ...over,
-});
-const dock = (input: { statement: string }, expanded = true) => (
-	<PracticeDock problemCallId="call_math" input={input} expanded={expanded} onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} />
-);
+/** The problem he works on, under Your turn. */
+const dock = (input: { statement: unknown }) => <ProseProblem input={input} active />;
+/** A problem earlier in the transcript. */
+const settled = (input: unknown) => <ProseProblem input={input} active={false} />;
+/** How a problem ended; the model solution shows open, as after Show me. */
+const conclude = (input: Record<string, unknown>, reveal?: string) => <ProseConclude toolCallId="call_conclude" input={{ ...input, outcome: input.outcome === "dismissed" ? "dismissed" : "surrendered" }} output={{}} reveal={reveal} />;
+const question = (raw: string, id: string) => <ProseQuestion tool="ask_user_question" toolCallId={id} input={{ question: raw }} open />;
 
 function math(html: string) {
 	const { document } = parseHTML(html);
@@ -90,7 +90,7 @@ describe("upgraded KaTeX rendering on real question and practice surfaces", () =
 			for (const raw of [`$${formula}$`, `\\(${formula}\\)`, `$$\n${formula}\n$$`, `\\[\n${formula}\n\\]`]) {
 				for (const element of [
 					<MessageResponse mode="static">{raw}</MessageResponse>,
-					<QuestionDock toolName="ask_user_question" toolCallId="security_question" input={{ question: raw }} expanded onExpand={() => {}} onSubmit={() => {}} />,
+					question(raw, "security_question"),
 					dock({ statement: raw }),
 				]) {
 					const html = renderToStaticMarkup(element);
@@ -104,9 +104,9 @@ describe("upgraded KaTeX rendering on real question and practice surfaces", () =
 			}
 		});
 	}
-	it("preserves escaped currency and code on both dock surfaces", () => {
+	it("preserves escaped currency and code on the question and the problem", () => {
 		const raw = "Costs \\$5 and \\$10. `" + clean + "`\n\n```text\n" + doubled + "\n```";
-		for (const element of [dock({ statement: raw }), <QuestionDock toolName="ask_user_question" toolCallId="security_code" input={{ question: raw }} expanded onExpand={() => {}} onSubmit={() => {}} />]) {
+		for (const element of [dock({ statement: raw }), question(raw, "security_code")]) {
 			const html = renderToStaticMarkup(element);
 			assert.deepEqual(math(html).annotations, []);
 			assert.ok(parseHTML(html).document.firstElementChild?.textContent?.includes("$5 and $10"));
@@ -123,24 +123,22 @@ describe("practice display surfaces", () => {
 		["clean math", clean, tex, ["∇", "∈", "×"]],
 		["matrix with legitimate row break", matrix, repairedMatrix, ["1", "2", "3", "4"]],
 	] as const) {
-		it(`${name}: expanded dock, settled statement, verdict, committed reveal and legacy fallback`, () => {
+		it(`${name}: open problem, settled statement, committed reveal and legacy fallback`, () => {
 			const input = Object.freeze({ statement: raw, modelSolution: `HIDDEN COMMITMENT ${raw}` });
-			const conclusion = Object.freeze({ outcome: "solved", verdict: raw, solutionReveal: raw });
+			const conclusion = Object.freeze({ outcome: "surrendered", verdict: raw, solutionReveal: raw });
 			const before = JSON.stringify({ input, conclusion });
-			for (const element of [dock(input), <ProblemCard part={part(input)} />]) {
+			for (const element of [dock(input), settled(input)]) {
 				const html = renderToStaticMarkup(element);
 				assertMath(html, [expected], [...glyphs]);
 				assert.ok(!html.includes("HIDDEN COMMITMENT"));
 			}
-			assertMath(renderToStaticMarkup(<ConcludeCard part={part(conclusion, { type: "tool-conclude", reveal: raw })} />),
-				[expected, expected], [...glyphs]);
-			assertMath(renderToStaticMarkup(<ConcludeCard part={part({ outcome: "solved", solutionReveal: raw })} />),
-				[expected], [...glyphs]);
+			assertMath(renderToStaticMarkup(conclude(conclusion, raw)), [expected], [...glyphs]);
+			assertMath(renderToStaticMarkup(conclude({ solutionReveal: raw })), [expected], [...glyphs]);
 			assert.equal(JSON.stringify({ input, conclusion }), before);
 		});
 	}
 
-	it("keeps a boundary-converted numeric statement raw and preserves prior dock passthrough", () => {
+	it("keeps a boundary-converted numeric statement raw in the record and shows it as its number", () => {
 		const raw = { statement: 17, mode: "recall", topics: ["arithmetic"], modelSolution: "Committed solution." };
 		const call = { type: "toolCall", id: "numeric_problem", name: "problem", arguments: raw };
 		const validated = validateToolArguments(
@@ -157,26 +155,16 @@ describe("practice display surfaces", () => {
 		const active = activeProblemOf(messages);
 		assert.ok(active);
 		assert.equal((active.input as { statement: unknown }).statement, 17);
-		// Mirror the existing runtime cast at the Chat -> PracticeDock seam.
-		const input = active.input as { statement: string };
-		let expanded = "";
-		assert.doesNotThrow(() => { expanded = renderToStaticMarkup(dock(input)); });
-		const { document } = parseHTML(expanded);
-		assert.equal(document.querySelector("[data-dock-scroll-area]")!.innerHTML,
-			parseHTML(renderToStaticMarkup(<MessageResponse>{input.statement}</MessageResponse>)).document.firstElementChild!.outerHTML,
-			"non-string values pass through exactly as before, without string coercion or a new fallback");
-		const collapsed = renderToStaticMarkup(dock(input, false));
-		assert.match(collapsed, /data-testid="practice-dock-bar"/);
-		assert.equal(parseHTML(collapsed).document.querySelector("span.truncate")!.textContent, "17");
-		assert.deepEqual(math(collapsed).annotations, []);
+		const html = renderToStaticMarkup(dock(active.input as { statement: unknown }));
+		assert.match(html, />17</, "the tutor saw 17, so he does too");
+		assert.deepEqual(math(html).annotations, []);
 		assert.deepEqual(messages, before);
 		assert.equal(raw.statement, 17);
 	});
 
 	it("preserves code spans/fences across every repaired display surface", () => {
 		const raw = "`" + doubled + "`\n\n```text\n" + doubled + "\n```";
-		for (const element of [dock({ statement: raw }), <ProblemCard part={part({ statement: raw })} />,
-			<ConcludeCard part={part({ outcome: "solved", verdict: raw }, { reveal: raw })} />]) {
+		for (const element of [dock({ statement: raw }), settled({ statement: raw }), conclude({ verdict: raw }, raw)]) {
 			const html = renderToStaticMarkup(element);
 			assert.deepEqual(math(html).annotations, []);
 			const { document } = parseHTML(html);
@@ -184,12 +172,9 @@ describe("practice display surfaces", () => {
 		}
 	});
 
-	it("does not change the collapsed preview, dismissal or global prose renderer", () => {
-		const preview = renderToStaticMarkup(dock({ statement: doubled }, false));
-		assert.ok(preview.includes(doubled));
-		assert.deepEqual(math(preview).annotations, []);
-		const dismissed = renderToStaticMarkup(<ConcludeCard part={part({ outcome: "dismissed", verdict: doubled }, { reveal: doubled })} />);
-		assert.ok(dismissed.includes("You skipped this problem."));
+	it("does not change the dismissal or the global prose renderer", () => {
+		const dismissed = renderToStaticMarkup(conclude({ outcome: "dismissed", verdict: doubled }, doubled));
+		assert.ok(dismissed.includes("You skipped this problem"));
 		assert.deepEqual(math(dismissed).annotations, []);
 		const plain = math(renderToStaticMarkup(<MessageResponse>{doubled}</MessageResponse>));
 		assert.deepEqual(plain.annotations, [doubled.slice(1, -1)]);
@@ -223,15 +208,15 @@ describe("practice display surfaces", () => {
 		const problem = projectView(messages)[0]!.parts.find((p) => p.type === "tool-problem")!;
 		assert.ok(problem.state && problem.toolCallId);
 		assert.deepEqual(problem.input, input);
-		const statementHtml = renderToStaticMarkup(<ProblemCard part={{ ...problem, state: problem.state, toolCallId: problem.toolCallId }} />);
+		const statementHtml = renderToStaticMarkup(settled(problem.input));
 		assertMath(statementHtml);
 		assert.ok(!statementHtml.includes("COMMITTED"));
 		const conclusion = projectView(concluded).flatMap((m) => m.parts).find((p) => p.type === "tool-conclude")!;
 		assert.ok(conclusion.state && conclusion.toolCallId);
 		assert.equal(conclusion.reveal, input.modelSolution);
-		const revealHtml = renderToStaticMarkup(<ConcludeCard part={{ ...conclusion, state: conclusion.state, toolCallId: conclusion.toolCallId }} />);
+		const revealHtml = renderToStaticMarkup(conclude(conclusion.input as Record<string, unknown>, conclusion.reveal as string));
 		assert.ok(revealHtml.includes("COMMITTED"));
-		assertMath(revealHtml, [tex, tex]);
+		assertMath(revealHtml, [tex]);
 		assert.deepEqual(concluded, before);
 	});
 });

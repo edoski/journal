@@ -23,10 +23,11 @@ describe("a one-line label from page text", () => {
 		assert.doesNotMatch(label.body.textContent!, /\*/);
 	});
 
-	it("keeps a matrix on the line as a small matrix, never dots", () => {
-		assert.equal(lineTex("B = \\begin{pmatrix} 2 & 0 \\\\ 0 & 3 \\end{pmatrix}"), "B = \\left(\\begin{smallmatrix} 2 & 0 \\\\ 0 & 3 \\end{smallmatrix}\\right)");
-		assert.equal(lineTex("\\begin{bmatrix} a \\end{bmatrix}"), "\\left[\\begin{smallmatrix} a \\end{smallmatrix}\\right]");
-		assert.equal(lineTex("f(x) = \\begin{cases} 1 & x > 0 \\\\ 0 & \\text{else} \\end{cases}"), "f(x) = \\left\\{\\begin{smallmatrix} 1 & x > 0 \\\\ 0 & \\text{else} \\end{smallmatrix}\\right.");
+	it("keeps a matrix on the line as a small matrix a size up, its entries at the label's size, never dots", () => {
+		assert.equal(lineTex("B = \\begin{pmatrix} 2 & 0 \\\\ 0 & 3 \\end{pmatrix}"), "B = {\\large\\left(\\begin{smallmatrix} 2 & 0 \\\\ 0 & 3 \\end{smallmatrix}\\right)}");
+		assert.equal(lineTex("\\begin{bmatrix} a \\end{bmatrix}"), "{\\large\\left[\\begin{smallmatrix} a \\end{smallmatrix}\\right]}");
+		assert.equal(lineTex("\\begin{matrix} a \\end{matrix}"), "{\\large\\begin{smallmatrix} a \\end{smallmatrix}}");
+		assert.equal(lineTex("f(x) = \\begin{cases} 1 & x > 0 \\\\ 0 & \\text{else} \\end{cases}"), "f(x) = {\\large\\left\\{\\begin{smallmatrix} 1 & x > 0 \\\\ 0 & \\text{else} \\end{smallmatrix}\\right.}");
 		assert.equal(lineTex("\\begin{aligned} a &= b \\\\ c &= d \\end{aligned}"), "a = b ,\\quad c = d");
 		assert.equal(lineTex("\\dfrac{a}{b}"), "\\tfrac{a}{b}");
 		const label = doc(<span><LineText>{"Take $$B = \\begin{pmatrix} 2 & 0 \\\\ 0 & 3 \\end{pmatrix}$$ now"}</LineText></span>);

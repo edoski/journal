@@ -350,7 +350,8 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });
 		const linked = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === LINALG);
 		const verbs = linked.map((c) => c.args[2]);
-		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.equal(verbs.filter((v) => v === "map").length, 2, "each brief reads every course's daily plan");
 		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
 		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each practice brief also reads the exam run-up");
 		const save = linked.find((c) => c.args[2] === "save")!;
@@ -364,6 +365,40 @@ describe("a course-linked turn", () => {
 		const ack = chatStore.getChat(id)!.messages.find((m) => (m as { toolName?: string }).toolName === "conclude") as { isError: boolean; content: Array<{ text: string }> };
 		assert.equal(ack.isError, false);
 		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
+	});
+
+	it("practice: a message sent from Ask concludes nothing and carries no confidence (round 5)", async () => {
+		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: LINALG } })).json()) as { id: string };
+		const pose = { statement: "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.", mode: "recall", topics: ["rank"], modelSolution: "Row 2 is twice row 1, so the rank is 1." };
+		const engine = scripted([
+			() => fauxAssistantMessage([fauxToolCall("problem", pose, { id: "p1" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("Look at the rows.")]),
+			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right.", rung: null, missClass: null, retest: false, result: "correct", response: "1, the rows are dependent" }, { id: "c1" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("Send it as your answer when you're ready.")]),
+			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "surrendered", verdict: "Given up.", rung: null, missClass: null, retest: false, result: "incorrect", response: "no answer" }, { id: "c2" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("Here is the solution.")]),
+		]);
+		const factory: Factory = (opts) => createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
+		const saves = () => engineCalls().filter((c) => c.args[2] === "save");
+		const before = saves().length;
+		await turn(id, { type: "text", text: "practice rank" }, factory);
+		await turn(id, { type: "thinking", problemCallId: "p1", text: "maybe 2?", confidence: "guessing" }, factory);
+		await turn(id, { type: "text", text: "it's 1, the rows are dependent", asked: true }, factory);
+
+		const messages = chatStore.getChat(id)!.messages;
+		const asked = messages.findIndex((m) => (m as { customType?: string }).customType === "asked");
+		assert.ok(asked >= 0 && messages[asked + 1]?.role === "user", "an Ask message reaches the tutor marked as a question");
+		assert.match(String((messages[asked] as { content: string }).content), /not his answer/);
+		const refused = messages.find((m) => (m as { toolCallId?: string }).toolCallId === "c1") as { isError: boolean; content: Array<{ text: string }> };
+		assert.equal(refused.isError, true, "a solved conclusion from an Ask message is refused");
+		assert.match(refused.content[0]!.text, /Ask/);
+		assert.equal(saves().length, before, "nothing was recorded from it");
+
+		await turn(id, { type: "text", text: "just show me", asked: true }, factory);
+		const save = saves()[before]!;
+		const [observation] = JSON.parse(save.stdin).observations as Record<string, unknown>[];
+		assert.equal(observation!.gave_up, true);
+		assert.equal("sure" in observation!, false, "the Guessing of an earlier note is not this give-up's confidence");
 	});
 
 	it("a course session's file search defaults to the course folder", async () => {

@@ -2,13 +2,15 @@
  * The calendar page as Edo sees it, mounted on FullCalendar's day grid in
  * a DOM: an empty week says so, a busy week shows each entry's course
  * mark, title and type, an exam names how far off it is, an overdue
- * review says Overdue, and a review's panel starts the topic page's
+ * review says how late, as Home does ("10d overdue"), and a review's panel starts the topic page's
  * session or opens the topic.
  */
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
 
 import { dom } from "./helpers/radix-dom.ts";
+// The day grid's More panel asks whether its root is a Document.
+(globalThis as Record<string, unknown>).Document = dom.document.constructor;
 // next/link reaches for `self` when a link mounts.
 (globalThis as Record<string, unknown>).self = globalThis;
 import assert from "node:assert/strict";
@@ -114,6 +116,13 @@ async function press(target: Element) {
 	});
 }
 
+/** Month, then a day's More: the day grid's own panel of everything on it. */
+async function openDayPanel(day: string) {
+	await press(document.querySelector("[data-testid=calendar-view-month]")!);
+	await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+	await press(document.querySelector(`[data-date="${day}"] [data-slot=calendar-more]`)!.closest("[aria-expanded]")!);
+}
+
 describe("the calendar page", () => {
 	it("says an empty week is empty", async () => {
 		await mount([{ ...linalg(null), due: [], map: { ...linalg(null).map, topics: [] } }], []);
@@ -126,7 +135,7 @@ describe("the calendar page", () => {
 		const drills = { ...lesson, id: "chat_drills", title: "Span drills", kind: "practice" as const, phase: "probe" as const, pendingQuestion: false, updatedAt: "2026-11-04T18:00:00" };
 		await mount([linalg(null)], [lesson, drills]);
 		assert.equal(document.querySelector("[data-slot=calendar-quiet]"), null);
-		assert.deepEqual(text("[data-slot=calendar-entry]"), ["Span drillsLAPractice", "Eigenvalues and eigenvectorsLAYour turn", "SpanLAOverdue"]);
+		assert.deepEqual(text("[data-slot=calendar-entry]"), ["Span drillsLAPractice", "Eigenvalues and eigenvectorsLAYour turn", "SpanLA10d overdue"]);
 		assert.deepEqual(text("[data-slot=calendar-day-head][data-today]"), ["Sun8Study 9:00 to 12:30"]);
 		assert.ok(document.querySelector('[data-slot=calendar-entry][data-look=lesson] svg[aria-label="Lesson"]'), "the waiting lesson's icon names its look");
 	});
@@ -145,10 +154,41 @@ describe("the calendar page", () => {
 		const exam = document.querySelector("[data-slot=calendar-entry][data-look=exam]");
 		assert.ok(exam, "the exam");
 		await press(exam);
-		const next = document.querySelector("[data-slot=calendar-entry-detail] [data-slot=exam-next] [data-slot=calendar-entry-start]");
-		assert.equal(next?.textContent, "Review Span");
+		const step = document.querySelector("[data-slot=calendar-entry-detail] [data-slot=exam-next]");
+		assert.equal(step?.querySelector("[data-slot=exam-next-what]")?.textContent, "Span", "what comes next is a line of its own");
+		const next = step?.querySelector("[data-slot=calendar-entry-start]");
+		// Round 5: "Review Random variables and distributions, Binomial distribution" wrapped the filled button onto two lines.
+		assert.equal(next?.textContent, "Review", "the button holds only the verb, so it never wraps");
 		await press(next!);
 		assert.deepEqual(started, [["Review Span", "/study/linalg", { topics: ["span"] }]]);
+	});
+
+	it("gives every panel one width: an exam's, a review's and a day's", async () => {
+		const widthOf = (el: Element | null) => (el?.className ?? "").split(/\s+/).filter((c) => /^w-/.test(c));
+		const remount = async (courses: CalendarCourse[], chats: ChatListItem[]) => {
+			await act(async () => root?.unmount());
+			host?.remove();
+			await mount(courses, chats);
+		};
+		await mount([linalg(TODAY)], []);
+		await press(document.querySelector("[data-slot=calendar-entry][data-look=overdue]")!);
+		const review = widthOf(document.querySelector("[data-slot=calendar-entry-detail]"));
+		assert.equal(review.length, 1, "a review's panel sets its width");
+		await remount([linalg(TODAY)], []);
+		await press(document.querySelector("[data-slot=calendar-entry][data-look=exam]")!);
+		assert.deepEqual(widthOf(document.querySelector("[data-slot=calendar-entry-detail]")), review, "an exam's panel is as wide as a review's (round 5: 318 against 286)");
+		await remount([linalg(null)], Array.from({ length: 8 }, (_, i) => ({ ...lesson, id: `chat_${i}`, title: `Lesson ${i}` })));
+		await openDayPanel("2026-11-08");
+		assert.deepEqual(widthOf(document.querySelector('[role=dialog][data-date="2026-11-08"]')), review, "a day's panel is as wide too");
+	});
+
+	it("heads a month day's panel with its date, not just the weekday", async () => {
+		await mount([linalg(null)], Array.from({ length: 8 }, (_, i) => ({ ...lesson, id: `chat_${i}`, title: `Lesson ${i}` })));
+		await openDayPanel("2026-11-08");
+		const panel = document.querySelector('[role=dialog][data-date="2026-11-08"]');
+		assert.ok(panel, "the day's panel opens");
+		// Round 5: it read "Sun".
+		assert.deepEqual(text("[data-slot=calendar-day-panel-head]"), ["Sunday 8 November"]);
 	});
 
 	it("opens an overdue review's panel, which starts the topic page's session or opens the topic", async () => {
@@ -160,7 +200,7 @@ describe("the calendar page", () => {
 		const detail = document.querySelector("[data-slot=calendar-entry-detail]");
 		assert.ok(detail, "its panel opens");
 		// The engine dates a due review on today and counts its days overdue (round 4: it read today's date).
-		assert.match(detail.textContent ?? "", /SpanOverdueWas due Thursday 29 October/);
+		assert.match(detail.textContent ?? "", /Span10d overdueWas due Thursday 29 October/);
 		assert.equal(detail.querySelector("a")?.getAttribute("href"), "/unit/L3N0dWR5L2xpbmFsZw/span");
 		await press(detail.querySelector("[data-slot=calendar-entry-start]")!);
 		assert.deepEqual(started, [["Review Span", "/study/linalg", { topics: ["span"] }]]);

@@ -82,14 +82,14 @@ describe("a session started from Check it", () => {
 
 describe("the check block", () => {
 	it("says nothing once the arc is no longer ready, and re-sends the brief when it goes", () => {
-		const shown = projectCourseBrief(RESUME, "practice", undefined, "spaces");
-		const gone = projectCourseBrief({ ...RESUME, arcs_ready: undefined }, "practice", undefined, "spaces");
+		const shown = projectCourseBrief(RESUME, "practice", { arcCheck: "spaces" });
+		const gone = projectCourseBrief({ ...RESUME, arcs_ready: undefined }, "practice", { arcCheck: "spaces" });
 		assert.doesNotMatch(gone.text, /Arc check/);
 		assert.notEqual(shown.key, gone.key);
 	});
 
 	it("leaves out the pairs line for an arc with no competing methods", () => {
-		const { text } = projectCourseBrief({ ...RESUME, arcs_ready: [{ ...READY, pairs: [] }] }, "teach", undefined, "spaces");
+		const { text } = projectCourseBrief({ ...RESUME, arcs_ready: [{ ...READY, pairs: [] }] }, "teach", { arcCheck: "spaces" });
 		assert.match(text, /Arc check/);
 		assert.doesNotMatch(text, /choose-the-method/);
 	});

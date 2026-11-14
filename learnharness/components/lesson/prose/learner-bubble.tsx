@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { MessageResponse } from "@/components/ai-elements/message";
+import { MathText } from "@/components/ui/math-text";
 import { SentPhotos } from "@/components/photos";
 import { MarkLine } from "@/components/lesson/mark-line";
 import type { Photo } from "@/src/core";
@@ -28,8 +28,8 @@ export function LearnerBubble({
 	icon?: LucideIcon;
 	label?: string;
 	testId?: string;
-	/** The answer whose mark goes on one line under the bubble, its words
-	 *  starting where his do. */
+	/** The answer whose mark goes on one line under the bubble, its facts
+	 *  ending where his words do. */
 	markId?: string;
 	children?: ReactNode;
 	className?: string;
@@ -43,7 +43,7 @@ export function LearnerBubble({
 					{label}
 				</div>
 			)}
-			{words && <MessageResponse className="text-foreground">{words}</MessageResponse>}
+			{words && <LearnerWords className="text-foreground">{words}</LearnerWords>}
 			{children}
 			{photos && photos.length > 0 && <SentPhotos photos={photos} className={words || label ? "mt-2" : undefined} />}
 		</div>
@@ -51,21 +51,30 @@ export function LearnerBubble({
 	return (
 		<div className="my-1 ms-auto flex w-fit max-w-[80%] min-w-0 flex-col">
 			{bubble}
-			{markId && <MarkLine answerId={markId} className={MARK_UNDER_BUBBLE} />}
+			{markId && <MarkLine answerId={markId} />}
 		</div>
 	);
 }
 
-/** The mark reads as his bubble's footnote: its facts end where his words
- *  do, and Dispute shows before them while the line is pointed at. */
-const MARK_UNDER_BUBBLE = "flex-row-reverse pe-4";
+/** His own words exactly as he typed them (prose.md, "His words"): plain
+ *  text with its line breaks, never Markdown, so `2*30`, `[2, ∞)` and
+ *  "$5 and $10" read as written. Only maths he wrapped in a delimiter on
+ *  purpose is typeset (`MathText`'s rule: `\(…\)`, `$$…$$`, or a `$…$`
+ *  hugging its formula, so money stays money). */
+export function LearnerWords({ children, className }: { children: string; className?: string }) {
+	return (
+		<p data-slot="learner-words" className={cn("lh-prose whitespace-pre-wrap break-words", className)}>
+			<MathText>{children}</MathText>
+		</p>
+	);
+}
 
 /** The record's mark for a problem, where the problem ended: under the
  *  bubble that ended it, on the right. */
 export function BubbleMark({ answerId }: { answerId: string }) {
 	return (
 		<div className="ms-auto w-fit max-w-[80%]">
-			<MarkLine answerId={answerId} className={MARK_UNDER_BUBBLE} />
+			<MarkLine answerId={answerId} />
 		</div>
 	);
 }

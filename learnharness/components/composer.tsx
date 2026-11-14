@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { ArrowRightIcon, ArrowUpIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,66 +32,6 @@ export function enterAction(state: {
 	if (state.nextProblem) return "next";
 	if (state.emptyAction) return "empty-action";
 	return "none";
-}
-
-/**
- * Session composer with local keystroke state. The owning Chat keeps the
- * current draft in a ref for send, so typing doesn't rerender the
- * transcript; revision signals explicit parent-driven draft resets.
- */
-export function ChatSessionComposer({
-	busy,
-	value,
-	revision,
-	onChange,
-	onSend,
-	onStop,
-	sendAllowed,
-	placeholder,
-	nextProblem,
-	onNext,
-	onEmptyEnter,
-	photos,
-}: {
-	busy: boolean;
-	value: string;
-	revision: number;
-	/** Enter on the empty, idle field runs this (Try again after a cut reply). */
-	onEmptyEnter?: () => void;
-	/** His photos waiting to go with the message (photos.tsx). */
-	photos?: PhotoDraft;
-	onChange: (value: string) => void;
-	onSend: () => void;
-	onStop: () => void;
-	sendAllowed: boolean;
-	placeholder?: string;
-	nextProblem?: boolean;
-	onNext?: () => void;
-}) {
-	const [draft, setDraft] = useState(value);
-	useLayoutEffect(() => { setDraft(value); }, [revision, value]);
-	// A photo alone is a message.
-	const canSend = sendAllowed && (draft.trim().length > 0 || (photos?.photos.length ?? 0) > 0);
-	const applyDraft = useCallback((next: string) => {
-		setDraft(next);
-		onChange(next);
-	}, [onChange]);
-
-	return (
-		<Composer
-			busy={busy}
-			value={draft}
-			onChange={applyDraft}
-			onSend={onSend}
-			onStop={onStop}
-			canSend={canSend}
-			placeholder={placeholder}
-			nextProblem={nextProblem}
-			onNext={onNext}
-			onEmptyEnter={onEmptyEnter}
-			photos={photos}
-		/>
-	);
 }
 
 /** The composer (spec: composer.md): one rounded surface, the text on top,

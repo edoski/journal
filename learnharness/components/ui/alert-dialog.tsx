@@ -5,7 +5,7 @@ import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { DIALOG_LAYER, claimEscape } from "@/components/ui/overlay"
+import { DIALOG_LAYER, claimEscape, landFocusAfterClose } from "@/components/ui/overlay"
 
 /** shadcn alert dialog on the dialog anatomy (spec: alert-dialog.md,
  *  dialog.md): a confirmation that only its buttons or Esc close. The
@@ -91,6 +91,7 @@ function AlertDialogContent({
   onEscapeKeyDown,
   onKeyDown,
   onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
   return (
@@ -107,6 +108,7 @@ function AlertDialogContent({
           onOpenAutoFocus?.(e)
           if (!e.defaultPrevented) focusFooter(e)
         }}
+        onCloseAutoFocus={landFocusAfterClose(onCloseAutoFocus)}
         className={cn(
           DIALOG_LAYER,
           "fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none",

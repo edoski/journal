@@ -10,7 +10,7 @@ import { TopicGlyph } from "./topic-glyph";
 import { CURRENT_TAG, type CardFact, type Standing } from "./topic-standing";
 import { entryCaption } from "./arc-view";
 import { BrailleSpinner } from "@/components/braille-spinner";
-import { FACT_ICON } from "@/components/unit-inbox/fact-icon";
+import { factIcon } from "@/components/unit-inbox/fact-icon";
 import { MathText } from "@/components/ui/math-text";
 import { MathLine } from "@/components/ui/math-line";
 
@@ -50,12 +50,18 @@ export interface TopicMapState {
 
 export const TopicMapContext = createContext<TopicMapState | null>(null);
 
+/** How far a card recedes when another chain is lit, or as an arc's entry
+ *  topic: the lowest strength at which its muted line keeps 4.5:1 on its
+ *  card (WCAG AA; tests/topic-map.test.tsx works it out from the tokens),
+ *  so a receded card still reads (round 5: 50% drew it at 2.8:1). */
+export const RECEDED = 0.8;
+
 /** A card's line as Home's rows draw a reason: a 12px icon (the
  *  sidebar's and the course page's, a spinner while the tutor writes),
  *  then its words, on a caption line whose middle is the words' cap
  *  height. */
 function LineMark({ line }: { line: CardFact }) {
-	const Icon = line.kind === "working" ? null : FACT_ICON[line.kind];
+	const Icon = factIcon(line);
 	return (
 		<span data-slot="topic-need" data-kind={line.kind} className="flex h-3.5 min-w-0 items-center gap-1 text-caption text-muted-foreground">
 			{Icon ? <Icon aria-hidden="true" className="size-3 shrink-0" /> : <BrailleSpinner />}
@@ -105,19 +111,11 @@ export function NodeBody({ topic, standing, line, from = null }: { topic: Course
 export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 	const state = useContext(TopicMapContext);
 	const { topic, current, standing, line, label, needs, href, from } = data;
-	const dim = state?.lit ? !state.lit.has(topic.handle) : false;
-	// An entry topic stays faded unless its chain is lit.
-	const faded = from !== null && !dim && !state?.lit?.has(topic.handle);
+	// Outside the lit chain, or an arc's entry topic whose chain is not lit.
+	const receded = state?.lit ? !state.lit.has(topic.handle) : from !== null;
 	const marked = state?.marked === topic.handle;
 	return (
-		<div
-			className={cn(
-				"relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none",
-				// Dimmed past its muted line's 3:1 (Edo, 14 Nov 2026: the pointed chain must stand out); the title still reads.
-				dim && "opacity-50",
-				faded && "opacity-60",
-			)}
-		>
+		<div className="relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none" style={receded ? { opacity: RECEDED } : undefined}>
 			{current && (
 				<span data-slot="course-map-current-tag" className="absolute -top-5 left-0 text-caption font-medium text-foreground">
 					{CURRENT_TAG}

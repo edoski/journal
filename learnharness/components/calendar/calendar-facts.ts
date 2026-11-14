@@ -1,9 +1,9 @@
 import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldWords, reviewWords, startsAfterWords } from "@/components/study-words";
+import { distanceWords, heldWords, movedWords, overdueWords, startsAfterWords } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
-import { courseMove, nextStepOf, stepWords, type CourseMove } from "@/components/study-home/study-facts";
+import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 
 /**
  * What the calendar draws (spec: calendar.md): the engine's dates and the
@@ -70,10 +70,26 @@ export type CalendarEntry =
 	  };
 
 /** The next step toward an exam: the course's step as Home's line takes it
- *  up (`nextStepOf`, `courseMove`), in Home's words. */
+ *  up (`nextStepOf`, `courseMove`), split into Home's verb and what it works
+ *  on, so the panel's button says only the verb and never wraps (round 5:
+ *  "Review Random variables and distributions, Binomial distribution" drew a
+ *  two-line button). */
 export interface NextMove {
-	words: string;
+	verb: "Review" | "Continue" | "Start";
+	what: string;
 	move: CourseMove;
+}
+
+/** A step's verb and what it works on: `stepWords` in two halves. Pure. */
+function nextParts(step: Exclude<NextStep, { kind: "none" }>): Pick<NextMove, "verb" | "what"> {
+	switch (step.kind) {
+		case "review":
+			return { verb: "Review", what: titleList(step.titles) };
+		case "task":
+			return { verb: "Continue", what: step.title };
+		case "topic":
+			return { verb: step.fresh ? "Start" : "Continue", what: step.title };
+	}
 }
 
 /** One week of the road to an exam: the days in it that start new topics
@@ -157,6 +173,15 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
 	}
 	const things = [...counts.values()].map(([one, many, n]) => (n > 1 ? many : one));
 	return things.length > 0 ? `Also ${listWords(things)}` : "More";
+}
+
+/** An entry's words beside its icon: its look's, except a review due
+ *  today, which says how late as Home's rows and the sidebar do ("Due
+ *  today", "2d overdue"), so one review never reads "2d overdue" on Home
+ *  and "Overdue" here (round 5). Pure. */
+export function lookWords(entry: CalendarEntry, today: string): string {
+	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;
+	return review?.kind === "due" ? overdueWords(review.overdue) : LOOKS[lookOf(entry)].words;
 }
 
 export function lookOf(entry: CalendarEntry): EntryLook {
@@ -270,14 +295,14 @@ export function calendarEntries({
 			const road = roadOf(planned, map.exam.date, titleOf);
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
 			const step = nextStepOf(studied);
-			const next = map.exam.date > today && step.kind !== "none" ? { words: stepWords(step), move: courseMove(studied, chats) } : null;
+			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), move: courseMove(studied, chats) } : null;
 			const unreviewed = (map.exam.unreviewed ?? []).map(titleOf);
 			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
-			const since = held?.held && held.held.since < today ? reviewWords(held, today) : null;
+			const since = held ? movedWords(held, today) : null;
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held ? heldWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>

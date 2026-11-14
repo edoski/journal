@@ -38,6 +38,8 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * the arc he picked on the strip, else where he is (`currentArc`). Once
  * the follow names an arc, a pick is dropped, so leaving the row returns
  * to the arc of You are here. Enlarged, its Whole course shows every arc.
+ * `framed` (the topics of the Today row he points at) brings them into
+ * view on the chosen course's map (`TopicMap`'s `framed`).
  */
 export function HomeMap({
 	courses,
@@ -45,6 +47,7 @@ export function HomeMap({
 	workspace,
 	onSelect,
 	highlight = null,
+	framed = null,
 	arc: followed,
 	enlarged,
 	onEnlarge,
@@ -57,6 +60,9 @@ export function HomeMap({
 	onSelect: (workspace: string) => void;
 	/** Topics to light on the chosen course's map; null lights none. */
 	highlight?: ReadonlySet<TopicHandle> | null;
+	/** Topics the chosen course's map brings into view while he points at
+	 *  their Today row; null while he points at none. */
+	framed?: ReadonlySet<TopicHandle> | null;
 	/** The arc of the chosen course Home's follow shows (the Today row he
 	 *  points at, `litArc`); null shows where he is. Unset, the map follows
 	 *  `highlight` itself. */
@@ -165,6 +171,7 @@ export function HomeMap({
 								arc={shown && zoomedOut ? undefined : arcOf(course, shown)}
 								said={said.get(course.map.workspace)!}
 								highlight={shown ? highlight : null}
+								framed={shown ? framed : null}
 								whole={shown && zoomedOut}
 								onOpensWhole={(fits) =>
 									setOpensWhole((was) => (was.get(course.map.workspace) === fits ? was : new Map(was).set(course.map.workspace, fits)))
@@ -225,6 +232,7 @@ function CourseDrawing({
 	arc,
 	said,
 	highlight,
+	framed,
 	whole,
 	onOpensWhole,
 }: {
@@ -232,13 +240,14 @@ function CourseDrawing({
 	arc: ArcHandle | undefined;
 	said: ReadonlyMap<TopicHandle, Said>;
 	highlight: ReadonlySet<TopicHandle> | null;
+	framed: ReadonlySet<TopicHandle> | null;
 	whole: boolean;
 	onOpensWhole: (fits: boolean) => void;
 }) {
 	const { map } = course;
 	if (map.topics.length === 0) return <p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>;
 	// As much room as the fade, so a topic at the edge scrolls clear of it.
-	return <TopicMap map={map} arc={arc} said={said} margin={FADE} highlight={highlight} whole={whole} onOpensWhole={onOpensWhole} />;
+	return <TopicMap map={map} arc={arc} said={said} margin={FADE} highlight={highlight} framed={framed} whole={whole} onOpensWhole={onOpensWhole} />;
 }
 
 /** The one arc a set of lit topics lies in, or undefined when they span

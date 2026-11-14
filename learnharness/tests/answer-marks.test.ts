@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { answerMarksOf, correctorsToRead, latestMarkedAnswer, markLinks } from "../src/core/answer-marks.ts";
 import { ChatInputError, inputAppends, parseChatInput } from "../src/core/input-events.ts";
-import type { LhMessage } from "../src/core/native-messages.ts";
+import { answeredQuestionsOf, type LhMessage } from "../src/core/native-messages.ts";
 import { owedMessages, sdkInputBlocks } from "../src/core/sdk-session.ts";
-import { countedWords } from "../components/study-words.ts";
+import { markHow } from "../src/core/contracts/marks.ts";
+import { MARK_HOW_WORDS } from "../components/study-words.ts";
+
+const countedWords = (row: Parameters<typeof markHow>[0]) => MARK_HOW_WORDS[markHow(row)];
 
 let n = 0;
 const id = () => `m${++n}`;
@@ -87,6 +90,27 @@ describe("which attempts mark which answer", () => {
 		assert.deepEqual(markLinks(messages), { c1: ["o7", "o8", "o9"] });
 	});
 
+	it("an answer he gave in words marks his message when the save names his-message (round 5)", () => {
+		const said = (text: string) => ({ id: id(), role: "user", content: text, timestamp: 0 }) as LhMessage;
+		const first = said("Both parts: rank 3, nullity 1");
+		const later = said("thanks, next");
+		const messages = [
+			call("p1", "problem", { statement: "Rank and nullity?", topics: ["rank"] }),
+			result("p1", "problem", "posed"),
+			call("c1", "conclude", { outcome: "movedOn" }),
+			result("c1", "conclude", "No attempt recorded: he asked to be taught."),
+			first,
+			call("s1", "course_save", { changes: { observations: [named("his-message")] } }),
+			result("s1", "course_save", receipt("o38")),
+			later,
+		];
+		assert.deepEqual(markLinks(messages), { [first.id]: ["o38"] }, "the message the save answered, never one sent after it");
+		assert.equal(answeredQuestionsOf(messages).has("his-message"), true, "the course tool accepts the name");
+		assert.equal(answeredQuestionsOf(messages.slice(0, 4)).has("his-message"), false, "with no message of his there is nothing to name");
+		const disputed = inputAppends({ messages }, { type: "dispute", answerId: first.id, observations: ["o38"], said: "both parts are right" });
+		assert.match(String((disputed.at(-1) as { content: string }).content), /\[MARK DISPUTED\]/, "its mark can be disputed like any other");
+	});
+
 	it("an attempt that names no answer, or a refused save, marks nothing", () => {
 		const messages = [
 			...lesson().slice(0, 2),
@@ -110,7 +134,7 @@ describe("the mark that stands", () => {
 		assert.deepEqual(correctorsToRead({ o4: shown.o4 }, ["o4"]), ["o6"]);
 		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, shown), {
 			q1: {
-				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, sure: "confident" }],
+				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, predicted: false, gaveUp: false, sure: "confident" }],
 				disputed: true,
 				ruling: "You are right: the pivots give rank 2.",
 			},
@@ -143,8 +167,8 @@ describe("the mark that stands", () => {
 	});
 
 	it("a right guess counted as helped says so", () => {
-		assert.equal(countedWords({ grade: "helped", helped: false }), "Counted as helped");
-		assert.equal(countedWords({ grade: "solid", helped: false }), "On your own");
+		assert.equal(countedWords({ grade: "helped", helped: false, predicted: false, gaveUp: false }), "Counted as helped");
+		assert.equal(countedWords({ grade: "solid", helped: false, predicted: false, gaveUp: false }), "On your own");
 	});
 
 	it("⌘⇧M picks the newest marked answer", () => {
@@ -179,6 +203,14 @@ describe("the dispute input", () => {
 		assert.match(content, /"It is 2"/);
 		assert.match(content, /right \(correct\)/);
 		assert.deepEqual((marker as { details: unknown }).details, { answerId: "q1", observations: ["o4"], said: "It is 2", proposed: "correct" });
+	});
+
+	it("tells the tutor how the card words each grade, so the ruling never contradicts the card (round 5)", () => {
+		const content = String((inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q1", observations: ["o4"], said: "It is my own work" }).at(-1) as { content: string }).content);
+		for (const how of ["withHelp", "countedHelped", "predicted", "gaveUp", "ownWork"] as const) {
+			assert.ok(content.includes(`"${MARK_HOW_WORDS[how]}"`), `the dispute names the card's words for ${how}`);
+		}
+		assert.match(content, /never call it his own work/);
 	});
 
 	it("is refused for an answer with no mark", () => {

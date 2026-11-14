@@ -306,7 +306,7 @@ describe("teacher chat flow (scripted model)", () => {
 		// ── The learner answers: the client grades and posts the ANSWER
 		// EVENT — the answer lands as the call's real tool result. ──
 		const answer = answerFor(QUESTION_INPUT, "Mercury");
-		assert.equal(answer.confidence, "neutral");
+		assert.equal(answer.confidence, undefined, "the meter left alone sends no confidence");
 		await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer }), agentFactory(engine));
 
 		// ── The teacher reacts — the projection groups the reaction into the

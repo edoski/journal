@@ -20,7 +20,7 @@
 import type { Photo } from "./photos.ts";
 import { Type, type Static } from "typebox";
 import { stripModelValueDebris } from "./value-debris.ts";
-import { DEFAULT_CONFIDENCE, type Confidence } from "./contracts/course.ts";
+import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 
 // ─── shared types ───────────────────────────────────────────────────────────
 
@@ -142,9 +142,6 @@ export const explainInputBase = Type.Object({
 			"text — never revise the commitment after seeing his words, and never mark a wrong answer right to be kind. " +
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
-	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
-	),
 });
 
 /** The TEACH-side explain object: base + the teaching-cycle role field
@@ -200,9 +197,6 @@ export const askInputSchema = Type.Object({
 		description:
 			"The single question to ask the learner. ONE question per turn: ask, then end your turn — the answer determines the next question.",
 	}),
-	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
-	),
 	options: Type.Optional(
 		Type.Array(Type.Object(askOptionProps), {
 			minItems: 2,
@@ -238,7 +232,6 @@ export interface QuestionData {
 	id: string;
 	kind: QuestionKind;
 	question: string;
-	context?: string;
 	mode: QuestionMode;
 	options: QuestionOption[];
 	// explain only. NEVER send to the client before answering:
@@ -299,7 +292,7 @@ export interface AnswerRequest {
 	text?: string; // ask/explain text-mode
 	thinking?: string; // the reasoning-on-the-question channel (was `note`)
 	readingThinking?: string; // the thinking-while-reading channel (check answers)
-	confidence?: Confidence; // explain only; defaults to neutral
+	confidence?: Confidence; // explain only; sent only when he chose one (chosenConfidence)
 	hint?: boolean; // explain only: a hint request, never an answer
 }
 
@@ -420,7 +413,8 @@ export function buildAnswer(qd: QuestionData, req: AnswerRequest, tool?: string)
 	} else if (qd.kind === "explain") {
 		// The commitment snapshots for the reveal + rendering.
 		base.committed = qd.committedAnswer;
-		base.confidence = req.confidence ?? DEFAULT_CONFIDENCE;
+		const chosen = chosenConfidence(req.confidence);
+		if (chosen) base.confidence = chosen;
 	}
 	return base;
 }
@@ -467,7 +461,8 @@ export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, un
 		out.answers = ad.answers.map((a) => ({ index: a.index, label: a.label }));
 	if (ad.text) out.text = ad.text;
 	if (ad.other) out.other = ad.other;
-	if (ad.confidence !== undefined) out.confidence = ad.confidence;
+	const chosen = chosenConfidence(ad.confidence);
+	if (chosen) out.confidence = chosen;
 	// Two DISTINCT thinking channels, clearly keyed so the model never
 	// conflates them (owner 2026-10-03): reasoning on the question vs
 	// thinking while reading the teaching. `note` is the pre-rename key —

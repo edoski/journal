@@ -42,7 +42,6 @@ import {
 const view = (over: Partial<MapCourseView> = {}): MapCourseView => ({
 	topics: {},
 	order: [],
-	current: null,
 	basis: null,
 	exam: {},
 	sources: ["notes", "sheet"],
@@ -66,7 +65,6 @@ describe("course map merge", () => {
 			{ handle: "trees", title: "Decision trees", excluded: "Chapter 8 is not examined", refs: [{ source: "notes", locator: "§8" }] },
 		],
 		order: ["ols", "ridge", "lasso", "trees"],
-		current: "ols",
 		basis: "Notes order",
 	};
 
@@ -79,7 +77,7 @@ describe("course map merge", () => {
 			lasso: { title: "Lasso", needs: ["ols"], refs: [{ source: "notes", locator: "§3" }] },
 			trees: { title: "Decision trees", refs: [{ source: "notes", locator: "§8" }], excluded: "Chapter 8 is not examined" },
 		});
-		assert.deepEqual(merged.changes.path, { order: ["ols", "ridge", "lasso", "trees"], current: "ols", basis: "Notes order" });
+		assert.deepEqual(merged.changes.path, { order: ["ols", "ridge", "lasso", "trees"], basis: "Notes order" });
 		assert.equal(merged.summary, "4 new topics, 2 prerequisites, 1 pair of competing methods, 4 references, 1 topic left out of the exam");
 	});
 
@@ -92,7 +90,6 @@ describe("course map merge", () => {
 				trees: topic("Decision trees", { refs: [{ source: "notes", locator: "§8" }], excluded: "Chapter 8 is not examined" }),
 			},
 			order: ["ols", "ridge", "lasso", "trees"],
-			current: "ols",
 			basis: "Notes order",
 		});
 		assert.equal(mapChanges(answer, built), null);
@@ -105,7 +102,6 @@ describe("course map merge", () => {
 				ridge: topic("Ridge", { needs: ["ols"] }),
 			},
 			order: ["ols", "ridge"],
-			current: "ridge",
 			basis: "Your order",
 		});
 		const merged = mapChanges(
@@ -115,7 +111,6 @@ describe("course map merge", () => {
 					{ handle: "cv", title: "Cross-validation", refs: [{ source: "sheet", locator: "Ex. 1" }] },
 				],
 				order: ["cv", "ridge"],
-				current: "cv",
 				basis: "Sheet order",
 			},
 			before,
@@ -125,7 +120,7 @@ describe("course map merge", () => {
 			ridge: { needs: ["ols", "cv"], refs: [{ source: "sheet", locator: "Ex. 2" }], excluded: "not examined" },
 			cv: { title: "Cross-validation", refs: [{ source: "sheet", locator: "Ex. 1" }] },
 		});
-		assert.deepEqual(merged.changes.path, { order: ["cv", "ols", "ridge"] }, "a new topic with nothing placed before it goes first; current and basis stay");
+		assert.deepEqual(merged.changes.path, { order: ["cv", "ols", "ridge"] }, "a new topic with nothing placed before it goes first; the basis stays");
 	});
 
 	it("leaves out a prerequisite that would close a loop, and references to unregistered sources", () => {
@@ -173,7 +168,7 @@ describe("duplicates by meaning", () => {
 	it("folds a duplicate that slips through into the existing topic, with its references and links", () => {
 		const merged = mapChanges(
 			{ topics: [{ handle: "eigenvalues", title: "Eigenvalue", refs: [{ source: "sheet", locator: "Ex. 4" }] }, { handle: "power", title: "Power iteration", needs: ["eigenvalues"] }], order: ["eigenvalues", "power"] },
-			view({ topics: { eigen: topic("Eigenvalues") }, order: ["eigen"], current: "eigen" }),
+			view({ topics: { eigen: topic("Eigenvalues") }, order: ["eigen"] }),
 		);
 		assert.deepEqual(merged?.changes.topics, { eigen: { refs: [{ source: "sheet", locator: "Ex. 4" }] }, power: { title: "Power iteration", needs: ["eigen"] } });
 		assert.deepEqual(merged?.changes.path, { order: ["eigen", "power"] });
@@ -204,7 +199,6 @@ describe("a course with arcs", () => {
 	const withArcs = view({
 		topics: { vectors: topic("Vectors"), span: topic("Span", { needs: ["vectors"] }), elimination: topic("Gaussian elimination"), rank: topic("Rank", { needs: ["elimination"] }), eigen: topic("Eigenvalues", { needs: ["rank"] }), trace: topic("Trace") },
 		order: ["vectors", "span", "elimination", "rank", "eigen", "trace"],
-		current: "span",
 		arcs: ARCS,
 		topicArc: { vectors: "spaces", span: "spaces", elimination: "systems", rank: "systems", eigen: "spectra", trace: "spectra" },
 		studied: ["vectors", "span"],
@@ -294,7 +288,7 @@ describe("a course with arcs", () => {
 	});
 
 	it("a course without arcs merges exactly as before: every arc field of the answer is ignored", () => {
-		const plain = view({ topics: { vectors: topic("Vectors"), span: topic("Span", { needs: ["vectors"] }) }, order: ["vectors", "span"], current: "span" });
+		const plain = view({ topics: { vectors: topic("Vectors"), span: topic("Span", { needs: ["vectors"] }) }, order: ["vectors", "span"] });
 		const full = answer({ moves: [{ topic: "span", arc: "orthogonality", reason: "x" }], arcNote: "a note" });
 		assert.deepEqual(mapChanges(full, plain), mapChanges(withoutArcs({ ...full, arcNote: undefined }), plain));
 		assert.equal(JSON.stringify(mapChanges(full, plain)?.changes).match(/"arc/g), null);
@@ -429,7 +423,8 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		assert.deepEqual(model.reads, ["notes"]);
 		const built = record(dir);
 		assert.deepEqual(Object.keys(built.topics), ["ols", "ridge"]);
-		assert.deepEqual(built.path, { current: "ols", order: ["ols", "ridge"], basis: "Notes order" });
+		assert.deepEqual(built.path, { order: ["ols", "ridge"], basis: "Notes order" });
+		assert.deepEqual(engine(["--workspace", dir, "arcs"]).studied, [], "the build marks no topic where he is, so the engine counts nothing studied and the grouping pass may run");
 		assert.deepEqual(builder.status(dir), { state: "built", outcome: "2 new topics, 1 prerequisite, 2 references", at: ledgers.all.get(dir)!.done[0]!.at });
 		const revision = built.revision;
 		assert.deepEqual(await builder.buildMap(dir), { status: "nothing" });

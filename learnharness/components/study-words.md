@@ -20,7 +20,7 @@ One form each, wherever it shows.
 
 | Reason | Words |
 |---|---|
-| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Look again (a magnifier). A repair made only with help (`repairedWithHelp`) is not "Fixed": the next signal shows. |
+| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Look again (a magnifier). A repair made only with help (`repairedWithHelp`) is not "Fixed": it is Mistake to fix, since the signals under it describe answers before that right one ("Not right last time" or "Sure, but wrong" would contradict it). |
 | a review come due | Due today, 3d overdue, 16d overdue (always days, round 4) |
 | a review dated ahead | Back in 5d, Back in 21d, Back in 60d |
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 20d ago; Unfinished when no day is known. Never the tutor's step text. |
@@ -85,11 +85,8 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 
 | What | Words |
 |---|---|
-| the top bar (`PHASE_WORDS`) | Recall while the tutor asks its opening questions (the label they carry), Planning, Teaching, Practice; Done for today once he or the tutor stopped for the day. Never Quiz: a lesson is a lesson |
-| a question's card and folded bar (`QUESTION_WORDS`) | Check (a check after teaching), Prediction, Recall, else Question; never Explain, the tool's name |
 | a choice question's free field (`CHOICE_NOTE`) | Anything to add? A choice may be his goal, not an answer to justify |
 | Esc's confirm (`STOP_WORDS`) | Stop the tutor's reply? What it has written so far stays. Stop / Skip this question? The tutor goes on without your answer. Skip / Skip this problem? The tutor moves on, and the solution stays hidden. Skip; while the tutor writes, The tutor's reply stops too. |
-| the details panel (`DETAIL_WORDS`) | Tutor; Room left: Plenty until half the room before the tutor sums up the lesson is used, then Over half used. When it fills, the tutor sums up the lesson so far (`roomWords`; half is the one split that needs no tuning); Cost so far, or Included in your Claude plan. No token counts |
 
 ## Background work
 
@@ -97,13 +94,13 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 
 ## An answer's mark
 
-`MARK_WORDS` and `countedWords`: the record's mark on an answered card (answer-mark.md).
+`MARK_WORDS` and `MARK_HOW_WORDS`: the record's mark on an answered card (answer-mark.md). How an attempt counted is `markHow` (`src/core/contracts/marks.ts`), the one rule the card and the topic page's Earlier both read.
 
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right |
-| counted | On your own; With help; Counted as helped (a right guess, an unsure or a partly right answer with no help) |
-| confidence recorded | Guessing, Neutral, Confident |
+| counted | Prediction, not counted; Gave up; With help; Counted as helped (a right guess, an unsure or a partly right answer with no help); On your own |
+| confidence he chose | Guessing, Confident; none when he left the meter alone (Neutral is never shown as his choice) |
 | a dispute | Dispute; Disputed: and the tutor's ruling; in the transcript, You disputed the mark, You think: Partly right |
 
 ## Counts

@@ -93,14 +93,15 @@ describe("needsYouNow", () => {
 		);
 	});
 
-	it("leads an open task with the course's current topic when the task holds it, else its first held topic", () => {
+	it("leads an open task with the course's current topic when the task holds it, else with none, since the record does not say which topic the task is at", () => {
 		const sheet = { key: "sheet", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2", updated: null };
 		const holds = (handles: string[]) => LINALG.map.topics.map((t) => (handles.includes(t.handle) ? { ...t, tasks: ["sheet"] } : t));
 		const task = (handles: string[]): StudyCourse => ({ ...LINALG, due: [], map: { ...LINALG.map, focus: "sheet", tasks: [sheet], topics: holds(handles) } });
 		const [atRank] = needsYouNow([task(["independence", "rank"])], [], TODAY).lines;
 		assert.deepEqual([atRank!.lead?.title, atRank!.slot, atRank!.topics.map((t) => t.handle)], ["Rank and the column space", "Unfinished", ["rank", "independence"]]);
 		const [atFirst] = needsYouNow([task(["independence", "det"])], [], TODAY).lines;
-		assert.equal(atFirst!.lead?.title, "Linear independence");
+		assert.equal(atFirst!.lead, null, "never its first held topic, whose page is not the sheet");
+		assert.equal(atFirst!.title, "Continue Problem sheet 4: rank and nullity");
 	});
 
 	it("shows at most five lines, folding the rest into also as Today does", () => {

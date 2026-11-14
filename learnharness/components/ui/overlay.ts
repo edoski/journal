@@ -27,3 +27,29 @@ export function claimEscape(handler?: (event: KeyboardEvent) => void) {
     handler?.(event)
   }
 }
+
+/** Where his next key belongs once a layer closes (focus-home.ts): the
+ *  composer's field. */
+const WHERE_HE_TYPES = '[data-testid="composer"] textarea'
+
+/** Puts focus in the composer if nothing holds it: the page itself, or an
+ *  element that has left it. */
+export function focusWhereHeTypes(doc: Document | undefined, onlyIfLost = true): void {
+  if (!doc) return
+  const active = doc.activeElement
+  if (onlyIfLost && active != null && active !== doc.body && active.isConnected) return
+  doc.querySelector<HTMLElement>(WHERE_HE_TYPES)?.focus({ preventScroll: true })
+}
+
+/** A dialog's close focus (round 5, 14 Nov 2026). Radix gives focus back to
+ *  what held it before the dialog opened, or to the page when that is gone
+ *  (a dialog a shortcut opened, a course deleted with its menu). Radix
+ *  focuses after this event, so once it has, focus left on the page goes to
+ *  the composer. A caller that places focus itself prevents the default. */
+export function landFocusAfterClose(handler?: (event: Event) => void, doc: () => Document | undefined = () => globalThis.document) {
+  return (event: Event) => {
+    handler?.(event)
+    if (event.defaultPrevented) return
+    setTimeout(() => focusWhereHeTypes(doc()), 0)
+  }
+}

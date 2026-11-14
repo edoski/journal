@@ -163,7 +163,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 	it("keeps a weak topic Today does not take up in Learning, as the sidebar's Learning shelf does, saying why it is weak", () => {
 		const learning = groupOf(groups, "learning");
 		const kernel = learning.topics.find((t) => t.topic.handle === "kernel")!;
-		assert.deepEqual(kernel.fact, { kind: "slip", words: "Sure, but wrong" });
+		assert.deepEqual(kernel.fact, { kind: "slip", words: "Sure, but wrong", slip: "confident" });
 		assert.equal(groupOf(groups, "needs-you").topics.some((t) => t.topic.weak), false, "a slip alone does not need him today");
 	});
 
@@ -231,6 +231,21 @@ describe("the header's facts and next lesson", () => {
 		assert.deepEqual(facts, { progress: null, exam: null, studied: "Not studied yet", lastSession: null });
 	});
 
+	it("says when a course not studied yet gives its first lesson and why then, and offers Start, never Continue", () => {
+		const fresh = [topic("ode-intro", { starts: "2026-11-19", startsAfter: ["Probability", "Linear Algebra"] }), topic("ode-sep", { starts: "2026-11-20" })];
+		const odes = course({ exam: { date: "2026-12-18", daysLeft: 40 }, current: null, focus: null, tasks: [], topics: fresh, edges: [] }, { lastActiveDaysAgo: null, due: [] });
+		assert.equal(courseFacts(odes).studied, "First lesson Thu 19 Nov, after Probability's and Linear Algebra's new topics");
+		const today = course({ exam: null, current: null, focus: null, tasks: [], topics: [topic("ode-intro", { starts: "2026-11-08" })], edges: [] }, { lastActiveDaysAgo: null, due: [] });
+		assert.equal(courseFacts(today).studied, "First lesson today");
+		assert.equal(courseNext(today, []).action, "Start");
+	});
+
+	it("gives each topic not started the day the plan starts it, not the group's own words", () => {
+		const groups = courseGroups(course({ topics: [...TOPICS, topic("diag", { starts: "2026-11-11" })] }));
+		const diag = groupOf(groups, "not-started").topics.find((t) => t.topic.handle === "diag")!;
+		assert.deepEqual(diag.fact, { kind: "next", words: "Planned Wed 11 Nov" });
+	});
+
 	it("takes up Home's next step for the course: today's reviews first, in Today's words", () => {
 		const next = courseNext(course(), []);
 		assert.equal(next.action, "Review");
@@ -246,6 +261,14 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(next.action, "Resume");
 		assert.equal(next.lesson.title, "Rank practice");
 		assert.deepEqual(next.lesson.open, { kind: "session", href: "/chat/c1" });
+	});
+
+	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
+		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
+		const next = courseNext(course(), [left]);
+		assert.equal(next.action, "Review");
+		assert.equal(next.lesson.title, "Review Span");
+		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
 	});
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {
@@ -333,16 +356,18 @@ describe("the course topic row and group", () => {
 describe("the topic map's highlight", () => {
 	const map = course().map;
 	const dimmed = (document: Document) =>
-		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-50")).map((n) => n.getAttribute("data-testid"));
+		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
 
 	it("dims nothing by default, as Home draws it", () => {
 		assert.deepEqual(dimmed(render(<TopicMap map={map} said={new Map()} />) as unknown as Document), []);
 	});
 
-	it("lights the topics it is given and dims the rest", () => {
+	it("lights the topics it is given, You are here and the topics it leads to, and dims the rest", () => {
 		const document = render(<TopicMap map={map} said={new Map()} highlight={new Set([h("span"), h("independence")])} />) as unknown as Document;
-		const lit = TOPICS.filter((t) => !["span", "independence"].includes(t.handle)).map((t) => `map-node-${t.handle}`);
-		assert.deepEqual(dimmed(document).sort(), lit.sort());
+		const next = map.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === map.current ? [e.topic as string] : []));
+		const shown = new Set(["span", "independence", map.current as string, ...next]);
+		const rest = TOPICS.filter((t) => !shown.has(t.handle)).map((t) => `map-node-${t.handle}`);
+		assert.deepEqual(dimmed(document).sort(), rest.sort());
 	});
 });
 

@@ -3,13 +3,13 @@ import type { ArtifactPartProps } from "@/src/core";
 import { DemoCard } from "@/components/artifacts/demo-card";
 import { JobCard, PdfJobCard } from "@/components/artifacts/job-card";
 import { VisualCard } from "@/components/artifacts/visual-card";
-import { ProblemCard, ConcludeCard } from "@/components/practice-cards";
 
 /**
  * Artifact renderer registry — the extension point for tool-part UI.
  *
- * chat.tsx renders any tool part it doesn't specially handle (i.e. not
- * quiz/ask) by looking the tool name up here. Add your renderer — do NOT
+ * chat.tsx renders any tool part it doesn't specially handle (not the
+ * questions, nor the practice pair: problem and conclude are the tutor's
+ * words, prose-practice.tsx) by looking the tool name up here. Add your renderer — do NOT
  * edit chat.tsx (see docs/plan.md file-ownership rules).
  *
  * Typical shape: while the part is input-available render an activity card
@@ -30,9 +30,4 @@ export const artifactRenderers: Record<string, ComponentType<ArtifactPartProps>>
 	// Artifacts (W6 fills in the components):
 	demo: DemoCard,
 	visual: VisualCard,
-	// The practice pair (2026-10-04): the pose renders the statement ONLY
-	// (the commitment lives in the call's arguments and never renders);
-	// the conclusion carries the outcome + verdict + the reveal.
-	problem: ProblemCard,
-	conclude: ConcludeCard,
 };

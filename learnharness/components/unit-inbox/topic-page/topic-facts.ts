@@ -1,6 +1,6 @@
-import type { ArcHandle, ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StartsWhy, StudyCourse, TopicAttempt, TopicHandle, TopicRecord, TopicRef } from "@/src/core";
+import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, heldWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -112,8 +112,9 @@ export interface TopicFacts {
 	 *  topics, which (`startsAfterWords`); null otherwise. */
 	starts: { day: string; waits: string | null } | null;
 	/** Why the plan starts a topic not started then ("After Expectation
-	 *  and linearity, which it needs"), in a course with arcs; null once
-	 *  taught, with no plan for it, and in a course without arcs. */
+	 *  and linearity, which it needs", "Early, ahead of its place, while
+	 *  earlier topics wait on Change of basis"); null once taught and with
+	 *  no plan for it. */
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
@@ -167,12 +168,13 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 	return map.topics.filter((t) => needs.has(t.handle)).map((t) => ({ topic: t, standing: standingOf(t), href: unitHref(map.workspace, t.handle) }));
 }
 
-/** Why the review waits, after since when it was due when memory asked
- *  for it already: "Due since 1 Oct, earlier days are full". */
+/** Why the review waits past the day memory asked for it, after from
+ *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
+ *  from 9 Nov, earlier days are full". */
 function waitsWords(review: CourseMapTopic["review"], today: string): string | null {
 	const why = heldWords(review);
-	if (!why || review?.kind !== "scheduled" || !review.held || review.held.since >= today) return why;
-	return `${reviewWords(review, today)}, ${why.charAt(0).toLowerCase()}${why.slice(1)}`;
+	const moved = movedWords(review, today);
+	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : why;
 }
 
 /** The open tasks that hold the topic: the focused one first, then the
@@ -244,9 +246,13 @@ export function lastStudiedDay(topic: CourseMapTopic, sessions: readonly Session
 
 /** What went wrong, when the engine can say: the mistake it diagnosed,
  *  else, for a topic it calls weak, the newest attempt in the tutor's
- *  words when that attempt was not right. */
+ *  words when that attempt was not right. Nothing once he has fixed it on
+ *  his own: the head says "Fixed, check again later", and the mistake
+ *  under it read as one still open (round 5). */
 export function mistakeOf(topic: CourseMapTopic, attempts: readonly TopicAttempt[]): string | null {
-	if (topic.signals.gap) return topic.signals.gap;
+	const { gap, repaired, repairedWithHelp } = topic.signals;
+	if (repaired && !repairedWithHelp) return null;
+	if (gap) return gap;
 	const [last] = attempts;
 	return topic.weak && last && last.result !== "correct" ? last.text : null;
 }
@@ -316,14 +322,13 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
  *  one). */
 export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "wrong"; words: string | null } {
 	const result = attempt.result === "correct" ? "right" : attempt.result === "partial" ? "partly" : "wrong";
-	if (attempt.predicted) return { result, words: ATTEMPT_HOW_WORDS.predicted };
-	if (attempt.gaveUp) return { result, words: ATTEMPT_HOW_WORDS.gaveUp };
+	const how = markHow({ ...attempt, helped: !attempt.unaided, grade: attempt.grade ?? (attempt.unaided ? "solid" : "helped") });
+	if (how === "predicted" || how === "gaveUp") return { result, words: MARK_HOW_WORDS[how] };
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
 	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : null };
 	// How a right or partly right answer counted, in the answer card's words;
 	// his own work says nothing, so the ones that differ stand out.
-	const counted = countedWords({ helped: !attempt.unaided, grade: attempt.grade ?? (attempt.unaided ? "solid" : "helped") });
-	return { result, words: counted === MARK_WORDS.ownWork ? null : counted };
+	return { result, words: how === "ownWork" ? null : MARK_HOW_WORDS[how] };
 }
 
 /** The arc a topic lies in, by handle and title, with the share of its
@@ -373,7 +378,7 @@ export function topicFacts({
 		mistake: mistakeOf(topic, attempts),
 		waits: waitsWords(topic.review, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,
-		startsWhy: topic.level === "new" && topic.startsWhy && map.arcs ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null,
+		startsWhy: topic.level === "new" && topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null,
 		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,
