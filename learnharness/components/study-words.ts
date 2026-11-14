@@ -61,11 +61,13 @@ export type SlipKey = keyof typeof SLIP_WORDS | "mixed";
 /** Why the engine calls a topic weak, its first signal: a mistake he has
  *  answered right on his own since, a miss after he had it, a diagnosed
  *  mistake, a method chosen in its place, a wrong answer he was sure of,
- *  else none of those. A repair made only with help is not shown fixed:
- *  help may have carried it, so the signal under it shows. */
+ *  else none of those. A repair made only with help is not shown fixed,
+ *  since help may have carried it, and is still a mistake to fix: the
+ *  signals under it describe answers before that right one, so "Not right
+ *  last time" or "Sure, but wrong" would contradict it (round 5). */
 export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } {
 	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp } = signals;
-	if (repaired && !repairedWithHelp) return { key: "repaired", words: SLIP_WORDS.repaired };
+	if (repaired) return repairedWithHelp ? { key: "gap", words: SLIP_WORDS.gap } : { key: "repaired", words: SLIP_WORDS.repaired };
 	if (lapsed) return { key: "lapsed", words: SLIP_WORDS.lapsed };
 	if (gap) return { key: "gap", words: SLIP_WORDS.gap };
 	const [method] = Object.keys(choiceErrors);

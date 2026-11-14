@@ -286,6 +286,15 @@ describe("what went wrong", () => {
 	it("is nothing for a topic the engine does not call weak, even after a miss", () => {
 		assert.equal(mistakeOf(TOPICS.span, [missed]), null);
 	});
+
+	it("is nothing once he fixed it on his own, so it never sits under 'Fixed, check again later' as a mistake still open", () => {
+		const gap = "Forgot why det(A - lambda I) = 0 and guessed the reason backwards";
+		const fixed = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true } });
+		assert.deepEqual(headMarks(fixed, (x) => x, TODAY).map((mark) => mark.words), ["Fixed, check again later"]);
+		assert.equal(mistakeOf(fixed, [missed]), null);
+		const helped = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true, repairedWithHelp: true } });
+		assert.equal(mistakeOf(helped, [missed]), gap, "help may have carried the right answer: still a mistake to fix");
+	});
 });
 
 describe("where to pick the topic back up", () => {

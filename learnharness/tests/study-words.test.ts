@@ -59,9 +59,11 @@ describe("why a slip needs him", () => {
 		assert.equal(slip({ confidentErrors: 1, choiceErrors: {} }), "Sure, but wrong");
 	});
 
-	it("never calls a mistake fixed when only help repaired it: the signal under it shows", () => {
+	it("never calls a mistake fixed when only help repaired it, nor contradicts the right answer since with words about the ones before it", () => {
 		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Counts nonzero rows" }), "Mistake to fix");
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true }), "Not right last time");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true }), "Mistake to fix", "not 'Not right last time' after a right answer");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, confidentErrors: 1 }), "Mistake to fix", "not 'Sure, but wrong' after a right answer");
+		assert.equal(slipMark({ ...QUIET, repaired: true, repairedWithHelp: true, confidentErrors: 1 }, titleOf).key, "gap", "its icon is a mistake's");
 	});
 
 	it("gives each slip its own icon, so a fix never wears the mistake's", () => {
