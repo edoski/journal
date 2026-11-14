@@ -20,6 +20,8 @@ import { adviceSentences, afterQuestion, echoOf, repeatedAdvice, sentences, voic
 
 type Family = "message" | "question";
 
+const PROBE_DONE_TOOL = "probe_done";
+
 /** What the turn's input asks of the replies to it: the kind of turn its
  *  first message is (no kind: no length budget), and his words when it
  *  answers something of his, which a reply must not hand back. */
@@ -165,7 +167,24 @@ const DUPLICATE: AgentToolResult<unknown> = {
 	details: { withheld: "duplicate" },
 };
 
-/** One turn's guard, built from the record the turn runs on. */
+/** Words after `probe_done`: the teacher opens the lesson, so the probe
+ *  ends with none (its ack says so). */
+const AFTER_PROBE = (text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: "Not shown to him: the probe has ended and the teacher opens the lesson. End your turn with no words." }],
+	isError: true,
+	details: { withheld: "after-probe", text },
+});
+
+/** A call that would end the turn while a refused message is still owed:
+ *  he would never get the rewrite. */
+const OWED = (tool: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not done: your message before this was not shown to him, so he has nothing to read yet. Send the rewritten message with send_to_user first, then call ${tool} again.` }],
+	isError: true,
+	details: { withheld: "owed" },
+});
+
+/** One turn's guard, built from the record the turn runs on. `endsTurn`
+ *  names the calls that end the turn (a question, a pose, a handoff). */
 export class VoiceGuard {
 	private readonly input: TurnInput;
 	private readonly earlier: string[];
@@ -177,15 +196,29 @@ export class VoiceGuard {
 	private sentAtConclude = 0;
 	private sent = 0;
 	private duplicates = 0;
+	private probeEnded = false;
+	/** A refused message not yet rewritten, and whether a turn-ending call
+	 *  was already held back for it (once a turn). */
+	private owed = false;
+	private heldForOwed = false;
 
-	constructor(messages: readonly LhMessage[]) {
+	constructor(
+		messages: readonly LhMessage[],
+		private readonly endsTurn: (toolName: string) => boolean = (name) => (QUESTION_TOOLS as readonly string[]).includes(name),
+	) {
 		this.input = turnInputOf(messages);
 		this.earlier = earlierTexts(messages);
+	}
+
+	/** Whether a tool's calls pass through the guard. */
+	guards(toolName: string): boolean {
+		return toolName === SEND_TO_USER_TOOL || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
 	 *  the live call, so no view ever draws it. */
 	screen(call: ToolCall): void {
+		if (call.name === PROBE_DONE_TOOL) this.probeEnded = true;
 		if (call.name === PRACTICE_CONCLUDE_TOOL && !this.concluded) {
 			this.concluded = true;
 			this.sentAtConclude = this.sent;
@@ -217,20 +250,26 @@ export class VoiceGuard {
 		if (call.name === SEND_TO_USER_TOOL) {
 			const text = sendToUserText(call);
 			if (!text) return null;
-			if (this.said.some((s) => s.trim() === text.trim()) && this.duplicates < 2) {
+			if (this.duplicates < 2 && (this.probeEnded || this.said.some((s) => s.trim() === text.trim()))) {
 				this.duplicates++;
-				return DUPLICATE;
+				return this.probeEnded ? AFTER_PROBE(text) : DUPLICATE;
 			}
 			const kind = this.messageKind();
 			const breaks = this.refused.has("message") ? [] : this.messageBreaks(text, kind);
 			if (breaks.length > 0) {
 				this.refused.add("message");
+				this.owed = true;
 				return refusal("message", call.name, text, breaks, kind);
 			}
+			this.owed = false;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
 			this.sent++;
 			return null;
+		}
+		if (this.owed && !this.heldForOwed && this.endsTurn(call.name)) {
+			this.heldForOwed = true;
+			return OWED(call.name);
 		}
 		if (!(QUESTION_TOOLS as readonly string[]).includes(call.name)) return null;
 		const text = questionText(call);
@@ -269,7 +308,7 @@ export class VoiceGuard {
 
 	private questionBreaks(text: string): VoiceBreak[] {
 		const out = voiceBreaks(text).filter((b) => b.rule !== "headings");
-		const advice = adviceSentences(text);
+		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
 		return [...out, ...this.repeats(text)];
 	}

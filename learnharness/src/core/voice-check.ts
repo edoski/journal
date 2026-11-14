@@ -54,6 +54,7 @@ const DISPLAYS: Readonly<Record<TurnKind, number>> = { teach: 1, right: 1, wrong
 const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "praise", re: /(?:^|[.!?]\s+|\n)(?:that(?:'s| is) )?(?:exactly|great|nice|perfect|excellent|spot on|well done|good (?:question|instinct|timing|catch|thinking|work|job))\b/i },
 	{ rule: "praise", re: /\b(?:nice work|great job|well done|good question|good instinct|good timing|that is exactly it)\b/i },
+	{ rule: "praise", re: /\b(?:is|was) (?:the|a) (?:right|good|great|nice) (?:instinct|idea|start|move|approach|thought)\b/i },
 	{ rule: "preview", re: /\b(?:next (?:is|up|comes|you'?ll|we'?ll)|next,? (?:we|you)(?:'ll| will)|the next (?:question|step|problem) (?:tests|is|will)|here(?:'s| is) a fresh|now (?:we|you)(?:'ll| will)|coming up next)\b/i },
 	{ rule: "narration", re: /\b(?:I(?:'ll| will| am going to|'m going to) (?:save|record|ask|check|build|verify|now|start|move|give|stop|wait)|I(?:'ve| have) (?:saved|recorded|noted|told you)|let me (?:verify|check|build|save|record|ask|start)|I'?m (?:having|waiting|saving|recording|building)|I'?ll stop)\b/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
@@ -104,10 +105,12 @@ const FENCE = /^\s*```[^\n]*\n[\s\S]*?^\s*```/gm;
 
 const ABBREVIATIONS = /\b(?:e\.g|i\.e|etc|vs|cf)\.$/i;
 
-/** The sentences of a prose text, list markers and callout marks dropped. */
+/** The sentences of a prose text, list markers and callout marks dropped,
+ *  and table rows left out: a table is read like a display. */
 export function sentences(text: string): string[] {
 	const lines = text
 		.split(/\n+/)
+		.filter((l) => !/^\s*\|/.test(l))
 		.map((l) => l.replace(/^\s*(?:[-*+]|\d+\.|>\s*\[![A-Z]+\]|>)\s*/, "").trim())
 		.filter((l) => /[A-Za-z]/.test(l));
 	const out: string[] = [];
@@ -268,6 +271,9 @@ export function afterQuestion(text: string): string[] {
  *  one: "You got it right: …", "Yes, …", "That is right, …" always; "That
  *  is X, …" and "The product is X, …" when X is what he answered. */
 const GRADES = /^(?:you got it|you(?:'re| are) right|you said|your answer (?:is|was)|yes\b|(?:that|this|it)(?:'s| is) (?:right|correct)\b|(?:right|correct)[,.])/i;
+/** "Your last answer is right", "Both parts are correct": a right answer
+ *  called right, where no "but" goes on to where it broke. */
+const CALLED_RIGHT = /^(?:[a-z]+ ){1,4}(?:is|are|was|were) (?:right|correct)\b/i;
 const RESTATES = /^(?:(?:that|this|it)(?:'s| is) X\b|the [a-z]+(?: [a-z]+){0,3} (?:is|are) X\s*[,.])/i;
 
 const bare = (math: string) => math.replace(/\\(?:left|right)|[\s${}]/g, "");
@@ -278,7 +284,7 @@ export function echoOf(text: string, answer: string | null): string | null {
 	const raw = sentences(text.replace(FENCE, " ").replace(/\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]/g, "\n"))[0]?.trim();
 	const plain = raw ? sentences(prose(raw).text)[0]?.trim() : undefined;
 	if (!raw || !plain) return null;
-	if (GRADES.test(plain)) return raw;
+	if (GRADES.test(plain) || (CALLED_RIGHT.test(plain) && !/\bbut\b|\bnot (?:right|correct)\b/i.test(plain))) return raw;
 	if (!answer || !RESTATES.test(plain)) return null;
 	const said = bare(answer);
 	const maths = [...raw.matchAll(/\$([^$\n]+)\$/g)].map((m) => bare(m[1]!)).filter(Boolean);

@@ -24,7 +24,7 @@ import { createGrepTool, grepTool } from "./tools/grep.ts";
 import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, type LhMessage } from "../core/native-messages.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../core/native-messages.ts";
 import { VoiceGuard } from "./voice-guard.ts";
 
 /**
@@ -139,8 +139,8 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt(kind, { arcs: opts.course.arcs })}` : composed;
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.
-	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[]);
-	const spoken = (tool: AgentTool<any, any>) => (tool.name === SEND_TO_USER_TOOL || (QUESTION_TOOLS as readonly string[]).includes(tool.name) ? voice.wrap(tool) : tool);
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind));
+	const spoken = (tool: AgentTool<any, any>) => (voice.guards(tool.name) ? voice.wrap(tool) : tool);
 	return new SdkAgent({
 		engine,
 		systemPrompt,

@@ -45,6 +45,14 @@ function answering(text: string): LhMessage[] {
 	return [newUserMessage("Invertible matrices"), assistant([q]), answered(q.id, text)];
 }
 
+/** The words the lesson column draws: its text parts (an errored call's
+ *  part is drawn as nothing). */
+const visible = (messages: unknown[]): string =>
+	projectView(messages as LhMessage[])
+		.flatMap((m) => m.parts)
+		.flatMap((p) => (p.type === "text" ? [(p as { text: string }).text] : []))
+		.join("\n");
+
 const rules = (guard: InstanceType<typeof VoiceGuard>, call: ToolCall): string[] => {
 	guard.screen(call);
 	const refused = (guard as unknown as { decisions: Map<string, { details: { rules?: string[]; withheld: string } } | null> }).decisions.get(call.id);
@@ -81,6 +89,8 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 	it("advice under a question", () => {
 		const q = "Show that\n$$\nN = \\begin{pmatrix} 1 & 2 & 0 \\\\ 0 & 1 & -1 \\\\ 2 & 1 & 3 \\end{pmatrix}\n$$\nis not invertible by finding a nonzero vector $v$ with $Nv = 0$. Check your $v$ by multiplying it out.";
 		assert.deepEqual(rules(new VoiceGuard(answering("v = (1,1,1)")), ask(q)), ["advice"]);
+		const invite = "Phone calls reach a help desk at an average rate of $3$ per hour, independently of each other. What distribution would you use for the number of calls in one hour, and what is the probability of exactly $2$ calls in an hour? Say whatever you know or suspect, even if it's partial.";
+		assert.deepEqual(rules(new VoiceGuard(answering("Binomial, n=10, p=1/4")), ask(invite, "recall")), ["advice"], "a probe's invitation under its question, from a real run");
 		const message = "Here $AB$ sends $x$ to $A(Bx)$. In $ABx$, which map acts on $x$ first? Think of $AB$ as a composition of maps.";
 		assert.deepEqual(rules(new VoiceGuard(answering("A first")), send(message)), ["advice"]);
 	});
@@ -91,12 +101,19 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 		assert.ok(rules(new VoiceGuard([...turn, answered("x", "done")]), q).includes("repeat"));
 	});
 
+	it("half-approval of a wrong answer", () => {
+		const reply = "Splitting the hour into minutes is the right instinct. The flaw is that one minute can hold two calls, which your model forbids, so it is only an approximation.";
+		assert.deepEqual(rules(new VoiceGuard(answering("Maybe binomial? Split the hour into 60 minutes")), send(reply)), ["praise"]);
+	});
+
 	it("his answer handed back to him", () => {
 		const reply = "That is $E$, and the reason it works for every $A$ is that row $i$ of $EA$ is the combination of the rows of $A$ whose coefficients are row $i$ of $E$.";
 		assert.deepEqual(rules(new VoiceGuard(answering("Yes, E = [[1,0,0],[-2,1,0],[0,0,1]], apply the operation to I")), send(reply)), ["echo"]);
 		const product = "The product is $A^{-1}$, and writing $I$ beside $A$ makes the right-hand block collect $E_k \\cdots E_1 I$ with no multiplication.";
 		assert.deepEqual(rules(new VoiceGuard(answering("It's A^{-1}, apply the same ops to I alongside")), send(product)), ["echo"]);
 		assert.deepEqual(rules(new VoiceGuard(answering("rank 2")), send("You got it right: rank 2, with pivots in columns 1 and 3.")), ["echo"]);
+		const graded = "Your last answer is right, and both reviews today were right on your own. What you built is the **Poisson distribution**.";
+		assert.deepEqual(rules(new VoiceGuard(answering("e^{-3} e^3 = 1")), send(graded)), ["echo"], "a real run's grading of a right answer");
 	});
 
 	it("\"just explain\" answered with the topic's planned day", () => {
@@ -150,6 +167,26 @@ describe("the guard's turn", () => {
 		assert.deepEqual(rules(guard, ask("What is $A^3$? Why?")), []);
 	});
 
+	it("holds back the turn's question while a refused message is owed, so he gets the rewrite before it", () => {
+		const guard = new VoiceGuard(answering("rank 2"));
+		assert.deepEqual(rules(guard, send("You got it right: rank 2.")), ["echo"]);
+		assert.deepEqual(rules(guard, ask("What is $\\dim \\ker A$?")), ["owed"]);
+		assert.deepEqual(rules(guard, send("The pivots sit in columns 1 and 3.")), []);
+		assert.deepEqual(rules(guard, ask("What is $\\dim \\ker A$?")), []);
+	});
+
+	it("counts a table as a display, not as sentences", () => {
+		const turn = [newUserMessage("Poisson"), assistant([send("A step.")]), newUserMessage("does every topic get a review before the exam?")];
+		const answer = "Yes, for every topic you start before the exam:\n\n| Day | Reviews |\n| --- | --- |\n| Sat 14 Nov | Poisson, Expectation |\n| Sun 15 Nov | Geometric, Binomial |\n| Mon 16 Nov | Variance, Bayes' rule |\n\nCovariance starts after the exam, so it gets none.";
+		assert.deepEqual(rules(new VoiceGuard(turn), send(answer)), []);
+	});
+
+	it("shows no words after the probe ends: the teacher opens the lesson", () => {
+		const guard = new VoiceGuard(answering("the sum of 3^k/k! is e^3"));
+		guard.screen({ type: "toolCall", id: "pd", name: "probe_done", arguments: {} });
+		assert.deepEqual(rules(guard, send("What you built from the minutes model is the **Poisson distribution**.")), ["after-probe"]);
+	});
+
 	it("never shows the same message twice in a turn", () => {
 		const guard = new VoiceGuard([newUserMessage("Rank")]);
 		const text = "The rank is the number of pivots.";
@@ -198,9 +235,25 @@ describe("a real turn on the Agent SDK", () => {
 		await agent.continue();
 		assert.equal(faux.state.callCount, 3);
 		assert.match(told, /^Not shown to him: this message breaks the voice\.\n- It is too long for a close \(3 sentences, budget 2\)/);
-		const shown = JSON.stringify(projectView(agent.state.messages as LhMessage[]));
+		const shown = visible(agent.state.messages);
 		assert.ok(shown.includes("Your Poisson review comes back"), "the rewrite shows");
 		assert.ok(!shown.includes("You stopped today"), "the refused close never shows");
 		assert.ok(views.every((v) => !v.includes("You stopped today")), "not even while the reply streams");
+	});
+
+	it("a refused message beside the turn's question: the question waits for the rewrite, and the turn ends on it", async () => {
+		const question = { question: "What is $\\dim \\ker A$?", type: "check", nodeId: "rank", correctAnswer: "1, by rank-nullity." };
+		const { engine, faux } = scripted([
+			fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: "You got it right: rank 2." }, { id: "m1" }), fauxToolCall("explain", question, { id: "q1" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: "The pivots sit in columns 1 and 3." }, { id: "m2" }), fauxToolCall("explain", question, { id: "q2" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage("A third reply must not run: the question ends the turn."),
+		]);
+		const agent = createTeacherAgent(undefined, { engine, messages: asAgentMessages(answering("rank 2")) });
+		await agent.continue();
+		assert.equal(faux.state.callCount, 2);
+		const shown = visible(agent.state.messages);
+		assert.ok(shown.includes("The pivots sit in columns 1 and 3.") && !shown.includes("You got it right"));
+		const results = agent.state.messages.slice(3).filter((m) => m.role === "toolResult").map((m) => [(m as { toolCallId: string }).toolCallId, (m as { isError: boolean }).isError]);
+		assert.deepEqual(results, [["m1", true], ["q1", true], ["m2", false], ["q2", false]], "the held question is posed again after the rewrite, and waits for his answer");
 	});
 });
