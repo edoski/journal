@@ -230,7 +230,7 @@ describe("engine doctrine", () => {
 			for (const sentence of all) assert.ok(!normalize(text).includes(sentence), `${name} reads "${sentence}" in a course without arcs`);
 		}
 		assert.ok(courseMapDoctrine(flat).includes("## Building the path"));
-		assert.equal(digestSystemPrompt(flat), DIGEST_INSTRUCTIONS);
+		assert.ok(digestSystemPrompt(flat).startsWith(DIGEST_INSTRUCTIONS), "the digest keeps its instructions, then only the written voice");
 	});
 
 	it("a course has arcs when its whole record lists one: a v6 record and one before its arc pass have none", () => {

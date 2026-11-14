@@ -703,10 +703,13 @@ _THIRD_PERSON = re.compile(
     r"\b(?:he|him|his|himself|she|her|hers|herself|learners?|the\s+students?)\b",
     re.IGNORECASE,
 )
+# A dash used as punctuation: any em dash, or an en dash with space on both
+# sides. A name or a range keeps its unspaced en dash (Cauchy–Schwarz, 1–5).
+_PROSE_DASH = re.compile(r"\u2014|\s\u2013\s")
 
 
 def _learner_reads(kind: str, item: dict[str, Any], path: str) -> None:
-    """Refuse an id, a date or third-person words in text the learner reads."""
+    """Refuse ids, dates, third-person words and prose dashes the learner reads."""
     for name in LEARNER_READS.get(kind, ()):
         text = item.get(name)
         if not isinstance(text, str):
@@ -730,6 +733,11 @@ def _learner_reads(kind: str, item: dict[str, Any], path: str) -> None:
             raise ValueError(
                 f'{where} speaks of the learner as "{found[0]}", but {reads}: '
                 'write it to them, as "you", and save again'
+            )
+        if name in WRITTEN_TO_LEARNER.get(kind, ()) and _PROSE_DASH.search(text):
+            raise ValueError(
+                f"{where} uses a dash as punctuation, but {reads}, in plain "
+                "sentences: end the sentence there or use a comma, and save again"
             )
 
 

@@ -31,7 +31,7 @@ import {
 	type DigestWindow,
 } from "../../core/lesson-digest.ts";
 import type { PiEngine } from "../models.ts";
-import { DIGEST_DOCTRINE, composeDoctrine, type CourseShape } from "../prompt-segments.ts";
+import { DIGEST_DOCTRINE, composeDoctrine, writtenVoice, type CourseShape } from "../prompt-segments.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
 import { finishRun, setRunPhase } from "./background-runs.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
@@ -91,10 +91,12 @@ Rules:
 - Write to the learner, in plain words they understand days later: "you", never "he" or "the learner"; no dates or ids; math in $…$.
 - When nothing is worth recording, submit empty lists.`;
 
-/** The digest's system prompt: its instructions, then in a course with arcs
- *  how a new topic joins them, read from the tutor's references at each run. */
+/** The digest's system prompt: its instructions, the voice its gaps, notes
+ *  and task texts are written in, then in a course with arcs how a new topic
+ *  joins them, read from the tutor's references at each run. */
 export function digestSystemPrompt(course: CourseShape, dir?: string): string {
-	return course.arcs ? `${DIGEST_INSTRUCTIONS}\n\n${composeDoctrine(DIGEST_DOCTRINE, dir)}` : DIGEST_INSTRUCTIONS;
+	const base = `${DIGEST_INSTRUCTIONS}\n\n${writtenVoice()}`;
+	return course.arcs ? `${base}\n\n${composeDoctrine(DIGEST_DOCTRINE, dir)}` : base;
 }
 
 /** The run's inputs, as the agent reads them. */
