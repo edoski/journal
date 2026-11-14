@@ -73,14 +73,14 @@ describe("the card", () => {
 		});
 	}
 
-	it("draws Home's pie, the shared one: as full as the topic, dashed and empty before he starts, the warning ink on a slip", () => {
+	it("draws Home's pie, the shared one: as full as the topic, the outline alone before he starts, the warning ink on a slip", () => {
 		const pie = (t: CourseMapTopic) => render(t).querySelector('[data-slot="topic-glyph"]')!;
 		const home = renderToStaticMarkup(<Pie share={0.5} />);
 		assert.equal(pie(topic({ level: "attempted" })).getAttribute("data-fill"), "0.5");
 		assert.equal(pie(topic({ level: "attempted" })).querySelector("path")!.getAttribute("d"), parseHTML(home).document.querySelector("path")!.getAttribute("d"), "the wedge Home's rows draw");
 		assert.match(pie(topic({ level: "attempted" })).getAttribute("class")!, /size-4/);
 		assert.ok(pie(topic({ level: "retained" })).querySelector("circle[r='5']"), "full once he can do it on his own");
-		assert.ok(pie(topic()).querySelector("circle[stroke-dasharray]"));
+		assert.ok(pie(topic()).querySelector('[data-part="outline"]:not([stroke-dasharray])'), "a solid outline, never a dashed spinner");
 		assert.equal(pie(topic()).querySelector("path, circle[r='5']"), null, "empty before he starts");
 		assert.match(pie(weak("attempted", { lapsed: true })).getAttribute("class")!, /text-warning/);
 	});
