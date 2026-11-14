@@ -80,6 +80,14 @@ describe("the voice checker on recorded turns", () => {
 
 const SKILL = path.join(path.dirname(PATHS.tutorReferences), "SKILL.md");
 
+/** The agent tools' descriptions reach the model too (round 5: send_to_user
+ *  listed "introductions, progress messages" and probe_done asked for a
+ *  closing sentence), so their quoted text is held to the voice. */
+const TOOLS_DIR = path.join(import.meta.dirname, "../src/agent/tools");
+function toolWords(source: string): string {
+	return [...source.matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].map((m) => (m[1] ?? "").replaceAll("\\n", "\n")).join(" ");
+}
+
 /** Every text the agents read: each agent's composed prompt with its whole
  *  course doctrine, the turn markers the app sends, and the tutor skill. */
 const TEXTS: ReadonlyArray<[string, string]> = [
@@ -93,6 +101,7 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	["continuing", sessionResumeText("Kernels", [{ id: "kernel", title: "Kernel" }], "Kernel")],
 	["tutor skill", fs.readFileSync(SKILL, "utf8")],
 	...fs.readdirSync(PATHS.tutorReferences).map((file): [string, string] => [`tutor ${file}`, fs.readFileSync(path.join(PATHS.tutorReferences, file), "utf8")]),
+	...fs.readdirSync(TOOLS_DIR).filter((file) => file.endsWith(".ts")).map((file): [string, string] => [`tool ${file}`, toolWords(fs.readFileSync(path.join(TOOLS_DIR, file), "utf8"))]),
 ];
 
 describe("every text the agents read follows the voice", () => {
