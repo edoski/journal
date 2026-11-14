@@ -308,3 +308,104 @@ def test_with_no_exam_scheduling_is_todays_ladder(
             continue
         expected = _expected(replayed[key], record["topics"][key].get("introduced"))
         assert expected is not None and review["due"] == expected.isoformat()
+
+
+@st.composite
+def arc_cut_courses(draw: st.DrawFn) -> dict[str, Any]:
+    """A random prerequisite graph, cut into arcs at random boundaries of one
+    of its topological orders (so no topic needs a later arc), with
+    ``path.order`` shuffled."""
+    count = draw(st.integers(2, 14))
+    keys = [f"t{index:02d}" for index in range(count)]
+    needs = {
+        key: sorted(
+            draw(st.sets(st.sampled_from(keys[:index]), max_size=3)) if index else ()
+        )
+        for index, key in enumerate(keys)
+    }
+    cuts = sorted(draw(st.sets(st.integers(1, count - 1), max_size=count - 1)))
+    bounds = [0, *cuts, count]
+    arcs = [f"arc{index}" for index in range(len(bounds) - 1)]
+    home = {
+        key: arcs[next(i for i in range(len(arcs)) if bounds[i] <= n < bounds[i + 1])]
+        for n, key in enumerate(keys)
+    }
+    order = draw(st.permutations(keys))
+    return {
+        "topics": {key: {"needs": needs[key], "arc": home[key]} for key in keys},
+        "arcs": {arc: {} for arc in arcs},
+        "path": {"order": list(order), "arcs": arcs},
+    }
+
+
+@settings(max_examples=300, deadline=None)
+@given(arc_cut_courses())
+def test_the_path_runs_arc_by_arc_in_prerequisite_order(
+    record: dict[str, Any],
+) -> None:
+    order = progress.path_order(record)
+    arcs = record["path"]["arcs"]
+    assert sorted(order) == sorted(record["topics"])
+    seen: set[str] = set()
+    for key in order:
+        assert set(record["topics"][key]["needs"]) <= seen, "prerequisites first"
+        seen.add(key)
+    chapters = [arcs.index(record["topics"][key]["arc"]) for key in order]
+    assert chapters == sorted(chapters), "every topic of an arc before the next arc's"
+    within = [key for key in record["path"]["order"] if key in order]
+    for arc in arcs:
+        mine = [key for key in order if record["topics"][key]["arc"] == arc]
+        stored = [key for key in within if key in mine]
+        free = all(not record["topics"][key]["needs"] for key in mine)
+        if free:
+            assert mine == stored, "path.order breaks ties inside an arc"
+
+
+NAMES = ("Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta")
+
+
+@settings(max_examples=60, deadline=None)
+@given(arc_cut_courses(), st.integers(1, 3), st.booleans())
+def test_new_topics_never_run_past_the_next_arc_and_say_when_they_are_early(
+    cut: dict[str, Any], rate: int, exam: bool
+) -> None:
+    from hypothesis import assume
+
+    from learning import arcs
+
+    names = cut["path"]["arcs"]
+    assume(2 <= len(names) <= len(NAMES))
+    patch: dict[str, Any] = {
+        "arcs": {
+            arc: {"title": NAMES[i], "question": "Why?", "purpose": "Use it."}
+            for i, arc in enumerate(names)
+        },
+        "topics": cut["topics"],
+        "path": cut["path"],
+        "arc_change": {"reason": "random cut"},
+    }
+    if exam:
+        patch["exam"] = {"date": on(30).isoformat(), "arcs": None}
+    now = f"{START.isoformat()}T09:00:00+00:00"
+    empty = schema.empty()
+    record, outcome = schema.apply_patch(empty, patch, today=START, now=now)
+    arcs.settle(empty, record, patch, outcome, START)
+    record = capacity.final_reviews({"c": record}, START)["c"]
+    record, _ = progress.schedule(record, outcome, START)
+    record = capacity.final_reviews({"c": schema.validate_record(record)}, START)["c"]
+    rates = every_day(10, rate)
+    result = agenda.plan({"c": record}, START, 30, rates)
+    when = result.when("c", START, True)
+    free = progress.free_arcs(record)
+    untaught = progress.path_order(record)
+    for day in result.days["c"]:
+        for topic in day["new"]:
+            front = cut["topics"][untaught[0]]["arc"]
+            arc = cut["topics"][topic]["arc"]
+            why = when.why[topic]
+            ahead = names.index(arc) - names.index(front)
+            assert (
+                ahead <= progress.NEW_TOPIC_ARCS - 1 or arc in free or why.get("exam")
+            ), (topic, why)
+            assert (why["kind"] == "early") == (ahead > 0), (topic, why)
+            untaught.remove(topic)

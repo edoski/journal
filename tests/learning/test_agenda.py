@@ -149,9 +149,12 @@ def test_a_topic_waits_for_its_prerequisites_to_be_solid() -> None:
 
 def test_a_competing_method_waits_until_the_first_is_solid() -> None:
     record = course(3, exam=30, contrasts={"t00": ["t01"]})
-    days = plan({"c": record}, 3, week(5, 3, frozenset(range(7)))).days["c"]
-    assert days[0]["new"] == ["t00", "t02"]
-    assert days[1]["new"] == ["t01"]
+    result = plan({"c": record}, 3, week(5, 3, frozenset(range(7))))
+    days = result.days["c"]
+    assert days[0]["new"] == ["t00"], "t02 builds on nothing: it waits its place"
+    assert days[1]["new"] == ["t01", "t02"]
+    why = result.when("c", MONDAY, True).why
+    assert why["t01"] == {"kind": "after", "partners": ["t00"]}
 
 
 def test_the_final_review_spreads_over_the_study_days_by_what_each_holds() -> None:
@@ -373,6 +376,20 @@ def test_doing_exactly_what_the_plan_proposes_never_shows_a_limit() -> None:
     learned = capacity.of([record], on(21))
     assert not learned.on(on(21)).reviews.shown
     assert not learned.on(on(21)).new.shown
+
+
+def test_each_day_he_starts_fewer_than_a_pace_of_several_is_a_short_day() -> None:
+    record = course(12, exam=9)
+    paced = 0
+    for offset in range(5):
+        today = plan_for(record, on(offset))
+        paced = max(paced, len(today["new"]))
+        if today["new"]:
+            first = {today["new"][0]: {"introduced": True}}
+            record = save(record, {"topics": first}, on(offset))
+    assert paced >= 2, "the pace needs several topics a day"
+    days = capacity.activity([planned(record)], on(5))
+    assert all(days[on(offset)].new_short for offset in range(5)), days
 
 
 def plan_for(record: dict[str, Any], day: date) -> dict[str, Any]:

@@ -3,6 +3,7 @@ and Journal effort."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -86,15 +87,17 @@ def _runup(
     levels: dict[str, dict[str, Any]],
     week: capacity.Capacity,
 ) -> dict[str, Any] | None:
-    """The exam run-up: what is untaught or not recently solid, and the days
-    he studies before the exam."""
+    """The exam run-up: what the exam needs started that is untaught, what it
+    examines that is not recently solid, and the days he studies before it."""
     days_left = _days_left(record, today)
     if days_left is None or not _in_runup(record, today):
         return None
     behind = progress.unready(record, today)
+    untaught = [key for key in order if levels[key]["level"] == "new"]
+    scope = progress.exam_topics(record, untaught)
     result: dict[str, Any] = {
         "days_left": days_left,
-        "not_introduced": [key for key in order if levels[key]["level"] == "new"],
+        "not_introduced": [key for key in untaught if scope is None or key in scope],
         "unready": [key for key in order if key in behind],
         "study_days": sum(
             week.studies(today + timedelta(days=offset)) for offset in range(days_left)
@@ -109,9 +112,11 @@ def _days(
     days: int,
     planned: list[dict[str, Any]],
     misfits: tuple[list[str], list[str]],
+    why: Mapping[str, agenda.Why],
 ) -> dict[str, Any] | None:
-    """The daily plan: each day that proposes something, what no longer fits
-    before the exam, and the taught topics its final review has no room for."""
+    """The daily plan: each day that proposes something, why each of its new
+    topics comes then (``agenda.Why``), what no longer fits before the exam,
+    and the taught topics its final review has no room for."""
     exam = progress.exam_plan(record)
     proposed = [day for day in planned[:days] if day["reviews"] or day["new"]]
     late, unreviewed = misfits
@@ -121,6 +126,12 @@ def _days(
         {
             "final_review_days": (exam.day - exam.final).days if exam else None,
             "days": proposed,
+            "why": {
+                topic: why[topic]
+                for day in proposed
+                for topic in day["new"]
+                if topic in why
+            },
             "does_not_fit": late,
             "unreviewed": unreviewed,
         }
@@ -196,6 +207,7 @@ def _course(
                     together.does_not_fit.get(name, []),
                     together.unreviewed.get(name, []),
                 ),
+                planned.why,
             ),
         }
     )

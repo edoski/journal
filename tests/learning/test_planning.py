@@ -340,3 +340,30 @@ def test_one_course_is_planned_with_every_other(tmp_path: Path) -> None:
     assert alone["courses"][0]["plan"] == by_title["Far"]["plan"]
     assert by_title["Near"]["plan"]["days"][0]["new"] == ["a"]
     assert near is not None
+
+
+def test_the_run_up_names_only_what_the_exam_needs_started(tmp_path: Path) -> None:
+    def arc(title: str) -> dict[str, str]:
+        return {"title": title, "question": f"{title}?", "purpose": f"Use {title}."}
+
+    workspace = course(
+        tmp_path / "calculus",
+        {
+            "arcs": {"limits": arc("Limits"), "integrals": arc("Integrals")},
+            "topics": {
+                "limit": {"arc": "limits"},
+                "continuity": {"arc": "limits", "needs": ["limit"]},
+                "riemann": {"arc": "integrals", "needs": ["limit"]},
+                "ftc": {"arc": "integrals", "needs": ["riemann"]},
+            },
+            "path": {
+                "order": ["limit", "continuity", "riemann", "ftc"],
+                "arcs": ["limits", "integrals"],
+            },
+            "exam": {"date": day(10), "arcs": ["integrals"]},
+            "arc_change": {"reason": "the syllabus's two units"},
+        },
+    )
+    result = plan(workspace, tmp_path / "vault", everywhere=False, days=7)
+    runup = result["courses"][0]["runup"]
+    assert runup["not_introduced"] == ["limit", "riemann", "ftc"]
