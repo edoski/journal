@@ -3,36 +3,54 @@
 import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
-import { fuzzyScore, type ChatListItem } from "@/src/core";
+import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, useActivity } from "@/components/activity-dock";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { sessionState } from "@/components/nav/session-state";
+import { CourseResultRow } from "@/components/unit-inbox/course-result-row";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
+import { nowFor, studyDay } from "@/components/unit-inbox/now-inbox";
+import type { NowListProps } from "@/components/unit-inbox/now-list-props";
+import { NowSkeleton } from "@/components/unit-inbox/now-skeleton";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { SessionItem } from "@/components/unit-inbox/session-item";
 import { SidebarResizeHandle } from "@/components/unit-inbox/sidebar-resize-handle";
 import { onSidebarTreeKeyDown } from "@/components/unit-inbox/sidebar-tree";
 import { useSidebarWidth } from "@/components/unit-inbox/sidebar-width";
 import { isUnitOpen, TopicCard, TopicSlimRow } from "@/components/unit-inbox/unit-row";
-import { UnitShelf } from "@/components/unit-inbox/unit-shelf";
+import { TodayList } from "@/components/unit-inbox/today/today-list";
 import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
-import { SHELF_WORDS, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
+import { sessionTwins, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
 import { cn } from "@/lib/utils";
 
-/** Every topic and session whose title matches the query, best first. Pure. */
-function searchInbox(inbox: UnitInbox, chats: readonly ChatListItem[], query: string): { units: Unit[]; sessions: ChatListItem[] } {
-	const units = [...inbox.active, ...inbox.working, ...inbox.known]
-		.map((u) => ({ u, score: fuzzyScore(query.trim(), u.topic.title) }))
-		.filter((r): r is { u: Unit; score: number } => r.score !== null)
-		.sort((a, b) => b.score - a.score)
-		.map((r) => r.u);
-	return { units, sessions: filterSessions([...chats], query) };
+/** Every course, topic and session whose title matches the query, best
+ *  first; courses only when the app has a course page to open. Pure. */
+export function searchInbox(
+	inbox: UnitInbox,
+	chats: readonly ChatListItem[],
+	query: string,
+	courses: readonly StudyCourse[] = [],
+): { courses: StudyCourse[]; units: Unit[]; sessions: ChatListItem[] } {
+	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] =>
+		items
+			.map((item) => ({ item, score: fuzzyScore(query.trim(), title(item)) }))
+			.filter((r): r is { item: T; score: number } => r.score !== null)
+			.sort((a, b) => b.score - a.score)
+			.map((r) => r.item);
+	return {
+		courses: best(courses, (c) => c.map.title),
+		units: best([...inbox.active, ...inbox.working, ...inbox.known], (u) => u.topic.title),
+		sessions: filterSessions([...chats], query),
+	};
 }
+
+/** Search's label and tooltip, in its shortcut's own words. */
+const SEARCH_LABEL = KEYBOARD_ACTIONS.find((action) => action.id === "sessions-search")!.label;
 
 /** A results heading, T3 Code's quiet 12px label. */
 function ResultsLabel({ children }: { children: React.ReactNode }) {
@@ -53,9 +71,9 @@ const ICON_BUTTON =
 /**
  * The Proposed sidebar (spec: unit-inbox.md), T3 Code's sidebar for topics:
  * the mark and collapse, then the search with the course filter and New
- * lesson beside it, then one list. The topics to act on come first with no
- * header, each a card that opens its page; the folded shelves sit at the
- * foot (Working, Known, Other sessions). Background agents show only while
+ * lesson beside it, then one list: Home's Today, each line that needs him
+ * now as a card that opens its page, with everything else on the folded
+ * shelves at the foot (inbox-today.md). Background agents show only while
  * one runs; Settings is the footer's icon. Its right edge drags to resize,
  * as T3 Code's does; the width lasts across reloads.
  */
@@ -67,10 +85,31 @@ export function UnitSidebar() {
 	const s = useSessionsSidebar({ open, toggle });
 	const { state, scope, setScope, folded, fold } = useUnitInbox(s.chats);
 	const query = s.query.trim();
-	const found = useMemo(() => (state.status === "ready" && query ? searchInbox(state.inbox, s.chats ?? [], query) : null), [state, s.chats, query]);
+	const found = useMemo(
+		() => (state.status === "ready" && query ? searchInbox(state.inbox, s.chats ?? [], query, state.courses) : null),
+		[state, s.chats, query],
+	);
+	// The list's top is Home's Today (inbox-today.md).
+	const now = useMemo<NowListProps | null>(() => {
+		if (state.status !== "ready") return null;
+		const today = studyDay(state.inbox.today, new Date());
+		return {
+			needs: nowFor(state.courses, state.chats, scope, today),
+			inbox: state.inbox,
+			courses: state.courses,
+			chats: state.chats,
+			today,
+			unavailable: state.unavailable,
+			folded,
+			fold,
+			pathname: s.pathname,
+			s,
+		};
+	}, [state, scope, folded, fold, s]);
 	const walked = s.kbdIndex !== null ? found?.sessions[s.kbdIndex]?.id : undefined;
 	const isOpen = (u: Unit) => isUnitOpen(u, s.pathname);
 	const today = state.status === "ready" ? state.inbox.today : "";
+	const foundTwins = useMemo(() => sessionTwins(found?.sessions ?? []), [found]);
 	const focusFirstRow = () => s.listRef.current?.querySelector<HTMLElement>("[data-sidebar-row]")?.focus();
 	const width = useSidebarWidth();
 	const sidebarRef = useRef<HTMLElement>(null);
@@ -124,7 +163,7 @@ export function UnitSidebar() {
 
 					<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
 						<div className="flex h-8 min-w-0 flex-1 items-center rounded-md pr-0.5 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
-							<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
+							<Hint label={SEARCH_LABEL} action="sessions-search" side="bottom">
 								<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
 									<SearchIcon aria-hidden className="size-4 shrink-0" />
 									<input
@@ -141,7 +180,7 @@ export function UnitSidebar() {
 											s.onSearchKeyDown(e, found?.sessions ?? null);
 										}}
 										placeholder="Search"
-										aria-label="Search topics and sessions"
+										aria-label={SEARCH_LABEL}
 										spellCheck={false}
 										className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
 									/>
@@ -177,13 +216,17 @@ export function UnitSidebar() {
 
 					<ScrollArea viewportRef={s.listRef} bar={false} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
 						<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} className="flex min-h-full flex-col gap-px p-2">
-							{state.status === "loading" ? (
-								<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Loading…</li>
+							{!now ? (
+								<NowSkeleton />
 							) : found ? (
-								found.units.length + found.sessions.length === 0 ? (
+								found.courses.length + found.units.length + found.sessions.length === 0 ? (
 									<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing matches</li>
 								) : (
 									<>
+										{found.courses.length > 0 && <ResultsLabel>Courses</ResultsLabel>}
+										{found.courses.map((c) => (
+											<CourseResultRow key={c.map.workspace} course={c} active={s.pathname === courseHref(c.map.workspace)} />
+										))}
 										{found.units.length > 0 && <ResultsLabel>Topics</ResultsLabel>}
 										{found.units.map((u) =>
 											u.shelf === "known" ? (
@@ -194,55 +237,17 @@ export function UnitSidebar() {
 										)}
 										{found.sessions.length > 0 && <ResultsLabel>Sessions</ResultsLabel>}
 										{found.sessions.map((c) => (
-											<SessionItem key={c.id} chat={c} s={s} highlighted={c.id === walked} />
+											<SessionItem key={c.id} chat={c} s={s} today={today} twin={foundTwins.get(c.id)} highlighted={c.id === walked} />
 										))}
 									</>
 								)
 							) : (
-								<>
-									{state.inbox.active.map((u) => (
-										<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
-									))}
-									{state.inbox.active.length + state.inbox.working.length + state.inbox.known.length + state.inbox.other.length === 0 && (
-										<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing studied yet</li>
-									)}
-									<li aria-hidden className="mt-auto list-none" />
-									<UnitShelf
-										id="working"
-										label={SHELF_WORDS.working}
-										items={state.inbox.working}
-										folded={folded.working}
-										onFoldedChange={(next) => fold("working", next)}
-										isActive={isOpen}
-										waits={() => false}
-										renderItem={(u) => <TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:working" />}
-									/>
-									<UnitShelf
-										id="known"
-										label={SHELF_WORDS.known}
-										items={state.inbox.known}
-										folded={folded.known}
-										onFoldedChange={(next) => fold("known", next)}
-										isActive={isOpen}
-										waits={() => false}
-										renderItem={(u) => <TopicSlimRow key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:known" />}
-									/>
-									<UnitShelf
-										id="other"
-										label={SHELF_WORDS.other}
-										items={state.inbox.other}
-										folded={folded.other}
-										onFoldedChange={(next) => fold("other", next)}
-										isActive={(c) => s.pathname === `/chat/${c.id}`}
-										waits={(c) => sessionState(c) === "your-turn"}
-										renderItem={(c) => <SessionItem key={c.id} chat={c} s={s} parent="shelf:other" />}
-									/>
-								</>
+								<TodayList {...now} />
 							)}
 						</ul>
 					</ScrollArea>
 
-					{running && <ActivitySection variant="proposed" />}
+					{running && <ActivitySection />}
 
 					<div data-slot="sidebar-footer" className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-1">
 						<Hint label="Settings" action="open-settings" side="right">

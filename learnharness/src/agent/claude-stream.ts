@@ -104,7 +104,7 @@ export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rat
 		return `Claude is limiting requests right now. Wait a minute, then retry. See ${CLAUDE_USAGE_URL}.${NO_KEY}`;
 	}
 	if (code === "authentication_failed" || code === "oauth_org_not_allowed" || status === 401 || /not logged in|please (run \/)?log ?in|authenticat/i.test(text)) {
-		return `Claude Code is not signed in. Run \`claude\` in a terminal, sign in with your Claude account, then press Refresh in Settings → Providers.${NO_KEY}`;
+		return `Claude Code is not signed in. Run \`claude\` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts.${NO_KEY}`;
 	}
 	if (code === "model_not_found" || status === 404 || /model\b.*\b(not found|not available|unavailable|does not exist)|(invalid|unknown) model/i.test(text)) {
 		return `The selected Claude model is not available on your plan or this Claude Code version. Choose another Claude model.${NO_KEY}`;
@@ -119,7 +119,7 @@ export function claudeResetTime(resetsAt: number): string {
 }
 
 export const CLAUDE_API_KEY_REFUSAL = `Claude Code would bill an API key here, not your Claude plan, so LearnHarness stopped the request. Remove the API key from Claude Code's settings, then retry.${NO_KEY}`;
-export const CLAUDE_MISSING = `Claude Code was not found. Install Claude Code, run \`claude\` in a terminal and sign in, then press Refresh in Settings → Providers.${NO_KEY}`;
+export const CLAUDE_MISSING = `Claude Code was not found. Install Claude Code, run \`claude\` in a terminal and sign in, then press Refresh in Settings → Accounts.${NO_KEY}`;
 const CLAUDE_ABORTED = "Claude request cancelled.";
 /** Background jobs pass no abort signal, so a silent child would otherwise hold them forever. */
 const CLAUDE_IDLE_MS = 10 * 60_000;

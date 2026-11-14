@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownIcon, CheckIcon, ChevronRightIcon, LightbulbIcon, PlayIcon } from "lucide-react";
+import { ArrowDownIcon, CheckIcon, ChevronRightIcon, LightbulbIcon } from "lucide-react";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
@@ -85,9 +85,6 @@ export interface QuestionDockProps {
 	 *  and say so in the hint row. The server registry is the real gate;
 	 *  this is the affordance. */
 	compactionRunning?: boolean;
-	/** The design (spec: lesson/dock-surface.md). "proposed": content for
-	 *  the Proposed dock surface, sentence case, the segmented confidence. */
-	variant?: "current" | "proposed";
 }
 
 export function QuestionDock({
@@ -102,7 +99,6 @@ export function QuestionDock({
 	onSaveDraft,
 	phase = "probe",
 	compactionRunning = false,
-	variant = "current",
 }: QuestionDockProps) {
 	// The probe-phase name (owner, 2026-10-09) canonicalizes onto its teach
 	// twin for every dock concern — parse dispatch, labels, kinds.
@@ -118,7 +114,7 @@ export function QuestionDock({
 	// crash on `.map` over model-authored bytes.
 	const parsed = canonical === "explain" ? parseExplainInput(input) : parseAskInput(input);
 	if (!parsed) {
-		return <MalformedQuestion variant={variant} />;
+		return <MalformedQuestion />;
 	}
 	return (
 		<>
@@ -128,7 +124,6 @@ export function QuestionDock({
 					question={parsed.question}
 					onExpand={onExpand}
 					variant={reveal ? "reveal" : "collapsed"}
-					design={variant}
 					toolLabel={toolLabel}
 					label={
 						canonical === "explain" && normalizeQuestionType((parsed as { type?: unknown }).type) === "predict"
@@ -148,24 +143,10 @@ export function QuestionDock({
 					initialDraft={initialDraft}
 					onSaveDraft={onSaveDraft}
 					compactionRunning={compactionRunning}
-					variant={variant}
 				/>
 			</div>
 		</>
 	);
-}
-
-/** A plain-text teaser of a question for the collapsed bar: unwrap math, flatten common LaTeX. */
-function teaserText(q: string): string {
-	return repairMathForDisplay(q)
-		.replace(/\\\(([\s\S]*?)\\\)/g, "$1") // \(...\) inline math
-		.replace(/\\\[([\s\S]*?)\\\]/g, "$1") // \[...\] display math
-		.replace(/\$\$?([^$]*)\$\$?/g, "$1") // standard $...$/$$...$$ math
-		.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2")
-		.replace(/\\([a-zA-Z]+)/g, "$1")
-		.replace(/[{}]/g, "")
-		.replace(/\s+/g, " ")
-		.trim();
 }
 
 /** The question as one line of words and inline formulas, for MathText:
@@ -200,14 +181,11 @@ export function QuestionDockBar({
 	variant = "collapsed",
 	label,
 	toolLabel,
-	design = "current",
 }: {
 	toolName: "ask_user_question" | "explain";
 	question: string;
 	onExpand: () => void;
 	variant?: "collapsed" | "reveal";
-	/** The design: "proposed" draws the bar for the Proposed dock surface. */
-	design?: "current" | "proposed";
 	/** The kind chip's text (owner 2026-10-03): "Prediction" when a
 	 *  predict-type question minimizes by scroll — predictions never use the
 	 *  reveal variant, but the scroll-collapse strip can still hide them. */
@@ -216,62 +194,23 @@ export function QuestionDockBar({
 	 *  label Recall — the phase boundary visible in the composer. */
 	toolLabel?: string;
 }) {
-	if (design === "proposed") {
-		const reveal = variant === "reveal";
-		return (
-			<button
-				type="button"
-				data-testid={reveal ? "teach-check-reveal" : "question-dock-bar"}
-				onClick={onExpand}
-				className="dock-variant flex h-12 w-full items-center gap-3 px-4 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
-			>
-				<span className={cn("shrink-0", reveal ? "font-medium text-foreground" : "text-muted-foreground")}>
-					{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
-				</span>
-				<span className="min-w-0 flex-1 truncate text-muted-foreground">
-					<MathText>{teaserLine(question)}</MathText>
-				</span>
-				<span className={cn("flex shrink-0 items-center gap-1", reveal ? "text-link" : "text-foreground")}>
-					{reveal ? "Open" : "Answer"}
-					{reveal ? <ChevronRightIcon className="size-4" /> : <ArrowDownIcon className="size-4" />}
-				</span>
-			</button>
-		);
-	}
-	if (variant === "reveal") {
-		return (
-			<button
-				type="button"
-				data-testid="teach-check-reveal"
-				onClick={onExpand}
-				className="dock-variant flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
-			>
-				<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-					<PlayIcon className="size-3.5" />
-				</span>
-				<span className="min-w-0 flex-1">
-					<span className="block text-sm font-medium">Check your understanding</span>
-					<span className="block truncate text-xs text-muted-foreground">{teaserText(question)}</span>
-				</span>
-				<span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
-					Open <ChevronRightIcon className="size-3.5" />
-				</span>
-			</button>
-		);
-	}
+	const reveal = variant === "reveal";
 	return (
 		<button
 			type="button"
-			data-testid="question-dock-bar"
+			data-testid={reveal ? "teach-check-reveal" : "question-dock-bar"}
 			onClick={onExpand}
-			className="dock-variant flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent/40"
+			className="dock-variant flex h-12 w-full items-center gap-3 px-4 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
 		>
-			<span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-				{label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question")}
+			<span className={cn("shrink-0", reveal ? "font-medium text-foreground" : "text-muted-foreground")}>
+				{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
 			</span>
-			<span className="min-w-0 flex-1 truncate text-muted-foreground">{teaserText(question)}</span>
-			<span className="flex shrink-0 items-center gap-1 text-xs font-medium">
-				Answer <ArrowDownIcon className="size-3.5" />
+			<span className="min-w-0 flex-1 truncate text-muted-foreground">
+				<MathText>{teaserLine(question)}</MathText>
+			</span>
+			<span className={cn("flex shrink-0 items-center gap-1", reveal ? "text-link" : "text-foreground")}>
+				{reveal ? "Open" : "Answer"}
+				{reveal ? <ChevronRightIcon className="size-4" /> : <ArrowDownIcon className="size-4" />}
 			</span>
 		</button>
 	);
@@ -288,7 +227,6 @@ function QuestionDockForm({
 	initialDraft,
 	onSaveDraft,
 	compactionRunning = false,
-	variant = "current",
 }: Omit<QuestionDockProps, "expanded" | "onExpand" | "reveal">) {
 	const kind = toolQuestionKind(toolName);
 
@@ -507,189 +445,49 @@ function QuestionDockForm({
 			?.scrollIntoView({ block: "nearest" });
 	}, [kbdIdx]);
 
-	if (variant === "proposed") {
-		const marker = (on: boolean) => (
-			<span
-				aria-hidden
-				className={cn(
-					"mt-[5px] flex size-4 shrink-0 items-center justify-center",
-					qd.mode === "multi-select" ? "rounded-[4px]" : "rounded-full",
-					on ? "bg-primary text-primary-foreground" : "ring-1 ring-inset ring-muted-foreground",
-				)}
-			>
-				{on && (qd.mode === "multi-select" ? <CheckIcon className="size-3" strokeWidth={3} /> : <span className="size-1.5 rounded-full bg-current" />)}
-			</span>
+	const marker = (on: boolean) => (
+		<span
+			aria-hidden
+			className={cn(
+				"mt-[5px] flex size-4 shrink-0 items-center justify-center",
+				qd.mode === "multi-select" ? "rounded-[4px]" : "rounded-full",
+				on ? "bg-primary text-primary-foreground" : "ring-1 ring-inset ring-muted-foreground",
+			)}
+		>
+			{on && (qd.mode === "multi-select" ? <CheckIcon className="size-3" strokeWidth={3} /> : <span className="size-1.5 rounded-full bg-current" />)}
+		</span>
+	);
+	const row = (on: boolean, walked: boolean) =>
+		cn(
+			"flex w-full items-start gap-3 rounded-md px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+			on ? "bg-fill-selected" : walked ? "bg-fill-hover" : "hover:bg-fill-hover",
 		);
-		const row = (on: boolean, walked: boolean) =>
-			cn(
-				"flex w-full items-start gap-3 rounded-md px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
-				on ? "bg-fill-selected" : walked ? "bg-fill-hover" : "hover:bg-fill-hover",
-			);
-		const fieldKeys = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-			// The field claims Esc so the window chain doesn't open the
-			// question's dismiss confirm under the cursor.
-			if (e.key === "Escape") {
-				e.preventDefault();
-				e.stopPropagation();
-				return;
-			}
-			// Enter submits, Shift+Enter is a newline, ⌘/Ctrl+Enter submits too.
-			if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
-				e.preventDefault();
-				submit();
-			}
-		};
-		return (
-			<div ref={rootRef} data-testid="question-dock">
-				<div data-dock-scroll-area="" data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-4">
-					<ToolContentResponse>{qd.question}</ToolContentResponse>
-					{qd.context && (
-						<ToolContentResponse className="mt-1.5 text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]">
-							{qd.context}
-						</ToolContentResponse>
-					)}
-					{qd.mode === "multi-select" && <p className="mt-1.5 text-row text-muted-foreground">Select all that apply.</p>}
-					{qd.mode !== "text" && (
-						<div className="-mx-3 mt-3 flex flex-col gap-0.5" role={qd.mode === "multi-select" ? "group" : "radiogroup"}>
-							{qd.options.map((opt, i) => {
-								const isSel = sel.selected.has(i);
-								return (
-									<button
-										key={opt.value}
-										type="button"
-										role={qd.mode === "multi-select" ? "checkbox" : "radio"}
-										aria-checked={isSel}
-										data-kbdrow={i}
-										onClick={() => toggle(i)}
-										className={row(isSel, i === kbdIdx)}
-									>
-										{marker(isSel)}
-										<span className="min-w-0">
-											<ToolContentResponse>{opt.label}</ToolContentResponse>
-											{opt.description && (
-												<ToolContentResponse className="text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]">
-													{opt.description}
-												</ToolContentResponse>
-											)}
-										</span>
-									</button>
-								);
-							})}
-							{kind === "ask" && (
-								<div
-									role={qd.mode === "multi-select" ? "checkbox" : "radio"}
-									aria-checked={sel.otherSelected}
-									data-testid="other-option"
-									data-kbdrow={optionCount}
-									onClick={selectOther}
-									className={row(sel.otherSelected, kbdIdx === optionCount)}
-								>
-									{marker(sel.otherSelected)}
-									<input
-										ref={otherInputRef}
-										value={other}
-										onChange={(e) => {
-											setOther(e.target.value);
-											setSel((prev) => (prev.otherSelected ? prev : toggleOther(selectMode, prev)));
-										}}
-										onKeyDown={(e) => {
-											if (e.key === "Escape") {
-												e.preventDefault();
-												e.stopPropagation();
-												e.currentTarget.blur();
-												setKbdIdx(optionCount);
-											}
-											if (e.key === "Enter") {
-												e.preventDefault();
-												submit();
-											}
-										}}
-										placeholder="Type your own answer…"
-										className="lh-input w-full min-w-0 flex-1 bg-transparent leading-[26px] outline-none placeholder:text-muted-foreground"
-										onClick={(e) => e.stopPropagation()}
-									/>
-								</div>
-							)}
-						</div>
-					)}
-				</div>
-				<form
-					onSubmit={(e) => {
-						e.preventDefault();
-						submit();
-					}}
-				>
-					<div className="mx-4 mt-3 border-t" />
-					{qd.mode === "text" ? (
-						<textarea
-							data-testid="answer-field"
-							aria-label="Your answer"
-							value={text}
-							onChange={(e) => setText(e.target.value)}
-							onKeyDown={fieldKeys}
-							placeholder="Your answer"
-							rows={1}
-							className={cn(
-								"field-sizing-content block max-h-48 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground",
-								phase === "teach" ? "min-h-20" : "min-h-12",
-							)}
-						/>
-					) : (
-						<textarea
-							ref={thinkingRef}
-							data-testid="thinking-field"
-							aria-label="Your thinking"
-							value={thinking}
-							onChange={(e) => setThinking(e.target.value)}
-							onKeyDown={fieldKeys}
-							placeholder="Why this answer? Whatever comes to mind."
-							rows={1}
-							className={cn(
-								"field-sizing-content block max-h-48 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground",
-								phase === "teach" ? "min-h-20" : "min-h-12",
-							)}
-						/>
-					)}
-					<div className="flex items-center gap-3 p-2 pl-3">
-						{kind === "explain" && <ConfidenceChoice value={confidence} onChange={setConfidence} variant="proposed" />}
-						{hintButton()}
-						<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">
-							{compactionRunning ? "Compacting the conversation…" : kind === "explain" ? "" : "↵ to submit · ⇧↵ for a new line"}
-						</span>
-						<Button
-							type="submit"
-							disabled={!canSubmit || compactionRunning}
-							className="ml-auto h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-						>
-							Submit
-						</Button>
-					</div>
-				</form>
-			</div>
-		);
-	}
-
+	const fieldKeys = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		// The field claims Esc so the window chain doesn't open the
+		// question's dismiss confirm under the cursor.
+		if (e.key === "Escape") {
+			e.preventDefault();
+			e.stopPropagation();
+			return;
+		}
+		// Enter submits, Shift+Enter is a newline, ⌘/Ctrl+Enter submits too.
+		if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+			e.preventDefault();
+			submit();
+		}
+	};
 	return (
 		<div ref={rootRef} data-testid="question-dock">
-			{/* Question area — scrolls internally if very tall; the bottom row stays put.
-			    Capped by the measured column (--dock-max-h; the old fixed 55dvh cut
-			    long questions short — owner round, 2026-10-05). */}
-			<div data-dock-scroll-area="" data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-3">
-				<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-					{toolName === "recall" ? "Recall" : kind === "explain" ? "Explain" : "Question"}
-					{qd.mode === "multi-select" && " · select all that apply"}
-				</div>
-				<div className="mb-3 font-medium">
-					<ToolContentResponse>{qd.question}</ToolContentResponse>
-				</div>
+			<div data-dock-scroll-area="" data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-4">
+				<ToolContentResponse>{qd.question}</ToolContentResponse>
 				{qd.context && (
-					<div className="mb-3 text-sm text-muted-foreground">
-						<ToolContentResponse>{qd.context}</ToolContentResponse>
-					</div>
+					<ToolContentResponse className="mt-1.5 text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]">
+						{qd.context}
+					</ToolContentResponse>
 				)}
-
+				{qd.mode === "multi-select" && <p className="mt-1.5 text-row text-muted-foreground">Select all that apply.</p>}
 				{qd.mode !== "text" && (
-					<div className="flex flex-col gap-2 pb-2" role={qd.mode === "multi-select" ? "group" : "radiogroup"}>
+					<div className="-mx-3 mt-3 flex flex-col gap-0.5" role={qd.mode === "multi-select" ? "group" : "radiogroup"}>
 						{qd.options.map((opt, i) => {
 							const isSel = sel.selected.has(i);
 							return (
@@ -700,32 +498,13 @@ function QuestionDockForm({
 									aria-checked={isSel}
 									data-kbdrow={i}
 									onClick={() => toggle(i)}
-									className={cn(
-										"flex items-start gap-3 rounded-lg border px-3 py-2 text-left text-sm outline-none transition-colors",
-										isSel ? "border-primary bg-accent" : "hover:bg-accent/50",
-										i === kbdIdx && !isSel && "ring-1 ring-border bg-accent/40",
-									)}
+									className={row(isSel, i === kbdIdx)}
 								>
-									<span
-										className={cn(
-											"mt-0.5 flex size-4 shrink-0 items-center justify-center border",
-											qd.mode === "multi-select" ? "rounded-sm" : "rounded-full",
-											isSel ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40",
-										)}
-									>
-										{isSel && (
-											<span className={cn(qd.mode === "multi-select" ? "text-base leading-none" : "size-1.5 rounded-full bg-current")}>
-												{qd.mode === "multi-select" ? "✓" : ""}
-											</span>
-										)}
-									</span>
-									<span>
+									{marker(isSel)}
+									<span className="min-w-0">
 										<ToolContentResponse>{opt.label}</ToolContentResponse>
 										{opt.description && (
-											// Option subtext renders in Source Sans 3 (owner's mockup).
-											// Same MessageResponse path as the label (owner, 2026-10-12):
-											// descriptions are full markdown — LaTeX included.
-											<ToolContentResponse className="lh-prose block text-xs text-muted-foreground">
+											<ToolContentResponse className="text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]">
 												{opt.description}
 											</ToolContentResponse>
 										)}
@@ -733,7 +512,6 @@ function QuestionDockForm({
 								</button>
 							);
 						})}
-
 						{kind === "ask" && (
 							<div
 								role={qd.mode === "multi-select" ? "checkbox" : "radio"}
@@ -741,62 +519,30 @@ function QuestionDockForm({
 								data-testid="other-option"
 								data-kbdrow={optionCount}
 								onClick={selectOther}
-								className={cn(
-									"flex items-start gap-3 rounded-lg border px-3 py-2 text-left text-sm outline-none transition-colors",
-									sel.otherSelected ? "border-primary bg-accent" : "border-dashed hover:bg-accent/50",
-									kbdIdx === optionCount && !sel.otherSelected && "ring-1 ring-border bg-accent/40",
-								)}
+								className={row(sel.otherSelected, kbdIdx === optionCount)}
 							>
-								<span
-									className={cn(
-										"mt-0.5 flex size-4 shrink-0 items-center justify-center border",
-										qd.mode === "multi-select" ? "rounded-sm" : "rounded-full",
-										sel.otherSelected
-											? "border-primary bg-primary text-primary-foreground"
-											: "border-muted-foreground/40",
-									)}
-								>
-									{sel.otherSelected && (
-										<span className={cn(qd.mode === "multi-select" ? "text-base leading-none" : "size-1.5 rounded-full bg-current")}>
-											{qd.mode === "multi-select" ? "✓" : ""}
-										</span>
-									)}
-								</span>
+								{marker(sel.otherSelected)}
 								<input
 									ref={otherInputRef}
 									value={other}
 									onChange={(e) => {
 										setOther(e.target.value);
-										// Typing selects the row — displacing in
-										// single-select, alongside the siblings in multi.
 										setSel((prev) => (prev.otherSelected ? prev : toggleOther(selectMode, prev)));
 									}}
 									onKeyDown={(e) => {
-										// Esc escapes the typing (owner refinement round,
-										// 2026-09-24): focus leaves the input, the row STAYS
-										// selected — deselection is the next Space's job, acting
-										// on the row — and the arrow walk resumes from this
-										// row (kbdIdx pins it). stopPropagation keeps the
-										// window chain from reading this Esc as abort-turn.
 										if (e.key === "Escape") {
 											e.preventDefault();
 											e.stopPropagation();
 											e.currentTarget.blur();
 											setKbdIdx(optionCount);
 										}
-											// Enter submits directly (owner, keyboard round 2026-10-06):
-											// the custom answer is a single-line input — no newline
-											// to protect, and typing has already selected the row, so
-											// the payload is ready. Every Enter (shift or not — nothing
-											// else could ever happen in a one-line field) rides the
-											// same submit seam as the button.
-											if (e.key === "Enter") {
-												e.preventDefault();
-												submit();
-											}
+										if (e.key === "Enter") {
+											e.preventDefault();
+											submit();
+										}
 									}}
 									placeholder="Type your own answer…"
-									className="lh-input w-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+									className="lh-input w-full min-w-0 flex-1 bg-transparent leading-[26px] outline-none placeholder:text-muted-foreground"
 									onClick={(e) => e.stopPropagation()}
 								/>
 							</div>
@@ -804,93 +550,56 @@ function QuestionDockForm({
 					</div>
 				)}
 			</div>
-
-			{/* The learner's half of the dock — a composer TWIN: a labeled, bordered
-			    field with Submit docked inside, exactly like the chat composer's
-			    send. Select modes get "Your thinking" (Enter makes a newline — it
-			    is for dumping; the button submits); text mode
-			    keeps "Your answer" with Enter-to-submit. */}
 			<form
-				className="border-t border-border/60 p-1.5"
 				onSubmit={(e) => {
 					e.preventDefault();
 					submit();
 				}}
 			>
-				<div
-					data-testid={qd.mode === "text" ? "answer-field" : "thinking-field"}
-					className="rounded-[10px] border border-border/70 bg-background/60 transition-colors focus-within:border-primary/50"
-				>
-					<div className="px-2.5 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-						{qd.mode === "text" ? "Your answer" : "YOUR THINKING"}
-					</div>
-					{qd.mode === "text" ? (
-						<textarea
-							value={text}
-							onChange={(e) => setText(e.target.value)}
-							onKeyDown={(e) => {
-								// The field claims Esc so the window chain doesn't
-								// open the question's dismiss confirm under the cursor.
-								if (e.key === "Escape") {
-									e.preventDefault();
-									e.stopPropagation();
-									return;
-								}
-								// Chat convention: Enter submits, Shift+Enter is a newline;
-								// ⌘/Ctrl+Enter also submits (universal across the app).
-								if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
-									e.preventDefault();
-									submit();
-								}
-							}}
-							placeholder="Type your answer…"
-							rows={1}
-							className="field-sizing-content lh-input max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"
-						/>
-					) : (
-						<textarea
-							ref={thinkingRef}
-							value={thinking}
-							onChange={(e) => setThinking(e.target.value)}
-							onKeyDown={(e) => {
-								// The field claims Esc so the window chain doesn't
-								// open the question's dismiss confirm under the cursor.
-								if (e.key === "Escape") {
-									e.preventDefault();
-									e.stopPropagation();
-									return;
-								}
-								// THE STANDARD CHORD (owner round 5, 2026-10-05): Enter
-								// submits, Shift+Enter is a newline, ⌘/Ctrl+Enter works
-								// too — identical to the practice dock and the composer.
-								if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
-									e.preventDefault();
-									submit();
-								}
-							}}
-							placeholder="Why this answer? Whatever comes to mind."
-							rows={1}
-							className={cn(
-								"field-sizing-content lh-input max-h-48 w-full resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground/70",
-								// Phase-scaled prominence: teaching invites depth,
-								// probing stays quick.
-								phase === "teach" ? "min-h-[4.5rem]" : "min-h-10",
-							)}
-						/>
-					)}
-					<div className="flex items-center justify-between gap-2 p-1">
-						{kind === "explain" && <ConfidenceChoice value={confidence} onChange={setConfidence} />}
-						<span aria-hidden className="min-w-0 truncate pl-1.5 text-xs text-muted-foreground">
-								{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
-						</span>
-						<Button
-							type="submit"
-							disabled={!canSubmit || compactionRunning}
-							className="ml-auto h-9 rounded-[6px] px-3.5 text-sm font-medium"
-						>
-							Submit answer
-						</Button>
-					</div>
+				<div className="mx-4 mt-3 border-t" />
+				{qd.mode === "text" ? (
+					<textarea
+						data-testid="answer-field"
+						aria-label="Your answer"
+						value={text}
+						onChange={(e) => setText(e.target.value)}
+						onKeyDown={fieldKeys}
+						placeholder="Your answer"
+						rows={1}
+						className={cn(
+							"field-sizing-content block max-h-48 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground",
+							phase === "teach" ? "min-h-20" : "min-h-12",
+						)}
+					/>
+				) : (
+					<textarea
+						ref={thinkingRef}
+						data-testid="thinking-field"
+						aria-label="Your thinking"
+						value={thinking}
+						onChange={(e) => setThinking(e.target.value)}
+						onKeyDown={fieldKeys}
+						placeholder="Why this answer? Whatever comes to mind."
+						rows={1}
+						className={cn(
+							"field-sizing-content block max-h-48 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground",
+							phase === "teach" ? "min-h-20" : "min-h-12",
+						)}
+					/>
+				)}
+				<div className="flex items-center gap-3 p-2 pl-3">
+					{kind === "explain" && <ConfidenceChoice value={confidence} onChange={setConfidence} />}
+					{hintButton()}
+					<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">
+						{compactionRunning ? "Compacting the conversation…" : kind === "explain" ? "" : "↵ to submit · ⇧↵ for a new line"}
+					</span>
+					<Button
+						type="submit"
+						disabled={!canSubmit || compactionRunning}
+						className="ml-auto h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+					>
+						Submit
+					</Button>
 				</div>
 			</form>
 		</div>

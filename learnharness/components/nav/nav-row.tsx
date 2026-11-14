@@ -8,8 +8,7 @@ import { cn } from "@/lib/utils";
  *  Resting ink is muted; hover lifts the fill one step and the ink to full,
  *  the active row holds the selected fill. No weight change on hover or
  *  selection, so nothing moves; `attention` (the row waits on the learner)
- *  is the one state drawn in full ink at 500. `inset` starts the label on a
- *  NavGroup's label edge. */
+ *  is the one state drawn in full ink at 500. */
 const navRowVariants = cva(
 	"relative flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&>svg]:size-4 [&>svg]:shrink-0",
 	{
@@ -23,12 +22,8 @@ const navRowVariants = cva(
 				false: "",
 				true: "font-medium text-foreground",
 			},
-			inset: {
-				false: "",
-				true: "pl-8",
-			},
 		},
-		defaultVariants: { state: "rest", attention: false, inset: false },
+		defaultVariants: { state: "rest", attention: false },
 	},
 );
 
@@ -37,7 +32,6 @@ export function NavRow({
 	active = false,
 	highlighted = false,
 	attention = false,
-	inset = false,
 	className,
 	...props
 }: React.ComponentProps<"button"> & {
@@ -49,8 +43,6 @@ export function NavRow({
 	highlighted?: boolean;
 	/** Waits on the learner: full ink at weight 500. */
 	attention?: boolean;
-	/** An item of a NavGroup: the label starts on the group's label edge (32px). */
-	inset?: boolean;
 }) {
 	const Comp = asChild ? Slot.Root : "button";
 	return (
@@ -59,7 +51,7 @@ export function NavRow({
 			aria-current={active ? "page" : undefined}
 			{...(asChild ? {} : { type: "button" as const })}
 			className={cn(
-				navRowVariants({ state: active ? "active" : highlighted ? "highlighted" : "rest", attention, inset }),
+				navRowVariants({ state: active ? "active" : highlighted ? "highlighted" : "rest", attention }),
 				className,
 			)}
 			{...props}

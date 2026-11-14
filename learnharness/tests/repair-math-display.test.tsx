@@ -10,7 +10,6 @@ import { validateToolArguments } from "@earendil-works/pi-ai";
 import { problemInputObject } from "../src/agent/tools/practice.ts";
 import { PracticeDock } from "../components/practice-dock.tsx";
 import { QuestionDock } from "../components/question-dock.tsx";
-import { LatexGlyph } from "../components/latex-glyph.tsx";
 import { ProblemCard, ConcludeCard } from "../components/practice-cards.tsx";
 import { MessageResponse, ToolContentResponse } from "../components/ai-elements/message.tsx";
 import {
@@ -114,15 +113,6 @@ describe("upgraded KaTeX rendering on real question and practice surfaces", () =
 			assert.ok(parseHTML(html).document.querySelector("code")?.textContent?.includes(clean));
 		}
 	});
-	it("renders direct LatexGlyph connectors through the upgraded root", () => {
-		for (const [command, glyph] of [[String.raw`\Rightarrow`, "⇒"], [String.raw`\land`, "∧"], [String.raw`\neg`, "¬"]]) {
-			const html = renderToStaticMarkup(<LatexGlyph cmd={command!} />);
-			const { document } = parseHTML(html);
-			assert.equal(document.querySelectorAll(".katex-error").length, 0);
-			assert.ok(document.querySelector(".katex-base .katex-strut"));
-			assert.ok(document.querySelector(".katex-html")?.textContent?.includes(glyph!));
-		}
-	});
 });
 
 describe("practice display surfaces", () => {
@@ -172,7 +162,7 @@ describe("practice display surfaces", () => {
 		let expanded = "";
 		assert.doesNotThrow(() => { expanded = renderToStaticMarkup(dock(input)); });
 		const { document } = parseHTML(expanded);
-		assert.equal(document.querySelector(".lh-prose")!.innerHTML,
+		assert.equal(document.querySelector("[data-dock-scroll-area]")!.innerHTML,
 			parseHTML(renderToStaticMarkup(<MessageResponse>{input.statement}</MessageResponse>)).document.firstElementChild!.outerHTML,
 			"non-string values pass through exactly as before, without string coercion or a new fallback");
 		const collapsed = renderToStaticMarkup(dock(input, false));

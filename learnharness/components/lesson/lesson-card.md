@@ -1,6 +1,6 @@
 # LessonCard
 
-`<LessonCard label="Check" note="Confident">…</LessonCard>`: a record in the lesson's reading column. `data-slot="lesson-card"`, the label row `data-slot="lesson-card-label"`. Used by the answered question card, the practice problem and conclusion, the probe summary, the plan map, the malformed-question notice and the research card under the Proposed design.
+`<LessonCard label="Check" note="Confident">…</LessonCard>`: a record in the lesson's reading column. `data-slot="lesson-card"`, the label row `data-slot="lesson-card-label"`. Used by the answered question card, the practice problem and conclusion, the probe summary, the plan map, the malformed-question notice and the research card.
 
 | Slot | Notes |
 |---|---|

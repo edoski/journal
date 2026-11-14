@@ -17,7 +17,9 @@ import type { EffectiveSlot } from "../src/core/settings-resolution.ts";
 import type { SettingsValidation } from "../src/server/model-catalog.ts";
 import { clampThinkingLevel, getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { DEFAULT_THINKING_ORDER } from "../src/core/settings.ts";
-import { piEngineForSpec, piModels } from "../src/agent/models.ts";
+import { piEngineForSpec } from "../src/agent/models.ts";
+import { claudeSubscriptionModel } from "../src/agent/claude-stream.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 import { BACKGROUND_MODEL_ROLES } from "../src/core/settings.ts";
 import { resolveSettings } from "../src/core/settings-resolution.ts";
 import { readSettings } from "../src/store/settings.ts";
@@ -29,57 +31,32 @@ import { effectiveSettings } from "../src/server/stores.ts";
 // what we send. BYOK wave (2026-09-22): no factory pins — unset surfaces
 // are NULL/undefined, never phantom defaults.
 
-// The picker federates only providers with a PRESENT key (model slots
-// wave, 2026-09-20): pin openrouter's env key so its full catalog
-// federates in tests regardless of the developer shell's exports.
-process.env.OPENROUTER_API_KEY ??= "test-key-openrouter-catalog";
+// The app runs only on subscriptions: the catalog is the signed-in Claude
+// account's models (a fake sign-in, tests/claude-fixture.ts) plus ChatGPT's
+// when connected (not in this process).
+await signInTestClaude();
+const OPUS = { ...TEST_MODEL };
 
-/** The catalog's glm entry — the old factory pin's model, still the
- *  best-known thinking-truth specimen (low|high|max). */
-function glmModel() {
-	const glm = piModels().getModel("openrouter", "z-ai/glm-5.3-flash");
-	assert.ok(glm, "glm-5.3-flash in catalog");
-	return glm!;
-}
-
-/** Another reasoning specimen with a different supported set. */
-function qwenModel() {
-	const qwen = piModels().getModel("openrouter", "qwen/qwen3.8-max-0902");
-	assert.ok(qwen, "qwen3.8-max in catalog");
-	return qwen!;
+/** The Claude catalog entry — the thinking-truth specimen (low…max). */
+function opusModel() {
+	const opus = claudeSubscriptionModel(OPUS.provider, OPUS.id);
+	assert.ok(opus, "claude-opus-5-5 in catalog");
+	return opus!;
 }
 
 describe("the model catalog projection", () => {
-	it("serves the keyed providers' catalogs with the picker's DTO shape", () => {
+	it("serves the signed-in subscriptions' models with the picker's DTO shape, and no API-key provider", () => {
 		const { models, defaults, providers, slots } = modelCatalog();
-		// 0.85.1 ships 366 OpenRouter models — the exact count is pi's, but
-		// the shape and the config models' presence are ours to pin.
-		assert.ok(models.length > 300, `expected a full catalog, got ${models.length}`);
-		for (const m of models.slice(0, 25)) {
-			assert.equal(typeof m.id, "string");
-			assert.equal(typeof m.name, "string");
-			assert.ok(Array.isArray(m.supportedLevels));
-			assert.ok(typeof m.cost.input === "number" && typeof m.cost.output === "number");
-			assert.ok(m.contextWindow > 0);
-		}
-		const glm = models.find((m) => m.id === "z-ai/glm-5.3-flash");
-		assert.ok(glm, "glm-5.3-flash in catalog");
-		assert.deepEqual(glm!.supportedLevels, ["low", "high", "max"]);
-		assert.deepEqual(glm!.input, ["text", "image"]);
-		// pi's current glm price (pi 1.0.2 catalog refresh: cacheRead
-		// corrected 0.05 → 0.03; input/output unchanged since 0.87.1)
-		assert.deepEqual(glm!.cost, { input: 0.15, output: 0.5, cacheRead: 0.03, cacheWrite: 0 });
-		// model slots wave: the providers surface + the resolved slot pins
-		const openrouter = providers.find((p) => p.id === "openrouter");
-		assert.ok(openrouter && openrouter.keyPresent, "openrouter federated (key pinned above)");
-		assert.ok(providers.some((p) => !p.keyPresent), "keyless providers listed for discovery");
+		assert.deepEqual(models.map((m) => `${m.provider}:${m.id}`), ["claude-subscription:claude-opus-5-5"]);
+		const opus = models[0]!;
+		assert.deepEqual(opus.supportedLevels, ["low", "medium", "high", "xhigh", "max"]);
+		assert.deepEqual(opus.input, ["text", "image"]);
+		assert.deepEqual(opus.cost, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, "a plan model has no per-token price");
+		assert.deepEqual(providers.map((p) => p.id).sort(), ["chatgpt", "claude-subscription"]);
+		assert.equal(providers.find((p) => p.id === "claude-subscription")?.connected, true);
+		assert.equal(providers.find((p) => p.id === "chatgpt")?.connected, false);
 		assert.deepEqual(Object.keys(slots), ["strong", "cheap", "vision"]);
-		// a keyless provider's models never reach the picker
-		const keyless = providers.filter((p) => !p.keyPresent).map((p) => p.id);
-		for (const id of keyless) {
-			assert.ok(!models.some((m) => m.provider === id), `keyless ${id} must not federate`);
-		}
-		// BYOK: the payload carries ONLY what the machine's record actually
+		// BYOK: the payload carries ONLY what the machine's record actually		// BYOK: the payload carries ONLY what the machine's record actually
 		// says — never a phantom id. data/settings.json belongs to
 		// settings-store.test.ts (the one-fs-owner discipline), so READ the
 		// resolved truth here instead of pinning it: on a scratch worktree
@@ -116,7 +93,7 @@ describe("the model catalog projection", () => {
 	});
 
 	it("toModelDto projects the raw catalog model verbatim", () => {
-		const raw = glmModel();
+		const raw = opusModel();
 		const dto = toModelDto(raw);
 		assert.equal(dto.id, raw.id);
 		assert.equal(dto.name, raw.name);
@@ -171,13 +148,11 @@ describe("the model slots surface (model slots wave, 2026-09-20)", () => {
 		}
 	});
 
-	it("catalogProviders reads keys env-wins, fresh per call", () => {
-		const before = catalogProviders().find((p) => p.id === "zai");
-		assert.equal(before?.keyPresent, false);
+	it("catalogProviders lists only the subscriptions, whatever API keys the environment holds", () => {
 		const saved = process.env.ZAI_API_KEY;
 		process.env.ZAI_API_KEY = "test-zai-key-1234567890";
 		try {
-			assert.equal(catalogProviders().find((p) => p.id === "zai")?.keyPresent, true);
+			assert.ok(!catalogProviders().some((p) => p.id === "zai"));
 		} finally {
 			if (saved === undefined) delete process.env.ZAI_API_KEY;
 			else process.env.ZAI_API_KEY = saved;
@@ -186,61 +161,25 @@ describe("the model slots surface (model slots wave, 2026-09-20)", () => {
 });
 
 describe("the models-section validation gate", () => {
-	it("accepts a valid slot and rejects unknown provider/model", () => {
-		assert.equal(
-			validateModelsSettings({ strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } } }).ok,
-			true,
-		);
-		assert.equal(
-			validateModelsSettings({ cheap: { model: { provider: "nope", id: "x" } } }).ok,
-			false,
-		);
-		assert.equal(
-			validateModelsSettings({ vision: { model: { provider: "openrouter", id: "nope/nope" } } }).ok,
-			false,
-		);
+	it("accepts a valid slot and rejects unknown provider/model and API-key providers", () => {
+		assert.equal(validateModelsSettings({ strong: { model: OPUS } }).ok, true);
+		assert.equal(validateModelsSettings({ cheap: { model: { provider: "nope", id: "x" } } }).ok, false);
+		assert.equal(validateModelsSettings({ vision: { model: { provider: OPUS.provider, id: "nope" } } }).ok, false);
+		assert.equal(validateModelsSettings({ strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } } }).ok, false);
 	});
 
 	it("thinking levels never reject a slot write (owner, interlude 2026-09-22)", () => {
-		// clamp, never reject: the model swap with a pinned level JUST
-		// WORKS — validation accepts ANY level; the WRITE clamps to the
-		// new model's nearest supported and stores the clamped result.
-		assert.deepEqual(
-			validateModelsSettings({ strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" }, thinkingLevel: "minimal" } }),
-			{ ok: true },
-		);
-		assert.deepEqual(
-			validateModelsSettings({ strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" }, thinkingLevel: "xhigh" } }),
-			{ ok: true },
-		);
+		// clamp, never reject: validation accepts ANY level; the WRITE clamps.
+		assert.deepEqual(validateModelsSettings({ strong: { model: OPUS, thinkingLevel: "minimal" } }), { ok: true });
+		assert.deepEqual(validateModelsSettings({ strong: { model: OPUS, thinkingLevel: "off" } }), { ok: true });
 	});
 
-	it("clampModelsLevels: the slot's own model translates the pin (the owner's exact case)", () => {
-		// Claude Fable 5.1 xhigh → GLM 5.3 flash: the pin clamps to glm's
-		// nearest supported (low|high|max) and the CLAMPED value is stored.
-		const glm = { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" }, thinkingLevel: "xhigh" as const };
-		assert.deepEqual(clampModelsLevels({ strong: glm }), {
-			strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" }, thinkingLevel: "max" },
-		});
-		assert.deepEqual(clampModelsLevels({ strong: { ...glm, thinkingLevel: "minimal" as const } }).strong, {
-			model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" },
-			thinkingLevel: "low",
-		});
-		// glm cannot disable thinking: off clamps UP to low
-		assert.equal(
-			clampModelsLevels({ strong: { ...glm, thinkingLevel: "off" as const } }).strong?.thinkingLevel,
-			"low",
-		);
-		// a supported level passes through untouched
-		assert.deepEqual(clampModelsLevels({ strong: { ...glm, thinkingLevel: "high" as const } }).strong, {
-			model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" },
-			thinkingLevel: "high",
-		});
-		// a slot with no level rides as-is (client populates on fresh
-		// picks per DEFAULT_THINKING_ORDER — the server never invents one)
-		assert.deepEqual(clampModelsLevels({ strong: { model: glm.model } }), {
-			strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } },
-		});
+	it("clampModelsLevels: the slot's own model translates the pin", () => {
+		assert.deepEqual(clampModelsLevels({ strong: { model: OPUS, thinkingLevel: "minimal" } }), { strong: { model: OPUS, thinkingLevel: "low" } });
+		assert.equal(clampModelsLevels({ strong: { model: OPUS, thinkingLevel: "off" } }).strong?.thinkingLevel, "low", "Opus cannot disable thinking");
+		assert.deepEqual(clampModelsLevels({ strong: { model: OPUS, thinkingLevel: "xhigh" } }).strong, { model: OPUS, thinkingLevel: "xhigh" });
+		// a slot with no level rides as-is (the server never invents one)
+		assert.deepEqual(clampModelsLevels({ strong: { model: OPUS } }), { strong: { model: OPUS } });
 	});
 
 	it("accepts empty settings (the clear-slots write)", () => {
@@ -250,33 +189,22 @@ describe("the models-section validation gate", () => {
 
 describe("the settings validation gate", () => {
 	it("thinking levels never reject a chat write (owner, interlude 2026-09-22)", () => {
-		assert.deepEqual(
-			validateChatSettings({ model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" }, thinkingLevel: "minimal" }),
-			{ ok: true },
-		);
+		assert.deepEqual(validateChatSettings({ model: OPUS, thinkingLevel: "minimal" }), { ok: true });
 		assert.deepEqual(validateChatSettings({ thinkingLevel: "xhigh" }), { ok: true });
 	});
 
 	it("clampChatLevel: the body's model, else the strong slot, translates the pin", () => {
-		const glm = { provider: "openrouter", id: "z-ai/glm-5.3-flash" };
-		const strong: EffectiveSlot = { provider: "openrouter", id: "z-ai/glm-5.3-flash" };
-		// the body's own model wins
-		assert.deepEqual(
-			clampChatLevel({ model: { provider: "openrouter", id: "qwen/qwen3.8-max-0902" }, thinkingLevel: "xhigh" as const }, strong),
-			{ model: { provider: "openrouter", id: "qwen/qwen3.8-max-0902" }, thinkingLevel: clampThinkingLevel(qwenModel(), "xhigh") },
-		);
-		// no body model → the record's strong slot is the fallback
-		assert.equal(clampChatLevel({ thinkingLevel: "xhigh" as const }, strong).thinkingLevel, "max");
-		// no model anywhere → rides unchecked (runtime clamps; the turn
-		// gate refuses the model-less chat anyway)
-		assert.deepEqual(clampChatLevel({ thinkingLevel: "minimal" as const }, null), { thinkingLevel: "minimal" });
-		// no pinned level → untouched
-		assert.deepEqual(clampChatLevel({ model: { ...glm } }, strong), { model: { ...glm } });
+		const strong: EffectiveSlot = { ...OPUS };
+		assert.deepEqual(clampChatLevel({ model: OPUS, thinkingLevel: "minimal" as const }, null), { model: OPUS, thinkingLevel: "low" });
+		assert.equal(clampChatLevel({ thinkingLevel: "off" as const }, strong).thinkingLevel, "low", "no body model: the strong slot is the fallback");
+		assert.deepEqual(clampChatLevel({ thinkingLevel: "minimal" as const }, null), { thinkingLevel: "minimal" }, "no model anywhere rides unchecked");
+		assert.deepEqual(clampChatLevel({ model: OPUS }, strong), { model: OPUS });
 	});
 
-	it("rejects unknown providers and models", () => {
+	it("rejects unknown providers, unknown models and API-key providers", () => {
 		assert.equal(validateChatSettings({ model: { provider: "nope", id: "x/y" } }).ok, false);
-		assert.equal(validateChatSettings({ model: { provider: "openrouter", id: "nope/nope" } }).ok, false);
+		assert.equal(validateChatSettings({ model: { provider: OPUS.provider, id: "nope" } }).ok, false);
+		assert.equal(validateChatSettings({ model: { provider: "openai", id: "gpt-4" } }).ok, false);
 	});
 
 	it("accepts empty settings (the clear-overrides write)", () => {
@@ -285,41 +213,25 @@ describe("the settings validation gate", () => {
 });
 
 describe("pi thinking truth (pinned against pi-ai upgrades)", () => {
-	it("glm-5.3-flash: low|high|max; anything else clamps to the nearest", () => {
-		const glm = glmModel();
-		assert.deepEqual(getSupportedThinkingLevels(glm), ["low", "high", "max"]);
-		assert.equal(clampThinkingLevel(glm, "minimal"), "low");
-		assert.equal(clampThinkingLevel(glm, "off"), "low", "GLM cannot disable thinking (map: off → null)");
-		assert.equal(clampThinkingLevel(glm, "xhigh"), "max");
-		assert.equal(clampThinkingLevel(glm, "high"), "high");
+	it("claude-opus-5-5: low…max; anything else clamps to the nearest", () => {
+		const opus = opusModel();
+		assert.deepEqual(getSupportedThinkingLevels(opus), ["low", "medium", "high", "xhigh", "max"]);
+		assert.equal(clampThinkingLevel(opus, "minimal"), "low");
+		assert.equal(clampThinkingLevel(opus, "off"), "low");
+		assert.equal(clampThinkingLevel(opus, "high"), "high");
 	});
 
-	it("the engine factory clamps explicit levels; unknown models throw honestly", () => {
-		const over = piEngineForSpec({ provider: "openrouter", id: "qwen/qwen3.8-flash", thinkingLevel: "high" });
-		assert.equal(over.model.id, "qwen/qwen3.8-flash");
-		assert.equal(over.level, "high");
-		const clamped = piEngineForSpec({ provider: "openrouter", id: "z-ai/glm-5.3-flash", thinkingLevel: "minimal" });
-		assert.equal(clamped.level, "low");
-		assert.throws(() => piEngineForSpec({ provider: "openrouter", id: "nope/nope", thinkingLevel: "low" }), /catalog has no model/);
+	it("the engine factory clamps explicit levels; unknown and API-key models throw honestly", () => {
+		assert.equal(piEngineForSpec({ ...OPUS, thinkingLevel: "high" }).level, "high");
+		assert.equal(piEngineForSpec({ ...OPUS, thinkingLevel: "minimal" }).level, "low");
+		assert.throws(() => piEngineForSpec({ provider: OPUS.provider, id: "nope", thinkingLevel: "low" }), /catalog has no model/);
+		assert.throws(() => piEngineForSpec({ provider: "openrouter", id: "z-ai/glm-5.3-flash" }), /catalog has no model/);
 	});
 
 	it("UNSET levels resolve from the baked DEFAULT_THINKING_ORDER (owner, 2026-09-22)", () => {
 		assert.deepEqual([...DEFAULT_THINKING_ORDER], ["medium", "low", "high", "minimal", "xhigh", "max"]);
-		// glm supports low|high|max → first supported in the order is "low"
-		const glm = piEngineForSpec({ provider: "openrouter", id: "z-ai/glm-5.3-flash" });
-		assert.equal(glm.level, "low");
-		// explicit levels never consult the order — pi clamps nearest
-		assert.equal(piEngineForSpec({ provider: "openrouter", id: "z-ai/glm-5.3-flash", thinkingLevel: "max" }).level, "max");
-		// a non-reasoning model reports exactly ["off"] → the order lands there
-		const flat = piModels()
-			.getProviders()
-			.flatMap((p) => piModels().getModels(p.id))
-			.find((m) => !m.reasoning);
-		if (flat) {
-			const engine = piEngineForSpec({ provider: flat.provider, id: flat.id });
-			assert.deepEqual(getSupportedThinkingLevels(flat), ["off"]);
-			assert.equal(engine.level, "off");
-		}
+		assert.equal(piEngineForSpec({ ...OPUS }).level, "medium", "the first supported level in the order");
+		assert.equal(piEngineForSpec({ ...OPUS, thinkingLevel: "max" }).level, "max", "explicit levels never consult the order");
 	});
 
 	it("the legacy piEngineFor role entry point throws honestly (BYOK: no pins)", async () => {

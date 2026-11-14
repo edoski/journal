@@ -1,6 +1,6 @@
 # NavSection
 
-A titled, fixed group of sidebar rows: Background agents in the sidebar, and the Settings sheet's section list. Courses use `NavGroup` (nav-group.md), which collapses. `data-slot="nav-section"`, header `data-slot="nav-section-header"`.
+A titled, fixed group of sidebar rows: Background agents in the sidebar, and the Settings sheet's section list. `data-slot="nav-section"`, header `data-slot="nav-section-header"`.
 
 ## Anatomy
 

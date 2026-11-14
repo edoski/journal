@@ -9,7 +9,6 @@ import {
 } from "../agent/teacher-agent.ts";
 import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
 import { connectionBackgroundAllowed, connectionScopeCurrent, isSubscriptionProvider } from "../agent/subscription-connections.ts";
-import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { claudeErrorMessage, claudeTurnError } from "../agent/claude-stream.ts";
 import { isClaudeProvider } from "../core/contracts/claude.ts";
@@ -38,9 +37,8 @@ import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
-import { providerKeyPresent } from "./keys.ts";
+import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
 import {
-	extractionEnabled,
 	graphToolsEnabled,
 	resolveConversationSpec,
 	resolveRoleSpec,
@@ -146,9 +144,7 @@ const lessonDigest = createLessonDigest({
 const lessonFinishDeps = {
 	chatStore: stores.chatStore,
 	digest: lessonDigest,
-	extractTail: (chatId: string) => {
-		if (extractionEnabled(effectiveSettings().graph)) startExtraction(extraction, chatId);
-	},
+	extractTail: (chatId: string) => startExtraction(extraction, chatId),
 };
 
 interface LhLessonFinishGlobal {
@@ -319,7 +315,7 @@ export async function handleChatInput(
 	};
 	let conversationEngine: PiEngine;
 	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
-	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
+	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : "The selected model is unavailable." }, { status: 503 }); }
 	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
 	await ensureCompacted(
 		{
@@ -329,7 +325,6 @@ export async function handleChatInput(
 			modelId: modelIdForCompaction,
 			kind: compactionKind(record),
 			thresholdTokens: effectiveThresholdTokens(
-				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
 			),
 			systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(record.messages, record.kind)).length / 4),
@@ -514,10 +509,6 @@ export async function handleChatInput(
 		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
 		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
 		chatId,
-		// The prompt-override switches (P2, 2026-09-19): same resolution
-		// point as the tool delta — the agent layer composes the system
-		// prompt fresh per turn, swapping in any enabled override segments.
-		promptSwitches: effective.agent.prompts,
 		// A course-linked session reads and writes the learner's course
 		// record through the engine, whatever the agent kind.
 		...(record.course ? { course: { course: record.course, records: stores.courseRecords } } : {}),
@@ -622,7 +613,6 @@ export async function handleChatInput(
 					console.error(`[chat ${chatId}] Claude turn error:`, error);
 					return claudeTurnError(error instanceof Error ? error.message : String(error));
 				}
-				if (isSubscriptionProvider(conversation.provider)) return nativeSubscriptionError(conversation.provider, String(error));
 				console.error(`[chat ${chatId}] turn error:`, error);
 				return "An error occurred.";
 			},
@@ -659,16 +649,11 @@ export async function handleChatInput(
 						steps,
 					});
 				}
-				// GRAPH GATE (settings-storage wave, 2026-09-19): the write channel —
-				// extraction, its auditor — dies with the master switch.
 				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
 				// no extraction, no graph, no coverage (v1: the session itself
 				// is the deliverable).
-				if ((!requestCycle || requestCycle.dispatched) && agentKind !== "practice" && extractionEnabled(effective.graph)) {
-					// Fresh per-turn read of the graph section's chunk budget
-					// (extraction-UX redesign, 2026-09-24): the trigger compares
-					// against it and the pipeline's batches share it.
-					triggerExtraction(stores, extraction, chatId, effective.graph.extractionChunkTokens);
+				if ((!requestCycle || requestCycle.dispatched) && agentKind !== "practice") {
+					triggerExtraction(stores, extraction, chatId);
 				}
 				// PARKED DISMISSAL (owner, 2026-10-04): a dismissal that arrived
 				// mid-turn was parked by the dismiss route (202); now that
@@ -722,7 +707,6 @@ export async function handleChatInput(
 							modelId: kickModelId,
 							kind: compactionKind(freshRecord),
 							thresholdTokens: effectiveThresholdTokens(
-								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
 							),
 							systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(freshRecord.messages, freshRecord.kind)).length / 4),

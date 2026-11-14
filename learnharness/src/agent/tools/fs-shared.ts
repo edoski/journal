@@ -2,7 +2,7 @@ import * as fsSync from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AUTH_FILE } from "../../../config.ts";
+import { CREDENTIALS_DIR } from "../../../config.ts";
 import { claudeConfigDirs } from "../claude-accounts.ts";
 import { claudeWorkDirPath } from "../claude-cli.ts";
 
@@ -91,10 +91,11 @@ const SENSITIVE_HOME_PREFIX = /^\.claude(?:$|[-_.\d])/i;
 
 /** Templates are deliberately included: their names do not guarantee safe contents. */
 const ENV_FILE = /^\.env(\..*)?$/i;
-const SUBSCRIPTION_FILES = ["chatgpt-credentials.json", "github-copilot-credentials.json", "xai-credentials.json"];
-// Match the actual writers in store/auth.ts and electron/{chatgpt,subscription-store}.cjs.
-const CREDENTIAL_TEMP = /^(?:\.auth\.json\.tmp-\d+|(?:chatgpt|github-copilot|xai)-credentials\.json\.[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp)$/i;
-const ATOMIC_TEMP_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** auth.json is the retired API-key store: a key saved before the app went
+ *  subscription-only may still sit there. */
+const CREDENTIAL_FILES = ["chatgpt-credentials.json", "auth.json"];
+// Matches electron/chatgpt.cjs's atomic writes.
+const CREDENTIAL_TEMP = /^chatgpt-credentials\.json\.[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/i;
 
 /** Windows namespace aliases and alternate data streams must not change policy.
  *  The returned spelling is for comparison only, never for opening a file. */
@@ -119,17 +120,13 @@ function isWithin(absolute: string, root: string, ignoreCase = false): boolean {
 	return rel === "" || (rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
 }
 
-function credentialFiles(authFile: string): string[] {
-	return [authFile, ...SUBSCRIPTION_FILES.map((name) => path.join(/* turbopackIgnore: true */ path.dirname(authFile), name))];
+function credentialFiles(directory: string): string[] {
+	return CREDENTIAL_FILES.map((name) => path.join(/* turbopackIgnore: true */ directory, name));
 }
 
-function isCredentialTemp(absolute: string, directory: string, authBasename: string): boolean {
+function isCredentialTemp(absolute: string, directory: string): boolean {
 	const file = comparisonPath(absolute);
-	if (path.relative(comparisonPath(directory), path.dirname(file)) !== "") return false;
-	const name = path.basename(file);
-	const prefix = `${authBasename}.tmp-`;
-	return CREDENTIAL_TEMP.test(name) ||
-		(name.toLowerCase().startsWith(prefix.toLowerCase()) && ATOMIC_TEMP_UUID.test(name.slice(prefix.length)));
+	return path.relative(comparisonPath(directory), path.dirname(file)) === "" && CREDENTIAL_TEMP.test(path.basename(file));
 }
 
 /** The first segment below home, or "" outside it. Case-insensitive like the home denials. */
@@ -142,13 +139,13 @@ function homeTopLevel(file: string, home: string): string {
 /** String-only check, also usable with synthetic home/credential locations.
  *  The runtime guard below additionally resolves both sources and protected roots.
  *  Only credentials are app-private denials: learning data remains readable. */
-export function isSensitivePath(absolute: string, home: string = os.homedir(), authFile: string = AUTH_FILE): boolean {
+export function isSensitivePath(absolute: string, home: string = os.homedir(), credentialsDir: string = CREDENTIALS_DIR): boolean {
 	const file = comparisonPath(absolute);
 	return ENV_FILE.test(path.basename(file)) ||
 		SENSITIVE_HOME_PREFIX.test(homeTopLevel(file, home)) ||
 		SENSITIVE_HOME_PATHS.some((p) => isWithin(file, path.join(home, p), true)) ||
-		credentialFiles(authFile).some((p) => isWithin(file, p)) ||
-		isCredentialTemp(file, path.dirname(authFile), path.basename(comparisonPath(authFile)));
+		credentialFiles(credentialsDir).some((p) => isWithin(file, p)) ||
+		isCredentialTemp(file, credentialsDir);
 }
 
 /** Resolve existing ancestors too, so absent descendants of symlinked roots
@@ -207,15 +204,15 @@ export function sensitiveHomeLocations(
 }
 
 /** One snapshot per resolution/walk, not per visited entry. Resolve protected
- *  roots too: a sensitive directory or AUTH_FILE can itself be a symlink to
+ *  roots too: a sensitive directory or credential file can itself be a symlink to
  *  a location outside home. Never read credential contents or app records. */
 function sourcePathCheck(home = os.homedir()): (absolute: string) => boolean {
 	const homeRoots = [...sensitiveHomeLocations(home), ...claudeConfigDirs({ home }), claudeWorkDirPath()].map(protectedRealPath);
-	const files = credentialFiles(AUTH_FILE).map(protectedRealPath);
-	const credentialDir = protectedRealPath(path.dirname(AUTH_FILE));
+	const files = credentialFiles(CREDENTIALS_DIR).map(protectedRealPath);
+	const credentialDir = protectedRealPath(CREDENTIALS_DIR);
 	return (absolute) => isSensitivePath(absolute, home) ||
 		homeRoots.some((p) => isWithin(absolute, p, true)) ||
-		files.some((p) => isWithin(absolute, p)) || isCredentialTemp(absolute, credentialDir, path.basename(comparisonPath(AUTH_FILE)));
+		files.some((p) => isWithin(absolute, p)) || isCredentialTemp(absolute, credentialDir);
 }
 
 function checkedSourcePath(absolute: string, denied: (absolute: string) => boolean): string {

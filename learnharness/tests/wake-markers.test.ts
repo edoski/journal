@@ -20,7 +20,6 @@ fs.writeFileSync(PYTHON, `#!/bin/sh\nexec "${process.execPath}" "${path.join(HER
 process.env.LH_DATA_DIR = path.join(TMP, "data");
 process.env.LH_LEARNING_ENGINE = TMP;
 process.env.LH_LEARNING_PYTHON = PYTHON;
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
 
 const { newUserMessage } = await import("../src/core/native-messages.ts");
 const { buildModeHandoffSteer } = await import("../src/core/contracts/jobs.ts");
@@ -29,12 +28,14 @@ const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { createPracticeAgent } = await import("../src/agent/teacher-agent.ts");
 const { subscribe } = await import("../src/core/events.ts");
+const { signInTestClaude, TEST_MODEL } = await import("./claude-fixture.ts");
+await signInTestClaude();
 
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 it("a wake turn announces its markers as soon as they are written", async () => {
 	const chat = chatStore.createChat("practise rank", { workspace: "/study/linalg", title: "Linear Algebra" });
-	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 	const handoff = { id: "h1", role: "assistant", content: [{ type: "toolCall", id: "call-h1", name: "practice", arguments: { scope: "rank", reason: "asked" } }], api: "faux", provider: "t", model: "t", usage, stopReason: "toolUse", timestamp: 1 };
 	const result = { id: "r1", role: "toolResult", toolCallId: "call-h1", toolName: "practice", content: [{ type: "text", text: "ok" }], details: { ok: true, mode: "practice" }, isError: false, timestamp: 2 };

@@ -21,7 +21,7 @@ import {
 import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
 import { concludeInputObject, concludeTool, createPracticeGate, problemTool, practiceTools } from "../src/agent/tools/practice.ts";
 import { composeInstructions, createPracticeAgent } from "../src/agent/teacher-agent.ts";
-import { allSegmentPaths } from "../src/agent/prompt-segments.ts";
+import { listSourceSegments } from "../src/agent/prompt-segments.ts";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -345,8 +345,9 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.ok(prompt.indexOf("The agent") < prompt.indexOf("# The practice session"));
 	});
 
-	it("the segment registry knows practice (override paths resolve)", () => {
-		assert.ok(allSegmentPaths().includes("practice/00-base.md"));
-		assert.ok(allSegmentPaths().includes("practice/10-doctrine.md"));
+	it("the segment registry knows practice", () => {
+		const paths = listSourceSegments("practice").map((segment) => segment.path);
+		assert.ok(paths.includes("practice/00-base.md"));
+		assert.ok(paths.includes("practice/10-doctrine.md"));
 	});
 });

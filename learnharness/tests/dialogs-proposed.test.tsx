@@ -9,10 +9,9 @@ import { Dialog } from "../components/ui/dialog.tsx";
 import { AlertDialog } from "../components/ui/alert-dialog.tsx";
 import { NewCourseBody } from "../components/course-picker.tsx";
 import { AbortTurnBody } from "../components/abort-turn-dialog.tsx";
-import { DeleteNodeBody } from "../components/delete-node-dialog.tsx";
 import { DeleteSessionBody } from "../components/delete-session-dialog.tsx";
 
-// The Proposed dialogs on Radix Dialog and AlertDialog: what each says and
+// The dialogs on Radix Dialog and AlertDialog: what each says and
 // offers, and that Esc closes the dialog without reaching the turn.
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -46,12 +45,12 @@ async function escapeReachesWindow(): Promise<boolean> {
 	return reached;
 }
 
-describe("Proposed dialogs keep their actions", () => {
+describe("dialogs keep their actions", () => {
 	it("New course: a dialog with a title field, the exam day and material, Cancel, and Create disabled until there is a title", async () => {
 		const closes: boolean[] = [];
 		await mount(
 			<Dialog open onOpenChange={(open) => closes.push(open)}>
-				<NewCourseBody variant="proposed" roots={["/study/courses"]} onClose={() => {}} onCreated={() => {}} />
+				<NewCourseBody roots={["/study/courses"]} onClose={() => {}} onCreated={() => {}} />
 			</Dialog>,
 		);
 		const dialog = $('[data-testid="new-course-dialog"]');
@@ -69,7 +68,7 @@ describe("Proposed dialogs keep their actions", () => {
 	it("abort: an alert dialog with the question's own words and action, Cancel first", async () => {
 		await mount(
 			<AlertDialog open>
-				<AbortTurnBody variant="proposed" mode="problem" busy onClose={() => {}} onConfirm={() => {}} />
+				<AbortTurnBody mode="problem" busy onClose={() => {}} onConfirm={() => {}} />
 			</AlertDialog>,
 		);
 		assert.equal($('[data-testid="abort-turn-dialog"]')?.getAttribute("role"), "alertdialog");
@@ -79,28 +78,13 @@ describe("Proposed dialogs keep their actions", () => {
 		assert.deepEqual(footer, ["Cancel", "Discard"]);
 	});
 
-	it("delete notes: counts in the title, names listed, the delete button named for what it does", async () => {
-		const nodes = ["A", "B", "C"].map((name) => ({ id: name.toLowerCase(), name }));
-		await mount(
-			<AlertDialog open>
-				<DeleteNodeBody variant="proposed" nodes={nodes} busy={false} failure={null} onClose={() => {}} onRun={() => {}} />
-			</AlertDialog>,
-		);
-		assert.equal($('[data-slot="alert-dialog-title"]')?.textContent, "Delete 3 nodes?");
-		assert.equal($('[data-testid="node-names-code"]')?.textContent, "A, B, C");
-		assert.equal($('[data-testid="node-delete-confirm"]')?.textContent, "Delete");
-	});
-
 	it("delete lesson: plain words with the lesson named, no engine talk or traces checkbox, and a plain retry on failure", async () => {
 		await mount(
 			<AlertDialog open>
 				<DeleteSessionBody
-					variant="proposed"
 					chat={{ id: "c1", title: "Rank practice" }}
-					traces={false}
 					busy={false}
 					failure={{ code: "jobs_running", error: "Background jobs are still running in this session — try again when they finish" }}
-					onTraces={() => {}}
 					onClose={() => {}}
 					onRun={() => {}}
 				/>

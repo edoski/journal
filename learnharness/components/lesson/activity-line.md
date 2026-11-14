@@ -1,6 +1,6 @@
 # ActivityLine
 
-`<ActivityLine label="Thinking…" />`: the lesson's only working-state signal under the Proposed design. `data-slot="activity-line"`, `role="status"`.
+`<ActivityLine label="Thinking…" />`: the lesson's only working-state signal. `data-slot="activity-line"`, `role="status"`.
 
 | Slot | Notes |
 |---|---|

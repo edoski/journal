@@ -1,13 +1,13 @@
 import type { CourseMapEdge, CourseMapTopic, PlanNodeStatus, SessionPlan, TopicHandle } from "@/src/core";
 import { layoutTopicMap, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
-import { dayWords, type Pickup, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
+import { dayWords } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /**
- * What the `steps` candidate draws (spec: steps.md): one tab per session
- * whose tutor wrote a plan, and that plan's steps as a map in the topic
- * map's geometry, with the marks the lesson's own Plan list wears. The
- * plan and its two derived facts only; nothing says a step is done.
- * Every function here is pure.
+ * What the hybrid's lesson map draws (spec: ../hybrid/hybrid.md): a
+ * lesson's plan as a map in the topic map's geometry, with the marks the
+ * lesson's own Plan list wears, and the words naming the lesson. The plan
+ * and its two derived facts only; nothing says a step is done. Every
+ * function here is pure.
  */
 
 /** "Today's lesson", "Yesterday's lesson", "Lesson of Tue 3 Nov"; a
@@ -17,32 +17,6 @@ export function lessonWords(day: string, today: string, kind: "lesson" | "practi
 	if (when === "Today") return `Today's ${kind}`;
 	if (when === "Yesterday") return `Yesterday's ${kind}`;
 	return `${kind === "lesson" ? "Lesson" : "Practice"} of ${when}`;
-}
-
-export interface PlanTab {
-	/** The session's id. */
-	id: string;
-	label: string;
-	entry: SessionEntry & { plan: SessionPlan };
-}
-
-const hasSteps = (entry: SessionEntry): entry is PlanTab["entry"] => (entry.plan?.tree.nodes.length ?? 0) > 0;
-
-/**
- * One tab per session with a plan, in the order given (newest first),
- * labelled by its day; two on one label gain the session's title. The tab
- * that opens: the pick-up session when it has a plan, else the newest.
- */
-export function planTabs(sessions: readonly SessionEntry[], pickups: readonly Pickup[], today: string): { tabs: PlanTab[]; opens: string | null } {
-	const planned = sessions.filter(hasSteps);
-	const labels = planned.map((entry) => lessonWords(entry.day, today, entry.chat.kind === "practice" ? "practice" : "lesson"));
-	const tabs = planned.map((entry, index) => {
-		const label = labels[index]!;
-		const shared = labels.filter((other) => other === label).length > 1;
-		return { id: entry.chat.id, label: shared ? `${label}, ${entry.chat.title}` : label, entry };
-	});
-	const pickedUp = pickups.find((pickup) => pickup.kind === "session" && tabs.some((tab) => tab.id === pickup.chat.id));
-	return { tabs, opens: pickedUp?.kind === "session" ? pickedUp.chat.id : (tabs[0]?.id ?? null) };
 }
 
 /** A plan drawn in the topic map's geometry, and its edges in the map's terms. */

@@ -9,7 +9,6 @@ import { chatStore } from "../src/store/chats.ts";
 import { graphStore } from "../src/store/graph.ts";
 import { createExtractionPipeline } from "../src/agent/subagents/extraction.ts";
 import { getGraph } from "../src/core/graph.ts";
-import { effectiveSettings } from "../src/server/stores.ts";
 
 async function main() {
 	const only = process.argv[2]; // optional: extract just one chat id
@@ -18,8 +17,6 @@ async function main() {
 	const pipeline = createExtractionPipeline({
 		chatStore,
 		graphStore,
-		// Live budget: the graph section's setting, same as the app's trigger
-		getChunkTokens: () => effectiveSettings().graph.extractionChunkTokens,
 	});
 	for (const chat of chats) {
 		const t0 = Date.now();

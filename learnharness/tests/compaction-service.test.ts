@@ -283,11 +283,11 @@ describe("the compaction service", () => {
 		}
 	});
 
-	it("effectiveThresholdTokens: the setting rules big windows; the window rule binds small ones", () => {
-		assert.equal(effectiveThresholdTokens(150_000, 200_000), 150_000);
-		assert.equal(effectiveThresholdTokens(150_000, 100_000), 100_000 - 16_384);
-		assert.equal(effectiveThresholdTokens(undefined, 200_000), 150_000);
-		assert.equal(effectiveThresholdTokens(undefined, undefined), 150_000);
+	it("effectiveThresholdTokens: the 150k bound rules big windows; the window rule binds small ones", () => {
+		assert.equal(effectiveThresholdTokens(1_000_000), 150_000);
+		assert.equal(effectiveThresholdTokens(200_000), 150_000);
+		assert.equal(effectiveThresholdTokens(100_000), 100_000 - 16_384);
+		assert.equal(effectiveThresholdTokens(undefined), 150_000);
 	});
 
 	it("kickCompaction: fire-and-forget, registry-set, over-threshold only", async () => {

@@ -5,8 +5,9 @@
  *
  *   1. bridge-script injection (buildDemoSrcDoc) + the pure bridge-message
  *      reducer (reduceDemoBridgeState)
- *   2. card rendering (static markup): sandboxed iframe attrs, error chip,
- *      failure notes, SVG image documents
+ *   2. card rendering (static markup; the complete badges mount on the
+ *      Radix DOM helper to open their briefs): sandboxed iframe attrs,
+ *      error chip, failure notes, SVG image documents
  *   3. the demo-builder loop with a FAKE model + FAKE headless (success with
  *      a fix iteration, untested-final verification, never-clean failure,
  *      no-Chrome failure)
@@ -21,8 +22,9 @@
  * in the after() hook; overrides reset in finally blocks).
  */
 
-import React from "react";
+import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React; // tsx classic-JSX shim (see render-cards.test.tsx)
+import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
@@ -32,6 +34,8 @@ import { createCanvas } from "@napi-rs/canvas";
 import { Value } from "typebox/value";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep, type ToolCall } from "@earendil-works/pi-ai";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createRoot } from "react-dom/client";
+import { parseHTML } from "linkedom";
 import { PATHS } from "../config.ts";
 import {
 	buildDemoSrcDoc,
@@ -47,7 +51,6 @@ import { chartSize } from "../components/session-overlay.tsx";
 import { SubagentSteerCard } from "../components/artifacts/steer-card.tsx";
 import { DispatchCard } from "../components/artifacts/dispatch-card.tsx";
 import { JobCard, PdfJobCard } from "../components/artifacts/job-card.tsx";
-import { ToolCallCard } from "../components/artifacts/tool-call-card.tsx";
 import { JobsContext } from "../components/jobs-context.ts";
 import { demoInputSchema, jobTools, pdfInputSchema, visualInputSchema } from "../src/agent/tools/jobs.ts";
 import { runDemoBuilder } from "../src/agent/subagents/demo-builder.ts";
@@ -88,11 +91,9 @@ function testRunner() {
 	return { steers, runner };
 }
 import { artifactRenderers } from "../components/artifacts/index.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
-// The key-presence turn gate (provider-key interlude, 2026-09-25): scripted
-// turns pin openrouter per chat — the gate reads env-first truth, so the
-// key must be present in the test process like any real setup.
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+await signInTestClaude();
 
 
 
@@ -247,6 +248,30 @@ describe("demo bridge", () => {
 
 // ─── 2. card rendering ───────────────────────────────────────────────────────
 
+function documentFor(node: React.ReactNode) {
+	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
+}
+
+/** Mounts a steer card on the real Radix layer, presses its disclosure, and
+ *  hands back what the learner sees closed and then open. */
+async function openDisclosure(node: React.ReactElement, testid: string) {
+	const host = dom.document.createElement("div");
+	dom.document.body.appendChild(host);
+	const root = createRoot(host);
+	try {
+		await act(async () => root.render(node));
+		const disclosure = host.querySelector(`[data-testid="${testid}"]`);
+		const trigger = disclosure?.querySelector('[data-slot="collapsible-trigger"]');
+		assert.ok(trigger, `${testid} has a trigger`);
+		const closed = { expanded: trigger.getAttribute("aria-expanded"), html: host.innerHTML, summary: trigger.textContent ?? "" };
+		await act(async () => trigger.dispatchEvent(new dom.window.Event("click", { bubbles: true })));
+		return { closed, open: { expanded: trigger.getAttribute("aria-expanded"), html: host.innerHTML } };
+	} finally {
+		await act(async () => root.unmount());
+		host.remove();
+	}
+}
+
 const DEMO_HTML = "<!doctype html><html><body><h1>oscillator</h1><script>let t=0;</script></body></html>";
 
 function part(state: string, output?: unknown) {
@@ -255,48 +280,33 @@ function part(state: string, output?: unknown) {
 
 describe("dispatch card rendering (the tool-call ack box)", () => {
 	const ackPart = { type: "tool-research", state: "output-available", toolCallId: "call-1", input: { question: "q" }, output: "Dispatched (job j1)." };
-	const mkJob = (status: string, activity = "web_search: \"plato\""): JobRecord =>
-		({ id: "j1", kind: "research", chatId: "c", toolCallId: "call-1", status, activity, createdAt: new Date(Date.now() - 5000).toISOString(), updatedAt: new Date().toISOString() }) as JobRecord;
+	const mkJob = (status: string, activity = "web_search: \"plato\"", kind: JobRecord["kind"] = "research"): JobRecord =>
+		({ id: "j1", kind, chatId: "c", toolCallId: "call-1", status, activity, createdAt: new Date(Date.now() - 5000).toISOString(), updatedAt: new Date().toISOString() }) as JobRecord;
+	const inJobs = (jobs: JobRecord[], card: React.ReactNode) =>
+		documentFor(<JobsContext.Provider value={jobs}>{card}</JobsContext.Provider>);
 
-	it("renders a live activity card while the job runs", () => {
-		const html = renderToStaticMarkup(
-			<JobsContext.Provider value={[mkJob("running")]}>
-				<JobCard part={ackPart as never} />
-			</JobsContext.Provider>,
-		);
-		assert.match(html, /Research agent/);
-		assert.match(html, /web_search: (&quot;|")plato/);
-		assert.ok(!html.includes("Dispatched (job j1.)") || true, "ack text is not the display");
+	it("draws one muted working line while the job runs, never the tool's arguments", () => {
+		const doc = inJobs([mkJob("running")], <JobCard part={ackPart as never} />);
+		const line = doc.querySelector('[data-testid="dispatch-card"]');
+		assert.equal(line?.getAttribute("role"), "status");
+		assert.equal(line?.textContent, "Checking sources…");
+		assert.ok(!doc.body.innerHTML.includes("web_search"), "the ack and the activity are not the display");
 	});
 
-	it("renders the dispatched pulse when the poll has not seen the job yet", () => {
-		const html = renderToStaticMarkup(
-			<JobsContext.Provider value={[]}>
-				<JobCard part={ackPart as never} />
-			</JobsContext.Provider>,
-		);
-		assert.match(html, /Research agent/);
-		assert.match(html, /Dispatched…/);
+	it("draws the same working line when the poll has not seen the job yet", () => {
+		const doc = inJobs([], <JobCard part={ackPart as never} />);
+		assert.equal(doc.querySelector('[data-testid="dispatch-card"]')?.textContent, "Checking sources…");
 	});
 
-	it("settles to a quiet finished one-liner when the worker is done", () => {
-		const html = renderToStaticMarkup(
-			<JobsContext.Provider value={[mkJob("done", "delivered")]}>
-				<JobCard part={ackPart as never} />
-			</JobsContext.Provider>,
-		);
-		assert.match(html, /Research agent/);
-		assert.match(html, /finished/);
-		assert.ok(!html.includes("web_search"), "no stale activity line once settled");
+	it("draws nothing once the worker is done: the result arrives in the steer card below", () => {
+		const doc = inJobs([mkJob("done", "delivered")], <JobCard part={ackPart as never} />);
+		assert.equal(doc.body.innerHTML, "");
 	});
 
-	it("marks a failed job as failed", () => {
-		const html = renderToStaticMarkup(
-			<JobsContext.Provider value={[mkJob("error")]}>
-				<JobCard part={ackPart as never} />
-			</JobsContext.Provider>,
-		);
-		assert.match(html, /failed/);
+	it("marks a failed job with one plain failure line", () => {
+		const doc = inJobs([mkJob("error")], <JobCard part={ackPart as never} />);
+		assert.equal(doc.querySelector('[data-testid="dispatch-settled"]')?.textContent, "The sources couldn't be checked");
+		assert.equal(doc.querySelector('[data-testid="dispatch-card"]'), null, "no working line once it failed");
 	});
 
 	it("renders nothing for a still-streaming tool input", () => {
@@ -310,44 +320,15 @@ describe("dispatch card rendering (the tool-call ack box)", () => {
 
 	// sources v0 — the live browser smoke (2026-09-19) caught the pdf dispatch
 	// part rendering nothing: PdfJobCard is the fix.
-	it("pdf dispatch renders the live PDF-reader card while the job runs", () => {
-		const pdfJob: JobRecord = ({
-			id: "jp1",
-			kind: "pdf",
-			chatId: "c",
-			toolCallId: "call-1",
-			status: "running",
-			activity: 'pdf_render: 42-44 @150dpi',
-			createdAt: new Date(Date.now() - 5000).toISOString(),
-			updatedAt: new Date().toISOString(),
-		}) as JobRecord;
-		const html = renderToStaticMarkup(
-			<JobsContext.Provider value={[pdfJob]}>
-				<PdfJobCard part={ackPart as never} />
-			</JobsContext.Provider>,
-		);
-		assert.match(html, /PDF reader/);
-		assert.match(html, /pdf_render/);
+	it("pdf dispatch draws the PDF reader's working line while the job runs", () => {
+		const doc = inJobs([mkJob("running", "pdf_render: 42-44 @150dpi", "pdf")], <PdfJobCard part={ackPart as never} />);
+		assert.equal(doc.querySelector('[data-testid="dispatch-card"]')?.textContent, "Reading the PDF…");
+		assert.ok(!doc.body.innerHTML.includes("pdf_render"), "no tool arguments on the line");
 	});
 
-	it("pdf dispatch settles to the finished one-liner", () => {
-		const pdfJob: JobRecord = ({
-			id: "jp1",
-			kind: "pdf",
-			chatId: "c",
-			toolCallId: "call-1",
-			status: "done",
-			activity: "delivered",
-			createdAt: new Date(Date.now() - 5000).toISOString(),
-			updatedAt: new Date().toISOString(),
-		}) as JobRecord;
-		const html = renderToStaticMarkup(
-			<JobsContext.Provider value={[pdfJob]}>
-				<PdfJobCard part={ackPart as never} />
-			</JobsContext.Provider>,
-		);
-		assert.match(html, /PDF reader/);
-		assert.match(html, /finished/);
+	it("pdf dispatch draws nothing once delivered", () => {
+		const doc = inJobs([mkJob("done", "delivered", "pdf")], <PdfJobCard part={ackPart as never} />);
+		assert.equal(doc.body.innerHTML, "");
 	});
 });
 
@@ -413,7 +394,7 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.match(htmlNoMeta, /job-aborted-badge/, "metadata is pump mechanics, never the render seam");
 	});
 
-	it("renders a quiet Research-complete one-liner whose collapsed <details> carries the full brief", () => {
+	it("renders a quiet Research-complete one-liner whose collapsed disclosure carries the full brief", async () => {
 		const steer = buildSubagentSteer(
 			{ id: "jr", kind: "research", toolCallId: "cr" },
 			{
@@ -424,21 +405,20 @@ describe("steer card rendering (the delivered artifact)", () => {
 				],
 			},
 		);
-		const html = renderToStaticMarkup(<SubagentSteerCard message={projectNative([steer])[0] as never} />);
-		assert.match(html, /Research/);
-		assert.match(html, /complete/);
-		assert.match(html, /2 sources/);
-		assert.match(html, /view brief/, "the expansion affordance is offered");
-		// the one-liner is a native <details> — collapsed by default, so the
-		// brief + sources ride in the DOM but never clutter the transcript
-		// until the learner opens them (the wave-1 "view full research" ask)
-		assert.match(html, /<details[^>]*data-testid="research-complete-badge"/, "a real disclosure");
-		assert.ok(!/<details[^>]*open/.test(html), "collapsed by default — no `open` attribute");
-		assert.ok(html.includes("founded the Academy"), "the persisted brief rides inside the details");
-		assert.ok(html.includes("britannica.com/plato"), "source links ride inside the details");
+		const { closed, open } = await openDisclosure(<SubagentSteerCard message={projectNative([steer])[0] as never} />, "research-complete-badge");
+		assert.match(closed.summary, /Research complete · 2 sources/);
+		assert.match(closed.summary, /View brief/, "the expansion affordance is offered");
+		// collapsed by default, so the brief + sources never clutter the
+		// transcript until the learner opens them (the wave-1 "view full
+		// research" ask)
+		assert.equal(closed.expanded, "false");
+		assert.ok(!closed.html.includes("founded the Academy"), "the brief waits behind the disclosure");
+		assert.equal(open.expanded, "true");
+		assert.ok(open.html.includes("founded the Academy"), "the persisted brief opens in place");
+		assert.ok(open.html.includes("britannica.com/plato"), "source links open with it");
 	});
 
-	it("renders a quiet PDF-reading-complete one-liner (sources v0) whose collapsed details carries the brief + pages", () => {
+	it("renders a quiet PDF-reading-complete one-liner (sources v0) whose collapsed disclosure carries the brief + pages", async () => {
 		const steer = buildSubagentSteer(
 			{ id: "jpf", kind: "pdf", toolCallId: "cpf" },
 			{
@@ -449,15 +429,14 @@ describe("steer card rendering (the delivered artifact)", () => {
 				pagesConsulted: [1, 2],
 			},
 		);
-		const html = renderToStaticMarkup(<SubagentSteerCard message={projectNative([steer])[0] as never} />);
-		assert.match(html, /PDF/);
-		assert.match(html, /reading complete/);
-		assert.match(html, /read 1 page/, "the badge counts READ pages, not search hits");
-		assert.match(html, /<details[^>]*data-testid="pdf-complete-badge"/, "a real disclosure like the research badge");
-		assert.ok(!/<details[^>]*open/.test(html), "collapsed by default");
-		assert.ok(html.includes("power rule"), "the brief rides inside the details");
+		const { closed, open } = await openDisclosure(<SubagentSteerCard message={projectNative([steer])[0] as never} />, "pdf-complete-badge");
+		assert.match(closed.summary, /PDF reading complete/);
+		assert.match(closed.summary, /read 1 page\b/, "the badge counts READ pages, not search hits");
+		assert.equal(closed.expanded, "false", "collapsed by default");
+		assert.ok(!closed.html.includes("power rule"), "the brief waits behind the disclosure");
+		assert.ok(open.html.includes("power rule"), "the brief opens in place");
 		// the path/question are sub-agent context — never learner-facing chrome
-		assert.ok(!html.includes("/Users/x/course/chapter-3.pdf"), "the file path never renders");
+		assert.ok(!open.html.includes("/Users/x/course/chapter-3.pdf"), "the file path never renders");
 	});
 
 	it("renders the PDF failure brief with the failed badge when the reader FAILED", () => {
@@ -918,7 +897,7 @@ describe("demo/visual job runners", () => {
 		createdChats.push(chat.id);
 		// BYOK turn gate (owner, 2026-09-22): the scripted chat needs a
 		// conversation model — the per-chat pin, exactly like the setup flow.
-		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 
 		// A teacher that calls demo on turn 1, then continues in the SAME turn.
 		const teacher = scriptedModel([
@@ -1018,103 +997,9 @@ describe("tool + renderer registry wiring", () => {
 		assert.equal(artifactRenderers.visual, VisualCard);
 		// sources v0 — pdf maps to its dispatch card (the live-smoke gap)
 		assert.equal(artifactRenderers.pdf, PdfJobCard);
-		// sources v1 — the learner-filesystem set maps to the generic tool-call card
-		for (const t of ["read", "ls", "find", "grep"]) {
-			assert.equal(artifactRenderers[t], ToolCallCard, `${t} renders the tool-call card`);
+		// The agent's own tools render nothing in the lesson column (agent chrome out).
+		for (const t of ["read", "ls", "find", "grep", "list_sessions", "list_propositions"]) {
+			assert.equal(artifactRenderers[t], undefined, `${t} has no transcript card`);
 		}
-		// wave 7 — the prober's graph tools join the SAME discipline (they
-		// rendered like nothing happened before this interlude)
-		for (const t of ["list_sessions", "list_propositions"]) {
-			assert.equal(artifactRenderers[t], ToolCallCard, `${t} renders the tool-call card`);
-		}
-	});
-
-	it("the tool-call card: the prober's graph tools — collapsed headline + their compact row output", () => {
-		// list_propositions: the session id is the call's subject
-		const propPart = {
-			type: "tool-list_propositions",
-			state: "output-available",
-			toolCallId: "g1",
-			input: { session: "chat_mtiudjao_776beada" },
-			output: "2 proposition(s) born in this session:\n- Kepler's laws — solid (as of 2026-09-20)\n- Tidal locking — shaky (as of 2026-09-21)",
-		};
-		const html = renderToStaticMarkup(<ToolCallCard part={propPart as never} />);
-		assert.match(html, /list_propositions/);
-		assert.match(html, /chat_mtiudjao_776beada/); // the collapsed headline
-		assert.match(html, /Kepler&#x27;s laws/); // the row output, verbatim (apostrophe HTML-escaped)
-		assert.ok(html.includes("<details"), "collapsed by default");
-
-		// list_sessions: no headline arg (empty input) — the tool name alone,
-		// exactly the ls-with-no-path discipline
-		const sessPart = {
-			type: "tool-list_sessions",
-			state: "output-available",
-			toolCallId: "g2",
-			input: {},
-			output: "3 session(s) in the knowledge graph, most recent first:\n1. Orbital mechanics (chat, 8 propositions, born 2026-09-18)",
-		};
-		const html2 = renderToStaticMarkup(<ToolCallCard part={sessPart as never} />);
-		assert.match(html2, /list_sessions/);
-		assert.match(html2, /Orbital mechanics/);
-		const headline = html2.split("<summary")[1]?.split("</summary>")[0] ?? "";
-		assert.doesNotMatch(headline, /Orbital/, "the collapsed line shows the tool name only — no noise");
-	});
-
-	it("the tool-call card: collapsed one-liner with the tool name + headline arg; expand shows input and output", () => {
-		const part = {
-			type: "tool-read",
-			state: "output-available",
-			toolCallId: "c1",
-			input: { path: "notes/calculus.md", offset: 1, limit: 20 },
-			output: "Calculus notes\nThe derivative measures force.",
-		};
-		const html = renderToStaticMarkup(<ToolCallCard part={part as never} />);
-		// collapsed headline: tool name + path as given
-		assert.match(html, /read/);
-		assert.match(html, /notes\/calculus\.md/);
-		// expandable payload: input JSON + output text
-		assert.match(html, /Input/);
-		assert.match(html, /Output/);
-		assert.match(html, /The derivative measures force\./);
-		assert.ok(html.includes("<details"), "collapsed by default via a details element");
-	});
-
-	it("the tool-call card: image-bearing read results note the attachment; errors render red", () => {
-		const imgPart = {
-			type: "tool-read",
-			state: "output-available",
-			toolCallId: "c2",
-			input: { path: "shot.png" },
-			output: { text: "Read image file [image/png].", images: [{ data: "AAAA", mimeType: "image/png" }] },
-		};
-		const html = renderToStaticMarkup(<ToolCallCard part={imgPart as never} />);
-		assert.match(html, /Read image file \[image\/png\]\./);
-		assert.match(html, /1 image attached to the model/);
-		assert.ok(!html.includes("AAAA"), "the image payload itself never renders");
-
-		const errPart = {
-			type: "tool-read",
-			state: "output-error",
-			toolCallId: "c3",
-			input: { path: "/gone.md" },
-			errorText: "ENOENT: no such file",
-		};
-		const errHtml = renderToStaticMarkup(<ToolCallCard part={errPart as never} />);
-		assert.match(errHtml, /Error/);
-		assert.match(errHtml, /ENOENT/);
-		assert.match(errHtml, /text-red-500/);
-	});
-
-	it("the tool-call card: find/grep headline the pattern, ls defaults to ~", () => {
-		const findHtml = renderToStaticMarkup(
-			<ToolCallCard part={{ type: "tool-find", state: "output-available", toolCallId: "c", input: { pattern: "*calculus*" }, output: "notes/calculus.md" } as never} />,
-		);
-		assert.match(findHtml, /find/);
-		assert.match(findHtml, /\*calculus\*/);
-		const lsHtml = renderToStaticMarkup(
-			<ToolCallCard part={{ type: "tool-ls", state: "output-available", toolCallId: "c", input: {}, output: "notes/" } as never} />,
-		);
-		assert.match(lsHtml, /ls/);
-		assert.match(lsHtml, /~/);
 	});
 });

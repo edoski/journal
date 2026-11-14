@@ -12,12 +12,9 @@ import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
 import { Button } from "@/components/ui/button";
 
-/** The heading over the composer: Today asks about the day, the draft
- *  about the session. Neither names a mode: the tutor routes the request
- *  to teaching or practice itself. */
-function startHeading(today: boolean): string {
-	return today ? "What are we learning today?" : "What do you want to work on?";
-}
+/** The heading over the composer. It names no mode: the tutor routes the
+ *  request to teaching or practice itself. */
+const START_HEADING = "What do you want to work on?";
 
 /** The composer's prompt, for a lesson and for practice alike. */
 const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
@@ -25,18 +22,10 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
 /**
  * The Proposed start surface (spec: start-screen.md), T3 Code's new-chat
  * anatomy: a light question and the composer centred in a 736px column,
- * nothing else. `/` (`today`) and the draft at /chat/new share it; a
- * session is created only when something is sent, through the same path
- * the current screens use.
+ * nothing else. It is the draft at /chat/new; a session is created only
+ * when something is sent.
  */
-export function StartScreen({
-	initialConfigured,
-	today = false,
-}: {
-	initialConfigured: boolean;
-	/** At `/`: the day's question. */
-	today?: boolean;
-}) {
+export function StartScreen({ initialConfigured }: { initialConfigured: boolean }) {
 	const router = useRouter();
 	const [text, setText] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -44,7 +33,7 @@ export function StartScreen({
 	const starterRef = useRef(new SessionStarter());
 	const [startError, setStartError] = useState<string | null>(null);
 	const courseChoice = useCourseChoice();
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const [setupOpen, setSetupOpen] = useState(false);
 
 	const cycleComposer = useCallback(
@@ -56,7 +45,7 @@ export function StartScreen({
 	/** The pre-send guards: missing models or keys open setup, an unavailable
 	 *  model opens its picker; nothing is created, so no orphan session. */
 	const canStart = (): boolean => {
-		if (!configured || zeroKeys) {
+		if (!configured || unconnected) {
 			setSetupOpen(true);
 			return false;
 		}
@@ -102,11 +91,10 @@ export function StartScreen({
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<main data-slot="start-screen" className="relative flex min-h-0 flex-1 flex-col px-5">
 				<div className="flex min-h-0 flex-1 flex-col justify-end pb-8">
-					<h1 className="text-center text-display font-normal tracking-[-0.025em] text-foreground">{startHeading(today)}</h1>
+					<h1 className="text-center text-display font-normal tracking-[-0.025em] text-foreground">{START_HEADING}</h1>
 				</div>
 				<div className="mx-auto w-full max-w-[46rem]">
 					<Composer
-						variant="proposed"
 						busy={busy}
 						value={text}
 						onChange={setText}
@@ -115,31 +103,31 @@ export function StartScreen({
 						canSend={text.trim().length > 0}
 						autoFocus
 						placeholder={START_PLACEHOLDER}
-						toolbar={<CourseControl choice={courseChoice} variant="proposed" />}
+						toolbar={<CourseControl choice={courseChoice} />}
 					/>
 				</div>
 				<div className="mx-auto flex min-h-0 w-full max-w-[46rem] flex-1 flex-col gap-6 overflow-y-auto pt-4 pb-6">
-					{(startError || courseChoice.notice || zeroKeys || !configured) && (
+					{(startError || courseChoice.notice || unconnected || !configured) && (
 						<div className="flex flex-col items-start gap-2 px-4">
 							{startError && <p role="alert" className="text-row text-danger">{startError}</p>}
 							{courseChoice.notice && (
 								<p role="alert" data-testid="course-notice" className="text-row text-danger">{courseChoice.notice}</p>
 							)}
-							{(zeroKeys || !configured) && (
+							{(unconnected || !configured) && (
 								<Button
 									variant="quiet"
-									data-testid={zeroKeys ? "setup-cta-keys" : "setup-cta"}
+									data-testid={unconnected ? "setup-cta-keys" : "setup-cta"}
 									onClick={() => setSetupOpen(true)}
 									className="-ml-3 h-8 px-3 text-row font-normal text-link hover:text-link"
 								>
-									{zeroKeys ? "Add a provider key to start" : "Set up your models to start"}
+									{unconnected ? "Sign in to Claude or ChatGPT to start" : "Set up your models to start"}
 								</Button>
 							)}
 						</div>
 					)}
 					{state.status === "unavailable" && (
 						<div className="px-4">
-							<CoursesUnavailable reason={state.reason} variant="proposed" />
+							<CoursesUnavailable reason={state.reason} />
 						</div>
 					)}
 				</div>

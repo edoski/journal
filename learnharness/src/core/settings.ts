@@ -28,8 +28,7 @@
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { AUTH_PROVIDER_KEYS } from "./auth-keys.ts";
-import { isClaudeProvider } from "./contracts/claude.ts";
+import { CLAUDE_MODEL_IDS, CLAUDE_ROLE_DEFAULT, isClaudeProvider } from "./contracts/claude.ts";
 import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
 
@@ -134,9 +133,9 @@ export class ModelsNotConfiguredError extends Error {
 	}
 }
 
-/** The key-presence refusal (provider-key interlude, owner, 2026-09-25):
- * a PINNED model is not enough — its provider's key must be present, or
- * the action dies mid-stream masked to a generic error. Same envelope
+/** The connection refusal: a PINNED model is not enough — its provider
+ * must be signed in, or the action dies mid-stream masked to a generic
+ * error. The code keeps its historical name (provider_key_missing). Same envelope
  * family as modelsNotConfigured: HTTP callers get 503 + this JSON;
  * in-band consumers (the job record's error field) carry the human
  * `error` line. `provider` names whose key is gone; `slots` names the
@@ -147,20 +146,19 @@ export interface ProviderKeyMissing {
 	error: string;
 	/** The machine discriminator the client switches on. */
 	code: typeof PROVIDER_KEY_MISSING_CODE;
-	/** The provider whose key is gone, e.g. "openrouter". */
+	/** The provider that is not signed in, e.g. "chatgpt". */
 	provider: string;
 	/** Which slot tiers the refused action resolves to that provider. */
 	slots: ModelSlotName[];
 }
-/** The refusal wording's invariant tail — the matcher below keys on it
- * (the label prefix varies by provider). */
-const PROVIDER_KEY_MISSING_TAIL = "key is set — add one in Settings → Keys";
-/** Claude has no app-held key: its "key" is the user's own Claude Code sign-in. */
-const CLAUDE_NOT_CONNECTED = "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Providers";
+/** Claude's connection is the user's own Claude Code sign-in. */
+const CLAUDE_NOT_CONNECTED = "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts";
+const CHATGPT_NOT_CONNECTED = "ChatGPT is not signed in — connect it in Settings → Accounts";
+/** The tail of the refusal for a provider only an API key could run, which the app no longer uses. */
+const API_KEY_PROVIDER_TAIL = "runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent";
 export function providerKeyMissing(provider: string, slots: ModelSlotName[]): ProviderKeyMissing {
-	const label = AUTH_PROVIDER_KEYS.find((p) => p.id === provider)?.label ?? provider;
 	return {
-		error: isClaudeProvider(provider) ? CLAUDE_NOT_CONNECTED : `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`,
+		error: isClaudeProvider(provider) ? CLAUDE_NOT_CONNECTED : provider === "chatgpt" ? CHATGPT_NOT_CONNECTED : `${provider} ${API_KEY_PROVIDER_TAIL}`,
 		code: PROVIDER_KEY_MISSING_CODE,
 		provider,
 		slots,
@@ -171,7 +169,7 @@ export function providerKeyMissing(provider: string, slots: ModelSlotName[]): Pr
  * scary-error) — the envelope's home module owns the string so the
  * writer and the matcher can never drift. */
 export function isProviderKeyRefusal(error: string | undefined): boolean {
-	return !!error && (error.endsWith(PROVIDER_KEY_MISSING_TAIL) || error === CLAUDE_NOT_CONNECTED);
+	return !!error && (error === CLAUDE_NOT_CONNECTED || error === CHATGPT_NOT_CONNECTED || error.endsWith(API_KEY_PROVIDER_TAIL));
 }
 /** The typed throw for in-process seams (extraction pipeline) — the
  * ProviderKeyMissing sibling of ModelsNotConfiguredError: callers catch
@@ -241,14 +239,8 @@ export interface AgentSettings {
 	 *  knowledge-graph views for the prober agent — a session list + the
 	 *  propositions born in each session. Its SUBJECT is the graph but its
 	 *  MECHANISM is agent capability (tool registration), so it lives here
-	 *  in its OWN subsection, not in the tool-toggles map. Absent = enabled (the toggle discipline); the
-	 *  effective gate composes graph.enabled AND this switch. */
+	 *  in its OWN subsection, not in the tool-toggles map. Absent = enabled (the toggle discipline). */
 	graphTools?: { enabled?: boolean };
-	/** System-prompt override SWITCHES keyed by segment path (absent key =
-	 *  off). Switch-on requires the override file to exist (enforced by the
-	 *  route); the switch is explicit so users keep a file on disk but run
-	 *  the source default to compare (owner decision 2026-09-19). */
-	prompts?: Record<string, boolean>;
 }
 
 /** Markdown-rendering knobs — the bare-bones set (owner decision). */
@@ -280,69 +272,6 @@ export interface AppearanceSettings {
 	mdRendering?: MdRenderingSettings;
 }
 
-/** Knowledge-graph settings — a strict dependency ladder (owner decision
- *  2026-09-19): graph → embedding → clustering → labeling, each rung only
- *  meaningful when its parent is on (the UI grays dependents out; stored
- *  values persist but resolve inert). All default true. */
-export interface GraphSettings {
-	/** MASTER (and, since wave 7, ONLY): off = no extraction, no auditor.
-	 *  The wave-7 collapse (owner ruling 2026-09-23) deleted the three
-	 *  subordinate rungs — embedding/clustering/labeling — and the BYOK
-	 *  embeddingModel: clustering is the free birth-session partition
-	 *  derived on read (core/session-clusters.ts), labels ARE session
-	 *  names, and the prober graph tools read the ledgers directly — there
-	 *  is nothing left to configure. Data stays stored either way. */
-	enabled?: boolean;
-	/** GRAPH RENDERING (owner, 2026-10-06 — the release graph-controls
-	 *  round): gates ONLY the home's main view. Off = the home shows the
-	 *  chains view instead of the canvas; the ledgers, the extraction
-	 *  pipeline, and every write path are untouched — this is a display
-	 *  switch, not a data switch (the extraction master above is the
-	 *  data switch). Default on. */
-	rendering?: boolean;
-	/** The chunk budget (extraction-UX redesign, owner 2026-09-24): the
-	 *  transcript-token share of the extractor's context — a run fires
-	 *  when a chat's UNCOVERED tokens reach it, and the run batches the
-	 *  oldest uncovered messages into runs of ≤ this many tokens. It
-	 *  bounds both cost and chunk size (the extractor prompt also
-	 *  carries the whole graph + instructions, so a smaller budget means
-	 *  more, smaller runs — each paying that fixed overhead).
-	 *
-	 *  FACTORY DEFAULT 4096 (owner, 2026-10-13: halved back from the
-	 *  digest-era 8192 — the labeled passages + message anchors made
-	 *  smaller batches worth their overhead again; the pre-setting
-	 *  constant was 4096, vision-extraction-coverage.md, 2026-09-15).
-	 *  Only the FACTORY moves: an explicit user value always wins.
-	 *
-	 *  FLOOR 500 (EXTRACTION_CHUNK_TOKENS_FLOOR, the implementer's call
-	 *  per the owner's dispatch): every run pays the graph-carrying
-	 *  prompt overhead out of the write channel's money — a budget below
-	 *  ~500 tokens would fire penny-batches that cost more per extracted
-	 *  token than the content is worth, so the sanitizer clamps and the
-	 *  PUT rejects below it. NO CEILING on purpose: a large budget just
-	 *  delays extraction — the user's stated cost/thoroughness tradeoff,
-	 *  not a misconfiguration to police. */
-	extractionChunkTokens?: number;
-}
-
-/**
- * COMPACTION (owner round 14, 2026-10-05): the context-fitting mechanic's
- * user-facing knob. One number — the trigger threshold in context tokens.
- * The effective trigger is min(this, model contextWindow − 16k reserve)
- * (owner ruling: on big models the setting rules; on small ones the
- * window rules before the provider overflows).
- *
- * FACTORY DEFAULT 150_000 (owner ruling).
- *
- * FLOOR 32_000 (implementer's call, the chunk-budget discipline): below
- * the kept tail (20k) + a summary the chat would re-compact every turn —
- * a burn, not a preference. NO CEILING: a huge threshold just means "fit
- * everything" until the window rule binds.
- */
-export interface CompactionSettings {
-	thresholdTokens?: number;
-}
-
 /** THE record. Every section optional (delta); unknown top-level keys are
  *  preserved verbatim by the sanitizer (forward-compat with newer records). */
 export interface UserSettings {
@@ -351,16 +280,13 @@ export interface UserSettings {
 	/** The strong/cheap/vision model slots (model slots wave, 2026-09-20). */
 	models?: ModelsSettings;
 	appearance?: AppearanceSettings;
-	graph?: GraphSettings;
-	compaction?: CompactionSettings;
 	[key: string]: unknown;
 }
 
 /** Factory defaults for everything core can pin (owner decisions
  *  2026-09-19). NO factory models exist anywhere (owner, 2026-09-22 — BYOK
  *  all the way down): the chat section and every slot stay empty until the
- *  user picks, and the per-need gates refuse honestly; tools default on;
- *  prompts default off — hence their absence here. */
+ *  user picks, and the per-need gates refuse honestly; tools default on. */
 export interface FactorySettings {
 	version: number;
 	appearance: {
@@ -375,8 +301,6 @@ export interface FactorySettings {
 			italicColor: string | null;
 		};
 	};
-	graph: Required<GraphSettings>;
-	compaction: Required<CompactionSettings>;
 }
 
 export const FACTORY_SETTINGS: FactorySettings = {
@@ -389,14 +313,7 @@ export const FACTORY_SETTINGS: FactorySettings = {
 		sessionNameSerif: true,
 		mdRendering: { headingWeight: 900, boldColor: null, italicColor: null },
 	},
-	graph: { enabled: true, rendering: true, extractionChunkTokens: 4096 },
-	compaction: { thresholdTokens: 150_000 },
 };
-
-/** The chunk budget's validated floor (GraphSettings.extractionChunkTokens
- *  — see its doc for the penny-batch rationale; the settings PUT names this
- *  in its rejection, the sanitizer clamps to it). */
-export const EXTRACTION_CHUNK_TOKENS_FLOOR = 500;
 
 // ─── Sanitizer ─────────────────────────────────────────────────────────────
 
@@ -431,6 +348,15 @@ const THINKING_LEVELS: readonly ThinkingLevel[] = [
 	"max",
 ];
 
+/** A Claude model the app does not offer (a slot saved as
+ *  claude-haiku-5-5 or claude-sonnet-5-5 before Opus became the only one)
+ *  reads as the one it offers, on the same account: no Claude account runs
+ *  any other, so a job on that slot would fail at once. Pure. */
+function offeredModel(model: { provider: string; id: string }): { provider: string; id: string } {
+	if (!isClaudeProvider(model.provider) || (CLAUDE_MODEL_IDS as readonly string[]).includes(model.id)) return model;
+	return { provider: model.provider, id: CLAUDE_ROLE_DEFAULT.id };
+}
+
 function sanitizeRoleOverride(raw: unknown): RoleModelOverride | undefined {
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
 	const r = raw as Record<string, unknown>;
@@ -442,10 +368,10 @@ function sanitizeRoleOverride(raw: unknown): RoleModelOverride | undefined {
 		typeof (r.model as Record<string, unknown>).provider === "string" &&
 		typeof (r.model as Record<string, unknown>).id === "string"
 	) {
-		out.model = {
+		out.model = offeredModel({
 			provider: (r.model as { provider: string }).provider,
 			id: (r.model as { id: string }).id,
-		};
+		});
 	}
 	if (typeof r.thinkingLevel === "string" && THINKING_LEVELS.includes(r.thinkingLevel as ThinkingLevel)) {
 		out.thinkingLevel = r.thinkingLevel as ThinkingLevel;
@@ -488,8 +414,6 @@ function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
 	}
 	const tools = sanitizeBooleanMap(raw.tools);
 	if (tools) out.tools = tools;
-	const prompts = sanitizeBooleanMap(raw.prompts);
-	if (prompts) out.prompts = prompts;
 	// Prober graph tools (wave 7): its own agent-section subsection —
 	// lenient read side (a bad shape drops the key and the default ON
 	// resumes; the write side's parser is strict).
@@ -529,47 +453,6 @@ function sanitizeAppearance(raw: Record<string, unknown>): AppearanceSettings {
 	return out;
 }
 
-function sanitizeGraph(raw: Record<string, unknown>): GraphSettings {
-	// Wave 7 collapse (owner ruling 2026-09-23): the section is the master
-	// switch ONLY. The dead rungs' keys (embedding/clustering/labeling/
-	// embeddingModel) in existing records are simply UNREAD and DROPPED by
-	// this reconstruction — the migration story: the next graph-section
-	// write (PUT is replace-whole) persists the collapsed shape, and no
-	// active code ever looks at the stale fields.
-	//
-	// extractionChunkTokens (extraction-UX redesign, 2026-09-24): the chunk
-	// budget — clamp-never-reject (the bd68486 discipline): a finite
-	// positive number floors to EXTRACTION_CHUNK_TOKENS_FLOOR (fractions
-	// floor to integers), anything else drops to the factory default at
-	// resolution. A disk record below the floor (older app, hand edit)
-	// clamps UP — the floor is a cost protection, not data to honor.
-	const out: GraphSettings = {};
-	const enabled = boolOrDrop(raw.enabled);
-	if (enabled !== undefined) out.enabled = enabled;
-	const rendering = boolOrDrop(raw.rendering);
-	if (rendering !== undefined) out.rendering = rendering;
-	const rawTokens = raw.extractionChunkTokens;
-	if (typeof rawTokens === "number" && Number.isFinite(rawTokens) && rawTokens > 0) {
-		out.extractionChunkTokens = Math.max(EXTRACTION_CHUNK_TOKENS_FLOOR, Math.floor(rawTokens));
-	}
-	return out;
-}
-
-/** clamp-never-reject (the sanitizer's discipline): a finite positive
- *  number floors to COMPACTION_THRESHOLD_FLOOR, anything else drops (the
- *  factory default resolves at read time). Exported for the PUT parser's
- *  reject-with-rationale (the graph chunk-budget precedent). */
-export const COMPACTION_THRESHOLD_FLOOR = 32_000;
-
-function sanitizeCompaction(raw: Record<string, unknown>): CompactionSettings {
-	const out: CompactionSettings = {};
-	const rawTokens = raw.thresholdTokens;
-	if (typeof rawTokens === "number" && Number.isFinite(rawTokens) && rawTokens > 0) {
-		out.thresholdTokens = Math.max(COMPACTION_THRESHOLD_FLOOR, Math.floor(rawTokens));
-	}
-	return out;
-}
-
 /**
  * Coerce arbitrary JSON (disk file, network body) into a valid delta record:
  * known fields validated strictly (invalid ones drop/clamp per module doc),
@@ -591,12 +474,6 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	if (r.models !== null && typeof r.models === "object" && !Array.isArray(r.models)) {
 		const models = sanitizeModels(r.models as Record<string, unknown>);
 		if (Object.keys(models).length) out.models = models;
-	}
-	if (r.graph !== null && typeof r.graph === "object" && !Array.isArray(r.graph)) {
-		out.graph = sanitizeGraph(r.graph as Record<string, unknown>);
-		if (r.compaction !== undefined && r.compaction !== null && typeof r.compaction === "object") {
-			out.compaction = sanitizeCompaction(r.compaction as Record<string, unknown>);
-		}
 	}
 	// Unknown top-level keys ride along untouched (forward-compat). One
 	// known-DEAD key is stripped instead of riding: `chat` (the old

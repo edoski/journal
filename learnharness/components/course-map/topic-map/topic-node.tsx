@@ -3,11 +3,12 @@
 import { createContext, useContext, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { CircleXIcon, HistoryIcon, type LucideIcon } from "lucide-react";
+import { BookmarkIcon, CircleXIcon, HistoryIcon, type LucideIcon } from "lucide-react";
 import type { CourseMapTopic, TopicHandle } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { TopicGlyph } from "./topic-glyph";
-import { CURRENT_TAG, type Need, type Standing } from "./topic-standing";
+import { CURRENT_TAG, type Standing, type Status } from "./topic-standing";
+import { MathText } from "@/components/ui/math-text";
 
 /** What the map hands each node: the topic, what the card says, and where
  *  a click goes. */
@@ -16,7 +17,8 @@ export type TopicFlowNode = Node<
 		topic: CourseMapTopic;
 		current: boolean;
 		standing: Standing;
-		need: Need | null;
+		/** What the card says under its title in place of the standing. */
+		status: Status | null;
 		/** The topic's name for a screen reader, and its prerequisites by name. */
 		label: string;
 		needs: string | null;
@@ -41,22 +43,61 @@ export interface TopicMapState {
 export const TopicMapContext = createContext<TopicMapState | null>(null);
 
 /** One icon per kind of need, the ones Today's rows and the sidebar use. */
-const NEED_ICON: Record<Need["kind"], LucideIcon> = { slip: CircleXIcon, review: HistoryIcon };
+const NEED_ICON: Record<Status["kind"], LucideIcon> = { slip: CircleXIcon, review: HistoryIcon, task: BookmarkIcon };
+
+/** A status as Home's rows draw a reason: a 12px icon, then its words,
+ *  on a caption line whose middle is the words' cap height. */
+function StatusMark({ status }: { status: Status }) {
+	const Icon = NEED_ICON[status.kind];
+	return (
+		<span data-slot="topic-need" data-kind={status.kind} className="flex h-3.5 min-w-0 items-center gap-1 text-caption text-muted-foreground">
+			<Icon aria-hidden="true" className="size-3 shrink-0" />
+			<span className="truncate">
+				<MathText>{status.words}</MathText>
+			</span>
+		</span>
+	);
+}
+
+/**
+ * What a node holds (spec: topic-map.md, Node): Home's pie centred beside
+ * two lines, as a hybrid row centres its pie beside its course and lesson.
+ * The title on one 18px line, so a formula in it never makes the line
+ * taller; under it, on its left edge, the status, or else where he stands
+ * in words.
+ */
+export function NodeBody({ topic, standing, status }: { topic: CourseMapTopic; standing: Standing; status: Status | null }) {
+	return (
+		<span className="flex w-full min-w-0 items-center gap-4">
+			<TopicGlyph standing={standing} />
+			<span className="flex min-w-0 flex-1 flex-col gap-1">
+				<span className={cn("block h-4.5 truncate text-row font-medium", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>
+					<MathText>{topic.title}</MathText>
+				</span>
+				{status ? (
+					<StatusMark status={status} />
+				) : (
+					<span data-slot="topic-standing" className="block h-3.5 truncate text-caption text-muted-foreground">
+						{standing.words}
+					</span>
+				)}
+			</span>
+		</span>
+	);
+}
 
 /** The open's per-layer stagger, capped so the whole entrance ends under 300ms. */
 const STAGGER_MS = 15;
 const STAGGER_CAP_MS = 110;
 
 /**
- * One topic on the map (spec: topic-map.md): its pie, its title, and one
- * line only when it needs him. A link to the topic's page.
+ * One topic on the map (spec: topic-map.md): one card, its pie beside its
+ * title and one line under it. A link to the topic's page.
  */
 export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 	const state = useContext(TopicMapContext);
-	const { topic, current, standing, need, label, needs, href, layer } = data;
-	const started = topic.level !== "new";
+	const { topic, current, standing, status, label, needs, href, layer } = data;
 	const dim = state?.lit ? !state.lit.has(topic.handle) : false;
-	const NeedIcon = need ? NEED_ICON[need.kind] : null;
 	return (
 		<div
 			className={cn(
@@ -88,24 +129,13 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 				onBlur={() => state?.onActive(null)}
 				onKeyDown={(event) => state?.onKeyDown(topic.handle, event)}
 				className={cn(
-					"pointer-events-auto flex size-full cursor-pointer items-center rounded-lg border px-3 outline-none transition-colors duration-150 motion-reduce:transition-none",
-					"hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-					started ? "border-border bg-card" : "border-white/6 bg-background",
+					"pointer-events-auto flex size-full cursor-pointer rounded-lg border outline-none transition-colors duration-150 motion-reduce:transition-none",
+					"hover:border-white/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+					"items-center border-border bg-card px-3",
 					current && "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)] hover:border-ring",
 				)}
 			>
-				<span className="flex min-w-0 items-start gap-2">
-					<TopicGlyph standing={standing} className="mt-px" />
-					<span className="flex min-w-0 flex-col gap-0.5">
-						<span className={cn("line-clamp-2 text-row font-medium", started ? "text-foreground" : "text-muted-foreground")}>{topic.title}</span>
-						{need && NeedIcon && (
-							<span data-slot="topic-need" data-kind={need.kind} className="flex min-w-0 items-center gap-1 text-caption text-muted-foreground">
-								<NeedIcon aria-hidden="true" className="size-3 shrink-0" />
-								<span className="truncate">{need.words}</span>
-							</span>
-						)}
-					</span>
-				</span>
+				<NodeBody topic={topic} standing={standing} status={status} />
 			</Link>
 			<Handle type="target" position={Position.Top} isConnectable={false} className="invisible" />
 			<Handle type="source" position={Position.Bottom} isConnectable={false} className="invisible" />

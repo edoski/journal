@@ -1,6 +1,6 @@
-# Composer (proposed variant)
+# Composer
 
-`<Composer variant="proposed" toolbar={…} />`: the message field as one rounded surface, shared by Today, the draft at `/chat/new` and (phase 3) the lesson dock. `data-slot="composer"`; the toolbar row `data-slot="composer-toolbar"`, the send button `data-slot="composer-send"`. The host draws no shell around it. Without `variant`, the current composer renders unchanged.
+`<Composer toolbar={…} />`: the message field as one rounded surface, shared by New lesson, the draft at `/chat/new` and the lesson dock. `data-slot="composer"`; the toolbar row `data-slot="composer-toolbar"`, the send button `data-slot="composer-send"`. The host draws no shell around it.
 
 ## Anatomy
 
@@ -22,7 +22,7 @@
 | control focus-visible | 2px `ring` (send and next problem offset 2px from the surface) |
 | hover (toolbar pills) | `fill-hover`, ink to `foreground` |
 
-Enter sends, Shift+Enter is a newline, ⌘/Ctrl+Enter sends; the stop and next-problem rules are `enterAction`'s, shared with the current composer.
+Enter sends, Shift+Enter is a newline, ⌘/Ctrl+Enter sends; the stop and next-problem rules are `enterAction`'s.
 
 ## Sources
 

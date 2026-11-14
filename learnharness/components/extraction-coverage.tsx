@@ -3,29 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivity } from "@/components/activity-dock";
 import { useServerEvent } from "@/components/server-events";
-import { usePopoverDismiss } from "@/components/popover-dismiss";
-import { useSettingsSaved } from "@/components/settings-signal";
 import { formatTokens } from "@/components/usage-format";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
-import { timeAgo } from "@/components/sidebar";
-import { resolveSettings } from "@/src/core";
-import { cn } from "@/lib/utils";
+import { timeAgo } from "@/components/time-ago";
+import { EXTRACTION_CHUNK_TOKENS } from "@/src/core";
 
 /**
  * The extraction-coverage surfaces (extraction-UX redesign, owner-locked
  * dispatch 2026-09-24): the ring meter in the chat top bar and the coverage
- * block in the sidebar's session context menu — the two replacements for
+ * item in the session menu (unit-inbox/coverage-menu-item.tsx) — the two replacements for
  * the graph view's coverage panel (components/graph-coverage.tsx, retired
  * with this wave). Coverage is the SAME derivation, scoped to one session:
  * GET /api/chats/[id] now carries `coverage` (Platform's eed4b4e).
  *
- * The ring fills with uncoveredTokens / extractionChunkTokens — the chunk
- * budget the threshold setting (Graph ▸ extractionChunkTokens) pins: the
- * meter is "how close this session is to firing its next extraction run".
- * It DRAINS as a run folds (coverage re-derives per request), pulses while
- * a run is in flight, and vanishes entirely when the graph is off (the
- * master kill-switch means no extraction, so no meter).
+ * The ring fills with uncoveredTokens / EXTRACTION_CHUNK_TOKENS — the
+ * number the extraction trigger waits for: the meter is "how close this
+ * session is to firing its next extraction run". It DRAINS as a run folds
+ * (coverage re-derives per request) and pulses while a run is in flight.
  *
  * The manual affordance stays POST /api/graph/coverage/extract {chatId}
  * (409 = already running, BENIGN — the trigger raced us; the dock's
@@ -57,31 +52,6 @@ async function fetchCoverage(chatId: string): Promise<SessionCoverage | null> {
 	}
 }
 
-/** The ring's denominator + visibility, resolved through the SAME core
- *  resolver the server's effective settings use (fix, 2026-10-02): the
- *  meter denominates at exactly the number the extraction trigger waits
- *  for — the old hand-rolled `?? 4096` fallback drifted from the factory
- *  default (8192) and the ring filled at half the truth. Null on fetch
- *  failure → no ring. */
-export interface GraphRead {
-	enabled: boolean;
-	chunkTokens: number;
-}
-
-/** Exported for the render pin (the ringFill precedent): resolves the
- *  raw settings delta to the factory-true graph section. */
-export async function fetchGraphRead(): Promise<GraphRead | null> {
-	try {
-		const res = await fetch("/api/settings");
-		if (!res.ok) return null;
-		const body = (await res.json()) as { settings?: Parameters<typeof resolveSettings>[0] };
-		const graph = resolveSettings(body.settings ?? null).graph;
-		return { enabled: graph.enabled, chunkTokens: graph.extractionChunkTokens };
-	} catch {
-		return null;
-	}
-}
-
 /** The manual-extract seam, shared by both surfaces. 409 is BENIGN (the
  *  run is already in flight) — returns "running" so the caller flips to the
  *  optimistic/running state instead of an error. Returns false only on a
@@ -100,26 +70,11 @@ async function requestExtract(chatId: string): Promise<boolean> {
 	}
 }
 
-// ─── The sidebar context menu's coverage block ──────────────────────────────
-
-/**
- * The info block at the bottom of the session context menu (owner-locked
- * redesign): what the extractor hasn't covered yet, plus the manual Extract
- * affordance — visually separated from Rename/Delete below (those stay the
- * two session-management actions). Fetched ON MENU OPEN (the block mounts
- * with the menu — on-demand, never eagerly), and re-read as each batch of
- * a run merges so the numbers settle live. No coverage (fetch failed, 404):
- * the whole block renders nothing — no fake zeros.
- */
-export function CoverageMenuBlock({ chatId }: { chatId: string }) {
-	const { coverage, extracting, extract } = useSessionCoverage(chatId);
-	if (coverage === null) return null;
-	return <CoverageMenuBody coverage={coverage} extracting={extracting} onExtract={extract} />;
-}
+// ─── The session menu's coverage item ──────────────────────────────────────
 
 /** One session's coverage while its menu is open, and the manual Extract:
- *  the block's data, shared by both designs' menus. `coverage` stays null
- *  until the first read lands, and when it fails. */
+ *  the menu item's data. `coverage` stays null until the first read lands,
+ *  and when it fails (the item then renders nothing — no fake zeros). */
 export function useSessionCoverage(chatId: string): {
 	coverage: SessionCoverage | null;
 	extracting: boolean;
@@ -145,7 +100,7 @@ export function useSessionCoverage(chatId: string): {
 		setCoverage(next);
 	}, [chatId]);
 
-	// On MENU OPEN (the block mounts with the menu — on-demand, never
+	// On MENU OPEN (the item mounts with the menu — on-demand, never
 	// eagerly): one read, then one per merged batch and per run change.
 	useEffect(() => {
 		lastUncoveredRef.current = null;
@@ -172,7 +127,7 @@ export function useSessionCoverage(chatId: string): {
 	return { coverage, extracting, extract: () => void onExtract() };
 }
 
-/** The Proposed menu's one coverage item (components/ui/menu.md): its label,
+/** The session menu's one coverage item: its label,
  *  the backlog as its detail while there is one, and whether Extract can
  *  run. Pure. */
 export function coverageItem(
@@ -192,53 +147,6 @@ export function coverageItem(
 	};
 }
 
-/** The block's presentational core (exported for static-render tests):
- *  the numbers, the running pulse, and the Extract affordance with its
- *  optimistic "Running" state. */
-export function CoverageMenuBody({
-	coverage,
-	extracting,
-	onExtract,
-}: {
-	coverage: SessionCoverage;
-	/** Click-pending (optimistic) until the server says running. */
-	extracting: boolean;
-	onExtract: () => void;
-}) {
-	const busy = coverage.running || extracting;
-	const complete = coverage.uncoveredTokens === 0 && coverage.uncoveredCount === 0;
-	return (
-		<div data-testid="ctx-coverage" className="flex flex-col gap-1 px-2.5 pt-1 pb-2">
-			{busy ? (
-				<span className="flex items-center gap-1.5 text-muted-foreground" data-testid="ctx-coverage-running">
-					<span className="size-1.5 animate-pulse rounded-full bg-foreground/70" aria-hidden />
-					extracting…
-				</span>
-			) : complete ? (
-				<span className="text-muted-foreground">fully extracted</span>
-			) : (
-				<span className="flex flex-col">
-					<span className="tabular-nums text-foreground">
-						{formatTokens(coverage.uncoveredTokens)} tok uncovered
-					</span>
-					<span className="tabular-nums text-muted-foreground">
-						{coverage.uncoveredCount} message{coverage.uncoveredCount === 1 ? "" : "s"} unextracted
-					</span>
-				</span>
-			)}
-			<button
-				type="button"
-				data-testid="ctx-extract"
-				onClick={onExtract}
-				disabled={busy || complete}
-				className="flex items-center justify-center rounded-lg border px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent"
-			>
-				{busy ? "Running" : "Extract"}
-			</button>
-		</div>
-	);
-}
-
 // ─── The chat top bar's ring meter ──────────────────────────────────────────
 
 /** The donut's geometry (pure, exported for tests): the fill fraction
@@ -249,7 +157,7 @@ export function ringFill(uncoveredTokens: number, chunkTokens: number): number {
 }
 
 /**
- * The ring meter (owner-locked: "a donut next to the PhaseChip"): how
+ * The ring meter (owner-locked: "a donut next to the phase label"): how
  * close this session is to its next extraction run. Click → the exact
  * numbers (covered/uncovered tokens, messages, the threshold, the last
  * fold). Vanishes entirely while the graph is disabled or before the
@@ -262,19 +170,11 @@ export function ringFill(uncoveredTokens: number, chunkTokens: number): number {
  * coverage-changed (the ring drains as the fold lands) + the settings signal (the
  * threshold/kill-switch re-read live).
  */
-export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
+export function CoverageRing({ chatId, refreshKey = 0 }: {
 	chatId: string;
 	refreshKey?: number;
-	/** "proposed": the numbers open in the shared popover (popover.md). */
-	variant?: "current" | "proposed";
 }) {
-	const proposed = variant === "proposed";
-	const [graph, setGraph] = useState<GraphRead | null>(null);
 	const [coverage, setCoverage] = useState<SessionCoverage | null>(null);
-	const [open, setOpen] = useState(false);
-	const [nonce, setNonce] = useState(0);
-	const rootRef = useRef<HTMLDivElement>(null);
-	usePopoverDismiss(rootRef, open && !proposed, () => setOpen(false));
 
 	// The activity/refresh chain (the dispatch's seam): runs can fire from
 	// OTHER surfaces (the sidebar menu's Extract, the turn pipeline, another
@@ -284,25 +184,13 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 	const feed = useActivity().feed;
 	const runHere = feed.extractions.some((run) => run.chatId === chatId);
 
-	useSettingsSaved((section) => {
-		if (section === "graph") setNonce((n) => n + 1);
-	});
-
-	useEffect(() => {
-		let alive = true;
-		void fetchGraphRead().then((g) => alive && setGraph(g));
-		return () => {
-			alive = false;
-		};
-	}, [nonce]);
-
 	useEffect(() => {
 		let alive = true;
 		void fetchCoverage(chatId).then((c) => alive && setCoverage(c));
 		return () => {
 			alive = false;
 		};
-	}, [chatId, refreshKey, nonce, runHere]);
+	}, [chatId, refreshKey, runHere]);
 
 	// While a run is in flight the ring DRAINS batch by batch: each merged
 	// batch announces coverage-changed for its chat. The run settling at
@@ -314,59 +202,27 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 		});
 	});
 
-	// Vanishes entirely when the graph is off, or before the first honest
-	// read (no fake zeros — the doctrine).
-	if (graph === null || !graph.enabled || coverage === null) return null;
+	// Nothing before the first honest read (no fake zeros — the doctrine).
+	if (coverage === null) return null;
 
-	const fill = ringFill(coverage.uncoveredTokens, graph.chunkTokens);
-	if (proposed) {
-		return (
-			<Popover open={open} onOpenChange={setOpen}>
-				<Hint label="How much of this session isn't mapped yet" side="bottom">
-					<PopoverTrigger asChild>
-						<button
-							type="button"
-							data-testid="coverage-ring"
-							className="relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							<CoverageRingGlyph fill={fill} running={coverage.running} />
-						</button>
-					</PopoverTrigger>
-				</Hint>
-				<PopoverContent align="end" data-testid="coverage-ring-popover" className="w-64 p-3">
-					<CoverageRingDetail coverage={coverage} chunkTokens={graph.chunkTokens} variant="proposed" />
-				</PopoverContent>
-			</Popover>
-		);
-	}
+	const fill = ringFill(coverage.uncoveredTokens, EXTRACTION_CHUNK_TOKENS);
 	return (
-		<div ref={rootRef} className="lh-no-drag relative shrink-0">
-			<Hint
-				// Trimmed (owner, subtlety round 2026-09-25).
-				label="How much of this session isn't mapped yet"
-				side="bottom"
-			>
-				<button
-					type="button"
-					data-testid="coverage-ring"
-					onClick={() => setOpen((o) => !o)}
-					aria-expanded={open}
-					className="relative flex size-5 cursor-pointer items-center justify-center transition-opacity hover:opacity-80"
-				>
-					{/* The donut: track + fill. The whole ring pulses while a run
-					    is in flight (motion = the working-state signal). */}
-					<CoverageRingGlyph fill={fill} running={coverage.running} />
-				</button>
+		<Popover>
+			<Hint label="How much of this session isn't mapped yet" side="bottom">
+				<PopoverTrigger asChild>
+					<button
+						type="button"
+						data-testid="coverage-ring"
+						className="relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						<CoverageRingGlyph fill={fill} running={coverage.running} />
+					</button>
+				</PopoverTrigger>
 			</Hint>
-			{open && (
-				<div
-					data-testid="coverage-ring-popover"
-					className="absolute top-full right-0 z-40 mt-1.5 w-64 rounded-xl border bg-card p-3 text-xs shadow-xl"
-				>
-					<CoverageRingDetail coverage={coverage} chunkTokens={graph.chunkTokens} />
-				</div>
-			)}
-		</div>
+			<PopoverContent align="end" data-testid="coverage-ring-popover" className="w-64 p-3">
+				<CoverageRingDetail coverage={coverage} chunkTokens={EXTRACTION_CHUNK_TOKENS} />
+			</PopoverContent>
+		</Popover>
 	);
 }
 
@@ -400,22 +256,14 @@ export function CoverageRingGlyph({ fill, running }: { fill: number; running: bo
 /** The popover body (exported for static-render tests): the exact numbers —
  *  covered/uncovered tokens, message coverage, the threshold, the last
  *  fold's age. */
-export function CoverageRingDetail({ coverage, chunkTokens, variant = "current" }: {
+export function CoverageRingDetail({ coverage, chunkTokens }: {
 	coverage: SessionCoverage;
 	chunkTokens: number;
-	/** "proposed": the popover's sentence-case title over 13px rows. */
-	variant?: "current" | "proposed";
 }) {
 	return (
 		<>
-			{variant === "proposed" ? (
-				<PopoverTitle className="mb-2">Extraction coverage</PopoverTitle>
-			) : (
-				<div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-					Extraction coverage
-				</div>
-			)}
-			<div className={cn("flex flex-col gap-1 text-muted-foreground", variant === "proposed" && "text-row")}>
+			<PopoverTitle className="mb-2">Extraction coverage</PopoverTitle>
+			<div className="flex flex-col gap-1 text-row text-muted-foreground">
 				<div className="flex justify-between gap-2">
 					<span>Uncovered</span>
 					<span className="tabular-nums text-card-foreground">

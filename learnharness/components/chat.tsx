@@ -5,7 +5,7 @@ import { useChatSession } from "@/components/session";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
-import { useModelSetup, selectedModelUnavailable, openModelPicker, ZeroKeysPill } from "@/components/setup-cta";
+import { useModelSetup, selectedModelUnavailable, openModelPicker, SignInPill } from "@/components/setup-cta";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
 	Conversation,
@@ -14,18 +14,13 @@ import {
 	ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
-import { Shimmer } from "@/components/ai-elements/shimmer";
-import { BrailleSpinner } from "@/components/braille-spinner";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
-import { Separator } from "@/components/ui/separator";
 import { AnsweredCard } from "@/components/answered-card";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { ChatSessionComposer } from "@/components/composer";
 import { useEnterSubmits } from "@/components/enter-submits";
-import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { dockStateKey } from "@/components/dock-state-key";
 import { clearOpeningPrompt, readOpeningPromptEntry, stashOpeningPrompt, OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { takeLessonMessage } from "@/components/lesson-message";
@@ -33,7 +28,6 @@ import { forwardDockWheel, useDockHeight } from "@/components/dock-height";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
-import { StatsBar } from "@/components/stats-bar";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import {
 	isProviderKeyRefusal,
@@ -43,15 +37,12 @@ import {
 	textPartMessageId,
 	kbdEventForAction as kbdEventForChat,
 	type ChatInput,
-	type ChatSettings,
 	type LhMessage,
 	type ModelSlotName,
 } from "@/src/core";
-import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
-import { PlanMarginalia, planExists } from "@/components/plan-window";
+import { latestTree } from "@/components/lesson/plan-facts";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
-import { ArrowRightIcon, DumbbellIcon, WaypointsIcon } from "lucide-react";
 import type { PlanBlockData } from "@/src/core";
 import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
@@ -63,14 +54,9 @@ import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, JobRecord, PracticeRequest, PracticeRequestDetails, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
-import { CHIP_LABEL, ModeDivider, PhaseChip, PhaseDivider } from "@/components/phase-divider";
-import {
-	CompactionCutDivider,
-	CompactionMomentDivider,
-	type CompactionDividerData,
-} from "@/components/compaction-divider";
+import { CHIP_LABEL, ModeDivider, PhaseDivider } from "@/components/phase-divider";
+import { CompactionCutDivider } from "@/components/compaction-divider";
 import { CoverageRing } from "@/components/extraction-coverage";
-import { Button } from "@/components/ui/button";
 import {
 	activeProblemOf,
 	pendingQuestionOf,
@@ -89,9 +75,9 @@ import {
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
-import { useDesignVariant } from "@/components/design-variant";
-import { LessonDesignContext } from "@/components/lesson/lesson-design";
+import { ActiveProblemContext } from "@/components/lesson/active-problem";
 import { LessonDetails, LessonTopBar } from "@/components/lesson/lesson-top-bar";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { PlanCard, PlanPanel } from "@/components/lesson/plan-map";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
@@ -100,26 +86,6 @@ import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 
-/** One width for everything: transcript, cards, and the bottom blob share this column. */
-/**
- * Width tokens (wave-5 reskin, owner decision): the teaching PROSE spans the
- * full session width with a thin px-6 margin; the composer/question DOCK is
- * deliberately narrower (~46rem centered) per the reference. Same ELEMENT,
- * same place — width polish only.
- */
-const COLUMN = "mx-auto w-full max-w-none px-6";
-const DOCK = "mx-auto w-full max-w-[46rem] px-4";
-// The DOCK container's fixed width (46rem) and the plan marginalia's
-// geometry (owner, plan-placement round): the bare diagram sits in the
-// dock band's RIGHT flank — MARGIN_GAP from the DOCK container's edge and
-// the same from the column's right edge. The box width is pure CSS, so
-// the diagram shrinks CONTINUOUSLY with the flank; MARGIN_MIN_W is only
-// the fade floor (owner, resize round) — below it the marginalia fades
-// out over the normal transition instead of popping away, and it stays
-// mounted while the question owns the band so widening fades it back.
-const DOCK_W = 46 * 16;
-const MARGIN_GAP = 16;
-const MARGIN_MIN_W = 220;
 // The dock overlay's gradient band (h-24) — part of the reserved tail.
 const GRADIENT_H = 96;
 // Fold thresholds (owner, scroll round 1, tuned round 3): pixel distance
@@ -198,20 +164,6 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 
 /** A wake-pipeline steer message: user-role delivery whose metadata marks it
  * as a sub-agent result — rendered as an artifact card, never a bubble. */
-/** The quiet system line (custom-message scheme rendering): centered, muted,
- *  small — the transcript's voice for events that are not speech (wake
- *  scaffolding). */
-function SystemLine({ children, testId }: { children: React.ReactNode; testId?: string }) {
-	return (
-		<div
-			data-testid={testId}
-			className="flex items-center justify-center gap-1.5 py-1 text-xs text-muted-foreground"
-		>
-			{children}
-		</div>
-	);
-}
-
 function isSubagentSteer(m: LhViewMessage): boolean {
 	return (m.metadata as { subagentResult?: unknown } | undefined)?.subagentResult != null;
 }
@@ -273,11 +225,6 @@ export function Chat({
 	// settled terminal's callback — a stable ref assigned below, once
 	// syncFromServer exists (refs, not closures: no stale capture).
 	const reattachSettledRef = useRef<() => void>(() => {});
-	// The one read of the design switch for the whole session surface
-	// (components/design-variant.ts); every part below gets it as a prop
-	// or, for registry-rendered parts, through LessonDesignContext.
-	const design = useDesignVariant();
-	const proposed = design === "proposed";
 	const { open: openSettings } = useSettingsDialog();
 
 	// THE SESSION HOOK (Wave D, owner-approved 2026-09-26): the app-owned
@@ -612,7 +559,7 @@ export function Chat({
 	}, []);
 	// Saved slot completeness is live, but the session's selected route
 	// comes from its own ordinary model control, never today's Strong pin.
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const catalogRef = useRef(catalog);
 	catalogRef.current = catalog;
 	const [selectedModel, setSelectedModel] = useState<string | undefined>();
@@ -719,7 +666,7 @@ export function Chat({
 				draftRef.current = null;
 			}
 			clearError();
-			if (keyRefused && catalogRef.current?.providers.some((p) => p.keyPresent)) openModelPicker();
+			if (keyRefused && catalogRef.current?.providers.some((p) => p.connected)) openModelPicker();
 			else setSetupOpen(true);
 		})();
 		return () => {
@@ -852,15 +799,10 @@ export function Chat({
 		}
 	}, [chatId, adoptRecord]);
 
-	// The live plan popup (wave 4): opened by any transcript plan block, the
-	// top-bar plan chip, and the dock band's marginalia.
+	// The live plan panel (wave 4): opened by any transcript plan card or
+	// the top-bar plan chip.
 	const [planOpen, setPlanOpen] = useState(false);
 	const closePlan = useCallback(() => setPlanOpen(false), []);
-	// Real plan presence — gates the marginalia's clickable flank. A JSX
-	// element is always truthy; gating on the node alone mounted a phantom
-	// (invisible, clickable) button in the bottom-right whenever a question
-	// was pending with no plan yet (owner report, UI round 2026-10-01).
-	const hasPlan = useMemo(() => planExists(messages), [messages]);
 	// The coverage ring's refresh chain (extraction-UX redesign): bumped at
 	// turn settle — the moment this session's uncovered mass changes.
 	const [coverageTick, setCoverageTick] = useState(0);
@@ -888,20 +830,19 @@ export function Chat({
 	planOpenRef.current = planOpen;
 	const setupOpenRef = useRef(setupOpen);
 	setupOpenRef.current = setupOpen;
-	// The session's live plan (drives the top-bar chip; the marginalia
-	// derives its own from the same transcript).
+	// The session's live plan (drives the top-bar chip).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 
-	// ── Session usage (wave-4 stats bar) ──
+	// ── Session usage (the lesson's details menu) ──
 	// The money channel: the record's turns log and read-time server Pi
 	// pricing projection. Seeded once on mount (the page doesn't carry turns),
 	// refreshed when the local stream settles (each turn appends to the log
 	// server-side), and kept fresh by syncFromServer whenever it already
-	// fetches the record. No turns yet → the bar renders "—" everywhere.
+	// fetches the record. No turns yet → the labels read "—".
 	const [turns, setTurns] = useState<TurnUsage[]>([]);
 	const [pricing, setPricing] = useState<SessionPricing | undefined>();
 	// The per-chat model control state (model-picker writes via PUT; the
-	// record is the source of truth, lifted here so the stats bar re-renders).
+	// record is the source of truth, lifted here so the details re-render).
 	// The dock's reserved tail height (DockOverlay reports it; the spacer at
 	// the end of the transcript renders it). Lives here because the spacer is
 	// inside the scroller while the dock overlays OUTSIDE it — two parents.
@@ -941,7 +882,7 @@ export function Chat({
 		// branch — the re-fire-on-dep-churn wart, fixed S3).
 		prevStatusRef.current = status;
 		if (!transitioned) return;
-		// immediate: turns-only refetch — the stats bar updates even while
+		// immediate: turns-only refetch — the details update even while
 		// the server's persist/endTurn lags the client by milliseconds
 		void syncTurns();
 		// The coverage ring re-reads at turn settle too (extraction-UX
@@ -1174,19 +1115,17 @@ export function Chat({
 		else void syncFromServer();
 	});
 
-	// Registry-rendered parts read the design and the problem the dock
-	// shows (its transcript card stays out, so the problem reads once).
+	// The problem card reads which problem the dock shows (its transcript
+	// card stays out, so the problem reads once).
 	const activeProblemCallId = activeProblem?.toolCallId ?? null;
-	const lessonDesign = useMemo(() => ({ variant: design, activeProblemCallId }), [design, activeProblemCallId]);
 
-	// The Proposed lesson opens at the latest turn (findings 19): math,
-	// diagrams and the dock settle after the first paint and leave the
-	// scroller short of the bottom; one pass once they have settled.
+	// The lesson opens at the latest turn (findings 19): math, diagrams and
+	// the dock settle after the first paint and leave the scroller short of
+	// the bottom; one pass once they have settled.
 	useEffect(() => {
-		if (!proposed) return;
 		const timers = [150, 600].map((ms) => setTimeout(() => void scrollContextRef.current?.scrollToBottom("instant"), ms));
 		return () => timers.forEach(clearTimeout);
-	}, [proposed, chatId]);
+	}, [chatId]);
 
 	const onSend = () => {
 		if (pending || compacting) return;
@@ -1196,7 +1135,7 @@ export function Chat({
 		if (busy || pending || compacting) return;
 		const t = textRef.current.trim();
 		if (!t) return;
-		if (zeroKeys) {
+		if (unconnected) {
 			setSetupOpen(true);
 			return;
 		}
@@ -1265,7 +1204,7 @@ export function Chat({
 			}}
 		>
 		<JobsContext.Provider value={jobs}>
-		<LessonDesignContext.Provider value={lessonDesign}>
+		<ActiveProblemContext.Provider value={activeProblemCallId}>
 		{/* The session surface: the transcript column (header + scroller) and
 		    the plan-tree panel as full-height SIBLINGS — the panel spans top to
 		    bottom exactly like the left sidebar, and the header (name + phase
@@ -1285,7 +1224,7 @@ export function Chat({
 				    LH wordmark band, so the header's border-b continues that
 				    band's bottom edge as one line across the app (owner, round 6). */}
 				<TopBar
-					size={proposed ? "slim" : "default"}
+					size="slim"
 					// While renaming the bar is NOT a drag surface: app-region:drag
 					// would eat the mousedown, so click-to-escape (below) could
 					// never fire. Rename mode is interactive mode (owner ask) —
@@ -1299,163 +1238,64 @@ export function Chat({
 						if (renaming && e.target !== titleInputRef.current) titleInputRef.current?.blur();
 					}}
 				>
-					{proposed ? (
-						<LessonTopBar
-							title={
-								renaming ? (
-									<input
-										ref={titleInputRef}
-										value={titleDraft}
-										onChange={(e) => setTitleDraft(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") void commitRename(titleDraft);
-											else if (e.key === "Escape") {
-												e.stopPropagation();
-												setRenaming(false);
-											}
-										}}
-										onBlur={() => void commitRename(titleDraft)}
-										spellCheck={false}
-										aria-label="Session title"
-										className="lh-no-drag -mx-1.5 min-w-[8ch] max-w-full shrink-0 rounded-md bg-fill-hover px-1.5 text-control font-medium caret-current outline-none [field-sizing:content]"
-									/>
-								) : (
-									<Hint label="Rename session" action="rename-session" side="bottom">
-										<button
-											type="button"
-											onClick={() => {
-												setTitleDraft(titleText);
-												setRenaming(true);
-											}}
-											className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left text-control font-medium outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-										>
-											{titleText}
-										</button>
-									</Hint>
-								)
-							}
-							course={course?.title}
-							phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
-							plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
-							details={
-								<LessonDetails
-									chatId={chatId}
-									turns={turns}
-									contextTokens={contextTokens}
-									pricing={pricing}
-									selectedModel={selectedModel}
-									onModelChange={setSelectedModel}
-									extraction={mode !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} variant="proposed" /> : undefined}
+					<LessonTopBar
+						title={
+							renaming ? (
+								<input
+									ref={titleInputRef}
+									value={titleDraft}
+									onChange={(e) => setTitleDraft(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") void commitRename(titleDraft);
+										else if (e.key === "Escape") {
+											e.stopPropagation();
+											setRenaming(false);
+										}
+									}}
+									onBlur={() => void commitRename(titleDraft)}
+									spellCheck={false}
+									aria-label="Session title"
+									className="lh-no-drag -mx-1.5 min-w-[8ch] max-w-full shrink-0 rounded-md bg-fill-hover px-1.5 text-control font-medium caret-current outline-none [field-sizing:content]"
 								/>
-							}
-						/>
-					) : (<>
-					{renaming ? (
-						<>
-							<input
-								ref={titleInputRef}
-								value={titleDraft}
-								onChange={(e) => setTitleDraft(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") void commitRename(titleDraft);
-									// stopPropagation claims the Esc (keyboard wave A):
-									// closing rename must not also abort a turn.
-									else if (e.key === "Escape") {
-										e.stopPropagation();
-										setRenaming(false);
-									}
-								}}
-								onBlur={() => void commitRename(titleDraft)}
-								spellCheck={false}
-								aria-label="Session title"
-								title="Rename this session"
-								className="lh-no-drag min-w-[8ch] max-w-[70%] shrink-0 bg-transparent font-title text-3xl tracking-tight caret-current outline-none [field-sizing:content]"
+							) : (
+								<Hint label="Rename session" action="rename-session" side="bottom">
+									<button
+										type="button"
+										onClick={() => {
+											setTitleDraft(titleText);
+											setRenaming(true);
+										}}
+										className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left text-control font-medium outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+									>
+										{titleText}
+									</button>
+								</Hint>
+							)
+						}
+						course={course?.title}
+						courseHref={course ? courseHref(course.workspace) : undefined}
+						phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
+						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
+						details={
+							<LessonDetails
+								chatId={chatId}
+								turns={turns}
+								contextTokens={contextTokens}
+								pricing={pricing}
+								selectedModel={selectedModel}
+								onModelChange={setSelectedModel}
+								extraction={mode !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
 							/>
-							{/* flex-1 spacer during rename too, so the chips stay at
-							    the right edge; clicks here commit via the header
-							    mousedown handler. */}
-							<div className="min-w-4 flex-1" aria-hidden="true" />
-						</>
-					) : (
-					<>
-						<Hint
-							// F2 renames (registry) — surfaced on the hover.
-							label="Rename session"
-							action="rename-session"
-							side="bottom"
-						>
-<button
-							type="button"
-														onClick={() => {
-								setTitleDraft(titleText);
-								setRenaming(true);
-							}}
-							className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left font-title text-3xl tracking-tight transition-colors hover:bg-accent"
-						>
-							{titleText}
-							</button>
-						</Hint>
-						{course && (
-							<span data-testid="course-label" className="min-w-0 shrink truncate font-ui text-xs text-muted-foreground">
-								{course.title}
-							</span>
-						)}
-							{/* flex-1 spacer: keeps the chips at the right edge AND stays a
-							    drag surface (no carve-out) — the freed bar is grippable. */}
-							<div className="min-w-4 flex-1" aria-hidden="true" />
-					</>
-					)}
-					{/* The plan chip (owner, plan-placement round): session-level
-					    structure beside the phase chip — access to the full-DAG popup
-					    at every width; the marginalia is the wide-screen glance view. */}
-					{planTree && (
-						<Hint label="Open the full plan" side="bottom">
-<button
-							type="button"
-							data-testid="plan-chip"
-							onClick={(e) => {
-								blurAfterPointerClick(e);
-								setPlanOpen(true);
-							}}
-							className="lh-no-drag flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border/80 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-						>
-							<WaypointsIcon className="size-3.5 text-primary" aria-hidden />
-							Plan
-						</button>
-</Hint>
-					)}
-					{/* The extraction ring (owner-locked redesign, 2026-09-24): fills
-					    with uncovered vs the chunk threshold, pulses while a run is in
-					    flight, vanishes when the graph is off. Click → the exact
-					    numbers. Before the phase label — the chips cluster right. */}
-					{/* Practice (owner, 2026-10-04): the coverage ring hides —
-				    practice never extracts, so an ever-filling ring with no
-				    run behind it would lie. */}
-					{mode !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
-					{/* Practice sessions: no phase arc — a quiet Practice tag
-					    instead of the phase chip. */}
-					{mode === "practice" ? (
-						<span
-							data-testid="phase-chip"
-							data-phase="practice"
-							aria-hidden="true"
-							className="pointer-events-none flex shrink-0 select-none items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-						>
-							<DumbbellIcon className="size-3" />
-							Practice
-						</span>
-					) : (
-						<PhaseChip phase={phases.at(-1) ?? "probe"} />
-					)}
-					</>)}
+						}
+					/>
 				</TopBar>
 
-				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} variant={design} />
+				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
 					<SessionMessageNavigation />
 					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-						<div data-session-find-root="" className={`${proposed ? LESSON_COLUMN : COLUMN} flex flex-1 flex-col gap-4 ${proposed ? "pt-6" : "pt-4"}`}>
+						<div data-session-find-root="" className={`${LESSON_COLUMN} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="New session"
@@ -1474,7 +1314,7 @@ export function Chat({
 								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume") ? (
 								// A session that picks up an earlier lesson opens teaching:
 								// the plan carried over, so no probe or planning came first.
-								<PhaseDivider key={m.id || `m-${mi}`} phase="teach" variant={design} />
+								<PhaseDivider key={m.id || `m-${mi}`} phase="teach" />
 								) : m.role === "user" && m.parts.some((p) => p.type === "data-probe-handoff") ? (
 								// The probe→teach handoff wake (custom-message scheme): the
 								// PLANNING DIVIDER IS the seam (owner ruling 2026-09-26 — it
@@ -1484,11 +1324,11 @@ export function Chat({
 								// Wave D grouping merged the whole probe into one giant
 								// assistant group — is gone). Never a user bubble: the wake is
 								// scaffolding; the model-facing instruction lives in the adapter.
-								<PhaseDivider key={m.id || `m-${mi}`} phase="plan" variant={design} />
+								<PhaseDivider key={m.id || `m-${mi}`} phase="plan" />
 							) : m.role === "user" && m.parts.some((p) => p.type === "data-mode-handoff") ? (
 								// A handoff between teaching and practice: the rule where
 								// the next agent takes over, never a user bubble.
-								<ModeDivider key={m.id || `m-${mi}`} mode={modeHandoffTarget(m)} variant={design} />
+								<ModeDivider key={m.id || `m-${mi}`} mode={modeHandoffTarget(m)} />
 							) : m.role === "user" && m.parts.length > 0 && m.parts.every((p) => p.type.startsWith("data-")) ? (
 								// Marker cards (custom messages, 2026-10-04): user-side
 								// scaffolding — the graph-context pick, the practice
@@ -1502,28 +1342,17 @@ export function Chat({
 										switch (part.type) {
 											case "data-graph-context":
 												return <GraphContextCard key={pi} data={part.data as GraphContextData} />;
-											case "data-compaction":
-												return <CompactionMomentDivider key={pi} data={part.data as CompactionDividerData} variant={design} />;
 											case "data-compaction-cut":
-												return <CompactionCutDivider key={pi} data={part.data as CompactionDividerData} variant={design} />;
+												return <CompactionCutDivider key={pi} />;
 											case "data-practice-thinking":
-												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} variant={design} />;
+												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-request":
-												return <RequestCard key={pi} data={part.data as PracticeRequestDetails} variant={design} />;
+												return <RequestCard key={pi} data={part.data as PracticeRequestDetails} />;
 											case "data-practice-next":
-												// The learner's move-on signal (owner round 16): a compact
-												// centered mono-caps line — chrome, the dismissal register.
-												if (proposed) return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
-												return (
-													<div
-														key={pi}
-														data-testid="practice-next-line"
-														className="my-4 flex items-center justify-center gap-1.5 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground"
-													>
-														<ArrowRightIcon className="size-3" />
-														Next problem
-													</div>
-												);
+												// The learner's move-on signal (owner round 16).
+												return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
+											// data-compaction (the moment the summary ran) stays
+											// unmarked: the cut's hairline is enough.
 											default:
 												return null;
 										}
@@ -1554,49 +1383,19 @@ export function Chat({
 									phases[mi] === "teach" &&
 									phases[mi - 1] !== "teach" &&
 									teachStepIndex(m.parts) === -1 ? (
-										<PhaseDivider key={`teach-${m.id || `m-${mi}`}`} phase="teach" variant={design} />
+										<PhaseDivider key={`teach-${m.id || `m-${mi}`}`} phase="teach" />
 									) : null}
-									{m.role === "user" && proposed ? (
+									{m.role === "user" ? (
 										// The learner's words: a quiet surface, full width (the
 										// transcript reads as a document), no label, set in the
 										// lesson's markdown and math like the tutor's.
 										<div data-testid="user-message" data-slot="learner-message" className="my-1 w-full rounded-xl bg-card px-4 py-3">
 											<MessageResponse className="text-foreground">{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}</MessageResponse>
 										</div>
-									) : m.role === "user" ? (
-										/* THE DOCUMENT ROW (owner round, 2026-10-05): no right-aligned
-										    bubble — the transcript reads as a document. User text is a
-										    full-width quote block: muted "You" label, muted rail,
-										    FULL-opacity text (learner words are content, not whisper).
-										    Distinguished from user thinking at a glance: thinking is
-										    collapsed + 50% italic; this is upright and present.
-										    User text renders plain — the model's LaTeX pipeline is not
-										    applied to learner-authored text ($ stays $, no surprises).
-										    Rendered WITHOUT the Message wrapper — that is the bubble. */
-											<div
-										data-testid="user-message"
-										/* THE DOCUMENT, ALL-IN (owner rounds two+three, 2026-10-07):
-										    no chat side — the user message is a full-width card-color
-										    BAND, the IDENTICAL geometry as the thinking rows: 5px band
-										    padding, the left gap matches it, the rail fills the 3ch
-										    inset (the band is the authorship mark against the agent's
-										    transparent prose). The "You" label stays — one register
-										    with the thinking labels. */
-										className="my-2 w-full border-l-[calc(3ch-14px)] border-muted-foreground/30 bg-card py-1 pl-[14px] pr-4 font-ui text-xs"
-									>
-												{/* The rail GROUPS (owner round 4, 2026-10-05): the YOU heading
-												    sits INSIDE the rail, same mono-xs register and same 1ch
-												    rail as the thinking rows — one quote geometry. */}
-												<div className="font-medium uppercase tracking-wide text-muted-foreground">You</div>
-												<div className="lh-prose whitespace-pre-wrap text-foreground">
-													{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
-												</div>
-											</div>
 									) : (
 									<Message from="assistant" className="max-w-full">
 									<MessageContent className="w-full">
 											{m.parts.map((part, pi) => {
-												const isLastPart = mi === messages.length - 1 && pi === m.parts.length - 1;
 												// The step boundary where teaching begins (round 8): when
 												// the teach flip happens in a LATER step, its PhaseDivider
 												// replaces this boundary's plain hairline.
@@ -1618,14 +1417,9 @@ export function Chat({
 													part.type.startsWith("tool-") &&
 													part.errorText !== "Operation aborted"
 												) {
-													// The Proposed lesson keeps the agent's retry loop out of
-													// the column: the turn's own activity line covers it.
-													if (proposed) return null;
-													return (
-														<SystemLine key={`retry-${pi}`} testId="tool-retry">
-															Retrying…
-														</SystemLine>
-													);
+													// The lesson keeps the agent's retry loop out of the
+													// column: the turn's own activity line covers it.
+													return null;
 												}
 												switch (part.type) {
 													case "text": {
@@ -1639,30 +1433,14 @@ export function Chat({
 													}
 													case "reasoning":
 														// Agent chrome out (owner): the tutor's thinking never
-														// shows in the Proposed lesson.
-														if (proposed) return null;
-														return (
-															<Reasoning key={pi} isStreaming={status === "streaming" && isLastPart} className="mb-2">
-																<ReasoningTrigger />
-																<ReasoningContent>{part.text ?? ""}</ReasoningContent>
-															</Reasoning>
-														);
+														// shows in the lesson.
+														return null;
 													case "step-start":
-														if (teachBoundary)
-															return <PhaseDivider key={`teach-step-${pi}`} phase="teach" variant={design} />;
-														if (proposed) return null;
-														return pi > 0 ? <Separator key={pi} className="my-3" /> : null;
+														return teachBoundary ? <PhaseDivider key={`teach-step-${pi}`} phase="teach" /> : null;
 													case "data-plan-block":
 														// The plan in the chat (wave 4): a frozen snapshot
-														// block — rendered as carried, never re-derived.
-														if (proposed) return <PlanCard key={pi} data={part.data as PlanBlockData} onOpen={() => setPlanOpen(true)} />;
-														return (
-															<PlanBlock
-																key={pi}
-																data={part.data as PlanBlockData}
-																onOpen={() => setPlanOpen(true)}
-															/>
-														);
+														// card — rendered as carried, never re-derived.
+														return <PlanCard key={pi} data={part.data as PlanBlockData} onOpen={() => setPlanOpen(true)} />;
 													// quiz/probe: the removed multiple-choice tools — an old
 													// transcript's answered ones render as plain cards.
 													case "tool-quiz":
@@ -1671,7 +1449,7 @@ export function Chat({
 													case "tool-explain":
 													case "tool-recall": {
 														const malformed = !busy && malformedQuestions.find(call => call.messageId === part.sourceMessageId && call.contentIndex === part.sourceContentIndex && call.toolCallId === part.toolCallId);
-														if (malformed) return <MalformedQuestion key={pi} variant={design} disabled={!!pending || compacting}
+														if (malformed) return <MalformedQuestion key={pi} disabled={!!pending || compacting}
 															reason={pending ? "Answer or discard the remaining question first." : undefined}
 															onRetry={() => {
 																draftRef.current = null;
@@ -1681,19 +1459,18 @@ export function Chat({
 														// transcript; answered ones render as records.
 														if (part.state === "output-available") {
 															return (
-																<AnsweredCard key={pi} answer={part.output as QuestionAnswerData} input={part.input} variant={design} />
+																<AnsweredCard key={pi} answer={part.output as QuestionAnswerData} input={part.input} />
 															);
 														}
 														return null;
 													}
 													default: {
 														// A tool call being WRITTEN (owner, streaming round 2026-10-01):
-														// input-streaming spans the whole execution, and the live card —
-														// spinner + shimmered activity label, the input watchable on expand
-														// — replaces the retired transcript bottom line. On settling, the
-														// registry's card takes over below.
+														// input-streaming spans the whole execution, and the live line
+														// says what the tutor is doing. On settling, the registry's card
+														// takes over below.
 														if (part.type.startsWith("tool-") && part.state === "input-streaming") {
-															return <LiveToolCard key={pi} part={part as ArtifactPartProps["part"]} variant={design} />;
+															return <LiveToolCard key={pi} part={part as ArtifactPartProps["part"]} />;
 														}
 														// Artifact extension point (contracts.ts): job
 														// parts and future artifacts render via the
@@ -1732,38 +1509,13 @@ export function Chat({
 						    the summarizer holds the model gate. Mutually exclusive with
 						    the THINKING placeholder by construction (the gate sits
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
-							{compacting && proposed && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{(status === "submitted" || turnInFlight) && proposed && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
-							{compacting && !proposed && (
-								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
-									<BrailleSpinner label="Compacting context" />
-									<Shimmer duration={1}>COMPACTING CONTEXT…</Shimmer>
-								</span>
-							)}
-							{(status === "submitted" || turnInFlight) && !proposed && (
-								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
-									<BrailleSpinner label="Thinking" />
-									<Shimmer duration={1}>
-										THINKING…
-									</Shimmer>
-								</span>
-							)}
-							{openingError && <p role="alert" className={proposed ? "text-row text-danger" : "text-sm text-destructive"}>{OPENING_PROMPT_FAILURE}</p>}
-							{error && proposed && (
+							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
+							{(status === "submitted" || turnInFlight) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
+							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
-									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} chatId={chatId} failure={claudeLimit} onContinue={retryFailedTurn} variant="proposed" />}
-								</TurnError>
-							)}
-							{error && !proposed && (
-								<div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
-									<span>Something went wrong: {error.message}</span>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} chatId={chatId} failure={claudeLimit} onContinue={retryFailedTurn} />}
-									{retryable && (
-										<Button variant="outline" size="xs" data-testid="retry-failed-turn" onClick={retryFailedTurn}>
-											Retry
-										</Button>
-									)}
-								</div>
+								</TurnError>
 							)}
 						</div>
 
@@ -1780,8 +1532,7 @@ export function Chat({
 				    anchored to the dock block's top edge, so it rides every
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
-				{!course ? <CourseLinkBanner chatId={chatId} variant={design} /> : <DockOverlay
-					variant={design}
+				{!course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
 					pending={pending}
 					initialQuestionDraft={pending ? questionDraft(pending.key)?.form : undefined}
 					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
@@ -1789,23 +1540,16 @@ export function Chat({
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
 					onPracticeRequest={sendPracticeRequest}
-					chatId={chatId}
-					onModelChange={setSelectedModel}
-					plan={hasPlan && !proposed ? <PlanMarginalia messages={messages} /> : undefined}
-					onOpenPlan={() => setPlanOpen(true)}
 					requiresReveal={requiresReveal}
 					readingThinking={readingThinkingRef.current}
 					readingThinkingRevision={readingThinkingSeed.revision}
 					onReadingThinking={applyReadingThinking}
 					phase={phases.at(-1) ?? "probe"}
-					turns={turns}
-					contextTokens={contextTokens}
-					pricing={pricing}
 					onReserve={setDockReserve}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
 					setupCta={
-						zeroKeys ? (
-							<ZeroKeysPill onOpen={() => setSetupOpen(true)} />
+						unconnected ? (
+							<SignInPill onOpen={() => setSetupOpen(true)} />
 						) : (
 							!configured && (
 								<div className="pointer-events-auto mb-2 flex justify-center">
@@ -1813,11 +1557,7 @@ export function Chat({
 										type="button"
 										data-testid="setup-cta"
 										onClick={() => setSetupOpen(true)}
-										className={
-											proposed
-												? "h-8 cursor-pointer rounded-full border px-3.5 text-row font-medium text-foreground outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-												: "rounded-sm border border-border bg-card px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 hover:bg-accent cursor-pointer"
-										}
+										className="h-8 cursor-pointer rounded-full border px-3.5 text-row font-medium text-foreground outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 									>
 										Set up your models
 									</button>
@@ -1844,7 +1584,6 @@ export function Chat({
 							nextProblem={nextReady}
 							onNext={sendNext}
 							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : undefined}
-							variant={design}
 						/>
 					}
 					onSubmitAnswer={(output) => {
@@ -1880,12 +1619,11 @@ export function Chat({
 						onClose={() => setFigureFocus(null)}
 					/>
 				)}
-				{planOpen && !proposed && <PlanPopup messages={messages} onClose={() => setPlanOpen(false)} />}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
 				</div>
 			</div>
 		</div>
-		</LessonDesignContext.Provider>
+		</ActiveProblemContext.Provider>
 		</JobsContext.Provider>
 		</SessionMermaidContext.Provider>
 		{/* The BYOK setup flow (owner, 2026-09-22): one mount serves the
@@ -2017,7 +1755,6 @@ export function shouldStampGeometryMute(nextH: number, prevH: number, pending: b
 }
 
 function DockOverlay({
-	variant,
 	pending,
 	initialQuestionDraft,
 	onSaveQuestionDraft,
@@ -2030,22 +1767,12 @@ function DockOverlay({
 	readingThinkingRevision,
 	onReadingThinking,
 	phase,
-	turns,
-	contextTokens,
-	pricing,
 	composer,
 	onSubmitAnswer,
-	chatId,
-	onModelChange,
 	onReserve,
-	plan,
-	onOpenPlan,
 	setupCta,
 	queuedSteers,
 }: {
-	/** The design, from Chat's one read: "proposed" draws the lesson column,
-	 *  the shared dock surface (lesson/dock-surface.md) and no stats row. */
-	variant: "current" | "proposed";
 	pending: ReturnType<typeof pendingQuestionOf>;
 	initialQuestionDraft?: QuestionFormDraft;
 	onSaveQuestionDraft: (draft: QuestionFormDraft) => void;
@@ -2069,23 +1796,11 @@ function DockOverlay({
 	onReadingThinking: (v: string) => void;
 	/** Session phase at the pending question — scales the thinking field. */
 	phase: Phase3;
-	/** The session's usage log — the stats bar beneath the composer folds it. */
-	turns: TurnUsage[];
-	contextTokens: number | null;
-	pricing?: SessionPricing;
 	composer: React.ReactNode;
 	onSubmitAnswer: (output: QuestionAnswerData) => void;
-	/** The model control's pass-through (the stats bar hosts it). */
-	chatId: string;
-	onModelChange: (model: string | undefined) => void;
 	/** Reports the dock's settled height (block + gradient) — ChatView's
 	 *  dockReserve state feeds the transcript's spacer from it. */
 	onReserve: (h: number) => void;
-	/** The plan marginalia's content (the bare diagram) — rendered only
-	 *  while a question owns the band. Null until a plan exists. */
-	plan?: React.ReactNode;
-	/** Opens the full-DAG popup (the marginalia + chip share it). */
-	onOpenPlan: () => void;
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
 	 *  already filtered by visibleQueuedSteers — only undrained steers. */
 	queuedSteers: QueuedSteerLine[];
@@ -2177,18 +1892,11 @@ function DockOverlay({
 			? `practice:${practice.toolCallId}`
 			: "chat";
 
-	// The plan marginalia's flank width (owner, plan-placement round): from
-	// the DOCK container's right edge to the block's right edge — the bare
-	// diagram's canvas. Tracked LIVE by a ResizeObserver on the block
-	// (owner, resize round): every geometry change — window resize, sidebar
-	// toggle, scrollbar appearance, the box's own rewrap — reports the real
-	// width instantly, so the fade floor never lags behind reality (the old
-	// render-time measurement went stale during drag-resizes and the mount
-	// decision popped late).
-	const [flankW, setFlankW] = useState(0);
-	const flankWRef = useRef(0);
-	// Part A of the same round (the resize mute): any block size change
-	// stamps this — the fold machine ignores scroll events for a beat after,
+	// The block's width, tracked LIVE by a ResizeObserver (owner, resize
+	// round): every geometry change — window resize, sidebar toggle,
+	// scrollbar appearance — reports the real width instantly.
+	const blockWRef = useRef(0);
+	// The resize mute: any block width change stamps this — the fold machine ignores scroll events for a beat after,
 	// because a resize/rewrap re-clamps scrollTop and emits PHANTOM scroll
 	// events mid-transient (the box flickered to the bar and back).
 	// Width changes stamp HERE (column resizes); height growth stamps at
@@ -2202,10 +1910,9 @@ function DockOverlay({
 		const block = blockRef.current;
 		if (!block) return;
 		const measure = () => {
-			const next = Math.round(block.offsetWidth / 2 - DOCK_W / 2 - 2 * MARGIN_GAP);
-			if (Math.abs(next - flankWRef.current) > 1) {
-				flankWRef.current = next;
-				setFlankW(next);
+			const next = block.offsetWidth;
+			if (Math.abs(next - blockWRef.current) > 1) {
+				blockWRef.current = next;
 				geometryAtRef.current = Date.now();
 			}
 		};
@@ -2437,7 +2144,7 @@ function DockOverlay({
 		<div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ right: sbInset }}>
 			<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 			<div ref={blockRef} className="relative bg-background pb-5">
-				<div className={variant === "proposed" ? LESSON_COLUMN : DOCK}>
+				<div className={LESSON_COLUMN}>
 					<div ref={viewportRef} data-dock-viewport="" className="pointer-events-auto">
 					<div ref={bodyRef}>
 					{setupCta}
@@ -2445,7 +2152,7 @@ function DockOverlay({
 					    one-liners above the shell - right-aligned to where its corner
 					    rounding starts, truncated, no background, no container. A
 					    line dies when its card lands (visibleQueuedSteers). */}
-					<QueuedSteersBody steers={queuedSteers} variant={variant} />
+					<QueuedSteersBody steers={queuedSteers} />
 					{/* The reading-thinking field (owner 2026-10-03): mounted while a
 					    teach-phase check waits — the same cue that collapses it.
 					    Rides the check answer on submit. */}
@@ -2455,19 +2162,12 @@ function DockOverlay({
 							revision={readingThinkingRevision}
 							onChange={onReadingThinking}
 							onOpen={!expanded ? () => expandAndRevealRef.current() : undefined}
-							variant={variant}
 						/>
 					)}
 					<div
 						ref={shellRef}
-						data-slot={variant === "proposed" && (pending || practice) ? "dock-surface" : undefined}
-						className={
-							variant !== "proposed"
-								? "pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg"
-								: pending || practice
-									? `pointer-events-auto overflow-hidden ${DOCK_SURFACE}`
-									: "pointer-events-auto overflow-hidden rounded-[20px]"
-						}
+						data-slot={pending || practice ? "dock-surface" : undefined}
+						className={pending || practice ? `pointer-events-auto overflow-hidden ${DOCK_SURFACE}` : "pointer-events-auto overflow-hidden rounded-[20px]"}
 					>
 						{/* Include descendant margins (notably practice thinking's
 						    bottom margin) in the natural content measurement. */}
@@ -2489,7 +2189,6 @@ function DockOverlay({
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
 									compactionRunning={compactionRunning}
-									variant={variant}
 								/>
 							) : practice ? (
 								<PracticeDock
@@ -2503,7 +2202,6 @@ function DockOverlay({
 									onSubmit={onSubmitThinking}
 									onRequest={onPracticeRequest}
 									compactionRunning={compactionRunning}
-									variant={variant}
 								/>
 							) : (
 								composer
@@ -2512,21 +2210,9 @@ function DockOverlay({
 					</div>
 					</div>
 					</div>
-					{/* The stats row: beneath the composer/question shell, not
-					    flush to the screen bottom — static height, outside the
-					    morphing shell so it never joins a height animation. */}
-					{variant !== "proposed" && (
-						<StatsBar
-							turns={turns}
-							contextTokens={contextTokens}
-							pricing={pricing}
-							chatId={chatId}
-							onModelChange={onModelChange}
-						/>
-					)}
 					{/* The scroll-down disc (moved here from the Conversation,
 					    owner refinement round 2026-09-24): anchored to the BLOCK's
-					    top edge — above the composer shell AND the stats row, in
+					    top edge — above the composer shell, in
 					    the gradient's transparent band — so it never overlaps
 					    any dock element. Because the anchor is the block itself
 					    (not the scroller's bottom), it rides every height change
@@ -2537,33 +2223,6 @@ function DockOverlay({
 					    child. */}
 					<ConversationScrollButton className="pointer-events-auto bottom-full mb-2" />
 				</div>
-				{/* The plan marginalia (owner, plan-placement round): the bare
-				    diagram in the band's right flank — boundaless, meet-fitted, part
-				    of the lesson's page rather than a floating widget. Mounted only
-				    while a question owns the band (its reserved height is the canvas);
-				    folding the dock fades + blurs it out of existence, so reading
-				    the transcript in full wipes the margin clean. Click → popup.
-				    Width (owner, resize round): the box shrinks continuously with
-				    the flank; below MARGIN_MIN_W it FADES (never pops away — no
-				    mid-question unmount), and widening past the floor fades it
-				    back in. */}
-				{pending && plan && (
-					<Hint label="Open the full plan" side="bottom">
-<button
-						type="button"
-						data-testid="plan-marginalia"
-						onClick={onOpenPlan}
-						style={{ left: `calc(50% + ${DOCK_W / 2 + MARGIN_GAP}px)` }}
-						className={`absolute bottom-5 right-4 top-0 cursor-pointer transition-[filter,opacity] duration-300 ease-out ${
-							expanded && flankW >= MARGIN_MIN_W
-								? "pointer-events-auto opacity-100 blur-0"
-								: "pointer-events-none opacity-0 blur-md"
-						}`}
-					>
-						{plan}
-					</button>
-</Hint>
-				)}
 			</div>
 		</div>
 	);

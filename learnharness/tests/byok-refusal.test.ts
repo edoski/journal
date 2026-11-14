@@ -110,10 +110,10 @@ describe("isModelsRefusal — the job-record matcher", () => {
 });
 
 describe("providerKeyMissing — the envelope factory (provider-key interlude, 2026-09-25)", () => {
-	it("names the provider from the curated label and carries the exact machine code", () => {
+	it("names an API-key provider as no longer usable and carries the exact machine code", () => {
 		const envelope = providerKeyMissing("openrouter", ["strong"]);
 		assert.deepEqual(envelope, {
-			error: "No OpenRouter key is set — add one in Settings → Keys",
+			error: "openrouter runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent",
 			code: PROVIDER_KEY_MISSING_CODE,
 			provider: "openrouter",
 			slots: ["strong"],
@@ -121,9 +121,9 @@ describe("providerKeyMissing — the envelope factory (provider-key interlude, 2
 		assert.equal(envelope.code, "provider_key_missing");
 	});
 
-	it("an unknown provider falls back to its raw id as the label", () => {
-		const envelope = providerKeyMissing("weird", ["cheap"]);
-		assert.equal(envelope.error, "No weird key is set — add one in Settings → Keys");
+	it("a signed-out subscription asks for its sign-in", () => {
+		assert.equal(providerKeyMissing("chatgpt", ["cheap"]).error, "ChatGPT is not signed in — connect it in Settings → Accounts");
+		assert.match(providerKeyMissing("claude-subscription", ["cheap"]).error, /^Claude Code is not signed in/);
 	});
 });
 
@@ -146,6 +146,8 @@ describe("isProviderKeyRefusal — the job-record matcher (provider-key interlud
 	it("matches the envelope wording regardless of provider label, not real failures", () => {
 		assert.equal(isProviderKeyRefusal(providerKeyMissing("together", ["cheap"]).error), true);
 		assert.equal(isProviderKeyRefusal(providerKeyMissing("openai", ["strong"]).error), true);
+		assert.equal(isProviderKeyRefusal(providerKeyMissing("chatgpt", ["strong"]).error), true);
+		assert.equal(isProviderKeyRefusal(providerKeyMissing("claude-subscription", ["strong"]).error), true);
 		assert.equal(isProviderKeyRefusal(""), false);
 		assert.equal(isProviderKeyRefusal(undefined), false);
 		assert.equal(isProviderKeyRefusal("FAILED: headless crashed"), false);
@@ -222,7 +224,7 @@ describe("prefillLevelFromPin — the setup dialog's level prefill (chunk 2)", (
 describe("setupStage — unknown is not keyless", () => {
 	it("keys first (owner ordering), pickers when a provider is keyed", () => {
 		assert.equal(setupStage(null), "loading");
-		assert.equal(setupStage([{ id: "x", keyPresent: false }]), "keys");
-		assert.equal(setupStage([{ id: "x", keyPresent: true }]), "pickers");
+		assert.equal(setupStage([{ id: "x", connected: false }]), "keys");
+		assert.equal(setupStage([{ id: "x", connected: true }]), "pickers");
 	});
 });

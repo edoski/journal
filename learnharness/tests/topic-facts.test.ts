@@ -20,7 +20,6 @@ import {
 	heldTasks,
 	lastStudiedDay,
 	mistakeOf,
-	nextReviewWords,
 	pickupsOf,
 	sessionEntries,
 	studiedWords,
@@ -183,32 +182,32 @@ describe("the open tasks that hold a topic", () => {
 	});
 });
 
-describe("where he stands, in the map's words", () => {
+describe("where he stands, in the app's one wording", () => {
 	it("says every seeded head line word for word", () => {
 		const lines: [CourseMapTopic, string][] = [
-			[TOPICS.rank, "Nearly on your own. A mistake to fix. Review overdue by 3 days"],
-			[TOPICS.matmul, "On your own. Missed last time. Review overdue by 2 days"],
-			[TOPICS.span, "On your own. Review overdue by a week"],
-			[TOPICS.vectors, "On your own. Next review Fri 13 Nov"],
-			[TOPICS.cramer, "Just started. Review overdue by 2 days"],
-			[TOPICS.riemann, "On your own. Missed last time. Review due today"],
-			[TOPICS.elimination, "Nearly on your own. Mixed up with Cramer's rule. Review overdue by 2 days"],
-			[TOPICS.kernel, "Learning. Sure, but wrong. Review overdue by a day"],
-			[TOPICS.basis, "On your own. Review overdue by a week"],
-			[TOPICS.independence, "Nearly on your own. A mistake to fix. Review overdue by 2 weeks"],
-			[TOPICS.chain, "On your own. Missed last time. Review overdue by 4 weeks"],
+			[TOPICS.rank, "Right with help. Mistake to fix. 3d overdue"],
+			[TOPICS.matmul, "Right with help. Missed last time. 2d overdue"],
+			[TOPICS.span, "On your own. 1w overdue"],
+			[TOPICS.vectors, "On your own. Back in 5d"],
+			[TOPICS.cramer, "Taught, not tried. 2d overdue"],
+			[TOPICS.riemann, "Right with help. Missed last time. Due today"],
+			[TOPICS.elimination, "Right with help. Mixed up with Cramer's rule. 2d overdue"],
+			[TOPICS.kernel, "Tried, not right yet. Sure, but wrong. 1d overdue"],
+			[TOPICS.basis, "On your own. 1w overdue"],
+			[TOPICS.independence, "Right with help. Mistake to fix. 2w overdue"],
+			[TOPICS.chain, "Right with help. Missed last time. 4w overdue"],
 			[TOPICS.eigen, "Not started"],
 		];
-		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf).map((mark) => mark.words)].join(". ");
+		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
 		for (const [t, words] of lines) assert.equal(said(t), words, t.handle);
 	});
 
 	it("gives why it needs him and its review as marks of their own kind", () => {
-		assert.deepEqual(headMarks(TOPICS.matmul, titleOf), [
+		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [
 			{ kind: "slip", words: "Missed last time" },
-			{ kind: "review", words: "Review overdue by 2 days" },
+			{ kind: "review", words: "2d overdue" },
 		]);
-		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf), []);
+		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);
 	});
 
 	it("is silent for a topic not started that already has a session", () => {
@@ -217,9 +216,9 @@ describe("where he stands, in the map's words", () => {
 	});
 
 	it("says a topic still being learned is due, as its action does, and dates a later review", () => {
-		assert.deepEqual(headMarks(TOPICS.determinant, titleOf), [{ kind: "review", words: "Review overdue by 4 days" }]);
-		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: null }, titleOf), []);
-		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: { kind: "scheduled", date: "2026-11-09" } }, titleOf), [{ kind: "review", words: "Next review Mon 9 Nov" }]);
+		assert.deepEqual(headMarks(TOPICS.determinant, titleOf, TODAY), [{ kind: "review", words: "4d overdue" }]);
+		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: null }, titleOf, TODAY), []);
+		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: { kind: "scheduled", date: "2026-11-09" } }, titleOf, TODAY), [{ kind: "review", words: "Back in 1d" }]);
 	});
 });
 
@@ -240,11 +239,6 @@ describe("the page's words for time", () => {
 		assert.equal(dayWords("2026-11-07", TODAY), "Yesterday");
 		assert.equal(dayWords("2026-11-03", TODAY), "Tue 3 Nov");
 		assert.equal(dayWords("2025-12-31", "2026-01-02"), "Wed 31 Dec");
-	});
-
-	it("date the next review by its day", () => {
-		assert.equal(nextReviewWords("2026-11-13"), "Next review Fri 13 Nov");
-		assert.equal(nextReviewWords("2027-01-01"), "Next review Fri 1 Jan");
 	});
 });
 

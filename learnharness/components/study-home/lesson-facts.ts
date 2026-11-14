@@ -36,11 +36,6 @@ export function topicSpan(course: StudyCourse, topics: readonly TopicHandle[]): 
 	return { from: Math.min(...at) + 1, to: Math.max(...at) + 1, of: course.map.topics.length };
 }
 
-/** "Topic 7 of 16", "Topics 2 to 9 of 16". Pure. */
-export function spanWords(place: PathPlace): string {
-	return place.from === place.to ? `Topic ${place.from} of ${place.of}` : `Topics ${place.from} to ${place.to} of ${place.of}`;
-}
-
 /** A line of Today as a lesson. A waiting session sits at the course topics
  *  its transcript worked on; a course's step at the topics it takes up.
  *  "Then" is left out when it only repeats a review. Pure. */
@@ -80,14 +75,4 @@ export function lessonOf(row: TodayRow): Lesson {
 		place: topicSpan(course, topics),
 		open: { kind: "course", workspace: course.map.workspace },
 	};
-}
-
-/** A topic on a lesson's path track: worked on today, started before
- *  today, or still ahead. */
-export type TrackMark = "today" | "started" | "ahead";
-
-/** One mark per topic of the course, in path order. Pure. */
-export function trackMarks(course: StudyCourse, topics: readonly TopicHandle[]): TrackMark[] {
-	const today = new Set<string>(topics);
-	return course.map.topics.map((t) => (today.has(t.handle) ? "today" : t.level === "new" ? "ahead" : "started"));
 }

@@ -1,7 +1,7 @@
 /**
  * The topic page's hybrid candidate: the history and the lesson map side
- * by side, each in a bounded pane, the page's action left to the composer
- * foot. The eigen and determinant plans and Rank's record are the seeded
+ * by side, each in a bounded pane, the page's action held by the history's
+ * Now. The eigen and determinant plans and Rank's record are the seeded
  * demo's own (fixtures/topic), read through the topic read's parsers.
  * Same tsx classic-JSX shim as the other render tests.
  */
@@ -108,30 +108,29 @@ describe("the hybrid's facts", () => {
 });
 
 describe("the hybrid page drawn", () => {
-	it("draws the history and the shown lesson's map side by side, with no button in the head when the composer holds the action", () => {
+	it("draws the history and the shown lesson's map side by side, with no button in the head since Now holds the action", () => {
 		const document = page(factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]));
 		assert.equal(document.querySelector('[data-testid="unit-page"]')!.getAttribute("data-topic-candidate"), "hybrid");
 		assert.equal(document.querySelector('[data-testid="topic-action"]'), null);
 		const panes = document.querySelector('[data-slot="topic-panes"]')!;
-		assert.deepEqual([...panes.children].map((pane) => pane.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
+		assert.deepEqual([...panes.querySelectorAll(":scope > div > [data-slot]")].map((pane) => pane.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
+		assert.ok(panes.querySelector('[data-slot="linked-tie"]'), "the lesson's row tied to its step (Link: Connected, the default)");
 		const steps = [...document.querySelectorAll('[data-slot="topic-step"]')];
 		assert.equal(steps.length, 7);
 		assert.ok(steps.every((step) => step.getAttribute("href") === "/chat/chat_demo_eigen"));
 		assert.equal(document.querySelector('[data-slot="topic-step-tag"]')!.textContent, "Next");
 	});
 
-	it("lists every session as a link to it and gives each lesson that planned the button that puts it on the map, the shown one pressed", () => {
+	it("opens the shown lesson from Now and gives every earlier lesson that planned the button that puts it on the map", () => {
 		const document = page(factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]));
+		const now = document.querySelector('[data-slot="pickup-now"]')!;
+		assert.equal(now.querySelector('[data-slot="pickup-now-press"]')!.getAttribute("href"), "/chat/chat_demo_eigen");
+		assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true");
 		const rows = [...document.querySelectorAll('[data-slot="topic-history-session"]')];
 		assert.deepEqual(
 			rows.map((row) => [row.querySelector("a")!.getAttribute("href"), row.getAttribute("data-shown"), row.querySelector('[data-slot="topic-map-toggle"]')?.getAttribute("aria-pressed")]),
-			[
-				["/chat/chat_demo_eigen", "true", "true"],
-				["/chat/chat_eigen_before", null, "false"],
-			],
+			[["/chat/chat_eigen_before", null, "false"]],
 		);
-		assert.equal(rows[0]!.querySelector('[data-slot="topic-why"]')!.textContent, "Your turn");
-		assert.equal(document.querySelectorAll('[data-slot="topic-history"] h2').length, 2);
 	});
 
 	it("keeps the steps out of the history and puts attempts on it as plain entries", () => {
@@ -148,16 +147,5 @@ describe("the hybrid page drawn", () => {
 		assert.equal(document.querySelector('[data-slot="topic-lesson-map"]'), null);
 		assert.equal(document.querySelectorAll('[data-slot="topic-map-toggle"]').length, 0);
 		assert.ok(document.querySelector('[data-slot="topic-history"]'));
-	});
-
-	it("keeps the head's button when the page's action is not in the composer", () => {
-		const document = page(factsOf(DET, [DET_LESSON], [DET_PLAN]), () => {});
-		assert.equal(document.querySelector('[data-testid="topic-action"]')!.textContent, "Continue");
-	});
-
-	it("draws only the head when the topic has no session and no attempt", () => {
-		const document = page(factsOf(topic("invertibility", { title: "Invertibility" }), []));
-		assert.equal(document.querySelector('[data-slot="topic-history"]'), null);
-		assert.ok(document.querySelector('[data-slot="topic-head"]'));
 	});
 });

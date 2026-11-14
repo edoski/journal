@@ -6,7 +6,7 @@ import { pickupSections } from "@/components/unit-inbox/topic-page/pickup/pickup
 import { EarlierDays, NextList, NowRow, ScheduledEntry, Section } from "@/components/unit-inbox/topic-page/pickup/pickup-parts";
 
 /**
- * Pick up option "sections" (spec: pickup.md): the history sorted by
+ * The history pane, Pick up's sections (spec: pickup.md): the history sorted by
  * relevance into Now, Next, Scheduled and Earlier, each under a quiet
  * divider. Now is the weightiest row, marked in the accent; an empty
  * section is not drawn.

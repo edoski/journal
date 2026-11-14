@@ -1,7 +1,7 @@
 /**
- * The hybrid topic page's Pick up options: the history sorted into Now,
+ * The hybrid topic page's Pick up sections: the history sorted into Now,
  * Next, Scheduled and Earlier, every row of the action table (`topicAction`)
- * held by Now, and each option's order on the page. The eigen and
+ * held by Now, and their order on the page. The eigen and
  * determinant plans and Rank's record are the seeded demo's own
  * (fixtures/topic). Same tsx classic-JSX shim as the other render tests.
  */
@@ -24,8 +24,6 @@ import { sessionPlanOf, topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
-import { PICKUP_PANES } from "../components/unit-inbox/topic-page/pickup/pickup-options.ts";
-import { PICKUP_OPTIONS } from "../components/design-variant.ts";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
 const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), "utf-8"));
@@ -89,7 +87,7 @@ const ROWS: Array<[string, TopicFacts]> = [
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
-const page = (option: (typeof PICKUP_OPTIONS)[number], facts: TopicFacts) => render(<HybridTopic facts={facts} busy={false} onAct={() => {}} onTask={() => {}} pane={PICKUP_PANES[option]} />);
+const page = (facts: TopicFacts) => render(<HybridTopic facts={facts} busy={false} onAct={() => {}} onTask={() => {}} />);
 
 /** The pane's sections top to bottom, by label. */
 function order(document: Document): string[] {
@@ -107,7 +105,7 @@ describe("Now", () => {
 			[
 				["resume", "Computing a 2×2 spectrum", "Your turn", "Resume", "chat_demo_eigen"],
 				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
-				["review", "Review overdue by 2 days", null, "Review", null],
+				["review", "2d overdue", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "Not started", null, "Start", null],
 				["continue", DET_STOPPED, "Left off yesterday", "Continue", "chat_demo_det"],
@@ -136,7 +134,7 @@ describe("the sections' order", () => {
 		assert.equal(now.chat, "chat_practice");
 		assert.deepEqual(
 			next.map((item) => (item.kind === "session" ? item.entry.chat.id : item.kind === "task" ? item.key : item.words)),
-			["chat_question", "chat_writing", "Review due today", "sheet-4", "sheet-5"],
+			["chat_question", "chat_writing", "Due today", "sheet-4", "sheet-5"],
 		);
 		assert.equal(scheduled, null);
 		assert.deepEqual(earlier.flatMap((day) => day.sessions.map((entry) => entry.chat.id)), ["chat_done"]);
@@ -157,7 +155,7 @@ describe("the sections' order", () => {
 	});
 });
 
-describe("each option drawn", () => {
+describe("the sections drawn", () => {
 	const RICH = factsOf(VECTORS, [
 		{ ...EIGEN_LESSON, topics: ["vectors"] },
 		chat("chat_other", "Vectors, a question", "2026-11-07T08:00:00.000Z", { pendingQuestion: true, topics: ["vectors"] }),
@@ -165,34 +163,30 @@ describe("each option drawn", () => {
 	], [EIGEN_PLAN]);
 
 	it("orders Now, Next, Scheduled and Earlier, and draws no empty section", () => {
-		assert.deepEqual(order(page("sections", RICH)), ["now", "next", "scheduled", "earlier"]);
+		assert.deepEqual(order(page(RICH)), ["now", "next", "scheduled", "earlier"]);
 		const alone = ROWS[4]![1];
-		assert.deepEqual(order(page("sections", alone)), ["now"]);
+		assert.deepEqual(order(page(alone)), ["now"]);
 	});
 
 	it("draws every row of the action table as Now, the session it opens as a link and every other press as a button, with no button in the head", () => {
-		for (const option of PICKUP_OPTIONS) {
-			for (const [name, facts] of ROWS) {
-				const document = page(option, facts);
-				assert.equal(document.querySelector('[data-testid="topic-action"]'), null, `${option} ${name}: no head button`);
-				const now = document.querySelector('[data-slot="pickup-now"]')!;
-				assert.equal(now.getAttribute("data-action"), facts.action.kind, `${option} ${name}`);
-				const press = now.querySelector('[data-slot="pickup-now-press"]')!;
-				if ("chat" in facts.action) assert.equal(press.getAttribute("href"), `/chat/${facts.action.chat.id}`, `${option} ${name}`);
-				else assert.equal(press.tagName, "BUTTON", `${option} ${name}`);
-			}
+		for (const [name, facts] of ROWS) {
+			const document = page(facts);
+			assert.equal(document.querySelector('[data-testid="topic-action"]'), null, `${name}: no head button`);
+			const now = document.querySelector('[data-slot="pickup-now"]')!;
+			assert.equal(now.getAttribute("data-action"), facts.action.kind, name);
+			const press = now.querySelector('[data-slot="pickup-now-press"]')!;
+			if ("chat" in facts.action) assert.equal(press.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
+			else assert.equal(press.tagName, "BUTTON", name);
 		}
 	});
 
 	it("keeps the lesson Now opens on the map, its map button pressed, Now itself a plain row with no fill", () => {
-		for (const option of PICKUP_OPTIONS) {
-			const document = page(option, ROWS[0]![1]);
-			const now = document.querySelector('[data-slot="pickup-now"]')!;
-			assert.equal(now.getAttribute("data-shown"), "true", option);
-			assert.doesNotMatch(now.className, /bg-fill-selected|ring-1/, `${option}: no box around Now`);
-			assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true", option);
-			assert.ok(document.querySelector('[data-slot="topic-lesson-map"]'), option);
-		}
+		const document = page(ROWS[0]![1]);
+		const now = document.querySelector('[data-slot="pickup-now"]')!;
+		assert.equal(now.getAttribute("data-shown"), "true");
+		assert.doesNotMatch(now.className, /bg-fill-selected|ring-1/, "no box around Now");
+		assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true");
+		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]'));
 	});
 });
 
@@ -200,7 +194,7 @@ describe("Earlier", () => {
 	it("lists each attempt as its result icon, its sentence and its day, with no help words", () => {
 		const facts = factsOf(RANK, [], [], RANK_RECORD);
 		assert.ok(facts.attempts.some((attempt) => !attempt.unaided), "the record holds a helped attempt");
-		const earlier = page("sections", facts).querySelector('[data-section="earlier"]')!;
+		const earlier = page(facts).querySelector('[data-section="earlier"]')!;
 		const rows = [...earlier.querySelectorAll('[data-slot="topic-attempt"]')];
 		assert.equal(rows.length, facts.attempts.length);
 		for (const row of rows) {

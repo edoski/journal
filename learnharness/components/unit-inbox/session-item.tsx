@@ -45,7 +45,23 @@ function RenameRow({ chat, onCommit, onCancel }: { chat: ChatListItem; onCommit:
 
 /** One session as a one-line shelf row, with its menu (Rename, Export,
  *  Delete, the notes it has not given yet). */
-export function SessionItem({ chat, s, highlighted = false, parent }: { chat: ChatListItem; s: SessionsSidebar; highlighted?: boolean; parent?: string }) {
+export function SessionItem({
+	chat,
+	s,
+	today,
+	twin = null,
+	highlighted = false,
+	parent,
+}: {
+	chat: ChatListItem;
+	s: SessionsSidebar;
+	/** The engine's study day. */
+	today: string;
+	/** The session's day when its title repeats in the list (`sessionTwins`). */
+	twin?: string | null;
+	highlighted?: boolean;
+	parent?: string;
+}) {
 	if (s.renamingId === chat.id) {
 		return <RenameRow chat={chat} onCommit={(next) => void s.commitRename(chat.id, next)} onCancel={() => s.setRenamingId(null)} />;
 	}
@@ -53,7 +69,15 @@ export function SessionItem({ chat, s, highlighted = false, parent }: { chat: Ch
 		<li className="group/sidebar-row relative list-none">
 			<ContextMenu>
 				<ContextMenuTrigger asChild>
-					<SessionSlimRow chat={chat} active={s.pathname === `/chat/${chat.id}`} highlighted={highlighted} parent={parent} onOpen={() => s.openChat(chat.id)} />
+					<SessionSlimRow
+						chat={chat}
+						today={today}
+						twin={twin}
+						active={s.pathname === `/chat/${chat.id}`}
+						highlighted={highlighted}
+						parent={parent}
+						onOpen={() => s.openChat(chat.id)}
+					/>
 				</ContextMenuTrigger>
 				<ContextMenuContent data-testid="session-context-menu" className="w-64">
 					<ContextMenuItem data-testid="ctx-rename" onSelect={() => s.renameChat(chat.id)}>

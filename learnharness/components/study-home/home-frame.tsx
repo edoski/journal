@@ -7,7 +7,8 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { SidebarToggle } from "@/components/sidebar";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
-import { courseMove, todayCourses, todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { needsYouNow } from "@/components/study-home/needs-you";
+import { courseMove, todayCourses, type TodayRow } from "@/components/study-home/study-facts";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { StudyCourse } from "@/src/core";
 
@@ -17,7 +18,8 @@ export interface HomeReady {
 	rows: readonly TodayRow[];
 	/** The same lines as lessons in plain words. */
 	lessons: readonly Lesson[];
-	/** The courses, in Today's order. */
+	/** The courses, in Today's order, each once (two sessions waiting in
+	 *  one course are two lines of one course). */
 	courses: readonly StudyCourse[];
 	busy: boolean;
 	/** Take up a course's next step (`courseMove`). */
@@ -89,7 +91,7 @@ function HomeBody({
 		case "loading":
 			return <Notice>Reading your courses…</Notice>;
 		case "unavailable":
-			return <CoursesUnavailable reason={state.reason} variant="proposed" />;
+			return <CoursesUnavailable reason={state.reason} />;
 		case "failed":
 			return (
 				<Notice>
@@ -104,7 +106,7 @@ function HomeBody({
 				return <Notice>No courses yet. Start a lesson from New lesson and pick a course there.</Notice>;
 			}
 			const today = state.courses[0]!.map.today;
-			const rows = todayRows(state.courses, state.open, today);
+			const { rows } = needsYouNow(state.courses, state.chats, today);
 			return (
 				<>
 					{children({

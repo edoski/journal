@@ -6,7 +6,7 @@ import { ScrollArea as ScrollAreaPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 /** shadcn scroll area on the Proposed tokens (spec: scroll-area.md): an
- *  overlay bar 10px wide with a 15% white thumb, or no bar at all
+ *  overlay bar 10px wide with a 15% white thumb, or no bar in view
  *  (`bar={false}`, T3 Code's sidebar), the area still scrolling by wheel,
  *  trackpad and keyboard. `viewportRef` reaches the scroller for code that
  *  locks or measures it. Radix lets the viewport scroll only on an axis

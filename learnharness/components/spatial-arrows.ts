@@ -100,10 +100,9 @@ function pick(direction: Direction, main: HTMLElement, lastPointer: Element | nu
 	return targets[index] ?? null;
 }
 
-/** Mounted once by KeyboardShortcuts; on under the Proposed design only. */
-export function useSpatialArrows(on: boolean) {
+/** Mounted once by KeyboardShortcuts. */
+export function useSpatialArrows() {
 	useEffect(() => {
-		if (!on) return;
 		let lastPointer: Element | null = null;
 		const onPointerDown = (e: PointerEvent) => {
 			lastPointer = e.target instanceof Element ? e.target : null;
@@ -125,5 +124,5 @@ export function useSpatialArrows(on: boolean) {
 			window.removeEventListener("pointerdown", onPointerDown, { capture: true });
 			window.removeEventListener("keydown", onKeyDown);
 		};
-	}, [on]);
+	}, []);
 }

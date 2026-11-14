@@ -1,28 +1,17 @@
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
-import { parseHTML } from "linkedom";
 import { SetupDialog } from "../components/setup-dialog.tsx";
 import { AgentSection } from "../components/settings/agent-section.tsx";
-import { providerKeyLabel, classifyKeys } from "../components/settings/keys-section.tsx";
 import { useModelCatalog } from "../components/model-catalog.ts";
 import { notifySettingsSaved } from "../components/settings-signal.ts";
 import { useModelSetup, savedSlotsConfigured, selectedModelUnavailable, openModelPicker } from "../components/setup-cta.tsx";
-import { StatsBar } from "../components/stats-bar.tsx";
+import { ModelControl } from "../components/model-picker.tsx";
 import type { ModelCatalogEntry, ModelCatalogResponse, ModelsSettings } from "../src/core/index.ts";
 
-const dom = parseHTML("<html><body></body></html>");
-Object.assign(globalThis, {
-	window: dom.window, document: dom.document, Element: dom.window.Element,
-	HTMLElement: dom.window.HTMLElement, HTMLInputElement: dom.window.HTMLInputElement,
-	CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true,
-	requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 0),
-	cancelAnimationFrame: (id: number) => clearTimeout(id),
-});
-Object.assign(dom.window, { innerWidth: 1280, innerHeight: 800 });
-dom.window.HTMLElement.prototype.scrollIntoView = () => {};
 const originalFetch = globalThis.fetch;
 let root: Root | undefined;
 let host: HTMLDivElement | undefined;
@@ -30,7 +19,7 @@ let requests: ReturnType<typeof deferred<Response>>[] = [];
 let writes: ModelsSettings[] = [];
 let snapshot: ReturnType<typeof useModelCatalog>;
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { resolve, promise }; }
-const provider = { id: "fixture", envVar: "FIXTURE_KEY", label: "Fixture" };
+const provider = { id: "fixture", label: "Fixture" };
 const a: ModelCatalogEntry = { id: "vendor/model:free", name: "Model free", provider: provider.id, input: ["text", "image"], reasoning: true, supportedLevels: ["off", "low", "high"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 };
 const b: ModelCatalogEntry = { ...a, id: "claude-opus-5-5", name: "Claude Opus 5.5", supportedLevels: ["off", "medium"] };
 function catalog(connected = true): ModelCatalogResponse {
@@ -38,7 +27,7 @@ function catalog(connected = true): ModelCatalogResponse {
 		models: connected ? [a, b] : [], defaults: null,
 		rolePins: { researcher: null, demoBuilder: null, visualMaker: null, extractor: null, auditor: null },
 		slots: { strong: { model: { provider: a.provider, id: a.id }, thinkingLevel: "low" }, cheap: { model: { provider: a.provider, id: a.id }, thinkingLevel: "high" }, vision: { model: { provider: a.provider, id: a.id }, thinkingLevel: "low" } },
-		providers: [{ ...provider, keyPresent: connected }],
+		providers: [{ ...provider, connected: connected }],
 	};
 }
 function Reader() { snapshot = useModelCatalog(); return null; }
@@ -50,7 +39,6 @@ function installFetch() {
 		if (path === "/api/models") { const request = deferred<Response>(); requests.push(request); return request.promise; }
 		if (path === "/api/settings/models") { writes.push(JSON.parse(String(init?.body))); return Response.json({ settings: { models: writes.at(-1) } }); }
 		if (path === "/api/keys") return Response.json({ providers: [provider], keys: [] });
-		if (path === "/api/settings/prompts") return Response.json({ prober: [], teacher: [] });
 		throw new Error(`Unexpected request ${path}`);
 	};
 }
@@ -61,7 +49,11 @@ async function render(children: React.ReactNode) {
 async function answer(index: number, body: ModelCatalogResponse | null) { await act(async () => requests[index]!.resolve(body ? Response.json(body) : new Response("unavailable", { status: 503 }))); }
 function element(testid: string) { const e = document.querySelector<HTMLElement>(`[data-testid="${testid}"]`); assert.ok(e, testid); return e; }
 async function click(testid: string) { await act(async () => element(testid).click()); }
-function levels() { return [...document.querySelectorAll('[data-testid^="thinking-option-"]')].map((e) => e.textContent); }
+/** Thinking menus open and close on keydown, as Radix menus do. */
+async function toggleMenu(testid: string) {
+	await act(async () => { const key = new dom.window.Event("keydown", { bubbles: true, cancelable: true }); Object.assign(key, { key: "Enter" }); element(testid).dispatchEvent(key); });
+}
+function levels() { return [...document.querySelectorAll('[data-testid^="thinking-option-"]')].map((e) => `${e.textContent}${e.getAttribute("aria-checked") === "true" ? "✓" : ""}`); }
 async function warm(body = catalog()) { await render(<Reader />); await answer(0, body); }
 
 afterEach(async () => {
@@ -87,17 +79,17 @@ test("cached setup is immediately usable; fresh metadata/untouched slots update 
 	assert.equal(requests.length, 2);
 	assert.ok(element("setup-stage-pickers"));
 	assert.equal(document.querySelector('[data-testid="setup-stage-keys"]'), null);
-	assert.equal(element("setup-trigger-strong").textContent, "model:free▾");
+	assert.equal(element("setup-trigger-strong").textContent, "model:free");
 	await click("setup-trigger-strong"); await click("model-option-claude-opus-5-5");
-	await click("setup-thinking-strong"); await click("thinking-option-medium");
+	await toggleMenu("setup-thinking-strong"); await click("thinking-option-medium");
 	const fresh = catalog(); fresh.slots.cheap = { model: { provider: b.provider, id: b.id }, thinkingLevel: "off" };
 	fresh.models[1] = { ...b, supportedLevels: ["off", "medium", "high"] };
 	await answer(1, fresh);
-	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5▾");
-	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium▾");
-	assert.equal(element("setup-trigger-cheap").textContent, "claude-opus-5-5▾");
-	await click("setup-thinking-strong"); assert.deepEqual(levels(), ["off", "medium✓", "high"]);
-	await click("setup-thinking-strong");
+	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5");
+	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium");
+	assert.equal(element("setup-trigger-cheap").textContent, "claude-opus-5-5");
+	await toggleMenu("setup-thinking-strong"); assert.deepEqual(levels(), ["off", "medium✓", "high"]);
+	await toggleMenu("setup-thinking-strong");
 	await act(async () => snapshot.refresh()); await answer(2, null);
 	assert.ok(element("setup-catalog-error")); assert.equal(element("setup-save").hasAttribute("disabled"), false);
 	await click("setup-save");
@@ -122,7 +114,7 @@ test("zero providers always means exclusive connection stage; reconnect with all
 	assert.equal(document.querySelector('[data-testid="setup-add-provider"]'), null);
 	assert.equal(document.querySelector('[data-testid="setup-save"]'), null);
 	await act(async () => notifySettingsSaved("keys"));
-	const other = catalog(false); other.providers = [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }];
+	const other = catalog(false); other.providers = [{ id: "other", connected: true }];
 	await answer(3, other);
 	assert.equal(closed, 1); assert.equal(completed, 0); assert.deepEqual(writes, []);
 	assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null, "no intermediate picker frame after reconnect");
@@ -138,8 +130,10 @@ test("cold saved disconnected pins still enter the provider stage, without any m
 		return null;
 	}
 	await render(<><Reader />{setup()}<Probe /></>);
+	assert.ok(element("setup-stage-loading"));
 	await answer(1, catalog(false));
-	assert.deepEqual(stages, ["setup-stage-loading", "setup-stage-keys"]);
+	// The dialog's portal mounts a commit after Probe's first frame.
+	assert.deepEqual(stages.filter(Boolean), ["setup-stage-keys"]);
 });
 
 for (const count of [0, 1, 2]) test(`connecting with ${count} saved slots only requires the missing slots; stale identities/thinking survive`, async () => {
@@ -151,14 +145,14 @@ for (const count of [0, 1, 2]) test(`connecting with ${count} saved slots only r
 	await warm(before);
 	let closed = 0; await render(<><Reader />{setup(() => { closed++; })}</>); await answer(1, before);
 	assert.ok(element("setup-stage-keys"));
-	const connected = { ...before, models: [{ ...b, provider: "other" }], providers: [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }] };
+	const connected = { ...before, models: [{ ...b, provider: "other" }], providers: [{ id: "other", connected: true }] };
 	await act(async () => notifySettingsSaved("keys")); await answer(2, connected);
 	assert.ok(element("setup-stage-pickers")); assert.equal(document.querySelector('[data-testid="setup-stage-keys"]'), null); assert.equal(closed, 0);
 	for (const slot of ["strong", "cheap", "vision"] as const) {
 		if (before.slots[slot]) continue;
 		await click(`setup-trigger-${slot}`); await click("model-option-claude-opus-5-5");
 	}
-	if (count > 0) assert.equal(element("setup-thinking-strong").textContent?.trim(), "xhigh▾");
+	if (count > 0) assert.equal(element("setup-thinking-strong").textContent?.trim(), "xhigh");
 	await click("setup-save");
 	for (const slot of ["strong", "cheap", "vision"] as const) {
 		if (before.slots[slot]) assert.deepEqual(writes[0]?.[slot], before.slots[slot]);
@@ -170,27 +164,27 @@ test("a partial setup's model/thinking edits survive exclusive provider recovery
 	installFetch(); const before = catalog(); before.slots.cheap = null; before.slots.vision = null;
 	await warm(before); await render(<><Reader />{setup()}</>); await answer(1, before);
 	await click("setup-trigger-strong"); await click("model-option-claude-opus-5-5");
-	await click("setup-thinking-strong"); await click("thinking-option-medium");
+	await toggleMenu("setup-thinking-strong"); await click("thinking-option-medium");
 	await act(async () => notifySettingsSaved("keys")); await answer(2, { ...before, models: [], providers: [] });
 	assert.ok(element("setup-stage-keys")); assert.equal(document.querySelector('[data-testid="setup-stage-pickers"]'), null);
 	await act(async () => notifySettingsSaved("keys")); await answer(3, before);
-	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5▾");
-	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium▾");
+	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5");
+	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium");
 	await render(<Reader />); await render(<><Reader />{setup()}</>);
-	assert.equal(element("setup-trigger-strong").textContent, "model:free▾");
-	assert.equal(element("setup-thinking-strong").textContent?.trim(), "low▾"); await answer(4, before);
+	assert.equal(element("setup-trigger-strong").textContent, "model:free");
+	assert.equal(element("setup-thinking-strong").textContent?.trim(), "low"); await answer(4, before);
 });
 
 test("Agent opens with cached thinking metadata; refresh and disconnect never clear saved levels", async () => {
 	installFetch(); await warm();
 	const models: ModelsSettings = { strong: { model: { provider: a.provider, id: a.id }, thinkingLevel: "low" } };
 	let changed: ModelsSettings | undefined;
-	await render(<><Reader /><AgentSection agent={undefined} models={models} graph={undefined} compaction={undefined} onSectionChange={() => {}} onModelsChange={(next) => { changed = next; }} onCompactionChange={() => {}} /></>);
-	await click("slot-thinking-strong"); assert.deepEqual(levels(), ["off", "low✓", "high"]);
-	assert.equal(element("slot-model-strong").textContent, "model:free▾");
+	await render(<><Reader /><AgentSection agent={undefined} models={models} onSectionChange={() => {}} onModelsChange={(next) => { changed = next; }} /></>);
+	await toggleMenu("slot-thinking-strong"); assert.deepEqual(levels(), ["off", "low✓", "high"]);
+	assert.equal(element("slot-model-strong").textContent, "Model free");
 	await answer(1, catalog());
 	await act(async () => notifySettingsSaved("keys")); await answer(2, catalog(false));
-	assert.equal(element("slot-thinking-strong").textContent, "low▾");
+	assert.equal(element("slot-thinking-strong").textContent, "low");
 	await click("thinking-option-xhigh"); assert.equal(changed?.strong?.thinkingLevel, "xhigh"); assert.equal(changed?.strong?.model?.id, a.id);
 });
 
@@ -201,14 +195,14 @@ test("saved completeness follows ordinary repairs and survives temporary connect
 	assert.equal(state!.configured, true);
 	await act(async () => notifySettingsSaved("keys")); assert.equal(state!.configured, true);
 	const partial = catalog(false); partial.slots.vision = null;
-	await answer(1, partial); assert.equal(state!.configured, false); assert.equal(state!.zeroKeys, true);
+	await answer(1, partial); assert.equal(state!.configured, false); assert.equal(state!.unconnected, true);
 	await act(async () => notifySettingsSaved("models")); await answer(2, catalog(false));
-	assert.equal(state!.configured, true); assert.equal(state!.zeroKeys, true, "saved is not connected");
+	assert.equal(state!.configured, true); assert.equal(state!.unconnected, true, "saved is not connected");
 });
 
 test("blocked session recovery opens its ordinary picker, never changes Strong or substitutes a model", async () => {
 	installFetch(); const available = { ...b, provider: "other" }; const body = catalog();
-	body.models = [available]; body.providers = [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }];
+	body.models = [available]; body.providers = [{ id: "other", connected: true }];
 	body.slots.strong = { model: { provider: "other", id: b.id }, thinkingLevel: "medium" };
 	const globals: ModelsSettings = { strong: body.slots.strong };
 	const session = { model: { provider: a.provider, id: a.id }, thinkingLevel: "xhigh" };
@@ -220,7 +214,7 @@ test("blocked session recovery opens its ordinary picker, never changes Strong o
 		return requestsOnly(input, init);
 	};
 	await warm(body); let selected: string | undefined;
-	await render(<><Reader /><StatsBar turns={[]} chatId="fixture" onModelChange={(id) => { selected = id; }} /></>);
+	await render(<><Reader /><ModelControl chatId="fixture" onModelChange={(id) => { selected = id; }} /></>);
 	assert.equal(selected, `${a.provider}:${a.id}`, "current session does not inherit a different Strong pin");
 	assert.equal(selectedModelUnavailable(body, selected), true);
 	assert.deepEqual(sessionWrites, []);
@@ -234,7 +228,7 @@ test("blocked session recovery opens its ordinary picker, never changes Strong o
 
 for (const result of ["override", "legacy", "http-failure", "network-failure"] as const) test(`known catalog never enforces provisional Strong on a pending session; session read ${result}`, async () => {
 	installFetch(); const available = { ...b, provider: "other" }; const body = catalog();
-	body.models = [available]; body.providers = [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }];
+	body.models = [available]; body.providers = [{ id: "other", connected: true }];
 	// Global Strong is unavailable, but this existing session owns a valid
 	// model. Resolve global settings first while keeping its record pending.
 	const globals: ModelsSettings = { strong: { model: { provider: a.provider, id: a.id }, thinkingLevel: "xhigh" } };
@@ -248,9 +242,9 @@ for (const result of ["override", "legacy", "http-failure", "network-failure"] a
 		return requestsOnly(input, init);
 	};
 	await warm(body); const identities: Array<string | undefined> = [];
-	await render(<><Reader /><StatsBar turns={[]} chatId="fixture" onModelChange={(id) => { identities.push(id); }} /></>);
+	await render(<><Reader /><ModelControl chatId="fixture" onModelChange={(id) => { identities.push(id); }} /></>);
 	assert.ok(snapshot.catalog, "catalog is already known, not the deferred unknown-catalog case");
-	assert.equal(element("stats-model").textContent, "—▾");
+	assert.equal(element("stats-model").textContent, "—");
 	assert.equal(identities.at(-1), undefined);
 	assert.equal(selectedModelUnavailable(snapshot.catalog, identities.at(-1)), false, "pending session cannot block Send using global Strong");
 	await act(async () => {
@@ -271,7 +265,7 @@ test("availability and setup completeness never conflate missing metadata, disco
 	assert.equal(selectedModelUnavailable(body, `${a.provider}:${a.id}`), true);
 	assert.equal(selectedModelUnavailable(undefined, `${a.provider}:${a.id}`), false);
 	assert.equal(selectedModelUnavailable(body, undefined), false);
-	body.models = [b]; body.providers = [{ ...provider, keyPresent: true }];
+	body.models = [b]; body.providers = [{ ...provider, connected: true }];
 	assert.equal(selectedModelUnavailable(body, `${b.provider}:${b.id}`), false);
 	body.slots.cheap = null; assert.equal(savedSlotsConfigured(body.slots), false);
 });
@@ -286,12 +280,4 @@ test("shared refresh fences late failure as well as late success, and Retry clea
 	assert.equal(snapshot.failed, true); assert.equal(snapshot.catalog?.models[0]?.id, b.id);
 	await act(async () => snapshot.refresh()); assert.equal(snapshot.failed, false);
 	await answer(4, fresh);
-});
-
-test("OpenCode's saved shared credential names both Pi providers without changing addable-provider semantics", () => {
-	const providers = [{ id: "opencode", envVar: "OPENCODE_API_KEY", label: "OpenCode Zen" }, { id: "opencode-go", envVar: "OPENCODE_API_KEY", label: "OpenCode Go" }];
-	assert.equal(providerKeyLabel("OPENCODE_API_KEY", providers), "OpenCode (Zen / Go)");
-	assert.equal(providerKeyLabel("OPENCODE_API_KEY", [...providers].reverse()), "OpenCode (Zen / Go)");
-	assert.equal(providerKeyLabel("FIXTURE_KEY", [provider]), "Fixture");
-	assert.equal(classifyKeys([{ id: "OPENCODE_API_KEY", present: true, masked: "…fake", source: "file", shadowedByEnv: false }], providers).addable.length, 0);
 });

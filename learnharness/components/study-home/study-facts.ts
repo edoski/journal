@@ -4,12 +4,12 @@ import { continueMove, sessionState, type SessionState } from "@/components/nav/
 import { taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 
-/** "Span", "Span and Rank", "Span, Rank and more": at most two titles,
- *  never a count. Pure. */
+/** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
+ *  in order, joined by commas only, since a title may hold its own "and"
+ *  ("Random variables and distributions") and "and more" hid which topics
+ *  a review takes up (13 Nov 2026). Never a count. Pure. */
 export function titleList(titles: readonly string[]): string {
-	const [first, second] = titles;
-	if (second === undefined) return first ?? "";
-	return titles.length > 2 ? `${first}, ${second} and more` : `${first} and ${second}`;
+	return titles.join(", ");
 }
 
 function overdue(t: CourseMapTopic): number {
@@ -62,7 +62,7 @@ export function nextStepOf(course: StudyCourse): NextStep {
 	return current ? { kind: "topic", title: current.title, topics: [current.handle], fresh: current.level === "new", planned: false } : { kind: "none" };
 }
 
-/** The step as a short instruction: "Review Linear independence and Rank",
+/** The step as a short instruction: "Review Linear independence, Rank",
  *  "Continue Problem sheet 4", "Start Poisson distribution" for a topic not
  *  started. Pure. */
 export function stepWords(step: NextStep): string {

@@ -45,7 +45,7 @@ const STAGGER_MS = 15;
 const STAGGER_CAP_MS = 110;
 
 /**
- * One step of a lesson's plan (spec: steps.md): the Plan list's dot and
+ * One step of a lesson's plan (spec: ../hybrid/hybrid.md, Lesson map): the Plan list's dot and
  * the step's title on the topic map's node. Every step has the same
  * surface, since nothing says which are done; the step the lesson stopped
  * on is ringed and tagged. A link to the lesson.
@@ -75,7 +75,7 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 				"pointer-events-auto flex size-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 outline-none transition-colors duration-150 motion-reduce:transition-none",
 				"hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
 				current && "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)] hover:border-ring",
-				// Link "connected": the step answers its row being pointed at.
+				// Linked columns: the step answers its tied row being pointed at.
 				current && "in-data-[lit]:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ring)_36%,transparent)]",
 			)}
 		>

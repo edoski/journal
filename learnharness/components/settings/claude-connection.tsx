@@ -5,11 +5,10 @@ import { CLAUDE_ROLE_DEFAULT, MODEL_SLOTS, type ClaudeAccount, type ClaudeAccoun
 import { Button } from "@/components/ui/button";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { useModelCatalog } from "@/components/model-catalog";
-import { ConnectionRow, connectionBlockClass, connectionNoteClass } from "./connection-controls";
-import { useSettingsProposed } from "./settings-design";
+import { CONNECTION_BLOCK, ConnectionRow, connectionNoteClass } from "./connection-controls";
 
-export const CLAUDE_LABEL = "Claude (your subscription)";
-export const CLAUDE_NOTICE = "Prompts and session context go to Anthropic through Claude Code and count toward your Claude plan's usage limits.";
+export const CLAUDE_LABEL = "Claude";
+export const CLAUDE_NOTICE = "Your lessons run on your Claude plan through Claude Code and count toward its limits.";
 const PATH = "/api/subscriptions/claude";
 
 const METHOD_LABELS: Record<string, string> = {
@@ -84,26 +83,24 @@ export async function readClaudeAccounts(refresh: boolean): Promise<ClaudeAccoun
 /** Mounted only while signed in, so a signed-out row never reads the catalog. */
 function UseForAllRoles({ providerId, busy, onUse }: { providerId: string; busy: boolean; onUse: () => void }) {
 	const { catalog } = useModelCatalog();
-	const proposed = useSettingsProposed();
 	if (!catalog || holdsAllRoles(catalog.slots, providerId)) return null;
-	return <Button type="button" size={proposed ? "sm" : "xs"} variant="outline" className={proposed ? "h-7 cursor-pointer px-3 disabled:cursor-not-allowed" : "cursor-pointer disabled:cursor-not-allowed"} data-testid="claude-use-all" disabled={busy} onClick={onUse}>Use for all roles</Button>;
+	return <Button type="button" size="sm" variant="outline" className="h-7 cursor-pointer px-3 disabled:cursor-not-allowed" data-testid="claude-use-all" disabled={busy} onClick={onUse}>Use for everything</Button>;
 }
 
-function AccountRow({ status, busy, labelClassName, onUse }: { status: ClaudeAccountStatus; busy: boolean; labelClassName?: string; onUse: () => void }) {
+function AccountRow({ status, busy, onUse }: { status: ClaudeAccountStatus; busy: boolean; onUse: () => void }) {
 	const { account, connection, usage } = status;
 	const connected = connection.state === "connected";
-	const proposed = useSettingsProposed();
-	return <div className={proposed ? "flex flex-col gap-0.5 pt-1" : "flex flex-col gap-0.5"} data-testid="claude-account" data-provider={account.providerId}>
-		<div className={proposed ? "flex min-h-7 items-center gap-3" : "flex flex-wrap items-center gap-3"}>
-			<span className={proposed ? "min-w-0 flex-1 truncate text-row text-foreground" : labelClassName ?? "font-ui text-xs text-foreground"}>{claudeAccountLabel(account)}</span>
+	return <div className="flex flex-col gap-0.5 pt-1" data-testid="claude-account" data-provider={account.providerId}>
+		<div className="flex min-h-7 items-center gap-3">
+			<span className="min-w-0 flex-1 truncate text-row text-foreground">{claudeAccountLabel(account)}</span>
 			{connected && <UseForAllRoles providerId={account.providerId} busy={busy} onUse={onUse} />}
 		</div>
-		<p className={connectionNoteClass(proposed, "muted", "text-xs text-muted-foreground")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection, account)}</p>
-		{connected && usage && <p className={connectionNoteClass(proposed, "muted", "text-xs text-muted-foreground")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
+		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection, account)}</p>
+		{connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
 	</div>;
 }
 
-export function ClaudeConnectionRow({ labelClassName }: { labelClassName?: string }) {
+export function ClaudeConnectionRow() {
 	const [accounts, setAccounts] = useState<ClaudeAccountStatus[] | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -147,12 +144,11 @@ export function ClaudeConnectionRow({ labelClassName }: { labelClassName?: strin
 		}
 	}
 
-	const proposed = useSettingsProposed();
-	return <div className={connectionBlockClass(proposed, "flex flex-col gap-1.5")} data-testid="claude-connection">
-		<ConnectionRow label={CLAUDE_LABEL} labelClassName={labelClassName} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()} />
-		{!accounts && !error && <p className={connectionNoteClass(proposed, "muted", "text-xs text-muted-foreground")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
-		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} busy={busy} labelClassName={labelClassName} onUse={() => void useForAllRoles(status.account.providerId)} />)}
-		<p className={connectionNoteClass(proposed, "muted", "text-xs text-muted-foreground")}>{CLAUDE_NOTICE}</p>
-		{error && <p role="alert" className={connectionNoteClass(proposed, "danger", "text-xs text-red-400")}>{error}</p>}
+	return <div className={CONNECTION_BLOCK} data-testid="claude-connection">
+		<ConnectionRow label={CLAUDE_LABEL} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()} />
+		{!accounts && !error && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
+		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} busy={busy} onUse={() => void useForAllRoles(status.account.providerId)} />)}
+		<p className={connectionNoteClass("muted")}>{CLAUDE_NOTICE}</p>
+		{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
 	</div>;
 }

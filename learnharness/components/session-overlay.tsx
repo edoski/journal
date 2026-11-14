@@ -1,6 +1,5 @@
 "use client";
 
-import { useDesignVariant } from "@/components/design-variant";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { MaximizeIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,26 +65,15 @@ export function chartSize(svg: string): { w: number; h: number } {
 	return { w: 600, h: 400 };
 }
 
-/** The overlay's classes per design (Proposed: the same translucent surface, quiet controls). */
-const OVERLAY_LOOK = {
-	current: {
-		root: "absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm",
-		title: "text-sm font-medium",
-		sub: "text-xs text-muted-foreground",
-		close: "ml-auto rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-		hint: "text-xs text-muted-foreground/60",
-		zoom: "pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground",
-		loading: "flex h-full items-center justify-center gap-2 text-sm text-muted-foreground",
-	},
-	proposed: {
-		root: "absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm",
-		title: "text-row font-medium text-foreground",
-		sub: "text-row text-muted-foreground",
-		close: "ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
-		hint: "text-label text-muted-foreground",
-		zoom: "pointer-events-auto flex size-8 items-center justify-center rounded-md border bg-popover text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
-		loading: "flex h-full items-center justify-center gap-2 text-row text-muted-foreground",
-	},
+/** The overlay's classes: a translucent surface, quiet controls. */
+const L = {
+	root: "absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm",
+	title: "text-row font-medium text-foreground",
+	sub: "text-row text-muted-foreground",
+	close: "ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+	hint: "text-label text-muted-foreground",
+	zoom: "pointer-events-auto flex size-8 items-center justify-center rounded-md border bg-popover text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+	loading: "flex h-full items-center justify-center gap-2 text-row text-muted-foreground",
 } as const;
 
 /** The diagram focus: the chart at natural size inside a pan/zoom viewport
@@ -108,7 +96,6 @@ export function MermaidOverlay({
 	onClose: () => void;
 }) {
 	// ── chart render (own instance, own ids); figure mode uses the raw svg ──
-	const design = useDesignVariant();
 	const [svg, setSvg] = useState<string | null>(rawSvg ?? null);
 	const [error, setError] = useState<string | null>(null);
 	const [attempt, setAttempt] = useState(0);
@@ -233,7 +220,6 @@ export function MermaidOverlay({
 		setView(fitGraphView(box, size, fitZoom));
 	};
 
-	const L = OVERLAY_LOOK[design];
 	return (
 		<div
 			data-testid="mermaid-overlay"

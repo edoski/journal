@@ -1,16 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ChatSettings, ModelCatalogEntry, ModelCatalogResponse, ModelsSettings, UserSettings } from "@/src/core";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
-import { ModelMenuList, ThinkingMenuList } from "@/components/settings/model-menu";
 import { composeSlotModel } from "@/components/settings/agent-section";
-import { MenuShell } from "@/components/menu-shell";
 import { Hint } from "@/components/ui/hint";
 import { ChevronDownIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { MENU_SURFACE } from "@/components/ui/menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ModelCommand, ThinkingMenuItems } from "@/components/settings/model-pickers";
@@ -24,19 +20,19 @@ import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/t
  *  amendment, owner 2026-09-23: pi's live catalog is the ONLY limit
  *  source — no hardcoded fallback exists anywhere, so a model missing
  *  from the index reads limit-null and the meter renders usage-only,
- *  the honest-render precedent). Consumed by the stats bar: the same
+ *  the honest-render precedent). Consumed by the stats readouts: the same
  *  cached /api/models fetch the picker rides feeds the denominator. */
 export function catalogLimits(catalog: Pick<ModelCatalogResponse, "models">): Map<string, number> {
 	return new Map(catalog.models.map((m) => [`${m.provider}:${m.id}`, m.contextWindow]));
 }
 
-/** The Proposed trigger: the settings field look (settings.md), 28px. */
-const PROPOSED_TRIGGER =
+/** The trigger: the settings field look (settings.md), 28px. */
+const TRIGGER =
 	"flex h-7 items-center gap-1.5 rounded-md border border-input bg-transparent pl-2.5 pr-1.5 text-row text-foreground outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
 
 /**
  * THE CONVERSATION MODEL CONTROL — dual-bound (owner, per-session models,
- * 2026-09-28). WITH a chatId (the in-session stats bar): the pills bind
+ * 2026-09-28). WITH a chatId (the lesson's details menu): the pills bind
  * THE SESSION'S OWN record — reads GET /api/chats/:id (its settings field;
  * a legacy unstamped record falls back to the strong slot's display,
  * exactly what the engine resolves), writes PUT /api/chats/:id/settings
@@ -53,15 +49,10 @@ const PROPOSED_TRIGGER =
 export function ModelControl({
 	chatId,
 	onModelChange,
-	variant = "current",
 }: {
 	chatId?: string;
 	onModelChange?: (model: string | undefined) => void;
-	/** "proposed": quiet field-style triggers and the shared menu anatomy
-	 *  (the lesson's details menu, lesson-top-bar.md). */
-	variant?: "current" | "proposed";
 }) {
-	const proposed = variant === "proposed";
 	const { catalog, refresh } = useModelCatalog();
 	const [models, setModels] = useState<ModelsSettings | undefined>();
 	// A successful read with no settings is a legacy session; undefined
@@ -69,7 +60,6 @@ export function ModelControl({
 	const [session, setSession] = useState<{ settings?: ChatSettings }>();
 	const [open, setOpen] = useState<"model" | "thinking" | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const containerRef = useRef<HTMLDivElement>(null);
 
 	// The record read — BOTH mount and the cross-surface signal land
 	// here (fix wave: another surface's models write re-reads into the
@@ -133,40 +123,6 @@ export function ModelControl({
 	// — because that is exactly what the engine build would run. Display-
 	// only: the record stays unset until a fresh pick populates it.
 	const effectiveLevel = storedLevel ?? (entry ? defaultOrderLevel(levels) : undefined);
-
-	// The intuitive dropdown contract (owner, stats-control round 1): any
-	// click outside the open menu — or an Esc keypress — closes it. The
-	// menu's own surface keeps it open: the toggle buttons live inside the
-	// container, and the menu BODY lives in a portal on document.body
-	// (MenuShell) — never a container descendant, so its rows are carved
-	// out via [data-lh-menu] (the settings sections' discipline; without
-	// it a row's pointerdown counts as outside and eats the pick —
-	// live-caught in the fix wave, broken since the MenuShell migration).
-	useEffect(() => {
-		// Proposed: the Radix layers dismiss themselves (overlay.md).
-		if (open === null || proposed) return;
-		const onPointerDown = (e: PointerEvent) => {
-			const t = e.target as Element;
-			if (t instanceof Element && t.closest("[data-lh-menu]")) return;
-			if (containerRef.current && !containerRef.current.contains(t)) {
-				setOpen(null);
-			}
-		};
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				// Claim the Esc (keyboard wave A): the window-level chain must
-				// not ALSO abort the turn under this menu.
-				e.stopPropagation();
-				setOpen(null);
-			}
-		};
-		document.addEventListener("pointerdown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.removeEventListener("pointerdown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
-		};
-	}, [open, proposed]);
 
 	// One write seam: composeSlotModel preserves the cheap/vision siblings
 	// (replace-whole-section discipline) and the per-field independence of
@@ -299,161 +255,55 @@ export function ModelControl({
 
 	const modelLabel = effectiveId ? `${effectiveProvider ? `${effectiveProvider}:` : ""}${effectiveId}` : "Model selector";
 	const levelLabel = effectiveLevel === undefined ? "—" : (THINKING_LABEL[effectiveLevel] ?? effectiveLevel);
-	if (proposed) {
-		return (
-			<div className="flex items-center gap-1.5" data-testid="model-control">
-				<Popover open={open === "model"} onOpenChange={(next) => (next ? openMenu("model") : setOpen(null))}>
-					<Hint label={modelLabel} action="open-model-picker" side="bottom">
-						<PopoverTrigger asChild>
-							<button type="button" data-testid="stats-model" className={PROPOSED_TRIGGER}>
-								<span>{effectiveId ? prettyModel(effectiveId) : "—"}</span>
-								<ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
-							</button>
-						</PopoverTrigger>
-					</Hint>
-					<PopoverContent align="end" className="w-[22rem] p-1" data-testid="model-menu">
-						<ModelCommand
-							models={catalog?.models}
-							effectiveId={effectiveId}
-							effectiveProvider={effectiveProvider}
-							onPick={pickModel}
-							error={error}
-							footer={
-								catalog && catalog.models.length === 0
-									? "No models — add a provider key in Keys"
-									: chatId
-										? "This session's model"
-										: "Strong tier — the default for new sessions"
-							}
-						/>
-					</PopoverContent>
-				</Popover>
-				{/* No model picked: nothing to set a level for, so no menu. */}
-				<DropdownMenu open={open === "thinking"} onOpenChange={(next) => (next && entry !== undefined ? openMenu("thinking") : setOpen(null))}>
-					<Hint label="Thinking" action="cycle-thinking" side="bottom">
-						<DropdownMenuTrigger asChild>
-							<button type="button" data-testid="stats-thinking" className={PROPOSED_TRIGGER}>
-								<span>{levelLabel}</span>
-								<ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
-							</button>
-						</DropdownMenuTrigger>
-					</Hint>
-					<DropdownMenuContent align="end" className="w-44" data-testid="thinking-menu">
-						<ThinkingMenuItems
-							levels={catalog ? levels : []}
-							effectiveLevel={effectiveLevel}
-							onPick={(level) => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
-							empty={catalog ? (effectiveId ? `${prettyModel(effectiveId)} has no thinking levels.` : "Pick a model first.") : "Loading…"}
-							footer="Levels this model actually supports"
-						/>
-						{error && <div className="px-2 py-1.5 text-label text-danger">{error}</div>}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-		);
-	}
-
 	return (
-		<div ref={containerRef} className="relative flex items-center gap-1.5" data-testid="model-control">
-			<Hint
-				label={effectiveId ? `${effectiveProvider ? `${effectiveProvider}:` : ""}${effectiveId}` : "Model selector"}
-				action="open-model-picker"
-				side="bottom"
-			>
-				<button
-				type="button"
-				data-testid="stats-model"
-				onClick={() => openMenu("model")}
-				aria-expanded={open === "model"}
-				// Chrome look (owner, fix wave round 3): matches the graph
-				// view's floating top-right buttons (import notes, gear,
-				// coverage) — blurred, fuller opacity, shadowed — so the
-				// graph no longer bleeds through these pills.
-				className={proposed ? PROPOSED_TRIGGER : "flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"}
-			>
-				<span className="text-card-foreground">{effectiveId ? prettyModel(effectiveId) : "—"}</span>
-				{proposed ? <ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" /> : <span aria-hidden className="text-xs text-muted-foreground">▾</span>}
-			</button>
-			</Hint>
-			<Hint
-				// "Thinking" + its real shortcut via the registry (owner interlude
-				// 2026-09-25): ⇧⇥ cycles the level, so "Thinking (⇧⇥)" —
-				// rebind-live like every Hint suffix.
-				label="Thinking"
-				action="cycle-thinking"
-				side="bottom"
-			>
-				<button
-				type="button"
-				data-testid="stats-thinking"
-				onClick={() => {
-					// No model picked → nothing to set a level FOR: the click
-					// is a no-op, never an empty menu.
-					if (entry === undefined) return;
-					openMenu("thinking");
-				}}
-				aria-expanded={open === "thinking"}
-				// Chrome look (owner, fix wave round 3): matches the graph
-				// view's floating top-right buttons (import notes, gear,
-				// coverage) — blurred, fuller opacity, shadowed — so the
-				// graph no longer bleeds through these pills.
-				className={proposed ? PROPOSED_TRIGGER : "flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"}
-			>
-				{/* Just the level — the button reads like the model button reads
-				   the model name (owner, stats-control round 1). */}
-				<span className="text-card-foreground">
-					{effectiveLevel === undefined ? "—" : (THINKING_LABEL[effectiveLevel] ?? effectiveLevel)}
-				</span>
-				{proposed ? <ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" /> : <span aria-hidden className="text-xs text-muted-foreground">▾</span>}
-			</button>
-			</Hint>
-
-			{/* The shared dropdown body (extracted 2026-09-20): the agent
-			    settings' slot selects and the setup dialog use the exact same
-			    one. */}
-			{open === "model" && (
-				<MenuShell
-					anchorRef={containerRef}
-					testid="model-menu"
-					preferredSide="up"
-					menuClass={proposed ? cn(MENU_SURFACE, "w-[22rem]") : "flex w-[22rem] flex-col rounded-xl border bg-card p-2 text-xs shadow-xl"}
-				>
-					{error && <div className={proposed ? "px-2 py-1.5 text-label text-danger" : "mb-1.5 text-destructive"}>{error}</div>}
-					<ModelMenuList
-						variant={variant}
+		<div className="flex items-center gap-1.5" data-testid="model-control">
+			<Popover open={open === "model"} onOpenChange={(next) => (next ? openMenu("model") : setOpen(null))}>
+				<Hint label={modelLabel} action="open-model-picker" side="bottom">
+					<PopoverTrigger asChild>
+						<button type="button" data-testid="stats-model" className={TRIGGER}>
+							<span>{effectiveId ? prettyModel(effectiveId) : "—"}</span>
+							<ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
+						</button>
+					</PopoverTrigger>
+				</Hint>
+				<PopoverContent align="end" className="w-[22rem] p-1" data-testid="model-menu">
+					<ModelCommand
 						models={catalog?.models}
 						effectiveId={effectiveId}
 						effectiveProvider={effectiveProvider}
 						onPick={pickModel}
+						error={error}
 						footer={
 							catalog && catalog.models.length === 0
-								? "No models — add a provider key in Keys"
+								? "No models — sign in to Claude or ChatGPT in Settings → Accounts"
 								: chatId
 									? "This session's model"
 									: "Strong tier — the default for new sessions"
 						}
 					/>
-				</MenuShell>
-			)}
-
-			{open === "thinking" && (
-				<MenuShell
-					anchorRef={containerRef}
-					testid="thinking-menu"
-					preferredSide="up"
-					menuClass={proposed ? cn(MENU_SURFACE, "w-44") : "flex w-44 flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"}
-				>
-					<ThinkingMenuList
-						variant={variant}
+				</PopoverContent>
+			</Popover>
+			{/* No model picked: nothing to set a level for, so no menu. */}
+			<DropdownMenu open={open === "thinking"} onOpenChange={(next) => (next && entry !== undefined ? openMenu("thinking") : setOpen(null))}>
+				<Hint label="Thinking" action="cycle-thinking" side="bottom">
+					<DropdownMenuTrigger asChild>
+						<button type="button" data-testid="stats-thinking" className={TRIGGER}>
+							<span>{levelLabel}</span>
+							<ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
+						</button>
+					</DropdownMenuTrigger>
+				</Hint>
+				<DropdownMenuContent align="end" className="w-44" data-testid="thinking-menu">
+					<ThinkingMenuItems
 						levels={catalog ? levels : []}
 						effectiveLevel={effectiveLevel}
 						onPick={(level) => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
 						empty={catalog ? (effectiveId ? `${prettyModel(effectiveId)} has no thinking levels.` : "Pick a model first.") : "Loading…"}
 						footer="Levels this model actually supports"
 					/>
-					{error && <div className={proposed ? "px-2 py-1.5 text-label text-danger" : "mt-1 text-destructive"}>{error}</div>}
-				</MenuShell>
-			)}
+					{error && <div className="px-2 py-1.5 text-label text-danger">{error}</div>}
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</div>
 	);
 }

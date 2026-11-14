@@ -1,6 +1,6 @@
 # SectionBreak
 
-`<SectionBreak label="Teaching" />`: the lesson column's section break under the Proposed design. `data-slot="section-break"`, `role="separator"`.
+`<SectionBreak label="Teaching" />`: the lesson column's section break. `data-slot="section-break"`, `role="separator"`.
 
 | Slot | Notes |
 |---|---|

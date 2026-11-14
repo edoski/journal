@@ -3,15 +3,12 @@
 import * as React from "react"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Kbd } from "@/components/ui/kbd"
-import { useDesignVariant } from "@/components/design-variant"
 import { bindingForAction, formatBinding, type KeyAction } from "@/src/core"
 
 /**
  * The tooltip composition for icon and pill controls (tooltip wave, owner
  * 2026-09-25; subtlety round same day). The styled Radix tooltip carries
- * the label, with the control's shortcut appended in parentheses when
- * it has one ("Model selector (⌘K)") — the owner call: the em-dash suffix read
- * as too much air.
+ * the label, then the control's shortcut as muted key glyphs when it has one.
  *
  * The binding is override-aware: pass `action` for registry shortcuts (a
  * user rebind in Settings → Keyboard changes the suffix live), or
@@ -34,38 +31,26 @@ interface HintProps {
 	children: React.ReactElement
 }
 
-/** The composition itself, pure — "Model selector" + ⌘K → "Model selector (⌘K)". Exported
- *  for the mechanism pins (tests/tooltip-mechanism.test.tsx). */
-export function hintText(label: string, action?: KeyAction, binding?: string): string {
-	const live = hintBinding(action, binding)
-	return live ? `${label} (${live})` : label
-}
-
 /** The live shortcut glyphs for a hint, "" when it has none. */
 export function hintBinding(action?: KeyAction, binding?: string): string {
 	return action ? formatBinding(bindingForAction(action)) : binding ? formatBinding(binding) : ""
 }
 
 export function Hint({ label, action, binding, side = "top", children }: HintProps) {
-	// Proposed: the label, then the shortcut as muted glyphs (kbd.md), not in parentheses.
-	const proposed = useDesignVariant() === "proposed"
-	const live = proposed ? hintBinding(action, binding) : ""
+	// The label, then the shortcut as muted glyphs (kbd.md), not in parentheses.
+	const live = hintBinding(action, binding)
 	return (
 		<TooltipProvider>
 			<Tooltip>
-				{/* Proposed: hover only. Tab is dead app-wide, so focus lands on a
+				{/* Hover only. Tab is dead app-wide, so focus lands on a
 				    control only programmatically (a dialog's autofocus, a closed
 				    menu's return), and a tooltip opened then would take the next
 				    Esc meant for the dialog (overlay.md). */}
-				<TooltipTrigger asChild onFocus={proposed ? (e) => e.preventDefault() : undefined}>{children}</TooltipTrigger>
-				{proposed ? (
-					<TooltipContent side={side} variant="proposed">
-						<span>{label}</span>
-						{live && <Kbd>{live}</Kbd>}
-					</TooltipContent>
-				) : (
-					<TooltipContent side={side}>{hintText(label, action, binding)}</TooltipContent>
-				)}
+				<TooltipTrigger asChild onFocus={(e) => e.preventDefault()}>{children}</TooltipTrigger>
+				<TooltipContent side={side}>
+					<span>{label}</span>
+					{live && <Kbd>{live}</Kbd>}
+				</TooltipContent>
 			</Tooltip>
 		</TooltipProvider>
 	)

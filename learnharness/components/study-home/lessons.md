@@ -1,6 +1,6 @@
 # Lessons
 
-What the split, map and path study homes share: Today's lines as lessons in plain words, and the pieces that draw one. `lesson-facts.ts` (`lessonOf`, `topicSpan`, `spanWords`, `trackMarks`), `lesson-text.tsx` (`data-slot` `lesson-text`), `lesson-button.tsx`, `day-heading.tsx` (`day-heading`), `map-frame.ts`, and the page frame `home-frame.tsx`. The lines and their order are Today's (today.md, `todayRows`); the agenda home draws them its own way.
+Today's lines as lessons in plain words, which the study home, the course page and the sidebar read, and the pieces that draw one: `lesson-facts.ts` (`lessonOf`, `topicSpan`), `lesson-button.tsx`, `day-heading.tsx` (`day-heading`), `map-frame.ts`, and the page frame `home-frame.tsx`. The lines and their order are Today's (today.md, `todayRows`).
 
 ## A lesson
 
@@ -8,22 +8,12 @@ What the split, map and path study homes share: Today's lines as lessons in plai
 |---|---|---|
 | course | the course's title; "No course" for a session without one | the engine's map, the session's record |
 | exam | "Exam in 11 days", only inside the exam run-up | `plan`'s run-up, the map's exam |
-| place | "Topic 7 of 16", or "Topics 2 to 9 of 16" when the lesson works on several | the lesson's topics among the course's topics in the engine's path order (prerequisites first) |
-| title | the session's title, "Review A, B and more", "Continue <task or topic>", "Start a lesson" | `stepWords` |
+| place | the lesson's first and last topic in the course's path, of how many (`topicSpan`) | the lesson's topics among the course's topics in the engine's path order (prerequisites first) |
+| title | the session's title, "Review A, B, C", "Continue <task or topic>", "Start a lesson" | `stepWords` |
 | detail | "Waiting for your reply"; "Then <task or topic>" after reviews, left out when it only repeats a review; the open task's step | the session's state, the map's tasks |
 | action | Open (a session), Review, Continue, Start | the lesson's kind |
 
-A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place counts topics, not the map's rows: the drawing's layers ("steps") stay the agenda home's.
-
-## LessonText
-
-| Line | Notes |
-|---|---|
-| course line | 12/16: the course in ink, then the exam and the place in muted ink, 12px apart; in a narrow list the exam and the place wrap under the course before the course's name is cut; `place` off leaves the place to a home that draws it |
-| title | 14/20 at 500 in ink, up to three lines, `text-wrap: pretty` |
-| detail | 12/16 muted, one line, shown only when the lesson has one |
-
-2px between lines. Two weights (400, 500), two inks.
+A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place counts topics, not the map's rows: the drawing's layers ("steps") stay the study home's map's.
 
 ## The page frame
 

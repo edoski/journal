@@ -1,31 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { CoursesUnavailable } from "@/components/course-picker";
-import { useDesignVariant } from "@/components/design-variant";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { calendarEntries } from "@/components/calendar/calendar-facts";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { useCalendarRead } from "@/components/calendar/use-calendar";
 
-/** `/calendar`, the Proposed design's page only: Current goes Home once
- *  the page has hydrated, since the switch reads Current until then. */
+/** `/calendar`: the calendar over the engine's read and the sessions; a
+ *  press starts a session as the topic page would, linked to its topic. */
 export function CalendarPage({ initialConfigured }: { initialConfigured: boolean }) {
-	const design = useDesignVariant();
-	const router = useRouter();
-	const [hydrated, setHydrated] = useState(false);
-	useEffect(() => setHydrated(true), []);
-	useEffect(() => {
-		if (hydrated && design === "current") router.replace("/");
-	}, [hydrated, design, router]);
-	return design === "proposed" ? <CalendarRoute initialConfigured={initialConfigured} /> : null;
-}
-
-/** The calendar over the engine's read and the sessions: a press starts
- *  a session as the topic page would, linked to its topic. */
-function CalendarRoute({ initialConfigured }: { initialConfigured: boolean }) {
 	const read = useCalendarRead();
 	const lesson = useLessonStart(initialConfigured);
 	const [scope, setScope] = useState<string | null>(null);
@@ -38,7 +23,7 @@ function CalendarRoute({ initialConfigured }: { initialConfigured: boolean }) {
 	if (read.status !== "ready") {
 		return (
 			<div className="flex h-dvh items-center justify-center px-6">
-				{read.status === "loading" ? <p className="text-row text-muted-foreground">Reading your courses…</p> : <CoursesUnavailable reason={read.reason} variant="proposed" />}
+				{read.status === "loading" ? <p className="text-row text-muted-foreground">Reading your courses…</p> : <CoursesUnavailable reason={read.reason} />}
 			</div>
 		);
 	}

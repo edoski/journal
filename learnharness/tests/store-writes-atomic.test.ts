@@ -16,7 +16,6 @@ import { after, describe, it, type TestContext } from "node:test";
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-store-writes-atomic-"));
 process.env.LH_DATA_DIR = TMP_DATA;
-process.env.LH_AUTH_FILE = path.join(TMP_DATA, "auth.json");
 
 const config = await import("../config.ts");
 const { chatStore } = await import("../src/store/chats.ts");
@@ -25,8 +24,6 @@ const { writeSettings } = await import("../src/store/settings.ts");
 const { graphStore } = await import("../src/store/graph.ts");
 const { writeRenderSettings } = await import("../src/store/render-settings.ts");
 const { ensureGraphFormat } = await import("../src/store/graph-format.ts");
-const { promptOverrides } = await import("../src/store/prompt-overrides.ts");
-const { authStore } = await import("../src/store/auth.ts");
 
 after(() => fs.rmSync(TMP_DATA, { recursive: true, force: true }));
 
@@ -82,16 +79,6 @@ describe("failed saves leave the old file whole", () => {
 		assertAllOrNothing(t, config.POSITIONS_FILE, () => graphStore.writePositions({ a: { x: 1, y: 1 } }), () => graphStore.writePositions({ a: { x: 2, y: 2 } }));
 		assertAllOrNothing(t, config.LEDGER_FILES.chains, () => graphStore.rewriteLedgers({ chains: [] }), () => graphStore.rewriteLedgers({ chains: [] }));
 	});
-
-	it("prompt edit", (t) => {
-		assertAllOrNothing(t, path.join(config.PROMPTS_OVERRIDE_DIR, "system-prompt.md"),
-			() => promptOverrides.writeOverride("system-prompt.md", "old prompt"),
-			() => promptOverrides.writeOverride("system-prompt.md", "new prompt"));
-	});
-
-	it("auth keys", (t) => {
-		assertAllOrNothing(t, config.AUTH_FILE, () => authStore.setAuthVar("KEEP", "old"), () => authStore.setAuthVar("KEEP", "new"));
-	});
 });
 
 describe("Windows sharing violations: per-writer compatibility policy (modeled)", () => {
@@ -112,8 +99,6 @@ describe("Windows sharing violations: per-writer compatibility policy (modeled)"
 			fs.unlinkSync(config.GRAPH_FORMAT_FILE);
 			return { file: config.GRAPH_FORMAT_FILE, save: ensureGraphFormat };
 		} },
-		{ name: "prompt override", fallback: true, prepare: () => ({ file: path.join(config.PROMPTS_OVERRIDE_DIR, "system-prompt.md"), save: () => promptOverrides.writeOverride("system-prompt.md", "compatible prompt") }) },
-		{ name: "auth", fallback: false, prepare: () => ({ file: config.AUTH_FILE, save: () => authStore.setAuthVar("KEEP", "must not land") }) },
 		{ name: "ledger rewrite", fallback: false, prepare: () => ({ file: config.LEDGER_FILES.chains, save: () => graphStore.rewriteLedgers({ chains: [] }) }) },
 		{ name: "positions", fallback: false, prepare: () => ({ file: config.POSITIONS_FILE, save: () => graphStore.writePositions({ policy: { x: 3, y: 4 } }) }) },
 	];

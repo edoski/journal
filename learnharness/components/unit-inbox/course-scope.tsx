@@ -1,24 +1,32 @@
 "use client";
 
+import Link from "next/link";
 import { ListFilterIcon } from "lucide-react";
 import type { StudyCourse } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { Hint } from "@/components/ui/hint";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MathText } from "@/components/ui/math-text";
 
 const ALL = "";
 
 /** Which courses the sidebar lists, T3 Code's project filter: a 28px icon
  *  button beside the search (the filter glyph, or the chosen course's mark)
- *  opening every course with its exam countdown. */
+ *  opening every course with its exam countdown, then each course again as
+ *  a link to its page. */
 export function CourseScope({
 	courses,
 	scope,
@@ -50,11 +58,27 @@ export function CourseScope({
 					{courses.map((c) => (
 						<DropdownMenuRadioItem key={c.map.workspace} value={c.map.workspace} indicator={false}>
 							<CourseMark title={c.map.title} />
-							<span className="min-w-0 flex-1 truncate">{c.map.title}</span>
+							<span className="min-w-0 flex-1 truncate">
+								<MathText>{c.map.title}</MathText>
+							</span>
 							{examText(c.map.exam) && <DropdownMenuShortcut>{examText(c.map.exam)}</DropdownMenuShortcut>}
 						</DropdownMenuRadioItem>
 					))}
 				</DropdownMenuRadioGroup>
+				<DropdownMenuSeparator />
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Open a course page</DropdownMenuLabel>
+					{courses.map((c) => (
+						<DropdownMenuItem key={c.map.workspace} asChild>
+							<Link href={courseHref(c.map.workspace)} data-testid="course-scope-page">
+								<CourseMark title={c.map.title} />
+								<span className="min-w-0 flex-1 truncate">
+									<MathText>{c.map.title}</MathText>
+								</span>
+							</Link>
+						</DropdownMenuItem>
+					))}
+				</DropdownMenuGroup>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

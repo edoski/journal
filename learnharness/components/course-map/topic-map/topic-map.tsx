@@ -6,9 +6,9 @@ import type { CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import { NeedEdge, type NeedFlowEdge } from "./need-edge";
-import { MIN_ZOOM, NODE_HEIGHT, NODE_WIDTH, cameraAt, centreOf, chainOf, isWalkKey, layoutTopicMap, neighbourOf, openingCamera, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
+import { MIN_ZOOM, TOPIC_NODE_SIZE as node, cameraAt, centreOf, chainOf, isWalkKey, layoutTopicMap, neighbourOf, openingCamera, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, TopicNode, type TopicFlowNode, type TopicMapState } from "./topic-node";
-import { needOf, standingOf, topicLabel } from "./topic-standing";
+import { standingOf, statusOf, topicLabel } from "./topic-standing";
 
 const nodeTypes = { topic: TopicNode };
 const edgeTypes = { need: NeedEdge };
@@ -32,10 +32,21 @@ function reducedMotion(): boolean {
  * whether it needs him, and opens the topic's page. The map opens on the
  * whole course when that fits, else on the current topic; it pans by drag
  * or scroll and zooms by pinch. Hover or focus lights a topic's
- * prerequisite chain; arrows walk the edges.
+ * prerequisite chain; arrows walk the edges. `highlight` lights a set of
+ * topics while nothing is hovered or focused, for a page that points at
+ * them from elsewhere; off by default.
  */
-export function TopicMap({ map, margin = ROOM }: { map: CourseMap; margin?: { x: number; y: number } }) {
-	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges), [map.topics, map.edges]);
+export function TopicMap({
+	map,
+	margin = ROOM,
+	highlight = null,
+}: {
+	map: CourseMap;
+	margin?: { x: number; y: number };
+	/** Topics to light, the rest dimmed as a hover dims them; null lights none. */
+	highlight?: ReadonlySet<TopicHandle> | null;
+}) {
+	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node), [map.topics, map.edges]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
 	const nodes = useMemo<TopicFlowNode[]>(
 		() =>
@@ -47,12 +58,12 @@ export function TopicMap({ map, margin = ROOM }: { map: CourseMap; margin?: { x:
 					id: topic.handle,
 					type: "topic" as const,
 					position: { x: placed.x, y: placed.y },
-					width: NODE_WIDTH,
-					height: NODE_HEIGHT,
+					width: node.width,
+					height: node.height,
 					// A server render has no measured handles; these let it draw the needs.
 					handles: [
-						{ type: "target" as const, position: Position.Top, x: NODE_WIDTH / 2, y: 0 },
-						{ type: "source" as const, position: Position.Bottom, x: NODE_WIDTH / 2, y: NODE_HEIGHT },
+						{ type: "target" as const, position: Position.Top, x: node.width / 2, y: 0 },
+						{ type: "source" as const, position: Position.Bottom, x: node.width / 2, y: node.height },
 					],
 					draggable: false,
 					selectable: false,
@@ -62,7 +73,7 @@ export function TopicMap({ map, margin = ROOM }: { map: CourseMap; margin?: { x:
 						topic,
 						current: map.current === topic.handle,
 						standing: standingOf(topic),
-						need: needOf(topic, titleOf),
+						status: statusOf(topic, map.tasks, titleOf),
 						label: topicLabel(topic, map.current === topic.handle, titleOf),
 						needs: needs.length ? `Needs ${needs.join(", ")}` : null,
 						href: unitHref(map.workspace, topic.handle),
@@ -89,7 +100,7 @@ export function TopicMap({ map, margin = ROOM }: { map: CourseMap; margin?: { x:
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} />
+			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} />
 		</ReactFlowProvider>
 	);
 }
@@ -101,6 +112,7 @@ function Flow({
 	edges,
 	titleOf,
 	margin: frameMargin,
+	highlight,
 }: {
 	map: CourseMap;
 	layout: TopicMapLayout;
@@ -108,6 +120,7 @@ function Flow({
 	edges: NeedFlowEdge[];
 	titleOf: (handle: TopicHandle) => string;
 	margin: { x: number; y: number };
+	highlight: ReadonlySet<TopicHandle> | null;
 }) {
 	const captionId = useId();
 	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y]);
@@ -118,7 +131,8 @@ function Flow({
 	const [active, setActive] = useState<TopicHandle | null>(null);
 	const [tabStop, setTabStop] = useState<TopicHandle | null>(map.current ?? map.topics[0]?.handle ?? null);
 	const links = useRef(new Map<TopicHandle, HTMLAnchorElement>());
-	const lit = useMemo(() => (active ? chainOf(active, map.edges) : null), [active, map.edges]);
+	// A hovered or focused topic's chain, else the page's highlight.
+	const lit = useMemo(() => (active ? chainOf(active, map.edges) : highlight), [active, map.edges, highlight]);
 
 	const extent = useMemo<CoordinateExtent>(
 		() => [
@@ -145,8 +159,8 @@ function Flow({
 			const { x, y, zoom } = flow.getViewport();
 			const left = at.x * zoom + x;
 			const top = at.y * zoom + y;
-			const inside = left >= margin.x && top >= margin.y && left + NODE_WIDTH * zoom <= frameWidth - margin.x && top + NODE_HEIGHT * zoom <= frameHeight - margin.y;
-			if (!inside) void flow.setViewport(cameraAt(layout, centreOf(at), zoom, { width: frameWidth, height: frameHeight }, margin), { duration: reducedMotion() ? 0 : FOLLOW_MS });
+			const inside = left >= margin.x && top >= margin.y && left + layout.node.width * zoom <= frameWidth - margin.x && top + layout.node.height * zoom <= frameHeight - margin.y;
+			if (!inside) void flow.setViewport(cameraAt(layout, centreOf(layout, at), zoom, { width: frameWidth, height: frameHeight }, margin), { duration: reducedMotion() ? 0 : FOLLOW_MS });
 		},
 		[flow, layout, frameWidth, frameHeight, margin],
 	);

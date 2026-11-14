@@ -1,6 +1,6 @@
 # Dialog
 
-One anatomy for every modal under the Proposed design: Settings (its own two-pane frame in the same content), setup, New course, the subscription connection dialogs and the keyboard cheat sheet; the confirmations (delete session, delete notes, abort turn) use the same anatomy on `AlertDialog` (alert-dialog.md). `components/ui/dialog.tsx` is shadcn's Radix Dialog; `data-slot` per shadcn (`dialog-overlay`, `dialog-content`, `dialog-header`, `dialog-title`, `dialog-description`, `dialog-footer`, `dialog-close`).
+One anatomy for every modal: Settings (its own two-pane frame in the same content), setup, New course, the subscription connection dialogs and the keyboard cheat sheet; the confirmations (delete session, delete notes, abort turn) use the same anatomy on `AlertDialog` (alert-dialog.md). `components/ui/dialog.tsx` is shadcn's Radix Dialog; `data-slot` per shadcn (`dialog-overlay`, `dialog-content`, `dialog-header`, `dialog-title`, `dialog-description`, `dialog-footer`, `dialog-close`).
 
 Radix owns the portal, the focus trap, the scroll lock, Esc and the click on the dimmed layer. The menus, selects and popovers inside a dialog are Radix layers too, so a click in one counts as inside and the first Esc closes only it (overlay.md). A dialog without a visible title still renders a `DialogTitle` (`sr-only`); one without a description passes `aria-describedby={undefined}`.
 

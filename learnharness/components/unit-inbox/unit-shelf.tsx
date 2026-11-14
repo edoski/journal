@@ -10,7 +10,8 @@ export const SHELF_TAIL = 10;
 export const SHELF_PAGE = 25;
 
 /** One folded shelf at the sidebar's foot (spec: unit-inbox.md), T3 Code's
- *  shelf: a 32px header with the name, the count and a trailing chevron,
+ *  shelf: a 32px header with the name and a trailing chevron (no count: a
+ *  bare number told him nothing, 13 Nov 2026),
  *  then its rows. A folded shelf still shows the open row, and a dot when
  *  a hidden row waits on the learner. Open, it shows its first rows, then
  *  "Show N more". */
@@ -63,9 +64,6 @@ export function UnitShelf<T>({
 							<span className="sr-only">, your turn</span>
 						</span>
 					)}
-					<span data-slot="unit-shelf-count" className="font-normal tabular-nums">
-						{items.length}
-					</span>
 					<ChevronDownIcon
 						aria-hidden
 						className={cn("size-3 shrink-0 transition-transform duration-150 motion-reduce:transition-none", folded && "-rotate-90")}
@@ -82,7 +80,7 @@ export function UnitShelf<T>({
 							data-sidebar-row={`more:${id}`}
 							data-sidebar-parent={`shelf:${id}`}
 							onClick={() => setShownCount((n) => n + SHELF_PAGE)}
-							className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-control text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+							className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-control text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
 						>
 							<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
 							Show {more} more

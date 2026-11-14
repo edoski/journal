@@ -61,8 +61,11 @@ function scenario(fixture: { lines: unknown[]; exit?: number; stderr?: string },
 		ANTHROPIC_AUTH_TOKEN: "parent-auth-token",
 		CLAUDE_CODE_OAUTH_TOKEN: "parent-oauth-token",
 		LH_DESKTOP_API_SECRET: "x".repeat(64),
-		LH_AUTH_FILE: "/secret/auth.json",
+		LH_CREDENTIALS_DIR: "/secret",
 		OPENAI_API_KEY: "sk-openai-parent",
+		GROQ_API_KEY: "gsk-parent",
+		ANTHROPIC_CUSTOM_HEADERS: "x-api-key: parent",
+		GITHUB_AUTH_TOKEN: "parent-gh",
 		CLAUDE_CODE_USE_BEDROCK: "1",
 		ANTHROPIC_BASE_URL: "https://proxy.example",
 		CLAUDE_CODE_OAUTH_REFRESH_TOKEN: "parent-refresh",
@@ -101,7 +104,7 @@ test("the child gets the user's environment minus every credential and app secre
 	assert.deepEqual(done.message.content, [{ type: "toolCall", id: "toolu_1", name: "quiz", arguments: { question: "Q?" } }]);
 
 	const { argv, env, stdin, cwd, systemPrompt, mcp, tools } = run.recorded();
-	for (const name of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BASE_URL", "LH_DESKTOP_API_SECRET", "LH_AUTH_FILE", "OPENAI_API_KEY"]) assert.equal(env[name], undefined, `${name} must not reach Claude Code`);
+	for (const name of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BASE_URL", "LH_DESKTOP_API_SECRET", "LH_CREDENTIALS_DIR", "OPENAI_API_KEY", "GROQ_API_KEY", "ANTHROPIC_CUSTOM_HEADERS", "GITHUB_AUTH_TOKEN"]) assert.equal(env[name], undefined, `${name} must not reach Claude Code`);
 	assert.equal(env.HOME, process.env.HOME, "the user's own environment is kept");
 	assert.equal(env.PATH, [dir, process.env.PATH].join(delimiter), "the binary's own directory leads PATH");
 	assert.equal(env.ENABLE_TOOL_SEARCH, "false");

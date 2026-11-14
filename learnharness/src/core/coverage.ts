@@ -27,6 +27,12 @@ import { failedOutputCallIds, sessionModesOf, userFacingTextOf, type LhMessage }
 
 export type { CoverageEntry };
 
+/** The extraction chunk budget: a run fires once a session's UNCOVERED
+ *  tokens reach it, and batches the oldest uncovered messages into runs of
+ *  at most this many tokens. Each run also carries the whole graph, so a
+ *  smaller budget means more, smaller runs paying that overhead. */
+export const EXTRACTION_CHUNK_TOKENS = 4096;
+
 /**
  * The extraction-relevant lines of ONE native message — the shared seam
  * between the extractor's prompt and messageFingerprint (coverage).

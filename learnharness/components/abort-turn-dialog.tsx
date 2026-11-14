@@ -1,9 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { useBackdropDismiss } from "@/components/backdrop-dismiss";
-import { useDesignVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
 import {
 	AlertDialog,
@@ -22,6 +18,7 @@ import {
  * it must never chain into another abort), which is also why Chat's
  * abort handler ignores events while this dialog is open: two window
  * listeners fire per Esc and stopPropagation alone cannot order them.
+ * The alert dialog claims that Esc itself.
  *
  * MINIMAL, the delete-node dialog's tone: title, one line, Cancel +
  * action. No busy state — both actions are local (a fetch that fires
@@ -56,89 +53,40 @@ const COPY: Record<AbortMode, { title: string; line: string; action: string }> =
 	},
 };
 
-/** The dialog's pure body — exported for SSR pins (the delete-node
- * pattern). The wrapper owns effects + the portal. */
+/** The dialog's body in the shared dialog anatomy (components/ui/dialog.md) —
+ * exported for render pins. */
 export function AbortTurnBody({
 	mode,
 	onClose,
 	onConfirm,
 	busy = false,
-	variant = "current",
 }: {
 	mode: AbortMode;
 	onClose: () => void;
 	onConfirm: () => void;
-	/** "proposed": the shared dialog anatomy (components/ui/dialog.md). */
-	variant?: "current" | "proposed";
 	/** The dismiss doubles as the abort when a turn is still running
 	 * (owner, 2026-10-04): the line says so. */
 	busy?: boolean;
 }) {
-	const backdropDismiss = useBackdropDismiss(onClose);
 	const copy = COPY[mode];
-	if (variant === "proposed") {
-		return (
-			<AlertDialog open onOpenChange={(open) => !open && onClose()}>
-				<AlertDialogContent data-testid="abort-turn-dialog" className="max-w-sm">
-					<AlertDialogHeader>
-						<AlertDialogTitle data-testid="abort-turn-title">{copy.title}</AlertDialogTitle>
-						<AlertDialogDescription data-testid="abort-turn-line">
-							{copy.line}
-							{busy && mode !== "turn" ? " The working turn stops too." : ""}
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter className="pt-2">
-						<AlertDialogCancel data-testid="abort-turn-cancel">Cancel</AlertDialogCancel>
-						<Button variant="destructive" data-testid="abort-turn-confirm" onClick={onConfirm}>
-							{copy.action}
-						</Button>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-		);
-	}
 	return (
-		<div
-			role="dialog"
-			aria-modal="true"
-			aria-label={copy.title}
-			data-testid="abort-turn-dialog"
-			className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-			// A genuine click on the scrim cancels — the cautious default, like Esc.
-			{...backdropDismiss}
-		>
-			<div
-				className="mx-4 w-full max-w-sm rounded-xl border bg-card p-5 shadow-lg"
-				onClick={(e) => e.stopPropagation()}
-			>
-				<h2 className="text-sm font-semibold text-card-foreground" data-testid="abort-turn-title">
-					{copy.title}
-				</h2>
-				<p className="mt-1.5 text-xs text-muted-foreground" data-testid="abort-turn-line">
-					{copy.line}
-					{busy && mode !== "turn" ? " The working turn stops too." : ""}
-				</p>
-				<div className="mt-4 flex justify-end gap-2">
-					<button
-						type="button"
-						data-testid="abort-turn-cancel"
-						onClick={onClose}
-						className="rounded-sm px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						data-testid="abort-turn-confirm"
-						onClick={onConfirm}
-						// Destructive red — the app's established destructive pair.
-						className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/20"
-					>
+		<AlertDialog open onOpenChange={(open) => !open && onClose()}>
+			<AlertDialogContent data-testid="abort-turn-dialog" className="max-w-sm">
+				<AlertDialogHeader>
+					<AlertDialogTitle data-testid="abort-turn-title">{copy.title}</AlertDialogTitle>
+					<AlertDialogDescription data-testid="abort-turn-line">
+						{copy.line}
+						{busy && mode !== "turn" ? " The working turn stops too." : ""}
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+				<AlertDialogFooter className="pt-2">
+					<AlertDialogCancel data-testid="abort-turn-cancel">Cancel</AlertDialogCancel>
+					<Button variant="destructive" data-testid="abort-turn-confirm" onClick={onConfirm}>
 						{copy.action}
-					</button>
-				</div>
-			</div>
-		</div>
+					</Button>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
 	);
 }
 
@@ -154,29 +102,6 @@ export function AbortTurnDialog({
 	onConfirm: (mode: AbortMode) => void;
 	busy?: boolean;
 }) {
-	const variant = useDesignVariant();
-	// Esc cancels the popup (claimed — never a chained abort). Proposed: the
-	// alert dialog claims it itself.
-	useEffect(() => {
-		if (mode === null || variant === "proposed") return;
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				// THE ONE-ESC LAW (keyboard round 2026-10-06): claim at the
-				// document level — a window-level stopPropagation cannot stop
-				// the earlier-registered global window listener.
-				e.preventDefault();
-				e.stopPropagation();
-				onClose();
-			}
-		};
-		document.addEventListener("keydown", onKeyDown);
-		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [mode, onClose, variant]);
-
 	if (mode === null || typeof document === "undefined") return null;
-	if (variant === "proposed") return <AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} variant={variant} />;
-	return createPortal(
-		<AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} variant={variant} />,
-		document.body,
-	);
+	return <AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} />;
 }

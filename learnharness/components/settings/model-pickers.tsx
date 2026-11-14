@@ -7,14 +7,20 @@ import { formatTokens } from "@/components/usage-format";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, MENU_SEPARATOR } from "@/components/ui/dropdown-menu";
-import { priceLabel } from "./model-menu";
 
-/** The Proposed pickers' bodies (spec: model-pickers.md): the model and
+/** The pickers' bodies (spec: model-pickers.md): the model and
  *  provider pickers are a Command inside a picker Popover, the thinking level
  *  a radio group inside a DropdownMenu. One body per picker, shared by the
  *  lesson's details, Settings › Agent and Keys, and setup. */
 
 const NOTE = "px-2 py-1.5 text-label text-muted-foreground";
+
+/** USD per 1M tokens in/out, two decimals on every price (one format in a
+ *  column of figures). */
+export function priceLabel(cost: ModelCatalogEntry["cost"]): string {
+	const fmt = (n: number) => `$${n.toFixed(2)}`;
+	return `${fmt(cost.input)}/${fmt(cost.output)}`;
+}
 
 /** Fuzzy-ranked, best first; ties keep `compare`'s order. */
 function ranked<T>(items: readonly T[], query: string, terms: (item: T) => string[], compare: (a: T, b: T) => number): T[] {
@@ -70,7 +76,7 @@ export function ModelCommand({
 						>
 							<span className="flex items-center justify-between gap-3">
 								<span className="truncate">{m.name}</span>
-								<CommandShortcut className="shrink-0">{subscription ?? priceLabel(m.cost, "proposed")}</CommandShortcut>
+								<CommandShortcut className="shrink-0">{subscription ?? priceLabel(m.cost)}</CommandShortcut>
 							</span>
 							<span className="flex items-center justify-between gap-3 text-label text-muted-foreground tabular-nums">
 								<span className="truncate">{subscription ? `${subscription} (subscription)` : m.provider} · {m.id}</span>
@@ -86,36 +92,6 @@ export function ModelCommand({
 					<div className={NOTE}>{footer}</div>
 				</>
 			)}
-		</Command>
-	);
-}
-
-export interface ProviderOption {
-	id: string;
-	envVar: string;
-	label: string;
-}
-
-/** The provider picker (Keys › Add provider key, setup): search, then each
- *  provider with its environment variable at the right. */
-export function ProviderCommand<T extends ProviderOption>({ providers, onPick }: { providers: readonly T[]; onPick: (provider: T) => void }) {
-	const [query, setQuery] = useState("");
-	const results = useMemo(
-		() => ranked(providers, query, (p) => [p.id, p.envVar, p.label], (a, b) => a.id.localeCompare(b.id)),
-		[providers, query],
-	);
-	return (
-		<Command shouldFilter={false} data-testid="provider-command">
-			<CommandInput data-testid="provider-search" placeholder="Search providers…" value={query} onValueChange={setQuery} autoFocus />
-			<CommandList data-testid="provider-list">
-				<CommandEmpty>No providers match.</CommandEmpty>
-				{results.map((p) => (
-					<CommandItem key={p.id} value={p.id} onSelect={() => onPick(p)} data-testid={`provider-option-${optionId(p.id)}`} className="justify-between gap-3">
-						<span className="truncate">{p.label}</span>
-						<CommandShortcut className="ml-0 shrink-0">{p.envVar}</CommandShortcut>
-					</CommandItem>
-				))}
-			</CommandList>
 		</Command>
 	);
 }

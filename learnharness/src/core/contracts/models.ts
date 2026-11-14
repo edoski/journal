@@ -74,11 +74,9 @@ export interface ModelCatalogResponse {
 	providers: CatalogProvider[];
 }
 
-/** One row of the providers surface. */
+/** One subscription provider (ChatGPT or a Claude account). */
 export interface CatalogProvider {
 	id: string;
-	/** The env var whose presence federates this provider in. */
-	envVar: string;
-	/** Whether that var is currently present (env or auth file). */
-	keyPresent: boolean;
+	/** Signed in now, so its models are in the catalog. */
+	connected: boolean;
 }

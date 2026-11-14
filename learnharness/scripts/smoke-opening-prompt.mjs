@@ -8,7 +8,6 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import fs from "node:fs";
 import net from "node:net";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
@@ -16,16 +15,6 @@ import puppeteer from "puppeteer-core";
 const root = path.resolve(import.meta.dirname, "..");
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "lh154-ui-"));
 fs.mkdirSync(path.join(home, "data"));
-fs.writeFileSync(path.join(home, "auth.json"), "{}\n");
-// Next's supported font fixture avoids external font downloads in this check.
-const require = createRequire(import.meta.url);
-const { getFontAxes } = require("next/dist/compiled/@next/font/dist/google/get-font-axes.js");
-const { getGoogleFontsUrl } = require("next/dist/compiled/@next/font/dist/google/get-google-fonts-url.js");
-const fonts = Object.fromEntries(["JetBrains Mono", "Source Sans 3"].map(family => [
-	getGoogleFontsUrl(family, getFontAxes(family, ["variable"], ["normal"]), "swap"),
-	`@font-face { font-family: '${family}'; src: local('Arial'); font-weight: 100 900; }`,
-]));
-fs.writeFileSync(path.join(home, "fonts.cjs"), `module.exports = ${JSON.stringify(fonts)};\n`);
 const listener = net.createServer();
 listener.listen(0, "127.0.0.1");
 await once(listener, "listening");
@@ -34,9 +23,8 @@ await new Promise(resolve => listener.close(resolve));
 const origin = `http://127.0.0.1:${port}`;
 const env = {
 	PATH: process.env.PATH, HOME: home, TMPDIR: home, NODE_ENV: "development",
-	LH_DATA_DIR: path.join(home, "data"), LH_AUTH_FILE: path.join(home, "auth.json"),
-	LH_IGNORE_ENV_KEYS: "1", NEXT_TELEMETRY_DISABLED: "1",
-	NEXT_FONT_GOOGLE_MOCKED_RESPONSES: path.join(home, "fonts.cjs"),
+	LH_DATA_DIR: path.join(home, "data"), LH_CREDENTIALS_DIR: home,
+	NEXT_TELEMETRY_DISABLED: "1",
 };
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
 	cwd: root, env, stdio: ["ignore", "pipe", "pipe"],
@@ -66,7 +54,7 @@ try {
 	page.on("pageerror", err => errors.push(err.message));
 	const model = { id: "synthetic", name: "Synthetic (no calls)", provider: "fixture", input: ["text"], reasoning: false, supportedLevels: ["off"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 };
 	const slot = { model: { provider: model.provider, id: model.id }, thinkingLevel: "off" };
-	const catalog = { models: [model], providers: [{ id: "fixture", label: "Fixture", keyPresent: true }], defaults: null,
+	const catalog = { models: [model], providers: [{ id: "fixture", label: "Fixture", connected: true }], defaults: null,
 		slots: { strong: slot, cheap: slot, vision: slot }, rolePins: {} };
 	const posts = [];
 	const creates = [];
@@ -109,27 +97,27 @@ try {
 		// Release synthetic streams from prior cases rather than pin slots.
 		await Promise.all(held.splice(0).map(request => request.abort("aborted").catch(() => {})));
 		await page.goto(origin + route, { waitUntil: "domcontentloaded", timeout: 120000 });
-		await page.waitForSelector(route === "/" ? "textarea" : '[data-testid="composer"] textarea');
+		await page.waitForSelector('[data-testid="composer"] textarea');
 		await page.waitForFunction(() => !document.querySelector('[data-testid="setup-cta"]') && !document.querySelector('[data-testid="setup-cta-keys"]'));
 	}
 	async function fill(text) {
 		await page.evaluate(value => {
-			const textarea = document.querySelector('[data-testid="composer"] textarea') || document.querySelector("textarea");
+			const textarea = document.querySelector('[data-testid="composer"] textarea');
 			Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(textarea, value);
 			textarea.dispatchEvent(new Event("input", { bubbles: true }));
 		}, text);
 	}
 	async function submit() {
 		await page.waitForFunction(() => {
-			const button = document.querySelector('button[aria-label="Start session"], [data-testid="composer"] button[aria-label="Send"]');
+			const button = document.querySelector('[data-testid="composer"] button[aria-label="Send"]');
 			return button && !button.disabled;
 		});
-		await page.locator('button[aria-label="Start session"], [data-testid="composer"] button[aria-label="Send"]').click();
+		await page.locator('[data-testid="composer"] button[aria-label="Send"]').click();
 	}
 	async function stash(id) { return page.evaluate(chat => sessionStorage.getItem(`lh.openingPrompt.${chat}`), id); }
 	async function assertDraft(text) { await page.waitForFunction(value => document.querySelector('[data-testid="composer"] textarea')?.value === value, {}, text); }
 	const long = "A full synthetic syllabus — 世界 & ? #. ".repeat(1200).trim();
-	for (const route of ["/", "/chat/new"]) {
+	for (const route of ["/chat/new"]) {
 		for (const text of ["a short synthetic topic", long]) {
 			await open(route);
 			const count = posts.length;
@@ -149,7 +137,7 @@ try {
 	assert.equal(oldResponse.status, 431); await oldResponse.text();
 	checks.push("old long-query request returned431 (browser-shell blank appearance not asserted)");
 
-	for (const route of ["/", "/chat/new"]) {
+	for (const route of ["/chat/new"]) {
 		await open(route);
 		await page.evaluate(() => {
 			const setItem = Storage.prototype.setItem;
@@ -239,7 +227,7 @@ try {
 	console.log(JSON.stringify({ checks, pageErrors: errors, isolation: "synthetic catalog/POST+streams; empty auth; no providers", origin }, null, 2));
 } catch (err) {
 	console.error(err);
-	console.error(JSON.stringify({ checks, errors, url: page?.url(), dom: await page?.evaluate(() => ({ textareas: [...document.querySelectorAll('textarea')].map(e => ({ length: e.value.length, placeholder: e.placeholder })), buttons: [...document.querySelectorAll('button[aria-label="Send"], button[aria-label="Start session"]')].map(e => ({ disabled: e.disabled, label: e.getAttribute('aria-label') })), alerts: [...document.querySelectorAll('[role="alert"]')].map(e => e.textContent), failStorage: window.failOpeningStorage, text: document.body.innerText.slice(-1200) })).catch(() => null) }, null, 2));
+	console.error(JSON.stringify({ checks, errors, url: page?.url(), dom: await page?.evaluate(() => ({ textareas: [...document.querySelectorAll('textarea')].map(e => ({ length: e.value.length, placeholder: e.placeholder })), buttons: [...document.querySelectorAll('button[aria-label="Send"]')].map(e => ({ disabled: e.disabled, label: e.getAttribute('aria-label') })), alerts: [...document.querySelectorAll('[role="alert"]')].map(e => e.textContent), failStorage: window.failOpeningStorage, text: document.body.innerText.slice(-1200) })).catch(() => null) }, null, 2));
 	console.error(logs); process.exitCode = 1;
 } finally {
 	await browser?.close();

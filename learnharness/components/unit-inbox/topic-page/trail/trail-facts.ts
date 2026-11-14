@@ -1,9 +1,8 @@
-import type { SessionPlan, TopicAttempt } from "@/src/core";
-import { planMapSteps, type PlanMapStep } from "@/components/lesson/plan-map";
-import { dayWords, type SessionEntry, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
+import type { TopicAttempt } from "@/src/core";
+import { dayWords, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /**
- * What the trail draws (spec: trail.md), pure: the topic's sessions and
+ * The topic's history by day (Pick up's Earlier), pure: the topic's sessions and
  * the engine's scored attempts on it, placed by day on one line, newest
  * first. A session and an attempt on the same day sit together; nothing
  * says one came from the other.
@@ -39,16 +38,4 @@ export function trailDays(sessions: readonly SessionEntry[], attempts: readonly 
 		day.attempts.sort((a, b) => newestFirst(a.recorded ?? "", b.recorded ?? "") || byId.compare(b.id, a.id));
 	}
 	return [...days.values()].sort((a, b) => newestFirst(a.day, b.day));
-}
-
-/** The session whose steps show at first: the one the page's action opens. */
-export function opensAtFirst(action: TopicAction): string | null {
-	return "chat" in action ? action.chat.id : null;
-}
-
-/** A lesson's steps in teaching order, marked as the lesson marks them:
- *  the step its newest tagged question was about, the steps earlier ones
- *  were about, the rest not reached. */
-export function lessonSteps(plan: SessionPlan): PlanMapStep[] {
-	return planMapSteps(plan.tree.nodes, plan.tree.edges, (id) => (id === plan.current ? "current" : plan.visited.includes(id) ? "visited" : "upcoming"));
 }

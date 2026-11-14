@@ -1,12 +1,12 @@
 # NavRow
 
-The sidebar's one row: navigation (New lesson, Home, Calendar, Settings), sessions under their course (`NavGroup`, nav-group.md) and, while one runs, background agents alike; the Settings sheet's section list uses it too. `data-slot="nav-row"`, set after the caller's props so a wrapping trigger (the session's context menu) cannot replace it.
+The sidebar's one row: navigation (New lesson, Home, Calendar, Settings), and, while one runs, background agents alike; the Settings sheet's section list uses it too. `data-slot="nav-row"`, set after the caller's props so a wrapping trigger (the session's context menu) cannot replace it.
 
 ## Anatomy
 
 | Slot | Element | Notes |
 |---|---|---|
-| root | `NavRow` (`button`, or the child with `asChild`) | 32px high, radius 8, padding 0 8, gap 8; `inset` pads the start to 32 so the label sits on a `NavGroup` name's edge |
+| root | `NavRow` (`button`, or the child with `asChild`) | 32px high, radius 8, padding 0 8, gap 8 |
 | icon | a lucide icon as a direct child | 16px, one stroke (lucide 2 at 24 = 1.33px); an inset row has none |
 | label | `NavRowLabel` | 13/18, weight 400, truncates |
 | trailing | `NavRowTrailing` | one item in a column at least 32px wide and 24px high, right-aligned: 12/16, weight 400, tabular figures, `muted-foreground` whatever the row's state |

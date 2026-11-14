@@ -9,7 +9,7 @@
  * This pin drives the actual route handler (framework-free
  * Request/Response) under an isolated LH_DATA_DIR — the seam must be set
  * before the first import that transitively loads config.ts, so every
- * app-module import is dynamic (the prompt-overrides discipline).
+ * app-module import is dynamic.
  */
 
 import assert from "node:assert/strict";

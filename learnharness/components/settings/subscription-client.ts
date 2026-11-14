@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { ChatGPTControlBridge, ChatGPTStatus, NativeSubscriptionControlBridge, NativeSubscriptionProviderId, NativeSubscriptionStatus } from "@/src/core";
+import type { ChatGPTControlBridge, ChatGPTStatus } from "@/src/core";
 import { useNotifyHub, type createNotifyHub } from "@/components/server-events";
 
 type Hub = ReturnType<typeof createNotifyHub> | null;
@@ -12,7 +12,7 @@ const headers = { "Content-Type": "application/json", "x-learnharness-subscripti
 async function status() {
 	const response = await fetch(PATH, { headers, cache: "no-store" });
 	if (!response.ok) throw new Error("Subscription status is unavailable.");
-	return response.json() as Promise<{ chatgpt: ChatGPTStatus; native: NativeSubscriptionStatus[] }>;
+	return response.json() as Promise<{ chatgpt: ChatGPTStatus }>;
 }
 async function control<T>(providerId: string, op: string, fields: Record<string, unknown> = {}): Promise<Reply<T>> {
 	const response = await fetch(PATH, { method: "POST", headers, body: JSON.stringify({ providerId, op, ...fields }) });
@@ -54,24 +54,7 @@ export function createWebChatGPTBridge(hub: Hub): ChatGPTControlBridge {
 		onChange: (listener) => onChange(hub, listener),
 	};
 }
-export function createWebNativeBridge(hub: Hub): NativeSubscriptionControlBridge {
-	const call = async (providerId: NativeSubscriptionProviderId, op: string, fields?: Record<string, unknown>) => { await control(providerId, op, fields); };
-	return {
-		status: async () => (await status()).native,
-		login: (providerId, enabled) => call(providerId, "login", { enabled }),
-		cancel: (providerId) => call(providerId, "cancel"),
-		respond: (providerId, attemptId, promptId, value) => call(providerId, "respond", { attemptId, promptId, value }),
-		open: async (providerId, attemptId, actionId) => { await withBrowser(() => control(providerId, "open", { attemptId, actionId })); },
-		retry: (providerId) => call(providerId, "retry"), disconnect: (providerId) => call(providerId, "disconnect"),
-		consent: (providerId, enabled) => call(providerId, "consent", { enabled }),
-		onChange: (listener) => onChange(hub, listener),
-	};
-}
 export function useChatGPTBridge(): ChatGPTControlBridge | undefined {
 	const hub = useNotifyHub();
 	return useMemo(() => typeof window === "undefined" ? undefined : window.lh?.subscriptionTransport !== "web" && window.lh?.chatgpt ? window.lh.chatgpt : createWebChatGPTBridge(hub), [hub]);
-}
-export function useNativeSubscriptionBridge(): NativeSubscriptionControlBridge | undefined {
-	const hub = useNotifyHub();
-	return useMemo(() => typeof window === "undefined" ? undefined : window.lh?.subscriptionTransport !== "web" && window.lh?.subscriptions ? window.lh.subscriptions : createWebNativeBridge(hub), [hub]);
 }

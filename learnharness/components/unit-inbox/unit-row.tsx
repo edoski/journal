@@ -3,47 +3,39 @@
 import Link from "next/link";
 import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
 import type { ChatListItem } from "@/src/core";
-import { BrailleSpinner } from "@/components/braille-spinner";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { resumableSession, sessionState } from "@/components/nav/session-state";
-import { shortTimeAgo } from "@/components/sidebar-next";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { monogram, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { monogram, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { CARD_ACTION_PLACE, ROW_ACTION, RowCard, rowSurface, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { cn } from "@/lib/utils";
+import { MathText, mathPlain } from "@/components/ui/math-text";
+
+export { rowSurface };
+
+/** Where a one-line row's action sits: over its status slot. */
+export const SLIM_ACTION_PLACE = "inset-y-0 right-2.5 my-auto h-6";
 
 /** A course's 16px mark, T3 Code's project monogram: its initials in a
- *  rounded tile tinted 14% by its own ink. */
+ *  rounded tile tinted 14% by its own ink, in SF Pro at 500. The letters
+ *  span the tile and centre in it, trimmed to their cap height, so every
+ *  badge's letters sit on the same centre whatever their width. */
 export function CourseMark({ title, className }: { title: string; className?: string }) {
 	return (
 		<span
 			aria-hidden
 			data-slot="course-mark"
 			className={cn(
-				"flex size-4 shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-mono text-[8.25px] font-bold leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
+				"flex size-4 shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-sans text-[9px] font-medium leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
 				className,
 			)}
 		>
-			<span className="text-foreground/85">{monogram(title)}</span>
+			<span className="w-full text-center tracking-[-0.02em] text-foreground/85 [text-box:trim-both_cap_alphabetic]">{monogram(title)}</span>
 		</span>
 	);
 }
-
-/** Every row's surface: a rounded block, the selected fill on the open
- *  page, the hover fill from its list item (so hovering its action keeps
- *  it), and an inset ring on keyboard focus. */
-const rowSurface = (active: boolean) =>
-	cn(
-		"relative w-full min-w-0 rounded-md text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
-		active ? "bg-fill-selected" : "group-hover/sidebar-row:bg-fill-hover",
-	);
-
-/** The status slot: its label fades out while the row is hovered or its
- *  action has keyboard focus, so the action takes its place without moving
- *  anything. */
-const STATUS_SLOT =
-	"relative ml-auto flex min-w-8 shrink-0 items-center justify-end text-label tabular-nums text-muted-foreground transition-opacity motion-reduce:transition-none group-hover/sidebar-row:opacity-0 group-has-[[data-slot=row-action]:focus-visible]/sidebar-row:opacity-0";
 
 /** The row's one action, over its status slot: Resume opens the session
  *  waiting on the learner (or running), else Study starts a new one on the
@@ -55,11 +47,8 @@ function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 	const Icon = resume ? PlayIcon : SquarePenIcon;
 	const props = {
 		"data-slot": "row-action",
-		"aria-label": `${label}: ${unit.topic.title}`,
-		className: cn(
-			"pointer-events-none absolute inline-flex items-center gap-1 rounded-md px-1.5 text-label font-medium text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 motion-reduce:transition-none [&>svg]:size-3",
-			className,
-		),
+		"aria-label": `${label}: ${mathPlain(unit.topic.title)}`,
+		className: cn(ROW_ACTION, className),
 	} as const;
 	if (resume) {
 		return (
@@ -96,33 +85,20 @@ export function isUnitOpen(unit: Unit, pathname: string): boolean {
  * the topic's page; a topic the tutor writes in recedes until hovered.
  */
 export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
-	const working = unit.now === "working";
 	return (
-		<li data-slot="unit-card" className="group/sidebar-row relative list-none py-0.5">
-			<Link
-				href={unitHref(unit.course.workspace, unit.topic.handle)}
-				onClick={blurAfterPointerClick}
-				aria-current={active ? "page" : undefined}
-				data-sidebar-row={unit.key}
-				data-sidebar-parent={parent}
-				data-testid="unit-row"
-				className={cn(
-					rowSurface(active),
-					"flex h-[3.75rem] flex-col px-2.5 py-2",
-					working && !active && "opacity-70 hover:opacity-100 focus-visible:opacity-100",
-				)}
-			>
-				<span className="flex h-5 items-center gap-1.5">
-					<CourseMark title={unit.course.title} />
-					<span className="min-w-0 flex-1 truncate text-label text-muted-foreground">{unit.course.title}</span>
-					<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-5")}>
-						<UnitStatusText status={unitStatus(unit, today)} />
-					</span>
-				</span>
-				<span className="mt-1 truncate text-control font-medium text-foreground">{unit.topic.title}</span>
-			</Link>
-			<RowAction unit={unit} className="right-2.5 top-2.5 h-5" />
-		</li>
+		<RowCard
+			href={unitHref(unit.course.workspace, unit.topic.handle)}
+			active={active}
+			rowKey={unit.key}
+			parent={parent}
+			mark={<CourseMark title={unit.course.title} />}
+			course={unit.course.title}
+			status={<UnitStatusText status={unitStatus(unit, today)} />}
+			title={unit.topic.title}
+			action={<RowAction unit={unit} className={CARD_ACTION_PLACE} />}
+			recede={unit.now === "working"}
+			capStatus
+		/>
 	);
 }
 
@@ -130,8 +106,24 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
  * A known topic on its shelf, T3 Code's one-line shelf row (36px): the
  * course's mark, greyed until hovered, the title, and when it comes back.
  * A click opens the topic's page; the action starts a review now.
+ * `status` and `action` replace the slot's fact and the action (the
+ * shelves under Today).
  */
-export function TopicSlimRow({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
+export function TopicSlimRow({
+	unit,
+	today,
+	active,
+	parent,
+	status,
+	action,
+}: {
+	unit: Unit;
+	today: string;
+	active: boolean;
+	parent?: string;
+	status?: React.ReactNode;
+	action?: React.ReactNode;
+}) {
 	return (
 		<li data-slot="unit-slim" className="group/sidebar-row relative list-none">
 			<Link
@@ -141,7 +133,7 @@ export function TopicSlimRow({ unit, today, active, parent }: { unit: Unit; toda
 				data-sidebar-row={unit.key}
 				data-sidebar-parent={parent}
 				data-testid="unit-row"
-				className={cn(rowSurface(active), "flex h-9 items-center gap-2.5 px-2.5")}
+				className={cn(rowSurface(active), "flex h-9 items-center gap-2 px-2.5")}
 			>
 				<CourseMark
 					title={unit.course.title}
@@ -150,31 +142,45 @@ export function TopicSlimRow({ unit, today, active, parent }: { unit: Unit; toda
 				<span
 					className={cn("min-w-0 flex-1 truncate text-control", active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}
 				>
-					{unit.topic.title}
+					<MathText>{unit.topic.title}</MathText>
 				</span>
-				<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-6")}>
-					<UnitStatusText status={unitStatus(unit, today)} />
+				<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-6 max-w-[50%]")}>
+					{status ?? <UnitStatusText status={unitStatus(unit, today)} />}
 				</span>
 			</Link>
-			<RowAction unit={unit} className="inset-y-0 right-2.5 my-auto h-6" />
+			{action ?? <RowAction unit={unit} className={SLIM_ACTION_PLACE} />}
 		</li>
 	);
 }
 
 /**
- * A session on no listed topic, as a one-line shelf row: its course's mark
- * (a dashed circle for a session older than courses), its title, and Your
- * turn, the spinner or how long ago. `highlighted` is the search's
- * keyboard walk.
+ * A session as a one-line shelf row, in the shelf row's anatomy: its
+ * course's mark (a dashed circle for a session older than courses), its
+ * title, and the topic rows' status: Your turn, the spinner, or how long
+ * ago in Home's words. A title another listed session shares carries its
+ * day (`twin`, `sessionTwins`), so the two tell apart at a glance.
+ * `highlighted` is the search's keyboard walk.
  */
 export function SessionSlimRow({
 	chat,
+	today,
+	twin = null,
 	active,
 	highlighted = false,
 	onOpen,
 	parent,
 	...props
-}: Omit<React.ComponentProps<"button">, "onClick"> & { chat: ChatListItem; active: boolean; highlighted?: boolean; onOpen: () => void; parent?: string }) {
+}: Omit<React.ComponentProps<"button">, "onClick"> & {
+	chat: ChatListItem;
+	/** The engine's study day, for how long ago. */
+	today: string;
+	/** The session's day when its title repeats in the list: "6 Nov". */
+	twin?: string | null;
+	active: boolean;
+	highlighted?: boolean;
+	onOpen: () => void;
+	parent?: string;
+}) {
 	const state = sessionState(chat);
 	return (
 		<button
@@ -188,7 +194,7 @@ export function SessionSlimRow({
 				onOpen();
 				blurAfterPointerClick(e);
 			}}
-			className={cn(rowSurface(active), "flex h-9 items-center gap-2.5 px-2.5", highlighted && "bg-fill-hover")}
+			className={cn(rowSurface(active), "flex h-9 items-center gap-2 px-2.5", highlighted && "bg-fill-hover")}
 		>
 			{chat.course ? (
 				<CourseMark
@@ -200,26 +206,25 @@ export function SessionSlimRow({
 			)}
 			<span
 				className={cn(
-					"min-w-0 flex-1 truncate text-control",
+					"flex min-w-0 flex-1 items-baseline gap-1.5 text-control",
 					active || state === "your-turn" ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground",
 					state === "your-turn" && "font-medium",
 				)}
 			>
-				{chat.title}
-			</span>
-			<span className="ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end text-label tabular-nums text-muted-foreground">
-				{state === "working" ? (
-					<>
-						<BrailleSpinner />
-						<span className="sr-only">Working</span>
-					</>
-				) : state === "your-turn" ? (
-					<span data-testid="session-waiting" className="font-medium text-link">
-						<span className="sr-only">, </span>Your turn
+				<span className="min-w-0 truncate">
+					<MathText>{chat.title}</MathText>
+				</span>
+				{twin && (
+					<span data-slot="session-twin" className="shrink-0 text-label font-normal text-muted-foreground">
+						<span className="sr-only">, </span>
+						{twin}
 					</span>
-				) : (
-					<time dateTime={chat.updatedAt}>{shortTimeAgo(chat.updatedAt)}</time>
 				)}
+			</span>
+			<span data-testid={state === "your-turn" ? "session-waiting" : undefined} className={cn(TRAILING_SLOT, "h-6")}>
+				<UnitStatusText
+					status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
+				/>
 			</span>
 		</button>
 	);

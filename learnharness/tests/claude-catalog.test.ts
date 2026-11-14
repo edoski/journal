@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { claudeAccount, refreshClaudeConnections, resetClaudeConnections } from "../src/agent/claude-connection.ts";
 import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 import { piEngineForSpec } from "../src/agent/models.ts";
-import { catalogContextLimits, catalogProviders, modelCatalog, validateModelsSettings } from "../src/server/model-catalog.ts";
-import { providerKeyPresent } from "../src/server/keys.ts";
+import { catalogContextLimits, catalogProviders, modelCatalog, providerConnected, validateModelsSettings } from "../src/server/model-catalog.ts";
+
 import { isSubscriptionProvider } from "../src/agent/subscription-connections.ts";
 
 const signedIn = JSON.stringify({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "learner@example.com", subscriptionType: "max" });
@@ -17,14 +17,14 @@ beforeEach(() => resetClaudeConnections());
 
 test("Claude models join the picker, context limits and slot validation only while Claude Code is signed in to the plan", async () => {
 	await connect(signedOut);
-	assert.equal(providerKeyPresent("claude-subscription"), false);
-	assert.equal(catalogProviders().find((p) => p.id === "claude-subscription")?.keyPresent, false);
+	assert.equal(providerConnected("claude-subscription"), false);
+	assert.equal(catalogProviders().find((p) => p.id === "claude-subscription")?.connected, false);
 	assert(!modelCatalog().models.some((m) => m.provider === "claude-subscription"));
 	assert.equal(validateModelsSettings(claudeSlots).ok, false);
 
 	await connect(signedIn);
-	assert.equal(providerKeyPresent("claude-subscription"), true);
-	assert.equal(catalogProviders().find((p) => p.id === "claude-subscription")?.keyPresent, true);
+	assert.equal(providerConnected("claude-subscription"), true);
+	assert.equal(catalogProviders().find((p) => p.id === "claude-subscription")?.connected, true);
 	const claude = modelCatalog().models.filter((m) => m.provider === "claude-subscription");
 	assert.deepEqual(claude.map((m) => m.id), ["claude-opus-5-5"], "only Opus 5.5 is listed");
 	assert(claude.every((m) => m.cost.input === 0 && m.cost.output === 0));
@@ -51,9 +51,9 @@ test("each signed-in account is its own provider: one Opus 5.5 each, and dispatc
 		["claude-subscription", "claude-opus-5-5", "Claude Opus 5.5 · Main"],
 		["claude-subscription-work", "claude-opus-5-5", "Claude Opus 5.5 · Work"],
 	]);
-	assert.deepEqual(catalogProviders().filter((p) => p.id.startsWith("claude-subscription")).map((p) => [p.id, p.keyPresent]), [["claude-subscription", true], ["claude-subscription-old", false], ["claude-subscription-work", true]]);
-	assert.equal(providerKeyPresent("claude-subscription-work"), true);
-	assert.equal(providerKeyPresent("claude-subscription-old"), false);
+	assert.deepEqual(catalogProviders().filter((p) => p.id.startsWith("claude-subscription")).map((p) => [p.id, p.connected]), [["claude-subscription", true], ["claude-subscription-old", false], ["claude-subscription-work", true]]);
+	assert.equal(providerConnected("claude-subscription-work"), true);
+	assert.equal(providerConnected("claude-subscription-old"), false);
 	assert.deepEqual(validateModelsSettings({ strong: { model: { provider: "claude-subscription-work", id: "claude-opus-5-5" } } }), { ok: true });
 	assert.equal(validateModelsSettings({ strong: { model: { provider: "claude-subscription-old", id: "claude-opus-5-5" } } }).ok, false);
 	const engine = piEngineForSpec({ provider: "claude-subscription-work", id: "claude-opus-5-5", thinkingLevel: "high" });

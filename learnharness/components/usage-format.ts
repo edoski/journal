@@ -1,7 +1,9 @@
 /**
  * Money/token presentation helpers (wave-4 observability UI) — shared by the
- * activity dock and the stats bar. Pure; exported for tests.
+ * activity dock, the stats bar and the lesson's details menu. Pure; exported for tests.
  */
+
+import { subscriptionLabels, type SessionPricing, type TurnUsage } from "@/src/core";
 
 /** USD for cent-scale money: >= $1 keeps two decimals, smaller keeps four. */
 export function formatUsd(c: number): string {
@@ -36,4 +38,28 @@ export function prettyModel(id: string, qualified = false): string {
 	const { provider, id: bare } = qualified ? splitQualified(id) : { provider: null, id };
 	const short = bare.includes("/") ? bare.slice(bare.lastIndexOf("/") + 1) : bare;
 	return provider ? `${short} · ${provider}` : short;
+}
+
+export function formatContextMeasurement(tokens: number | null, limit: number | null): string {
+	const numerator = tokens === null ? "?" : formatTokens(tokens);
+	return limit === null ? numerator : `${numerator} / ${formatTokens(limit)}`;
+}
+
+/** The session's two footprint labels, shared by the stats bar and the
+ *  lesson's details menu: context as "used / limit" (catalog denominator
+ *  only) and cost, honest "—" until at least one turn priced. */
+export function sessionStatLabels({ turns, contextTokens, pricing, limit }: {
+	turns: TurnUsage[];
+	contextTokens: number | null;
+	pricing?: SessionPricing;
+	limit: number | null;
+}): { contextLabel: string; costLabel: string; providers: string[] } {
+	const { cost = 0, unpriced = turns.length, subscription = 0 } = pricing ?? {};
+	const pricedCount = turns.length - unpriced - subscription;
+	const providers = pricing?.subscriptionProviders ?? subscriptionLabels(turns.map((turn) => turn.model));
+	return {
+		contextLabel: formatContextMeasurement(contextTokens, limit),
+		costLabel: planCostLabel(pricedCount > 0 ? cost : null, providers),
+		providers,
+	};
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { ChevronRightIcon, EllipsisIcon, WaypointsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ModelControl, catalogLimits, useModelCatalog } from "@/components/model-picker";
-import { sessionStatLabels } from "@/components/stats-bar";
+import { sessionStatLabels } from "@/components/usage-format";
 import type { SessionPricing, TurnUsage } from "@/src/core";
 
 /** The lesson's top bar contents (spec: lesson-top-bar.md), rendered inside
@@ -17,26 +18,40 @@ import type { SessionPricing, TurnUsage } from "@/src/core";
 export function LessonTopBar({
 	title,
 	course,
+	courseHref,
 	phase,
 	plan,
 	details,
 }: {
 	title: ReactNode;
 	course?: string;
+	/** The course's page, which the crumb links to. */
+	courseHref?: string;
 	/** Sentence case: "Probing", "Planning", "Teaching", "Practice". */
 	phase: string;
 	/** Present once the session has a plan: the toggle opens it as a popover. */
 	plan?: { open: boolean; onOpenChange: (open: boolean) => void; body: ReactNode };
 	details: ReactNode;
 }) {
+	const linked = courseHref !== undefined;
 	return (
 		<>
 			<div className="flex min-w-0 flex-1 items-center gap-1.5">
 				{course && (
 					<>
-						<span data-testid="course-label" className="min-w-0 max-w-40 shrink-[2] truncate text-control text-muted-foreground">
-							{course}
-						</span>
+						{linked ? (
+							<Link
+								href={courseHref}
+								data-testid="course-label"
+								className="lh-no-drag min-w-0 max-w-40 shrink-[2] truncate rounded-sm text-control text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+							>
+								{course}
+							</Link>
+						) : (
+							<span data-testid="course-label" className="min-w-0 max-w-40 shrink-[2] truncate text-control text-muted-foreground">
+								{course}
+							</span>
+						)}
 						<ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/60" />
 					</>
 				)}
@@ -110,7 +125,7 @@ export function LessonDetails({
 				<dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 [&_dt]:whitespace-nowrap">
 					<dt className="text-muted-foreground">Model</dt>
 					<dd className="flex justify-end whitespace-nowrap">
-						<ModelControl chatId={chatId} onModelChange={onModelChange} variant="proposed" />
+						<ModelControl chatId={chatId} onModelChange={onModelChange} />
 					</dd>
 					<dt className="text-muted-foreground">Context</dt>
 					<dd data-testid="stats-context" className="text-right tabular-nums">{contextLabel}</dd>

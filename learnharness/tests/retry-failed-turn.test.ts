@@ -18,14 +18,14 @@ import type { PiEngine } from "../src/agent/models.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { QuestionData } from "../src/core/question-core.ts";
 import type { SteerMessage } from "../src/core/contracts.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 // Set the storage/auth seams BEFORE any app/config-loading imports.
 assert.equal(process.env.NODE_ENV, "test", "Run with NODE_ENV=test; these tests must not invoke real providers.");
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-retry-failed-turn-"));
 process.env.LH_DATA_DIR = path.join(scratch, "data");
-process.env.LH_AUTH_FILE = path.join(scratch, "auth.json");
-process.env.OPENROUTER_API_KEY = "test-key-presence-gate";
-fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
+process.env.LH_CREDENTIALS_DIR = scratch;
+await signInTestClaude();
 
 const { SessionModel } = await import("../components/session-core.ts");
 const { createPracticeAgent, createProberAgent, createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
@@ -93,7 +93,7 @@ async function turn(engine: PiEngine, chatId: string, input: unknown, buildAgent
 
 function createConfiguredChat(title: string) {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	chatStore.saveTree(chat.id, { nodes: [{ id: "planet-order", title: "Planet order" }], edges: [], version: 1 });
 	return chat;
 }

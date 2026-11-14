@@ -1,11 +1,12 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
-import { needOf, reviewWords as dueWords, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { overdueWords, returnWords } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
 /**
- * What every topic page candidate reads (spec: topic-page.md). Engine
+ * What the topic page reads (spec: topic-page.md). Engine
  * fields and session facts only: the app judges no standing, and the one
  * clock is the engine's study day. Every function here is pure.
  */
@@ -125,11 +126,6 @@ const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric",
 /** A date as the page writes it: "Tue 3 Nov". */
 export const dayOf = (date: string) => DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
 
-/** "Next review Fri 13 Nov". */
-export function nextReviewWords(date: string): string {
-	return `Next review ${dayOf(date)}`;
-}
-
 /** A day against the engine's: "Today", "Yesterday", else "Tue 3 Nov". A
  *  day after the engine's reads as today. */
 export function dayWords(day: string, today: string): string {
@@ -159,17 +155,18 @@ export function studiedWords(days: number): string {
 }
 
 /**
- * What the head says beside the pie, in the map's words, each drawn as an
- * icon and a few words: why the engine calls the topic weak, then its
- * review, due or dated, as the page's action and Home say it.
+ * What the head says beside the pie, in the app's words (study-words.ts),
+ * each drawn as an icon and a few words: why the engine calls the topic
+ * weak, then its review, due ("3d overdue") or dated ("Back in 5d"), as
+ * the map, Home and the sidebar say it. `today` is the engine's study day.
  */
-export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string): HeadMark[] {
+export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {
 	const slip = topic.weak ? needOf(topic, titleOf)?.words : null;
 	const review =
 		topic.review?.kind === "due"
-			? dueWords(topic.review.overdue)
+			? overdueWords(topic.review.overdue)
 			: topic.review?.kind === "scheduled"
-				? nextReviewWords(topic.review.date)
+				? returnWords(Math.max(1, daysBetween(today, topic.review.date)))
 				: null;
 	return [...(slip ? [{ kind: "slip" as const, words: slip }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }
@@ -256,7 +253,7 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	return { result, words: attempt.unaided ? null : "With a hint" };
 }
 
-/** Everything a candidate draws, from the course, the topic, every
+/** Everything the page draws, from the course, the topic, every
  *  session and the topic read; `read` is null when it failed. */
 export function topicFacts({ course, topic, chats, read }: { course: StudyCourse; topic: CourseMapTopic; chats: readonly ChatListItem[]; read: TopicRead | null }): TopicFacts {
 	const { map } = course;
@@ -273,7 +270,7 @@ export function topicFacts({ course, topic, chats, read }: { course: StudyCourse
 		topic,
 		today: map.today,
 		standing: silent ? null : standingOf(topic),
-		marks: silent ? [] : headMarks(topic, titleOf),
+		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
 		action: topicAction(topic, map, chats),

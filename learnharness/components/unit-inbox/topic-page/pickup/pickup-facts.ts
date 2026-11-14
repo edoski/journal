@@ -1,6 +1,7 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
+import { overdueWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -76,7 +77,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 			};
 		}
 		case "review":
-			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Review due" };
+			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0) };
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
@@ -104,7 +105,7 @@ export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	const waiting = [...sessions.filter((entry) => entry.state === "your-turn"), ...sessions.filter((entry) => entry.state === "working")];
 	const review =
 		facts.action.kind !== "review" && facts.topic.review?.kind === "due"
-			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Review due", press: { opening: `Review ${facts.topic.title}` } }]
+			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0), press: { opening: `Review ${facts.topic.title}` } }]
 			: [];
 	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;
 	const tasks = facts.pickups.flatMap((pickup): NextItem[] =>

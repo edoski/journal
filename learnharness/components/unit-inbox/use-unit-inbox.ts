@@ -6,29 +6,42 @@ import { useServerEvent, useServerResync } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
 import { buildInbox, type FoldedShelf, type UnitInbox } from "@/components/unit-inbox/units";
 
-/** Without the engine every session is listed under Other. */
-export type InboxState = { status: "loading" } | { status: "ready"; inbox: UnitInbox; courses: readonly StudyCourse[] };
+/** Without the engine every session is listed under Other, and
+ *  `unavailable` says the courses could not be read. `chats` is the
+ *  session list the inbox was built from. */
+export type InboxState =
+	| { status: "loading" }
+	| { status: "ready"; inbox: UnitInbox; courses: readonly StudyCourse[]; chats: readonly ChatListItem[]; unavailable: boolean };
 
-/** Every course's map, read once per mount and again when a course record
- *  changes or the day turns over. A failed read keeps the last map. */
+/** Every course's map, read once per mount and again whenever a course
+ *  record changes, a course is added, renamed or deleted, or the day turns
+ *  over. Reads never overlap: an event during a read asks for one more
+ *  read when it ends, so a burst of events costs at most two. A failed read
+ *  keeps the last map. */
 function useStudyCourses(): StudyCourse[] | null | "unavailable" {
 	const [courses, setCourses] = useState<StudyCourse[] | null | "unavailable">(null);
+	const reading = useRef(false);
+	const again = useRef(false);
 	const read = useCallback(async () => {
-		try {
-			const listing = (await (await fetch("/api/study", { cache: "no-store" })).json()) as StudyListing;
-			setCourses(listing.available ? listing.courses : "unavailable");
-		} catch {
-			setCourses((prev) => prev ?? "unavailable");
+		if (reading.current) {
+			again.current = true;
+			return;
 		}
+		reading.current = true;
+		do {
+			again.current = false;
+			try {
+				const listing = (await (await fetch("/api/study", { cache: "no-store" })).json()) as StudyListing;
+				setCourses(listing.available ? listing.courses : "unavailable");
+			} catch {
+				setCourses((prev) => prev ?? "unavailable");
+			}
+		} while (again.current);
+		reading.current = false;
 	}, []);
 	useEffect(() => void read(), [read]);
-	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-	const later = () => {
-		clearTimeout(timer.current);
-		timer.current = setTimeout(() => void read(), 250);
-	};
-	useEffect(() => () => clearTimeout(timer.current), []);
-	useServerEvent("course-changed", later);
+	useServerEvent("course-changed", () => void read());
+	useServerEvent("courses-changed", () => void read());
 	useServerResync(() => void read());
 	useDayChange(() => void read());
 	return courses;
@@ -80,7 +93,7 @@ const parseScope = (raw: string | null): string | null => {
 /** Which shelves are folded. Every shelf starts folded, as T3 Code's do:
  *  the list shows what to do, the rest one click away. */
 export type Folded = Readonly<Record<FoldedShelf, boolean>>;
-const FOLDED: Folded = { working: true, known: true, other: true };
+const FOLDED: Folded = { working: true, learning: true, known: true, other: true };
 const parseFolded = (raw: string | null): Folded => {
 	const v = json(raw);
 	return typeof v === "object" && v !== null ? { ...FOLDED, ...(v as Partial<Folded>) } : FOLDED;
@@ -97,7 +110,7 @@ export function useUnitInbox(chats: readonly ChatListItem[] | null) {
 	const state = useMemo<InboxState>(() => {
 		if (courses === null || chats === null) return { status: "loading" };
 		const listed = courses === "unavailable" ? [] : courses;
-		return { status: "ready", inbox: buildInbox(listed, chats, scope), courses: listed };
+		return { status: "ready", inbox: buildInbox(listed, chats, scope), courses: listed, chats, unavailable: courses === "unavailable" };
 	}, [courses, chats, scope]);
 	const fold = useCallback((shelf: FoldedShelf, next: boolean) => setFolded({ ...folded, [shelf]: next }), [folded, setFolded]);
 	return { state, scope, setScope, folded, fold };

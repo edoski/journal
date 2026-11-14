@@ -192,8 +192,6 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 			data-shown={onMap || undefined}
 			className={cn(
 				"group/now relative -mx-3 grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg px-3 py-3 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
-				// Link: flush to the split's hairline.
-				"in-data-[link=split]:rounded-none",
 				marked && "before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-full before:bg-link",
 			)}
 		>

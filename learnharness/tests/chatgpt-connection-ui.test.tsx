@@ -1,21 +1,19 @@
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { parseHTML } from "linkedom";
 import { createRequire } from "node:module";
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
 import { ChatGPTBackgroundAccess, ChatGPTConnection, ChatGPTUIProvider, CHATGPT_NOTICE, CHATGPT_DISCONNECT_COPY } from "../components/settings/chatgpt-connection.tsx";
 import { SettingsDialogBody } from "../components/settings/settings-dialog.tsx";
-import { KeysSection } from "../components/settings/keys-section.tsx";
 import { ModelControl } from "../components/model-picker.tsx";
 import type { ChatGPTStatus, ChatGPTControlBridge } from "../src/core/index.ts";
 import { completedWithin } from "./completion.ts";
 
-const dom = parseHTML("<html><body></body></html>");
-Object.assign(globalThis, { window: dom.window, document: dom.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true, localStorage: { getItem: () => null, setItem() {} } });
+Object.assign(globalThis, { localStorage: { getItem: () => null, setItem() {} } });
 const originalFetch = globalThis.fetch;
 let root: Root | undefined, host: HTMLDivElement | undefined;
 const account = (id = "private-registration-id", email = "learner@example.invalid", connected = true) => ({ id, email, registration: "private-issued-client", connected, planEnabled: connected, canSignInAgain: !connected });
@@ -61,10 +59,20 @@ const byTest = (id: string) => document.querySelector<HTMLElement>(`[data-testid
 async function click(element: HTMLElement) { assert(element); await act(async () => element.click()); }
 function button(text: string, scope: ParentNode = document) { return [...scope.querySelectorAll<HTMLButtonElement>("button")].find((el) => el.textContent === text)!; }
 const toggle = () => document.querySelector<HTMLElement>('[data-testid="chatgpt-account-dialog"] [role="switch"]')!;
-async function selectAccount(label: string, id: string) {
- const select = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!; assert(select);
- await act(async () => { Object.defineProperty(select, "value", { configurable: true, writable: true, value: id }); select.dispatchEvent(new window.Event("change", { bubbles: true })); });
+const picker = (label: string) => document.querySelector<HTMLElement>(`[role="combobox"][aria-label="${label}"]`);
+const heading = () => byTest("chatgpt-account-dialog").querySelector("h2:not(.sr-only)")?.textContent;
+async function press(target: Element, type: string, init: Record<string, unknown> = {}) {
+ await act(async () => { const event = new dom.window.Event(type, { bubbles: true, cancelable: true }); Object.assign(event, { pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0, ctrlKey: false, ...init }); target.dispatchEvent(event); });
 }
+async function openPicker(label: string) {
+ const trigger = picker(label); assert(trigger, `${label} picker`); await press(trigger, "pointerdown");
+ return [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+}
+async function pick(options: HTMLElement[], text: string) {
+ const option = options.find((o) => o.textContent === text); assert(option, `offers ${text}`);
+ await press(option, "pointerdown"); await press(option, "pointerup");
+}
+async function selectAccount(label: string, email: string) { await pick(await openPicker(label), email); }
 async function begin() { await click(byTest("chatgpt-login")); await click(byTest("chatgpt-proceed")); }
 async function confirmDisconnect() { await click(byTest("chatgpt-disconnect")); await click(byTest("chatgpt-confirm-disconnect")); }
 afterEach(async () => { await act(async () => root?.unmount()); host?.remove(); root = undefined; host = undefined; delete window.lh; globalThis.fetch = originalFetch; });
@@ -72,31 +80,23 @@ afterEach(async () => { await act(async () => root?.unmount()); host?.remove(); 
 test("Providers is the first/default page; General is last and other pages keep relative order", () => {
  const html = renderToStaticMarkup(<SettingsDialogBody onClose={() => {}} />);
  const ids = [...html.matchAll(/data-testid="settings-nav-([^"]+)"/g)].map((m) => m[1]);
- assert.deepEqual(ids, ["keys", "agent", "appearance", "graph", "keyboard", "general"]);
- assert.match(html, /settings-nav-keys[^>]*aria-current="true"/); assert.match(html, />Providers<\/button>/);
- assert.doesNotMatch(html, />Model providers<\/button>/);
+ assert.deepEqual(ids, ["keys", "agent", "appearance", "keyboard", "general"]);
+ assert.match(html, /settings-nav-keys[^>]*aria-selected="true"/); assert.match(html, /settings-nav-keys[^>]*><span[^>]*>Accounts<\/span><\/button>/);
+ assert.doesNotMatch(html, />Model providers</);
 });
 
-test("Providers has exactly two ordered sections; unknown variables stay masked/read-only at the end of Model API keys", async () => {
- globalThis.fetch = async (url) => {
-  assert.equal(url, "/api/keys");
-  return Response.json({ providers: [{ id: "openai", envVar: "OPENAI_API_KEY", label: "OpenAI" }], keys: [{ id: "FUTURE_VAR", present: true, masked: "…abcd", source: "file", shadowedByEnv: false }] });
- };
- fixture(); await mount(<KeysSection />);
- const headings = [...document.querySelectorAll('[data-testid^="group-"] > p')].map((el) => el.textContent);
- assert.deepEqual(headings, ["Model API keys", "Subscriptions"]);
- assert(byTest("unknown-FUTURE_VAR").closest('[data-testid="group-provider-keys"]'));
- assert(byTest("group-unknown-keys").parentElement?.lastElementChild === byTest("group-unknown-keys"));
- assert.equal(byTest("unknown-FUTURE_VAR").textContent, "FUTURE_VAR…abcd"); assert(!byTest("unknown-FUTURE_VAR").querySelector("input, button"));
+test("Providers holds only the subscriptions: no API-key group, no key field", () => {
+ const html = renderToStaticMarkup(<SettingsDialogBody onClose={() => {}} />);
+ assert.doesNotMatch(html, /group-provider-keys|Model API keys|Add provider key/);
 });
 
 test("disconnected row uses shared Connect action; initial default is ON; cancel discards draft without OAuth/global mutation", async () => {
- const f = fixture(); await mount(<ChatGPTConnection setup />);
+ const f = fixture(); await mount(<ChatGPTConnection />);
  assert.equal(byTest("chatgpt-connection").textContent, "ChatGPTConnect");
  assert(!document.body.textContent?.includes(CHATGPT_NOTICE)); const trigger = byTest("chatgpt-login");
  assert.match(trigger.className, /cursor-pointer/); assert.match(trigger.className, /hover:bg-accent/); assert.match(trigger.className, /focus-visible:ring/);
  await click(trigger); assert.equal(f.calls.login.length, 0); assert(document.body.textContent?.includes(CHATGPT_NOTICE));
- assert.equal(byTest("chatgpt-account-dialog").querySelector("h2")?.textContent, "ChatGPT");
+ assert.equal(heading(), "ChatGPT");
  assert.equal(byTest("chatgpt-proceed").textContent, "Continue with ChatGPT"); assert(byTest("chatgpt-proceed").querySelector('img[src="/siwc/chatgpt-logo-white.svg"]'));
  assert(!button("Continue", byTest("chatgpt-account-dialog")), "ChatGPT remains one step, with disclosure and toggle together");
  assert.equal(toggle().getAttribute("aria-checked"), "true");
@@ -188,24 +188,25 @@ test("error-only cancellation reconciliation keeps last valid authority and leav
 test("email-only connected selector and Manage remain responsive; account selection never changes global OFF", async () => {
  const initial = connected(false); initial.accounts.push(account("second", "second@example.invalid"), account("missing", ""));
  const f = fixture(initial); await mount();
- assert.deepEqual([...document.querySelectorAll('select[aria-label="ChatGPT account"] option')].map((o) => o.textContent), ["learner@example.invalid", "second@example.invalid", "ChatGPT account"]);
  assert.doesNotMatch(byTest("chatgpt-connection").textContent!, /private-registration|private-issued| · active|signed-out/);
  assert.match(byTest("chatgpt-connection").firstElementChild!.className, /items-center/);
  const row = byTest("chatgpt-connection").firstElementChild!;
- assert.equal(row.children[0]!.textContent, "ChatGPT"); assert.equal(row.children[1]!.tagName, "SELECT"); assert.equal(row.children[2]!.textContent, "Manage…");
+ assert.equal(row.children[0]!.textContent, "ChatGPT"); assert(row.children[1] === picker("ChatGPT account")); assert.equal(row.children[1]!.textContent, "learner@example.invalid"); assert.equal(row.children[2]!.textContent, "Manage…");
  assert.match(row.children[2]!.className, /text-muted-foreground/); assert(!row.textContent?.includes("Connected"));
- await selectAccount("ChatGPT account", "second"); assert.deepEqual(f.calls.select, ["second"]); assert.equal(f.status.allowBackgroundUse, false);
+ const options = await openPicker("ChatGPT account");
+ assert.deepEqual(options.map((o) => o.textContent), ["learner@example.invalid", "second@example.invalid", "ChatGPT account"]);
+ await pick(options, "second@example.invalid"); assert.deepEqual(f.calls.select, ["second"]); assert.equal(f.status.allowBackgroundUse, false);
  await click(button("Manage…")); assert(byTest("chatgpt-managed-identity").textContent?.includes("second@example.invalid"));
  assert.deepEqual([...byTest("chatgpt-account-footer").querySelectorAll("button")].map((b) => b.textContent), ["Disconnect", "Close"]);
  const dialog = byTest("chatgpt-account-dialog").innerHTML;
  assert(dialog.indexOf('data-testid="chatgpt-managed-identity"') < dialog.indexOf('data-testid="chatgpt-account-actions"'));
  assert(dialog.indexOf('data-testid="chatgpt-global-background"') < dialog.indexOf('data-testid="chatgpt-managed-identity"'));
  assert(!byTest("chatgpt-account-dialog").querySelector('[data-testid="chatgpt-privacy-notice"]'));
- assert.equal(byTest("chatgpt-account-dialog").querySelector("h2")?.textContent, "ChatGPT");
+ assert.equal(heading(), "ChatGPT");
  assert(byTest("chatgpt-account-dialog").querySelector('a[href="https://openai.com/policies/privacy-policy/"]'));
  assert(byTest("chatgpt-account-dialog").querySelector('a[href="https://chatgpt.com/settings/usage"]'));
  await click(toggle()); assert.deepEqual(f.calls.consent, [true]); assert.equal(toggle().getAttribute("aria-checked"), "true");
- await click(button("Close")); await selectAccount("ChatGPT account", "private-registration-id"); assert.equal(f.status.allowBackgroundUse, true);
+ await click(button("Close")); await selectAccount("ChatGPT account", "learner@example.invalid"); assert.equal(f.status.allowBackgroundUse, true);
  assert.equal(f.calls.logout, 0);
 });
 
@@ -217,7 +218,7 @@ test("Disconnect is the quiet red left-footer action below identity; confirmatio
  assert.equal(byTest("chatgpt-account-footer").lastElementChild?.lastElementChild, button("Close"));
  assert(!byTest("chatgpt-account-footer").contains(byTest("chatgpt-add-accounts")));
  await click(byTest("chatgpt-disconnect")); assert.equal(f.calls.disconnect.length, 0);
- assert.equal(byTest("chatgpt-account-dialog").querySelector("h2")?.textContent, "ChatGPT");
+ assert.equal(heading(), "ChatGPT");
  assert(byTest("chatgpt-disconnect-confirmation").textContent?.includes(CHATGPT_DISCONNECT_COPY.title));
  assert(byTest("chatgpt-disconnect-confirmation").textContent?.includes(CHATGPT_DISCONNECT_COPY.body));
  assert(!document.body.textContent?.includes("delete your OpenAI"));
@@ -235,7 +236,7 @@ for (const count of [1, 3]) test(`Add accounts reuses the actual add flow with $
  assert.match(byTest("chatgpt-add-accounts").className, /cursor-pointer/);
  await click(byTest("chatgpt-add-accounts"));
  assert(byTest("chatgpt-privacy-notice").textContent?.includes(CHATGPT_NOTICE)); assert(byTest("chatgpt-proceed"));
- assert.equal(document.querySelector<HTMLSelectElement>('select[aria-label="Saved ChatGPT account"]')?.value, "");
+ assert.equal(picker("Saved ChatGPT account")?.textContent, "Add another account or workspace");
  assert.equal(toggle().getAttribute("aria-checked"), String(before.allowBackgroundUse));
  assert.deepEqual(f.status, before); assert.deepEqual(f.calls.login, []); assert.deepEqual(f.calls.select, []); assert.deepEqual(f.calls.disconnect, []);
  await click(toggle()); await click(button("Cancel", byTest("chatgpt-account-dialog")));
@@ -250,10 +251,10 @@ for (const count of [1, 3]) test(`Add accounts reuses the actual add flow with $
 
 test("ChatGPT Sign in again is reserved for a saved disconnected account and keeps its existing registration flow", async () => {
  const f = fixture(connected(false)); await mount(); await click(button("Manage…"));
- assert(!button("Sign in again")); await selectAccount("Manage ChatGPT account", "signed-out-record"); assert(button("Sign in again"));
- await click(button("Sign in again")); assert.equal(byTest("chatgpt-account-dialog").querySelector("h2")?.textContent, "ChatGPT");
+ assert(!button("Sign in again")); await selectAccount("Manage ChatGPT account", "signed-out@example.invalid"); assert(button("Sign in again"));
+ await click(button("Sign in again")); assert.equal(heading(), "ChatGPT");
  assert(byTest("chatgpt-privacy-notice")); assert(toggle()); assert.equal(toggle().getAttribute("aria-checked"), "false");
- assert.equal(document.querySelector<HTMLSelectElement>('select[aria-label="Saved ChatGPT account"]')?.value, "signed-out-record"); assert.deepEqual(f.calls.login, []);
+ assert.equal(picker("Saved ChatGPT account")?.textContent, "signed-out@example.invalid"); assert.deepEqual(f.calls.login, []);
  await click(byTest("chatgpt-proceed")); assert.deepEqual(f.calls.login, ["signed-out-record"]); assert.equal(f.status.activeId, "private-registration-id");
  await click(button("Cancel", byTest("chatgpt-account-dialog"))); assert.equal(f.calls.cancel, 1); assert.deepEqual(f.calls.disconnect, []); assert.deepEqual(f.calls.consent, []);
 });
@@ -269,7 +270,7 @@ test("actual controller storage-write failure is not ChatGPT authorization recov
 for (const tokens of ["missing", "restricted", "scope"] as const) test(`actual controller ${tokens} authorization permits recovery, but paused/closed state does not`, async () => {
  const f = recoveryController({ tokens });
  try {
-  await mount(); await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "fixture"); await click(button("Manage…"));
+  await mount(); await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "fixture@example.invalid"); await click(button("Manage…"));
   assert.equal((await f.service.status()).accounts[0].canSignInAgain, true); assert(button("Sign in again"));
   assert.equal(f.saved.registrations[0].canSignInAgain, undefined, "eligibility is projected, never persisted");
   await act(async () => f.service.pause()); assert.equal((await f.service.status()).accounts[0].canSignInAgain, false); assert(!button("Sign in again"));
@@ -281,7 +282,7 @@ for (const tokens of ["missing", "restricted", "scope"] as const) test(`actual c
 test("storage denial overrides an otherwise eligible remembered ChatGPT authorization recovery", async () => {
  const f = recoveryController({ tokens: "missing", writeFails: true });
  try {
-  await mount(); await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "fixture"); await click(button("Manage…")); assert(button("Sign in again"));
+  await mount(); await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "fixture@example.invalid"); await click(button("Manage…")); assert(button("Sign in again"));
   await click(toggle()); const status = await f.service.status(); assert.equal(status.available, true); assert.equal(status.error, storageError); assert.equal(status.accounts[0].canSignInAgain, false); assert(!button("Sign in again"));
   assert.equal(f.browserAttempts, 0); assert.equal(f.tokenRequests, 0);
  } finally { await act(async () => f.service.close()); }
@@ -293,7 +294,7 @@ test("actual invalid_grant recovery preserves remembered identity and stages the
   await act(async () => { await f.service.models(); });
   const status = await f.service.status(); assert.equal(status.available, true); assert.equal(status.accounts[0].connected, false); assert.equal(status.accounts[0].canSignInAgain, true);
   assert.equal(status.accounts[0].id, "fixture"); assert.equal(status.accounts[0].registration, "oaiapp_fixture"); assert.equal(f.saved.registrations[0].tokens, undefined);
-  await click(button("Sign in again")); assert(byTest("chatgpt-privacy-notice")); assert(toggle()); assert.equal(document.querySelector<HTMLSelectElement>('select[aria-label="Saved ChatGPT account"]')?.value, "fixture");
+  await click(button("Sign in again")); assert(byTest("chatgpt-privacy-notice")); assert(toggle()); assert.equal(picker("Saved ChatGPT account")?.textContent, "fixture@example.invalid");
   assert.equal(f.tokenRequests, 1, "only the injected refresh response was requested"); assert.equal(f.browserAttempts, 0, "staging recovery never starts OAuth");
  } finally { await act(async () => f.service.close()); }
 });
@@ -307,16 +308,22 @@ test("missing eligibility remains compatible but never implies authorization rec
  }
 });
 test("connected setup row retains the email dropdown before muted Manage", async () => {
- fixture(connected()); await mount(<ChatGPTConnection setup />);
- const row = byTest("chatgpt-connection").firstElementChild!; assert.equal(row.children[1]!.tagName, "SELECT"); assert.equal(row.children[2]!.textContent, "Manage…"); assert.match(row.children[2]!.className, /text-muted-foreground/);
+ fixture(connected()); await mount(<ChatGPTConnection />);
+ const row = byTest("chatgpt-connection").firstElementChild!; assert(row.children[1] === picker("ChatGPT account")); assert.equal(row.children[2]!.textContent, "Manage…"); assert.match(row.children[2]!.className, /text-muted-foreground/);
 });
 test("Add accounts reuses the existing dialog's initial focus for the pre-auth transition", async () => {
- const previous = HTMLElement.prototype.focus; const focused: HTMLElement[] = [];
- HTMLElement.prototype.focus = function () { focused.push(this); };
+ // linkedom ignores TreeWalker filters and reports tabIndex -1 everywhere; Radix finds the first tabbable with both.
+ const walker = document.createTreeWalker, tabIndex = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "tabIndex");
+ document.createTreeWalker = ((root: Node, show?: number, filter?: NodeFilter | null) => {
+  const inner = walker.call(document, root, show);
+  if (!filter || typeof filter === "function") return inner;
+  return { get currentNode() { return inner.currentNode; }, nextNode() { for (let node = inner.nextNode(); node; node = inner.nextNode()) if (filter.acceptNode(node) === NodeFilter.FILTER_ACCEPT) return node; return null; } } as TreeWalker;
+ }) as typeof document.createTreeWalker;
+ Object.defineProperty(HTMLElement.prototype, "tabIndex", { configurable: true, get(this: HTMLElement) { return this.hasAttribute("tabindex") ? Number(this.getAttribute("tabindex")) : /^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(this.tagName) || (this.tagName === "A" && this.hasAttribute("href")) ? 0 : -1; }, set(this: HTMLElement, value: number) { this.setAttribute("tabindex", String(value)); } });
  try {
   fixture(connected()); await mount(); await click(button("Manage…")); await click(byTest("chatgpt-add-accounts"));
-  assert(focused.at(-1) === document.querySelector('select[aria-label="Saved ChatGPT account"]'));
- } finally { HTMLElement.prototype.focus = previous; }
+  assert(document.activeElement === picker("Saved ChatGPT account"));
+ } finally { document.createTreeWalker = walker; if (tabIndex) Object.defineProperty(HTMLElement.prototype, "tabIndex", tabIndex); else delete (HTMLElement.prototype as { tabIndex?: number }).tabIndex; }
 });
 
 test("Add accounts respects existing busy, pending and unavailable guards", async () => {
@@ -346,7 +353,7 @@ test("confirmed disconnect preserves identity/pending content until outcome, pre
 
 test("signed-out legacy accounts remain manageable/forgettable without pretending selection is a usable connection", async () => {
  const f = fixture(); await mount(); assert.equal(byTest("chatgpt-connection").textContent, "ChatGPTConnect");
- await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "signed-out-record"); await click(button("Manage…"));
+ await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "signed-out@example.invalid"); await click(button("Manage…"));
  assert(byTest("chatgpt-managed-identity").textContent?.includes("signed-out@example.invalid"));
  assert.deepEqual(f.calls.select, []); assert.equal(f.calls.login.length, 0); await confirmDisconnect();
  assert.deepEqual(f.calls.disconnect, ["signed-out-record"]); assert.equal(f.status.accounts.length, 0); assert.equal(f.status.allowBackgroundUse, true);
@@ -445,7 +452,7 @@ test("failed pending verification never applies draft/starts login/closes disclo
 });
 
 test("saved-registration mismatch cannot complete the attempt or apply its global draft", async () => {
- const f = fixture(); await mount(); await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "signed-out-record");
+ const f = fixture(); await mount(); await click(byTest("chatgpt-login")); await selectAccount("Saved ChatGPT account", "signed-out@example.invalid");
  await click(toggle()); await click(byTest("chatgpt-proceed")); await act(async () => f.complete());
  assert.deepEqual(f.calls.consent, []); assert.deepEqual(f.calls.login, ["signed-out-record"]); assert(document.querySelector('[role="alert"]')); assert(byTest("chatgpt-account-dialog"));
 });

@@ -12,13 +12,14 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 	const previous = new Map<string, PropertyDescriptor | undefined>();
 	const bodies: Record<string, unknown> = {
 		"/api/models": { models: [], slots: { strong: null, cheap: null, vision: null } },
-		"/api/settings/prompts": { prober: [], teacher: [] },
 	};
 	for (const [key, value] of Object.entries({
 		window: dom.window,
 		document: dom.document,
 		navigator: globals.navigator ?? { userAgent: "", platform: "" },
 		HTMLElement: dom.window.HTMLElement,
+		// The Radix switch checks for an enclosing form.
+		HTMLFormElement: (dom.window as unknown as Record<string, unknown>).HTMLFormElement ?? class {},
 		IS_REACT_ACT_ENVIRONMENT: true,
 		fetch: async (url: string) => {
 			assert.ok(url in bodies, `unexpected request: ${url}`);
@@ -36,11 +37,8 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 			root.render(<AgentSection
 				agent={{ tools: { research: true } }}
 				models={undefined}
-				graph={undefined}
-				compaction={undefined}
 				onSectionChange={(next) => { written = next; }}
 				onModelsChange={() => {}}
-				onCompactionChange={() => {}}
 			/>);
 		});
 		const row = document.querySelector<HTMLElement>('[data-testid="tool-row-research"]')!;
@@ -48,7 +46,7 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 		assert.ok(toggle);
 		assert.equal(toggle.hasAttribute("disabled"), false);
 		assert.equal(toggle.getAttribute("aria-checked"), "true");
-		assert.ok(!row.className.includes("opacity-40"));
+		assert.ok(!row.className.includes("opacity-50"), "the row is not dimmed");
 		act(() => { toggle.click(); });
 		assert.equal(written?.tools?.research, false, "the toggle emits the stored boolean");
 		assert.equal(document.querySelector('[data-testid="search-engine-row"]'), null);

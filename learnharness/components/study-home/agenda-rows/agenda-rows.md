@@ -6,7 +6,7 @@ Four candidates ran behind a Rows switch: `reason` (every row says why it is the
 
 ## Shared
 
-`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` (a session waiting on him; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `studiedAgo` (`lastActiveDaysAgo`), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `progress-pie.tsx` draws `courseProgress` as the course's pie. `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
+`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` (a session waiting on him; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `studiedAgo` (`lastActiveDaysAgo`) and its sentence `lastStudied` (the course page's), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `progress-pie.tsx` draws `courseProgress` as the course's pie. `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
 
 ## The signal test
 
@@ -14,4 +14,4 @@ Every word on a row must read at a glance to someone back after several days who
 
 ## Sources
 
-The ranked facts and the three directions come from the lesson-list research of 12 Nov 2026: T3 Code's thread row (`SidebarThreadRow`, two lines, a trailing time), Apple's inset grouped lists and SwiftUI separator insets, shadcn `Item` and `Separator`, Raycast's list accessories, Duolingo's "Review previous mistakes", Mochi's "how likely you are to forget", and Things' project progress pie.
+The ranked facts come from the lesson-list research of 12 Nov 2026: T3 Code's thread row (`SidebarThreadRow`, two lines, a trailing time), Apple's inset grouped lists and SwiftUI separator insets, shadcn `Item` and `Separator`, Raycast's list accessories, Duolingo's "Review previous mistakes", Mochi's "how likely you are to forget", and Things' project progress pie.

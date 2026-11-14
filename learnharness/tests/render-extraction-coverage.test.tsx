@@ -5,18 +5,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-	CoverageMenuBody,
 	CoverageRingDetail,
 	CoverageRingGlyph,
-	fetchGraphRead,
+	coverageItem,
 	ringFill,
 	type SessionCoverage,
 } from "../components/extraction-coverage.tsx";
 
 /**
  * The extraction-coverage surfaces (extraction-UX redesign, owner-locked
- * dispatch 2026-09-24): the sidebar context-menu block (numbers + the
- * manual Extract affordance) and the chat top bar's ring meter. The pure
+ * dispatch 2026-09-24): the session menu's coverage item (its label and
+ * the manual Extract) and the chat top bar's ring meter. The pure
  * folds and the presentational bodies are pinned here; the live fetch
  * chains (menu-open read, the 2s running poll, the turn-settle bump, the
  * settings signal) are Playwright's beat.
@@ -35,60 +34,6 @@ function coverage(over: Partial<SessionCoverage> = {}): SessionCoverage {
 	};
 }
 
-describe("fetchGraphRead — one truth with the extraction trigger (2026-10-02)", () => {
-	// The meter's denominator MUST be the number the server's
-	// effectiveSettings gate waits for. The old hand-rolled fallback
-	// read the raw delta and guessed `?? 4096` — a stale pre-setting-era
-	// constant — so an unset budget filled the ring at half the truth
-	// (owner repro: 6k shown full, extraction correctly silent at the then-
-	// factory 8192). The 2026-10-13 ruling restored the factory to 4096 (more
-	// frequent graph updates); the LAW is unchanged — the denominator is the
-	// factory the same core resolver serves, never a hand-rolled constant.
-	const stub = (payload: unknown, ok = true) => {
-		const real = globalThis.fetch;
-		globalThis.fetch = (async () =>
-				new Response(JSON.stringify(payload), { status: ok ? 200 : 500 })) as typeof fetch;
-		return () => {
-			globalThis.fetch = real;
-		};
-	};
-
-	it("an absent graph section denominates at the factory 4096 — never a hand-rolled constant, never a missing ring", async () => {
-		const restore = stub({ settings: { version: 1 } });
-		const read = await fetchGraphRead();
-		restore();
-		assert.deepEqual(read, { enabled: true, chunkTokens: 4096 });
-	});
-
-	it("the owner repro shape — graph section present, budget never written — is the factory", async () => {
-		const restore = stub({ settings: { version: 1, graph: { enabled: true } } });
-		const read = await fetchGraphRead();
-		restore();
-		assert.equal(read?.chunkTokens, 4096, "the record lacks the key: factory, not a stale constant");
-	});
-
-	it("first boot (settings null) resolves factory — the ring shows, at the true budget", async () => {
-		const restore = stub({ settings: null });
-		const read = await fetchGraphRead();
-		restore();
-		assert.deepEqual(read, { enabled: true, chunkTokens: 4096 });
-	});
-
-	it("a custom budget rides through verbatim", async () => {
-		const restore = stub({ settings: { version: 1, graph: { enabled: true, extractionChunkTokens: 2000 } } });
-		const read = await fetchGraphRead();
-		restore();
-		assert.equal(read?.chunkTokens, 2000);
-	});
-
-	it("fetch failure → null → no ring", async () => {
-		const restore = stub({}, false);
-		const read = await fetchGraphRead();
-		restore();
-		assert.equal(read, null);
-	});
-});
-
 describe("ringFill (the donut's fold, pure)", () => {
 	it("fills uncovered/chunk, clamped to [0,1]", () => {
 		assert.equal(ringFill(0, 4096), 0);
@@ -100,49 +45,6 @@ describe("ringFill (the donut's fold, pure)", () => {
 	it("a non-positive threshold reads zero (never NaN, never a fake full)", () => {
 		assert.equal(ringFill(2048, 0), 0);
 		assert.equal(ringFill(2048, -5), 0);
-	});
-});
-
-describe("CoverageMenuBody — the context-menu block", () => {
-	it("renders the uncovered numbers + the Extract affordance", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody coverage={coverage()} extracting={false} onExtract={() => {}} />,
-		);
-		assert.ok(html.includes('data-testid="ctx-coverage"'), "the block carries its testid");
-		assert.match(html, /2k tok uncovered/, "the unit is typed out — tok (owner refinement round)");
-		assert.match(html, /5 messages unextracted/);
-		assert.ok(html.includes('data-testid="ctx-extract"'), "the Extract affordance");
-		assert.ok(!html.includes('disabled=""'), "an uncovered session can extract (the disabled: utilities alone don't count)");
-	});
-
-	it("fully extracted: the quiet line, Extract disabled (never a fake run)", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody
-				coverage={coverage({ uncoveredTokens: 0, uncoveredCount: 0 })}
-				extracting={false}
-				onExtract={() => {}}
-			/>,
-		);
-		assert.match(html, /fully extracted/);
-		assert.ok(html.includes("disabled"), "nothing to run — the button rests");
-	});
-
-	it("running: the pulse line + 'Running', not the numbers (motion is the state)", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody coverage={coverage({ running: true })} extracting={false} onExtract={() => {}} />,
-		);
-		assert.ok(html.includes('data-testid="ctx-coverage-running"'));
-		assert.match(html, /extracting…/);
-		assert.ok(html.includes(">Running</button>"), "the affordance reads Running while in flight");
-		assert.ok(html.includes("disabled"), "no double-fire");
-	});
-
-	it("optimistic (click-pending, server not yet saying running): same running shape", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody coverage={coverage()} extracting onExtract={() => {}} />,
-		);
-		assert.ok(html.includes('data-testid="ctx-coverage-running"'), "the optimistic state shows at once");
-		assert.match(html, />Running</);
 	});
 });
 
@@ -194,5 +96,25 @@ describe("CoverageRingDetail — the popover's exact numbers", () => {
 		);
 		assert.ok(html.includes('data-testid="coverage-ring-running"'));
 		assert.match(html, /extracting…/);
+	});
+});
+
+describe("the session menu's extraction item", () => {
+	const coverage = (over: Partial<SessionCoverage>) => ({ uncoveredTokens: 81, uncoveredCount: 2, running: false, ...over }) as SessionCoverage;
+
+	it("offers Extract notes with the backlog beside it", () => {
+		assert.deepEqual(coverageItem(coverage({}), false), {
+			label: "Extract notes",
+			detail: "81 tok · 2 messages",
+			running: false,
+			disabled: false,
+		});
+	});
+
+	it("is disabled and says so while extracting, optimistic or not, and once everything is extracted", () => {
+		assert.equal(coverageItem(coverage({ running: true }), false).label, "Extracting notes…");
+		assert.equal(coverageItem(coverage({}), true).disabled, true);
+		const done = coverageItem(coverage({ uncoveredTokens: 0, uncoveredCount: 0 }), false);
+		assert.deepEqual([done.label, done.detail, done.disabled], ["Notes fully extracted", null, true]);
 	});
 });

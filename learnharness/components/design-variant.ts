@@ -1,98 +1,66 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { onPolishChange, polishVariant, type PolishGroup } from "@/components/dev/polish-variant.js";
+import { onPolishChange, polishVariant, setPolishVariant, type PolishGroup } from "@/components/dev/polish-variant.js";
 
-export type DesignVariant = "current" | "proposed";
-
-/** The study homes `/` can be, one per candidate (spec:
- *  components/study-home/study-home.md). */
-export const HOME_OPTIONS = ["agenda", "split", "map", "path"] as const;
-/** "current" keeps `/` the composer; an option makes it that study home. */
-export type HomeVariant = "current" | (typeof HOME_OPTIONS)[number];
-
-/** The topic page's candidates (spec:
- *  components/unit-inbox/topic-page/topic-page.md). */
-export const TOPIC_OPTIONS = ["brief", "steps", "trail", "hybrid"] as const;
-/** "current" keeps the topic page as it is. */
-export type TopicVariant = "current" | (typeof TOPIC_OPTIONS)[number];
-
-/** Where the hybrid topic page puts the lesson to pick up: in its history,
- *  sorted by relevance (spec:
- *  components/unit-inbox/topic-page/pickup/pickup.md). */
-export const PICKUP_OPTIONS = ["sections"] as const;
-/** "current" keeps the hybrid's dated history. */
-export type PickupVariant = "current" | (typeof PICKUP_OPTIONS)[number];
-
-/** How the hybrid topic page ties its list to the lesson map under Pick up
- *  (spec: components/unit-inbox/topic-page/link/link.md). */
-export const LINK_OPTIONS = ["split", "connected"] as const;
-/** "current" keeps the two panes side by side with nothing between them. */
+/** Whether the linked columns draw the line from the selected row to its
+ *  node (spec: components/linked-columns/linked-columns.md): Current is
+ *  the two columns with no tie, Connected draws it. */
+export const LINK_OPTIONS = ["connected"] as const;
 export type LinkVariant = "current" | (typeof LINK_OPTIONS)[number];
+/** What anyone who has not picked sees, and what production builds draw
+ *  (Edo, 14 Nov 2026). */
+const LINK_DEFAULT: LinkVariant = "connected";
 
 /** The switch registry, which the Logbook's in-app guide switches (dev
- *  only): Design is Current or Proposed; Home is Current or one of its
- *  options, Sidebar Current or Proposed, and anything but Current wears
- *  Design's Proposed; Topic is Current or one of the topic page's
- *  candidates; Pick up is Current or Sections, and wears Topic's hybrid;
- *  Link is Current or one of its options, and wears Pick up's Sections.
+ *  only): Link is whether the course page and the topic page tie their
+ *  list to their map with a line. Every other surface has one version.
  *  Read only through the hooks below. */
-export const POLISH_GROUPS: readonly PolishGroup[] = [
-	{ id: "design", label: "Design" },
-	{ id: "home", label: "Home", options: HOME_OPTIONS, requires: { design: "proposed" } },
-	{ id: "sidebar", label: "Sidebar", requires: { design: "proposed" } },
-	{ id: "topic", label: "Topic", options: TOPIC_OPTIONS, requires: { design: "proposed" } },
-	{ id: "pickup", label: "Pick up", options: PICKUP_OPTIONS, requires: { design: "proposed", topic: "hybrid" } },
-	{ id: "link", label: "Link", options: LINK_OPTIONS, requires: { design: "proposed", topic: "hybrid", pickup: "sections" } },
-];
+export const POLISH_GROUPS: readonly PolishGroup[] = [{ id: "link", label: "Link", options: LINK_OPTIONS }];
+
+/** A group nobody has picked (or set to an option since deleted, such as
+ *  the topic page's `split`) starts on its default rather than Current,
+ *  so the guide shows what the app draws. The registry is the one place
+ *  that reads the switch's storage; the dev host calls this once it has
+ *  registered the groups. */
+export function seedDefaults(): void {
+	try {
+		const stored = localStorage.getItem("polish:link");
+		const known = stored === "current" || LINK_OPTIONS.some((option) => option === stored);
+		if (!known && !new URLSearchParams(location.search).has("polish-link")) setPolishVariant("link", LINK_DEFAULT);
+	} catch {
+		// No storage: the hooks read the default.
+	}
+}
 
 const DEV = process.env.NODE_ENV === "development";
 const subscribeNever = () => () => {};
-const readCurrent = (): DesignVariant => "current";
-const readSwitch = (): DesignVariant => (polishVariant("design") === "proposed" ? "proposed" : "current");
-const readHomeCurrent = (): HomeVariant => "current";
-const readHome = (): HomeVariant => HOME_OPTIONS.find((option) => option === polishVariant("home")) ?? "current";
-const readTopicCurrent = (): TopicVariant => "current";
-const readTopic = (): TopicVariant => TOPIC_OPTIONS.find((option) => option === polishVariant("topic")) ?? "current";
-const readPickupCurrent = (): PickupVariant => "current";
-const readPickup = (): PickupVariant => PICKUP_OPTIONS.find((option) => option === polishVariant("pickup")) ?? "current";
-const readLinkCurrent = (): LinkVariant => "current";
-const readLink = (): LinkVariant => LINK_OPTIONS.find((option) => option === polishVariant("link")) ?? "current";
-const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
-
-/** The one reader of the design switch: "proposed" only in development with the guide on Proposed.
- *  Production builds always get "current" until a surface ships. */
-export function useDesignVariant(): DesignVariant {
-	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readSwitch : readCurrent, readCurrent);
+/** A switch moved, or the guide registered the groups: before it does, a
+ *  group's options read as Current, so a page drawn before then reads
+ *  again once they are known. */
+function subscribeSwitch(onChange: () => void): () => void {
+	const off = onPolishChange(onChange);
+	window.addEventListener("polish:host", onChange);
+	return () => {
+		off();
+		window.removeEventListener("polish:host", onChange);
+	};
 }
-
-/** Which study home `/` is, or "current" while it stays the composer.
- *  Production builds get "current". */
-export function useHomeVariant(): HomeVariant {
-	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readHome : readHomeCurrent, readHomeCurrent);
+const readLinkDefault = (): LinkVariant => LINK_DEFAULT;
+/** Current only once picked: before the guide registers the group, or with
+ *  nothing stored, the default. */
+function readLink(): LinkVariant {
+	const value = polishVariant("link");
+	if (value === "connected") return value;
+	try {
+		const picked = new URLSearchParams(location.search).get("polish-link") ?? localStorage.getItem("polish:link");
+		return picked === "current" ? "current" : LINK_DEFAULT;
+	} catch {
+		return LINK_DEFAULT;
+	}
 }
-
-/** Whether the Proposed design's sidebar lists course topics ("proposed",
- *  spec: components/unit-inbox/unit-inbox.md) or stays as it is
- *  ("current"). Production builds get "current". */
-export function useSidebarVariant(): DesignVariant {
-	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readSidebar : readCurrent, readCurrent);
-}
-
-/** Which topic page `/unit/...` draws, or "current" for the page as it is.
- *  Production builds get "current". */
-export function useTopicVariant(): TopicVariant {
-	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readTopic : readTopicCurrent, readTopicCurrent);
-}
-
-/** Where the hybrid topic page puts the lesson to pick up, or "current"
- *  for its dated history. Production builds get "current". */
-export function usePickupVariant(): PickupVariant {
-	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readPickup : readPickupCurrent, readPickupCurrent);
-}
-
-/** How the hybrid topic page ties its list to the lesson map, or "current"
- *  for nothing between them. Production builds get "current". */
+/** Whether the course page and the topic page draw the tie's line.
+ *  Production builds draw it. */
 export function useLinkVariant(): LinkVariant {
-	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readLink : readLinkCurrent, readLinkCurrent);
+	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readLink : readLinkDefault, readLinkDefault);
 }

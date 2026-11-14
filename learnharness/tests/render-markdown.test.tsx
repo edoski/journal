@@ -2,17 +2,20 @@
  * Render tests for the presentation layer (W3): the \(...\)/\[...\] math
  * delimiter contract, single-newline line breaks, and mermaid rendering.
  *
- * Same idiom as render-cards.test.tsx: static HTML via react-dom/server, no
- * DOM. tsx note: tsx uses the CLASSIC JSX transform, so `React` must be a
- * resolvable global — the shim below provides it.
+ * Same idiom as render-cards.test.tsx: static HTML via react-dom/server;
+ * only the mermaid fallback mounts on the Radix DOM helper, to open its
+ * source. tsx note: tsx uses the CLASSIC JSX transform, so `React` must be
+ * a resolvable global — the shim below provides it.
  */
 
-import React from "react";
+import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createRoot } from "react-dom/client";
 import { MessageResponse } from "../components/ai-elements/message.tsx";
 import { MermaidError } from "../components/mermaid-error.tsx";
 import { transformMathDelimiters, healOverescapedCommands } from "../src/core/math-delims.ts";
@@ -208,21 +211,34 @@ describe("render — mermaid", () => {
 		assert.ok(html.includes('data-streamdown="code-block"'), "js fences keep the code-block path");
 	});
 
-	it("renders the error fallback for invalid mermaid: error + source + retry", () => {
+	it("renders the error fallback for invalid mermaid: error + collapsed source + retry", async () => {
 		// The fallback component mounts client-side when mermaid fails to
-		// parse; render it directly to pin its contract.
-		const html = renderToStaticMarkup(
-			<MermaidError
-				chart={"not a diagram @@@\nA --> B"}
-				error="Parse error on line 1: unexpected text"
-				retry={() => {}}
-			/>,
-		);
-		assert.match(html, /Diagram failed to render/);
-		assert.match(html, /Parse error on line 1/);
-		assert.match(html, /Show diagram source/);
-		assert.match(html, /not a diagram/);
-		assert.match(html, />Retry</);
+		// parse; mount it directly to pin its contract.
+		const host = dom.document.createElement("div");
+		dom.document.body.appendChild(host);
+		const root = createRoot(host);
+		try {
+			await act(async () =>
+				root.render(
+					<MermaidError
+						chart={"not a diagram @@@\nA --> B"}
+						error="Parse error on line 1: unexpected text"
+						retry={() => {}}
+					/>,
+				),
+			);
+			assert.match(host.innerHTML, /Diagram failed to render/);
+			assert.match(host.innerHTML, /Parse error on line 1/);
+			assert.match(host.innerHTML, />Retry</);
+			const trigger = host.querySelector('[data-slot="collapsible-trigger"]');
+			assert.equal(trigger?.textContent, "Show diagram source");
+			assert.ok(!host.innerHTML.includes("not a diagram"), "the source stays collapsed so a broken diagram doesn't flood the transcript");
+			await act(async () => trigger!.dispatchEvent(new dom.window.Event("click", { bubbles: true })));
+			assert.match(host.innerHTML, /not a diagram/, "the source opens in place");
+		} finally {
+			await act(async () => root.unmount());
+			host.remove();
+		}
 	});
 });
 
