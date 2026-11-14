@@ -21,7 +21,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from learning import clock, schema, storage
+from learning import clock, preferences, schema, storage
 from learning import workspace as workspaces
 from learning.workspace import Workspace
 
@@ -32,7 +32,6 @@ PREVIOUS, CURRENT = 6, 7
 _RECORD_ARC_FIELDS = ("arcs", "arc_log")
 _NESTED_ARC_FIELDS = {"path": ("arcs",), "exam": ("arcs", "leaves_out")}
 _ITEM_ARC_FIELDS = {"topics": "arc", "observations": "checkpoint"}
-_ARC_PREFERENCES = ("questions",)
 
 
 def backups() -> Path:
@@ -82,8 +81,12 @@ def _down(stored: dict[str, Any]) -> dict[str, Any]:
         elif name in _ITEM_ARC_FIELDS:
             field = (_ITEM_ARC_FIELDS[name],)
             value = {k: _strip(item, field) for k, item in value.items()}
-        elif name == "preferences":
-            value = _strip(value, _ARC_PREFERENCES)
+        elif (
+            name == "preferences"
+            and value.get(preferences.QUESTIONS)
+            in (preferences.CHOICES[preferences.QUESTIONS])
+        ):
+            value = _strip(value, (preferences.QUESTIONS,))
         result[name] = value
     content = {
         k: v for k, v in result.items() if k not in ("schema", *storage.METADATA)

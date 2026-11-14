@@ -1166,6 +1166,17 @@ def test_migrating_down_strips_every_arc_field_and_keeps_every_other_save(
     assert json.loads(backup.read_text()) == up
 
 
+def test_migrating_down_keeps_a_questions_preference_schema_6_held(
+    tmp_path: Path,
+) -> None:
+    free = {**SIX, "preferences": {"questions": "one at a time, short"}}
+    workspace = course(tmp_path, "calculus", free)
+    original = workspace.record.read_bytes()
+    migrate.migrate(workspace)
+    migrate.migrate(workspace, to=6)
+    assert workspace.record.read_bytes() == original
+
+
 def test_restore_puts_a_backup_back_after_keeping_what_it_replaces(
     tmp_path: Path,
 ) -> None:
