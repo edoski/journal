@@ -348,11 +348,9 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 	for (const [k, t] of Object.entries(view.topics)) for (const c of t.contrasts) pairs.add([k, c].sort().join("\u0000"));
 	const counts: MapCounts = { created: 0, extended: 0, needs: 0, contrasts: 0, refs: 0, excluded: 0 };
 	const topics: Record<string, Json> = {};
-	const merged = new Set<string>();
 
 	for (const t of proposed) {
-		if (!exists.has(t.handle) || merged.has(t.handle)) continue;
-		merged.add(t.handle);
+		if (!exists.has(t.handle)) continue;
 		const old = view.topics[t.handle];
 		const patch: Json = {};
 		if (!old) {
