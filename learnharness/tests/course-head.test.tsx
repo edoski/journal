@@ -14,7 +14,8 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
-import { lastSessionOf, namesWords, paceOf } from "../components/course-page/course-head/head-facts.ts";
+import { examGaps, lastSessionOf, namesWords, paceOf } from "../components/course-page/course-head/head-facts.ts";
+import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
 import { PaceHead } from "../components/course-page/course-head/pace-head.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
@@ -129,5 +130,46 @@ describe("a lesson that could not start", () => {
 		assert.equal(head(null).querySelector('[role="alert"]'), null);
 		const alert = head("Couldn’t open the session. Try again.").querySelector('[data-slot="page-head"] [role="alert"]');
 		assert.equal(alert?.textContent, "Couldn’t open the session. Try again.");
+	});
+});
+
+describe("what the final review leaves out (round 6: Variance had no word, Random variables showed only in the calendar)", () => {
+	const gapped = (doesNotFit: string[], unreviewed: string[]) => course({ exam: { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-14", doesNotFit: doesNotFit.map(h), unreviewed: unreviewed.map(h) } });
+
+	it("reads the engine's two facts: the topics it has no room to start, and the taught ones its final review has no room for", () => {
+		const gaps = examGaps(gapped(["variance"], ["binomial"]).map);
+		assert.deepEqual(gaps && { start: gaps.start.map((t) => t.handle), review: gaps.review.map((t) => t.handle) }, { start: ["variance"], review: ["binomial"] });
+		assert.equal(examGaps(gapped([], []).map), null);
+		assert.equal(examGaps(course({ exam: null }).map), null);
+		assert.equal(examGaps(course({ exam: { date: "2026-11-01", daysLeft: -7, unreviewed: [h("binomial")] } }).map), null, "once the exam has passed");
+	});
+
+	it("never says every topic fits while the final review leaves one out", () => {
+		assert.deepEqual(paceOf(gapped([], ["binomial"]), plan()), { kind: "short", words: "No room in the final review for Binomial" });
+		assert.deepEqual(paceOf(gapped(["variance"], ["binomial"]), plan(["variance"])), { kind: "short", words: "No room before the exam to start Variance" }, "what has no room to start first");
+	});
+
+	const gapLine = (c: StudyCourse, lead?: React.ReactNode) => render(<PaceHead view={viewOf(c)} busy={false} onContinue={() => {}} lead={lead} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
+
+	it("says why under the head's first line, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
+		const one = gapLine(gapped(["variance"], []))!;
+		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WORDS.full}.`);
+		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask]);
+		const review = gapLine(gapped([], ["binomial"]))!;
+		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.review, EXAM_GAP_WORDS.ask]);
+		const both = gapLine(gapped(["variance"], ["binomial"]))!;
+		assert.equal(both.querySelector("[data-slot=exam-gaps-why]")?.textContent, `No room in the final review for Binomial either. ${EXAM_GAP_WORDS.full}.`);
+		assert.deepEqual([...both.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.startOne, EXAM_GAP_WORDS.ask], "one press picks which, from a menu");
+		assert.doesNotMatch(both.textContent ?? "", /\d/, "no counts");
+	});
+
+	it("shows under either candidate's first line, and nothing when every topic fits", () => {
+		assert.ok(gapLine(gapped(["variance"], []), <p data-slot="course-ready">Ready line</p>), "the Exam & mistakes candidates keep it");
+		assert.equal(gapLine(course()), null);
+	});
+
+	it("asks the tutor in his words, naming the topics", () => {
+		assert.equal(examGapAsk(["Variance"]), "My exam plan has no room for Variance. How can I still fit it in before the exam?");
+		assert.equal(examGapAsk(["Variance", "Binomial"]), "My exam plan has no room for Variance and Binomial. How can I still fit them in before the exam?");
 	});
 });

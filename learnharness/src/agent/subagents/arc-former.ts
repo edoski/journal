@@ -20,6 +20,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
 	ARC_PASS_MIN_TOPICS,
+	answeredNeeds,
 	arcPassChanges,
 	arcPassProblems,
 	arcPassView,
@@ -30,13 +31,29 @@ import {
 	lastEdgesEntry,
 	formationWords,
 	liveTopics,
+	mergeMisses,
 	passDue,
+	purposeAnswerProblems,
+	purposeProblems,
+	purposeQuiz,
+	sortAnswerProblems,
+	sortMisses,
+	sortProblems,
+	sortQuiz,
 	storedEdges,
 	type ArcPassView,
 	type ArcSubmit,
 	type EdgeDiff,
 	type EdgeSubmit,
 	type Formation,
+	type SortAnswer,
+	type SortMiss,
+	type SortQuiz,
+	type PurposeAnswer,
+	type PurposeQuiz,
+	type EdgeAdd,
+	withMissing,
+	withProposed,
 } from "../../core/arc-pass.ts";
 import { courseView, NO_STANDING, openLessonsOf, sourcesOf, type MapCourseView } from "../../core/course-map-build.ts";
 import type { ChatSummary } from "../../core/contracts/chat.ts";
@@ -51,8 +68,14 @@ import { failureWords, mapRuns } from "./course-map-builder.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
 
 const EDGES_TOOL = "submit_edges";
+const MISSING_TOOL = "submit_missing";
 const ARCS_TOOL = "submit_arcs";
+const SORT_TOOL = "submit_sort";
+const PURPOSE_TOOL = "submit_purpose";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
+/** Blind readers per cut: the rubric scores with two fresh scorers and
+ *  takes the lower, so a name passes only when both place every topic. */
+const SORT_READERS = 2;
 /** Model rounds beyond reading, as the map builder counts them: one to look
  *  at the course, one to submit, and the submit seam's retries. */
 const SUBMIT_ROUNDS = 6;
@@ -82,6 +105,38 @@ const edgeSchema = Type.Object({
 	),
 });
 
+const addSchema = Type.Object({
+	topic: Type.String({ description: "B, the topic that needs." }),
+	need: Type.String({ description: "A, the topic it needs." }),
+	reason: Type.String({ description: "The step of an exercise on B that uses A." }),
+});
+
+const missingSchema = Type.Object({
+	add: Type.Array(addSchema, { description: "Direct prerequisites the graph misses; an empty list when none." }),
+});
+
+const sortSchema = Type.Object({
+	sort: Type.Array(
+		Type.Object({
+			topic: Type.String({ description: "The topic's id: t1, t2, …" }),
+			arcs: Type.Array(Type.String(), { description: "The arc names it reads as part of, exactly as listed, best first; a second only when it fits exactly as well." }),
+		}),
+		{ description: "Every topic, once." },
+	),
+});
+
+const purposeSchema = Type.Object({
+	false: Type.Array(
+		Type.Object({ topic: Type.String({ description: "The topic's id: t1, t2, …" }), why: Type.String({ description: "What the purpose line claims that this topic does not give." }) }),
+		{ description: "Each topic its arc's purpose line is false of; an empty list when every line is true of every topic." },
+	),
+	lines: Type.Optional(
+		Type.Array(Type.Object({ arc: Type.String({ description: "The arc's name, exactly as listed." }), why: Type.String({ description: "What fails: the term, the promise, or the missing thing to do." }) }), {
+			description: "Each purpose line that fails as a sentence; leave out or send an empty list when none does.",
+		}),
+	),
+});
+
 const arcSchema = Type.Object({
 	arcs: Type.Array(
 		Type.Object({
@@ -103,18 +158,30 @@ const arcSchema = Type.Object({
 		Type.Array(Type.Object({ topic: Type.String(), need: Type.String(), reason: Type.String() }), { description: "Stored prerequisites you think false: kept, and recorded with your reason." }),
 	),
 	none: Type.Optional(Type.String({ description: "Only when the course should get no arcs: why, by the size rules." })),
-	basis: Type.String({ description: "In one line, the material's units the cut follows." }),
+	basis: Type.String({ description: "The material's units the cut follows, then each place the cut departs from them, with its reason: a topic homed outside its unit, a unit merged or re-cut, an order other than the material's, a count outside four to eight arcs." }),
 });
 
 export const ARC_EDGES_INSTRUCTIONS = `You settle a course's prerequisites before anything is built on them, following the test below. You answer with one ${EDGES_TOOL} call; the app saves it.
 
-- Judge every edge listed under "Edges to judge": "B needs A" is kept only when B cannot be done or understood without A. Give each verdict its reason in one line.
+- Judge every edge listed under "Edges to judge": "B needs A" is kept only when an exercise on B cannot be worked without A. A result used only to prove B's theorem, never in working B's exercises, is no prerequisite. Give each verdict its reason in one line: the step of an exercise on B that uses A, or why none does.
 - Judge each edge from the topics' meaning and the material, never from the order the material teaches them in. A topic taught earlier is not a prerequisite for that alone.
 - Keep every direct prerequisite. An edge is only implied, and dropped, when B uses A solely through another of B's prerequisites. When an exercise on B itself works with A (continuity is defined by a limit; an improper integral is a limit of integrals), the edge is direct: keep it, even when another path also leads to A.
-- When the test leaves you unsure, keep the edge. A false drop hides what the learner must recall before B; a kept edge only orders the path.
-- Under add, list true, direct prerequisites the graph misses, each with its reason; send an empty list when there are none.
+- Drop an edge only after reading B's own material for A (search_material with A's terms): when that material runs, names or works with A, the edge stays. A topic listed with no refs has no material to read, so its edges stay.
+- When the test leaves you unsure, keep the edge, and give as its reason the exercise step you think uses A; "unsure" is no reason. A false drop hides what the learner must recall before B; a kept edge only orders the path.
+- Look for missing prerequisites as hard as for false ones. For each topic, read what its material works with that another topic of the course teaches (a definition, a result, a method, a tool or service it runs on: a deploy runbook that ships through a hosting platform needs the topic that teaches that platform; a distribution whose section computes its mean needs expectation; a formula written with an operation another topic defines, such as a transpose or a norm, needs that topic; an overview of how parts connect needs the topics on those parts, unless it is the opening sketch the parts build on), and test each. Under add, list every such prerequisite the graph misses, direct and passing the same test as a kept edge, each with its reason; send an empty list when there are none.
 - The material is registered: read it with read_material, search_material and render_pages where a test needs it. You need not read every source whole.
 - Each handle is its own topic. Two topics whose names share words are still two topics: never treat one as the other.
+
+`;
+
+export const ARC_MISSING_INSTRUCTIONS = `You check a course's prerequisites for what they miss, following the test below. Another check has judged every stored edge; you look only for true prerequisites the graph does not hold. You answer with one ${MISSING_TOOL} call.
+
+- Go through every topic in turn. Picture a typical exercise on it from its material, and list what each step uses: a definition, a result, a method, a notation, a tool or a service.
+- For each thing another topic of the course teaches, the topic needs that topic, unless its listed needs already lead there (through a need of a need). List each such missing prerequisite under add, with the exercise step that uses it as its reason.
+- Never list a need the graph holds or implies, one that only a proof of the topic's theorem uses, or one that only the material's order suggests.
+- The material is registered: read it with read_material, search_material and render_pages where a topic's exercises are unclear. A topic listed with no refs is judged from its title and the topics around it.
+- Each handle is its own topic. Two topics whose names share words are still two topics.
+- Send an empty list when the graph misses nothing.
 
 `;
 
@@ -122,18 +189,33 @@ export const ARC_CUT_INSTRUCTIONS = `You group a course's topics into arcs, foll
 
 How this differs from the text below:
 - The prerequisites are settled and you cannot change them: your answer has no field for needs. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
+- A topic's proposed needs are prerequisites the edge step found, waiting for the learner's yes. Cut as if they were stored: no topic sits in an arc before the arc holding one of its needs, stored or proposed, so the arcs hold whichever proposals the learner accepts.
 - Read the material's units before you cut: the sources' tables of contents with read_material, headings with search_material, and the unit each topic's reference locator names. A source the course cannot open is listed as such; then the locators are the material you have.
-- List the arcs in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
+- List the arcs in study order, and each arc's topics in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
 - A topic keeps its title; give a title only to a topic listed with none, under titles. A leading label two or more of an arc's topics share ("GTM: Pricing") is dropped by the app, since the arc now names it: name such an arc for the label's group.
 - Each handle is its own topic. Two topics whose names share words are still two topics, and both keep their handles.
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
-- Before you submit, test your names as the learner will read them: sort the topic titles, shuffled, into your arc names alone. A title that fits another arc's name better means that arc's name is wrong, or the topic's place is (move it if rule 2 allows). Use the material's chapter title only when the sort holds; otherwise name the idea that tells the neighbours apart.
-- Each arc's focus question is one question. If it only reads as two questions joined by "and" for unrelated ideas, the arc holds two ideas: cut it, or find the one question both serve.
+- Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
 - examArcs and leavesOut only when the material states the next exam's scope.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
 `;
+
+export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the names of its arcs, in no particular order, and its topic titles, shuffled. For each topic, say which arc's name it reads as part of, from the names alone: nothing else about the course is given, and nothing else counts. List a second name only when it fits the topic exactly as well as the first. Answer with one ${SORT_TOOL} call.`;
+
+export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student does. Each arc below has a purpose line, one sentence on what the arc lets the student do, and its topics. For each arc:
+- Read the purpose line against each of its topics in turn: is it true of that topic, so that studying the topic is part of what the line promises? Under false, list each topic a line is false of, with what the line claims that the topic does not give.
+- Read the line as a sentence. Under lines, list it when it uses a term that none of its arc's topic titles use and a student would not know, when it promises something none of its topics teaches, or when it names no thing the student will be able to do (it restates the arc's name, or only lists its topics).
+A line that is broad but true, plain and concrete is fine. Answer with one ${PURPOSE_TOOL} call.`;
+
+function purposePrompt(quiz: PurposeQuiz): string {
+	return quiz.arcs.flatMap((a) => [`## ${a.title}`, `Purpose: ${a.purpose}`, ...a.topics.map((t) => `- ${t.id}: ${t.title}`), ""]).join("\n");
+}
+
+function sortPrompt(quiz: SortQuiz): string {
+	return ["## Arc names", ...[...quiz.arcs].sort().map((a) => `- ${a}`), "", "## Topics", ...quiz.topics.map((t) => `- ${t.id}: ${t.title}`)].join("\n");
+}
 
 /** A source the agent reads, in one line. */
 function fileLine(f: MaterialFile): string {
@@ -157,12 +239,15 @@ function courseHead(title: string, record: unknown, files: readonly MaterialFile
 }
 
 /** The topics in path order, each with what the step reads of it. */
-function topicLines(view: MapCourseView, withNeeds: boolean): string[] {
+function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed">, withNeeds: boolean): string[] {
 	const listed = [...view.order.filter((k) => k in view.topics), ...Object.keys(view.topics).filter((k) => !view.order.includes(k))];
 	return listed.map((handle) => {
 		const t = view.topics[handle]!;
+		const proposed = view.proposed?.[handle] ?? [];
+		const stored = t.needs.filter((n) => !proposed.includes(n));
 		const facts = [
-			withNeeds && t.needs.length > 0 ? `needs ${t.needs.join(", ")}` : "",
+			withNeeds && stored.length > 0 ? `needs ${stored.join(", ")}` : "",
+			withNeeds && proposed.length > 0 ? `proposed needs ${proposed.join(", ")}` : "",
 			t.contrasts.length > 0 ? `contrasts ${t.contrasts.join(", ")}` : "",
 			t.refs.length > 0 ? `refs ${refWords(t.refs)}` : "",
 			t.aliases.length > 0 ? `also called ${t.aliases.join(", ")}` : "",
@@ -183,6 +268,19 @@ function edgesPrompt(title: string, view: MapCourseView, record: unknown, files:
 		"",
 		"## Edges to judge",
 		...(edges.length > 0 ? edges.map(([b, a]) => `- "${b}" (${name(b)}) needs "${a}" (${name(a)})`) : ["(none stored)"]),
+	].join("\n");
+}
+
+function missingPrompt(title: string, view: MapCourseView, record: unknown, files: readonly MaterialFile[], needs: ReadonlyMap<string, readonly string[]>): string {
+	const name = (k: string) => view.topics[k]?.title ?? k;
+	return [
+		...courseHead(title, record, files),
+		"",
+		"## Topics",
+		...topicLines(view, false),
+		"",
+		"## The graph as judged: each topic and the topics it needs",
+		...[...needs].map(([k, ns]) => `- "${k}" (${name(k)}): ${ns.length > 0 ? ns.map((n) => `"${n}"`).join(", ") : "nothing"}`),
 	].join("\n");
 }
 
@@ -215,15 +313,16 @@ export interface EdgeRun {
 }
 
 export type ArcPassResult =
-	| { status: "formed"; summary: string; edges: EdgeRun; answer: ArcSubmit; formation: Formation; revision: number | null; report: unknown }
+	| { status: "formed"; summary: string; edges: EdgeRun; answer: ArcSubmit; formation: Formation; revision: number | null; report: unknown; sort: SortMiss[] | null }
 	| { status: "none"; reason: string; edges?: EdgeRun; answer?: ArcSubmit }
 	| { status: "failed"; reason: string; edges?: EdgeRun; answer?: ArcSubmit; patch?: Json };
 
 /** One entry of a run's transcript: a model message, an answer the app or
  *  the engine refused, or a save. */
 export type TranscriptEntry =
-	| { at: string; step: "edges" | "cut"; kind: "message"; message: AssistantMessage }
-	| { at: string; step: "edges" | "cut"; kind: "refused"; problems: string }
+	| { at: string; step: "edges" | "missing" | "cut" | "sort" | "purpose"; kind: "message"; message: AssistantMessage }
+	| { at: string; step: "sort"; kind: "sorted"; misses: SortMiss[] }
+	| { at: string; step: "edges" | "missing" | "cut"; kind: "refused"; problems: string }
 	| { at: string; step: "edges" | "cut" | "note"; kind: "saved" | "save refused"; changes: unknown; message?: string };
 
 export interface ArcPassOptions {
@@ -307,14 +406,14 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		const files = (await measureMaterial(directory, sourcesOf(first), deps.fetchPage)).filter((f) => f.kind !== "folder");
 		const title = typeof obj(first).title === "string" ? (obj(first).title as string) : workspace;
 		const signal = options.signal;
-		const agent = <T>(step: "edges" | "cut", tool: string, parameters: typeof edgeSchema | typeof arcSchema, doctrine: string, instructions: string, prompt: string, validate: (answer: T) => Promise<string | null>) =>
+		const agent = <T>(step: "edges" | "missing" | "cut", tool: string, parameters: typeof edgeSchema | typeof missingSchema | typeof arcSchema, doctrine: string, instructions: string, prompt: string, validate: (answer: T) => Promise<string | null>) =>
 			withBgLlmSlot(signal, () =>
 				runSubmitAgent<T>({
 					role: "teacher",
 					toolName: tool,
-					toolDescription: step === "edges" ? "Submit the verdict on every prerequisite." : "Submit the course's arcs.",
+					toolDescription: step === "edges" ? "Submit the verdict on every prerequisite." : step === "missing" ? "Submit the prerequisites the graph misses." : "Submit the course's arcs.",
 					parameters,
-					fill: (input: Json) => (step === "edges" ? { verdicts: input.verdicts ?? [], add: input.add ?? [] } : { ...input, arcs: input.arcs ?? [] }) as T,
+					fill: (input: Json) => (step === "edges" ? { verdicts: input.verdicts ?? [], add: input.add ?? [] } : step === "missing" ? { add: input.add ?? [] } : { ...input, arcs: input.arcs ?? [] }) as T,
 					validate: async (answer) => {
 						const problems = await validate(answer);
 						if (problems) {
@@ -341,10 +440,21 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		};
 
 		const before = await viewNow(workspace);
-		const edgeAnswer = await agent<EdgeSubmit>("edges", EDGES_TOOL, edgeSchema, composeDoctrine(ARC_EDGES_DOCTRINE), ARC_EDGES_INSTRUCTIONS, edgesPrompt(title, before.view, before.record, files), async (a) =>
+		const judged = await agent<EdgeSubmit>("edges", EDGES_TOOL, edgeSchema, composeDoctrine(ARC_EDGES_DOCTRINE), ARC_EDGES_INSTRUCTIONS, edgesPrompt(title, before.view, before.record, files), async (a) =>
 			edgeProblems(a, before.view),
 		);
 		if (signal?.aborted) throw aborted();
+		const missing = await agent<{ add: EdgeAdd[] }>(
+			"missing",
+			MISSING_TOOL,
+			missingSchema,
+			composeDoctrine(ARC_EDGES_DOCTRINE),
+			ARC_MISSING_INSTRUCTIONS,
+			missingPrompt(title, before.view, before.record, files, answeredNeeds(before.view, judged)),
+			async (a) => edgeProblems(withMissing(judged, a.add), before.view),
+		);
+		if (signal?.aborted) throw aborted();
+		const edgeAnswer = withMissing(judged, missing.add);
 		const diffs = edgeDiffs(edgeAnswer);
 		const edges: EdgeRun = { mode: options.edges, submit: edgeAnswer, diffs, applied: [], skipped: [] };
 		if (options.edges === "apply" && diffs.length > 0) {
@@ -358,21 +468,76 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			} else edges.skipped = diffs;
 		}
 
-		const cut = await viewNow(workspace);
+		const settled = async () => {
+			const read = await viewNow(workspace);
+			return options.edges === "propose" ? { ...read, view: withProposed(read.view, diffs) } : read;
+		};
+		const cut = await settled();
 		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;
+		let sorted: SortMiss[] | null = null;
+		const blindSort = async (a: ArcSubmit, formation: Formation): Promise<string | null> => {
+			const quiz = sortQuiz(a, cut.view, formation);
+			const reader = () => runSubmitAgent<SortAnswer>({
+				role: "teacher",
+				toolName: SORT_TOOL,
+				toolDescription: "Submit the arc each topic reads as part of.",
+				parameters: sortSchema,
+				fill: (input: Json) => ({ sort: (input.sort as SortAnswer["sort"] | undefined) ?? [] }),
+				validate: (answer) => sortAnswerProblems(answer, quiz),
+				systemPrompt: SORT_INSTRUCTIONS,
+				prompt: sortPrompt(quiz),
+				engine,
+				signal,
+				onMessage: (message) => log({ step: "sort", kind: "message", message }),
+				onStep: (usage, model, n, finish, tools) => console.info(`[arc-pass ${workspace}] sort step ${n} ${model}: ${usage.input} in, ${usage.output} out, ${finish}, ${tools}`),
+				neverSubmitted: "The blind sort never submitted.",
+			}).catch((err: unknown) => {
+				if (signal?.aborted) throw aborted();
+				console.info(`[arc-pass ${workspace}] a blind reader skipped: ${err instanceof Error ? err.message : String(err)}`);
+				return null;
+			});
+			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
+			if (reads.length > 0) {
+				sorted = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				log({ step: "sort", kind: "sorted", misses: sorted });
+				const misses = sortProblems(sorted, a);
+				if (misses) return misses;
+			}
+			const purposes = purposeQuiz(a, cut.view, formation);
+			const purposeRead = await runSubmitAgent<PurposeAnswer>({
+				role: "teacher",
+				toolName: PURPOSE_TOOL,
+				toolDescription: "Submit the topics a purpose line is false of.",
+				parameters: purposeSchema,
+				fill: (input: Json) => ({ false: (input.false as PurposeAnswer["false"] | undefined) ?? [], lines: (input.lines as PurposeAnswer["lines"] | undefined) ?? [] }),
+				validate: (answer) => purposeAnswerProblems(answer, purposes),
+				systemPrompt: PURPOSE_INSTRUCTIONS,
+				prompt: purposePrompt(purposes),
+				engine,
+				signal,
+				onMessage: (message) => log({ step: "purpose", kind: "message", message }),
+				onStep: (usage, model, n, finish, tools) => console.info(`[arc-pass ${workspace}] purpose step ${n} ${model}: ${usage.input} in, ${usage.output} out, ${finish}, ${tools}`),
+				neverSubmitted: "The purpose check never submitted.",
+			}).catch((err: unknown) => {
+				if (signal?.aborted) throw aborted();
+				console.info(`[arc-pass ${workspace}] the purpose check skipped: ${err instanceof Error ? err.message : String(err)}`);
+				return null;
+			});
+			return purposeRead ? purposeProblems(purposeRead, purposes) : null;
+		};
 		const answer = await agent<ArcSubmit>("cut", ARCS_TOOL, arcSchema, composeDoctrine(ARC_CUT_DOCTRINE), ARC_CUT_INSTRUCTIONS, cutPrompt(title, cut.view, cut.record, files), async (a) => {
 			const problems = arcPassProblems(a, cut.view);
 			if (problems) return problems;
 			const formation = arcPassChanges(a, cut.view, { edgesEntry, asked: options.asked, reason: options.reason });
 			if (!formation) return null;
 			const checked = await courseRecords.run(workspace, { verb: "check", changes: formation.changes });
-			if (checked.ok || checked.kind !== "validation") return null;
-			return `The engine refused the arcs: ${checked.message}`;
+			if (!checked.ok && checked.kind === "validation") return `The engine refused the arcs: ${checked.message}`;
+			return blindSort(a, formation);
 		});
 		if (signal?.aborted) throw aborted();
 		if (answer.none?.trim()) return { status: "none", reason: answer.none.trim(), edges, answer };
 
-		const now = await viewNow(workspace);
+		const now = await settled();
 		if (recordHasArcs(now.record)) return { status: "failed", reason: "the course got arcs while the pass read it", edges, answer };
 		const formation = arcPassChanges(answer, now.view, { edgesEntry, asked: options.asked, reason: options.reason });
 		if (!formation) return { status: "none", reason: "the answer formed no arcs", edges, answer };
@@ -384,7 +549,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		const after = await readRecord(workspace);
 		const reported = await courseRecords.run(workspace, { verb: "arcs", report: true });
 		const revision = typeof obj(after).revision === "number" ? (obj(after).revision as number) : null;
-		return { status: "formed", summary: formationWords(answer), edges, answer, formation, revision, report: reported.ok ? obj(reported.json).report : null };
+		return { status: "formed", summary: formationWords(answer), edges, answer, formation, revision, report: reported.ok ? obj(reported.json).report : null, sort: sorted };
 	}
 
 	/** Release the course, and run a map build asked for meanwhile. */

@@ -9,7 +9,8 @@ import { MARK_WORDS } from "@/components/study-words";
 
 /** How the record marked his answer, as one 13px line under his bubble
  *  (spec: mark-line.md): the result, how it counted, the confidence
- *  recorded, whether it was disputed. The facts end where his words end,
+ *  recorded, whether it was disputed; a problem's tries one line each.
+ *  The facts end where his words end,
  *  on the bubble's right padding; Dispute shows just before them while the
  *  line is pointed at or focused, drawn out of the line's flow so a hidden
  *  button never pushes the facts in. The engine's mark only
@@ -21,7 +22,7 @@ export function MarkLine({ answerId }: { answerId: string }) {
 	if (!mark) return null;
 	return (
 		<div data-testid="mark-line" data-slot="mark-line" className="group/mark flex min-h-8 min-w-0 justify-end pe-4 text-row text-muted-foreground">
-			<div data-slot="mark-facts" className="relative flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1">
+			<div data-slot="mark-facts" className="relative flex min-w-0 flex-col items-end justify-center gap-y-1">
 				<Hint label={MARK_WORDS.disputeTitle} action="dispute-mark">
 					<Button
 						variant="quiet"

@@ -4,7 +4,7 @@ import { misfitWords } from "@/components/calendar/calendar-facts";
 import { resumableSession } from "@/components/nav/session-state";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { agoWords, notReadyWords, PART_WORDS, READY_WORDS, slipMark, type SlipKey } from "@/components/study-words";
+import { agoWords, finalReviewMissWords, notReadyWords, PART_WORDS, READY_WORDS, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -25,17 +25,20 @@ export function partState(part: ReadinessPart): PartState {
 }
 
 /** The answer to "am I ready for the exam, and where not?":
- *  - `short`: topics with no room before the exam, named (the run-up's words);
+ *  - `short`: topics with no room before the exam, else taught topics the
+ *    final review has no room for, named (the run-up's words);
  *  - `notYet`: the arcs not ready, as their bubbles (`arcs`), none when no
  *    arc is ready; in a course the page shows without arcs, the topics,
  *    named (`words`);
  *  - `ready`: every part solid. */
 export type ExamReady = { kind: "short"; words: string } | { kind: "notYet"; words: string; arcs: readonly StripArc[] } | { kind: "ready"; words: string };
 
-export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics">, arcs: readonly CourseArcSection[] | null): ExamReady {
+export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam">, arcs: readonly CourseArcSection[] | null): ExamReady {
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const wontFit = readiness.parts.flatMap((p) => p.wontFit);
 	if (wontFit.length > 0) return { kind: "short", words: misfitWords(wontFit.map(titleOf))! };
+	// Never "ready" while the final review leaves a taught topic out (the engine's `map`).
+	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf)) };
 	const notReady = readiness.parts.filter((p) => partState(p) === "notYet");
 	if (notReady.length === 0) return { kind: "ready", words: READY_WORDS.ready };
 	if (arcs && notReady.length === readiness.parts.length) return { kind: "notYet", words: READY_WORDS.notYet, arcs: [] };

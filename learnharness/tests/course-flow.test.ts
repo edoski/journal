@@ -353,7 +353,7 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
 		assert.equal(verbs.filter((v) => v === "map").length, 2, "each brief reads every course's daily plan");
 		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
-		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each practice brief also reads the exam run-up");
+		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each brief reads the daily plan, practice's exam run-up with it");
 		const save = linked.find((c) => c.args[2] === "save")!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
 		assert.deepEqual(JSON.parse(save.stdin), {

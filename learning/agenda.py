@@ -6,7 +6,8 @@ Pure and read-only. The plan projects every course's record forward from today
 together. Each study day (``capacity.Capacity``) takes every review due, and
 each exam course's pace of new topics, unless he has shown a limit for that
 kind of work: then it takes as many as his limit on that weekday, the
-fractions carried from day to day. Nothing lands on a weekday he does not
+fractions carried from day to day within the calendar week, so a date's room
+does not depend on the day the plan is made. Nothing lands on a weekday he does not
 study. Planned reviews are assumed ``solid``, so a later day's reviews are the
 ladder's next steps; what does not fit stays due. The plan never stores
 anything; the next save and the next plan start again from what happened.
@@ -67,11 +68,19 @@ new topics should end (``progress.new_end``: within its final review, the day
 before the exam), nearest exam first, past the pace he has shown until he has
 shown a limit; so a nearer exam's last topics come before a later exam's pace,
 since a topic started late is better known at the exam than one never started.
-Spare new-topic capacity then goes to the nearest exam with topics left; then
-to courses with no exam, the one that started a topic least recently first.
+A pace is whole topics a day, its fraction carried within the calendar week
+(``capacity.pace``): half a topic a day starts one every other day, and a date
+gets the same pace whichever day the plan is made on. Rounding each day up
+instead took a start every day from courses with no exam until the exam's
+topics ran out. Once he has shown a limit, a day's pace also takes what the
+days after it cannot hold, so a fraction carried to a day with no room is never
+a topic lost. Spare new-topic capacity then goes to courses with no exam
+ahead, the one that started a topic least recently first; then to the nearest
+exam with topics left; then to the topics outside an exam's scope.
 Spare capacity starts one topic on a day that starts none, and a second only
 when it belongs with the first (one needs the other, or both rest on the same
-prerequisites) or his own rate that weekday holds two: two unrelated topics in
+prerequisites) in the arc the plan is taking from, or his own rate that
+weekday holds two: two unrelated topics in
 one sitting split his attention, and nothing but a pace asks for them. A pace
 that needs two still takes two, related ones first. A topic a course cannot start before its exam does not
 fit. Before any pace, an untaught topic that a taught topic needs starts first,
@@ -81,13 +90,17 @@ waits while other courses' new topics take the days names them
 
 New topics follow the material. The path runs arc by arc, and a start comes
 from the window: the earliest arc with topics left (the arc of the earliest
-untaught topic he may start), the next arc, and any arc that needs nothing
-from another (``progress.window``). That arc is not the current arc, the
-arc of "You are here" (``arcs.current``): the two differ once he studies
-ahead. Without arcs the path bounds it: a topic ahead of the
+untaught topic he may start) and the next arc; in a course whose arcs need
+nothing from each other, strands with no order between them, every arc
+(``progress.window``). Once one arc builds on another the arcs are chapters,
+and a later one that happens to need nothing still waits its place. That arc
+is not the current arc, the arc of "You are here" (``arcs.current``): the two
+differ once he studies ahead. Without arcs the path bounds it: a topic ahead of the
 earliest untaught one starts only when it builds on one, so a topic that
 needs nothing waits its place (``progress.opens``). An exam's pace passes the
-window only on a day when holding would raise the pace it needs. Each start
+window only on a day when holding would raise the pace it needs, or, once he
+has shown a limit, when his limit on the days left cannot make the day up
+(``progress.holding_raises``). Each start
 says why it comes then (``When.why``): next in its arc, after what it waited
 on, or early, with the earliest arc with topics left and what it waits on.
 
@@ -255,8 +268,8 @@ class _Course:
     def opens(self, topic: str, front: str | None) -> bool:
         """Whether ``topic`` is in the window new topics come from, read from
         ``front`` (``progress.opens``): the earliest arc with topics left, the
-        next and any arc that needs nothing from another; without arcs, the
-        path's own order."""
+        next, and every strand of a course whose arcs need nothing from each
+        other; without arcs, the path's own order."""
         window = progress.window(self.record, front, self.free)
         return progress.opens(self.record, topic, window, front)
 
@@ -615,18 +628,17 @@ class Plan:
         )
 
 
-class _Allowance:
-    """Whole items a day from fractional rates, the remainder carried."""
+def _whole(week: Capacity, day: date, kind: str) -> int:
+    """A study day's whole items of ``kind`` from his fractional rates, the
+    fractions carried within the calendar week (``capacity.whole``)."""
 
-    def __init__(self) -> None:
-        self.carry = {"reviews": 0.5, "new": 0.5}
+    def rate(other: date) -> float:
+        if not week.studies(other):
+            return 0.0
+        weekday = week.on(other)
+        return (weekday.reviews if kind == "reviews" else weekday.new).value
 
-    def take(self, kind: str, rate: float) -> int:
-        """A day's whole items: never more than its own rate rounded up, so a
-        remainder carried from lighter days never doubles a day's load."""
-        whole = min(math.floor(self.carry[kind] + rate), math.ceil(rate))
-        self.carry[kind] += rate - whole
-        return whole
+    return capacity.whole(day, rate)
 
 
 def _gaps(record: dict[str, Any], untaught: set[str]) -> set[str]:
@@ -650,6 +662,16 @@ def _study_days(week: Capacity, first: date, last: date) -> int:
     return sum(
         week.studies(first + timedelta(days=n)) for n in range((last - first).days + 1)
     )
+
+
+def _room_after(week: Capacity, day: date, last: date) -> int | None:
+    """The new topics his shown limit holds from the day after ``day`` to
+    ``last``, as the days take them (``_whole``); None while he has shown
+    none."""
+    if not week.on(day).new.shown:
+        return None
+    days = (day + timedelta(days=n) for n in range(1, (last - day).days + 1))
+    return sum(_whole(week, other, "new") for other in days if week.studies(other))
 
 
 def _reviews(
@@ -793,20 +815,24 @@ def _new(
         pool: Collection[str] | None = None,
         bound: bool = True,
         pace: bool = False,
+        second: bool = False,
     ) -> int:
         """Up to ``count`` ready topics of ``among`` in path order from the
         window (``_Course.opens``; all of them when not ``bound``), those
         related to one it starts today first: a second topic on one day builds
-        on what the first does. The window is read from the earliest untaught
+        on what the first does, within the arc it would take anyway, so a
+        later arc's topic never passes the earlier arc's next one for sharing
+        a prerequisite. A ``second`` takes only such a topic, or none. The
+        window is read from the earliest untaught
         topic of ``pool`` (of ``among`` when None), so narrowing the
         candidates never moves where he is in the material."""
         taken = 0
         while taken < count:
             front = course.front(among if pool is None else pool)
-            # Ready topics go in path order, arc by arc, so a free arc later in
+            # Ready topics go in path order, arc by arc, so a strand later in
             # the path gives one only when no earlier arc in the window has one
-            # ready, bar one related to today's start. capacity._opened mirrors
-            # this order: change the two together.
+            # ready. capacity._opened mirrors this order: change the two
+            # together.
             ready = [
                 topic
                 for topic in course.untaught
@@ -814,8 +840,15 @@ def _new(
                 and course.ready(topic)
                 and (not bound or course.opens(topic, front))
             ]
-            near = [t for t in ready if course.related(t, chosen[course.name])]
             if not ready:
+                break
+            near = [
+                t
+                for t in ready
+                if course.arc(t) == course.arc(ready[0])
+                and course.related(t, chosen[course.name])
+            ]
+            if second and not near:
                 break
             topic = (near or ready)[0]
             course.start(topic, day, front, pace=pace)
@@ -829,23 +862,43 @@ def _new(
         his attention, so it starts one only on a day that starts none yet, or
         one related to a topic this course starts today, unless his own rate
         that weekday holds two."""
-        if not any(chosen.values()) or week.on(day).new.value >= 2:
-            return take(course, 1, set(among), pool=pool)
-        started = chosen[course.name]
-        related = {t for t in among if course.related(t, started)}
-        return take(course, 1, related, pool=pool)
+        alone = not any(chosen.values()) or week.on(day).new.value >= 2
+        return take(course, 1, set(among), pool=pool, second=not alone)
+
+    def share(group: list[_Course]) -> int:
+        """Topics planned as in a course with no exam, within ``room``: one
+        per course of ``group`` a round, the course that started a topic least
+        recently first, while any of them starts one."""
+        group = sorted(group, key=lambda course: course.began or date.min)
+        count = 0
+        while count < room and group:
+            started = []
+            for course in group:
+                among = course.untaught if course.exam is None else course.outside(day)
+                if count < room and spare(course, among, course.startable(day)):
+                    started.append(course)
+                    count += 1
+            group = started
+        return count
 
     exams = sorted(
         (course for course in courses if course.new_end(day) is not None),
         key=lambda course: (course.exam.day if course.exam else day, course.name),
     )
     paces: dict[str, int] = {}
+    before: dict[str, int] = {}
     for course in exams:
         end = course.new_end(day)
         assert end is not None
         left = _study_days(week, day, end)
         if left > 0 and course.scoped:
-            paces[course.name] = math.ceil(len(course.scoped) / left)
+            rest = len(course.scoped)
+            after = _room_after(week, day, end)
+            before[course.name] = rest
+            paces[course.name] = max(
+                capacity.pace(rest, left, day, week.studies),
+                rest - after if after is not None else 0,
+            )
     if begun is not None:
         room = max(room, sum(paces.values()) - begun)
     others = [course for course in courses if course.new_end(day) is None]
@@ -865,26 +918,23 @@ def _new(
             if (
                 room > 0
                 and taken < pace
-                and progress.holding_raises(left, len(course.scoped), pace)
+                and progress.holding_raises(
+                    left,
+                    len(course.scoped),
+                    before[course.name],
+                    _room_after(week, day, end),
+                )
             ):
                 scoped = set(course.scoped)
                 more = min(room, pace - taken)
                 room -= take(course, more, scoped, bound=False, pace=True)
+    room -= share(
+        [course for course in others if course.exam is None or course.outside(day)]
+    )
     for course in exams:
         while room > 0 and spare(course, course.scoped, course.scoped):
             room -= 1
-    open_ = sorted(
-        (course for course in courses if course.exam is None or course.outside(day)),
-        key=lambda course: course.began or date.min,
-    )
-    while room > 0 and open_:
-        started = []
-        for course in open_:
-            among = course.untaught if course.exam is None else course.outside(day)
-            if room > 0 and spare(course, among, course.startable(day)):
-                started.append(course)
-                room -= 1
-        open_ = started
+    room -= share([course for course in exams if course.outside(day)])
     for course in courses:
         course.watch(course.startable(day))
     _waited(courses, chosen, day)
@@ -981,7 +1031,6 @@ def plan(
     courses = [_Course.of(name, record) for name, record in records.items()]
     done = history.get(today, capacity.Done())
     spent = _spent_today(records, courses, today, week) if done.reviews else 0
-    allowance = _Allowance()
     for offset in range(days):
         day = today + timedelta(days=offset)
         rates = week.on(day)
@@ -990,11 +1039,9 @@ def plan(
         begun: int | None = None
         if week.studies(day):
             reviews_room = (
-                allowance.take("reviews", rates.reviews.value)
-                if rates.reviews.shown
-                else math.inf
+                _whole(week, day, "reviews") if rates.reviews.shown else math.inf
             )
-            new_room = allowance.take("new", rates.new.value)
+            new_room = _whole(week, day, "new")
             if not rates.new.shown:
                 begun = done.new if offset == 0 else 0
         if offset == 0:

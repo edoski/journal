@@ -1434,7 +1434,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || doneTonight || gone || courseGone} />}
+						tonight={<DoneTonightButton onDone={sendTonight} gone={closedForToday} disabled={busy || doneTonight || gone || courseGone} />}
 					/>
 				</TopBar>
 

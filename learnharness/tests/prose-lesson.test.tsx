@@ -42,10 +42,12 @@ describe("the Prose question in the tutor's message", () => {
 		assert.doesNotMatch(html, /The answer|by 3/, "the committed answer never shows before he answers");
 	});
 
-	it("asks again after a hint with Your turn alone, its words already above the hint", () => {
+	it("asks again after a hint with nothing under it, its words already above the hint", () => {
 		const open = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} open repeat />);
-		assert.match(open, /data-slot="your-turn"[^>]*>Your turn</);
+		assert.doesNotMatch(open, /Your turn/, "no label heads nothing");
 		assert.match(open, /data-repeat=""/);
+		const choices = renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="c2" input={choice} open repeat />);
+		assert.match(choices, /data-slot="your-turn"[^>]*>Your turn</, "a repeated choice still heads its rows");
 		assert.doesNotMatch(open, /stretch/, "the question's words print once");
 		const spec = proseQuestionSpec("explain", "c1", check)!;
 		const answered = withMarks(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={buildAnswer(spec.data, { text: "Along (1,1)", confidence: "confident" }, "explain")} open={false} repeat />);

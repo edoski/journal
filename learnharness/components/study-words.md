@@ -35,7 +35,7 @@ A topic often has more than one reason, and a row says one. Every surface takes 
 2. a slip;
 3. a review come due (Due today, 3d overdue): the engine dates it today;
 4. unfinished work that holds it (Left off 2d ago);
-5. when its review comes back (Back in 5d), a review the plan holds back included (Due since 21 Oct): the engine dates that review on a later day, so the work he left comes first;
+5. when its review comes back (Back in 5d), a review the plan holds back included (Due since 21 Oct): the engine dates that review on a later day, so the work he left comes first. A review held past memory's day is due already, so it is a fact that needs him, with the review's icon, and the map's card says it as the lists do (round 6: Cramer's rule read Due since 6 Nov in the lists and its standing on the map);
 6. how long since he studied it.
 
 Both "left off" and "due" are true at once, and neither is wrong: a review due today is today's work, so it leads; a review the plan has moved to a later day is not, so the unfinished work leads until that day. A topic Home's Today takes up says Today's reason instead, wherever it shows (the sidebar's card, the course page's Needs you).
@@ -62,7 +62,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 
 | Reason | Words |
 |---|---|
-| `next` | Next in Matrices; without arcs, Next in Linear Algebra |
+| `next` | Next in Matrices; without arcs, Next in Linear Algebra; in an arc before the one "You are here" is in (`currentArc`), Back to Matrices, earlier in the course (short: Back to Matrices), so a lesson that moved him ahead never reads against "Next in" an arc behind him (round 6) |
 | `after`, its prerequisites | After Expectation, which it needs |
 | `after`, a method it competes with | After Separable equations, so the two methods stay apart |
 | `early` | Early, from Orthogonality; without arcs, Early, ahead of its place; then, while earlier topics wait on Rank, or, when the exam's pace took it, to keep pace with the exam |

@@ -86,6 +86,15 @@ export function askOptionProblems(options: Array<{ label: string; value?: string
 	return problems;
 }
 
+/** An option's label becomes his answer's words when he picks it, so it
+ *  holds only what he would say: a tag such as "(Recommended)" would show
+ *  in his bubble. Checked where the tutor asks, never on recorded asks. */
+export function askLabelProblems(options: Array<{ label: string }>): string[] {
+	return options
+		.filter((option) => /\((?:recommended|suggested|default)\)/i.test(option.label))
+		.map((option) => `"${option.label.trim()}" carries a tag: a label is his words when he picks it, so drop the parenthesis and list the option you recommend first.`);
+}
+
 // The teaching-cycle role (owner design 2026-10-03, "two questions per
 // teaching unit"): `type` declares the teach question's role. The ROLE
 // DOCTRINE lives in the system prompt; tool descriptions stay mechanical.

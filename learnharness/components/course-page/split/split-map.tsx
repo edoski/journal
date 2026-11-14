@@ -267,9 +267,10 @@ export function SplitMap({
 	return (
 		<>
 		{header && (
-			<div data-slot="course-split-map-head" className="mb-2 flex h-9 shrink-0 items-center gap-4">
+			<div data-slot="course-split-map-head" className="mb-2 flex min-h-9 shrink-0 items-start gap-4 py-1">
 				<div className="flex min-w-0 flex-1">{header}</div>
-				{wholeButton}
+				{/* On the strip's first row, however many rows it wraps to. */}
+				<div className="flex h-7 shrink-0 items-center">{wholeButton}</div>
 			</div>
 		)}
 		<section

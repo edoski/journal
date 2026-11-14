@@ -103,6 +103,13 @@ describe("exam readiness, from the engine's sorting", () => {
 		assert.deepEqual(examReady(readiness(part({ solid: [h("span")] })), map, null), { kind: "ready", words: "Ready for the exam" });
 	});
 
+	it("never says ready while the final review leaves a taught topic out", () => {
+		const { map } = course(false);
+		const left = { ...map, exam: { date: "2026-11-19", daysLeft: 11, unreviewed: [h("rank")] } };
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), left, null), { kind: "short", words: "No room in the final review for Rank" });
+		assert.deepEqual(examReady(readiness(part({ wontFit: [h("kernel")] })), left, null), { kind: "short", words: "No room before the exam to start Kernel" }, "what has no room to start first");
+	});
+
 	it("gives each examined arc its few words, and an arc off the exam none", () => {
 		const words = partWordsByArc(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), wontFit: [h("kernel")] })));
 		assert.deepEqual(words.get(a("spaces")), { state: "ready", words: "Solid for the exam" });

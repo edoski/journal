@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { partKey, roadmapLabel, roadmapSteps, stepAnchors } from "../components/lesson/roadmap-facts.ts";
 import { derivePlanStatuses } from "../src/core/index.ts";
+import { rowDot, rowWord, stripDot } from "../components/lesson/lesson-roadmap.tsx";
 import { LiveToolCard } from "../components/artifacts/live-tool-card.tsx";
 import { artifactRenderers } from "../components/artifacts/index.ts";
 import { CompactionCutDivider } from "../components/compaction-divider.tsx";
@@ -54,6 +55,19 @@ describe("the lesson's roadmap", () => {
 			["Computing a 2×2 spectrum", "upcoming", true, false, false],
 		]);
 		assert.equal(roadmapLabel(steps), "The eigen-equation");
+	});
+
+	it("draws a step before Now that was never reached as passed, never like the next one", () => {
+		const steps = roadmapSteps(tree, { current: "compute", visited: new Set(["maps", "compute"]), done: new Set() }, new Set());
+		assert.deepEqual(steps.map((s) => [s.id, s.status, s.next]), [
+			["maps", "visited", false],
+			["equation", "passed", false],
+			["compute", "current", false],
+		]);
+		const [visited, passed] = steps;
+		assert.equal(rowDot(passed!), rowDot(visited!), "the panel draws it filled, as a step behind him, never hollow like a step ahead");
+		assert.equal(stripDot(passed!), stripDot(visited!), "and so does the strip");
+		assert.equal(rowWord(passed!), null, "never Next");
 	});
 
 	it("names the next step between steps, and says when every step was taught", () => {

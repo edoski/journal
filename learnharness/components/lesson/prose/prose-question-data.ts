@@ -115,7 +115,7 @@ interface QuestionPart {
  *  pressed Hint on or set aside to ask the tutor something. The tutor asks
  *  it again after either (neither is an answer, so the question must come
  *  back open), and the transcript draws those words once, above the hint or
- *  his side question, so the re-ask shows only "Your turn" (round 5: the
+ *  his side question, so the re-ask draws nothing of its own (round 5: the
  *  whole question printed twice after a hint; round 6: after a side
  *  question). A re-ask in new words is a rephrasing and draws them. */
 export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {

@@ -91,7 +91,8 @@ const NONE: ReadonlySet<string> = new Set();
  *  overdue"). Pure. */
 export function shelfStatus(unit: Unit, today: string, planned: ReadonlySet<string> = NONE): UnitStatus {
 	const own = unitStatus(unit, today);
-	if (!planned.has(unit.key) || !(own.kind === "returns" || own.kind === "studied" || own.kind === "none")) return own;
+	const dated = own.kind === "returns" || (own.kind === "review" && unit.topic.review?.kind === "scheduled");
+	if (!planned.has(unit.key) || !(dated || own.kind === "studied" || own.kind === "none")) return own;
 	return { kind: "review", words: overdueWords(unit.topic.review?.kind === "due" ? unit.topic.review.overdue : 0) };
 }
 

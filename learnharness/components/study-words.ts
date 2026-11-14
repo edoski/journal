@@ -1,4 +1,4 @@
-import type { ArcState, CourseExam, CourseMap, CourseMapTopic, JobKind, MarkHow, MarkResult, MarkRow, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import { currentArc, type ArcHandle, type ArcState, type CourseExam, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, type RightAnswer, type StartsWhy, type TopicHandle, type TopicSignals, type UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -262,6 +262,37 @@ export const ARC_EXAM_WORDS = {
 	none: "Not on the exam",
 } as const;
 
+/** The course head's line under its first, when the exam's plan leaves
+ *  topics out (`examGaps`: the engine's `does_not_fit` and `unreviewed`):
+ *  why, then a way in. "Today", since a press starts it now. */
+export const EXAM_GAP_WORDS = {
+	full: "Every day before the exam is full at your pace",
+	start: "Start it today",
+	review: "Review it today",
+	startOne: "Start one today",
+	ask: "Ask the tutor",
+	/** Each topic in Start one today's menu: "Start Variance", "Review Rank". */
+	startTopic: "Start",
+	reviewTopic: "Review",
+} as const;
+
+/** The taught topics the final review has no room for, standing alone
+ *  (the calendar's "No room in it for" reads under its final review). */
+export function finalReviewMissWords(titles: readonly string[]): string {
+	return `No room in the final review for ${listWords(titles)}`;
+}
+
+/** The same, when the head's first line already names a topic with no
+ *  room to start. */
+export function examGapEitherWords(titles: readonly string[]): string {
+	return `${finalReviewMissWords(titles)} either`;
+}
+
+/** His opening words in a lesson Ask the tutor starts, naming the topics. */
+export function examGapAsk(titles: readonly string[]): string {
+	return `My exam plan has no room for ${listWords(titles)}. How can I still fit ${titles.length === 1 ? "it" : "them"} in before the exam?`;
+}
+
 /** Why a topic the exam ahead leaves out (`exam.leavesOut`) starts when
  *  it does: "Not on the exam; after it" when the plan starts it after the
  *  exam, "Not on the exam" when it starts before, since nothing the exam
@@ -272,13 +303,28 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
 	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
 }
 
+/** The map's fields the words of a start read: its arcs' names and
+ *  order, and where he is (`currentArc`). */
+type StartsMap = Pick<CourseMap, "title" | "topics" | "arcs" | "current" | "currentArc">;
+
+/** Whether `arc` comes before the arc he is in (`currentArc`), in the
+ *  course's arc order: the plan goes back to it. */
+function behindHere(arc: ArcHandle, map: StartsMap): boolean {
+	const order = map.arcs?.map((a) => a.handle) ?? [];
+	const here = currentArc(map);
+	return here !== null && order.indexOf(arc) >= 0 && order.indexOf(arc) < order.indexOf(here);
+}
+
 /** Why an untaught topic starts when the plan starts it, in his course's
- *  names: "Next in Matrices"; "After Expectation, which it needs"; "After
- *  Separable equations, so the two methods stay apart"; "Early, from
- *  Orthogonality, while earlier topics wait on Rank"; "Early, from
- *  Orthogonality, to keep pace with the exam". A course without arcs says
- *  "Next in Linear Algebra" and "Early, ahead of its place". Pure. */
-export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "topics" | "arcs">): string {
+ *  names: "Next in Matrices"; "Back to Matrices, earlier in the course"
+ *  when the arc he is in comes after it, so "You are here" in a later arc
+ *  never reads against "Next in" an earlier one (round 6); "After
+ *  Expectation, which it needs"; "After Separable equations, so the two
+ *  methods stay apart"; "Early, from Orthogonality, while earlier topics
+ *  wait on Rank"; "Early, from Orthogonality, to keep pace with the exam".
+ *  A course without arcs says "Next in Linear Algebra" and "Early, ahead
+ *  of its place". Pure. */
+export function startsWhyWords(why: StartsWhy, map: StartsMap): string {
 	const titles = (handles: readonly TopicHandle[]) => listWords(handles.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h));
 	const arc = why.arc && (map.arcs?.find((a) => a.handle === why.arc)?.title ?? why.arc);
 	if (why.kind === "early") {
@@ -291,6 +337,7 @@ export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "t
 		const apart = why.partners.length > 0 ? `${titles(why.partners)}, so the ${why.partners.length === 1 ? "two methods stay" : "methods stay"} apart` : null;
 		return `After ${[needs, apart].filter(Boolean).join(", and ")}`;
 	}
+	if (why.arc && behindHere(why.arc, map)) return `Back to ${arc}, earlier in the course`;
 	return `Next in ${arc ?? map.title}`;
 }
 
@@ -303,16 +350,17 @@ export function startsWhyTells(why: StartsWhy): boolean {
 }
 
 /** `startsWhyWords` cut to fit a row's reason beside its icon, where the
- *  topic page keeps the whole sentence: "Next in Matrices"; "After
- *  Expectation"; "After Separable equations"; "Early, from Orthogonality"
- *  ("Early, ahead of its place" without arcs). Pure. */
-export function startsWhyShort(why: StartsWhy, map: Pick<CourseMap, "title" | "topics" | "arcs">): string {
+ *  topic page keeps the whole sentence: "Next in Matrices"; "Back to
+ *  Matrices"; "After Expectation"; "After Separable equations"; "Early,
+ *  from Orthogonality" ("Early, ahead of its place" without arcs). Pure. */
+export function startsWhyShort(why: StartsWhy, map: StartsMap): string {
 	if (why.kind === "early") return startsWhyWords({ ...why, waitingOn: [], exam: false }, map);
 	if (why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0)) {
 		const handles = why.needs.length > 0 ? why.needs : why.partners;
 		return `After ${listWords(handles.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h))}`;
 	}
-	return startsWhyWords(why, map);
+	const arc = why.arc && behindHere(why.arc, map) ? map.arcs?.find((a) => a.handle === why.arc)?.title : undefined;
+	return arc ? `Back to ${arc}` : startsWhyWords(why, map);
 }
 
 /** How far a day is from the engine's, one form wherever a distance shows

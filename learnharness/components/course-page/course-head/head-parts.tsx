@@ -60,7 +60,7 @@ export function ExamFact({ course, runup, words }: { course: StudyCourse; runup:
 				<CalendarIcon aria-hidden className={MARK} />
 				{words}
 			</PopoverTrigger>
-			<PopoverContent data-slot="course-exam-runup" align="start" collisionPadding={12} className="flex w-80 flex-col gap-3">
+			<PopoverContent data-slot="course-exam-runup" align="start" collisionPadding={12} className="flex flex-col gap-3">
 				<div className="flex flex-col gap-1">
 					<p className="text-row font-medium text-foreground">{map.title} exam</p>
 					<p className="text-label text-muted-foreground">

@@ -136,7 +136,7 @@ export function CalendarEntryView({
 			<PopoverTrigger data-slot="calendar-entry" data-look={look} className={face}>
 				<Face entry={entry} today={today} compact={compact} />
 			</PopoverTrigger>
-			<PopoverContent data-slot="calendar-entry-detail" align="start" collisionPadding={12} className={cn("flex flex-col gap-3", PANEL_WIDTH)}>
+			<PopoverContent data-slot="calendar-entry-detail" align="start" collisionPadding={12} className="flex flex-col gap-3">
 				<EntryDetail entry={entry} today={today} busy={busy} onStart={onStart} />
 			</PopoverContent>
 		</Popover>

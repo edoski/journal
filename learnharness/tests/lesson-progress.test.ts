@@ -129,6 +129,31 @@ describe("the close marks the lesson's new topics introduced", () => {
 		assert.match((res.content[0] as { text: string }).text, /Marked introduced: eigen/);
 	});
 
+	it("gives each lesson topic's day as the plan holds it after the close's save, in words, for the close to copy", async () => {
+		const maps = [
+			{ today: "2026-11-08", topics: [mapTopic("eigen", null), mapTopic("rank", "2026-11-03")] },
+			{
+				today: "2026-11-08",
+				topics: [
+					{ ...mapTopic("eigen", "2026-11-08"), review: { kind: "scheduled", date: "2026-11-13", held: { reason: "full", due: "2026-11-09" } } },
+					{ ...mapTopic("rank", "2026-11-03"), review: { kind: "scheduled", date: "2026-11-09" } },
+				],
+			},
+		];
+		const course = {
+			course: { workspace: "/study/la", title: "Linear Algebra" },
+			records: { map: async () => ({ ok: true, map: maps.shift() }), run: async () => ({ ok: true, json: {} }) },
+		};
+		const messages = [assistant([call("s1", "course_save", { changes: { observations: [{ topics: ["rank"], result: "correct" }] } })]), result("s1", "course_save", null)];
+		const tool = planTools({ chatId: "c1", chatStore: { getChat: () => ({ tree: TOPIC_TREE, messages, topics: ["eigen"] }) } as never, course: course as never })[LESSON_PROGRESS_TOOL]!;
+		const res = await tool.execute("t1", { done: ["eigen"], close: true });
+		const body = JSON.parse((res.content[0] as { text: string }).text) as { days: Record<string, { planned: string; planned_words: string }> };
+		assert.deepEqual(body.days, {
+			eigen: { planned: "2026-11-13", planned_words: "Friday 13 November, in 5 days" },
+			rank: { planned: "2026-11-09", planned_words: "tomorrow, Monday 9 November" },
+		});
+	});
+
 	it("saves nothing without a close, or when every topic is already introduced", async () => {
 		const open = closeWith({ topics: [mapTopic("eigen", null)] });
 		await open.tool.execute("t1", { done: ["eigen"] });

@@ -4,7 +4,7 @@ import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { MathText } from "@/components/ui/math-text";
 import { PageFact, PageHead } from "@/components/page-frame/page-frame";
 import { arcHref, courseHref } from "@/components/unit-inbox/unit-href";
-import { ArcPill } from "@/components/course-map/arc-pill";
+import { ArcPill } from "@/components/course-map/arc-strip";
 import type { HeadMark, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { SLIP_ICON } from "@/components/slip-icons";
 
@@ -68,7 +68,7 @@ export function TopicHead({ facts, children }: { facts: TopicFacts; children?: R
 							// The row's divider is this span's own; the pill sits 2px into the gaps above and below, so the row keeps its 20px.
 							<span data-kind="arc" className="inline-flex h-5 min-w-0 max-w-full items-center">
 								{standing && PAUSE}
-								<ArcPill arc={facts.arc} share={facts.arc.share} href={arcHref(facts.course.workspace, facts.arc.handle)} className="-my-0.5" />
+								<ArcPill arc={facts.arc} size="segment-sm" href={arcHref(facts.course.workspace, facts.arc.handle)} className="-my-0.5" />
 							</span>
 						)}
 					</>

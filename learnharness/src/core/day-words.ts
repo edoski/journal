@@ -40,6 +40,18 @@ export function studyDay(env: Record<string, string | undefined> = process.env, 
 	return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+/** Now on the study day: the pinned `LEARNING_TODAY` at the time of day it
+ *  is now, else now. What the app stamps a session's activity with, so the
+ *  day it was studied is the day every surface and the engine call today. */
+export function studyNow(env: Record<string, string | undefined> = process.env, now = new Date()): Date {
+	const pinned = env.LEARNING_TODAY;
+	if (!pinned || !DAY.test(pinned)) return now;
+	const [year, month, day] = pinned.split("-").map(Number) as [number, number, number];
+	const at = new Date(now);
+	at.setFullYear(year, month - 1, day);
+	return at;
+}
+
 /** The engine's JSON with `planned_words` beside every `planned` day and
  *  `starts_words` beside every `starts` day, relative to the output's own
  *  `today` when it has one, else `today`. */

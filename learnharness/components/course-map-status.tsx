@@ -11,7 +11,7 @@ import { BACKGROUND_WORDS } from "@/components/study-words";
 /** Where the new course's map stands, as GET /api/courses/map reports it. */
 export type MapStatus =
 	| { state: "building" }
-	| { state: "built"; outcome: string }
+	| { state: "built"; outcome: string; unread?: readonly string[] }
 	| { state: "failed"; reason: string }
 	| { state: "none" };
 
@@ -19,7 +19,9 @@ export type MapStatus =
 export function mapStatusWords(status: MapStatus | null): { text: string; retry: boolean } {
 	switch (status?.state) {
 		case "built":
-			return { text: `Its topic map is ready: ${status.outcome}.`, retry: false };
+			// The build's outcome counts what it saved, which tells him
+			// nothing (round 6); only material it could not read is his.
+			return { text: `Its topic map is ready.${status.unread?.length ? ` It could not read ${status.unread.join(", ")}.` : ""}`, retry: false };
 		case "failed":
 			return { text: `Its topic map could not be built, because ${status.reason}. Nothing in the course changed.`, retry: true };
 		case "none":

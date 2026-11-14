@@ -6,7 +6,7 @@ A non-modal floating panel anchored to a trigger: the lesson's details and plan,
 
 | Slot | Notes |
 |---|---|
-| content | `popover` fill, 1px `border` (white 8%), radius 12, padding 16, 13/18 text, `shadow-lg`, width 288 unless the caller sets one; 4 from the trigger |
+| content | `popover` fill, 1px `border` (white 8%), radius 12, padding 16, 13/18 text, `shadow-lg`, width 320, one width for every panel the app opens (round 6: Mistakes opened at 416), so a caller never sets one; only content that sizes itself, a date picker or a swatch grid, says `w-auto`; 4 from the trigger |
 | picker content | the caller passes `p-1` and a width; a `Command` fills it |
 | title | 13/18 at 600 |
 | description | 12/16 muted |
@@ -17,4 +17,4 @@ Opens and closes with a 150ms fade and zoom; Esc or a click outside closes it. A
 
 ## Sources
 
-shadcn popover (radius, padding 16, `w-72`), the menu anatomy (`menu.md`) for the surface, T3 Code's floating panels (research/agent-apps.md).
+shadcn popover (radius, padding 16; `w-80` here, shadcn ships `w-72`), the menu anatomy (`menu.md`) for the surface, T3 Code's floating panels (research/agent-apps.md).
