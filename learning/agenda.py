@@ -207,6 +207,7 @@ class When:
     reviews: dict[str, date]
     starts: dict[str, date]
     studies: bool
+    does_not_fit: list[str]
 
     def review(self, topic: str, stored: str | None) -> str | None:
         placed = self.reviews.get(topic)
@@ -236,7 +237,7 @@ class Plan:
                     reviews.setdefault(topic, on)
             for topic in day["new"]:
                 starts.setdefault(topic, on)
-        return When(today, reviews, starts, studies)
+        return When(today, reviews, starts, studies, self.does_not_fit.get(name, []))
 
 
 class _Allowance:

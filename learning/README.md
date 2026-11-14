@@ -22,7 +22,7 @@ python -m learning.install --study-root DIR                      # offer the MCP
 
 | Verb | Purpose |
 | --- | --- |
-| `resume [--task KEY]` | the session opener: today, last activity, exam countdown, the reviews the daily plan puts today and those it puts later (`due_later`), the path with levels, weak topics, the open task, active topics, recent evidence, relevant knowledge, preferences |
+| `resume [--task KEY]` | the session opener: today, last activity, exam countdown, the reviews the daily plan puts today and those it puts later (`due_later`), the day it starts each untaught topic (`starts`) and what does not fit before the exam, the path with levels, weak topics, the open task, active topics, recent evidence, relevant knowledge, preferences |
 | `show HANDLE...` / `show --all` | whole items: a topic with its standing and history, an observation, a knowledge entry, a task, a source; or everything |
 | `map` | the whole course for drawing it: today, exam countdown, current topic, open tasks, and every topic in path order with its `needs`, symmetric `contrasts`, level, review date (the day the daily plan puts it), `overdue` when that is today, `starts` (the day the plan starts an untaught topic), the weak verdict and its signals; uncapped and without observation text. The app's course map reads it; no MCP tool |
 | `search QUERY [--all]` | accent-insensitive lexical discovery with light stemming, in this course or every registered course |

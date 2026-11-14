@@ -106,3 +106,31 @@ def test_a_save_tells_the_day_the_plan_puts_the_next_review(
     assert receipt["reviews"]["today"]["planned"] == review["today"]
     assert review["today"] > day(1)
     assert receipt["due_count"] == 0
+
+
+def test_a_new_course_s_whole_path_is_planned_up_to_its_exam(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = course(tmp_path / "graphs")
+    order = [f"t{index}" for index in range(8)]
+    built = {
+        "exam": {"date": day(30)},
+        "topics": {
+            key: {"title": key.upper(), **({"needs": [order[0]]} if index else {})}
+            for index, key in enumerate(order)
+        },
+        "path": {"order": order},
+    }
+    run(monkeypatch, capsys, root, "save", stdin=built)
+    plan = run(monkeypatch, capsys, root, "plan", "--days", "30")["courses"][0]
+    starts = {
+        topic: planned["date"]
+        for planned in plan["plan"]["days"]
+        for topic in planned["new"]
+    }
+    assert set(starts) == set(order) and max(starts.values()) < day(30)
+    assert run(monkeypatch, capsys, root, "resume")["starts"] == starts
+    topics = run(monkeypatch, capsys, root, "map")["topics"]
+    assert {item["topic"]: item["starts"] for item in topics} == starts

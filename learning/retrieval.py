@@ -363,6 +363,12 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
         "due_oldest": _oldest_unlisted(due),
         "due_later": later[:DUE_LIMIT] or None,
         "due_later_more": max(0, len(later) - DUE_LIMIT) or None,
+        "starts": {
+            topic: day.isoformat()
+            for topic, day in sorted(planned.starts.items(), key=lambda item: item[1])
+        }
+        or None,
+        "does_not_fit": planned.does_not_fit or None,
         "path": compact(
             {
                 "current": path.get("current"),

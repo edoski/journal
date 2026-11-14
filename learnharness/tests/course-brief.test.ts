@@ -265,3 +265,19 @@ describe("the brief's review days are the daily plan's", () => {
 		assert.notEqual(moved, key, "a review the plan moves re-sends the brief");
 	});
 });
+
+describe("the brief's road is the daily plan's", () => {
+	it("the days the plan starts each new topic, and what does not fit, by day", () => {
+		const resume = {
+			today: "2026-11-08",
+			starts: { poisson: "2026-11-09", geometric: "2026-11-11", expectation: "2026-11-11" },
+			does_not_fit: ["covariance"],
+		};
+		const { text, key } = projectCourseBrief(resume, "teach");
+		assert.match(
+			text,
+			/New topics on the days the daily plan starts them: 2026-11-09 \(Monday\): poisson; 2026-11-11 \(Wednesday\): geometric, expectation\nNo room before the exam to start: covariance/,
+		);
+		assert.notEqual(projectCourseBrief({ ...resume, starts: { poisson: "2026-11-10" } }, "teach").key, key, "a moved start re-sends the brief");
+	});
+});
