@@ -3,8 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { BotIcon, FileTextIcon, PenToolIcon, PlayIcon, SearchIcon, SquareIcon, WaypointsIcon } from "lucide-react";
 import type { CallUsage, JobKind, JobRecord } from "@/src/core";
-import { isProviderKeyRefusal, subscriptionLabel } from "@/src/core";
-import { formatTokens, planCostLabel } from "@/components/usage-format";
+import { isProviderKeyRefusal } from "@/src/core";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
@@ -23,11 +23,9 @@ import { Hint } from "@/components/ui/hint";
  *
  * Data: ONE feed of GET /api/activity (jobs across ALL chats, title-joined,
  * oldest-first + background runs), fetched when truth moves (events
- * channel, S5) and folded client-side with core/prices.ts.
- * Cost is INFERRED server-side through Pi; the context line is the LAST model call's
- * input+output against the model's limit (JobUsage.lastStep — pending
- * contract) — never a cumulative sum, which would be the wrong number.
- * Absent data renders "—", never zero (the doctrine).
+ * channel, S5). The dock speaks plain words only: what a process is
+ * doing, what it works for, and for how long; no cost, tokens, model or
+ * step counts.
  *
  * Quiet/ambient by design: no entry animations, stable keys, updates land
  * in place — refreshes never flicker. ALWAYS present (owner, sidebar round):
@@ -39,9 +37,9 @@ import { Hint } from "@/components/ui/hint";
  * the session it works for, elapsed, an explicit END button (POST
  * /api/activity/abort — the wave-4 backend is live): 404/409 mean the
  * process is already gone (refresh, no error); real failures degrade to
- * an inline "Abort failed", never a dead control. Detail (context, model,
- * steps, session link) EXPANDS INLINE — the section scrolls, so a
- * floating popover would clip at its bounds.
+ * an inline "Abort failed", never a dead control. Detail (what it is
+ * doing, for how long, a link to its lesson or course) EXPANDS INLINE —
+ * the section scrolls, so a floating popover would clip at its bounds.
  */
 
 // ─── Wire shapes (client-safe mirrors of server/observability.ts) ────────────
@@ -180,60 +178,24 @@ export interface ActivityBlob {
 	chatId: string;
 	/** ms epoch — blobs order oldest-first and elapsed counts from it. */
 	startedAt: number;
-	/** Inferred USD cost (jobCost) — null renders "—". */
-	cost: number | null;
-	/** Last model call's footprint vs the model's limit — null renders "—". */
-	context: { used: number; limit: number } | null;
 	/** Latest human-readable activity line (""). */
 	activity: string;
-	/** Sub-agent model id, when usage is reported. */
-	model?: string;
-	/** Model calls made so far, when usage is reported. */
-	steps?: number;
 }
 
 /** Merge the feed into one oldest-first blob list (the stable blob order). */
 export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
-	const blobs: ActivityBlob[] = feed.jobs.map((job) => {
-		const usage = job.usage;
-		let context: ActivityBlob["context"] = null;
-		const lastStep = usage?.lastStep;
-		// Context-meter amendment (owner 2026-09-23): the limit comes off
-		// the FEED (server-joined from pi's live catalog) — no client-side
-		// table. Null limit = no context line (usage-only render is the
-		// blob shape's call — here the line simply hides).
-		const limit = job.contextLimit;
-		if (usage && lastStep && limit !== null && lastStep.inputTokens !== undefined) {
-			// Same metric as the session meter (four normalized buckets — the
-			// context-meter audit, owner 2026-09-23): all four directions.
-			// Provider "input" EXCLUDES cacheRead/cacheWrite, so input+output
-			// alone reads wildly low on cache-heavy jobs.
-			context = {
-				used:
-					lastStep.inputTokens +
-					(lastStep.outputTokens ?? 0) +
-					(lastStep.cacheReadTokens ?? 0) +
-					(lastStep.cacheWriteTokens ?? 0),
-				limit,
-			};
-		}
-		return {
-			id: job.id,
-			process: "job",
-			jobKind: job.kind,
-			title: job.title,
-			chatId: job.chatId,
-			startedAt: Date.parse(job.createdAt) || 0,
-			cost: job.costUsd ?? null,
-			context,
-			// A refusal is info, not failure: a job refused because the
-			// Claude account is signed out reads as a sign-in being needed,
-			// matching the dispatch card's quiet tone.
-			activity: isProviderKeyRefusal(job.error) ? "needs a sign-in" : (job.activity ?? ""),
-			model: usage?.model,
-			steps: usage?.steps,
-		};
-	});
+	const blobs: ActivityBlob[] = feed.jobs.map((job) => ({
+		id: job.id,
+		process: "job",
+		jobKind: job.kind,
+		title: job.title,
+		chatId: job.chatId,
+		startedAt: Date.parse(job.createdAt) || 0,
+		// A refusal is info, not failure: a job refused because the Claude
+		// account is signed out reads as a sign-in being needed, matching
+		// the dispatch card's quiet tone.
+		activity: isProviderKeyRefusal(job.error) ? "needs a sign-in" : (job.activity ?? ""),
+	}));
 	for (const run of feed.runs) {
 		blobs.push({
 			id: run.id,
@@ -242,9 +204,7 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 			title: run.title,
 			chatId: run.chatId,
 			startedAt: run.startedAt,
-			cost: null, // background runs don't ride the money channel
-			context: null,
-			activity: "",
+			activity: run.phase === "mapping" ? "Reading the course's material to build its topic map" : "Writing down what you learned in this lesson",
 		});
 	}
 	blobs.sort((a, b) => a.startedAt - b.startedAt);
@@ -329,7 +289,6 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 
 	// The sidebar's own anatomy (nav-section.md, nav-row.md): a quiet
 	// header and one 32px row per process, its detail opening under it.
-	// Cost and context live in the detail, not on the row's face.
 	return (
 		<NavSection data-testid="activity-section" title="Working in the background" className="shrink-0 px-2 pt-2">
 			<div className="flex max-h-[40dvh] flex-col overflow-y-auto">
@@ -368,10 +327,17 @@ function blobLabel(blob: ActivityBlob): string {
 	}
 }
 
+/** Where a process's detail links: a course-map build to its course's
+ *  page (its key is the course), anything else to its lesson. */
+function openTarget(blob: ActivityBlob): { href: string; words: string } {
+	if (blob.process === "run" && blob.phase === "mapping") return { href: courseHref(blob.chatId), words: "Open the course" };
+	return { href: `/chat/${blob.chatId}`, words: "Open the lesson" };
+}
+
 /** One process as a sidebar row: kind icon, what it is doing and the
- *  session it works for, elapsed time, and a stop button at the right
- *  edge; a click opens its detail (what it is doing, cost, context,
- *  model, steps, the session link) under the row. */
+ *  lesson or course it works for, elapsed time, and a stop button at the
+ *  right edge; a click opens its detail (what it is doing, for how long,
+ *  a link to its lesson or course) under the row. */
 function ActivityRow({
 	blob,
 	now,
@@ -390,6 +356,7 @@ function ActivityRow({
 	const Icon = blob.process === "run" ? WaypointsIcon : (blob.jobKind && KIND_ICON[blob.jobKind]) || BotIcon;
 	const label = blobLabel(blob);
 	const elapsed = formatElapsed(now - blob.startedAt);
+	const target = openTarget(blob);
 	return (
 		<div data-testid={`activity-blob-${blob.process}`} className="relative">
 			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="pr-9">
@@ -397,7 +364,7 @@ function ActivityRow({
 				<NavRowLabel>{`${label} · ${blob.title}`}</NavRowLabel>
 				<NavRowTrailing data-testid="activity-blob-elapsed">{elapsed}</NavRowTrailing>
 			</NavRow>
-			<Hint label={abortState === "failed" ? "Abort failed — try again" : "Stop"} side="right">
+			<Hint label={abortState === "failed" ? "Couldn't stop it. Try again" : "Stop"} side="right">
 				<Button
 					variant="quiet"
 					size="icon-inline"
@@ -411,41 +378,14 @@ function ActivityRow({
 				</Button>
 			</Hint>
 			{detailOpen && (
-				<dl
-					data-testid="activity-blob-detail"
-					className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground"
-				>
-					<dt className="col-span-2 text-foreground">{label}</dt>
-					{blob.activity && <dd className="col-span-2 break-words">{blob.activity}</dd>}
-					<dt>Cost</dt>
-					<dd data-testid="activity-blob-cost" className="text-right tabular-nums text-foreground">
-						{planCostLabel(blob.cost, subscriptionLabel(blob.model))}
-					</dd>
-					<dt>Context</dt>
-					<dd data-testid="activity-blob-context" className="text-right tabular-nums text-foreground">
-						{blob.context === null ? "—" : `${formatTokens(blob.context.used)} / ${formatTokens(blob.context.limit)}`}
-					</dd>
-					{blob.model && (
-						<>
-							<dt>Model</dt>
-							<dd className="truncate text-right text-foreground">{blob.model}</dd>
-						</>
-					)}
-					{blob.steps !== undefined && (
-						<>
-							<dt>Steps</dt>
-							<dd className="text-right tabular-nums text-foreground">{blob.steps}</dd>
-						</>
-					)}
-					<dd className="col-span-2">
-						<a href={`/chat/${blob.chatId}`} className="text-link underline-offset-2 hover:underline">
-							Open session
-						</a>
-					</dd>
-					{abortState && (
-						<dd className="col-span-2">{abortState === "failed" ? "Abort failed — try again" : "Stopping…"}</dd>
-					)}
-				</dl>
+				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground">
+					{blob.activity && <p className="break-words text-foreground">{blob.activity}</p>}
+					<p>{`Running for ${elapsed}`}</p>
+					<a href={target.href} className="w-fit text-link underline-offset-2 hover:underline">
+						{target.words}
+					</a>
+					{abortState && <p>{abortState === "failed" ? "Couldn't stop it. Try again" : "Stopping…"}</p>}
+				</div>
 			)}
 		</div>
 	);

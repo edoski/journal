@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { ActivitySection, formatElapsed, toBlobs, type ActivityFeed, type FeedRun } from "../components/activity-dock.tsx";
 import { formatTokens, formatUsd } from "../components/usage-format.ts";
+import { courseHref } from "../components/unit-inbox/unit-href.ts";
 import { jobCost } from "../src/server/pricing.ts";
 import { providerKeyMissing } from "../src/core/settings.ts";
 
@@ -64,27 +65,6 @@ describe("activity dock pure layer", () => {
 		assert.deepEqual(blobs.map((b) => b.chatId), ["cx", "algebra"], "the abort sends the key's chat or course");
 	});
 
-	it("uses the server's Pi price projection; absent pricing is null, never zero", () => {
-		const priced = job({
-			usage: {
-				model: "openrouter:z-ai/glm-5.3-flash",
-				inputTokens: 10_000,
-				outputTokens: 1000,
-				cacheReadTokens: 5000,
-				cacheWriteTokens: 0,
-				reasoningTokens: 0,
-				steps: 2,
-			},
-		});
-		const blob = toBlobs({ jobs: [priced], runs: [] })[0]!;
-		// Pi-normalized fresh input is priced directly, never reduced by reads.
-		assert.equal(blob.cost, 0.00215);
-		const missingProjection = toBlobs({ jobs: [{ ...priced, costUsd: undefined }], runs: [] })[0]!;
-		assert.equal(missingProjection.cost, null, "the browser must not invent a fallback price");
-		const absent = toBlobs({ jobs: [job()], runs: [] })[0]!;
-		assert.equal(absent.cost, null);
-	});
-
 	it("a connection-refused job reads as info — 'needs a sign-in'", () => {
 		const refused = job({
 			status: "error",
@@ -102,68 +82,16 @@ describe("activity dock pure layer", () => {
 		assert.equal(real.activity, "failed");
 	});
 
-	it("context line = LAST step's tokens vs the model limit, never a cumulative sum", () => {
-		const base = {
-			model: "openrouter:z-ai/glm-5.3-flash",
-			inputTokens: 400_000, // running total (much bigger — must NOT feed the line)
-			outputTokens: 8_000,
-			cacheReadTokens: 0,
-			cacheWriteTokens: 0,
-			reasoningTokens: 0,
-			steps: 5,
-		};
-		const withLast = job({
-			usage: { ...base, lastStep: step(90_000, 2_000) },
-			// The amendment (owner 2026-09-23): the limit is the server's
-			// live-catalog join riding the feed — the dock never resolves it.
-			contextLimit: 131_072,
-		});
-		const blob = toBlobs({ jobs: [withLast], runs: [] })[0]!;
-		assert.equal(blob.context?.used, 92_000);
-		assert.equal(blob.context?.limit, 131_072);
-		// No lastStep yet (capture pending) → "—", even though usage exists.
-		const stripped = toBlobs({ jobs: [job({ usage: { ...base } })], runs: [] })[0]!;
-		assert.equal(stripped.context, null);
-		// Model missing from the live catalog (historical session,
-		// package update) → the feed carries null → no context line.
-		const uncatalogued = toBlobs({
-			jobs: [job({ usage: { ...base, model: "nope/unknown", lastStep: step(5, 5), } })],
-			runs: [],
-		})[0]!;
-		assert.equal(uncatalogued.context, null);
-		// The numerator is the same cache-inclusive fold the session meter
-		// uses (context-meter audit, owner 2026-09-23): provider "input"
-		// EXCLUDES cacheRead/cacheWrite, so input+output alone reads wildly
-		// low on cache-heavy jobs — 10k+0.5k+120k+30k = 160.5k, not 10.5k.
-		const cached = toBlobs({
-			jobs: [
-				job({
-					usage: {
-						...base,
-						lastStep: {
-							inputTokens: 10_000,
-							outputTokens: 500,
-							cacheReadTokens: 120_000,
-							cacheWriteTokens: 30_000,
-							reasoningTokens: undefined,
-						},
-					},
-					contextLimit: 200_000,
-				}),
-			],
-			runs: [],
-		})[0]!;
-		assert.equal(cached.context?.used, 160_500);
-		assert.equal(cached.context?.limit, 200_000);
-	});
-
-	it("background-run blobs carry no money/context (—, the doctrine)", () => {
-		const blob = toBlobs({
+	it("a background run says in words what it is doing", () => {
+		const [digest, map] = toBlobs({
 			jobs: [],
-			runs: [{ id: "cx#digest", chatId: "cx", title: "T", phase: "digesting", startedAt: NOW }],
-		})[0]!;
-		assert.equal(blob.cost, null);
-		assert.equal(blob.context, null);
+			runs: [
+				{ id: "cx#digest", chatId: "cx", title: "T", phase: "digesting", startedAt: NOW },
+				{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW + 1 },
+			],
+		});
+		assert.equal(digest!.activity, "Writing down what you learned in this lesson");
+		assert.equal(map!.activity, "Reading the course's material to build its topic map");
 	});
 
 	it("formatElapsed ticks compactly", () => {
@@ -185,7 +113,7 @@ describe("activity dock pure layer", () => {
 });
 
 /** Mounts the section, opens the detail of the row whose title is
- *  `title`, and hands back that detail's text and cost. */
+ *  `title`, and hands back that detail's text and link. */
 async function openDetail(feed: ActivityFeed, title: string) {
 	const host = dom.document.createElement("div");
 	dom.document.body.appendChild(host);
@@ -199,7 +127,7 @@ async function openDetail(feed: ActivityFeed, title: string) {
 		return {
 			expanded: row.getAttribute("aria-expanded"),
 			text: detail?.textContent ?? "",
-			cost: detail?.querySelector('[data-testid="activity-blob-cost"]')?.textContent,
+			href: detail?.querySelector("a")?.getAttribute("href"),
 			totalCost: host.querySelector('[data-testid="activity-total-cost"]'),
 		};
 	} finally {
@@ -217,7 +145,7 @@ describe("activity section render", () => {
 		assert.doesNotMatch(html, /activity-total-cost/, "the cost span is population, not decoration");
 	});
 
-	it("renders one row per running process with elapsed time and the abort affordance; the detail carries activity and cost", async () => {
+	it("renders one row per running process with elapsed time and the abort affordance; the detail says what it does, for how long, in words", async () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "j1", kind: "demo", activity: "building sandbox…", title: "Chain-rule demo" })],
 			runs: [{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 60_000 }],
@@ -237,34 +165,21 @@ describe("activity section render", () => {
 
 		const detail = await openDetail(feed, "Chain-rule demo");
 		assert.equal(detail.expanded, "true");
-		assert.match(detail.text, /Demo builder/);
 		assert.match(detail.text, /building sandbox…/);
-		// Unpriced job → "—", never $0.0000 (doctrine).
-		assert.equal(detail.cost, "—");
+		assert.match(detail.text, /Running for \d/);
+		assert.match(detail.text, /Open the lesson/);
+		assert.equal(detail.href, "/chat/c1");
+		assert.doesNotMatch(detail.text, /Cost|Context|Model|Steps|tokens|\$|—/, "no counts or engine words");
 	});
 
-	it("shows a priced job's cost in its detail, with no running total", async () => {
-		const usage = {
-			model: "openrouter:z-ai/glm-5.3-flash",
-			inputTokens: 10_000,
-			outputTokens: 1000,
-			cacheReadTokens: 0,
-			cacheWriteTokens: 0,
-			reasoningTokens: 0,
-			steps: 1,
-		};
+	it("a course-map run's detail opens its course page, with no counts", async () => {
 		const detail = await openDetail(
-			{
-				jobs: [
-					job({ id: "a", usage, title: "Limits lesson" }),
-					job({ id: "b", usage, title: "Series lesson", createdAt: new Date(NOW - 20_000).toISOString() }),
-				],
-				runs: [],
-			},
-			"Limits lesson",
+			{ jobs: [], runs: [{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 125_000 }] },
+			"Algebra",
 		);
-		// glm-5.3-flash at pi's prices (drifted in pi-ai 0.87.1): $0.002 a job
-		assert.equal(detail.cost, "$0.0020");
+		assert.match(detail.text, /Reading the course's material to build its topic map/);
+		assert.match(detail.text, /Open the course/);
+		assert.equal(detail.href, courseHref("algebra"), "a map build's key is its course, not a chat");
 		assert.equal(detail.totalCost, null, "no running total in the header");
 	});
 
