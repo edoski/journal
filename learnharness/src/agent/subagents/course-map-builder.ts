@@ -260,7 +260,9 @@ interface LhCourseMapGlobal {
 	__lhCourseMapRuns?: { inFlight: Set<string>; rerun: Set<string> };
 }
 
-function mapRuns(): NonNullable<LhCourseMapGlobal["__lhCourseMapRuns"]> {
+/** The courses a map build or a grouping pass holds: the two never run on
+ *  one course at once. A build asked for meanwhile runs once the holder ends. */
+export function mapRuns(): NonNullable<LhCourseMapGlobal["__lhCourseMapRuns"]> {
 	const g = globalThis as typeof globalThis & LhCourseMapGlobal;
 	return (g.__lhCourseMapRuns ??= { inFlight: new Set(), rerun: new Set() });
 }

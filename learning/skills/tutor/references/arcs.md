@@ -13,7 +13,7 @@ A course has arcs when its record has `arcs`; in a course without them, none of 
 - `path.arcs`: the arcs in study order, each exactly once, sent whole like every list.
 - `exam.arcs` and `exam.leaves_out`: the next exam's scope (*Changing arcs*).
 - `checkpoint` on an observation: the arc whose check this attempt is an item of (*Teaching with arcs*).
-- `arc_change`: `{"reason": "…", "asked": "…"}`, why a save changes arcs, and the learner's own words when the change needs them (*Changing arcs*). The engine stores it only as events in `arc_log`, which is never patched.
+- `arc_change`: `{"reason": "…", "asked": "…"}`, why a save changes arcs, and the learner's own words when the change needs them (*Changing arcs*). The engine stores it only as events in `arc_log`, which is never patched. Its `edges`, `[{"topic", "need", "change": "add" or "drop", "reason"}]`, logs needs the same save adds or drops as one `edges` event, in a course with or without arcs; the save's arc changes, or a later save's through `edges_entry` (that event's index in `arc_log`), refer to it.
 - `questions` in course `preferences`: `"asked"` (the default) or `"none"`, for a course that takes no questions.
 - `arcs_placed` in the receipt: the arc the engine gave each new topic saved without one.
 
@@ -68,7 +68,7 @@ This is the grouping pass's job: it forms the arcs of a course that has topics a
    - Split an arc that holds two consecutive parts which each pass rule 2, each have their own focus question and name, and which the material or the exam treats as separate.
    - Merge two neighbours that share one focus question and that the material treats as one unit.
    - No arc spans more than one unit of the material unless the material joins them.
-   - At least two arcs, or none. A course of about five topics usually gets none: form arcs only when the material has two units that each group at least two topics under their own question and boundary. When the course gets none, say why.
+   - At least two arcs, or none. A course of about five topics usually gets none: form arcs only when the material has two units that each group at least two topics under their own question and boundary. A unit shows in a source's headings or a topic's `refs` locator; a path basis or a course description names none. When the course gets none, say why.
    - When several cuts pass all of this, prefer the one whose arcs need the most even work in lesson steps, else in topics.
 7. **Order.** Arcs follow rule 2; among the orders it allows, the material's order; then the nearer exam's arcs first; then broad before narrow, and tool before use. `path.order` reads as the arcs one after another.
 8. **Names and purpose lines** as *What an arc is* says. Use the material's chapter title when it fits the topics. Every topic title reads naturally as part of its arc's name, and no topic fits another arc's name better than its own.

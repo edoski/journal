@@ -9,6 +9,7 @@
  * adapters may import core; core NEVER imports an adapter.
  */
 
+import type { ArcPassLedger } from "./arc-pass.ts";
 import type { CourseMapLedger } from "./course-map-build.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type {
@@ -133,6 +134,18 @@ export interface CourseMapLedgers {
 	forget(workspace: string): void;
 }
 
+// ─── ArcPassLedgers — where each course stands with the grouping pass ───────
+
+/** The grouping pass's ledger, one per course workspace: whether a live run
+ *  may form its arcs, and what the last run found. A course without one
+ *  never gets a live run. */
+export interface ArcPassLedgers {
+	get(workspace: string): ArcPassLedger | undefined;
+	save(workspace: string, ledger: ArcPassLedger): void;
+	workspaces(): string[];
+	forget(workspace: string): void;
+}
+
 // ─── CourseRecords — the learning engine's course records ───────────────────
 
 /**
@@ -152,8 +165,10 @@ export interface CourseRecords {
 	 *  the engine forgot. A save there would bring the course back as an
 	 *  untitled ghost. Absent where nothing keeps records on disk. */
 	forgotten?(workspace: string): boolean;
-	/** The course map: the engine's read-only `map` verb, parsed. */
-	map(workspace: string): Promise<{ ok: true; map: CourseMap } | Extract<CourseResult, { ok: false }>>;
+	/** The course map: the engine's read-only `map` verb, parsed. `here`
+	 *  is the topic of the lesson in progress, which the engine cannot see:
+	 *  its `currentArc` then names that topic's arc. */
+	map(workspace: string, here?: string | null): Promise<{ ok: true; map: CourseMap } | Extract<CourseResult, { ok: false }>>;
 	/** Make an existing directory a titled, registered course: the engine's
 	 *  `init` there, then one save of the title and the exam day. `workspace`
 	 *  is the directory as the engine registered it. */

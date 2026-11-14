@@ -11,6 +11,7 @@ import { jobStore } from "../store/jobs.ts";
 import { settingsStore } from "../store/settings.ts";
 import { createCourseRecords } from "../store/course-records.ts";
 import { courseMapLedgers } from "../store/course-map-ledgers.ts";
+import { arcPassLedgers } from "../store/arc-pass-ledgers.ts";
 import { LEARNING_ENGINE } from "../../config.ts";
 import { resolveSettings, type EffectiveSettings } from "../core/settings-resolution.ts";
 /** The wired adapters. */
@@ -20,6 +21,7 @@ export const stores = {
 	settingsStore,
 	courseRecords: createCourseRecords(LEARNING_ENGINE),
 	courseMapLedgers,
+	arcPassLedgers,
 };
 
 export type Stores = typeof stores;

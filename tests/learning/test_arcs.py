@@ -845,6 +845,124 @@ def test_a_reason_without_a_change_is_kept_as_a_note(workspace: Workspace) -> No
     }
 
 
+PLAIN = {key: {k: v for k, v in t.items() if k != "arc"} for key, t in TOPICS.items()}
+SETTLED = "The prerequisite test, answered against the material, before the cut"
+DROP_FTC = {
+    "topic": "ftc",
+    "need": "derivative",
+    "change": "drop",
+    "reason": "FTC part 2 integrates by antiderivatives, which the course has not",
+}
+ADD_FTC = {
+    "topic": "ftc",
+    "need": "continuity",
+    "change": "add",
+    "reason": "FTC part 1 differentiates the integral of a continuous function",
+}
+
+
+def test_an_edges_event_saves_on_a_course_without_arcs_while_arc_change_stays_refused(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {"topics": deepcopy(PLAIN)})
+    refused(
+        workspace,
+        {"arc_change": {"reason": "kept the edges"}},
+        "drop arc_change from the patch",
+    )
+    records.save(
+        workspace,
+        {
+            "topics": {"ftc": {"needs": ["riemann", "continuity"]}},
+            "arc_change": {"reason": SETTLED, "edges": [DROP_FTC, ADD_FTC]},
+        },
+    )
+    record = records.load(workspace)
+    assert record["arcs"] == {}
+    assert record["arc_log"] == [
+        {"day": TODAY, "kind": "edges", "edges": [DROP_FTC, ADD_FTC], "reason": SETTLED}
+    ]
+
+
+def test_an_edges_event_lists_only_needs_its_save_adds_or_drops(
+    workspace: Workspace,
+) -> None:
+    formed(workspace)
+    refused(
+        workspace,
+        {"arc_change": {"reason": SETTLED, "edges": [DROP_FTC]}},
+        'arc_change.edges[0]: this save does not drop "derivative" in the needs '
+        'of "ftc"; list only the needs it adds or drops',
+    )
+    refused(
+        workspace,
+        {
+            "topics": {"ftc": {"needs": ["riemann"]}},
+            "arc_change": {"reason": SETTLED, "edges": [DROP_FTC, DROP_FTC]},
+        },
+        "listed twice",
+    )
+    records.save(
+        workspace,
+        {
+            "topics": {"ftc": {"needs": ["riemann"]}},
+            "arc_change": {"reason": SETTLED, "edges": [DROP_FTC]},
+        },
+    )
+    assert records.load(workspace)["arc_log"][1:] == [
+        {"day": TODAY, "kind": "edges", "edges": [DROP_FTC], "reason": SETTLED}
+    ], "with arcs, the edges are logged and no note is added"
+
+
+def test_a_formation_refers_to_the_edges_event_it_was_cut_on(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {"topics": deepcopy(PLAIN)})
+    records.save(
+        workspace,
+        {
+            "topics": {"ftc": {"needs": ["riemann"]}},
+            "arc_change": {"reason": SETTLED, "edges": [DROP_FTC]},
+        },
+    )
+    cut = {
+        **deepcopy(FORMED),
+        "topics": {k: {"arc": t["arc"]} for k, t in TOPICS.items()},
+    }
+    refused(
+        workspace,
+        {**cut, "arc_change": {**REASON, "edges_entry": 1}},
+        "arc_change.edges_entry: arc_log[1] is no edges event",
+    )
+    records.save(workspace, {**cut, "arc_change": {**REASON, "edges_entry": 0}})
+    log = records.load(workspace)["arc_log"]
+    assert log[1] == {"day": TODAY, "kind": "formed", "edges_entry": 0, **REASON}
+    assert log[log[1]["edges_entry"]]["edges"] == [DROP_FTC]
+
+    dangling = {**json.loads(workspace.record.read_text()), "arc_log": log[1:]}
+    unreadable(workspace, dangling, "edges_entry: arc_log.0. is no edges event")
+
+
+def test_one_save_that_settles_edges_and_forms_arcs_links_them(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {"topics": deepcopy(PLAIN)})
+    change = {**REASON, "edges": [DROP_FTC]}
+    refused(
+        workspace,
+        {**deepcopy(FORMED), "arc_change": {**change, "edges_entry": 0}},
+        "drop edges_entry",
+    )
+    topics = {**deepcopy(TOPICS), "ftc": {**TOPICS["ftc"], "needs": ["riemann"]}}
+    records.save(
+        workspace, {**deepcopy(FORMED), "topics": topics, "arc_change": change}
+    )
+    assert records.load(workspace)["arc_log"] == [
+        {"day": TODAY, "kind": "edges", "edges": [DROP_FTC], **REASON},
+        {"day": TODAY, "kind": "formed", "edges_entry": 0, **REASON},
+    ]
+
+
 # --- the current arc, studied and held -----------------------------------------
 
 
@@ -1323,6 +1441,38 @@ def test_a_record_migrated_down_has_only_schema_6_fields(tmp_path: Path) -> None
     assert v6_strays(up), "the record holds schema 7 fields to strip"
     migrate.migrate(workspace, to=6)
     assert v6_strays(json.loads(workspace.record.read_text())) == []
+
+
+def test_migrating_down_strips_an_edges_event_with_the_rest_of_the_log(
+    tmp_path: Path,
+) -> None:
+    workspace = course(tmp_path, "calculus")
+    migrate.migrate(workspace)
+    records.save(
+        workspace,
+        {
+            "topics": {"continuity": {"needs": []}},
+            "arc_change": {
+                "reason": SETTLED,
+                "edges": [
+                    {
+                        "topic": "continuity",
+                        "need": "limit",
+                        "change": "drop",
+                        "reason": "x",
+                    }
+                ],
+            },
+        },
+    )
+    up = json.loads(workspace.record.read_text())
+    assert [event["kind"] for event in up["arc_log"]] == ["edges"]
+    assert "arcs" not in up or up["arcs"] == {}
+    migrate.migrate(workspace, to=6)
+    down = json.loads(workspace.record.read_text())
+    assert "arc_log" not in down, "a course without arcs loses its log too"
+    assert v6_strays(down) == []
+    assert down["topics"] == up["topics"], "the settled needs stay"
 
 
 def test_migrating_down_keeps_a_questions_preference_schema_6_held(

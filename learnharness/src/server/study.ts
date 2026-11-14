@@ -7,6 +7,7 @@
 import type { CourseMap, TopicHandle } from "../core/contracts/course-map.ts";
 import { courseLabel, type CourseSummary, type UnreadableCourse } from "../core/contracts/course.ts";
 import type { StudyCourse, StudyListing } from "../core/contracts/study.ts";
+import { lessonTopics } from "../core/course-map-build.ts";
 import { listCourses } from "./courses.ts";
 import { stores } from "./stores.ts";
 
@@ -44,19 +45,20 @@ export function studyCourseOf(map: CourseMap, plan: unknown): StudyCourse {
 /** One readable course: its map and its plan's JSON (null when it failed). */
 type CourseRead = { map: CourseMap; plan: unknown };
 
-/** Every listed course's map and its `plan` over `days` (or the days a
- *  course asks for), read in parallel: the plan's JSON (null when it
- *  failed). A course the engine could not list, or whose map could not be
- *  read, is in `failed`. */
+/** Every listed course's map, told the lesson in progress there, and its
+ *  `plan` over `days` (or the days a course asks for), read in parallel:
+ *  the plan's JSON (null when it failed). A course the engine could not
+ *  list, or whose map could not be read, is in `failed`. */
 export async function readCourses(
 	days: number | ((course: CourseSummary) => number) = 1,
 ): Promise<{ available: true; read: CourseRead[]; failed: UnreadableCourse[] } | { available: false; reason: string }> {
 	const listing = await listCourses();
 	if (!listing.available) return listing;
+	const chats = stores.chatStore.listChats();
 	const read = await Promise.all(
 		listing.courses.map(async (course): Promise<CourseRead | UnreadableCourse> => {
 			const [map, plan] = await Promise.all([
-				stores.courseRecords.map(course.workspace),
+				stores.courseRecords.map(course.workspace, lessonTopics(chats, course.workspace)[0]),
 				stores.courseRecords.run(course.workspace, { verb: "plan", days: typeof days === "number" ? days : days(course) }),
 			]);
 			return map.ok

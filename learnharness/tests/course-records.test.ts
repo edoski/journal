@@ -13,7 +13,10 @@ import path from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { LEARNING_ENGINE } from "../config.ts";
-import { createCourseRecords } from "../src/store/course-records.ts";
+import { courseMapOf, createCourseRecords } from "../src/store/course-records.ts";
+import { currentArc, examCovers, type CourseMapArc } from "../src/core/contracts/course-arcs.ts";
+import type { CourseMap, TopicHandle } from "../src/core/contracts/course-map.ts";
+import { LINALG_ARCS } from "./fixtures/now-demo.ts";
 import { subscribe } from "../src/core/events.ts";
 import { courseTools } from "../src/agent/tools/course.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
@@ -216,6 +219,8 @@ describe("course records adapter (fake engine)", () => {
 		const records = createCourseRecords({ ...engine, env: { ...engine.env, FAKE_ENGINE_MAP: JSON.stringify(output) } });
 		const result = await records.map("/s/linalg");
 		assert.deepEqual(calls()[0]!.args, ["--workspace", "/s/linalg", "map"]);
+		await records.map("/s/linalg", "eigen");
+		assert.deepEqual(calls()[1]!.args, ["--workspace", "/s/linalg", "map", "--here", "eigen"], "the lesson in progress goes to the engine as --here");
 		assert.ok(result.ok);
 		const { map } = result;
 		assert.equal(map.workspace, "/s/linalg");
@@ -254,6 +259,135 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(odd, { ok: false, kind: "io", message: "map printed an unexpected shape" });
 		const missing = await createCourseRecords(engine).map("/s/missing");
 		assert.equal(missing.ok ? "ok" : missing.kind, "unavailable");
+	});
+});
+
+/** E2's map goldens (tests/learning/golden), the demo Linear Algebra on
+ *  8 Nov: without arcs, and hand cut into five arcs by chapter with "You
+ *  are here" in arc 4 while arc 3 still holds an untaught topic. */
+const GOLDEN = path.resolve(HERE, "..", "..", "tests", "learning", "golden");
+const goldenMap = (name: string) => JSON.parse(fs.readFileSync(path.join(GOLDEN, `${name}.map.json`), "utf-8")) as Record<string, unknown>;
+const parsed = (json: unknown): CourseMap => {
+	const map = courseMapOf("/s/linalg", json);
+	assert.ok(map);
+	return map;
+};
+const topicOf = (map: CourseMap, handle: string) => map.topics.find((t) => t.handle === handle)!;
+
+describe("course map arcs (E2's goldens)", () => {
+	it("a course without arcs has no arc fields, and each planned start says why it comes then", () => {
+		const map = parsed(goldenMap("linear-algebra"));
+		assert.equal("arcs" in map, false);
+		assert.equal("currentArc" in map, false);
+		assert.equal(map.topics.some((t) => "arc" in t), false, "no topic names an arc");
+		assert.equal(currentArc(map), null);
+		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["determinant"], partners: [] });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["determinant"], exam: false });
+		assert.deepEqual(
+			map.topics.filter((t) => t.startsWhy).map((t) => t.handle),
+			map.topics.filter((t) => t.starts).map((t) => t.handle),
+			"a reason exactly where a start is",
+		);
+	});
+
+	it("a course with arcs lists them in study order with their states and entry, each topic in its arc", () => {
+		const map = parsed(goldenMap("linear-algebra-arcs"));
+		assert.deepEqual(
+			map.arcs!.map((a) => [a.handle, a.title, a.state]),
+			[
+				["spaces", "Vector spaces", "ready"],
+				["systems", "Linear systems", "learning"],
+				["determinants", "Determinants", "learning"],
+				["eigenvalues", "Eigenvalues and diagonalization", "learning"],
+				["orthogonality", "Orthogonality", "new"],
+			],
+		);
+		assert.deepEqual(map.arcs!.find((a) => a.handle === "orthogonality")!.entry, ["vectors", "basis"], "what its first lesson recalls from earlier arcs");
+		assert.deepEqual(
+			Object.fromEntries(map.arcs!.map((a) => [a.handle, map.topics.filter((t) => t.arc === a.handle).length])),
+			{ spaces: 5, systems: 3, determinants: 3, eigenvalues: 3, orthogonality: 2 },
+			"every topic in one arc",
+		);
+		assert.equal(map.currentArc, "eigenvalues");
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: ["rank", "determinant"], exam: true });
+		assert.deepEqual(topicOf(map, "change-basis").startsWhy, { kind: "after", arc: "eigenvalues", needs: ["invertibility"], partners: [] });
+	});
+
+	it("an arc block it cannot read whole shows the course without arcs, never a partial list", () => {
+		const golden = goldenMap("linear-algebra-arcs");
+		const arcs = golden.arcs as Record<string, unknown>[];
+		const topics = golden.topics as Record<string, unknown>[];
+		const broken = {
+			"an arc without a title": { ...golden, arcs: arcs.map((a, i) => (i === 2 ? { ...a, title: "" } : a)) },
+			"a state the engine does not have": { ...golden, arcs: arcs.map((a, i) => (i === 0 ? { ...a, state: "mastered" } : a)) },
+			"a topic naming an arc not listed": { ...golden, topics: topics.map((t, i) => (i === 0 ? { ...t, arc: "gone" } : t)) },
+			"a topic with no arc": { ...golden, topics: topics.map((t, i) => (i === 0 ? { ...t, arc: undefined } : t)) },
+			"an arc listed twice": { ...golden, arcs: [...arcs, arcs[0]] },
+		};
+		for (const [why, json] of Object.entries(broken)) {
+			const map = parsed(json);
+			assert.equal("arcs" in map, false, why);
+			assert.equal("currentArc" in map, false, why);
+			assert.equal(map.topics.length, 16, `${why}: no topic vanishes`);
+			assert.equal(map.topics.some((t) => "arc" in t || (t.startsWhy && "arc" in t.startsWhy)), false, `${why}: nothing names an arc`);
+		}
+	});
+
+	it("an arc whose every topic the course leaves out is shown nowhere, and its topics name no arc", () => {
+		const golden = goldenMap("linear-algebra-arcs");
+		const json = {
+			...golden,
+			arcs: (golden.arcs as Record<string, unknown>[]).map((a) => (a.arc === "orthogonality" ? { ...a, hidden: true } : a)),
+			topics: (golden.topics as Record<string, unknown>[]).map((t) => (t.arc === "orthogonality" ? { ...t, excluded: "Not on this course's exam", starts: undefined, starts_why: undefined } : t)),
+		};
+		const map = parsed(json);
+		assert.deepEqual(map.arcs!.map((a) => a.handle), ["spaces", "systems", "determinants", "eigenvalues"]);
+		assert.equal(topicOf(map, "projection").arc, undefined);
+		assert.equal(topicOf(map, "projection").excluded, "Not on this course's exam");
+	});
+
+	it("the exam's scope of arcs and the topics it leaves out, as far as the map shows them", () => {
+		const golden = goldenMap("linear-algebra-arcs");
+		const exam = { ...(golden.exam as object), arcs: ["spaces", "systems", "gone"], leaves_out: ["kernel", "nope"] };
+		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-14", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
+		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-14" }, "null is the whole course");
+	});
+});
+
+describe("the current arc (design 1.4, T-current)", () => {
+	const map = parsed(goldenMap("linear-algebra-arcs"));
+	it("is the arc of the topic \"You are here\" names, even with an earlier arc unfinished", () => {
+		assert.equal(map.current, "eigen");
+		assert.equal(currentArc(map), "eigenvalues");
+	});
+	it("reads the same in the demo fixture the surfaces build on", () => {
+		assert.equal(currentArc(LINALG_ARCS.map), "systems");
+	});
+	it("follows the lesson in progress once Home moves \"You are here\" to it", () => {
+		assert.equal(currentArc({ ...map, current: "projection" as TopicHandle }), "orthogonality");
+	});
+	it("falls back to the engine's answer with no topic, or one the course leaves out", () => {
+		assert.equal(currentArc({ ...map, current: null, currentArc: "systems" as CourseMapArc["handle"] }), "systems");
+		const out = map.topics.map((t) => (t.handle === "eigen" ? { ...t, excluded: "dropped" } : t));
+		assert.equal(currentArc({ ...map, topics: out, currentArc: "determinants" as CourseMapArc["handle"] }), "determinants");
+	});
+});
+
+describe("how much of an arc the exam covers", () => {
+	const map = parsed(goldenMap("linear-algebra-arcs"));
+	const arc = (handle: string) => map.arcs!.find((a) => a.handle === handle)!;
+	const exam = map.exam!;
+	it("says nothing with no exam, and all of every arc for an exam over the whole course", () => {
+		assert.equal(examCovers(null, arc("spaces"), map.topics), null);
+		assert.equal(examCovers(exam, arc("orthogonality"), map.topics), "all");
+	});
+	it("reads all, part or none against the exam's arcs and the topics it leaves out", () => {
+		const scoped = { ...exam, arcs: [arc("spaces").handle, arc("systems").handle], leavesOut: ["kernel" as TopicHandle] };
+		assert.equal(examCovers(scoped, arc("spaces"), map.topics), "all");
+		assert.equal(examCovers(scoped, arc("systems"), map.topics), "part");
+		assert.equal(examCovers(scoped, arc("eigenvalues"), map.topics), "none");
+		const emptied = { ...scoped, leavesOut: ["elimination", "rank", "kernel"] as TopicHandle[] };
+		assert.equal(examCovers(emptied, arc("systems"), map.topics), "none", "an arc whose every topic it leaves out");
 	});
 });
 
@@ -431,6 +565,25 @@ describe("course records adapter (the real engine, throwaway course)", { skip: !
 			mapped.map.topics.map((t) => [t.handle, t.title, t.level]),
 			[["rank", "Rank of a matrix", "assisted"]],
 		);
+	});
+
+	it("the golden course with arcs reads its arcs from the real engine, and --here moves the current arc to the lesson's topic", async () => {
+		const home = fs.mkdtempSync(path.join(TMP, "home-"));
+		const workspace = fs.mkdtempSync(path.join(TMP, "course-"));
+		const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-08" };
+		execFileSync(ENGINE_PYTHON, ["-m", "learning", "--workspace", workspace, "init"], { cwd: ENGINE_ROOT, env: { ...env, PYTHONPATH: ENGINE_ROOT } });
+		fs.copyFileSync(path.join(GOLDEN, "linear-algebra-arcs.course.json"), path.join(workspace, ".study", "course.json"));
+		const records = createCourseRecords({ python: ENGINE_PYTHON, root: ENGINE_ROOT, env });
+
+		const mapped = await records.map(workspace);
+		assert.ok(mapped.ok, !mapped.ok ? mapped.message : "");
+		assert.deepEqual(mapped.map, { ...parsed(goldenMap("linear-algebra-arcs")), workspace }, "the engine's map today is its golden, parsed");
+		assert.equal(currentArc(mapped.map), "eigenvalues");
+
+		const here = await records.map(workspace, "projection");
+		assert.ok(here.ok, !here.ok ? here.message : "");
+		assert.equal(here.map.current, "eigen", "path.current stays");
+		assert.equal(here.map.currentArc, "orthogonality", "the engine counts the lesson in progress");
 	});
 
 	it("create makes a new folder a course with its exam day and material; rename and delete go through the engine", async () => {
