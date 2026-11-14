@@ -35,10 +35,9 @@ export type { ThinkingLevel };
 
 let collection: ReturnType<typeof createModels> | undefined;
 
-/** The process-wide pi-ai Models collection, used as a CATALOG only: the
- *  ChatGPT connection reads OpenAI's model metadata from it, and read-time
- *  pricing reads older records' API models. Nothing streams through it,
- *  so no environment key is ever read for a model call. */
+/** The process-wide pi-ai Models collection, used as a CATALOG only:
+ *  read-time pricing reads older records' API models from it. Nothing
+ *  streams through it, so no environment key is ever read for a model call. */
 export function piModels() {
 	if (!collection) {
 		collection = createModels({ identity: APP_IDENTITY });
