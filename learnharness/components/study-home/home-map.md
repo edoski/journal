@@ -20,11 +20,12 @@ Nowhere in the app: the old Map page's List view, Import notes… and Statements
 Edo, 13 Nov 2026: Home felt disjointed, its map showing one course behind tabs and always opening on Linear Algebra rather than giving an overview. Of three sketched answers (small multiples, course tiles, the map following Today) he chose the map following Today, then asked to keep the tabs, with the tab moving smoothly to the course of the line he points at; he kept it over tabs alone, deleted with the Overview switch.
 
 - The tabs follow Today: pointing at a line (hover after a 150ms rest, so crossing lines on the way to the map does not flip it; focus at once) moves the tab to that line's course and lights that line's topics, the rest dimmed (TopicMap's `highlight`). At rest it follows Today's first line with a course. A tab pressed by hand holds until he points at a line again. The followed line wears a quiet `fill-hover` while he points at it (pointer or focus), so the tie reads both ways; at rest no line has a fill (no card behind a plain row, the round-3 evaluation).
+- The map brings the line's topics into view while he points at it (TopicMap's `framed`, topic-map.md), as Edo was promised on 13 Nov 2026: once the line is followed and he rests on it for 120ms, a topic out of view or under the fade glides in (200ms), all of the line's topics framed whole, inside the line's arc in a course with arcs, with "You are here" still in view when it fits with them; a line whose topics are already clear moves nothing. Once he points at no line for 400ms, or at a line with no topics on this course's map, it glides back to its opening view, so a sweep from line to line never sends it home and back. A drag or scroll of his own holds until the next line. Under reduced motion it jumps. At rest the first line's topics stay lit, but the camera stays at its opening view.
 - Every course's map stays drawn, one per course stacked in the frame, and the chosen one shows (200ms crossfade). A change of course never draws a map afresh, so its nodes do not replay their entrance (Edo saw that as a glitch).
 - The tabs' underline is one bar that slides to the chosen tab (200ms), in place of each tab's own underline fading.
 - The page's arrows (`components/spatial-arrows.ts`) walk Today's lines by where they sit; a line the arrows reach takes focus, so the map follows it at once. Enter opens the line.
 
-`followedRow` and `pointProps` (`agenda-rows/row-facts.ts`) are the pure parts, tested in `tests/home-follow.test.ts`.
+`followedRow` and `pointProps` (`agenda-rows/row-facts.ts`) are the pure parts, tested in `tests/home-follow.test.ts`; where the camera goes and when, in `tests/topic-map-follow.test.ts`.
 
 ## You are here
 

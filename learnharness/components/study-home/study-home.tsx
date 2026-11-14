@@ -23,7 +23,8 @@ const FOLLOW_DWELL_MS = 150;
  * window. A course's map on top behind course tabs, then Today, one line per course. The
  * map follows Today: it shows the course of the line he points at, with
  * that line's topics lit and, in a course with arcs, the arc they lie in
- * picked on the map's arc strip (home-map.md).
+ * picked on the map's arc strip (home-map.md); while he points at the line,
+ * the map brings those topics into view.
  */
 export function StudyHome() {
 	const [enlarged, setEnlarged] = useState(false);
@@ -54,6 +55,7 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
 	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
 	const highlight = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
+	const pointed = followed && pointingAt === lineKey(followed) ? pointingAt : null;
 
 	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
 		clearTimeout(dwell.current);
@@ -72,6 +74,7 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 					workspace={workspace}
 					onSelect={(ws) => setChosen({ by: "tab", workspace: ws })}
 					highlight={highlight}
+					framed={pointed && !enlarged ? highlight : null}
 					arc={lesson?.place?.handle ?? null}
 					enlarged={enlarged}
 					onEnlarge={onEnlarge}
@@ -83,7 +86,7 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 					done={done}
 					busy={busy}
 					onContinue={onContinue}
-					pointed={followed && pointingAt === lineKey(followed) ? pointingAt : null}
+					pointed={pointed}
 					onPoint={onPoint}
 					onPointEnd={() => {
 						clearTimeout(dwell.current);

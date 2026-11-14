@@ -117,6 +117,29 @@ def test_one_part_without_arcs_sorts_every_topic_for_the_exam(
     assert part["wont_fit"][-1] == names[-1]
 
 
+def test_a_topic_the_map_calls_weak_is_not_yet_solid_for_the_exam(
+    workspace: Workspace,
+) -> None:
+    records.save(
+        workspace,
+        {
+            "exam": {"date": day(30)},
+            "path": {"order": ["sure", "slips"]},
+            "topics": {
+                "sure": {"introduced": day(-20)},
+                "slips": {
+                    "introduced": day(-20),
+                    "gap": "Treats pairwise non-parallel vectors as independent",
+                },
+            },
+            "observations": [attempt("sure", -3), attempt("slips", -3)],
+        },
+    )
+    [part] = standing(workspace)["readiness"]["parts"]
+    assert part["solid"] == ["sure"]
+    assert part["not_yet"] == ["slips"]
+
+
 def test_a_topic_not_solid_lately_in_the_run_up_is_not_yet(
     workspace: Workspace,
 ) -> None:

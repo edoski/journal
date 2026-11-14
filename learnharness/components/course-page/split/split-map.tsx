@@ -7,6 +7,7 @@ import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { framedCamera, wholeZoom, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
+import { RETURN_DWELL_MS, REVEAL_DWELL_MS } from "@/components/course-map/topic-map/lit-camera";
 import { boxesOf, fadeAcross, scrollOfCamera, scrollOn, surfaceOf, topicAt, wholeSurfaceOf, type Scroll, type Size } from "@/components/course-page/split/split-tie";
 
 /** What the page asks of the map: focus a topic's node. */
@@ -21,14 +22,10 @@ const FADE = { x: 48, y: 32 };
 /** The room the map keeps above its drawing for the "You are here" tag
  *  (topic-map.tsx's TAG_ROOM). */
 const TAG_ROOM = 20;
-/** How long the pane takes to bring a topic he points at into view, and
- *  how long he rests on a row before it moves. */
+/** How long the pane takes to bring a topic he points at into view. The
+ *  rest before it moves, and before it glides back, are shared with Home's
+ *  map (lit-camera.ts). */
 const GLIDE_MS = 200;
-const REVEAL_DWELL_MS = 120;
-/** How long nothing is pointed at before the pane glides back to its
- *  opening view: longer than the pointer takes to cross from one row to the
- *  next, so moving down the list never sends it home and back. */
-const RETURN_DWELL_MS = 400;
 /** No visible scrollbar on either axis (T3 Code shows none). */
 const NO_BAR = "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 

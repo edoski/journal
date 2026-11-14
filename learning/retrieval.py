@@ -836,12 +836,15 @@ def course_arcs(
 
 
 def _ready_part(
+    record: dict[str, Any],
     keys: list[str],
     levels: dict[str, dict[str, Any]],
     behind: set[str],
     misfits: set[str],
 ) -> dict[str, list[str]]:
-    """One part's topics sorted for the exam (``course_standing``)."""
+    """One part's topics sorted for the exam (``course_standing``). A topic
+    the map calls weak is never solid, so the page never says "solid for the
+    exam" beside a slip the sidebar shows."""
     part: dict[str, list[str]] = {
         "solid": [],
         "not_yet": [],
@@ -853,7 +856,11 @@ def _ready_part(
             part["wont_fit"].append(key)
         elif levels[key]["level"] == "new":
             part["to_start"].append(key)
-        elif agenda.solid(levels[key]) and key not in behind:
+        elif (
+            agenda.solid(levels[key])
+            and key not in behind
+            and not _is_weak(record["topics"][key], levels[key])
+        ):
             part["solid"].append(key)
         else:
             part["not_yet"].append(key)
@@ -885,13 +892,13 @@ def _readiness(
             {
                 "arc": arc,
                 "title": arc_rules.title(record, arc),
-                **_ready_part(keys, levels, behind, misfits),
+                **_ready_part(record, keys, levels, behind, misfits),
             }
             for arc in arc_rules.live(record)
             if (keys := arcs.live_topics(record, arc, order))
         ]
     else:
-        parts = [_ready_part(order, levels, behind, misfits)]
+        parts = [_ready_part(record, order, levels, behind, misfits)]
     return {
         "date": countdown["date"],
         "days_left": countdown["days_left"],
@@ -975,7 +982,7 @@ def course_standing(workspace: Workspace) -> dict[str, Any]:
     ``days_left`` and its ``parts`` in study order: each arc it examines,
     or the whole course as one part in a course without arcs. Each part
     sorts the topics the exam examines, in path order, into ``solid``
-    (resting on an unaided answer, neither lapsed nor to re-teach, and
+    (resting on an unaided answer, not weak on the map, and
     inside the run-up solid in the last 14 days: ``progress.unready``),
     ``not_yet`` (taught and not solid), ``to_start`` (untaught, and the
     daily plan starts it before the exam) and ``wont_fit`` (untaught, and
