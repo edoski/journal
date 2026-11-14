@@ -56,9 +56,9 @@ test("actual select → answer → saved result → historical question uses sou
 	} finally { await act(async () => root.unmount()); host.remove(); }
 });
 
-test("the confidence he picks rides the free-response answer; neutral is the untouched default", () => {
+test("the confidence he picks rides the free-response answer; Neutral, the meter left alone, rides none", () => {
 	const spec = proseQuestionSpec("explain", "conf_a", { type: "check", nodeId: "n", question: "Why?", correctAnswer: "Because." })!;
-	assert.equal(proseAnswer(spec, emptyDockSelection(), "My reasoning.", "neutral").confidence, "neutral");
+	assert.equal(proseAnswer(spec, emptyDockSelection(), "My reasoning.", "neutral").confidence, undefined);
 	assert.equal(proseAnswer(spec, emptyDockSelection(), "My reasoning.", "guessing").confidence, "guessing");
 });
 

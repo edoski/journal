@@ -55,7 +55,7 @@ describe("the engine's show as the topic's record", () => {
 			rank.attempts.map((a) => [a.id, a.date, a.result, a.unaided, a.sure]),
 			[
 				["o15", "2026-11-03", "partial", false, null],
-				["o12", "2026-10-30", "incorrect", true, "neutral"],
+				["o12", "2026-10-30", "incorrect", true, null],
 			],
 		);
 		assert.equal(rank.attempts[0]!.text, "Row-reduced a 3x3 matrix and counted pivots, slipping once on a sign");

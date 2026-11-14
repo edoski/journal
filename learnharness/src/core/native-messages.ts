@@ -51,7 +51,7 @@ import {
 	disputeText,
 } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
-import type { Confidence } from "./contracts/course.ts";
+import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 import type { MarkResult } from "./contracts/marks.ts";
 import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
@@ -420,8 +420,9 @@ export function hintsAsked(messages: readonly LhMessage[], problemCallId: string
  *  content label is the single "Your thinking"; `details` keeps the raw
  *  payload for the transcript card. One problem may carry many
  *  submissions. `confidence` is the learner's one-tap read of the
- *  submission; the dock always sends one. */
-export function newThinkingMessage(problemCallId: string, text: string, confidence?: Confidence, photos?: readonly Photo[]): LhMarkerMessage {
+ *  submission, kept only when he chose one (`chosenConfidence`). */
+export function newThinkingMessage(problemCallId: string, text: string, picked?: Confidence, photos?: readonly Photo[]): LhMarkerMessage {
+	const confidence = chosenConfidence(picked);
 	const typed = text.trim() ? text : photos?.length ? PHOTO_ONLY_TEXT : text;
 	return {
 		id: newMessageId(),

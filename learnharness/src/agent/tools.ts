@@ -110,8 +110,8 @@ function explainDescription(name: "explain" | "recall", nodeId: boolean): string
 		" always has one. THE COMMITMENT RULE: " +
 		"correctAnswer is the FULL correct answer in your own words, reasoning included, COMMITTED before he ever " +
 		"sees the question. When his answer returns, grade it strictly against the commitment — never revise it " +
-		"after seeing his words. He sees the committed answer on submit. His answer arrives with `confidence`: " +
-		"guessing, neutral or confident, his own one-tap read of it. " +
+		"after seeing his words. He sees the committed answer on submit. His answer arrives with `confidence` " +
+		"when he marked one: guessing or confident, his own one-tap read of it; none means he left it unmarked. " +
 		(nodeId
 			? "Set `nodeId` (required) to the plan node this question is about — validated at call time against the session's plan map. "
 			: "") +
