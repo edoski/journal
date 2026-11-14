@@ -7,7 +7,7 @@
  * defaults) applies at the capture.
  */
 
-import type { Usage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { TSchema } from "typebox";
 import { invalidInputResult, toToolResult } from "../tool-execute.ts";
@@ -30,6 +30,8 @@ export async function runSubmitAgent<T>(opts: {
 	engine: PiEngine | undefined;
 	signal: AbortSignal | undefined;
 	onStep: (usage: Usage, model: string, step: number, finishReason: string, tools: string) => void;
+	/** Each whole assistant message, for a run that keeps a transcript. */
+	onMessage?: (message: AssistantMessage, step: number) => void;
 	neverSubmitted: string;
 	/** Extra tools beside the submit call (the course-map builder's material
 	 *  readers): a small agentic loop instead of a bare retry. */
@@ -76,7 +78,8 @@ export async function runSubmitAgent<T>(opts: {
 			maxTurns: opts.maxTurns ?? 4,
 			abortSignal: opts.signal,
 			chatId: opts.chatId,
-			onAssistantMessage: (message, step) =>
+			onAssistantMessage: (message, step) => {
+				opts.onMessage?.(message, step);
 				opts.onStep(
 					message.usage,
 					// Provider-qualified stamp:
@@ -86,7 +89,8 @@ export async function runSubmitAgent<T>(opts: {
 					step,
 					message.stopReason,
 					message.content.filter((c) => c.type === "toolCall").map((c) => (c as { name: string }).name).join(", ") || "(none)",
-				),
+				);
+			},
 			shouldStop: (_message, toolResults) => toolResults.some((r) => r.toolName === opts.toolName && !r.isError),
 		},
 	);

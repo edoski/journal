@@ -95,8 +95,9 @@ export type CourseVerb =
 	/** Every arc with its standing, and where the learner stands: the
 	 *  topics he has studied, the arcs held and the current arc. `here` is
 	 *  the topic of the lesson in progress, `open` every open lesson's
-	 *  topics, which only the app sees. */
-	| { verb: "arcs"; here?: string | null; open?: readonly string[] }
+	 *  topics, which only the app sees. `report` adds the rubric's
+	 *  computable checks. */
+	| { verb: "arcs"; here?: string | null; open?: readonly string[]; report?: boolean }
 	| { verb: "plan"; days?: number }
 	/** Register files as the course's material; paths are relative to the
 	 *  course folder. */
