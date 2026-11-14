@@ -193,6 +193,15 @@ describe("compactAnswerForModel (the model-visible diet, owner 2026-10-02)", () 
 
 // ─── dismissedAnswer / toolQuestionKind (ESC-abort dismissal, 2026-10-02) ──
 
+describe("a question set aside for his side question", () => {
+	it("tells the tutor it is no answer and to ask it again as it was, after answering him", () => {
+		const compact = compactAnswerForModel(dismissedAnswer("explain", "Why?", "asked"));
+		assert.equal(compact.dismissed, true);
+		assert.match(String(compact.reason), /not an answer/i);
+		assert.match(String(compact.reason), /again, word for word/);
+	});
+});
+
 describe("dismissedAnswer (the ESC-abort record)", () => {
 	it("the minimum honest answer: kind, questionText, dismissed — nothing else claimed", () => {
 		const ad = dismissedAnswer("explain", "Why?");

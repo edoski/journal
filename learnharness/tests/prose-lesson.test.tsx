@@ -84,6 +84,14 @@ describe("the Prose question in the tutor's message", () => {
 		assert.doesNotMatch(html, /data-testid="mark-line"|The answer/);
 	});
 
+	it("leaves a question he asked about as it was: no Skipped stamp, no answer shown", () => {
+		// Round 6 (practice N4, robustness minor 7): a side question stamped
+		// the question "Skipped" and the tutor posted it again in full.
+		const html = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={dismissedAnswer("explain", check.question, "asked")} open={false} />);
+		assert.match(html, /stretch\?/);
+		assert.doesNotMatch(html, /Skipped|prose-question-left|by 3|The answer/);
+	});
+
 	it("says a question left by Done for today is left, and never shows its answer", () => {
 		const html = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={dismissedAnswer("explain", check.question, "tonight")} open={false} />);
 		assert.match(html, /Left for next time/);
@@ -122,7 +130,6 @@ describe("the Prose composer", () => {
 		onAskInstead: noop,
 		toggleRef: { current: null },
 		busy: false,
-		compacting: false,
 		chatId: "chat",
 		onSaveDraft: noop,
 		onSubmitAnswer: noop,
@@ -160,7 +167,8 @@ describe("the Prose composer", () => {
 	it("asks instead: a message to the tutor, saying what sending does, with the way back", () => {
 		const html = draw({ open: question, answer: answerState({ mode: "ask" }) });
 		assert.match(html, /data-mode="message"/);
-		assert.match(html, /placeholder="Ask anything. Sending skips this question."/);
+		assert.match(html, /placeholder="Ask anything. The question stays open."/);
+		assert.doesNotMatch(html, /skips/, "asking never skips the question");
 		assert.match(html, /data-testid="prose-mode"[^>]*data-mode="ask"/, "the same toggle, now on asking, is the way back");
 	});
 });

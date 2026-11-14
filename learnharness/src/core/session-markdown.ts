@@ -91,6 +91,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
 		if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for today before answering; the answer was not shown.");
+		else if (out?.dismissed === true && out.reason === "asked") body.push("The learner asked something before answering; the check was asked again.");
 		else if (out?.dismissed === true) body.push("The learner skipped this check.");
 		else if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered in his own words: ${out.text.trim()}`);
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
@@ -131,6 +132,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered: ${out.text.trim()}`);
 		else if (chosen.length > 0) body.push(`The learner chose: ${chosen.join(", ")}`);
 		else if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for today before answering.");
+		else if (out?.dismissed === true && out.reason === "asked") body.push("The learner asked something before answering; the question was asked again.");
 		else if (out?.dismissed === true) body.push("The learner skipped this question.");
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
 		body.push(...photoLines(photosOf(result.content), ctx?.photos ?? "note"));

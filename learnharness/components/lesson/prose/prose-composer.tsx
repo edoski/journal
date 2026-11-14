@@ -113,7 +113,7 @@ export function ProseComposer(props: ProseComposerProps) {
 							sendAllowed: !compacting,
 							nextProblem: false,
 							onEmptyEnter: undefined,
-							placeholder: open.kind === "question" ? "Ask anything. Sending skips this question." : "Ask anything. The problem stays open.",
+							placeholder: `Ask anything. The ${open.kind} stays open.`,
 						}
 					: {})}
 				toolbar={back}
@@ -328,7 +328,7 @@ function RequestIcon({ icon: Icon, label, hint, action, testId, disabled, onClic
  *  between the two when it has focus. */
 export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; kind: ProseOpen["kind"]; onToggle: () => void }) {
 	const answerWords = kind === "question" ? "Answer the question" : "Work on the problem";
-	const askWords = kind === "question" ? "Ask the tutor instead. Sending skips this question" : "Ask the tutor instead. The problem stays open";
+	const askWords = `Ask the tutor instead. The ${kind} stays open`;
 	return (
 		<ToggleGroup
 			type="single"

@@ -276,14 +276,15 @@ export interface QuestionAnswerData {
 	hintRequested?: boolean;
 	dismissed?: boolean;
 	/** Why a dismissal happened: "tonight" when Done for today closed the
-	 *  session with this question open. Set only through dismissedAnswer,
-	 *  so it never rides an answer. */
+	 *  session with this question open, "asked" when he asked the tutor
+	 *  something first and the question waits to be asked again. Set only
+	 *  through dismissedAnswer, so it never rides an answer. */
 	reason?: DismissReason;
 	answeredAt: string;
 }
 
-/** The one reason a dismissal names. A plain Esc skip names none. */
-export type DismissReason = "tonight";
+/** The reasons a dismissal names. A plain Esc skip names none. */
+export type DismissReason = "tonight" | "asked";
 
 /** What the dock passes to buildAnswer when the learner answers. */
 export interface AnswerRequest {
@@ -440,6 +441,12 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string, reason
 export const LEFT_FOR_TONIGHT_TEXT =
 	"He stopped for today with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
 
+/** What the agent reads for a question he set aside to ask something
+ *  (round 6: the question stays open, so it comes back as it was and the
+ *  transcript draws it once). */
+export const ASKED_INSTEAD_TEXT =
+	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message, then ask this question again, word for word, with a fresh call.";
+
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):
  * the tool call already carries everything the model itself authored —
@@ -450,7 +457,11 @@ export const LEFT_FOR_TONIGHT_TEXT =
  * actually reads.
  */
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
-	if (ad.dismissed) return ad.reason === "tonight" ? { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT } : { kind: ad.kind, dismissed: true };
+	if (ad.dismissed) {
+		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT };
+		if (ad.reason === "asked") return { kind: ad.kind, dismissed: true, reason: ASKED_INSTEAD_TEXT };
+		return { kind: ad.kind, dismissed: true };
+	}
 	const out: Record<string, unknown> = { kind: ad.kind };
 	if (ad.hintRequested) {
 		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";

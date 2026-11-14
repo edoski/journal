@@ -41,8 +41,8 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 	/** The plan step this question first taught, when the roadmap opens
 	 *  the transcript here (roadmap-facts.ts). */
 	stepAnchor?: string;
-	/** It asks again, word for word, the question he pressed Hint on
-	 *  (`reaskedAfterHint`): its words are drawn above the hint already. */
+	/** It asks again, word for word, the question he pressed Hint on or
+	 *  asked about (`askedAgain`): its words are drawn above already. */
 	repeat?: boolean;
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
@@ -152,6 +152,8 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 			{spec.mode !== "text" && <ChoiceRows options={spec.data.options} multi={spec.mode === "multi-select"} selected={new Set()} />}
 		</div>
 	);
+	// Set aside for his side question, it stays as asked: it comes back open.
+	if (answer.dismissed && answer.reason === "asked") return question;
 	if (answer.dismissed) {
 		return (
 			<>

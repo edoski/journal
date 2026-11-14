@@ -2,8 +2,8 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec, reaskedAfterHint } from "../components/lesson/prose/prose-question-data.ts";
-import { emptyDockSelection } from "../src/core/index.ts";
+import { askedAgain, digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
+import { dismissedAnswer, emptyDockSelection } from "../src/core/index.ts";
 
 const check = { question: "Which way does $A$ stretch?", correctAnswer: "Along $(1,1)$, by 3.", type: "check" };
 const predict = { ...check, type: "predict" };
@@ -81,17 +81,24 @@ describe("a question asked again after a hint", () => {
 
 	it("is drawn once when its words are the same, however they are spaced", () => {
 		const spaced = { ...check, question: "Which way does   $A$\nstretch?" };
-		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, hinted)] }, { parts: [hint, ask("q2", spaced)] }])], ["q2"]);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted)] }, { parts: [hint, ask("q2", spaced)] }])], ["q2"]);
 	});
 
 	it("stays drawn after each of several hints", () => {
 		const second = proseHintRequest(proseQuestionSpec("explain", "q2", check)!, "");
-		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, hinted), hint, ask("q2", check, second), hint, ask("q3", check)] }])], ["q2", "q3"]);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), hint, ask("q2", check, second), hint, ask("q3", check)] }])], ["q2", "q3"]);
+	});
+
+	it("is drawn once after a side question set it aside", () => {
+		const aside = dismissedAnswer("explain", check.question, "asked");
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, aside)] }, { parts: [hint, ask("q2", check)] }])], ["q2"]);
+		const skipped = dismissedAnswer("explain", check.question);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, skipped)] }, { parts: [hint, ask("q2", check)] }])], [], "a skip is not set aside");
 	});
 
 	it("draws a rephrasing, and a question that follows an answer", () => {
 		const reworded = { ...check, question: "Along which line does $A$ stretch vectors?" };
-		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, hinted), ask("q2", reworded)] }])], []);
-		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], []);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), ask("q2", reworded)] }])], []);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], []);
 	});
 });

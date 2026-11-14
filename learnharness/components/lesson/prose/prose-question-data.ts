@@ -112,12 +112,13 @@ interface QuestionPart {
 }
 
 /** The question calls that ask again, word for word, the question he just
- *  pressed Hint on. The tutor re-asks after every hint (a hint is not an
- *  answer, so the question must come back open), and the transcript draws
- *  those words once, above the hint, so the re-ask shows only "Your turn"
- *  (round 5, 14 Nov 2026: the whole question printed twice). A re-ask in
- *  new words is a rephrasing and draws them. */
-export function reaskedAfterHint(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
+ *  pressed Hint on or set aside to ask the tutor something. The tutor asks
+ *  it again after either (neither is an answer, so the question must come
+ *  back open), and the transcript draws those words once, above the hint or
+ *  his side question, so the re-ask shows only "Your turn" (round 5: the
+ *  whole question printed twice after a hint; round 6: after a side
+ *  question). A re-ask in new words is a rephrasing and draws them. */
+export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
 	const reasked = new Set<string>();
 	const words = (part: QuestionPart) => {
 		const question = (part.input as { question?: unknown } | undefined)?.question;
@@ -127,8 +128,9 @@ export function reaskedAfterHint(messages: ReadonlyArray<{ parts: readonly Quest
 	for (const message of messages) {
 		for (const part of message.parts) {
 			if (!part.type.startsWith("tool-") || !(QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) continue;
-			const hinted = (previous?.output as Partial<QuestionAnswerData> | undefined)?.hintRequested === true;
-			if (previous && hinted && part.toolCallId && words(part) !== null && words(part) === words(previous)) reasked.add(part.toolCallId);
+			const left = previous?.output as Partial<QuestionAnswerData> | undefined;
+			const open = left?.hintRequested === true || (left?.dismissed === true && left.reason === "asked");
+			if (previous && open && part.toolCallId && words(part) !== null && words(part) === words(previous)) reasked.add(part.toolCallId);
 			previous = part;
 		}
 	}

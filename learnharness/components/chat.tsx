@@ -94,7 +94,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { reaskedAfterHint } from "@/components/lesson/prose/prose-question-data";
+import { askedAgain } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 
@@ -909,7 +909,7 @@ export function Chat({
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
-	const reasked = useMemo(() => reaskedAfterHint(messages), [messages]);
+	const reasked = useMemo(() => askedAgain(messages), [messages]);
 	const steps = useMemo(() => {
 		if (!planTree) return [];
 		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()));
@@ -1282,8 +1282,10 @@ export function Chat({
 
 	/* ASK INSTEAD (Prose): his message while a question or problem waits.
 	 * A question is set aside first through the silent dismissal, so the
-	 * record never holds a message after an unanswered call; a problem stays
-	 * open and his message reaches the tutor beside it. */
+	 * record never holds a message after an unanswered call; it stays open
+	 * all the same (round 6): the dismissal says he asked, the tutor asks it
+	 * again as it was, and his answer so far waits for it in the carry. A
+	 * problem stays open and his message reaches the tutor beside it. */
 	const askInstead = async () => {
 		if (compacting) return;
 		const t = textRef.current.trim();
@@ -1297,7 +1299,8 @@ export function Chat({
 			liveDraftRef.current = null;
 			sentFromDockRef.current = dockKeyRef.current;
 			const question = (p.input as { question?: string } | null)?.question ?? "";
-			if (!(await dismissQuestion(p.toolCallId, dismissedAnswer(toolQuestionKind(p.tool), question), p.key))) return;
+			if (carryScope) carryBox(`${chatId}:q:${p.key}`, carryScope, question);
+			if (!(await dismissQuestion(p.toolCallId, dismissedAnswer(toolQuestionKind(p.tool), question, "asked"), p.key))) return;
 		} else if (busyRef.current) {
 			applyText("");
 			sendWithPhotos((photos) => steer(t, photos));
