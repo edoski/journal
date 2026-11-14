@@ -183,8 +183,8 @@ describe("course records adapter (fake engine)", () => {
 			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }],
 			topics: [
 				{ topic: "vectors", title: "Vectors", needs: [], contrasts: [], level: "transferred", introduced: "2026-10-16", review: "2026-11-23", weak: false, tasks: [] },
-				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
-				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
+				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", right: "partial", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
+				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", right: "sideways", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
 				{ topic: "cramer", needs: ["vectors"], contrasts: ["elimination"], level: "introduced", weak: false, tasks: [] },
 				{ topic: "odd", level: "mastered", needs: [], contrasts: [], weak: false, tasks: [] },
 			],
@@ -208,6 +208,8 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(rank!.review, { kind: "due", date: "2026-11-05", overdue: 3 });
 		assert.deepEqual(rank!.signals, { gap: "Counts nonzero entries", lapsed: false, stale: true, choiceErrors: {}, confidentErrors: 0, repaired: true });
 		assert.equal(elimination!.signals.repaired, false);
+		assert.equal(elimination!.right, "partial", "how a topic not yet solid was best answered");
+		assert.equal("right" in rank!, false, "a word the engine does not have is dropped");
 		assert.deepEqual(elimination!.signals.choiceErrors, { cramer: 1 });
 		assert.equal(cramer!.title, "cramer", "a topic without a title shows its handle");
 		assert.deepEqual(map.edges, [

@@ -500,6 +500,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "review": topic.get("review", {}).get("due"),
             "overdue": overdue.get(key),
             "weak": _is_weak(topic, standing),
+            "right": standing.get("right"),
             "gap": topic.get("gap"),
             "excluded": topic.get("excluded"),
             **{

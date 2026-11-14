@@ -33,6 +33,11 @@ export interface TopicSignals {
 	repaired: boolean;
 }
 
+/** How he has best answered a topic he cannot yet do on his own (the
+ *  engine's `right`): right with no help (on the day it was learned), with
+ *  help, as a guess, on doubtful evidence, or partly. */
+export type RightAnswer = "unaided" | "helped" | "guess" | "uncertain" | "partial";
+
 export interface CourseMapTopic {
 	handle: TopicHandle;
 	/** The engine title; the handle when the record has none. */
@@ -43,6 +48,9 @@ export interface CourseMapTopic {
 	review: TopicReview | null;
 	/** The engine's weak verdict. */
 	weak: boolean;
+	/** At the `assisted` level, how he has best answered it; absent at
+	 *  every other level. */
+	right?: RightAnswer;
 	signals: TopicSignals;
 	/** Keys of open tasks that hold this topic. */
 	tasks: readonly string[];
