@@ -6,7 +6,7 @@ A menu of actions or one choice opened from a button: the course picker. `dropdo
 
 | Slot | `data-slot` | Notes |
 |---|---|---|
-| content | `dropdown-menu-content` | `popover` fill, 1px edge, radius 12, padding 4, 13/18, `shadow-lg`, min width 128, capped at the space Radix measures |
+| content | `dropdown-menu-content` | `popover` fill, 1px edge, radius 12, padding 4, 13/18, `shadow-lg`, min width 128, capped at the space Radix measures; kept 8px off the window's edges (`collisionPadding`), so a menu aligned past the window (the sidebar's course filter) never sits flush against it |
 | item | `dropdown-menu-item` | 32px, radius 8, padding 0 8, gap 8, 16px muted icon; `variant="destructive"` reads `danger` |
 | radio and checkbox item | `dropdown-menu-radio-item`, `dropdown-menu-checkbox-item` | the chosen row on `fill-selected` with a 14px check at the right; `indicator={false}` where trailing text already marks the row |
 | label | `dropdown-menu-label` | 12/16 at 500, muted |
