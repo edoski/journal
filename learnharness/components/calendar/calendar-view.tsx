@@ -272,7 +272,7 @@ export function CalendarView({
 					dayCellTopInnerClass={(info) =>
 						cn(
 							"m-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-row tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-							info.isToday ? "bg-foreground font-medium text-background" : info.isOther ? "text-muted-foreground/60" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
+							info.isToday ? "bg-foreground font-medium text-background" : info.isOther ? "text-muted-foreground/80" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
 						)
 					}
 					dayHeaderRowClass="border-0"
