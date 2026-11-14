@@ -25,3 +25,15 @@ One form each, wherever it shows.
 | a review dated ahead | Back in 5d, Back in 3w, Back in 2mo |
 
 Home's line names the lapsed topic when the line is about another one ("Missed Chain rule", `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Missed) is not a reason and keeps its own words.
+
+## In a lesson
+
+`LESSON_WORDS`: what happened to his work, said the same way everywhere.
+
+| Moment | Words |
+|---|---|
+| a reply arrived below what he can see | New reply (the cue above the dock) |
+| the tutor's turn ended with no reply (a restart, a stop before any words) | The tutor stopped before replying. Try again |
+| another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. |
+| he stops for the night | Done for tonight; a question he left reads Left for next time |
+| a course's record can't be read | Couldn't read this course's record, then why |

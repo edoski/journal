@@ -60,3 +60,17 @@ export function returnWords(days: number): string {
 	if (days < 60) return `Back in ${Math.round(days / 7)}w`;
 	return `Back in ${Math.round(days / 30)}mo`;
 }
+
+/** The lesson's words for what just happened to his work (round 2, 14 Nov
+ *  2026): a reply below the fold, a reply that never came, a draft another
+ *  window overtook, stopping for the night, and a course whose record
+ *  can't be read. One form each, wherever it shows. */
+export const LESSON_WORDS = {
+	newReply: "New reply",
+	stoppedBeforeReply: "The tutor stopped before replying.",
+	tryAgain: "Try again",
+	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
+	doneTonight: "Done for tonight",
+	leftForTonight: "Left for next time",
+	unreadableCourse: "Couldn't read this course's record",
+} as const;
