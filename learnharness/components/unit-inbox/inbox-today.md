@@ -9,12 +9,12 @@ Thesis: the sidebar's top is exactly Home's Today. One card per line, in the sam
 | Rule | Source |
 |---|---|
 | Today's lines (`needsYouNow(...).lines`, under the course filter `nowFor`), in Home's order, at most five; Home's "Also today" lines are not drawn and their topics stay on the shelves | `../study-home/needs-you.ts` |
-| A session's line is its session card (`now-card.md`, "The session card"), one per session however many topics its lesson touched; it takes every topic it stands for (its own and those it worked on) off the shelves, so a review of two topics never leaves a second row under Working or Learning (`claimedKeys`) | `todayTop`, `claimedKeys` |
+| A session's line is its session card (`now-card.md`, "The session card"), one per session however many topics its lesson touched; it takes every topic it stands for (its own and those it worked on) off the shelves, so a review of two topics never leaves a second row under Tutor writing or Learning (`claimedKeys`) | `todayTop`, `claimedKeys` |
 | A course's line with a lead topic is that topic's card (`NowCard`): the inbox's unit, else `unitFor` (a lead not started yet, resting on Learning). The lead is the topic the line's reason is about, so title and reason agree: a lapse's lapsed topic ("Not right last time"), an open task's current topic ("At part (c)" on Rank and the column space, the sheet's topic), else the line's first | `topicUnit` in `now-inbox.ts`; `leadOf` in `../study-home/needs-you.ts` |
 | A course's line with no lead (an open task that holds no topic, on a course with no current topic) is its course's card (`now-card.md`, "The course card"), so every line Home draws has a card; every card is under the line's one name, Home's (`NowLine.title`) | `todayTop` |
 | A topic is listed once, at the first line that leads with it; a topic on top is on no shelf | `restShelves(inbox, keys)` with `itemKey` |
 
-| The lesson he is in keeps its place through a turn: while the tutor writes, its card stays in its slot with the spinner and Working (70% unless it is the open page), its course's own line stays out, and the count holds; session cards drawn before keep their order among themselves, so answering the second does not swap it to the top. A new card comes in where Today puts it; a fresh draw is Today's order | `steadyTop`, with the top as last drawn kept in `TodayList` |
+| The lesson he is in keeps its place through a turn: while the tutor writes, its card stays in its slot with the spinner and Tutor writing (70% unless it is the open page), its course's own line stays out, and the count holds; session cards drawn before keep their order among themselves, so answering the second does not swap it to the top. A new card comes in where Today puts it; a fresh draw is Today's order | `steadyTop`, with the top as last drawn kept in `TodayList` |
 
 No header, no count and no total on top: cards leave as the day's plan empties, and none moves under his eyes.
 
@@ -22,7 +22,7 @@ No header, no count and no total on top: cards leave as the day's plan empties, 
 
 | Window | Top | Shelves (folded, 32px on a 33px pitch) | Scroll |
 |---|---|---|---|
-| 1440×900 | five cards from y 81, 60px on a 65px pitch, ending at 405 | Learning 10 at 754, On your own 26 at 787, Other sessions 4 at 820; Working N first while the tutor writes in a topic not on top | none |
+| 1440×900 | five cards from y 81, 60px on a 65px pitch, ending at 405 | Learning 10 at 754, On your own 26 at 787, Other sessions 4 at 820; Tutor writing N first while the tutor writes in a topic not on top | none |
 | 1100×700 | the same | 554 to 652 | none |
 | 1512×982 | the same | 836 to 934 | none |
 
@@ -38,7 +38,7 @@ The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowS
 | a quiet day | one card per line: "Left off 2d ago" (bookmark) under "Continue Problem sheet 4", opening the topic the task is about (the course's current topic), or the course's page for a task that holds no topic; "Next up" (arrow) for a current topic |
 | nothing needs him | "Nothing needs you today", then the shelves |
 | everything due | still one card per course line (the engine plans at most five reviews a course, Today at most five lines), a lapse's card titled by the lapsed topic with "Not right last time"; every other due topic sits on On your own with Review, or on Learning when the engine calls it weak |
-| a lesson running | a card whose topic the tutor writes in shows the spinner and Working at 70%, in its place through every turn (`steadyTop`); a topic not on top (or one already running when the sidebar first draws) sits on Working, whose open row stays in view while folded |
+| a lesson running | a card whose topic the tutor writes in shows the spinner and Tutor writing at 70%, in its place through every turn (`steadyTop`); a topic not on top (or one already running when the sidebar first draws) sits on Tutor writing, whose open row stays in view while folded |
 | a session waiting since yesterday | its own card, first, with Your turn |
 | an older waiting session | the accent dot on Learning's (or Other sessions') folded header |
 | no courses | the waiting sessions' cards, "No courses yet", Other sessions |

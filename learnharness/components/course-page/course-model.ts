@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { buildInbox, taskWords as leftOff, type Unit, type UnitNow } from "@/components/unit-inbox/units";
-import { courseShareWords, reviewWords } from "@/components/study-words";
+import { courseShareWords, reviewWords, TUTOR_WRITING } from "@/components/study-words";
 
 /**
  * The course page's model (spec: course-page.md): one course's topics, each
@@ -35,7 +35,7 @@ export const GROUP_WORDS: Record<GroupId, string> = {
 export type TopicFact =
 	/** A session on the topic waits on him: "Your turn". */
 	| { kind: "your-turn"; words: string }
-	/** The tutor is writing in a session on it: "Working". */
+	/** The tutor is writing in a session on it: "Tutor writing". */
 	| { kind: "working"; words: string }
 	/** The engine calls it weak, and why: "Not right last time", "Sure, but wrong". */
 	| { kind: "slip"; words: string }
@@ -86,7 +86,7 @@ function taskWords(course: StudyCourse, topic: CourseMapTopic): string | null {
  *  when it comes back). Pure. */
 function factOf(course: StudyCourse, topic: CourseMapTopic, group: GroupId, now: UnitNow, need: Need | null, current: boolean): TopicFact | null {
 	if (now === "your-turn") return { kind: "your-turn", words: "Your turn" };
-	if (now === "working") return { kind: "working", words: "Working" };
+	if (now === "working") return { kind: "working", words: TUTOR_WRITING };
 	switch (group) {
 		case "needs-you":
 			return need ? { kind: need.kind, words: need.words } : null;

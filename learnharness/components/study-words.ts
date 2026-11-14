@@ -181,6 +181,12 @@ function daysBetween(from: string, to: string): number {
 	return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
+/** What a session reads while the tutor writes in it, the one word for
+ *  that state wherever it shows: the sidebar's card and shelf, Home's row,
+ *  the topic page and the course page (round 4: the sidebar said "Working"
+ *  where Home said "Tutor writing"). */
+export const TUTOR_WRITING = "Tutor writing";
+
 /** The lesson's words for what just happened to his work (round 2, 14 Nov
  *  2026): a reply below the fold, a reply that never came (he stopped it,
  *  or the app lost it), a connection that dropped mid-reply, a draft

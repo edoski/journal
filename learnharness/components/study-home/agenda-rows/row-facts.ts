@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { LESSON_WORDS, lapsedOnWords, overdueWords } from "@/components/study-words";
+import { LESSON_WORDS, TUTOR_WRITING, lapsedOnWords, overdueWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -85,7 +85,7 @@ function reviewReason(due: readonly CourseMapTopic[]): Why | null {
 /** A session's line by where it stands; a finished session has no line. */
 const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
 	"your-turn": { kind: "reply", short: "Your turn" },
-	working: { kind: "working", short: "Tutor writing" },
+	working: { kind: "working", short: TUTOR_WRITING },
 	paused: { kind: "stopped", short: "Stopped mid-reply" },
 	left: { kind: "task", short: LESSON_WORDS.leftForTonight },
 	finished: null,

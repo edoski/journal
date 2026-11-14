@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { needsYouNow, type NeedsYou } from "@/components/study-home/needs-you";
 import { todaysReview } from "@/components/study-home/study-facts";
-import { overdueWords } from "@/components/study-words";
+import { TUTOR_WRITING, overdueWords } from "@/components/study-words";
 import { byLearning, nowOf, shelfOf, slipOf, taskOf, topicSessions, unitKey, unitStatus, type Unit, type UnitInbox, type UnitStatus } from "@/components/unit-inbox/units";
 
 /**
@@ -15,7 +15,7 @@ export type NowShelf = "working" | "learning" | "known" | "other";
 
 /** The shelves' names. "On your own" is the course page's group and Home's
  *  "N of M on your own". */
-export const NOW_SHELF_WORDS: Record<NowShelf, string> = { working: "Working", learning: "Learning", known: "On your own", other: "Other sessions" };
+export const NOW_SHELF_WORDS: Record<NowShelf, string> = { working: TUTOR_WRITING, learning: "Learning", known: "On your own", other: "Other sessions" };
 
 /** Today's lines for the sidebar: every course's, or under the course
  *  filter only that course's (its course line and the sessions in it).

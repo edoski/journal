@@ -30,7 +30,7 @@ The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directl
 | Not started | what the sidebar leaves out | the engine's path order | "You are here" if it is the current topic, else nothing |
 | On your own | the sidebar's Known shelf | the soonest back first | when it comes back, as the sidebar and the topic page say it (`reviewWords`): "Back in 5d", or "Due since 21 Oct" for a review held past its day |
 
-A session on the topic that waits on him says "Your turn" (in the accent) and one the tutor writes in says "Working", whatever the group, as the sidebar's rows do.
+A session on the topic that waits on him says "Your turn" (in the accent) and one the tutor writes in says "Tutor writing", whatever the group, as the sidebar's rows do.
 
 The head's progress words ("Some topics on your own", `courseShareWords`) follow Home's progress ring, which also takes in the topics he can do on his own whose review is due; those sit in Needs you, so the words can run ahead of the On your own group (decided for him: the words follow the ring, as Home does).
 

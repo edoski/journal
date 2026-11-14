@@ -1,7 +1,7 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { FIRST_LESSON, LESSON_WORDS, overdueWords } from "@/components/study-words";
+import { FIRST_LESSON, LESSON_WORDS, TUTOR_WRITING, overdueWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -75,7 +75,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				...base,
 				icon: action.kind === "open" ? "writing" : left ? "task" : "reply",
 				words: stoppedOn(entry) ?? action.chat.title,
-				note: action.kind === "open" ? "Tutor writing" : left ? LESSON_WORDS.leftForTonight : "Your turn",
+				note: action.kind === "open" ? TUTOR_WRITING : left ? LESSON_WORDS.leftForTonight : "Your turn",
 				chat: action.chat.id,
 			};
 		}
