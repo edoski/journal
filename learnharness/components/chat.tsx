@@ -21,6 +21,7 @@ import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { ChatSessionComposer } from "@/components/composer";
+import { SentPhotos, sentPhotos, usePhotoDraft, type PendingPhoto } from "@/components/photos";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { dockStateKey } from "@/components/dock-state-key";
 import { clearOpeningPrompt, readOpeningPromptEntry, stashOpeningPrompt, OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
@@ -52,7 +53,7 @@ import { RequestCard, ThinkingCard, type PracticeThinkingData } from "@/componen
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
-import type { ArtifactPartProps, Confidence, JobRecord, PracticeRequest, PracticeRequestDetails, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
+import type { ArtifactPartProps, Confidence, Photo, JobRecord, PracticeRequest, PracticeRequestDetails, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
 import { chipLabel, ModeDivider, PhaseDivider } from "@/components/phase-divider";
 import { CompactionCutDivider } from "@/components/compaction-divider";
@@ -517,10 +518,10 @@ export function Chat({
 	// the dock stays mounted (the problem is still active until the agent
 	// concludes).
 	const submitThinking = useCallback(
-		(text: string, confidence: Confidence) => {
+		(text: string, confidence: Confidence, photos?: Photo[]) => {
 			const problem = activeProblemRef.current;
-			if (!problem) return;
-			void send({ type: "thinking", problemCallId: problem.toolCallId, text, confidence });
+			if (!problem) return Promise.resolve(false);
+			return send({ type: "thinking", problemCallId: problem.toolCallId, text, confidence, ...(photos?.length ? { photos } : {}) });
 		},
 		[send],
 	);
@@ -599,6 +600,9 @@ export function Chat({
 	 * without a parent render per input event. Explicit resets still bump a
 	 * revision so the local field can sync. */
 	const textRef = useRef("");
+	// His photos waiting in the composer (photos.tsx): they stay while a
+	// question or problem holds the dock, and go with the next message.
+	const composerPhotos = usePhotoDraft();
 	const applyText = useCallback((v: string) => {
 		textRef.current = v;
 		setComposerDraftRevision((revision) => revision + 1);
@@ -885,6 +889,8 @@ export function Chat({
 	// overlay shell as mermaid, but carrying the raw svg + the card's invert
 	// state so the fullscreen view stays faithful to the toggled card.
 	const [figureFocus, setFigureFocus] = useState<{ svg: string; inverted: boolean } | null>(null);
+	// A photo of his working, open large (photos.tsx).
+	const [photoFocus, setPhotoFocus] = useState<string | null>(null);
 
 	// Overlay mirrors for the layered-Esc gate (owner 2026-10-04): the
 	// lh:kbd-abort-turn handler reads these at EVENT time — declared here
@@ -1222,21 +1228,29 @@ export function Chat({
 		if (pending || compacting) return;
 		doSteerOrSend();
 	};
+	// A refused send puts its photos back, as the refusal flow keeps the text.
+	const sendWithPhotos = (go: (photos: Photo[] | undefined) => Promise<boolean>) => {
+		const taken: PendingPhoto[] = composerPhotos.take();
+		void go(sentPhotos(taken)).then((accepted) => {
+			if (!accepted) composerPhotos.restore(taken);
+		});
+	};
 	const doSend = () => {
 		if (busy || pending || compacting) return;
 		const t = textRef.current.trim();
-		if (!t) return;
+		const withPhotos = composerPhotos.photos.length > 0;
+		if (!t && !withPhotos) return;
 		if (unconnected) {
 			setSetupOpen(true);
 			return;
 		}
-		if (openingDraftRef.current !== null) {
+		if (openingDraftRef.current !== null && !withPhotos) {
 			deliverOpeningPrompt(t);
 			return;
 		}
 		draftRef.current = t; // the refusal flow's preserve-and-replay seam
 		applyText("");
-		void send({ type: "text", text: t });
+		sendWithPhotos((photos) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }));
 	};
 
 	/* STEER VS SEND (owner arc 2026-10-03): a send while a turn runs steers
@@ -1251,10 +1265,10 @@ export function Chat({
 	const doSteerOrSend = () => {
 		if (pending || compacting) return;
 		const t = textRef.current.trim();
-		if (!t) return;
+		if (!t && composerPhotos.photos.length === 0) return;
 		if (busy) {
 			applyText("");
-			void steer(t);
+			sendWithPhotos((photos) => steer(t, photos));
 			return;
 		}
 		doSend();
@@ -1288,6 +1302,7 @@ export function Chat({
 			value={{
 				openMermaid: setMermaidFocus,
 				openFigure: (svg, inverted) => setFigureFocus({ svg, inverted }),
+				openPhoto: setPhotoFocus,
 			}}
 		>
 		<JobsContext.Provider value={jobs}>
@@ -1473,7 +1488,10 @@ export function Chat({
 										// transcript reads as a document), no label, set in the
 										// lesson's markdown and math like the tutor's.
 										<div data-testid="user-message" data-slot="learner-message" className="my-1 w-full rounded-xl bg-card px-4 py-3">
-											<MessageResponse className="text-foreground">{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}</MessageResponse>
+											{m.parts.some((p) => p.type === "text" && p.text?.trim()) && (
+												<MessageResponse className="text-foreground">{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}</MessageResponse>
+											)}
+											{m.parts.map((p) => p.type === "photos" ? <SentPhotos key={p.id} photos={p.data as Photo[]} className={m.parts.some((q) => q.type === "text" && q.text?.trim()) ? "mt-3" : undefined} /> : null)}
 										</div>
 									) : (
 									<Message from="assistant" className="max-w-full">
@@ -1542,7 +1560,7 @@ export function Chat({
 														// transcript; answered ones render as records.
 														if (part.state === "output-available") {
 															return (
-																<AnsweredCard key={pi} answer={part.output as QuestionAnswerData} input={part.input} />
+																<AnsweredCard key={pi} answer={part.output as QuestionAnswerData} input={part.input} photos={part.photos as Photo[] | undefined} />
 															);
 														}
 														return null;
@@ -1659,9 +1677,10 @@ export function Chat({
 							nextProblem={nextReady}
 							onNext={sendNext}
 							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : undefined}
+							photos={composerPhotos}
 						/>
 					}
-					onSubmitAnswer={(output) => {
+					onSubmitAnswer={(output, photos) => {
 						if (!pending) return;
 						// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
 						// 2026-09-26): one input event, one turn — the hook appends
@@ -1675,7 +1694,7 @@ export function Chat({
 						const reading = readingThinkingRef.current.trim() || undefined;
 						// The pending-id effect clears this only when the question
 						// actually leaves. An offline preflight keeps the draft visible.
-						submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output, pending.key);
+						submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output, pending.key, photos);
 					}}
 				/>}
 				</Conversation>
@@ -1687,6 +1706,7 @@ export function Chat({
 				{mermaidFocus !== null && (
 					<MermaidOverlay chart={mermaidFocus} onClose={() => setMermaidFocus(null)} />
 				)}
+				{photoFocus !== null && <MermaidOverlay photo={photoFocus} onClose={() => setPhotoFocus(null)} />}
 				{figureFocus !== null && (
 					<MermaidOverlay
 						svg={figureFocus.svg}
@@ -1855,8 +1875,9 @@ function DockOverlay({
 	 *  {toolCallId, input} — dock ownership exactly like a pending
 	 *  question (the composer is replaced); null in teaching sessions. */
 	practice: { toolCallId: string; input: unknown } | null;
-	/** (commit, text) — the practice dock's two submit lanes. */
-	onSubmitThinking: (text: string, confidence: Confidence) => void;
+	/** The practice dock's submit: text, confidence, photos; resolves
+	 *  whether the server took it. */
+	onSubmitThinking: (text: string, confidence: Confidence, photos?: Photo[]) => Promise<boolean>;
 	onPracticeRequest: (request: PracticeRequest, text: string) => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
 	requiresReveal: boolean;
@@ -1869,7 +1890,7 @@ function DockOverlay({
 	/** Session phase at the pending question — scales the thinking field. */
 	phase: Phase3;
 	composer: React.ReactNode;
-	onSubmitAnswer: (output: QuestionAnswerData) => void;
+	onSubmitAnswer: (output: QuestionAnswerData, photos?: Photo[]) => void;
 	/** Reports the dock's settled height (block + gradient) — ChatView's
 	 *  dockReserve state feeds the transcript's spacer from it. */
 	onReserve: (h: number) => void;

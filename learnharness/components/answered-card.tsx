@@ -3,7 +3,8 @@
 import { ThinkingBlock } from "@/components/thinking-block";
 import { cn } from "@/lib/utils";
 import { MessageResponse, ToolContentResponse } from "@/components/ai-elements/message";
-import type { QuestionAnswerData } from "@/src/core";
+import type { Photo, QuestionAnswerData } from "@/src/core";
+import { SentPhotos } from "@/components/photos";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { LESSON_WORDS } from "@/components/study-words";
@@ -23,9 +24,11 @@ import { teaserLine } from "@/components/question-dock";
  * removed multiple-choice tools (quiz, probe) in older transcripts render
  * the same plain way: the question and the option he picked, no grading.
  */
-export function AnsweredCard({ answer: savedAnswer, input }: {
+export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 	answer: QuestionAnswerData;
 	input?: unknown;
+	/** Photos of his working that went with the answer. */
+	photos?: readonly Photo[];
 }) {
 	const answer = answerForPresentation(savedAnswer, input);
 	if (answer.dismissed && answer.reason === "tonight") {
@@ -83,6 +86,7 @@ export function AnsweredCard({ answer: savedAnswer, input }: {
 					</ul>
 				)}
 				{answer.text && <MessageResponse className="mt-3">{`“${answer.text}”`}</MessageResponse>}
+				<SentPhotos photos={photos} className="mt-3" />
 				{(answer.thinking ?? answer.note) && (
 					<ThinkingBlock testId="your-thinking" label="YOUR THINKING" text={answer.thinking ?? answer.note ?? ""} inCard />
 				)}

@@ -22,8 +22,9 @@ const PROMPTS_DIR = path.join(PATHS.root, "src", "agent", "prompts");
  *  and the prompt-refinement round of 2026-10-07) — personality, the
  *  truth contract, and the thinking-fields doctrine are ONE law across
  *  every agent. The question/confidence/file mechanics stay out
- *  (practice has no such tools). */
-const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-model.md", "40-formatting.md"];
+ *  (practice has no such tools). Reading a photo of his working (45) is
+ *  the same law for every agent that marks him (14 Nov 2026). */
+const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-model.md", "40-formatting.md", "45-photos.md"];
 
 /** List the SOURCE segments for one agent, in composition order — the
  *  shared base, then the agent's own fragments sorted by filename, then

@@ -5,6 +5,7 @@
  */
 
 export * from "./chat-handler.ts";
+export { preparePhotos } from "./photos.ts";
 export * from "./events-stream.ts";
 export * from "./chats.ts";
 export * from "./courses.ts";

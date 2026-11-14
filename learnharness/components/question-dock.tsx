@@ -37,6 +37,8 @@ import {
 	type Phase3,
 } from "@/src/core";
 import { ConfidenceChoice } from "@/components/confidence-choice";
+import { PendingPhotos, PhotoAttachButton, sentPhotos, usePhotoDraft } from "@/components/photos";
+import type { Photo } from "@/src/core";
 
 /**
  * The question dock — a pending question REPLACES the chat composer: the
@@ -72,7 +74,8 @@ export interface QuestionDockProps {
 	 */
 	reveal?: boolean;
 	onExpand: () => void;
-	onSubmit: (output: QuestionAnswerData) => void;
+	/** The answer, with any photos of his working (text answers only). */
+	onSubmit: (output: QuestionAnswerData, photos?: Photo[]) => void;
 	/** Restore only this call's unconfirmed submission after recovery. */
 	initialDraft?: QuestionFormDraft;
 	onSaveDraft?: (draft: QuestionFormDraft) => void;
@@ -271,6 +274,8 @@ function QuestionDockForm({
 	// The learner's confidence read (explain only). The dock unmounts
 	// between questions, so each question starts fresh at neutral.
 	const [confidence, setConfidence] = useState<Confidence>(initialDraft?.confidence ?? DEFAULT_CONFIDENCE);
+	// Photos of his working: a text answer's only (a choice is a choice).
+	const photos = usePhotoDraft(initialDraft?.photos);
 	const selectMode: SelectMode = qd.mode === "multi-select" ? "multi-select" : "single-select";
 	const draftChangeRef = useRef(onDraftChange);
 	draftChangeRef.current = onDraftChange;
@@ -280,9 +285,10 @@ function QuestionDockForm({
 
 	const toggle = (idx: number) => setSel(toggleOption(selectMode, sel, idx));
 
+	// A photo of the working alone answers a text question.
 	const canSubmit =
 		qd.mode === "text"
-			? text.trim().length > 0
+			? text.trim().length > 0 || photos.photos.length > 0
 			: (sel.otherSelected && other.trim().length > 0) || sel.selected.size > 0;
 
 	const submit = () => {
@@ -301,8 +307,9 @@ function QuestionDockForm({
 			other,
 			text,
 			confidence,
+			...(photos.photos.length ? { photos: photos.photos } : {}),
 		});
-		onSubmit(buildAnswer(qd, req, toolName));
+		onSubmit(buildAnswer(qd, req, toolName), qd.mode === "text" ? sentPhotos(photos.photos) : undefined);
 	};
 
 	/* ENTER SUBMITS FROM ANYWHERE (owner round 6, 2026-10-05): the same
@@ -489,7 +496,7 @@ function QuestionDockForm({
 		}
 	};
 	return (
-		<div ref={rootRef} data-testid="question-dock">
+		<div ref={rootRef} data-testid="question-dock" {...(qd.mode === "text" ? photos.surface : {})} className={cn(photos.dragging && "bg-fill-hover")}>
 			<div data-dock-scroll-area="" data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-4">
 				<ToolContentResponse>{qd.question}</ToolContentResponse>
 				{qd.context && (
@@ -569,6 +576,7 @@ function QuestionDockForm({
 				}}
 			>
 				<div className="mx-4 mt-3 border-t" />
+				{qd.mode === "text" && <PendingPhotos draft={photos} />}
 				{qd.mode === "text" ? (
 					<Textarea
 						data-testid="answer-field"
@@ -600,6 +608,7 @@ function QuestionDockForm({
 					/>
 				)}
 				<div className="flex items-center gap-3 p-2 pl-3">
+					{qd.mode === "text" && <PhotoAttachButton draft={photos} active={active} disabled={compactionRunning} />}
 					{kind === "explain" && <ConfidenceChoice value={confidence} onChange={setConfidence} />}
 					{hintButton()}
 					<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">

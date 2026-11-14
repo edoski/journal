@@ -17,6 +17,7 @@
  * exited and resumed mid-question for free.
  */
 
+import type { Photo } from "./photos.ts";
 import { Type, type Static } from "typebox";
 import { stripModelValueDebris } from "./value-debris.ts";
 import { DEFAULT_CONFIDENCE, type Confidence } from "./contracts/course.ts";
@@ -320,6 +321,8 @@ export interface QuestionFormDraft {
 	other: string;
 	text: string;
 	confidence: Confidence;
+	/** Photos of his working waiting in the answer (photos.ts). */
+	photos?: { id: string; photo: Photo }[];
 }
 
 export interface QuestionDraft {

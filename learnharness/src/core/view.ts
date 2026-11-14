@@ -46,6 +46,7 @@ import {
 } from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
+import { photosOf } from "./photos.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
 import type { PlanBlockData } from "./contracts/chat.ts";
 
@@ -118,6 +119,9 @@ function applyResult(part: LhViewPart, result: ToolResultMessage): void {
 	} else {
 		part.state = "output-available";
 		part.output = result.details;
+		// A photo of his working answered with it (the answered card's strip).
+		const photos = photosOf(result.content);
+		if (photos.length) part.photos = photos;
 	}
 }
 
@@ -236,7 +240,9 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 				typeof content === "string"
 					? [content]
 					: content.filter((c) => c.type === "text").map((c) => (c as { text: string }).text);
-			out.push({ id: m.id, role: "user", parts: texts.map(textPart) });
+			// His photos follow his words, one part for the strip.
+			const photos = photosOf(content);
+			out.push({ id: m.id, role: "user", parts: [...texts.map(textPart), ...(photos.length ? [{ type: "photos", id: `ph_${m.id}`, data: photos }] : [])] });
 			continue;
 		}
 
@@ -506,7 +512,7 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			out.push({
 				id: marker.id,
 				role: "user",
-				parts: [{ type: "data-practice-thinking", id: `pt_${marker.id}`, data: marker.details }],
+				parts: [{ type: "data-practice-thinking", id: `pt_${marker.id}`, data: marker.images?.length ? { ...(marker.details as object), photos: marker.images } : marker.details }],
 			});
 			return;
 		}

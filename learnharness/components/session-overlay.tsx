@@ -36,6 +36,8 @@ import { SvgImage } from "@/components/artifacts/svg-image";
 export const SessionMermaidContext = createContext<{
 	openMermaid: (chart: string) => void;
 	openFigure: (svg: string, inverted: boolean) => void;
+	/** A photo of his working, large (photos.tsx): its image source. */
+	openPhoto: (src: string) => void;
 } | null>(null);
 
 export function useSessionMermaid() {
@@ -86,14 +88,32 @@ const L = {
 export function MermaidOverlay({
 	chart,
 	svg: rawSvg,
+	photo,
 	inverted = false,
 	onClose,
 }: {
 	chart?: string;
 	svg?: string;
+	/** PHOTO MODE (14 Nov 2026): a photo of his working, by image source,
+	 *  at its natural size in the same pan/zoom shell. */
+	photo?: string;
 	inverted?: boolean;
 	onClose: () => void;
 }) {
+	// The photo's natural size, read once it loads (a raster has no viewBox).
+	const [photoBox, setPhotoBox] = useState<{ w: number; h: number } | null>(null);
+	useEffect(() => {
+		if (photo === undefined) return;
+		let cancelled = false;
+		const img = new Image();
+		img.onload = () => {
+			if (!cancelled) setPhotoBox({ w: img.naturalWidth || 600, h: img.naturalHeight || 400 });
+		};
+		img.src = photo;
+		return () => {
+			cancelled = true;
+		};
+	}, [photo]);
 	// ── chart render (own instance, own ids); figure mode uses the raw svg ──
 	const [svg, setSvg] = useState<string | null>(rawSvg ?? null);
 	const [error, setError] = useState<string | null>(null);
@@ -146,7 +166,8 @@ export function MermaidOverlay({
 		return () => ro.disconnect();
 	}, []);
 
-	const box = useMemo(() => (svg ? chartSize(svg) : { w: 0, h: 0 }), [svg]);
+	const box = useMemo(() => photoBox ?? (svg ? chartSize(svg) : { w: 0, h: 0 }), [svg, photoBox]);
+	const shown = photo !== undefined ? photoBox !== null : Boolean(svg);
 	const fitZoom = useMemo(() => fitZoomFor(box, size), [box, size]);
 
 	const [view, setView] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
@@ -159,11 +180,11 @@ export function MermaidOverlay({
 		if (atFloor) userAdjustedRef.current = false;
 	}, [atFloor]);
 	useEffect(() => {
-		if (userAdjustedRef.current || !size.w || !size.h || !svg) return;
+		if (userAdjustedRef.current || !size.w || !size.h || !shown) return;
 		setView(fitGraphView(box, size, fitZoom));
 		const raf = requestAnimationFrame(() => setSettled(true));
 		return () => cancelAnimationFrame(raf);
-	}, [fitZoom, size, box, svg]);
+	}, [fitZoom, size, box, shown]);
 
 	useEffect(() => {
 		const el = viewportRef.current;
@@ -229,11 +250,11 @@ export function MermaidOverlay({
 			className={L.root}
 			role="dialog"
 			aria-modal="true"
-			aria-label="Diagram focus"
+			aria-label={photo !== undefined ? "Photo of your working" : "Diagram focus"}
 		>
 			<div className="mb-2 flex items-center gap-2">
-				<span className={L.title}>Diagram</span>
-				<span className={L.sub}>from this lesson</span>
+				<span className={L.title}>{photo !== undefined ? "Your working" : "Diagram"}</span>
+				<span className={L.sub}>{photo !== undefined ? "the photo you sent" : "from this lesson"}</span>
 				<Hint label="Close" binding="escape" side="left">
 <Button
 					variant="quiet"
@@ -262,7 +283,7 @@ export function MermaidOverlay({
 					<div className="flex h-full items-center justify-center p-4">
 						<MermaidError chart={chart ?? ""} error={error} retry={() => setAttempt((a) => a + 1)} />
 					</div>
-				) : svg ? (
+				) : shown ? (
 					<>
 						<div
 							className="absolute top-0 left-0 origin-top-left"
@@ -284,19 +305,22 @@ export function MermaidOverlay({
 							{/* Figures share the card's image boundary and white backing.
 							    Mermaid keeps its inline renderer; globals.css removes
 							    its max-width cap so it fills the natural-size box. */}
-							{rawSvg !== undefined ? (
+							{photo !== undefined ? (
+								// eslint-disable-next-line @next/next/no-img-element -- an in-memory photo; no Next image optimization
+								<img data-lh-overlay-chart src={photo} alt="Your working" className="block h-auto w-full" draggable={false} />
+							) : rawSvg !== undefined ? (
 								<div
 									data-lh-overlay-chart
 									className="bg-white"
 									style={inverted ? { filter: "invert(1) hue-rotate(180deg)" } : undefined}
 								>
-									<SvgImage svg={svg} className="block h-auto w-full" />
+									<SvgImage svg={svg ?? ""} className="block h-auto w-full" />
 								</div>
 							) : (
 								<div
 									data-lh-overlay-chart
 									className="[&_svg]:h-auto [&_svg]:w-full"
-									dangerouslySetInnerHTML={{ __html: svg }}
+									dangerouslySetInnerHTML={{ __html: svg ?? "" }}
 								/>
 							)}
 						</div>
@@ -314,11 +338,11 @@ export function MermaidOverlay({
 									<MinusIcon className="size-3.5" />
 								</Button>
 </Hint>
-								<Hint label="Fit diagram to view" side="bottom">
+								<Hint label={photo !== undefined ? "Fit the photo to the view" : "Fit diagram to view"} side="bottom">
 <Button
 									variant="quiet"
 									size="icon-row"
-									aria-label="Fit diagram to view"
+									aria-label={photo !== undefined ? "Fit the photo to the view" : "Fit diagram to view"}
 									onClick={fitView}
 									className="pointer-events-auto border bg-popover hover:bg-accent"
 								>
@@ -342,7 +366,7 @@ export function MermaidOverlay({
 				) : (
 					<div className={L.loading}>
 						<span className="inline-block size-4 animate-spin rounded-full border border-current border-b-2" />
-						Rendering diagram…
+						{photo !== undefined ? "Opening the photo…" : "Rendering diagram…"}
 					</div>
 				)}
 			</div>
