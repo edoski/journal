@@ -14,6 +14,7 @@
 import { Type, type Static } from "typebox";
 import type { ChatRecord, DigestLedger } from "../../core/contracts/chat.ts";
 import type { CourseMap } from "../../core/contracts/course-map.ts";
+import { recordHasArcs } from "../../core/contracts/course.ts";
 import type { ChatStore, CourseRecords } from "../../core/ports.ts";
 import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/plan.ts";
 import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
@@ -30,7 +31,7 @@ import {
 	type DigestWindow,
 } from "../../core/lesson-digest.ts";
 import type { PiEngine } from "../models.ts";
-import { DIGEST_DOCTRINE, composeDoctrine } from "../prompt-segments.ts";
+import { DIGEST_DOCTRINE, composeDoctrine, type CourseShape } from "../prompt-segments.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
 import { finishRun, setRunPhase } from "./background-runs.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
@@ -90,10 +91,10 @@ Rules:
 - Write to the learner, in plain words they understand days later: "you", never "he" or "the learner"; no dates or ids; math in $…$.
 - When nothing is worth recording, submit empty lists.`;
 
-/** The digest's system prompt: its instructions, then how a new topic joins
- *  the arcs, read from the tutor's references at each run. */
-export function digestSystemPrompt(dir?: string): string {
-	return `${DIGEST_INSTRUCTIONS}\n\n${composeDoctrine(DIGEST_DOCTRINE, dir)}`;
+/** The digest's system prompt: its instructions, then in a course with arcs
+ *  how a new topic joins them, read from the tutor's references at each run. */
+export function digestSystemPrompt(course: CourseShape, dir?: string): string {
+	return course.arcs ? `${DIGEST_INSTRUCTIONS}\n\n${composeDoctrine(DIGEST_DOCTRINE, dir)}` : DIGEST_INSTRUCTIONS;
 }
 
 /** The run's inputs, as the agent reads them. */
@@ -242,7 +243,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 				parameters: digestSchema,
 				fill: (input: Static<typeof digestSchema>) => ({ ...input, topics: input.topics ?? [], knowledge: input.knowledge ?? [] }),
 				validate: save,
-				systemPrompt: digestSystemPrompt(),
+				systemPrompt: digestSystemPrompt({ arcs: recordHasArcs(whole.json) }),
 				prompt: digestPrompt(record, window, map, view),
 				engine,
 				signal,

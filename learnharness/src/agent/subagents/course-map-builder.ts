@@ -28,6 +28,7 @@ import {
 	type MapSubmit,
 } from "../../core/course-map-build.ts";
 import { CLAUDE_LIMIT_TEXT } from "../../core/contracts/claude.ts";
+import { recordHasArcs } from "../../core/contracts/course.ts";
 import type { PiEngine } from "../models.ts";
 import { courseMapDoctrine } from "../prompt-segments.ts";
 import { createMaterialTools, measureMaterial, readingRounds, type MaterialFile } from "../tools/material.ts";
@@ -269,7 +270,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 					if (problems) console.info(`[course-map ${workspace}] answer refused: ${problems.replace(/\n/g, " | ")}`);
 					return problems;
 				},
-				systemPrompt: COURSE_MAP_INSTRUCTIONS + courseMapDoctrine(),
+				systemPrompt: COURSE_MAP_INSTRUCTIONS + courseMapDoctrine({ arcs: recordHasArcs(record) }),
 				prompt: mapPrompt(title, view, files, examDate, record, folders),
 				engine,
 				signal,

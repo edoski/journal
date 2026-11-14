@@ -1,4 +1,4 @@
-import type { PlanEdge, PlanNode, PlanTree } from "./contracts.ts";
+import { PLAN_MAP_CAP, type PlanEdge, type PlanNode, type PlanTree } from "./contracts.ts";
 
 /**
  * Pure, validated plan-tree operations (vision §2 "the formal plan tree").
@@ -123,6 +123,39 @@ export function createTree(nodes: PlanNode[], edges: PlanEdge[]): PlanTree {
 		accepted.push({ from: e.from, to: e.to });
 	}
 	return { nodes: nodes.map((n) => ({ ...n })), edges: accepted, version: 1 };
+}
+
+/** The longest chain of steps in a plan, counted in steps: the rows its
+ *  map takes. A tree from createTree is acyclic. */
+export function planDepth(tree: Pick<PlanTree, "nodes" | "edges">): number {
+	const above = new Map<string, string[]>(tree.nodes.map((n) => [n.id, []]));
+	for (const e of tree.edges) above.get(e.to)?.push(e.from);
+	const memo = new Map<string, number>();
+	const depth = (id: string): number => {
+		const known = memo.get(id);
+		if (known !== undefined) return known;
+		const value = 1 + Math.max(0, ...(above.get(id) ?? []).map(depth));
+		memo.set(id, value);
+		return value;
+	};
+	return Math.max(0, ...tree.nodes.map((n) => depth(n.id)));
+}
+
+/** What makes a plan too big for one screen of his lesson map
+ *  (`PLAN_MAP_CAP`), as words the tutor can act on, or null when it fits. */
+export function planMapTooBig(tree: Pick<PlanTree, "nodes" | "edges">): string | null {
+	const steps = tree.nodes.length;
+	const deep = planDepth(tree);
+	const over = [
+		steps > PLAN_MAP_CAP.steps ? `${steps} steps where ${PLAN_MAP_CAP.steps} fit` : null,
+		deep > PLAN_MAP_CAP.deep ? `a chain ${deep} steps long where ${PLAN_MAP_CAP.deep} fit` : null,
+	].filter((x): x is string => x !== null);
+	if (over.length === 0) return null;
+	return (
+		`This map does not fit his lesson map on one screen: ${over.join(", and ")}. ` +
+		"Each step is one idea. Prune steps he already holds (the probe shows them), or split the lesson: " +
+		"map the part that reaches the first goal he can use, and leave the rest for the next lesson."
+	);
 }
 
 // The per-node mutation ops (addNode/updateNode/removeNode/addEdge/removeEdge/

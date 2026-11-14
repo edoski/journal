@@ -22,7 +22,7 @@ The topic page (`/unit/<course>/<topic>`): `UnitPage` in `../unit-page.tsx` draw
 | 6 | else still being learned, no review set | Continue | as row 4 over the topic's sessions; with none, first message "Continue <title>" |
 | 7 | else (the next review is dated) | Study, outline | first message "<title>" |
 
-A session's state is one model (`components/nav/session-state.ts`): working, your turn (a question or a problem it posed, its plan waiting for his go-ahead, or its last words asking him something partway through a lesson), paused (its turn stopped before it finished) or finished (a sign-off such as "Good place to stop" included). A session belongs to a topic when the engine's records tie it there (a problem posed on it, an attempt saved on it, its introduction) or it was started on it (`topics` on the record, set at creation); never by a plan step's name, and never because it holds a task covering the topic: that task is continued through its own row.
+A session's state is one model (`components/nav/session-state.ts`): working, your turn (a question or a problem it posed, a plan it wrote but taught no step of, or its last words asking him something partway through a lesson), paused (its turn stopped before it finished) or finished (a sign-off such as "Good place to stop" included). A session belongs to a topic when the engine's records tie it there (a problem posed on it, an attempt saved on it, its introduction) or it was started on it (`topics` on the record, set at creation); never by a plan step's name, and never because it holds a task covering the topic: that task is continued through its own row.
 
 The app's one lever on the tutor is the session's first message; the tutor's own rule takes an unaided first try on any due topic it touches.
 

@@ -85,6 +85,15 @@ def level(observations: list[dict[str, Any]], **topic: Any) -> str:
         (
             [attempt("rank", offset=-1), attempt("rank", transfer=True)],
             {},
+            "independent",
+        ),
+        (
+            [
+                attempt("rank", offset=-3),
+                attempt("rank", offset=-1),
+                attempt("rank", transfer=True),
+            ],
+            {},
             "transferred",
         ),
         ([attempt("rank", "correct", "Hint", transfer=True)], {}, "assisted"),

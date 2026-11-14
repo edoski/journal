@@ -74,7 +74,7 @@ def vault(tmp_path: Path) -> tuple[Path, Path, Workspace]:
     (msc / "Algebra").mkdir(parents=True)
     learn.mkdir()
     course = initialize(msc / "Algebra")
-    course.record.write_text('{"schema": 6}')
+    course.record.write_text('{"schema": 7}')
     return msc, learn, course
 
 
@@ -601,6 +601,7 @@ def test_the_desktop_archive_carries_the_repository_arc_doctrine(
         skill = packed.read("tutor/SKILL.md").decode()
     assert arcs == (package / "skills/tutor/references/arcs.md").read_bytes()
     assert (
-        "Read [arcs.md](references/arcs.md) before any save that adds a topic, "
-        "changes arcs or sets an exam in a course with arcs"
+        "In a course with arcs (its record's `arcs` is not empty), read "
+        "[arcs.md](references/arcs.md) before any save that adds a topic, changes "
+        "arcs or sets an exam"
     ) in skill

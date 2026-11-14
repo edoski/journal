@@ -19,6 +19,7 @@ import {
 	type LhMessage,
 } from "../src/core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
+import { PLAN_MAP_CAP } from "../src/core/contracts/plan.ts";
 import { concludeInputObject, concludeTool, createPracticeGate, problemTool, practiceTools } from "../src/agent/tools/practice.ts";
 import { composeInstructions, createPracticeAgent } from "../src/agent/teacher-agent.ts";
 import { listSourceSegments } from "../src/agent/prompt-segments.ts";
@@ -305,9 +306,16 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.match(teacher, /Rewriting is a normal, common event/);
 		// planning is the natural verification moment
 		assert.match(teacher, /planning is the natural moment for verification/);
-		// no size ceilings, and the detour keeps the pace (owner round, 2026-10-07)
-		assert.ok(!teacher.includes("Typically 5–15 nodes"), "the node-count cap is dead");
-		assert.match(teacher, /No size ceiling/);
+		// one screen of map, each step one idea (Edo, 14 Nov 2026), the numbers
+		// PLAN_MAP_CAP's; and the detour keeps the pace (owner round, 2026-10-07)
+		assert.ok(!teacher.includes("No size ceiling"), "the map has a size: one screen");
+		assert.match(teacher, /Each node holds one idea/);
+		assert.ok(teacher.includes(`at most ${PLAN_MAP_CAP.steps} steps, and no chain of steps longer than ${PLAN_MAP_CAP.deep} (\`PLAN_MAP_CAP\``));
+		// no approval step before a lesson (Edo, 14 Nov 2026)
+		assert.match(teacher, /he is not asked to approve a map/);
+		assert.ok(!/confirm the plan|once he's on board|Presenting ends your turn/.test(teacher), "no plan confirmation");
+		// demos and figures are built unasked when they help (Edo, 14 Nov 2026)
+		assert.match(teacher, /\*\*Just build it\.\*\* When a demo or a figure would help him understand, dispatch it in that turn, unasked/);
 		assert.match(teacher, /never rush the repair/);
 		assert.match(teacher, /one and only pace/);
 		assert.match(teacher, /nothing to rush/, "the goal reiteration composes");

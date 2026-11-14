@@ -42,7 +42,7 @@ def test_init_registers_is_idempotent_and_nested_workspace_is_independent(
     parent = initialize(tmp_path)
     assert registry_path() == support_directory() / "workspaces.json"
     assert entries() == {str(tmp_path): {}}
-    parent.record.write_text('{"schema": 6}\n')
+    parent.record.write_text('{"schema": 7}\n')
     before = {p: p.read_bytes() for p in parent.root.rglob("*") if p.is_file()}
     assert initialize(tmp_path) == parent
     assert before == {p: p.read_bytes() for p in parent.root.rglob("*") if p.is_file()}

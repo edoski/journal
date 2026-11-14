@@ -188,6 +188,54 @@ def test_transferred_needs_a_solid_transfer_on_a_day_not_missed() -> None:
     assert doubtful.standing["level"] == "independent"
 
 
+def test_a_transfer_raises_the_level_only_after_an_earlier_solid_day() -> None:
+    first = learned(att("correct", text="taught"))
+    first.attempts(2, att("correct", text="new setting", transfer=True))
+    assert first.verdicts[-1] == (on(2).isoformat(), "solid")
+    assert first.standing["level"] == "independent"
+    first.attempts(5, att("correct", text="another new setting", transfer=True))
+    assert first.standing["level"] == "transferred"
+    same_day = started(att("correct"), att("correct", text="t", transfer=True))
+    assert same_day.standing["level"] == "independent"
+
+
+def test_an_existing_record_whose_only_solid_day_is_its_transfer_drops_a_level() -> (
+    None
+):
+    """A record as saved before the rule: taught, then one transfer answer the
+    next day, which read as transferred. Levels are derived on every read, so
+    the stored record reads independent with no migration."""
+    record = schema.empty()
+    record["topics"] = {
+        "a": {"title": "A", "review": {"due": "2026-01-05", "by": "engine"}}
+    }
+    record["observations"] = {
+        "o1": {
+            "kind": "attempt",
+            "topics": ["a"],
+            "text": "taught",
+            "help": "none",
+            "result": "correct",
+            "date": "2026-01-01",
+            "recorded": "2026-01-01T08:40:00+00:00",
+        },
+        "o2": {
+            "kind": "attempt",
+            "topics": ["a"],
+            "text": "new setting",
+            "help": "none",
+            "result": "correct",
+            "transfer": True,
+            "date": "2026-01-02",
+            "recorded": "2026-01-02T09:20:00+00:00",
+            "due_topics": ["a"],
+        },
+    }
+    record["next_observation"] = 3
+    stored = schema.validate_record(record)
+    assert progress.standing(stored, "a")["level"] == "independent"
+
+
 def test_uncertain_answers_are_never_solid_but_can_lower_a_verdict() -> None:
     course = started(att("correct", uncertain="Read from the notes"))
     assert course.verdicts == [(on(1).isoformat(), "helped")]
@@ -326,10 +374,20 @@ def test_a_re_mark_days_later_keeps_the_tags_the_engine_stamped_on_the_attempt()
     None
 ):
     course = started(att("correct"))
-    course.attempts(5, att("incorrect", text="the review"))
+    arc = {"title": "Arc", "question": "Why?", "purpose": "To know."}
+    course.save(
+        2,
+        {
+            "arcs": {"first": arc, "second": {**arc, "title": "Second arc"}},
+            "topics": {"a": {"arc": "first"}, "b": {"arc": "second"}},
+            "path": {"arcs": ["first", "second"]},
+        },
+    )
+    course.attempts(5, att("incorrect", text="the review", checkpoint="first"))
     assert course.record["observations"]["o2"]["due_topics"] == ["a"]
     course.attempts(9, dispute("correct", "o2", text="the review"))
     assert course.record["observations"]["o3"]["due_topics"] == ["a"]
+    assert course.record["observations"]["o3"]["checkpoint"] == "first"
     assert progress.replays(course.record)["a"].days[on(5).isoformat()] == "probe"
 
 

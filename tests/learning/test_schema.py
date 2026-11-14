@@ -62,8 +62,9 @@ BASE = {
 def test_empty_course_is_canonical_and_validates() -> None:
     record = schema.empty()
     assert record == {
-        "schema": 6,
+        "schema": 7,
         "sources": {},
+        "arcs": {},
         "topics": {},
         "observations": {},
         "knowledge": {},
@@ -783,12 +784,12 @@ def test_patch_and_record_shapes_are_explained() -> None:
         "corrects",
     )
     fails(course(BASE), {"topics": []}, "topics must map handles to objects")
-    with pytest.raises(ValueError, match="schema 6"):
-        schema.validate_record({"schema": 5})
+    with pytest.raises(ValueError, match="schema 7, not 6"):
+        schema.validate_record({"schema": 6})
     with pytest.raises(
         ValueError, match='Unknown field "scopes"|course: unknown field "scopes"'
     ):
-        schema.validate_record({"schema": 6, "scopes": {}})
+        schema.validate_record({"schema": 7, "scopes": {}})
 
 
 def test_typed_shapes_list_exactly_the_stored_fields() -> None:

@@ -30,7 +30,7 @@ import { runPiTurn } from "./pi/ui-stream.ts";
 import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
-import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
+import { courseBriefMarker, fetchCourseArcs, fetchCourseBrief } from "./course-brief.ts";
 import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
 import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settings.ts";
 import { beginTurn, endTurn } from "./turn-liveness.ts";
@@ -275,7 +275,10 @@ export async function handleChatInput(
 	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "retry-question" && input.type !== "continue";
 	// A mode handoff starts the other agent, whose brief differs.
 	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
-	const courseBrief = learnerInput || handoffWake ? await fetchCourseBrief(record) : null;
+	const [courseBrief, courseArcs] = await Promise.all([
+		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
+		fetchCourseArcs(record),
+	]);
 	const compactedRecord = stores.chatStore.getChat(chatId);
 	if (!compactedRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
 	record = compactedRecord;
@@ -428,7 +431,7 @@ export async function handleChatInput(
 		// record through the engine, whatever the agent kind, with the
 		// topics whose solution the session has shown him (shown-help.ts),
 		// read from the whole record, a cut turn's saves included.
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, shown: { topics: shownTopicsOf(merged) } } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, shown: { topics: shownTopicsOf(merged) } } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the

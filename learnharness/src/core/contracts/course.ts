@@ -105,6 +105,14 @@ export interface NewCourseRecord {
 	exam: string | null;
 }
 
+/** Whether a whole course record (the engine's `show --all`) groups its
+ *  topics into arcs: only then does an agent read the arcs doctrine. A v6
+ *  record, or one whose arc pass has not run, has none. */
+export function recordHasArcs(record: unknown): boolean {
+	const arcs = (record as { arcs?: unknown } | null)?.arcs;
+	return typeof arcs === "object" && arcs !== null && Object.keys(arcs).length > 0;
+}
+
 /** Display label for a course: its title, else the directory name. */
 export function courseLabel(course: { workspace: string; title: string | null }): string {
 	if (course.title) return course.title;

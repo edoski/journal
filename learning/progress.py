@@ -22,7 +22,7 @@ import heapq
 from itertools import groupby
 from typing import Any
 
-from learning import preferences
+from learning import arc_rules, preferences
 from learning.schema import PatchResult, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
@@ -40,6 +40,8 @@ RECENT_SOLID_DAYS = 14
 WEEK_DAYS = 7
 # Grades from worst to best.
 GRADES = ("missed", "helped", "solid")
+# Levels that rest on an unaided solid answer.
+SECURE = frozenset({"independent", "retained", "transferred"})
 LEARNING, PROBE, PRACTICE = "learning", "probe", "practice"
 
 Attempt = tuple[str, dict[str, Any]]
@@ -303,11 +305,16 @@ def replay(
 
 
 def _transferred(attempts: list[Attempt], replayed: Replay) -> bool:
-    """A ``solid`` transfer on a day neither missed nor a learning day."""
+    """A ``solid`` transfer on a day neither missed nor a learning day, after
+    an earlier ``solid`` day: applying an idea in a new setting is evidence
+    beyond holding it only once it is held, so one answer flagged as transfer
+    never lifts a topic on its own."""
+    solid = [day for day, verdict in replayed.verdicts if verdict == "solid"]
     missed = {day for day, verdict in replayed.verdicts if verdict == "missed"}
-    return any(
+    return bool(solid) and any(
         item.get("transfer")
         and grade(item) == "solid"
+        and item["date"] > solid[0]
         and item["date"] not in missed
         and replayed.days.get(item["date"]) != LEARNING
         for _, item in attempts
@@ -506,7 +513,8 @@ def _stamp_due(record: dict[str, Any], changes: PatchResult) -> None:
     """Record on each new answer which of its topics the engine had due when it
     was saved; a tutor's pin keeps its own rule (``replay``).
 
-    A correction keeps what it corrects had, since it takes that answer's day.
+    A correction keeps what it corrects had, since it takes that answer's day,
+    and stays the item of the arc check its target was (``checkpoint``).
     """
     observations = record["observations"] = dict(record["observations"])
     for key in changes.observations:
@@ -525,7 +533,17 @@ def _stamp_due(record: dict[str, Any], changes: PatchResult) -> None:
         }
         stamped = [topic for topic in item["topics"] if topic in due | inherited]
         if stamped:
-            observations[key] = {**item, "due_topics": stamped}
+            item = observations[key] = {**item, "due_topics": stamped}
+        checkpoint = next(
+            (
+                observations[target]["checkpoint"]
+                for target in item.get("corrects", ())
+                if "checkpoint" in observations.get(target, {})
+            ),
+            None,
+        )
+        if checkpoint is not None and "checkpoint" not in item:
+            observations[key] = {**item, "checkpoint": checkpoint}
 
 
 def _after_exam(key: str, replayed: Replay, exam: Exam | None) -> str | None:
@@ -849,7 +867,8 @@ def path_order(record: dict[str, Any], *, everything: bool = False) -> list[str]
 def path_health(record: dict[str, Any]) -> dict[str, list[str]]:
     """What a half-built path leaves undone, per studied topic: no title, no
     place in ``path.order``, no link to any other topic (with two or more
-    topics), no reference to where it is taught. Empty when nothing is."""
+    topics), no reference to where it is taught; and each arc whose stored
+    title a save would now refuse (``arc_names``). Empty when nothing is."""
     topics = record["topics"]
     order = path_order(record)
     stored = set(record.get("path", {}).get("order", []))
@@ -866,6 +885,7 @@ def path_health(record: dict[str, Any]) -> dict[str, list[str]]:
         if len(order) > 1
         else [],
         "unreferenced": [key for key in order if not topics[key].get("refs")],
+        "arc_names": arc_rules.misnamed(record),
     }
     return {name: keys for name, keys in health.items() if keys}
 

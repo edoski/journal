@@ -349,7 +349,8 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });
 		const linked = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === LINALG);
 		const verbs = linked.map((c) => c.args[2]);
-		assert.deepEqual(verbs.filter((v) => v !== "plan"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
 		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each practice brief also reads the exam run-up");
 		const save = linked.find((c) => c.args[2] === "save")!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
@@ -367,7 +368,7 @@ describe("a course-linked turn", () => {
 	it("a course session's file search defaults to the course folder", async () => {
 		const agent = createPracticeAgent(
 			{ chatId: "chat_files", chatStore },
-			{ engine: scripted([]), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never } },
+			{ engine: scripted([]), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never, arcs: false } },
 		);
 		for (const name of ["find", "grep", "ls"]) {
 			const tool = agent.state.tools.find((t) => t.name === name)!;
@@ -378,6 +379,30 @@ describe("a course-linked turn", () => {
 		const ls = agent.state.tools.find((t) => t.name === "ls")!;
 		const listing = await ls.execute("ls1", ls.prepareArguments ? ls.prepareArguments({}) : {});
 		assert.equal((listing.content[0] as { text: string }).text, path.join(LINALG, "lecture-1.md"), "ls with no path lists the course folder, as paths read opens");
+	});
+
+	it("each turn reads whether the course has arcs, and only a course with arcs gets the arcs doctrine (round 4)", async () => {
+		const prompts: Array<{ arcs: boolean | undefined; prompt: string }> = [];
+		const build = (chatId: string): Factory => (opts) => {
+			const agent = createProberAgent(
+				{ chatId, chatStore, deliver: () => {}, jobStore: { createJob: () => { throw new Error("unused"); } } as never, spawn: () => {} },
+				{ ...opts, engine: scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]) },
+			);
+			prompts.push({ arcs: opts.course?.arcs, prompt: agent.state.systemPrompt });
+			return agent;
+		};
+		const flat = (await (await createChat({ title: "no arcs yet", course: { workspace: LINALG } })).json()) as { id: string };
+		await turn(flat.id, { type: "text", text: "teach me rank" }, build(flat.id));
+		process.env.FAKE_ENGINE_SHOW = JSON.stringify({ arcs: { spaces: { title: "Vector spaces" } }, topics: {} });
+		try {
+			const grouped = (await (await createChat({ title: "arcs", course: { workspace: LINALG } })).json()) as { id: string };
+			await turn(grouped.id, { type: "text", text: "teach me rank" }, build(grouped.id));
+		} finally {
+			delete process.env.FAKE_ENGINE_SHOW;
+		}
+		assert.deepEqual(prompts.map((p) => p.arcs), [false, true]);
+		assert.ok(!prompts[0]!.prompt.includes("\n# Arcs\n"), "a course without arcs: no arcs doctrine");
+		assert.ok(prompts[1]!.prompt.includes("\n# Arcs\n"), "a course with arcs: its arcs doctrine");
 	});
 
 	it("probe phase: a course-linked prober asks by free recall", async () => {

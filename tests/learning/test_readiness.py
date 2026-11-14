@@ -159,9 +159,9 @@ def test_course_registry_and_global_preferences_are_checked(
 ) -> None:
     workspace, package = installed
     for contents, message in (
-        ('{"schema": 5}', "schema 6"),
+        ('{"schema": 6}', "schema 6"),
         ("{", "invalid JSON"),
-        ('{"schema": 6, "focus": "missing"}', 'unknown task "missing"'),
+        ('{"schema": 7, "focus": "missing"}', 'unknown task "missing"'),
     ):
         workspace.record.write_text(contents)
         result = readiness.check(workspace, "codex", package=package)
@@ -169,7 +169,7 @@ def test_course_registry_and_global_preferences_are_checked(
         (issue,) = result["issues"]  # type: ignore[misc]
         assert issue["detail"].startswith("Course record is invalid: ")
         assert message in issue["detail"]
-    workspace.record.write_text('{"schema": 6, "title": "Course"}')
+    workspace.record.write_text('{"schema": 7, "title": "Course"}')
     preferences.global_path().write_text('{"schema": 1, "preferences": []}')
     unregistered = Workspace(tmp_path / "elsewhere")
     unregistered.directory.mkdir()

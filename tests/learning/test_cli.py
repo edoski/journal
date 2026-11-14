@@ -96,7 +96,7 @@ def test_failures_print_one_error_object_and_exit_1(
     assert error["kind"] == "validation"
     _, error = run(capsys, monkeypatch, workspace, "show", "--limit", "0", "x")
     assert error["kind"] == "validation" and "--limit" in error["message"]
-    _, error = run(capsys, monkeypatch, workspace, "migrate")
+    _, error = run(capsys, monkeypatch, workspace, "migrat")
     assert error["kind"] == "validation" and "invalid choice" in error["message"]
     (workspace / ".study" / "course.json").mkdir()
     _, error = run(capsys, monkeypatch, workspace, "resume")
@@ -246,8 +246,8 @@ def test_study_prints_usage_for_anything_else(
     "broken",
     [
         ("course", "{"),
-        ("course", '{"schema": 5}'),
-        ("course", '{"schema": 6, "focus": "missing"}'),
+        ("course", '{"schema": 6}'),
+        ("course", '{"schema": 7, "focus": "missing"}'),
         ("global", "{not json"),
         ("global", '{"schema": 1, "preferences": {"Bad": "x"}}'),
     ],

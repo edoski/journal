@@ -6,6 +6,7 @@
  */
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
+import { recordHasArcs } from "../core/contracts/course.ts";
 import { projectCourseBrief } from "../core/course-brief.ts";
 import { newCourseContextMessage, sessionModeOf, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
 import { stores } from "./stores.ts";
@@ -32,6 +33,22 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 		console.error(`[chat ${record.id}] course brief skipped:`, err);
 	}
 	return null;
+}
+
+/** Whether the session's course groups its topics into arcs, read every
+ *  turn beside the brief, since the agent's prompt carries the arcs doctrine
+ *  only then. A failed read composes without it: the engine places new
+ *  topics itself and refuses an arc field in a course without arcs. */
+export async function fetchCourseArcs(record: ChatRecord): Promise<boolean> {
+	if (!record.course) return false;
+	try {
+		const shown = await stores.courseRecords.run(record.course.workspace, { verb: "show", handles: "all" });
+		if (shown.ok) return recordHasArcs(shown.json);
+		console.error(`[chat ${record.id}] arcs unread, composed without: ${shown.message}`);
+	} catch (err) {
+		console.error(`[chat ${record.id}] arcs unread, composed without:`, err);
+	}
+	return false;
 }
 
 /** The brief marker to add, or null when the agent already sees this key. */

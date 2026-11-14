@@ -46,6 +46,7 @@ function savingCourse(shown: Iterable<string> = []) {
 				return { ok: true, json: { observations: ["o41"], notes: [] } };
 			},
 		} as CourseToolContext["records"],
+		arcs: false,
 		shown: { topics: new Set(shown) },
 	};
 	return { ctx, saves, tools: courseTools(ctx) };

@@ -1,7 +1,7 @@
 /**
  * How the tutor's last turn left a lesson. A lesson waits on him partway
- * through only when the tutor's last words ask him something (or the plan
- * waits for his go-ahead); a sign-off such as "Good place to stop" ends the
+ * through only when the tutor's last words ask him something (or it wrote
+ * the plan but taught no step); a sign-off such as "Good place to stop" ends the
  * session there, even with plan steps still ahead.
  */
 
@@ -53,7 +53,7 @@ describe("a lesson's tutor ends its turn in words, plan steps still ahead", () =
 		assert.equal(sessionEndOf(lesson("Which pivot comes **first?**"), TREE), "mid-lesson", "past closing markup");
 	});
 
-	it("the plan waiting for his go-ahead waits on him", () => {
+	it("a plan written with no step taught waits on him", () => {
 		assert.equal(sessionEndOf(lesson("Say go.").slice(0, 6), TREE), "mid-lesson");
 	});
 });
