@@ -86,15 +86,17 @@ def _runup(
     levels: dict[str, dict[str, Any]],
     week: capacity.Capacity,
 ) -> dict[str, Any] | None:
-    """The exam run-up: what is untaught or not recently solid, and the days
-    he studies before the exam."""
+    """The exam run-up: what the exam needs started that is untaught, what it
+    examines that is not recently solid, and the days he studies before it."""
     days_left = _days_left(record, today)
     if days_left is None or not _in_runup(record, today):
         return None
     behind = progress.unready(record, today)
+    untaught = [key for key in order if levels[key]["level"] == "new"]
+    scope = progress.exam_topics(record, untaught)
     result: dict[str, Any] = {
         "days_left": days_left,
-        "not_introduced": [key for key in order if levels[key]["level"] == "new"],
+        "not_introduced": [key for key in untaught if scope is None or key in scope],
         "unready": [key for key in order if key in behind],
         "study_days": sum(
             week.studies(today + timedelta(days=offset)) for offset in range(days_left)

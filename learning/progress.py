@@ -19,7 +19,7 @@ which the exam keeps as ``final_review`` once that day has come
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 import heapq
@@ -120,6 +120,45 @@ def exam_plan(record: dict[str, Any]) -> Exam | None:
     return Exam(day, date.fromisoformat(start))
 
 
+def examining(record: dict[str, Any]) -> Callable[[str], Exam | None]:
+    """Each topic's exam: the course's, for a topic the next exam examines;
+    None for one outside the arcs it names (``arc_rules.examined``), which is
+    scheduled as in a course with no exam. The set reads no evidence, so a
+    topic keeps its exam, or its lack of one, as he is taught."""
+    exam = exam_plan(record)
+    examined = arc_rules.examined(record)
+    if exam is None or examined is None:
+        return lambda key: exam
+    return lambda key: exam if key in examined else None
+
+
+def exam_for(record: dict[str, Any], key: str) -> Exam | None:
+    """The exam that examines ``key``, else None (``examining``)."""
+    return examining(record)(key)
+
+
+def exam_topics(
+    record: dict[str, Any], untaught: Collection[str]
+) -> frozenset[str] | None:
+    """What the next exam needs started: the topics it examines and every
+    ``untaught`` topic they need, directly or through others. None when the
+    exam names no arcs (the whole course). An untaught prerequisite of an
+    examined topic is not examined itself, but the exam's topics cannot start
+    without it, so its start keeps the exam's pace; once taught it leaves
+    this set, and its reviews never had the exam's."""
+    examined = arc_rules.examined(record)
+    if examined is None:
+        return None
+    waiting = set(untaught)
+    scope, stack = set(examined), list(examined)
+    while stack:
+        for need in needs(record, stack.pop()):
+            if need in waiting and need not in scope:
+                scope.add(need)
+                stack.append(need)
+    return frozenset(scope)
+
+
 def unplanned(record: dict[str, Any]) -> bool:
     """An exam whose final review the plan has yet to read: no course
     preference sets its length and it has not begun."""
@@ -161,13 +200,15 @@ def redated(record: dict[str, Any], today: date) -> dict[str, Any]:
     exam = exam_plan(record)
     if exam is None or exam.day <= today:
         return record
+    exam_of = examining(record)
     histories = _histories(record["observations"])
     topics = dict(record["topics"])
     for key, topic in topics.items():
         review = topic.get("review", {})
         if review.get("by") != "engine":
             continue
-        due = replay(key, topic, histories.get(key, _History()).attempts, exam).due
+        attempts = histories.get(key, _History()).attempts
+        due = replay(key, topic, attempts, exam_of(key)).due
         if due is not None and due.isoformat() != review.get("due"):
             topics[key] = {**topic, "review": {**review, "due": due.isoformat()}}
     return {**record, "topics": topics}
@@ -533,9 +574,9 @@ def _repaired(
 def replays(record: dict[str, Any]) -> dict[str, Replay]:
     """Every topic's replayed verdicts and next expected review."""
     histories = _histories(record["observations"])
-    exam = exam_plan(record)
+    exam_of = examining(record)
     return {
-        key: replay(key, topic, histories.get(key, _History()).attempts, exam)
+        key: replay(key, topic, histories.get(key, _History()).attempts, exam_of(key))
         for key, topic in record["topics"].items()
     }
 
@@ -543,9 +584,9 @@ def replays(record: dict[str, Any]) -> dict[str, Replay]:
 def standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Every topic's standing, in one pass over the observations."""
     histories = _histories(record["observations"])
-    exam = exam_plan(record)
+    exam_of = examining(record)
     return {
-        key: _standing(key, topic, histories.get(key, _History()), exam)
+        key: _standing(key, topic, histories.get(key, _History()), exam_of(key))
         for key, topic in record["topics"].items()
     }
 
@@ -570,12 +611,13 @@ def _with_review(
 def _clamp_tutor_dates(
     record: dict[str, Any], changes: PatchResult, today: date, scheduled: Scheduled
 ) -> None:
-    exam = exam_plan(record)
+    exam_of = examining(record)
     for key in changes.tutor_reviews:
         review = record["topics"].get(key, {}).get("review", {})
         if "due" not in review:
             continue
         due = date.fromisoformat(review["due"])
+        exam = exam_of(key)
         if exam is not None and exam.day > today and due >= exam.day:
             moved = max(today, exam.day - timedelta(days=1))
             scheduled.notes.append(
@@ -649,8 +691,9 @@ def _resync(
     it back restores the dates. A tutor date on or after an exam still ahead is
     handed to the engine.
     """
-    exam = exam_plan(record)
+    exam_of = examining(record)
     for key, topic in list(record["topics"].items()):
+        exam = exam_of(key)
         review = topic.get("review", {})
         stored = review.get("due")
         if review.get("by") == "tutor" and not (
@@ -739,8 +782,9 @@ def _reschedule(
         {key: item for key, item in observations.items() if key not in new}
     )
     named = {topic for key in new for topic in observations[key]["topics"]}
-    exam = exam_plan(record)
+    exam_of = examining(record)
     for key, topic in list(record["topics"].items()):
+        exam = exam_of(key)
         now, then = histories.get(key, _History()), before.get(key, _History())
         if key in changes.tutor_reviews:
             continue
@@ -774,7 +818,7 @@ def _first_retrievals(
     histories: dict[str, _History],
     scheduled: Scheduled,
 ) -> None:
-    exam = exam_plan(record)
+    exam_of = examining(record)
     for key in changes.introduced:
         topic = record["topics"].get(key)
         if (
@@ -783,7 +827,7 @@ def _first_retrievals(
             or "due" in topic.get("review", {})
         ):
             continue
-        due = replay(key, topic, [], exam).due
+        due = replay(key, topic, [], exam_of(key)).due
         assert due is not None
         scheduled.reviews[key] = _with_review(record, key, due, "engine")
         scheduled.notes.append(
@@ -1041,17 +1085,20 @@ def unready(
     today: date,
     replayed_: dict[str, Replay] | None = None,
 ) -> set[str]:
-    """Within the exam run-up, taught topics without a ``solid`` verdict in 14 days.
+    """Within the exam run-up, taught topics it examines without a ``solid``
+    verdict in 14 days.
 
     ``replayed_`` is the record's ``replays`` when the caller already has them."""
     exam = exam_plan(record)
     if exam is None or not 0 <= (exam.day - today).days <= RUNUP_DAYS:
         return set()
+    examined = arc_rules.examined(record)
     recent = (today - timedelta(days=RECENT_SOLID_DAYS)).isoformat()
     return {
         key
         for key, replayed in (replayed_ or replays(record)).items()
         if "excluded" not in record["topics"][key]
+        if examined is None or key in examined
         if replayed.days or "introduced" in record["topics"][key]
         if not any(
             verdict == "solid" and day > recent for day, verdict in replayed.verdicts

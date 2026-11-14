@@ -52,7 +52,7 @@ from datetime import date, timedelta
 import math
 from typing import Any, TypeVar
 
-from learning import progress
+from learning import arc_rules, progress
 
 # Two weeks: each weekday is seen at least twice at near-full weight, and a new
 # routine outweighs the old one within a week.
@@ -190,8 +190,9 @@ def _new_short(
     studies: frozenset[int],
 ) -> set[date]:
     """Of ``days``, those he started fewer of this course's topics than its
-    exam pace owed: the topics left over the study days left, as many as were
-    ready that morning."""
+    exam pace owed: the topics the exam needed started that morning
+    (``progress.exam_topics``) over the study days left, as many as were
+    ready."""
     exam = progress.exam_plan(record)
     if exam is None:
         return set()
@@ -212,6 +213,8 @@ def _new_short(
             for n in range((end - day).days + 1)
         )
         untaught = [key for key in order if starts.get(key, day) >= day]
+        scope = progress.exam_topics(record, untaught)
+        untaught = [key for key in untaught if scope is None or key in scope]
         if not left or not untaught:
             continue
 
@@ -261,9 +264,9 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
     left: set[date] = set()
     short: set[date] = set()
     for record, replays in zip(records, replayed, strict=True):
-        exam = progress.exam_plan(record)
-        for replay in progress.replays({**record, "exam": {}}).values():
-            left |= _reviews_left(replay, exam, today)
+        exam_of = progress.examining(record)
+        for key, replay in progress.replays({**record, "exam": {}}).items():
+            left |= _reviews_left(replay, exam_of(key), today)
         short |= _new_short(record, replays, week.planned, week.study)
     return {
         day: Done(
@@ -473,6 +476,14 @@ def replanned(
     )
 
 
+def _examined(record: dict[str, Any]) -> int:
+    """How many path topics the next exam examines."""
+    examined = arc_rules.examined(record)
+    return sum(
+        examined is None or key in examined for key in progress.path_order(record)
+    )
+
+
 def final_review_days(
     record: dict[str, Any],
     others: Iterable[dict[str, Any]],
@@ -480,7 +491,7 @@ def final_review_days(
     today: date,
 ) -> int | None:
     """How many days before its exam a course's final review starts, from his
-    pace: the fewest that hold one review of each of its path topics, at the
+    pace: the fewest that hold one review of each topic it examines, at the
     reviews he does on each study day (``Weekday.reviews``), less what a
     nearer exam's final review takes of those days, and never fewer than the
     shortest final review (``progress.SHORTEST_FINAL_REVIEW``).
@@ -510,8 +521,8 @@ def final_review_days(
                 for n in range((plan.day - plan.final).days)
             ]
             total = sum(week.on(day).reviews.value for day in days if week.studies(day))
-            nearer.append((plan, len(progress.path_order(other)), total))
-    topics = len(progress.path_order(record))
+            nearer.append((plan, _examined(other), total))
+    topics = _examined(record)
     room = 0.0
     lead = 0
     while room < topics or lead < shortest:
