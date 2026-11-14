@@ -17,33 +17,6 @@ import { runSubagent } from "./pi-run.ts";
 import { healToolRecord } from "../tools/heal.ts";
 import { healEncodedArguments } from "../../core/argument-heal.ts";
 
-// ── the weak-model string-heal (owner, 2026-09-28 — wire-format medicine
-// for any submit agent that opts in through prepareArguments) ──
-//
-// OpenRouter log evidence: weak models under a big submit payload often
-// emit a whole array as ONE JSON-STRING instead of a native array
-// ("propositions.0: must be object"). pi-agent-core runs
-// `prepareArguments` BEFORE TypeBox validation — the sanctioned shim
-// point (same doctrine as restoreMathEscapes at the display seam: heal
-// weak-model wire behavior, don't punish it with a retry). Best-effort:
-// heal only a string that parses to an array; anything else passes
-// through untouched and fails validation exactly as before.
-export function healStringifiedArrays(raw: unknown): unknown {
-	if (typeof raw !== "object" || raw === null) return raw;
-	const out: Record<string, unknown> = { ...(raw as Record<string, unknown>) };
-	for (const key of ["propositions", "chains"]) {
-		const v = out[key];
-		if (typeof v !== "string" || v.trim().length === 0) continue;
-		try {
-			const parsed: unknown = JSON.parse(v);
-			if (Array.isArray(parsed)) out[key] = parsed;
-		} catch {
-			// not a clean stringify (e.g. truncated) — leave for validation
-		}
-	}
-	return out;
-}
-
 export async function runSubmitAgent<T>(opts: {
 	role: ModelRole;
 	toolName: string;
@@ -66,10 +39,6 @@ export async function runSubmitAgent<T>(opts: {
 	maxTurns?: number;
 	/** Debug: raw provider-event recording key (LH_PROVIDER_EVENTS=1). */
 	chatId?: string;
-	/** Weak-model argument heal at pi's prepareArguments seam (runs BEFORE
-	 *  TypeBox validation — the sanctioned shim point). Identity by
-	 *  default; healStringifiedArrays fits here. */
-	prepareArguments?: (args: unknown) => unknown;
 	/** Semantic validation at the submit seam: the value is schema-valid
 	 *  but may violate a PIPELINE law (coverage, echo-equality). Returning
 	 *  a problem string yields an isError result (invalidInputResult) →
@@ -88,14 +57,8 @@ export async function runSubmitAgent<T>(opts: {
 				label: opts.toolName,
 				description: opts.toolDescription,
 				parameters: opts.parameters,
-				prepareArguments: (args) =>
-					// The standard heal composes AFTER the caller's shim (the
-					// whitehead generalization, 2026-10-09) — extraction's
-					// healStringifiedArrays stays the inner pass.
-					healEncodedArguments(
-						opts.prepareArguments ? opts.prepareArguments(args) : args,
-						opts.parameters,
-					) as never,
+				// The standard argument heal (the whitehead generalization, 2026-10-09).
+				prepareArguments: (args) => healEncodedArguments(args, opts.parameters) as never,
 				execute: async (_toolCallId, input) => {
 					const value = opts.fill(input);
 					const problem = (await opts.validate?.(value)) ?? null;

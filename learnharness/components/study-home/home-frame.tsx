@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
-import { SidebarToggle } from "@/components/sidebar";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { needsYouNow } from "@/components/study-home/needs-you";
@@ -48,11 +47,6 @@ export function HomeFrame({
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-2 px-3 py-2">
-				<div className="pointer-events-auto">
-					<SidebarToggle />
-				</div>
-			</header>
 			<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
 				<div className={className}>
 					<HomeBody state={state} onRetry={retry} quiet={quiet} busy={lesson.busy} onStart={lesson.start}>

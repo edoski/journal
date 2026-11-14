@@ -4,6 +4,7 @@ import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { moreWords } from "@/components/study-words";
 
 /** How many rows a shelf shows before "Show more", and how many each press
  *  adds: T3 Code's settled tail. */
@@ -15,7 +16,7 @@ export const SHELF_PAGE = 25;
  *  bare number told him nothing, 13 Nov 2026),
  *  then its rows. A folded shelf still shows the open row, and a dot when
  *  a hidden row waits on the learner. Open, it shows its first rows, then
- *  "Show N more". */
+ *  "Show more" or "Show the rest" (`moreWords`). */
 export function UnitShelf<T>({
 	id,
 	label,
@@ -86,7 +87,7 @@ export function UnitShelf<T>({
 							className="h-9 gap-2 px-2.5 text-control focus-visible:ring-inset"
 						>
 							<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
-							Show {more} more
+							{moreWords(items.length - shown.length, SHELF_PAGE)}
 						</Button>
 					</li>
 				)}

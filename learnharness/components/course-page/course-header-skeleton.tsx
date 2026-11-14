@@ -8,10 +8,10 @@ const PULSE = "motion-reduce:animate-none";
  *  moves when the course arrives. Read as one busy region. */
 export function CourseHeaderSkeleton({ className }: { className?: string }) {
 	return (
-		<div data-slot="course-header-skeleton" role="status" aria-label="Reading the course" className={cn("flex shrink-0 flex-col gap-2", className)}>
+		<div data-slot="course-header-skeleton" role="status" aria-label="Reading the course" className={cn("flex shrink-0 flex-col gap-1", className)}>
 			<div className="flex h-8 items-center justify-between gap-4">
 				<Skeleton className={cn("h-6 w-48", PULSE)} />
-				<Skeleton className={cn("h-8 w-20", PULSE)} />
+				<Skeleton className={cn("h-6 w-40", PULSE)} />
 			</div>
 			<div className="flex h-5 items-center">
 				<Skeleton className={cn("h-3.5 w-80", PULSE)} />

@@ -16,7 +16,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { LINK_OPTIONS, POLISH_GROUPS } from "../components/design-variant.ts";
 import { LinkedColumns } from "../components/linked-columns/linked-columns.tsx";
-import { CLEARANCE, GUTTER_RUN, cubicAt, gutterRun, routeTie, sampleCubic, segmentHits, type Box, type Point, type TieGeometry } from "../components/linked-columns/tie-route.ts";
+import { CLEARANCE, GUTTER_RUN, clearShift, cubicAt, gutterRun, routeTie, sampleCubic, segmentHits, type Box, type Point, type TieGeometry } from "../components/linked-columns/tie-route.ts";
 import { tieOf } from "../components/course-page/split/split-tie.ts";
 
 /** The route's cubic, read back from its path. */
@@ -106,6 +106,30 @@ describe("the tie's route", () => {
 		const route = routeTie({ from: FROM, to: box(800, 300), obstacles: wall, gutter: GUTTER })!;
 		assert.equal(route.clear, false);
 		assert.match(route.d, /^M 396 120 C /);
+	});
+
+	it("goes around a node in the way when no one curve is clear: two curves meeting in a lane beside it, keeping every node clear", () => {
+		// The Eigenvalues lesson at 1512x982: its step sits under a sibling step that overhangs it to the left.
+		const sibling = box(464, 431, 184, 64);
+		const above = [box(568, 71, 184, 64), box(568, 191, 184, 64), box(568, 311, 184, 64), box(672, 431, 184, 64), sibling, box(568, 671, 184, 64)];
+		const geometry = { from: { x: 396, y: 68 }, to: box(568, 551, 184, 64), obstacles: above, gutter: { left: 384, right: 408 } };
+		const route = routeTie(geometry)!;
+		assert.equal(route.around, true);
+		assert.equal(route.clear, true);
+		assert.equal(route.side, "left");
+		const n = route.d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+		assert.equal(n.length, 14, "M, then two cubics");
+		const first: [Point, Point, Point, Point] = [{ x: n[0]!, y: n[1]! }, { x: n[2]!, y: n[3]! }, { x: n[4]!, y: n[5]! }, { x: n[6]!, y: n[7]! }];
+		const second: [Point, Point, Point, Point] = [{ x: n[6]!, y: n[7]! }, { x: n[8]!, y: n[9]! }, { x: n[10]!, y: n[11]! }, { x: n[12]!, y: n[13]! }];
+		assert.ok(first[3].x <= sibling.left - CLEARANCE, "the lane is left of the node in the way");
+		assert.equal(first[2].x, first[3].x, "it arrives in the lane heading along it");
+		assert.equal(second[1].x, second[0].x, "and leaves it the same way: one smooth stroke");
+		assert.equal(second[2].y, second[3].y, "square into the node's left edge");
+		const points = [...sampleCubic(first), ...sampleCubic(second)];
+		for (const wall of above.map((b) => grow(b, CLEARANCE))) {
+			assert.ok(points.every((p, i) => i === 0 || !segmentHits(points[i - 1]!, p, wall)), "clear of every node");
+		}
+		assert.equal(clearShift(geometry, [0]), null, "a route around is never a reason for the map not to move");
 	});
 
 	it("draws nothing to a node behind the row", () => {

@@ -10,7 +10,7 @@ The header is the sidebar's `NavSection` anatomy (nav-section.md: a 28px band, 1
 |---|---|
 | header | 28px; the name, then, on a foldable group, a 14px chevron 4 after it (pointing right while folded) |
 | rows | `CourseTopicRow`s in a `ul`, right under the header |
-| more | with `limit`, after the first rows: a 36px row with a 16px chevron and "Show N more" at 13/18 muted, full ink and the hover fill on hover; it shows the rest |
+| more | with `limit`, after the first rows: a 36px row with a 16px chevron and "Show the rest" (`moreWords`) at 13/18 muted, full ink and the hover fill on hover; it shows the rest |
 
 ## Props and states
 

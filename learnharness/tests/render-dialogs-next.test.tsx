@@ -109,7 +109,7 @@ describe("background agents", () => {
 				costUsd: 0.04,
 			},
 		],
-		extractions: [],
+		runs: [],
 	};
 
 	it("one row per process under a quiet header: what it is doing and for which session, elapsed time and a named stop button; cost waits in the detail", () => {

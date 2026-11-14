@@ -38,3 +38,10 @@ Home's line names the lapsed topic when the line is about another one ("Missed C
 | another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. |
 | he stops for the night | Done for tonight; a question he left reads Left for next time |
 | a course's record can't be read | Couldn't read this course's record, then why (`UNREADABLE_WORDS`): The app isn't allowed to open its files. / Its file is damaged. / Its file can't be opened. |
+
+## Counts
+
+| Where | Words |
+|---|---|
+| a course's progress (Home's ring, the course page's standing line) | 5 of 16 topics on your own; No topics on your own yet; All 16 topics on your own (`courseShareWords`) |
+| a folded list's last row (the sidebar's shelves, the course page's groups) | Show the rest, when one press shows every hidden row; else Show more (`moreWords`). No number: a bare count told him nothing |
