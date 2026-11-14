@@ -19,7 +19,9 @@ import {
 	NODE_GAP,
 	NODE_HEIGHT,
 	NODE_WIDTH,
+	READABLE_ZOOM,
 	TOPIC_NODE_SIZE,
+	cardFit,
 	chainOf,
 	framedCamera,
 	layoutTopicMap,
@@ -287,25 +289,32 @@ describe("where a course map opens framed", () => {
 	const layout = layoutTopicMap(MAP.topics, MAP.edges, TOPIC_NODE_SIZE);
 	const FADE = { x: 64, y: 40 };
 	const TAG = 20;
-	/** Every topic's box on screen under a camera, sorted into wholly clear of the fade, cut by the frame's edge where
-	 *  it shows, or out of view (only in the fade, or past the frame). */
+	/** Every topic's box on screen under a camera, sorted into wholly clear of the fade and cut by the frame's edge
+	 *  (part of it shows, in the fade or not, and the edge cuts the rest). */
 	const sort = (camera: Camera, frame: { width: number; height: number }) => {
 		const out = { clear: [] as string[], cut: [] as string[] };
 		for (const [handle, at] of layout.topics) {
 			const left = at.x * camera.zoom + camera.x;
 			const top = at.y * camera.zoom + camera.y;
-			const right = left + TOPIC_NODE_SIZE.width * camera.zoom;
-			const bottom = top + TOPIC_NODE_SIZE.height * camera.zoom;
-			if (right <= FADE.x + 1 || left >= frame.width - FADE.x - 1 || bottom <= FADE.y + 1 || top >= frame.height - FADE.y - 1) continue;
-			if (left < 0 || right > frame.width || top < 0 || bottom > frame.height) out.cut.push(handle);
-			else if (left >= FADE.x - 1 && right <= frame.width - FADE.x + 1 && top >= FADE.y - 1 && bottom <= frame.height - FADE.y + 1) out.clear.push(handle);
+			const fit = cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * camera.zoom, bottom: top + TOPIC_NODE_SIZE.height * camera.zoom }, frame, FADE);
+			if (fit === "cut") out.cut.push(handle);
+			else if (fit === "clear") out.clear.push(handle);
 		}
 		return out;
 	};
 
-	it("shows the whole course when it fits at three quarters or more", () => {
+	it("calls a card that shows only in the fade but runs past the frame's edge cut, and one wholly past it out of view", () => {
+		const frame = { width: 896, height: 413 };
+		assert.equal(cardFit({ left: 842, top: 100, right: 1065, bottom: 150 }, frame, FADE), "cut");
+		assert.equal(cardFit({ left: 100, top: -11, right: 323, bottom: 40 }, frame, FADE), "cut");
+		assert.equal(cardFit({ left: 896, top: 100, right: 1119, bottom: 150 }, frame, FADE), "out");
+		assert.equal(cardFit({ left: 840, top: 100, right: 890, bottom: 150 }, frame, FADE), "faded");
+		assert.equal(cardFit({ left: 100, top: 100, right: 323, bottom: 150 }, frame, FADE), "clear");
+	});
+
+	it("shows the whole course when it fits at a readable scale", () => {
 		const camera = framedCamera(layout, MAP.current, { width: 1600, height: 900 }, FADE, TAG);
-		assert.ok(camera.zoom >= 0.75);
+		assert.ok(camera.zoom >= READABLE_ZOOM);
 		assert.equal(sort(camera, { width: 1600, height: 900 }).clear.length, layout.topics.size);
 	});
 
@@ -316,7 +325,47 @@ describe("where a course map opens framed", () => {
 		assert.ok(clear.includes("rank"), "the current topic is clear");
 		assert.ok(layout.topics.get(h("rank"))!.y * camera.zoom + camera.y - TAG >= FADE.y - 1, "its tag too");
 		assert.deepEqual(cut, []);
-		assert.ok(camera.zoom >= 0.75 && camera.zoom <= 1);
+		assert.ok(camera.zoom >= READABLE_ZOOM && camera.zoom <= 1);
+	});
+
+	it("opens Linear Algebra on Eigenvalues on Home's map with no card cut, and its course page's with one at most (the round-3 evaluation)", () => {
+		const home = { width: 896, height: 413 };
+		const onHome = sort(framedCamera(layout, h("eigen"), home, FADE, TAG), home);
+		assert.ok(onHome.clear.includes("eigen"));
+		assert.deepEqual(onHome.cut, []);
+		const page = { width: 696, height: 782 };
+		const onPage = framedCamera(layout, h("eigen"), page, { x: 48, y: 32 }, TAG, "top");
+		const cut = [...layout.topics.values()].filter((at) => {
+			const left = at.x * onPage.zoom + onPage.x;
+			const top = at.y * onPage.zoom + onPage.y;
+			return cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * onPage.zoom, bottom: top + TOPIC_NODE_SIZE.height * onPage.zoom }, page, { x: 48, y: 32 }) === "cut";
+		});
+		assert.ok(cut.length <= 1, `${cut.length} cut`);
+	});
+
+	it("opens Probability's course page on where he is, its tag and the topics it leads to clear (the round-3 evaluation)", () => {
+		const needs = { "total-probability": ["conditional"], bayes: ["conditional", "total-probability"], independence: ["conditional"], binomial: ["random-variables", "independence"], poisson: ["random-variables"], geometric: ["random-variables", "independence"], expectation: ["random-variables"], variance: ["expectation"], covariance: ["variance", "independence"] };
+		const handles = ["conditional", "total-probability", "bayes", "independence", "random-variables", "binomial", "poisson", "geometric", "expectation", "variance", "covariance"];
+		const probability = layoutTopicMap(handles.map((handle) => topic(handle)), edgesOf(needs), TOPIC_NODE_SIZE);
+		const page = { width: 696, height: 782 };
+		const fade = { x: 48, y: 32 };
+		const camera = framedCamera(probability, h("random-variables"), page, fade, TAG, "top");
+		const fits = new Map([...probability.topics].map(([handle, at]) => {
+			const left = at.x * camera.zoom + camera.x;
+			const top = at.y * camera.zoom + camera.y;
+			return [handle, cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * camera.zoom, bottom: top + TOPIC_NODE_SIZE.height * camera.zoom }, page, fade)];
+		}));
+		assert.equal(fits.get(h("random-variables")), "clear");
+		assert.ok(probability.topics.get(h("random-variables"))!.y * camera.zoom + camera.y - TAG >= fade.y - 1, "its tag is clear");
+		assert.ok(["expectation", "poisson"].every((next) => fits.get(h(next)) === "clear"), "the topics it leads to");
+		assert.ok(![...fits.values()].includes("cut"));
+	});
+
+	it("never opens below the scale where a card's 13px title draws at about 11px", () => {
+		assert.ok(13 * READABLE_ZOOM >= 10.4);
+		for (const frame of [{ width: 896, height: 413 }, { width: 696, height: 782 }, { width: 600, height: 300 }]) {
+			assert.ok(framedCamera(layout, MAP.current, frame, FADE, TAG).zoom >= READABLE_ZOOM);
+		}
 	});
 
 	it("shows more topics than centring the current one at full size would", () => {

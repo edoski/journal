@@ -21,13 +21,12 @@ import {
 	openSessions,
 	todayCourses,
 	courseMove,
-	studyQuestion,
 	type TodayRow,
 } from "../components/study-home/study-facts.ts";
 import { lessonOf, topicSpan } from "../components/study-home/lesson-facts.ts";
 import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { Today } from "../components/study-home/today.tsx";
-import { courseProgress, foldLines, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
+import { courseProgress, foldLines, lessonTitle, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { UnreadableLines } from "../components/study-home/unreadable-course.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
@@ -121,22 +120,6 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 }
 
 describe("study facts", () => {
-	it("asks the home's question for the hour, never naming the date", () => {
-		assert.deepEqual(
-			[4, 5, 11, 12, 17, 18, 21, 22].map(studyQuestion),
-			[
-				"What are we studying tonight?",
-				"What are we studying this morning?",
-				"What are we studying this morning?",
-				"What are we studying this afternoon?",
-				"What are we studying this afternoon?",
-				"What are we studying this evening?",
-				"What are we studying this evening?",
-				"What are we studying tonight?",
-			],
-		);
-	});
-
 	it("words the next step in the order Continue takes it, naming every review with commas and never counting them", () => {
 		assert.equal(stepWords(nextStepOf(LINALG)), "Review Linear independence, Rank, Span");
 		assert.equal(stepWords(nextStepOf(PROB)), "Continue Bayes' rule");
@@ -176,7 +159,7 @@ describe("study facts", () => {
 		assert.equal(stepWords(step), "Start Poisson distribution");
 		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Next up");
 		const done: StudyCourse = { ...reviewed, map: { ...reviewed.map, topics: reviewed.map.topics.slice(0, 1) } };
-		assert.equal(nextStepOf(done).kind, "none", "nothing left to start: no Continue on a topic he has on his own");
+		assert.deepEqual(nextStepOf(done), { kind: "review", titles: ["Bayes' rule"], topics: ["bayes"], then: null, back: "2026-11-11" }, "nothing left to start: no Continue on a topic he has on his own, but the review the plan dates next");
 	});
 
 	it("a course never studied comes after every course with reviews tonight, even with the nearer exam", () => {
@@ -295,7 +278,7 @@ describe("Today", () => {
 	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
 	it("gives each line its pie, its course ending in how long ago it was studied, and its lesson ending in an icon and a few words for why it is on Today, with no button and no review counted", () => {
-		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} busy={false} onContinue={() => {}} />);
+		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} done={[]} busy={false} onContinue={() => {}} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
@@ -306,12 +289,19 @@ describe("Today", () => {
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["review", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
-		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|tonight)\?$/);
+		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|today)\?$/);
+		assert.equal(doc.querySelector('[data-slot="today-done"]'), null, "nothing says done before he finishes anything");
+	});
+
+	it("once he finished something today, asks what else and names what he did, never a count", () => {
+		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], [], TODAY)} done={["Eigenvalues and eigenvectors", "Rank practice"]} busy={false} onContinue={() => {}} />);
+		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What else are we studying (this morning|this afternoon|this evening|today)\?$/);
+		assert.equal(doc.querySelector('[data-slot="today-done"]')?.textContent, "Done today: Eigenvalues and eigenvectors, Rank practice");
 	});
 
 	it("past five lines, names the other courses on the last", () => {
 		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
-		const doc = render(<Today rows={todayRows(many, [], TODAY)} busy={false} onContinue={() => {}} />);
+		const doc = render(<Today rows={todayRows(many, [], TODAY)} done={[]} busy={false} onContinue={() => {}} />);
 		assert.equal(doc.querySelectorAll('[data-slot="today-line"]').length, 4);
 		assert.match(doc.querySelector('[data-slot="today-also"]')?.textContent ?? "", /Also today:Course 4Course 5/);
 	});
@@ -337,6 +327,26 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Missed Sequences"]);
 		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 3d ago"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
+	});
+
+	it("names the next dated review, and when it comes back, on a course with every topic his own and nothing due (round 3: \"Calculus I · Start a lesson\")", () => {
+		const done: StudyCourse = {
+			...ANALYSIS,
+			due: [],
+			map: {
+				...ANALYSIS.map,
+				current: "fundamental" as TopicHandle,
+				topics: [
+					topic("fundamental", "Fundamental theorem", "retained", { review: { kind: "scheduled", date: "2026-12-09" } }),
+					topic("improper", "Improper integrals", "retained", { review: { kind: "scheduled", date: "2026-11-29", held: true } }),
+				],
+			},
+		};
+		const row = rowOf(done);
+		assert.equal(lessonTitle(row), "Review Improper integrals");
+		assert.deepEqual(whyOf(row), { kind: "review", short: "Back in 3w" });
+		const empty = rowOf({ ...done, map: { ...done.map, topics: done.map.topics.map((t) => ({ ...t, review: null })) } });
+		assert.equal(lessonTitle(empty), "Start a lesson", "with no review dated at all, the tutor proposes");
 	});
 
 	it("says how long ago a course was studied in a few characters", () => {

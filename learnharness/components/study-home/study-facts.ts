@@ -36,11 +36,13 @@ export function todaysReview(course: StudyCourse): CourseMapTopic[] {
  *  "Let's continue": today's reviews, then the open task at its step, then
  *  the new topics the engine's daily plan starts today, then the current
  *  topic while it is taught but not yet his own, then the next topic the
- *  plan starts; a current topic he already has on his own is done, not
- *  next. `topics` are the topics it works on. A topic step is `fresh` when
- *  it was never taught, and `planned` when today's plan starts it. */
+ *  plan starts, then, with every topic his own and nothing due, the next
+ *  review the plan dates (`back`, its day); a current topic he already has
+ *  on his own is done, not next. `topics` are the topics it works on. A
+ *  topic step is `fresh` when it was never taught, and `planned` when
+ *  today's plan starts it. */
 export type NextStep =
-	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null }
+	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null; back?: string }
 	| { kind: "task"; key: string; title: string; updated: string | null; topics: readonly TopicHandle[] }
 	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; fresh: boolean; planned: boolean }
 	| { kind: "none" };
@@ -65,7 +67,14 @@ export function nextStepOf(course: StudyCourse): NextStep {
 		return { kind: "topic", title: current.title, topics: [current.handle], fresh: false, planned: false };
 	}
 	const next = map.topics.filter((t) => t.starts !== undefined).sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? (current?.level === "new" ? current : undefined);
-	return next ? { kind: "topic", title: next.title, topics: [next.handle], fresh: true, planned: false } : { kind: "none" };
+	if (next) return { kind: "topic", title: next.title, topics: [next.handle], fresh: true, planned: false };
+	// Every topic his own and nothing due: the review the plan dates next, so the line names a topic and when.
+	const settled = map.topics.length > 0 && map.topics.every((t) => SOLID.has(t.level));
+	const dated = settled ? map.topics.flatMap((t) => (t.review?.kind === "scheduled" ? [{ topic: t, date: t.review.date }] : [])) : [];
+	const back = dated.map((d) => d.date).sort()[0];
+	if (back === undefined) return { kind: "none" };
+	const ahead = dated.filter((d) => d.date === back).map((d) => d.topic);
+	return { kind: "review", titles: ahead.map((t) => t.title), topics: ahead.map((t) => t.handle), then: null, back };
 }
 
 /** The step as a short instruction: "Review Linear independence, Rank",
@@ -135,11 +144,11 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
 }
 
 /** Whether a course's line holds nothing for tonight: a course with
- *  nothing to take up, such as one never studied, or a new topic the plan
- *  starts on a later day. Such a line comes after every line with work
- *  tonight, however near its exam. */
+ *  nothing to take up, such as one never studied, a new topic the plan
+ *  starts on a later day, or a review it dates ahead. Such a line comes
+ *  after every line with work tonight, however near its exam. */
 function laterOnly(step: NextStep): boolean {
-	return step.kind === "none" || (step.kind === "topic" && step.fresh && !step.planned);
+	return step.kind === "none" || (step.kind === "topic" && step.fresh && !step.planned) || (step.kind === "review" && step.back !== undefined);
 }
 
 /**
@@ -182,14 +191,6 @@ export function addDays(date: string, days: number): string {
 	const d = new Date(`${date}T00:00:00Z`);
 	d.setUTCDate(d.getUTCDate() + days);
 	return d.toISOString().slice(0, 10);
-}
-
-/** The study home's question for the hour of the learner's day: "What
- *  are we studying this morning?", "…this afternoon?", "…this evening?",
- *  "…tonight?". Pure. */
-export function studyQuestion(hour: number): string {
-	const when = hour >= 5 && hour < 12 ? "this morning" : hour >= 12 && hour < 18 ? "this afternoon" : hour >= 18 && hour < 22 ? "this evening" : "tonight";
-	return `What are we studying ${when}?`;
 }
 
 /** What a press on a course's line does: open a session, or start one

@@ -3,7 +3,7 @@ import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring"
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedAgo, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
-import { MathText } from "@/components/ui/math-text";
+import { MathLine } from "@/components/ui/math-line";
 
 /** The pie beside both lines; the course line with when he last studied
  *  it at its end, then the lesson line with why now at its end. The ends
@@ -28,11 +28,11 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 				<li key={lineKey(row)} className={HAIRLINE}>
 					<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={ROW} {...pointProps(row, point)}>
 						<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
-						<span className="truncate text-label text-muted-foreground"><MathText>{courseTitle(row)}</MathText></span>
+						<MathLine className="text-label text-muted-foreground">{courseTitle(row)}</MathLine>
 						<span data-slot="today-when" className="justify-self-end text-label text-muted-foreground tabular-nums">
 							{studiedAgo(row)}
 						</span>
-						<span className="truncate text-control font-medium text-foreground"><MathText>{lessonTitle(row)}</MathText></span>
+						<MathLine className="text-control font-medium text-foreground">{lessonTitle(row)}</MathLine>
 						<WhyMark why={whyOf(row)} />
 					</LineTarget>
 				</li>

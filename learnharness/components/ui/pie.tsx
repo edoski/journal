@@ -38,24 +38,25 @@ export function Pie({ share, tone = "muted", className, ...svg }: { share: numbe
  * The app's one progress ring (spec: pie.md): how far along a whole course
  * is, kept apart from a topic's `Pie` so the two never read as one thing
  * (Edo, 14 Nov 2026: Home's row pie meant the course while the map's meant
- * the topic). A 16px track at 40%, and over it a square-ended arc in
- * `currentColor` from twelve o'clock clockwise as `share` goes from 0 to 1,
- * a closed ring at 1: a firm track and square ends, so it never reads as a
- * spinner. Hollow, where a pie is filled.
+ * the topic). A full faint hairline track, and drawn on it a thicker,
+ * square-ended arc in the ink from twelve o'clock clockwise as `share`
+ * goes from 0 to 1, a closed ring at 1. At rest, never animated: a thin
+ * whole with a heavier share on it reads as a measure, where a track as
+ * heavy as its arc read as a loading spinner (the round-3 evaluation). Hollow, where a pie is filled.
  */
 export function Ring({ share, className, ...svg }: { share: number } & Omit<SVGProps<SVGSVGElement>, "viewBox">) {
 	const arc = Math.min(1, Math.max(0, share));
 	return (
-		<svg viewBox="0 0 16 16" className={cn("size-4 shrink-0 text-muted-foreground", className)} {...svg}>
-			<circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeOpacity={0.4} strokeWidth="2.5" />
+		<svg viewBox="0 0 16 16" className={cn("size-4 shrink-0 text-foreground/80", className)} {...svg}>
+			<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity={0.3} strokeWidth="1.25" />
 			{arc > 0 && (
 				<circle
 					cx="8"
 					cy="8"
-					r="6.25"
+					r="6"
 					fill="none"
 					stroke="currentColor"
-					strokeWidth="2.5"
+					strokeWidth="3"
 					pathLength={1}
 					strokeDasharray={`${arc} 1`}
 					transform="rotate(-90 8 8)"

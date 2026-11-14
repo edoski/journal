@@ -14,8 +14,11 @@
 | Part | Notes |
 |---|---|
 | box | 16×16, `shrink-0` |
-| track | r 6.25, stroke 2.5, `currentColor` at 40%: firm, so a part-way ring never reads as a spinner |
-| arc | the same circle in full ink from twelve o'clock clockwise for the share, square ends; closed at one; none at zero |
+| ink | `foreground` at 80% |
+| track | r 6, stroke 1.25, the ink at 30%: a full faint hairline ring, the whole the share is of |
+| arc | on the same circle, stroke 3 in the ink, from twelve o'clock clockwise for the share, square ends; closed at one; none at zero; never animated |
+
+A 2.5 track at 40% under an arc as heavy read as a loading spinner (the round-3 evaluation, 14 Nov 2026): a part-way ring looked like a ring with a gap, and a faint track under a short arc of the same weight is the spinner's own glyph. A hairline whole with a heavier share on it reads as a gauge at rest.
 
 Callers: `ProgressRing` (`../study-home/agenda-rows/progress-ring.tsx`: a course, the share of topics he can do on his own, with "Some topics on your own" on hover, `data-slot` `today-progress`) and `TopicGlyph` (`../course-map/topic-map/topic-glyph.tsx`: a topic's standing, `data-slot` `topic-glyph`). Decorative unless the caller names it (`role="img"` and an `aria-label`).
 

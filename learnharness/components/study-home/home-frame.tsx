@@ -6,6 +6,7 @@ import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
+import { doneToday } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
 import { courseMove, todayCourses, type TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
@@ -21,6 +22,8 @@ export interface HomeReady {
 	/** The courses, in Today's order, each once (two sessions waiting in
 	 *  one course are two lines of one course). */
 	courses: readonly StudyCourse[];
+	/** What he finished today, by title, oldest first (`doneToday`). */
+	done: readonly string[];
 	busy: boolean;
 	/** Take up a course's next step (`courseMove`). */
 	onContinue: (workspace: string) => void;
@@ -107,6 +110,7 @@ function HomeBody({
 						rows,
 						lessons: rows.map(lessonOf),
 						courses: todayCourses(rows),
+						done: doneToday(state.chats, new Date()),
 						busy,
 						onContinue: (workspace) => {
 							const course = state.courses.find((c) => c.map.workspace === workspace);
