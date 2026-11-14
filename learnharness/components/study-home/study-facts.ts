@@ -3,6 +3,7 @@ import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
+import { localDay } from "@/components/day-change";
 
 /** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
  *  in order, joined by commas only, since a title may hold its own "and"
@@ -168,24 +169,33 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
 	return step.topics.every((h) => topics.has(h));
 }
 
+/** The learner's own calendar day of a session's last turn. Pure. */
+const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
+
 /**
  * Today's lines: each session to pick up since yesterday (it waits on the
  * learner, the tutor writes in it, or stopped mid-reply) and each one left
- * for next time however long ago, most recent first, then each course's next step, most urgent first and a line with
- * nothing for tonight last (`laterOnly`), unless a session shown already
- * works on it. A session stays on its line while the tutor writes. An older
+ * for next time on an earlier day however long ago, most recent first,
+ * then each course's next step, most urgent first and a line with nothing
+ * for today last (`laterOnly`), unless a session shown, or one he ended
+ * today, already works on it. A session he ended with Done for today has
+ * no line until tomorrow: he said he is done with it for today, and Home's
+ * Studied today names it (round 4: the finished lesson stayed the first
+ * row). A session stays on its line while the tutor writes. An older
  * session to pick up stays in the sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
-	const recent = open.filter((c) => sessionState(c) === "left" || c.updatedAt.slice(0, 10) >= since);
+	const leftToday = (c: ChatListItem) => sessionState(c) === "left" && lastDay(c) >= today;
+	const recent = open.filter((c) => !leftToday(c) && (sessionState(c) === "left" || lastDay(c) >= since));
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
 	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
+	const working = open.filter((c) => recent.includes(c) || leftToday(c));
 	const rest = ordered
 		.flatMap((course): (TodayRow & { kind: "course" })[] => {
 			const step = nextStepOf(course);
-			const taken = recent.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
+			const taken = working.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
 			return taken ? [] : [{ kind: "course", course, step }];
 		})
 		.sort((a, b) => Number(laterOnly(a.step)) - Number(laterOnly(b.step)));

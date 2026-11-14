@@ -32,6 +32,17 @@ describe("needsYouNow", () => {
 		assert.ok(!lines.some((l) => l.key === "chat_old"), "a session waiting from before yesterday gets no line");
 	});
 
+	it("gives a lesson ended with Done for today no line until tomorrow", () => {
+		const la = CHATS.find((c) => c.id === "chat_eigen")!.course;
+		const left = (updatedAt: string) => chat("chat_left", { title: "Eigenvalues lesson", course: la, topics: ["eigen"], ended: "left", updatedAt });
+		const today = needsYouNow(COURSES, [left("2026-11-08T09:20:00")], TODAY).rows.map(label);
+		assert.ok(!today.includes("session chat_left"), "the lesson he ended today waits for tomorrow");
+		const tomorrow = needsYouNow(COURSES, [left("2026-11-08T09:20:00")], "2026-11-09").rows.map(label);
+		assert.equal(tomorrow[0], "session chat_left", "the next day it heads Today as Left for next time");
+		const earlier = needsYouNow(COURSES, [left("2026-10-30T09:20:00")], TODAY).rows.map(label);
+		assert.equal(earlier[0], "session chat_left", "one left on an earlier day keeps its line however long ago");
+	});
+
 	it("orders the courses after the sessions by urgency: the exam run-up, the nearest exam, then the most recent study", () => {
 		const { lines } = needsYouNow([CALCULUS, ANALYSIS, PROB], [], TODAY);
 		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Real Analysis", "Calculus I"]);
