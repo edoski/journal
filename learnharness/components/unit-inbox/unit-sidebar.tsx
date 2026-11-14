@@ -97,6 +97,7 @@ export function UnitSidebar() {
 			needs: nowFor(state.courses, state.chats, scope, today),
 			inbox: state.inbox,
 			courses: state.courses,
+			unreadable: state.unreadable,
 			chats: state.chats,
 			today,
 			unavailable: state.unavailable,

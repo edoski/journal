@@ -5,6 +5,7 @@
  * invents no date.
  */
 
+import type { UnreadableCourse } from "./course.ts";
 import type { TopicHandle } from "./course-map.ts";
 import type { StudyCourse } from "./study.ts";
 
@@ -50,5 +51,5 @@ export interface ScheduledDay {
  *  has no schedule to read. A course whose read failed is named in
  *  `failed`. */
 export type CalendarListing =
-	| { available: true; courses: CalendarCourse[]; failed: string[]; schedule: ScheduledDay[] }
+	| { available: true; courses: CalendarCourse[]; failed: UnreadableCourse[]; schedule: ScheduledDay[] }
 	| { available: false; reason: string };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
+import type { ChatListItem, StudyCourse, StudyListing, UnreadableCourse } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
 import { openSessions } from "@/components/study-home/study-facts";
@@ -13,7 +13,7 @@ export type StudyHomeState =
 	| { status: "loading" }
 	| { status: "unavailable"; reason: string }
 	| { status: "failed" }
-	| { status: "ready"; courses: StudyCourse[]; failed: string[]; open: ChatListItem[]; chats: ChatListItem[] };
+	| { status: "ready"; courses: StudyCourse[]; failed: UnreadableCourse[]; open: ChatListItem[]; chats: ChatListItem[] };
 
 async function readHome(): Promise<StudyHomeState> {
 	const [study, chats] = await Promise.all([

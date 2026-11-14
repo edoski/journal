@@ -75,7 +75,7 @@ describe("another host's writes", () => {
 		const triggers = new Map<string, () => void>();
 		const listed = () => new Promise((resolve) => setImmediate(resolve));
 		const stopWatch = watchCourses({
-			courseRecords: { list: async () => ({ available: true, courses: courses.map((workspace) => ({ workspace }) as never) }) },
+			courseRecords: { list: async () => ({ available: true, courses: courses.map((workspace) => ({ workspace }) as never), unreadable: [] }) },
 			watch: (workspace, onChange) => {
 				watching.add(workspace);
 				triggers.set(workspace, onChange);

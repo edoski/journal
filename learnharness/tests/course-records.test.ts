@@ -40,14 +40,16 @@ function fakeEngine(plan?: unknown) {
 }
 
 describe("course records adapter (fake engine)", () => {
-	it("lists registered courses from plan --all, with due counts including due_more", async () => {
+	it("lists registered courses from plan --all, with due counts including due_more, and keeps those it could not read", async () => {
 		const { engine, calls } = fakeEngine({
 			today: "2026-11-07",
 			courses: [
 				{ workspace: "/s/smm", title: "SMM", due: [{ topic: "a" }, { topic: "b" }], due_more: 3, current: "rank", current_title: "Rank", task: { key: "t", title: "Exercise 5" }, last_activity: { date: "2026-11-05", days_ago: 2 } },
 				{ workspace: "/s/bare" },
 				{ title: "no workspace, skipped" },
-				{ workspace: "/s/broken", error: "course.json is not valid JSON" },
+				{ workspace: "/s/broken", error: "course.json is not valid JSON", problem: "damaged" },
+				{ workspace: "/s/closed", error: "Permission denied", problem: "denied" },
+				{ workspace: "/s/odd", error: "an engine before problems" },
 			],
 		});
 		const listing = await createCourseRecords(engine).list();
@@ -70,6 +72,11 @@ describe("course records adapter (fake engine)", () => {
 					lastActiveDaysAgo: 2,
 				},
 				{ workspace: "/s/bare", title: null, due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
+			],
+			unreadable: [
+				{ workspace: "/s/broken", title: "broken", problem: "damaged" },
+				{ workspace: "/s/closed", title: "closed", problem: "denied" },
+				{ workspace: "/s/odd", title: "odd", problem: "unreadable" },
 			],
 		});
 		assert.deepEqual(calls()[0]!.args, ["plan", "--all", "--days", "1"]);
@@ -252,7 +259,7 @@ describe("course records adapter: create (fake engine)", () => {
 function memoryRecords(answer: (verb: CourseVerb) => Awaited<ReturnType<CourseRecords["run"]>>) {
 	const seen: Array<{ workspace: string; verb: CourseVerb }> = [];
 	const records: CourseRecords = {
-		list: async () => ({ available: true, courses: [] }),
+		list: async () => ({ available: true, courses: [], unreadable: [] }),
 		run: async (workspace, verb) => {
 			seen.push({ workspace, verb });
 			return answer(verb);

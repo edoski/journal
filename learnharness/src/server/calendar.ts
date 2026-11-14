@@ -118,7 +118,7 @@ export function scheduleOf(plan: unknown): ScheduledDay[] {
 export async function calendarRead(): Promise<CalendarListing> {
 	const listing = await readCourses(planDays);
 	if (!listing.available) return listing;
-	const read = listing.read.flatMap((c) => (typeof c === "string" ? [] : [c]));
+	const { read, failed } = listing;
 	return {
 		available: true,
 		courses: read.map(({ map, plan }) => ({
@@ -127,7 +127,7 @@ export async function calendarRead(): Promise<CalendarListing> {
 			doesNotFit: doesNotFitOf(plan, map),
 			finalReview: finalReviewOf(plan, map.exam),
 		})),
-		failed: listing.read.filter((c): c is string => typeof c === "string"),
+		failed,
 		schedule: read.map(({ plan }) => scheduleOf(plan)).find((days) => days.length > 0) ?? [],
 	};
 }

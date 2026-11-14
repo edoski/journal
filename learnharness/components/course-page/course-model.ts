@@ -1,4 +1,4 @@
-import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
+import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, UnreadableCourse } from "@/src/core";
 import { CURRENT_TAG, needOf, standingOf, type Need, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { courseProgress, lastStudied, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
 import { examWords, todayRows, type TodayRow } from "@/components/study-home/study-facts";
@@ -223,7 +223,7 @@ export type CourseRead =
 	| { status: "loading" }
 	| { status: "unavailable" }
 	| { status: "failed" }
-	| { status: "unreadable" }
+	| { status: "unreadable"; course: UnreadableCourse }
 	| { status: "missing" }
 	| { status: "ready"; view: CourseView };
 
@@ -238,7 +238,10 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 			return { status: "failed" };
 		case "ready": {
 			const course = state.courses.find((c) => c.map.workspace === workspace);
-			if (!course) return { status: state.failed.includes(workspace) ? "unreadable" : "missing" };
+			if (!course) {
+				const unreadable = state.failed.find((c) => c.workspace === workspace);
+				return unreadable ? { status: "unreadable", course: unreadable } : { status: "missing" };
+			}
 			return {
 				status: "ready",
 				view: { course, groups: courseGroups(course, state.chats), facts: courseFacts(course), next: courseNext(course, state.open) },
