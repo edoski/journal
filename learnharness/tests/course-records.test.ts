@@ -5,6 +5,7 @@
  * their composition into every agent kind.
  */
 
+import { fakeEngine as fakeSdkEngine } from "./helpers/fake-sdk.ts";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -476,7 +477,7 @@ describe("course composition into the agents", () => {
 	const jobStore = {} as JobStore;
 	const { records } = memoryRecords(() => ({ ok: true, json: {} }));
 	const faux = createFauxCore({});
-	const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
+	const engine = fakeSdkEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 	const builds = {
 		prober: (course?: { course: typeof COURSE; records: CourseRecords; arcs: boolean }) =>
 			createProberAgent({ chatId: "c1", chatStore, deliver: () => {}, jobStore, spawn: () => {} }, course ? { course, engine } : { engine }),

@@ -9,6 +9,7 @@
  * adapters may import core; core NEVER imports an adapter.
  */
 
+import type { ChatSession } from "./sdk-session.ts";
 import type { ArcPassLedger } from "./arc-pass.ts";
 import type { CourseMapLedger } from "./course-map-build.ts";
 import type { LhMessage } from "./native-messages.ts";
@@ -43,6 +44,8 @@ export interface ChatStore {
 	saveMessages(id: string, messages: LhMessage[]): void;
 	/** Persist the session plan tree (plan tools call this in execute). */
 	saveTree(id: string, tree: PlanTree): void;
+	/** Persist the record's map to its Claude Code session. Silent, like saveTree. */
+	saveSession(id: string, session: ChatSession): void;
 	/** Append one usage entry to the record's turn log (the money channel,
 	 * 2026-09): idempotent per turn id — each request carries its own, so
 	 * a turn persisted twice appends once while continuation turns (which

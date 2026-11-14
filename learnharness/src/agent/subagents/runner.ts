@@ -1,4 +1,4 @@
-import type { PiEngine } from "../models.ts";
+import type { SdkEngine } from "../models.ts";
 import {
 	accumulateJobUsage,
 	buildSubagentSteer,
@@ -56,10 +56,10 @@ import { runVisualMaker } from "./visual-maker.ts";
  * Undefined in production. (The jobs spawn through the module-level KIND
  * runners, which read these at call time.)
  */
-export const researchModelOverride: { current?: PiEngine } = {};
-export const demoModelOverride: { current?: PiEngine } = {};
-export const visualModelOverride: { current?: PiEngine } = {};
-export const pdfModelOverride: { current?: PiEngine } = {};
+export const researchModelOverride: { current?: SdkEngine } = {};
+export const demoModelOverride: { current?: SdkEngine } = {};
+export const visualModelOverride: { current?: SdkEngine } = {};
+export const pdfModelOverride: { current?: SdkEngine } = {};
 
 /** The dispatch-time tool input (from src/agent/tools/jobs.ts schemas). */
 type JobToolInput = ResearchToolInput | DemoToolInput | VisualToolInput | PdfToolInput;
@@ -76,7 +76,7 @@ export interface JobRunnerDeps {
 	/** The engine per role, read FRESH per job (the server wiring resolves
 	 *  the settings' Claude account each time). Test overrides (below)
 	 *  still win. */
-	engineFor?: (role: ModelRole) => PiEngine;
+	engineFor?: (role: ModelRole) => SdkEngine;
 	/** Connection gate: given the engine's Claude account, the refusal
 	 *  envelope when it is not signed in (null = run). Injected because the
 	 *  agent layer may not read the connection state; absent in tests that
@@ -101,9 +101,6 @@ interface LoopContext {
 	/** Fires when abortJob kills the run; abortSignal is passed into every
 	 * model call so the spend stops mid-call, not at the next loop check. */
 	abortSignal: AbortSignal;
-	/** The job's chat (debug: raw provider-event recording under
-	 * LH_PROVIDER_EVENTS=1 — forwarded into every subagent run). */
-	chatId?: string;
 	/** Fold one model call's usage into the job record (progress write). */
 	onUsage: (step: UsageStepLike) => void;
 }
@@ -125,8 +122,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	 * then writes through the job store so the poll sees progress). */
 	const usageTotals = new Map<string, JobUsage>();
 
-	function makeLoopContext(jobId: string, engine: PiEngine, controller: AbortController): LoopContext {
-		const chatId = jobStore.getJob(jobId)?.chatId;
+	function makeLoopContext(jobId: string, engine: SdkEngine, controller: AbortController): LoopContext {
 		// Provider-qualified stamp: the engine's actual model — the only
 		// thing that ran.
 		const model = `${engine.model.provider}:${engine.model.id}`;
@@ -136,7 +132,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		registerJobAbort(jobId, controller);
 		return {
 			abortSignal: controller.signal,
-			chatId,
 			onUsage: (step) => {
 				const next = accumulateJobUsage(usageTotals.get(jobId), model, step);
 				usageTotals.set(jobId, next);
@@ -159,8 +154,8 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	/** The engine one job runs on: test override first (the old seam —
 	 *  tests swap scripted engines without touching deps), then the injected
 	 *  engineFor. undefined = nothing was injected — runJob refuses below. */
-	function pickEngine(kind: JobKind): PiEngine | undefined {
-		const testOverride: Record<string, { current?: PiEngine } | undefined> = {
+	function pickEngine(kind: JobKind): SdkEngine | undefined {
+		const testOverride: Record<string, { current?: SdkEngine } | undefined> = {
 			researcher: researchModelOverride,
 			demoBuilder: demoModelOverride,
 			visualMaker: visualModelOverride,
@@ -171,7 +166,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	const KIND_RUNNERS: Record<
 		JobKind,
-		(jobId: string, engine: PiEngine, input: JobToolInput | undefined, loop: LoopContext) => Promise<void>
+		(jobId: string, engine: SdkEngine, input: JobToolInput | undefined, loop: LoopContext) => Promise<void>
 	> = {
 		research: (jobId, engine, input, loop) => runResearchJob(jobId, engine, input, loop),
 		demo: (jobId, engine, input, loop) => runDemoJob(jobId, engine, input, loop),
@@ -205,7 +200,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		// No engine injected, its account signed out, or an account T3 Code
 		// no longer has: each fails the job before the loop, so the tutor
 		// reads why instead of waiting.
-		let engine: PiEngine | undefined;
+		let engine: SdkEngine | undefined;
 		try {
 			engine = pickEngine(job.kind);
 		} catch (err) {
@@ -323,7 +318,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runResearchJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -360,7 +355,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				engine: model,
 				pdfDir,
 				abortSignal: loop.abortSignal,
-				chatId: loop.chatId,
 				// Money channel: each agent step is one model call — fold its
 				// usage into the record as it completes (progress write).
 				onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
@@ -392,7 +386,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runDemoJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -411,8 +405,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				{
 					engine: model,
 					abortSignal: loop.abortSignal,
-					chatId: loop.chatId,
-					onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
+						onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 					onActivity: (line) => jobStore.updateJob(jobId, { activity: line }),
 				},
 			);
@@ -429,7 +422,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runVisualJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -447,8 +440,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				{
 					engine: model,
 					abortSignal: loop.abortSignal,
-					chatId: loop.chatId,
-					onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
+						onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 					onActivity: (line) => jobStore.updateJob(jobId, { activity: line }),
 				},
 			);
@@ -467,7 +459,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runPdfJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -486,7 +478,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			{
 				engine: model,
 				abortSignal: loop.abortSignal,
-				chatId: loop.chatId,
 				onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 				onActivity: (line) => jobStore.updateJob(jobId, { activity: line }),
 			},
@@ -551,7 +542,7 @@ function isPdfFailure(result: PdfResult): boolean {
 
 /** The activity line shown in the UI: `web_search: "query"` / `web_fetch: host`. */
 function activityLine(toolName: string, input: { query?: string; url?: string } | undefined): string {
-	if (toolName === "web_search") return `web_search: "${input?.query ?? ""}"`;
+	if (toolName === "WebSearch") return `web_search: "${input?.query ?? ""}"`;
 	if (toolName === "web_fetch") return `web_fetch: ${hostOf(input?.url)}`;
 	return toolName;
 }

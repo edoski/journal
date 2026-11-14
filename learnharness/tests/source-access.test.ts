@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { after, describe, it } from "node:test";
 import { createCanvas } from "@napi-rs/canvas";
 import { createFauxCore } from "@earendil-works/pi-ai";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ChatStore, JobStore } from "../src/core/ports.ts";
 
@@ -68,6 +69,8 @@ const { createLsTool, lsTool } = await import("../src/agent/tools/ls.ts");
 const { createFindTool, findTool } = await import("../src/agent/tools/find.ts");
 const { createGrepTool, grepTool } = await import("../src/agent/tools/grep.ts");
 const { runPdfReaderAgent } = await import("../src/agent/subagents/pdf-reader.ts");
+/** A denied source fails before any model call: this engine refuses one. */
+const noModel = fakeEngine({ model: createFauxCore({}).getModel(), streamFn: () => { throw new Error("must not call model"); } });
 const { createProberTools, createTeacherTools } = await import("../src/agent/tools.ts");
 const { practiceTools } = await import("../src/agent/tools/practice.ts");
 
@@ -234,7 +237,7 @@ describe("source access: canonical roots and all tool paths", () => {
 	it("PDF denial is a structured upfront failure before parsing, rendering or model calls", async () => {
 		const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
 		let modelCalls = 0;
-		const engine = { model: faux.getModel(), streamFn: (() => { modelCalls++; throw new Error("must not call model"); }) as typeof faux.streamSimple };
+		const engine = fakeEngine({ model: faux.getModel(), streamFn: (() => { modelCalls++; throw new Error("must not call model"); }) as typeof faux.streamSimple });
 		for (const file of [auth, path.join(home, ".ssh", "id_ed25519"), path.join(root, "transcripts", "projects", "session.jsonl")]) {
 			const result = await runPdfReaderAgent({ path: file, question: "synthetic" }, { engine });
 			assert.match(result.brief, /^PDF failed: Access denied:/);
@@ -296,7 +299,7 @@ describe("source access: case-sensitive home-location variants", () => {
 				await assert.rejects(findTool.execute!("case-root", { path: folder, pattern: "*" }), denied);
 				await assert.rejects(grepTool.execute!("case-root", { path: folder, pattern: "CASE_VARIANT_SECRET" }), denied);
 				await assert.rejects(walkFiles(folder, () => assert.fail("protected target must not be visited")), denied);
-				const pdf = await runPdfReaderAgent({ path: path.join(folder, "key"), question: "synthetic" });
+				const pdf = await runPdfReaderAgent({ path: path.join(folder, "key"), question: "synthetic" }, { engine: noModel });
 				assert.match(pdf.brief, /^PDF failed: Access denied:/);
 			}
 			assert.equal(await text(grepTool, { path: root, pattern: "CASE_VARIANT_SECRET" }), "No matches found");
@@ -335,7 +338,7 @@ describe("source access: credential case aliases on the fixture filesystem", () 
 			}
 			await assert.rejects(readTool.execute!("case-alias", { path: alias }), denied);
 			await assert.rejects(grepTool.execute!("case-alias", { path: alias, pattern: "LH_SYNTHETIC_SECRET_MARKER" }), denied);
-			const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" });
+			const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" }, { engine: noModel });
 			assert.match(pdf.brief, /^PDF failed: Access denied:/);
 		}
 		assert.equal(await text(grepTool, { path: path.join(root, "KEYFILES"), pattern: "LH_SYNTHETIC_SECRET_MARKER" }), "No matches found");
@@ -352,7 +355,7 @@ describe("source access: credential case aliases on the fixture filesystem", () 
 			for (const alias of [path.join(root, "keyfiles", "AUTH.JSON"), path.join(root, "KEYFILES", "auth.json")]) {
 				await assert.rejects(readTool.execute!("case-auth", { path: alias }), denied);
 				await assert.rejects(grepTool.execute!("case-auth", { path: alias, pattern: "LH_SYNTHETIC_SECRET_MARKER" }), denied);
-				const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" });
+				const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" }, { engine: noModel });
 				assert.match(pdf.brief, /^PDF failed: Access denied:/);
 			}
 		} finally {

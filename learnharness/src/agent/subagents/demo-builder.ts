@@ -2,8 +2,8 @@ import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 import { serverExecute } from "../tool-execute.ts";
-import type { PiEngine } from "../models.ts";
-import { runSubagent } from "./pi-run.ts";
+import type { SdkEngine } from "../models.ts";
+import { runSubagent } from "../sdk/task.ts";
 import type { DemoResult } from "../../core/contracts.ts";
 import { getHeadless, type DemoRunResult, type HeadlessApi } from "./headless.ts";
 import { healToolRecord } from "../tools/heal.ts";
@@ -31,8 +31,8 @@ export interface DemoBuilderInput {
 }
 
 export interface DemoBuilderOptions {
-	/** Test seam: scripted engine; production uses the demoBuilder role. */
-	engine?: PiEngine;
+	/** The engine (tests pass a scripted fake). */
+	engine: SdkEngine;
 	headless?: HeadlessApi;
 	/** Max agent steps (each write/run/fix is one step). Default 24 ≈ 6 cycles. */
 	maxSteps?: number;
@@ -42,8 +42,6 @@ export interface DemoBuilderOptions {
 	abortSignal?: AbortSignal;
 	/** Money channel: one call per agent step, folded into JobRecord.usage. */
 	onUsage?: (usage: Usage) => void;
-	/** Debug: raw provider-event recording key (LH_PROVIDER_EVENTS=1). */
-	chatId?: string;
 }
 
 const INSTRUCTIONS = `You are a demo builder — a specialist sub-agent inside a learning application. You
@@ -181,7 +179,7 @@ function failureSummary(result: DemoRunResult | null): string {
 	return details.length > 0 ? `${summarizeCounts(result)} — ${details.join(" | ")}` : summarizeCounts(result);
 }
 
-export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderOptions = {}): Promise<DemoResult> {
+export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderOptions): Promise<DemoResult> {
 	const headless = opts.headless ?? getHeadless();
 	const title = input.title.trim() || "Interactive demo";
 	const brief = input.brief.trim() || "(no brief)";
@@ -205,7 +203,6 @@ export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderO
 	let finalText = "";
 	try {
 		const result = await runSubagent(Object.values(createDemoBuilderTools(state, headless, opts.onActivity)), {
-			role: "demoBuilder",
 			engine: opts.engine,
 			systemPrompt: INSTRUCTIONS,
 			prompt,
@@ -213,7 +210,6 @@ export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderO
 			abortSignal: opts.abortSignal,
 			onUsage: (usage) => opts.onUsage?.(usage),
 			onToolStart: (toolName) => opts.onActivity?.(toolName),
-			chatId: opts.chatId,
 		});
 		finalText = result.text;
 	} catch (err) {

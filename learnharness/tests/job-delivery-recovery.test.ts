@@ -3,10 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { Agent } from "@earendil-works/pi-agent-core";
 import { after, afterEach, test } from "node:test";
 import { createFauxCore, fauxAssistantMessage } from "@earendil-works/pi-ai";
-import { toLlmMessages, type LhMessage } from "../src/core/native-messages.ts";
+import type { LhMessage } from "../src/core/native-messages.ts";
+import { SdkAgent } from "../src/agent/sdk/agent.ts";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import { buildSubagentSteer, type JobKind, type SteerMessage } from "../src/core/contracts.ts";
 
 // Install isolation before importing any storage/configuration composition.
@@ -94,7 +95,7 @@ test("saved question survives absent transcript; runner ends while delivery is s
 	const faux = createFauxCore({});
 	let seen = "";
 	faux.setResponses([(context) => { seen = JSON.stringify(context.messages); return fauxAssistantMessage("Fixture brief"); }]);
-	researchModelOverride.current = { model: faux.getModel(), streamFn: faux.streamSimple };
+	researchModelOverride.current = fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 	let delivery: Promise<void> | undefined;
 	const runner = createJobRunner({ ...stores, deliver: (steer) => { delivery = deliverJobResult(steer); return delivery; } });
 	await runner.runJob(job.id);
@@ -115,7 +116,7 @@ test("missing or blank research question records an honest failure without invok
 		const job = stores.jobStore.createJob({ kind: "research", chatId: owner.id, toolCallId: "missing-question", input });
 		const faux = createFauxCore({}); let calls = 0;
 		faux.setResponses([() => { calls++; return fauxAssistantMessage("must not run"); }]);
-		researchModelOverride.current = { model: faux.getModel(), streamFn: faux.streamSimple };
+		researchModelOverride.current = fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 		const steers: SteerMessage[] = [];
 		await createJobRunner({ ...stores, deliver: async (steer) => { steers.push(steer); } }).runJob(job.id);
 		assert.equal(calls, 0);
@@ -217,7 +218,7 @@ test("a racing foreground settlement cannot release an outstanding staged wake",
 			modelCopies = JSON.stringify(context.messages).split(result.brief).length - 1;
 			return fauxAssistantMessage("Fixture wake response");
 		}]);
-		const wake = new Agent({ initialState: { model: faux.getModel(), messages: input.steers }, convertToLlm: toLlmMessages, streamFn: faux.streamSimple });
+		const wake = new SdkAgent({ engine: fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }), systemPrompt: "Teach.", tools: [], endsTurn: () => false, messages: input.steers });
 		assert(beginTurn(id));
 		registerLiveAgent(id, wake, false, new Set(input.steers.map((message) => message.id)));
 		await wake.continue();

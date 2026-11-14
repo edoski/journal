@@ -10,7 +10,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
+import { createFauxCore, type AssistantMessage, type ToolResultMessage } from "@earendil-works/pi-ai";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 
 import {
 	activeProblemOf,
@@ -171,22 +172,17 @@ describe("the practice agent", () => {
 		assert.deepEqual(Object.keys(tools).sort(), ["conclude", "find", "grep", "ls", "pdf", "problem", "read", "research"]);
 	});
 
-	it("constructs with exactly the two practice tools", () => {
-		// baseAgentOptions needs an engine (the BYOK thrower is the only
-		// fallback) — inject a never-streamed faux engine for the smoke.
-		const agent = createPracticeAgent(ctxOf([]), {
-			engine: {
-				model: { api: "faux", provider: "faux", id: "faux-model", contextWindow: 8192 } as never,
-				streamFn: (async () => {
-					throw new Error("not streamed in this test");
-				}) as never,
-			},
-		});
-		// The agent built with the live turn API (the registry itself is
-		// pinned above; pi's Agent exposes no state getter).
-		assert.equal(typeof agent.prompt, "function");
+	it("constructs with exactly the practice registry", () => {
+		// A never-streamed faux engine for the smoke: the agent is built, not run.
+		const faux = createFauxCore({});
+		const agent = createPracticeAgent(ctxOf([]), { engine: fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }) });
+		assert.deepEqual(
+			agent.state.tools.map((tool) => tool.name).sort(),
+			[...Object.keys(practiceTools(ctxOf([]))), "send_to_user"].sort(),
+			"the agent runs the practice registry, plus send_to_user, and nothing else",
+		);
+		assert.equal(typeof agent.continue, "function");
 		assert.equal(typeof agent.steer, "function");
-		assert.equal(typeof agent.waitForIdle, "function");
 	});
 });
 

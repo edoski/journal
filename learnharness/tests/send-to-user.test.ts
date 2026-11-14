@@ -9,9 +9,9 @@ import { after, describe, it } from "node:test";
 import { Value } from "typebox/value";
 import {
 	createFauxCore, fauxAssistantMessage, fauxText, fauxThinking, fauxToolCall,
-	type FauxResponseStep,
+	type Context, type FauxResponseStep,
 } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
+import { fakeEngine, fakeFor, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { AgentBuildOptions } from "../src/agent/teacher-agent.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 
@@ -37,21 +37,26 @@ after(() => {
 
 const { sendToUserTool } = await import("../src/agent/tools/send-to-user.ts");
 const { createProberAgent, createTeacherAgent, createPracticeAgent, composeInstructions } = await import("../src/agent/teacher-agent.ts");
-const { SEND_TO_USER_TOOL, activeProblemOf, asAgentMessages, newUserMessage, sendToUserText, toLlmMessages, userFacingTextOf } = await import("../src/core/native-messages.ts");
+const { SEND_TO_USER_TOOL, activeProblemOf, asAgentMessages, newUserMessage, sendToUserText, userFacingTextOf } = await import("../src/core/native-messages.ts");
 const { projectView } = await import("../src/core/view.ts");
 const { sessionMarkdown } = await import("../src/core/session-markdown.ts");
-const { runSubagent } = await import("../src/agent/subagents/pi-run.ts");
+const { runSubagent } = await import("../src/agent/sdk/task.ts");
 const { persistTurn } = await import("../src/server/turn-service.ts");
 const { runPiTurn } = await import("../src/server/pi/ui-stream.ts");
 const { SessionModel } = await import("../components/session-core.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { jobStore } = await import("../src/store/jobs.ts");
 
-function scripted(provider: string, id: string, steps: FauxResponseStep[] = []) {
-	const faux = createFauxCore({ provider, models: [{ id }] });
+function scripted(steps: FauxResponseStep[] = []) {
+	const faux = createFauxCore({ provider: "anthropic", models: [{ id: "claude-opus-5-5" }] });
 	faux.setResponses(steps);
-	const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
-	return { engine, faux };
+	const model: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
+	return { model, engine: fakeEngine(model), faux };
+}
+
+/** A lesson turn on the record so far: the agent runs it to its end. */
+function lessonInput(text: string) {
+	return asAgentMessages([newUserMessage(text)]);
 }
 
 const chatId = chatStore.createChat("Synthetic output gate").id;
@@ -78,36 +83,22 @@ function prose(messages: ReturnType<typeof projectView>): string[] {
 	return messages.filter((m) => m.role === "assistant").flatMap((m) => m.parts.filter((p) => p.type === "text").map((p) => p.text!));
 }
 
-describe("send_to_user model gate", () => {
-	for (const [provider, id, enabled] of [
-		["anthropic", "claude-opus-5-5", true],
-		["anthropic", "claude-haiku-4-5-20251001", true],
-		["openrouter", "anthropic/claude-opus-5.5", true],
-		["openrouter", "anthropic/claude-sonnet-5.5", true],
-		["amazon-bedrock", "us.anthropic.claude-opus-5-5-v1:0", true],
-		["fixture", "CLAUDE-fixture", true],
-		["openrouter", "z-ai/glm-5.3-flash", false],
-		["openai", "gpt-4o-mini", false],
-		["anthropic", "opaque-alias", false],
-	] as const) {
-		it(`${provider}/${id}: ${enabled ? "includes" : "omits"} tool and description in all conversation agents`, () => {
-			const { engine } = scripted(provider, id);
-			for (const [kind, factory] of Object.entries(factories)) {
-				const agent = factory({ engine });
-				const output = agent.state.tools.find((tool) => tool.name === SEND_TO_USER_TOOL);
-				assert.equal(Boolean(output), enabled, kind);
-				if (enabled) {
-					assert.equal(output!.description, sendToUserTool.description);
-					assert.equal(typeof output!.prepareArguments, "function", "standard argument healing is wired");
-				}
-				assert.equal(agent.state.systemPrompt, composeInstructions(kind as keyof typeof factories));
-				assert.ok(!agent.state.systemPrompt.includes(SEND_TO_USER_TOOL), "no added prompt instructions");
-			}
-		});
-	}
+describe("send_to_user registry", () => {
+	it("every conversation agent carries the tool and its description, with no added prompt instructions", () => {
+		const { engine } = scripted();
+		for (const [kind, factory] of Object.entries(factories)) {
+			const agent = factory({ engine });
+			const output = agent.state.tools.find((tool) => tool.name === SEND_TO_USER_TOOL);
+			assert.ok(output, kind);
+			assert.equal(output.description, sendToUserTool.description);
+			assert.equal(typeof output.prepareArguments, "function", "standard argument healing is wired");
+			assert.equal(agent.state.systemPrompt, composeInstructions(kind as keyof typeof factories));
+			assert.ok(!agent.state.systemPrompt.includes(SEND_TO_USER_TOOL), "no added prompt instructions");
+		}
+	});
 
 	it("explicitly injected teacher/practice test registries remain unchanged", () => {
-		const { engine } = scripted("anthropic", "claude-opus-5-5");
+		const { engine } = scripted();
 		for (const factory of [factories.teacher, factories.practice]) {
 			assert.deepEqual(factory({ engine, tools: {} }).state.tools, []);
 		}
@@ -115,12 +106,12 @@ describe("send_to_user model gate", () => {
 
 	it("background agents do not acquire a learner-output tool", async () => {
 		let calls = 0;
-		const { engine } = scripted("anthropic", "claude-opus-5-5", [(context) => {
+		const { engine } = scripted([(context) => {
 			calls++;
-			assert.ok(!context.messages.some((m) => m.role === "system" && m.toolsAdded?.some((t) => t.name === SEND_TO_USER_TOOL)));
+			assert.ok(!((context as unknown as Context).tools ?? []).some((t) => t.name === SEND_TO_USER_TOOL));
 			return fauxAssistantMessage("Synthetic background result.");
 		}]);
-		await runSubagent([], { role: "researcher", engine, systemPrompt: "Synthetic fixture.", prompt: "Finish.", maxTurns: 2 });
+		await runSubagent([], { engine, systemPrompt: "Synthetic fixture.", prompt: "Finish.", maxTurns: 2 });
 		assert.equal(calls, 1);
 	});
 });
@@ -300,15 +291,15 @@ describe("send_to_user interrupted generations", () => {
 
 describe("send_to_user native flow (offline)", () => {
 	it("output alone continues the loop, so the model receives its native acknowledgement", async () => {
-		const { engine, faux } = scripted("anthropic", "claude-opus-5-5", [
+		const { engine, faux } = scripted([
 			fauxAssistantMessage([outputCall("Read this first.")], { stopReason: "toolUse" }),
 			(context) => {
 				assert.ok(context.messages.some((m) => m.role === "toolResult" && m.toolName === SEND_TO_USER_TOOL));
 				return fauxAssistantMessage([fauxText("Final plain reply.")]);
 			},
 		]);
-		const agent = createTeacherAgent(undefined, { engine });
-		await agent.prompt("Synthetic request.");
+		const agent = createTeacherAgent(undefined, { engine, messages: lessonInput("Synthetic request.") });
+		await agent.continue();
 		assert.equal(faux.state.callCount, 2);
 	});
 
@@ -318,12 +309,12 @@ describe("send_to_user native flow (offline)", () => {
 			const problem = fauxToolCall("problem", {
 				statement: "What is two plus two?", mode: "recall", topics: ["arithmetic"], modelSolution: "Four.",
 			}, { id: "problem-1" });
-			const { engine, faux } = scripted("anthropic", "claude-opus-5-5", [
+			const { engine, faux } = scripted([
 				fauxAssistantMessage(outputFirst ? [output, problem] : [problem, output], { stopReason: "toolUse" }),
 				fauxAssistantMessage("Premature continuation must not run."),
 			]);
-			const agent = createPracticeAgent({ chatId, chatStore }, { engine });
-			await agent.prompt("Pose a synthetic problem.");
+			const agent = createPracticeAgent({ chatId, chatStore }, { engine, messages: lessonInput("Pose a synthetic problem.") });
+			await agent.continue();
 			assert.equal(faux.state.callCount, 1, "wait for the learner after a successful mixed-batch pose");
 			const results = agent.state.messages.filter((m) => m.role === "toolResult");
 			assert.equal(results.length, 2);
@@ -333,7 +324,7 @@ describe("send_to_user native flow (offline)", () => {
 
 	for (const stopReason of ["error", "aborted"] as const) {
 		it(`${stopReason} mixed output/problem generation never executes or activates the pose`, async () => {
-			const { engine, faux } = scripted("anthropic", "claude-opus-5-5", [
+			const { engine, faux } = scripted([
 				fauxAssistantMessage([
 					outputCall("Undelivered introduction."),
 					fauxToolCall("problem", {
@@ -341,8 +332,8 @@ describe("send_to_user native flow (offline)", () => {
 					}, { id: "unfinished-problem" }),
 				], { stopReason }),
 			]);
-			const agent = createPracticeAgent({ chatId, chatStore }, { engine });
-			await agent.prompt("Pose a synthetic problem.");
+			const agent = createPracticeAgent({ chatId, chatStore }, { engine, messages: lessonInput("Pose a synthetic problem.") });
+			await agent.continue();
 			assert.equal(faux.state.callCount, 1);
 			assert.ok(!agent.state.messages.some((m) => m.role === "toolResult"));
 			const messages = agent.state.messages.map((m, i) => ({ ...m, id: `interrupted-${i}` })) as LhMessage[];
@@ -352,7 +343,7 @@ describe("send_to_user native flow (offline)", () => {
 	}
 
 	it("a rejected mixed-batch practice pose retries, then stops after the successful pose", async () => {
-		const { engine, faux } = scripted("anthropic", "claude-opus-5-5", [
+		const { engine, faux } = scripted([
 			fauxAssistantMessage([
 				outputCall("Try this practice problem."),
 				fauxToolCall("problem", { statement: "Incomplete problem.", mode: "recall" }, { id: "bad-problem" }),
@@ -365,8 +356,8 @@ describe("send_to_user native flow (offline)", () => {
 			], { stopReason: "toolUse" }),
 			fauxAssistantMessage("Premature continuation must not run."),
 		]);
-		const agent = createPracticeAgent({ chatId, chatStore }, { engine });
-		await agent.prompt("Pose a synthetic problem.");
+		const agent = createPracticeAgent({ chatId, chatStore }, { engine, messages: lessonInput("Pose a synthetic problem.") });
+		await agent.continue();
 		assert.equal(faux.state.callCount, 2, "failed authoring retries; successful pose waits for the learner");
 		const results = agent.state.messages.filter((m) => m.role === "toolResult" && m.toolName === "problem");
 		assert.equal(results.length, 2);
@@ -380,7 +371,7 @@ describe("send_to_user native flow (offline)", () => {
 			type: "check", nodeId: "synthetic", question: "What is two plus two?",
 			correctAnswer: "Four — two pairs make four.",
 		};
-		const { engine, faux } = scripted("openrouter", "anthropic/claude-opus-5.5", [
+		const { model, engine, faux } = scripted([
 			fauxAssistantMessage([
 				fauxThinking("Synthetic private thought."), outputCall(lesson),
 				fauxToolCall("explain", question, { id: "quiz-1" }),
@@ -406,8 +397,8 @@ describe("send_to_user native flow (offline)", () => {
 		assert.deepEqual(response.content[1], outputCall(lesson));
 		assert.ok(saved.some((m) => m.role === "toolResult" && m.toolName === SEND_TO_USER_TOOL), "native output ack persists");
 		assert.ok(!saved.some((m) => m.role === "toolResult" && m.toolName === "explain"), "question placeholder remains transient");
-		const providerHistory = toLlmMessages(asAgentMessages(saved));
-		assert.deepEqual(providerHistory.find((m) => m.role === "assistant")!.content, response.content, "next request keeps native call/thinking structure");
+		const session = fakeFor(model).sessions.get(agent.sessionEnd()!.id)!.map((entry) => entry.message);
+		assert.deepEqual(session.find((m) => m.role === "assistant")!.content, response.content, "the session the next request resumes keeps the native call/thinking structure the record holds");
 		assert.deepEqual(prose(projectView(saved)), [lesson]);
 		const parts = projectView(saved).flatMap((m) => m.parts);
 		assert.ok(parts.findIndex((p) => p.type === "text") < parts.findIndex((p) => p.type === "tool-explain"));

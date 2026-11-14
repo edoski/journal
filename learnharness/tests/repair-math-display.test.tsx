@@ -15,7 +15,7 @@ import { MessageResponse, ToolContentResponse } from "../components/ai-elements/
 import {
 	repairMathForDisplay, healOverescapedCommands, restoreMathEscapes,
 	parseAskInput, parseExplainInput, activeProblemOf, projectView,
-	toLlmMessages, type LhMessage, type ArtifactPartProps,
+	type LhMessage, type ArtifactPartProps,
 } from "../src/core/index.ts";
 
 const tex = String.raw`\nabla f(x) \in \mathbb{R}^{m \times n}`;
@@ -219,7 +219,6 @@ describe("practice display surfaces", () => {
 			{ id: "r2", role: "toolResult", toolCallId: "c1", toolName: "conclude", content: [{ type: "text", text: "Problem concluded" }], details: null, isError: false, timestamp: 3 },
 		] as unknown as LhMessage[];
 		const before = structuredClone(concluded);
-		const history = structuredClone(toLlmMessages(concluded));
 		assert.deepEqual(activeProblemOf(messages)?.input, input);
 		const problem = projectView(messages)[0]!.parts.find((p) => p.type === "tool-problem")!;
 		assert.ok(problem.state && problem.toolCallId);
@@ -234,6 +233,5 @@ describe("practice display surfaces", () => {
 		assert.ok(revealHtml.includes("COMMITTED"));
 		assertMath(revealHtml, [tex, tex]);
 		assert.deepEqual(concluded, before);
-		assert.deepEqual(toLlmMessages(concluded), history);
 	});
 });

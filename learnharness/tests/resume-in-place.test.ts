@@ -6,7 +6,7 @@
  * or the plan, and a double press starts one session at most.
  *
  * Drives the real chat route and turn handler under an isolated data
- * folder and the fake engine, with a scripted model.
+ * folder and the fake engine, with a scripted model on the fake Agent SDK.
  */
 
 import assert from "node:assert/strict";
@@ -14,9 +14,11 @@ import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, afterEach, beforeEach, describe, it } from "node:test";
-import { createFauxCore, fauxAssistantMessage, fauxText, type TranscriptContext } from "@earendil-works/pi-ai";
+import { randomUUID } from "node:crypto";
+import { createFauxCore, fauxAssistantMessage, fauxText, type Context, type Message } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
+import { fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-resume-in-place-"));
 process.env.LH_DATA_DIR = TMP_DATA;
@@ -38,10 +40,10 @@ const { todayRows, openSessions } = await import("../components/study-home/study
 const { buildInbox, taskSessions } = await import("../components/unit-inbox/units.ts");
 const { SessionStarter } = await import("../components/start-session.ts");
 const { writeSettings } = await import("../src/store/settings.ts");
+const { PATHS } = await import("../config.ts");
 writeSettings({ version: 1, models: { strong: { model: { ...TEST_MODEL } } } });
 
 import type { AgentKind } from "../src/agent/teacher-agent.ts";
-import type { PiEngine } from "../src/agent/models.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import type { StudyCourse } from "../src/core/contracts/study.ts";
@@ -119,6 +121,18 @@ function seedLesson(last: LhMessage): string {
 	return chat.id;
 }
 
+/** The Claude Code session the seeded lesson ran on, as the app keeps it:
+ *  held by the scripted model's fake, its copy beside the record, and the
+ *  record's map synced to its last message. */
+function seedSession(chatId: string, engine: ScriptedModel): void {
+	const messages = chatStore.getChat(chatId)!.messages;
+	const entries = messages.filter((m) => m.role === "user" || m.role === "assistant" || m.role === "toolResult").map((m) => ({ uuid: randomUUID(), message: m as Message }));
+	const id = randomUUID();
+	fakeFor(engine).sessions.set(id, entries);
+	fs.writeFileSync(path.join(PATHS.chats, `${chatId}.session.jsonl`), `${JSON.stringify({ entries: entries.length })}\n`);
+	chatStore.saveSession(chatId, { id, synced: messages.at(-1)!.id, anchor: entries.at(-1)!.uuid });
+}
+
 const listed = (): ChatListItem[] => chatStore.listChats().map((c) => ({ ...c, busy: false, compacting: false }));
 const item = (id: string) => listed().find((c) => c.id === id)!;
 
@@ -165,19 +179,17 @@ function scripted(reply: string) {
 	let agent: AgentKind = "prober";
 	const faux = createFauxCore({});
 	faux.setResponses(
-		Array.from({ length: 4 }, () => (context: TranscriptContext) => {
-			const system = context.messages.find((m) => m.role === "system");
-			const prompt = system && system.role === "system" ? (typeof system.content === "string" ? system.content : system.content.map((c) => c.text).join("")) : "";
-			seen.push({ agent, prompt, tools: (system && system.role === "system" ? system.toolsAdded ?? [] : []).map((t) => t.name) });
+		Array.from({ length: 4 }, () => (context: Context) => {
+			seen.push({ agent, prompt: context.systemPrompt ?? "", tools: (context.tools ?? []).map((t) => t.name) });
 			return fauxAssistantMessage([fauxText(reply)]);
 		}),
 	);
-	const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+	const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 	const deliver = (steer: SteerMessage) => void deliverJobResult(steer);
 	const factory: Parameters<typeof handleChatRequest>[1] = (opts) => {
 		agent = opts.agent;
-		const built = { ...opts, engine };
-		const ctx = { chatId: opts.chatId ?? "", chatStore, jobStore, spawn: () => {}, deliver };
+		const built = { ...opts, ...onFake(engine, opts) };
+		const ctx = { chatId: opts.sessionStore?.chatId ?? "", chatStore, jobStore, spawn: () => {}, deliver };
 		if (opts.agent === "practice") return createPracticeAgent(ctx, built);
 		if (opts.agent === "teacher") return createTeacherAgent(ctx, built);
 		return createProberAgent(ctx, built);
@@ -188,7 +200,7 @@ function scripted(reply: string) {
 		if (handle) await new Response(handle.subscribe()).text();
 		return ack.status;
 	});
-	return { seen, factory };
+	return { seen, factory, engine };
 }
 
 async function send(chatId: string, text: string, factory: Parameters<typeof handleChatRequest>[1]) {
@@ -219,7 +231,8 @@ describe("Continue on a lesson stopped at part (c)", () => {
 	it("opens it at its step: no new session, no new probe question, no new plan", async () => {
 		const id = seedLesson(assistant([fauxText(PROSE_QUESTION)], "stop"));
 		const sessions = listed().length;
-		const { seen, factory } = scripted("Two free variables, so dim ker A = 5 - 3 = 2. That finishes part (c).");
+		const { seen, factory, engine } = scripted("Two free variables, so dim ker A = 5 - 3 = 2. That finishes part (c).");
+		seedSession(id, engine);
 
 		const opened = await pressContinue(factory);
 		const from = opened === id ? chatStore.getChat(opened)!.messages.length : 0;

@@ -53,15 +53,8 @@ import {
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
 import type { Confidence } from "./contracts/course.ts";
 import type { MarkResult } from "./contracts/marks.ts";
-import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import { PHOTO_ONLY_TEXT, WORKING_PHOTO_NOTE, type Photo } from "./photos.ts";
-
-/** The hard-invariant wording for an aborted turn's unanswered calls —
- *  carried over verbatim from the pre-native era so the model's view
- *  never drifted. */
-export const INTERRUPTED_TEXT =
-	"The question was interrupted — the learner never answered; continue without holding a result for it.";
 
 // ─── The record's message type ───────────────────────────────────────────────
 
@@ -996,110 +989,6 @@ function resultIdsFrom(messages: readonly AgentMessage[]): Set<string> {
 	return ids;
 }
 
-/**
- * AgentMessage[] → the provider wire (the agent's convertToLlm — required
- * by pi-agent-core's loop config, the ONE place model-facing decisions
- * live):
- *
- * - user / assistant / toolResult pass through VERBATIM — signatures,
- *   usage, provider stamps all native — minus our record-`id` field.
- * - markers flatten to a user message carrying their content (the
- *   canonical text single-sourced in core/contracts); plan blocks are
- *   UI-only and filtered.
- * - dangling calls from successfully generated assistant messages (for
- *   example, an unanswered question) get a synthesized interrupted result.
- *   Error/aborted generations do not: Pi drops those assistant messages,
- *   so manufacturing their results would leave orphan results on the wire.
- *
- * Contract (pi-agent-core): never throws — an unknown shape passes
- * through untouched rather than killing the loop.
- */
-export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
-	// THE COMPACTION CUT (owner round 14, 2026-10-05): the ACTIVE marker
-	// (the newest — chained compactions rule last) names the first kept
-	// message; everything before it is replaced by the marker's content
-	// (header + summary) rendered ONCE, up top. All compaction markers
-	// in the retained tail are then skipped, including older summaries
-	// whose stored positions still lie after the cut. A cut naming a
-	// missing id degrades honestly (everything renders — never throw).
-	const lhMessages = messages as readonly LhMessage[];
-	const active = activeCompactionOf(lhMessages);
-	let start = 0;
-	let head: Message | null = null;
-	if (active) {
-		const kept = keptIndexFor(lhMessages, active);
-		if (kept > 0) {
-			start = kept;
-			head = {
-				role: "user",
-				content: [{ type: "text", text: active.content }],
-				timestamp: active.timestamp,
-			};
-		}
-	}
-	// THE LEADING SYSTEM MESSAGE IS REQUEST CHROME, NEVER COMPACTABLE
-	// PAYLOAD (the OpenRouter no-tools incident, owner 2026-10-05):
-	// pi-agent-core's Agent seeds a SystemMessage carrying the system
-	// prompt AND the tool declarations at state.messages[0]
-	// (createInitialSystemMessage — "messages declare the provider-visible
-	// loadout"). The record never persists it (ui-stream's settleWith
-	// filters the role), so RECORD-path callers never see it — but the
-	// Agent's convertToLlm DOES. The cut slices the RECORD's history;
-	// when [0] is the chrome it must carry through AHEAD of the
-	// compaction head, exactly as pi's own prepareRequest re-applies
-	// context.systemPrompt + context.tools around its projection.
-	const leading =
-		(messages[0] as { role?: string } | undefined)?.role === "system" ? (messages[0] as Message) : null;
-	const out: Message[] = [];
-	if (leading) out.push(leading);
-	if (head) out.push(head);
-	for (let i = leading ? Math.max(start, 1) : start; i < messages.length; i++) {
-		const m = messages[i]!;
-		const role = (m as { role?: string }).role;
-		if (role === "custom") {
-			const marker = m as LhMarkerMessage;
-			// UI-only markers: plan blocks, and problem dismissals (the
-			// synthesized conclude pair carries the model's face).
-			if (isUiOnlyMarker(marker)) continue;
-			// The head supersedes every compaction marker, not only its own
-			// stored position. Without a resolved head, preserve the existing
-			// full-history fallback, including the summary text.
-			if (marker.customType === "compaction" && head !== null) continue;
-			out.push({
-				role: "user",
-				content: [{ type: "text", text: marker.content }, ...(marker.images ?? [])],
-			timestamp: marker.timestamp,
-			});
-			continue;
-		}
-		// Strip the record id: the wire carries the native shape only.
-		const { id: _id, ...native } = m as LhMessage;
-		out.push(native as Message);
-		// Repair unanswered calls from completed generations, not calls in
-		// failed generations. Pi filters error/aborted assistants itself;
-		// adding results for their unexecuted calls would leave orphans.
-		if (role === "assistant") {
-			const assistant = m as AssistantMessage;
-			if (assistant.stopReason === "error" || assistant.stopReason === "aborted") continue;
-			const calls = assistant.content.filter((b) => b.type === "toolCall");
-			if (calls.length === 0) continue;
-			const answered = resultIdsFrom(messages.slice(i + 1));
-			for (const call of calls) {
-				if (answered.has(call.id)) continue;
-				out.push({
-					role: "toolResult",
-					toolCallId: call.id,
-					toolName: call.name,
-					content: [{ type: "text", text: INTERRUPTED_TEXT }],
-					isError: false,
-					timestamp: assistant.timestamp,
-				});
-			}
-		}
-	}
-	return out;
-}
-
 // ─── native scans (the UIMessage-era pending/phase seams, natively) ──────────
 
 /** The pending-question gate (findPendingToolCall's native twin): the
@@ -1317,7 +1206,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 }
 /** Markers toLlmMessages drops: the model never sees them between a call
  *  and its result. */
-function isUiOnlyMarker(m: LhMessage): boolean {
+export function isUiOnlyMarker(m: LhMessage): boolean {
 	return m.role === "custom" && (m.customType === "plan-block" || m.customType === "problem-dismissed" || m.customType === "session-mode");
 }
 

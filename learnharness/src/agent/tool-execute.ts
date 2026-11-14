@@ -1,6 +1,7 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { Static, TSchema } from "typebox";
 import { CONCLUDE_ACK_TEXT } from "../core/contracts/chat.ts";
+import { QUESTION_POSED_TEXT } from "../core/sdk-session.ts";
 
 /**
  * tool-execute — the execution machinery every server-side lh tool shares,
@@ -224,7 +225,7 @@ export function questionResult(): AgentToolResult<null> {
 		content: [
 			{
 				type: "text",
-				text: "Question posed — the turn ends here; the learner's graded answer arrives as this call's result.",
+				text: QUESTION_POSED_TEXT,
 			},
 		],
 		details: null,

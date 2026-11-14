@@ -10,6 +10,7 @@ import type { Phase3 } from "../phases.ts";
 import type { PlanNodeStatus, PlanTree } from "./plan.ts";
 import type { CourseLink } from "./course.ts";
 import type { MarkResult } from "./marks.ts";
+import type { ChatSession } from "../sdk-session.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
 
@@ -56,6 +57,9 @@ export interface ChatRecord {
 	named?: true;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
+	/** The lesson's Claude Code session, the model's memory of it
+	 *  (core/sdk-session.ts); absent until its first turn reached Claude. */
+	session?: ChatSession;
 	/** Append-only usage log (observability, 2026-09): one entry per model
 	 * turn. DELIBERATELY a parallel log, not per-message metadata — the client
 	 * re-POSTs its message list every turn and its copies never carry

@@ -6,6 +6,7 @@
  * build run once more, and a stopped build that leaves the course as it was.
  */
 
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -17,7 +18,7 @@ import { LEARNING_ENGINE } from "../config.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import { createCourseMapBuilder } from "../src/agent/subagents/course-map-builder.ts";
 import { abortRuns } from "../src/agent/subagents/background-runs.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
 import type { CourseMapLedgers } from "../src/core/ports.ts";
 import type { ChatSummary } from "../src/core/contracts/chat.ts";
 import {
@@ -369,7 +370,7 @@ function settled(ledgers: ReturnType<typeof memoryLedgers>, dir: string, builds:
 
 /** A model that reads every source it is told to read now, then submits
  *  `answers` in turn (the next one after a refusal). */
-function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): PiEngine & { reads: string[]; refusals: string[] } {
+function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): SdkEngine & { reads: string[]; refusals: string[] } {
 	const reads: string[] = [];
 	const refusals: string[] = [];
 	const faux = createFauxCore({});
@@ -389,7 +390,7 @@ function scriptedModel(answers: MapSubmit[], gate?: Promise<void>): PiEngine & {
 		return fauxAssistantMessage([fauxToolCall("submit_map", answer as unknown as ToolCall["arguments"], { id: `submit-${submitted}` })], { stopReason: "toolUse" });
 	};
 	faux.setResponses(Array.from({ length: 20 }, () => step));
-	return Object.assign({ model: faux.getModel(), streamFn: faux.streamSimple }, { reads, refusals });
+	return Object.assign(fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }), { reads, refusals });
 }
 
 describe("course map builder (real engine, scripted model)", { skip: !realEngine && "learning engine not installed" }, () => {

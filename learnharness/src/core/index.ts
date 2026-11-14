@@ -30,6 +30,7 @@ export * from "./math-delims.ts";
 // pure logic, browser-safe.
 export * from "./native-messages.ts";
 export * from "./compaction.ts";
+export * from "./sdk-session.ts";
 export * from "./input-events.ts";
 // photos.ts: photos of his handwritten working (pure, browser-safe).
 export * from "./photos.ts";

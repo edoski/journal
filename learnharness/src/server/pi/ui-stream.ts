@@ -1,12 +1,8 @@
-import type { Agent, AgentEvent, AgentMessage } from "@earendil-works/pi-agent-core";
-import { ToolCallIdUniquifier } from "./call-ids.ts";
+import type { AgentEvent, AgentMessage } from "@earendil-works/pi-agent-core";
 
 /**
  * THE NATIVE WIRE (Wave D, owner-approved 2026-09-26): one agent turn, streamed
- * to every view as pi AgentEvents — no translation, no part assembly. The one
- * sanctioned rewrite (the Lacan fix, 2026-10-04): tool-call IDs uniquify at
- * this boundary when the provider resets them per response (DeepSeek's
- * `call_0` every turn) — see call-ids.ts and PiTurnSpec.usedToolCallIds.
+ * to every view as the agent's events — no translation, no part assembly.
  * The SSE body is the agent's own event stream:
  *
  *   data: {"type":"agent_start"}\n\n
@@ -68,9 +64,17 @@ export type TurnWireEvent =
 	| { type: "message_update"; message: AgentMessage }
 	| { type: "error"; errorText: string };
 
+/** What the runner drives: one turn's agent (sdk/agent.ts in production). */
+export interface TurnAgent {
+	readonly state: { messages: AgentMessage[] };
+	subscribe(listener: (event: AgentEvent) => void): unknown;
+	continue(): Promise<void>;
+	abort(): void;
+}
+
 export interface PiTurnSpec {
-	/** The per-turn agent (stateless engine — built from the record). */
-	agent: Agent;
+	/** The per-turn agent, built from the record. */
+	agent: TurnAgent;
 	/** The handler's error-masking policy for LOOP-level failures (the
 	 *  event stream itself is verbatim — provider errors ride their
 	 *  message's stopReason/errorMessage through untouched). */
@@ -83,14 +87,6 @@ export interface PiTurnSpec {
 	 *  Receives the agent's FULL final state (native messages) — the caller
 	 *  persists the slice past its own base count. */
 	onFinish: (messages: AgentMessage[], isAborted: boolean) => void;
-	/** Tool-call ids already used in this chat's record (THE LACAN FIX,
-	 *  owner-approved 2026-10-04): when present, a ToolCallIdUniquifier
-	 *  sits at this boundary — providers that reset ids every response
-	 *  (DeepSeek's `call_0` × every turn) get colliding ids reminted ONCE
-	 *  here, so wire views, the persisted record, the dock, answer
-	 *  routing, and the next turn's provider context all agree. Absent →
-	 *  verbatim passthrough (the protocol law below still holds). */
-	usedToolCallIds?: ReadonlySet<string>;
 	/** The coalescing window for update fan-out (COMPACTION LAW above).
 	 *  Defaults to 100ms; tests tighten it. */
 	updateFlushMs?: number;
@@ -119,8 +115,7 @@ export interface PiTurnHandle {
 }
 
 export function runPiTurn(spec: PiTurnSpec): PiTurnHandle {
-	const { agent, onError, onFinish, onSettleError, onSettleFailure, usedToolCallIds, updateFlushMs = 100 } = spec;
-	const uniquifier = usedToolCallIds ? new ToolCallIdUniquifier(usedToolCallIds) : undefined;
+	const { agent, onError, onFinish, onSettleError, onSettleFailure, updateFlushMs = 100 } = spec;
 
 	let settled = false;
 	let sawAbort = false;
@@ -224,7 +219,7 @@ export function runPiTurn(spec: PiTurnSpec): PiTurnHandle {
 	const settleWith = () => {
 		try {
 			const settled_ = [...agent.state.messages].filter((m) => (m as { role?: string }).role !== "system");
-			onFinish((uniquifier?.remapSettled(settled_) as AgentMessage[]) ?? settled_, sawAbort);
+			onFinish(settled_, sawAbort);
 		} catch (err) {
 			console.error("[turn] settlement failed:", err);
 			try { onSettleFailure?.(err, reportedErrorText); }
@@ -238,15 +233,12 @@ export function runPiTurn(spec: PiTurnSpec): PiTurnHandle {
 
 	const handle = (event: AgentEvent) => {
 		if (settled) return;
-		// THE LACAN FIX: ids uniquify HERE, before any view — the one seam
-		// every consumer downstream shares. No uniquifier → verbatim.
-		const uniqued = uniquifier ? uniquifier.event(event) : event;
-		// WIRE DIET: slim the one event pi double-stuffs — our views read
-		// `message`, never `assistantMessageEvent` (same full partial twice).
+		// WIRE DIET: slim the one event that carries the partial twice — our
+		// views read `message`, never `assistantMessageEvent`.
 		const wire: TurnWireEvent =
-			uniqued.type === "message_update"
-				? { type: "message_update", message: uniqued.message }
-				: uniqued;
+			event.type === "message_update"
+				? { type: "message_update", message: event.message }
+				: event;
 		send(wire);
 		if (event.type === "message_end") {
 			const m = event.message as { role?: string; stopReason?: string } | undefined;

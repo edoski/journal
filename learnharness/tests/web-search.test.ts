@@ -3,30 +3,16 @@ import { describe, it } from "node:test";
 import { createWebTools } from "../src/agent/tools/web.ts";
 import { jobTools } from "../src/agent/tools/jobs.ts";
 import { runResearcherAgent } from "../src/agent/subagents/researcher.ts";
-import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type Api, type FauxResponseStep, type Model } from "@earendil-works/pi-ai";
+import { createJobRunner } from "../src/agent/subagents/runner.ts";
+import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
 import type { JobStore } from "../src/core/ports.ts";
 import type { JobRecord } from "../src/core/contracts.ts";
-import { CLAUDE_SUBSCRIPTION } from "../src/core/contracts/claude.ts";
+import { fakeEngine, fakeFor, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
-describe("web_search (web.ts)", () => {
-	it("returns the native search's result text", async () => {
-		const seen: string[] = [];
-		const { web_search } = createWebTools(async (query) => { seen.push(query); return "Links: [...]\n\nSummary."; });
-		const out = await web_search!.execute!("c1", { query: "sigma.js latest version" });
-		assert.deepEqual(seen, ["sigma.js latest version"]);
-		assert.deepEqual(out.content, [{ type: "text", text: "Links: [...]\n\nSummary." }]);
-	});
-
-	it("returns the thrown error text as its output instead of throwing", async () => {
-		const { web_search } = createWebTools(async () => { throw new Error("Your Claude plan's usage limit is reached."); });
-		const out = await web_search!.execute!("c1", { query: "q" });
-		assert.deepEqual(out.content, [{ type: "text", text: "Your Claude plan's usage limit is reached." }]);
-		assert.notEqual(out.isError, true);
-	});
-
-	it("is absent without a native search, while web_fetch stays", async () => {
+describe("web tools (web.ts)", () => {
+	it("offer web_fetch only (search is Claude Code's own WebSearch), and web_fetch rejects an invalid URL", async () => {
 		const tools = createWebTools();
-		assert.equal("web_search" in tools, false);
+		assert.deepEqual(Object.keys(tools), ["web_fetch"]);
 		const out = await tools.web_fetch!.execute!("c1", { url: "not a url" });
 		assert.match(String(out.details), /web_fetch failed: invalid URL/);
 	});
@@ -60,7 +46,8 @@ describe("web_search (web.ts)", () => {
 	});
 });
 
-function toolsSeenBy(model: Model<Api>, faux: ReturnType<typeof createFauxCore>) {
+function toolsSeenBy() {
+	const faux = createFauxCore({});
 	const seen: { names: string[]; prompt: string } = { names: [], prompt: "" };
 	faux.setResponses([(context) => {
 		const system = context.messages.find((m) => m.role === "system");
@@ -69,32 +56,25 @@ function toolsSeenBy(model: Model<Api>, faux: ReturnType<typeof createFauxCore>)
 		seen.prompt = system.content as string;
 		return fauxAssistantMessage([fauxText("done")]);
 	}]);
-	return { seen, run: () => runResearcherAgent("Check the tools only", { engine: { model, streamFn: faux.streamSimple } }) };
+	const scripted: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
+	return { seen, scripted, run: () => runResearcherAgent("Check the tools only", { engine: fakeEngine(scripted) }) };
 }
 
-describe("researcher tools follow the engine's provider", () => {
-	it("a Claude subscription model gets web_search", async () => {
-		const faux = createFauxCore({});
-		const { seen, run } = toolsSeenBy({ ...faux.getModel(), provider: CLAUDE_SUBSCRIPTION.providerId }, faux);
+describe("researcher tools", () => {
+	it("asks Claude Code for its own WebSearch, and the app adds web_fetch", async () => {
+		const { seen, scripted, run } = toolsSeenBy();
 		await run();
-		assert.ok(seen.names.includes("web_search"));
-		assert.ok(seen.names.includes("web_fetch"));
+		const [options] = fakeFor(scripted).calls;
+		assert.deepEqual(options!.tools, ["WebSearch"], "Claude Code's WebSearch, and none of its other tools");
+		assert.ok(options!.allowedTools?.includes("WebSearch"), "WebSearch runs without a permission prompt");
+		assert.deepEqual(seen.names, ["web_fetch"], "the app's own tools: web_fetch, no app-side search");
 	});
 
-	it("another provider gets no web_search but keeps web_fetch", async () => {
-		const faux = createFauxCore({});
-		const { seen, run } = toolsSeenBy(faux.getModel(), faux);
+	it("the prompt explains WebSearch summaries and the research process", async () => {
+		const { seen, run } = toolsSeenBy();
 		await run();
-		assert.equal(seen.names.includes("web_search"), false);
-		assert.ok(seen.names.includes("web_fetch"));
-	});
-
-	it("the prompt explains search summaries and research without web_search", async () => {
-		const faux = createFauxCore({});
-		const { seen, run } = toolsSeenBy(faux.getModel(), faux);
-		await run();
-		assert.match(seen.prompt, /If you have no web_search tool, research with web_fetch on URLs you can name with confidence/);
-		assert.match(seen.prompt, /web_search results come with a short summary/);
+		assert.match(seen.prompt, /Search with WebSearch using varied angles/);
+		assert.match(seen.prompt, /WebSearch results come with a short summary/);
 		assert.match(seen.prompt, /Break the question into 2-4 searchable facets/);
 		assert.match(seen.prompt, /## Gaps/);
 		assert.doesNotMatch(seen.prompt, /credentials|API key/);
@@ -102,55 +82,57 @@ describe("researcher tools follow the engine's provider", () => {
 });
 
 describe("researcher loop", () => {
-	for (const searchFirst of [true, false]) {
-		it(searchFirst ? "recovers from a failed search by fetching a supplied URL" : "fetch-only research runs without web_search", async () => {
-			const url = "https://example.com/supplied-source";
-			const brief = `## Summary\nVerified supplied source. [Source](${url})`;
-			const steps: FauxResponseStep[] = [];
-			const fetchCall = () => fauxAssistantMessage(
-				[fauxToolCall("web_fetch", { url }, { id: "fetch1" })], { stopReason: "toolUse" },
-			);
-			if (searchFirst) {
-				steps.push(
-					() => fauxAssistantMessage(
-						[fauxToolCall("web_search", { query: "supplied source" }, { id: "search1" })], { stopReason: "toolUse" },
-					),
-					(context) => {
-						const result = context.messages.find((m) => m.role === "toolResult" && m.toolCallId === "search1");
-						assert.ok(result && result.role === "toolResult");
-						assert.equal(result.isError, false, "a failed search does not abort the native loop");
-						assert.match(JSON.stringify(result.content), /search did not run/);
-						return fetchCall();
-					},
-				);
-			} else steps.push(fetchCall());
-			steps.push((context) => {
+	it("fetch-only research delivers the brief from the fetched page", async () => {
+		const url = "https://example.com/supplied-source";
+		const brief = `## Summary\nVerified supplied source. [Source](${url})`;
+		const steps: FauxResponseStep[] = [
+			fauxAssistantMessage([fauxToolCall("web_fetch", { url }, { id: "fetch1" })], { stopReason: "toolUse" }),
+			(context) => {
 				const result = context.messages.find((m) => m.role === "toolResult" && m.toolCallId === "fetch1");
 				assert.ok(result && result.role === "toolResult");
 				assert.equal(result.isError, false);
 				assert.match(JSON.stringify(result.content), /Synthetic verified source content/);
 				return fauxAssistantMessage([fauxText(brief)]);
-			});
-			const faux = createFauxCore({});
-			faux.setResponses(steps);
-			const realFetch = globalThis.fetch;
-			const fetched: string[] = [];
-			globalThis.fetch = (async (input) => {
-				fetched.push(String(input));
-				assert.equal(String(input), url, "only the supplied URL is fetched");
-				return new Response("Synthetic verified source content", { headers: { "content-type": "text/plain" } });
-			}) as typeof fetch;
-			try {
-				assert.equal(await runResearcherAgent(`Verify ${url}`, {
-					engine: { model: faux.getModel(), streamFn: faux.streamSimple },
-					search: searchFirst ? async () => { throw new Error("Claude's web search did not run."); } : null,
-				}), brief);
-				assert.deepEqual(fetched, [url]);
-			} finally {
-				globalThis.fetch = realFetch;
-			}
-		});
-	}
+			},
+		];
+		const faux = createFauxCore({});
+		faux.setResponses(steps);
+		const realFetch = globalThis.fetch;
+		const fetched: string[] = [];
+		globalThis.fetch = (async (input) => {
+			fetched.push(String(input));
+			assert.equal(String(input), url, "only the supplied URL is fetched");
+			return new Response("Synthetic verified source content", { headers: { "content-type": "text/plain" } });
+		}) as typeof fetch;
+		try {
+			assert.equal(await runResearcherAgent(`Verify ${url}`, { engine: fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }) }), brief);
+			assert.deepEqual(fetched, [url]);
+		} finally {
+			globalThis.fetch = realFetch;
+		}
+	});
+
+	it("a research job's activity line names a WebSearch call as web_search with its query", async () => {
+		const faux = createFauxCore({});
+		faux.setResponses([
+			fauxAssistantMessage([fauxToolCall("WebSearch", { query: "sigma.js latest version" }, { id: "ws1" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxText("## Summary\nSigma.js 3. [Docs](https://www.sigmajs.org)")]),
+		]);
+		const engine = fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
+		const jobStore = fakeJobStore();
+		const activities: string[] = [];
+		const updateJob = jobStore.updateJob.bind(jobStore);
+		jobStore.updateJob = (id, patch) => {
+			if (typeof patch.activity === "string") activities.push(patch.activity);
+			return updateJob(id, patch);
+		};
+		const job = jobStore.createJob({ kind: "research", chatId: "chat-activity", toolCallId: "research-call" });
+		const chatStore = { getChat: (id: string) => ({ id, messages: [] }) } as unknown as ChatStore;
+		const runner = createJobRunner({ chatStore, jobStore, deliver: async () => {}, engineFor: () => engine });
+		await runner.runJob(job.id, { question: "Which sigma.js version is current?" });
+		assert.ok(activities.includes('web_search: "sigma.js latest version"'), `activity lines: ${JSON.stringify(activities)}`);
+		assert.equal(jobStore.getJob(job.id)!.status, "done");
+	});
 });
 
 /** Minimal in-memory JobStore — registry tests never touch the fs. */

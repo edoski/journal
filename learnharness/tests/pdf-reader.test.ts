@@ -9,8 +9,9 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, before, describe, it } from "node:test";
-import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
+import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep, type TranscriptContext } from "@earendil-works/pi-ai";
+import type { SdkEngine } from "../src/agent/models.ts";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import { runPdfReaderAgent } from "../src/agent/subagents/pdf-reader.ts";
 import type { HeadlessApi } from "../src/agent/subagents/headless.ts";
 
@@ -21,10 +22,18 @@ const SOURCE = path.join(fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpd
 fs.copyFileSync(FIXTURE, SOURCE);
 process.on("exit", () => fs.rmSync(path.dirname(SOURCE), { recursive: true, force: true }));
 
-function fauxEngine(steps: FauxResponseStep[]): PiEngine {
+/** The scripted model behind the fake SDK; `onRequest` sees each request's
+ *  model-facing context before the scripted reply. */
+function fauxEngine(steps: FauxResponseStep[], onRequest?: (context: TranscriptContext) => void): SdkEngine {
 	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
 	faux.setResponses(steps);
-	return { model: faux.getModel(), streamFn: faux.streamSimple };
+	return fakeEngine({
+		model: faux.getModel(),
+		streamFn: (model, context, options) => {
+			onRequest?.(context as TranscriptContext);
+			return faux.streamSimple(model, context, options);
+		},
+	});
 }
 
 const PNG_1PX = Buffer.from([
@@ -88,19 +97,14 @@ describe("pdf-reader source paths", () => {
 			assert.equal(os.homedir(), home);
 			assert.notEqual(path.resolve(relativePath), absolutePath, "cwd is not the learner's home");
 			const headless = fakeHeadless();
+			let lastContext = "";
 			const engine = fauxEngine([
 				fauxAssistantMessage([fauxToolCall("pdf_info", {}, { id: "i1" })], { stopReason: "toolUse" }),
 				fauxAssistantMessage([fauxToolCall("pdf_search", { query: "integral", literal: true }, { id: "s1" })], { stopReason: "toolUse" }),
 				fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "2" }, { id: "e1" })], { stopReason: "toolUse" }),
 				fauxAssistantMessage([fauxToolCall("pdf_render", { pages: "3" }, { id: "r1" })], { stopReason: "toolUse" }),
 				fauxAssistantMessage([fauxText("Read the requested document (p. 1, p. 2, p. 3).")]),
-			]);
-			let lastContext = "";
-			const stream = engine.streamFn;
-			engine.streamFn = (...args) => {
-				lastContext = JSON.stringify(args[1]);
-				return stream(...args);
-			};
+			], (context) => { lastContext = JSON.stringify(context); });
 			const result = await runPdfReaderAgent(
 				{ path: inputPath, question: "Read the document" },
 				{ engine, headless },
@@ -116,11 +120,10 @@ describe("pdf-reader source paths", () => {
 
 	it("a missing home-relative source fails before any model call", async () => {
 		let modelCalls = 0;
-		const engine = fauxEngine([]);
-		engine.streamFn = () => {
+		const engine = fauxEngine([], () => {
 			modelCalls++;
 			throw new Error("the model must not be called");
-		};
+		});
 		const missing = path.join("Course notes", "missing.pdf");
 		const result = await runPdfReaderAgent({ path: missing, question: "anything" }, { engine });
 		assert.equal(result.path, path.join(home, missing));
@@ -151,39 +154,39 @@ describe("pdf-reader loop (faux engine)", () => {
 		assert.deepEqual(result.pagesConsulted, [1, 2]);
 	});
 
-	it("the unread-finish gate: a brief with zero consultation is bounced, not delivered", async () => {
-		let nudged = false;
+	it("the unread-finish gate: a brief with zero consultation is refused, not delivered", async () => {
+		const engine = fauxEngine([fauxAssistantMessage([fauxText("The answer is 42, trust me.")])]);
+		const result = await runPdfReaderAgent({ path: SOURCE, question: "integral of x?" }, { engine });
+		assert.equal(result.brief, "PDF failed: the reader wrote no brief from the document's pages.", "the invention is never the delivered brief");
+		assert.deepEqual(result.pagesRead, []);
+		assert.deepEqual(result.pagesConsulted, []);
+	});
+
+	it("the unread-finish gate lets a search-consulted brief through: search hits consult but do not read", async () => {
 		const engine = fauxEngine([
-			// first finish attempt with NOTHING read — the loop must inject the
-			// nudge and keep going rather than deliver invention
-			fauxAssistantMessage([fauxText("The answer is 42, trust me.")]),
-			// after the nudge: consult, then brief honestly
 			fauxAssistantMessage(
 				[fauxToolCall("pdf_search", { query: "integral", literal: false }, { id: "s1" })],
 				{ stopReason: "toolUse" },
 			),
 			fauxAssistantMessage([fauxText("Found it on page 1 (p. 1): the integral of x dx.")]),
 		]);
-		const result = await runPdfReaderAgent(
-			{ path: SOURCE, question: "integral of x?" },
-			{ engine, onActivity: (line) => void (line && (nudged ||= line.startsWith("pdf_search"))) },
-		);
+		const activity: string[] = [];
+		const result = await runPdfReaderAgent({ path: SOURCE, question: "integral of x?" }, { engine, onActivity: (line) => activity.push(line) });
 		assert.match(result.brief, /Found it on page 1/);
 		assert.deepEqual(result.pagesRead, [], "search hits consult but do not read (the split)");
 		assert.deepEqual(result.pagesConsulted, [1]);
-		// and the gate lets it through: search hits ARE genuine consultation
-		// the first (invention) answer must NOT be the delivered brief
-		assert.notEqual(result.brief, "The answer is 42, trust me.");
+		assert.ok(activity.some((line) => line.startsWith("pdf_search")));
 	});
 
-	it("the render path: images ride a user message after tool results; pages counted", async () => {
+	it("the render path: images ride the render's tool result; pages counted", async () => {
 		const headless = fakeHeadless();
+		const requests: TranscriptContext[] = [];
 		const engine = fauxEngine([
 			fauxAssistantMessage([fauxToolCall("pdf_render", { pages: "2-3", dpi: 150 }, { id: "r1" })], {
 				stopReason: "toolUse",
 			}),
 			fauxAssistantMessage([fauxText("The physics formula is visible on page 2 (p. 2).")]),
-		]);
+		], (context) => requests.push(structuredClone(context)));
 		const result = await runPdfReaderAgent(
 			{ path: SOURCE, question: "what is the force formula?" },
 			{ engine, headless },
@@ -191,6 +194,9 @@ describe("pdf-reader loop (faux engine)", () => {
 		assert.deepEqual(result.pagesRead, [2, 3], "rendered pages are read pages");
 		assert.deepEqual(result.pagesConsulted, [2, 3]);
 		assert.deepEqual(headless.calls, ["render:2,3"]);
+		const render = requests[1]!.messages.at(-1)!;
+		assert.equal(render.role, "toolResult");
+		assert.equal((render.content as { type: string }[]).filter((part) => part.type === "image").length, 2);
 	});
 
 	it("no Chrome: render calls degrade to an error note, text tools still work", async () => {

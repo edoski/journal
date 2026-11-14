@@ -39,7 +39,7 @@ import {
 } from "../../core/course-map-build.ts";
 import { CLAUDE_LIMIT_TEXT } from "../../core/contracts/claude.ts";
 import { recordHasArcs } from "../../core/contracts/course.ts";
-import type { PiEngine } from "../models.ts";
+import type { SdkEngine } from "../models.ts";
 import { courseMapDoctrine } from "../prompt-segments.ts";
 import { createMaterialTools, measureMaterial, readingRounds, type MaterialFile } from "../tools/material.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
@@ -206,10 +206,10 @@ export interface CourseMapBuilderDeps {
 	courseRecords: CourseRecords;
 	ledgers: CourseMapLedgers;
 	/** Test seam: a scripted engine, checked first. */
-	engine?: PiEngine;
+	engine?: SdkEngine;
 	/** The app's default model, resolved fresh per build; undefined when no
 	 *  model is set, and the build skips. */
-	engineFor?: () => PiEngine | undefined;
+	engineFor?: () => SdkEngine | undefined;
 	/** The subscription's background consent for the engine's provider. */
 	backgroundAllowed?: (provider: string) => boolean;
 	/** Test seam: how a linked website's page is read (the web tool's reader). */

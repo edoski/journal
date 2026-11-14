@@ -22,9 +22,9 @@ import {
 	type Message,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
+import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { createPracticeAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
-import { claudeTranscriptBlocks } from "../src/agent/claude-stream.ts";
+import { QUESTION_POSED_TEXT, sdkInputBlocks } from "../src/core/sdk-session.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import { PHOTO_UNREADABLE } from "../src/server/photos.ts";
@@ -35,9 +35,7 @@ import {
 	parseChatInput,
 	photosOf,
 	projectView,
-	serializeForSummary,
 	sessionMarkdown,
-	toLlmMessages,
 	WORKING_PHOTO_NOTE,
 	type LhMessage,
 	type QuestionData,
@@ -91,7 +89,7 @@ async function drainTurn(req: Request, factory: Parameters<typeof handleChatRequ
 }
 
 /** A scripted engine that keeps every context it was given. */
-function scripted(steps: FauxResponseStep[]): { engine: PiEngine; contexts: Message[][] } {
+function scripted(steps: FauxResponseStep[]): { engine: ScriptedModel; contexts: Message[][] } {
 	const contexts: Message[][] = [];
 	const faux = createFauxCore({});
 	faux.setResponses(steps.map((step) => async (context: TranscriptContext): Promise<AssistantMessage> => {
@@ -117,13 +115,13 @@ describe("photos of handwritten working", () => {
 	it("a photo alone is a message, reaches the model as his, and survives a reload", async () => {
 		const chat = teacherChat("Test: photo message");
 		const { engine, contexts } = scripted([fauxAssistantMessage([fauxText("I can read your working.")])]);
-		await drainTurn(post(chat.id, { type: "text", text: "", photos: [photo()] }), (opts) => createTeacherAgent(undefined, { engine, messages: opts.messages }));
+		await drainTurn(post(chat.id, { type: "text", text: "", photos: [photo()] }), (opts) => createTeacherAgent(undefined, onFake(engine, opts)));
 
-		// The model got the image part, tagged as his in Claude's transcript.
+		// The model got the image part, in his own message.
 		assert.equal(imagesIn(contexts[0]!).length, 1);
-		const blocks = claudeTranscriptBlocks(contexts[0]!);
-		const at = blocks.findIndex((b) => b.type === "image");
-		assert.deepEqual([blocks[at - 1], blocks[at + 1]], [{ type: "text", text: "<user_photo>" }, { type: "text", text: "</user_photo>" }]);
+		const his = contexts[0]!.at(-1)!;
+		assert.equal(his.role, "user");
+		assert.equal(imagesIn([his]).length, 1, "the photo rides his message");
 
 		// A reload reads it back from the record route, and the view shows it.
 		const res = await recordRoute.GET(new Request(`http://test/api/chats/${chat.id}`), { params: Promise.resolve({ id: chat.id }) });
@@ -134,13 +132,13 @@ describe("photos of handwritten working", () => {
 		assert.ok(view[0]!.parts.some((p) => p.type === "photos" && (p.data as unknown[]).length === 1));
 	});
 
-	it("a photo alone answers a check: the result carries it, says so, and the card gets it", async () => {
+	it("a photo alone answers a check: his answer carries it, says so, and the card gets it", async () => {
 		const chat = teacherChat("Test: photo answer");
 		const { engine, contexts } = scripted([
 			fauxAssistantMessage([fauxToolCall("explain", CHECK, { id: "call-photo" })], { stopReason: "toolUse" }),
 			fauxAssistantMessage([fauxText("Your second line slips.")]),
 		]);
-		const factory: Parameters<typeof handleChatRequest>[1] = (opts) => createTeacherAgent(undefined, { engine, messages: opts.messages });
+		const factory: Parameters<typeof handleChatRequest>[1] = (opts) => createTeacherAgent(undefined, onFake(engine, opts));
 		await drainTurn(post(chat.id, { type: "text", text: "Check me on factoring." }), factory);
 		const qd: QuestionData = { id: "call-photo", kind: "explain", question: CHECK.question, mode: "text", options: [], committedAnswer: CHECK.correctAnswer, createdAt: new Date().toISOString() };
 		// The dock's answer with no typed words: buildAnswer leaves text out.
@@ -148,10 +146,20 @@ describe("photos of handwritten working", () => {
 		assert.equal(answer.text, undefined);
 		await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-photo", answer, photos: [photo()] }), factory);
 
+		// The call's own result is the placeholder; his answer, tagged with the
+		// call, and its photo arrive in his next message.
 		const saw = contexts[1]!;
 		const result = saw.find((m) => m.role === "toolResult" && m.toolCallId === "call-photo")!;
-		assert.equal(photosOf(result.content).length, 1, "the photo reaches the model with the answer");
-		assert.equal(JSON.parse((result.content[0] as { text: string }).text).photo, WORKING_PHOTO_NOTE);
+		assert.deepEqual(result.content, [{ type: "text", text: QUESTION_POSED_TEXT }]);
+		const next = saw.at(-1)!;
+		assert.equal(next.role, "user");
+		const blocks = next.content as Array<{ type: string; text?: string }>;
+		const at = blocks.findIndex((b) => b.type === "text" && b.text!.startsWith('<answer tool="explain" call="call-photo">'));
+		assert.ok(at >= 0, "his answer is tagged with the question it answers");
+		const tagged = blocks[at]!.text!;
+		assert.equal(JSON.parse(tagged.slice(tagged.indexOf("\n") + 1, tagged.lastIndexOf("\n</answer>"))).photo, WORKING_PHOTO_NOTE);
+		assert.equal(blocks[at + 1]?.type, "image", "the photo reaches the model right after the answer");
+		assert.equal(imagesIn([next]).length, 1);
 
 		const saved = chatStore.getChat(chat.id)!.messages;
 		const view = projectView(saved);
@@ -171,7 +179,7 @@ describe("photos of handwritten working", () => {
 			fauxAssistantMessage([fauxToolCall("problem", POSE, { id: "call-pp" })], { stopReason: "toolUse" }),
 			fauxAssistantMessage([fauxText("Your factoring holds.")]),
 		]);
-		const factory: Parameters<typeof handleChatRequest>[1] = (opts) => createPracticeAgent({ chatId: chat.id, chatStore }, { engine, messages: opts.messages });
+		const factory: Parameters<typeof handleChatRequest>[1] = (opts) => createPracticeAgent({ chatId: chat.id, chatStore }, onFake(engine, opts));
 		await drainTurn(post(chat.id, { type: "text", text: "practice" }), factory);
 		await drainTurn(post(chat.id, { type: "thinking", problemCallId: "call-pp", text: "", photos: [photo()] }), factory);
 
@@ -203,14 +211,14 @@ describe("photos of handwritten working", () => {
 	it("resizes a large phone photo before it reaches the record", async () => {
 		const chat = teacherChat("Test: big photo");
 		const { engine } = scripted([fauxAssistantMessage([fauxText("Got it.")])]);
-		await drainTurn(post(chat.id, { type: "text", text: "my page", photos: [photo(workingPng(4032, 3024))] }), (opts) => createTeacherAgent(undefined, { engine, messages: opts.messages }));
+		await drainTurn(post(chat.id, { type: "text", text: "my page", photos: [photo(workingPng(4032, 3024))] }), (opts) => createTeacherAgent(undefined, onFake(engine, opts)));
 		const saved = photosOf(chatStore.getChat(chat.id)!.messages.find((m) => m.role === "user")!.content)[0]!;
 		const bytes = Buffer.from(saved.data, "base64");
 		const { width } = await import("@napi-rs/canvas").then(({ loadImage }) => loadImage(bytes));
 		assert.ok(width <= 2000, `the saved photo is at most 2000px wide (got ${width})`);
 	});
 
-	it("the export embeds the photo; the digest and the summary only say one is there", async () => {
+	it("the export embeds the photo; the digest only says one is there; the model gets the photo", async () => {
 		const data = workingPng();
 		const messages = [
 			{ id: "u1", role: "user", content: [{ type: "text", text: "Here is my page." }, photo(data)], timestamp: 1 },
@@ -219,9 +227,8 @@ describe("photos of handwritten working", () => {
 		const note = sessionMarkdown(messages);
 		assert.ok(note.includes("Here is my page.") && note.includes("photo of his handwritten working"));
 		assert.equal(note.includes(data), false);
-		const summary = serializeForSummary(messages);
-		assert.ok(summary.includes("[LEARNER] Here is my page.") && !summary.includes(data) && !summary.includes("[object Object]"));
-		assert.equal(imagesIn(toLlmMessages(messages)).length, 1);
+		const owed = sdkInputBlocks(messages);
+		assert.deepEqual(owed.map((b) => b.type), ["text", "image"], "the model still gets the photo itself");
 
 		const chat = teacherChat("Test: photo export");
 		chatStore.saveMessages(chat.id, messages);

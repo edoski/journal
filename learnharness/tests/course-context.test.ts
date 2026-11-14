@@ -8,6 +8,7 @@
  * what the map cites.
  */
 
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -18,7 +19,7 @@ import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseSt
 import { LEARNING_ENGINE } from "../config.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import { createCourseMapBuilder } from "../src/agent/subagents/course-map-builder.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
 import type { CourseMapLedgers } from "../src/core/ports.ts";
 import type { CourseMapLedger, MapSubmit } from "../src/core/course-map-build.ts";
 import { citedSources, contextOf, freeHandle, webAddress } from "../src/core/course-context.ts";
@@ -82,7 +83,7 @@ function memoryLedgers(): CourseMapLedgers & { all: Map<string, CourseMapLedger>
 
 /** A model that reads every source it is told to read now, then submits
  *  the answer; `reads` and `prompts` are what it was given. */
-function scriptedModel(answer: MapSubmit): PiEngine & { reads: string[]; prompts: string[] } {
+function scriptedModel(answer: MapSubmit): SdkEngine & { reads: string[]; prompts: string[] } {
 	const reads: string[] = [];
 	const prompts: string[] = [];
 	const faux = createFauxCore({});
@@ -98,7 +99,7 @@ function scriptedModel(answer: MapSubmit): PiEngine & { reads: string[]; prompts
 		return fauxAssistantMessage([fauxToolCall("submit_map", answer as unknown as ToolCall["arguments"], { id: "submit" })], { stopReason: "toolUse" });
 	};
 	faux.setResponses(Array.from({ length: 20 }, () => step));
-	return Object.assign({ model: faux.getModel(), streamFn: faux.streamSimple }, { reads, prompts });
+	return Object.assign(fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }), { reads, prompts });
 }
 
 /** Resolves once `check` holds, re-checked on every course-map status

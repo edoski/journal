@@ -14,14 +14,16 @@ import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
-import { createFauxCore, fauxAssistantMessage, fauxText, type TranscriptContext } from "@earendil-works/pi-ai";
+import { randomUUID } from "node:crypto";
+import { createFauxCore, fauxAssistantMessage, fauxText, type Message, type TranscriptContext } from "@earendil-works/pi-ai";
 import { signInTestClaude } from "./claude-fixture.ts";
+import { fakeFor, onFake } from "./helpers/fake-sdk.ts";
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-tools-always-on-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 await signInTestClaude();
 
-const { SETTINGS_FILE } = await import("../config.ts");
+const { PATHS, SETTINGS_FILE } = await import("../config.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { jobStore } = await import("../src/store/jobs.ts");
 const { handleChatRequest } = await import("../src/server/chat-handler.ts");
@@ -57,14 +59,22 @@ describe("a settings file that switched every tool off", () => {
 			offered.push((system && system.role === "system" ? system.toolsAdded ?? [] : []).map((t) => t.name));
 			return fauxAssistantMessage([fauxText("Let's plan it.")]);
 		}]);
-		const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const scripted = { model: faux.getModel(), streamFn: faux.streamSimple };
+		// The probe ran on Claude Code: its session holds the record so far.
+		const held = chatStore.getChat(chat.id)!.messages.map((m) => ({ uuid: randomUUID(), message: m as Message }));
+		const session = randomUUID();
+		fakeFor(scripted).sessions.set(session, held);
+		fs.mkdirSync(PATHS.chats, { recursive: true });
+		fs.writeFileSync(path.join(PATHS.chats, `${chat.id}.session.jsonl`), `${JSON.stringify({ entries: held.length })}\n`);
+		chatStore.saveSession(chat.id, { id: session, synced: "r1", anchor: held.at(-1)!.uuid });
 
 		const res = await handleChatRequest(
 			new Request("http://test/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, input: { type: "text", text: "Go." } }) }),
 			(opts) => {
 				kinds.push(opts.agent);
 				const ctx = { chatId: chat.id, chatStore, jobStore, spawn: () => {}, deliver: () => {} };
-				return opts.agent === "teacher" ? createTeacherAgent(ctx, { ...opts, engine }) : createProberAgent(ctx, { ...opts, engine });
+				const build = { ...onFake(scripted, opts), onUsage: opts.onUsage };
+				return opts.agent === "teacher" ? createTeacherAgent(ctx, build) : createProberAgent(ctx, build);
 			},
 		);
 		assert.equal(res.status, 200, await res.clone().text());

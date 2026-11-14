@@ -1,8 +1,7 @@
 /**
- * Raw-stream credential regression: the Sept 26 Agent getApiKey-hook tests
- * do not exercise these two hand-rolled loops. All credentials here are
- * synthetic; fetch is CLOSED (never delegates), including Google's global
- * fetch-only adapter.
+ * Background agent credential regression: the visual maker and the pdf
+ * reader run on the Agent SDK with no credential of the app's own. All
+ * credentials here are synthetic; fetch is CLOSED (never delegates).
  */
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -13,11 +12,12 @@ import {
 	createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall,
 	type JsonObject, type TranscriptContext, type Usage,
 } from "@earendil-works/pi-ai";
-import { claudeEngine, type PiEngine } from "../src/agent/models.ts";
+import { claudeEngine } from "../src/agent/models.ts";
 import { runVisualMaker } from "../src/agent/subagents/visual-maker.ts";
 import { runPdfReaderAgent } from "../src/agent/subagents/pdf-reader.ts";
 import type { HeadlessApi } from "../src/agent/subagents/headless.ts";
-import { providerEventsDir } from "../src/agent/provider-events.ts";
+import type { SdkEngine } from "../src/agent/sdk/engine.ts";
+import { fakeSdk } from "./helpers/fake-sdk.ts";
 
 const OR_KEY = "dummy-openrouter-MUST-NOT-REACH-other-endpoints";
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" fill="white"/></svg>';
@@ -39,9 +39,6 @@ type Call = { name: string; args: JsonObject };
 async function isolated<T>(env: Record<string, string>, run: () => Promise<T>): Promise<T> {
 	const previous = process.env;
 	const fetch = globalThis.fetch;
-	const previousEventsDir = providerEventsDir.current;
-	const eventsDir = mkdtempSync(path.join(tmpdir(), "lh-provider-neutral-"));
-	providerEventsDir.current = eventsDir;
 	globalThis.fetch = async () => { throw new Error("CLOSED: unexpected fetch"); };
 	process.env = { NODE_ENV: "test", HOME: "/nonexistent/provider-neutral-test-home", ...env };
 	try {
@@ -49,13 +46,11 @@ async function isolated<T>(env: Record<string, string>, run: () => Promise<T>): 
 	} finally {
 		process.env = previous;
 		globalThis.fetch = fetch;
-		providerEventsDir.current = previousEventsDir;
-		rmSync(eventsDir, { recursive: true, force: true });
 	}
 }
 
 function callsFor(loop: Loop, round: number): Call[] {
-	if (round === 2) return [];
+	if (round === 2) return loop === "visual" ? [{ name: "finish", args: { notes: FINAL } }] : [];
 	if (loop === "visual") return round === 0
 		? [{ name: "write_svg", args: { svg: SVG } }]
 		: [{ name: "render_svg", args: {} }];
@@ -84,7 +79,7 @@ function fakeHeadless(renders: string[]): HeadlessApi {
 	};
 }
 
-async function runLoop(loop: Loop, engine: PiEngine, signal = new AbortController().signal) {
+async function runLoop(loop: Loop, engine: SdkEngine, signal = new AbortController().signal) {
 	const renders: string[] = [];
 	const activities: string[] = [];
 	const usages: Usage[] = [];
@@ -92,8 +87,6 @@ async function runLoop(loop: Loop, engine: PiEngine, signal = new AbortControlle
 		engine, headless: fakeHeadless(renders), abortSignal: signal,
 		onActivity: (line: string) => activities.push(line),
 		onUsage: (usage: Usage) => usages.push(usage),
-		// Direct recording cases enable the observer into an isolated temp dir.
-		chatId: "provider-neutral-offline",
 	};
 	const result = loop === "visual"
 		? await runVisualMaker({ brief: "A white square, no external resources" }, opts)
@@ -117,60 +110,52 @@ function assertSuccess(loop: Loop, run: Awaited<ReturnType<typeof runLoop>>) {
 	assert.ok(run.activities.some((line) => line.startsWith(loop === "visual" ? "render_svg:" : "pdf_render:")));
 }
 
+/** The scripted rounds twice over (two runs), each request recorded. */
+function recordingFake(loop: Loop) {
+	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
+	faux.setResponses([0, 1, 2, 0, 1, 2].map((round) => {
+		const calls = callsFor(loop, round);
+		return fauxAssistantMessage(calls.length
+			? calls.map((c, i) => fauxToolCall(c.name, c.args, { id: `call_${round}_${i}` }))
+			: [fauxText(FINAL)], { stopReason: calls.length ? "toolUse" : "stop" });
+	}));
+	const requests: TranscriptContext[] = [];
+	return { fake: fakeSdk({ model: faux.models[0], streamFn: (model, context, options) => { requests.push(context); return faux.streamSimple(model, context, options); } }), requests };
+}
+
 // All global/env cases in this file are deliberately serial.
-describe("provider-neutral raw agent loops", { concurrency: false }, () => {
+describe("provider-neutral background agents", { concurrency: false }, () => {
 	for (const loop of LOOPS) {
-		it(`${loop}: every actual stream request has NO credential override (recording faux engine)`, async () => {
-			await isolated({ OPENROUTER_API_KEY: OR_KEY, LH_PROVIDER_EVENTS: "1" }, async () => {
-				const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
-				faux.setResponses([0, 1, 2, 0, 1, 2].map((round) => {
-					const calls = callsFor(loop, round);
-					return fauxAssistantMessage(calls.length
-						? calls.map((c, i) => fauxToolCall(c.name, c.args, { id: `call_${round}_${i}` }))
-						: [fauxText(FINAL)], { stopReason: calls.length ? "toolUse" : "stop" });
-				}));
-				const requests: { context: TranscriptContext; options: Record<string, unknown> }[] = [];
-				const signal = new AbortController().signal;
-				const engine: PiEngine = {
-					model: faux.getModel(), level: "medium",
-					streamFn: (model, context, options) => {
-						requests.push({ context, options: { ...options } });
-						return faux.streamSimple(model, context, options);
-					},
-				};
-				const run = await runLoop(loop, engine, signal);
+		it(`${loop}: no run carries a credential of the app's own, and each run is a separate unsaved conversation`, async () => {
+			await isolated({ OPENROUTER_API_KEY: OR_KEY }, async () => {
+				const { fake, requests } = recordingFake(loop);
+				const run = await runLoop(loop, fake.engine);
 				assertSuccess(loop, run);
 				assert.equal(requests.length, 3);
-				const sessionId = requests[0]!.options.sessionId;
-				assert.match(String(sessionId), /^[0-9a-f-]{36}$/);
-				assert.notEqual(sessionId, "provider-neutral-offline");
-				for (const { options } of requests) {
-					assert.equal(options.sessionId, sessionId);
-					for (const key of ["apiKey", "getApiKey", "auth", "headers"]) {
-						assert.ok(!Object.hasOwn(options, key), `${loop} stream must not supply ${key}`);
-					}
-					assert.equal(options.reasoning, "medium");
-					assert.equal(options.signal, signal);
-					assert.equal(typeof options.onProviderStreamEvent, "function");
-				}
-				assert.match(JSON.stringify(requests[2]!.context), /image\/png/);
-				assert.match(JSON.stringify(requests[2]!.context), /toolResult/);
-				const second = await runLoop(loop, engine, signal);
+				assert.match(JSON.stringify(requests[2]!.messages), /image\/png/, "the render came back as an image tool result");
+				assert.match(JSON.stringify(requests[2]!.messages), /toolResult/);
+				const second = await runLoop(loop, fake.engine);
 				assertSuccess(loop, second);
 				assert.equal(requests.length, 6);
-				const secondId = requests[3]!.options.sessionId;
-				assert.notEqual(secondId, sessionId, "a separate unsaved operation must not reuse a conversation");
-				for (const request of requests.slice(3)) assert.equal(request.options.sessionId, secondId);
+				assert.equal(fake.calls.length, 2, "one Claude Code run per operation");
+				for (const options of fake.calls) {
+					for (const key of ["env", "apiKey", "getApiKey", "auth", "headers"]) {
+						assert.ok(!Object.hasOwn(options, key), `${loop} must not supply ${key}: credentials come only from the account's launch`);
+					}
+					assert.equal(options.persistSession, false, "a background run keeps no session");
+					assert.equal(options.resume, undefined, "a separate operation must not reuse a conversation");
+				}
+				assert.ok(!JSON.stringify(requests).includes(OR_KEY));
 			});
 		});
 
-		it(`${loop}: abort still reaches the stream and retains the loop's failure semantics`, async () => {
+		it(`${loop}: abort still reaches the run and retains the loop's failure semantics`, async () => {
 			await isolated({ OPENROUTER_API_KEY: OR_KEY }, async () => {
 				const faux = createFauxCore({});
 				faux.setResponses([fauxAssistantMessage([fauxText("must not be delivered")])]);
 				const controller = new AbortController();
 				controller.abort();
-				const run = await runLoop(loop, { model: faux.getModel(), streamFn: faux.streamSimple }, controller.signal);
+				const run = await runLoop(loop, fakeSdk({ model: faux.models[0], streamFn: faux.streamSimple }).engine, controller.signal);
 				const failure = "svg" in run.result ? run.result.notes : run.result.brief;
 				assert.match(failure ?? "", /crashed — aborted/);
 				assert.deepEqual(run.renders, []);
@@ -187,4 +172,3 @@ describe("provider-neutral raw agent loops", { concurrency: false }, () => {
 		});
 	});
 });
-

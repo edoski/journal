@@ -1,15 +1,14 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-import type { NativeWebSearch } from "../native-web-search.ts";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 
 /**
- * Server-side web tools for the researcher sub-agent:
+ * Server-side web tools for the researcher sub-agent (search is Claude
+ * Code's own WebSearch):
  *
- *   web_search(query) → result links plus a sourced summary (the model's native search)
  *   web_fetch(url)    → readable markdown text (Readability + Turndown, Jina Reader
  *                       fallback for JS-rendered pages)
  *
@@ -110,17 +109,13 @@ export async function fetchAndExtract(url: string): Promise<string> {
 
 // ── tool registry ────────────────────────────────────────────────────────────
 
-const webSearchInput = Type.Object({
-	query: Type.String({ description: "The search query (a normal search string, phrases included)" }),
-});
 
 const webFetchInput = Type.Object({
 	url: Type.String({ description: "The URL to fetch" }),
 });
 
-export function createWebTools(search?: NativeWebSearch): Record<string, AgentTool<any>> {
+export function createWebTools(): Record<string, AgentTool<any>> {
 	return {
-		...(search ? { web_search: webSearchTool(search) } : {}),
 		web_fetch: {
 			name: "web_fetch",
 			label: "web_fetch",
@@ -147,22 +142,5 @@ export function createWebTools(search?: NativeWebSearch): Record<string, AgentTo
 				}
 			}),
 		},
-	};
-}
-
-function webSearchTool(search: NativeWebSearch): AgentTool<any> {
-	return {
-		name: "web_search",
-		label: "web_search",
-		description: "Search the web with the model's native search. One search per call, so use one call per search angle. " +
-			"Returns result links (title, url) plus a short sourced summary.",
-		parameters: webSearchInput,
-		execute: serverExecute("web_search", webSearchInput, async ({ query }, { signal }): Promise<string> => {
-			try {
-				return await search(query, signal);
-			} catch (err) {
-				return err instanceof Error ? err.message : String(err);
-			}
-		}),
 	};
 }
