@@ -1,4 +1,4 @@
-import { nativeInputCause, NEUTRAL_MARKERS, type LhMessage } from "./native-messages.ts";
+import { nativeInputCause, needsContinuation, NEUTRAL_MARKERS, type LhMessage } from "./native-messages.ts";
 
 /**
  * The tutor's turn ended without a word after his input (round 2, 14 Nov
@@ -33,6 +33,14 @@ export function replyCutOf(messages: readonly LhMessage[]): "stopped" | "lost" |
 	if (last.role === "assistant") return isEmptyStop(last) ? "stopped" : null;
 	if (last.role === "toolResult") return null;
 	return nativeInputCause(last as never, messages.slice(0, i) as never) === "learner" ? "lost" : null;
+}
+
+/** Whether a `continue` has anything to do (round 4, 14 Nov 2026): the
+ *  record owes the tutor's reaction to an answer, or its reply never came.
+ *  Anything else means the reply already came, from another window's
+ *  continue for one, so a second run would answer his input twice. Pure. */
+export function continuationOwed(messages: readonly LhMessage[]): boolean {
+	return needsContinuation(messages) || replyCutOf(messages) !== null;
 }
 
 /** The empty stopped replies a `continue` steps past (round 4): the record

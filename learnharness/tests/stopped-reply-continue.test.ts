@@ -1,5 +1,5 @@
 /**
- * Try again after a stop (round 4, 14 Nov
+ * Try again after a stop, and continue from two windows (round 4, 14 Nov
  * 2026). Scripted faux engines: no real provider calls or learning data.
  */
 
@@ -76,6 +76,20 @@ describe("Try again after a stop", () => {
 		assert.equal((await turn(engine, chat.id, { type: "continue" })).status, 200);
 		assert.deepEqual(calls, [["user"]]);
 		assert.deepEqual(texts(chat.id).at(-1), "Here it is.");
+	});
+});
+
+describe("a continue whose reply already came", () => {
+	it("runs no tutor turn, so a second window never answers his input twice", async () => {
+		const { engine, calls } = scripted([() => fauxAssistantMessage([fauxText("First reply.")]), () => fauxAssistantMessage([fauxText("Second reply.")])]);
+		const chat = chatStore.createChat("Test: two windows resume");
+		chatStore.saveMessages(chat.id, [newUserMessage("What is a pivot?")]);
+		assert.equal((await turn(engine, chat.id, { type: "continue" })).status, 200, "the first window resumes the lost reply");
+		const late = await turn(engine, chat.id, { type: "continue" });
+		assert.equal(late.status, 200);
+		assert.match(late.body, /turn-settled/, "the second window is pointed at the record");
+		assert.equal(calls.length, 1, "the tutor ran once");
+		assert.deepEqual(texts(chat.id), ["First reply."]);
 	});
 });
 

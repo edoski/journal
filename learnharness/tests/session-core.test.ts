@@ -238,6 +238,27 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 	});
 });
 
+describe("a continue that finds a turn running", () => {
+	it("attaches to that turn and never posts again, so two windows resume one reply", async () => {
+		// Round 4: after a restart both windows sent continue; the loser waited
+		// out the winner's turn, re-posted, and the tutor ran a second time.
+		const posts: string[] = [];
+		let streamed = 0;
+		const m = model({
+			waitMaxMs: 5_000,
+			fetch: dietFetch({
+				post: () => new Response("busy", { status: 409 }),
+				onPost: (body) => posts.push(body),
+				stream: () => { streamed++; return sseResponse({ type: "turn-settled" }, "[DONE]"); },
+			}),
+		});
+		await m.send({ type: "continue" });
+		assert.equal(posts.length, 1, "one POST, no identity retry");
+		assert.equal(streamed, 1, "it watches the running turn instead");
+		assert.equal(m.getState().error, null, "no busy error for an automatic resume");
+	});
+});
+
 // ─── send: optimistic appends + wire consumption ────────────────────────────
 
 describe("send (one input event, verbatim consumption)", () => {
