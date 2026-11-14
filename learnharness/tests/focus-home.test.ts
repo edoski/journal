@@ -25,6 +25,21 @@ test("with nothing open the next key goes to the composer", () => {
 	assert.equal(focusHomeIn(doc)?.tagName, "TEXTAREA");
 });
 
+test("while the tutor answers what he sent from a question or problem, his next key stays out of the message box", () => {
+	// Round 4: Enter sent part 1 of an answer, and part 2, typed on, went into
+	// the message box, kept there unseen behind the next question until it
+	// surfaced later as a stray draft ("he o").
+	const doc = page('<form data-testid="composer"><textarea></textarea></form>');
+	assert.equal(focusHomeIn(doc, true), null);
+	let focused = "";
+	const root = { querySelector: (selector: string) => (selector.includes("composer") ? { focus: () => { focused = "composer"; } } : null) } as unknown as ParentNode;
+	const body = { isConnected: true };
+	landFocus({ body, activeElement: body } as unknown as Document, root, true);
+	assert.equal(focused, "", "no key lands in the message box mid-reply");
+	landFocus({ body, activeElement: body } as unknown as Document, root, false);
+	assert.equal(focused, "composer", "once the reply is in, focus goes home as before");
+});
+
 test("focus moves only when nothing holds it", () => {
 	let focused = "";
 	const composer = { focus: () => { focused = "composer"; } };
