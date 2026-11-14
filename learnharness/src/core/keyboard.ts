@@ -47,7 +47,10 @@ export type KeyAction =
 	| "pick-course"
 	| "practice-hint"
 	| "practice-show"
-	| "practice-explain";
+	| "practice-explain"
+	| "jump-latest"
+	| "done-tonight"
+	| "dialog-confirm";
 
 /** Where Settings and the cheat sheet group an action (display only —
  *  dispatch is global; a seam that isn't mounted simply no-ops). */
@@ -100,6 +103,9 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "practice-hint", label: "Problem or check · hint", scope: "lesson", binding: "mod+shift+h" },
 	{ id: "practice-show", label: "Problem · show me", scope: "lesson", binding: "mod+shift+s" },
 	{ id: "practice-explain", label: "Problem · explain instead", scope: "lesson", binding: "mod+shift+e" },
+	{ id: "jump-latest", label: "Go to the newest reply", scope: "lesson", binding: "mod+arrowdown" },
+	{ id: "done-tonight", label: "Done for tonight", scope: "lesson", binding: "mod+shift+d" },
+	{ id: "dialog-confirm", label: "Confirm in a stop or skip box (← → move between its buttons)", scope: "lesson", binding: "mod+enter", displayOnly: true },
 	// The question dock's row machine (wave B) — displayOnly: the dock owns
 	// the keys while a question is open; the registry never dispatches
 	// them, so bare arrows stay free everywhere else.

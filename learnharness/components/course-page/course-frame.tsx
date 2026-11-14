@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { courseMove } from "@/components/study-home/study-facts";
+import { unreadableLine } from "@/components/study-home/unreadable-course";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CourseChrome } from "@/components/course-page/course-chrome";
@@ -81,7 +82,7 @@ function CourseBody({ read, onRetry, children }: { read: CourseRead; onRetry: ()
 		case "unreadable":
 			return (
 				<Notice>
-					The study engine couldn’t read this course.{" "}
+					{unreadableLine(read.course.problem)}{" "}
 					<Button variant="quiet" size="sm" onClick={onRetry} className="text-link hover:text-link">
 						Try again
 					</Button>

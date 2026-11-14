@@ -37,6 +37,8 @@ export * from "./input-events.ts";
 export * from "./view.ts";
 export * from "./tool-parts.ts";
 export * from "./answer-presentation.ts";
+export { doneTonightAtEnd } from "./session-end.ts";
+export { replyNeverCame } from "./turn-cut.ts";
 export * from "./prices.ts";
 export * from "./context-usage.ts";
 export type { ChatGPTStatus, ChatGPTControlBridge } from "./contracts/chatgpt.ts";

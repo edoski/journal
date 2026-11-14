@@ -200,6 +200,7 @@ function renderList(over: Partial<NowListProps> = {}, courses: readonly StudyCou
 		needs: needsYouNow(courses, chats, TODAY),
 		inbox: buildInbox(courses, chats, null),
 		courses,
+		unreadable: [],
 		chats,
 		today: TODAY,
 		unavailable: false,
@@ -250,5 +251,17 @@ describe("TodayList", () => {
 		assert.equal(down.querySelector('[data-slot="sidebar-note"]')?.textContent, "Couldn’t read your courses");
 		// A session waiting since before yesterday lights Other's dot.
 		assert.match(down.querySelector('[data-slot="unit-section-header"]')?.textContent ?? "", /^Other sessions, your turn$/);
+	});
+
+	it("keeps a course whose record can't be read as a card under Today's, named, that opens its course page", () => {
+		const broken = { workspace: "/s/analysis", title: "Real Analysis", problem: "damaged" as const };
+		const doc = renderList({ unreadable: [broken] });
+		const card = [...doc.querySelectorAll('[data-slot="unit-card"]')].at(-1)!;
+		assert.equal(card.querySelector('[data-testid="unit-row"] > span:first-child')?.textContent, "RAReal Analysis");
+		assert.equal(card.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent, "Couldn't read this course's record");
+		assert.match(card.querySelector("a")?.getAttribute("href") ?? "", /^\/unit\//);
+		const alone = renderList({ unreadable: [broken] }, [], []);
+		assert.equal(alone.querySelectorAll('[data-slot="unit-card"]').length, 1);
+		assert.equal(alone.querySelector('[data-slot="sidebar-note"]'), null, "not No courses yet");
 	});
 });

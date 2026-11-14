@@ -21,7 +21,7 @@ import type {
 	TurnUsage,
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
-import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb, NewCourseRecord } from "./contracts/course.ts";
+import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb, NewCourseRecord, UnreadableCourse } from "./contracts/course.ts";
 import type { CourseMap } from "./contracts/course-map.ts";
 
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
@@ -135,8 +135,10 @@ export interface CourseMapLedgers {
  * back as a CourseResult or an unavailable listing.
  */
 export interface CourseRecords {
-	/** Every registered course, for the chooser. */
-	list(): Promise<{ available: true; courses: CourseSummary[] } | Extract<CourseListing, { available: false }>>;
+	/** Every registered course, for the chooser, and those it could not read. */
+	list(): Promise<
+		{ available: true; courses: CourseSummary[]; unreadable: UnreadableCourse[] } | Extract<CourseListing, { available: false }>
+	>;
 	/** Run one verb against one course workspace. */
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
 	/** The course map: the engine's read-only `map` verb, parsed. */

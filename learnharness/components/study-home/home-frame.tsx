@@ -9,6 +9,7 @@ import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { needsYouNow } from "@/components/study-home/needs-you";
 import { courseMove, todayCourses, type TodayRow } from "@/components/study-home/study-facts";
+import { UnreadableLines } from "@/components/study-home/unreadable-course";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { StudyCourse } from "@/src/core";
 
@@ -30,7 +31,7 @@ export interface HomeReady {
  * What every study home shares (spec: lessons.md): the page chrome, the
  * read of the courses with its states, and the lesson start. A home gives
  * its column's classes and draws the ready state; `quiet` leaves out the
- * line that names an unreadable course, while a map fills the page.
+ * lines that name an unreadable course, while a map fills the page.
  */
 export function HomeFrame({
 	className,
@@ -101,6 +102,7 @@ function HomeBody({
 			);
 		case "ready": {
 			if (state.courses.length === 0) {
+				if (state.failed.length > 0) return <UnreadableLines courses={state.failed} />;
 				return <Notice>No courses yet. Start a lesson from New lesson and pick a course there.</Notice>;
 			}
 			const today = state.courses[0]!.map.today;
@@ -120,11 +122,7 @@ function HomeBody({
 							else onStart(move.opening, workspace, { topics: move.topics, from: move.from });
 						},
 					})}
-					{!quiet && state.failed.length > 0 && (
-						<p className="shrink-0 text-row text-muted-foreground">
-							Couldn’t read {state.failed.length === 1 ? "one course" : "some courses"}: {state.failed.join(", ")}
-						</p>
-					)}
+					{!quiet && <UnreadableLines courses={state.failed} />}
 				</>
 			);
 		}

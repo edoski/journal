@@ -41,9 +41,9 @@ function asks(reply: Extract<LhMessage, { role: "assistant" }>): boolean {
 	return /\?[\s*_)\]"'”’$]*$/.test(text);
 }
 
-/** True when the tutor's latest close (`lesson_progress` with `close: true`)
- *  has had no word from him since: he finished for tonight. His next
- *  message reopens the session. Pure. */
+/** True when the session closed for tonight with no word from him since:
+ *  the tutor's latest close (`lesson_progress` with `close: true`), or his
+ *  own Done for tonight. His next message reopens the session. Pure. */
 export function closedTonight(messages: readonly LhMessage[]): boolean {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const m = messages[i]!;
@@ -51,8 +51,22 @@ export function closedTonight(messages: readonly LhMessage[]): boolean {
 			if (m.stopReason === "error" || m.stopReason === "aborted") continue;
 			if (m.content.some((b) => b.type === "toolCall" && b.name === LESSON_PROGRESS_TOOL && lessonProgressOf(b.arguments)?.close === true)) return true;
 		} else if (nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") {
-			return false;
+			return isDoneTonight(m);
 		}
 	}
 	return false;
+}
+
+/** True while his Done for tonight is his latest input: nothing he sent
+ *  since reopened the session. Pure. */
+export function doneTonightAtEnd(messages: readonly LhMessage[]): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") return isDoneTonight(m);
+	}
+	return false;
+}
+
+function isDoneTonight(m: LhMessage): boolean {
+	return m.role === "custom" && m.customType === "done-tonight";
 }

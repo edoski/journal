@@ -29,6 +29,7 @@ import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
+import { UnreadableLines } from "../components/study-home/unreadable-course.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
 
@@ -347,5 +348,26 @@ describe("what a line of Today reads", () => {
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 4);
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["review", 1]]);
 		plain(doc);
+	});
+});
+
+describe("a course whose record can't be read", () => {
+	it("stays on Home by its name, with the line that says what's wrong in plain words", () => {
+		const html = renderToStaticMarkup(
+			<UnreadableLines
+				courses={[
+					{ workspace: "/s/real-analysis", title: "Real Analysis", problem: "damaged" },
+					{ workspace: "/s/probability", title: "Probability", problem: "denied" },
+				]}
+			/>,
+		);
+		const lines = [...parseHTML(`<html><body>${html}</body></html>`).document.querySelectorAll('[data-slot="unreadable-course"]')];
+		assert.deepEqual(
+			lines.map((p) => p.textContent),
+			[
+				"Real Analysis Couldn't read this course's record. Its file is damaged.",
+				"Probability Couldn't read this course's record. The app isn't allowed to open its files.",
+			],
+		);
 	});
 });

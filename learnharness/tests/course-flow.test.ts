@@ -123,6 +123,7 @@ describe("course chooser routes", () => {
 				{ workspace: LINALG, title: "Linear Algebra", due: 1, reviews: [{ title: "rank", overdue: 0, gap: null }], current: "rank", currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
 				{ workspace: RUST, title: "Rust", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
 			],
+			unreadable: [],
 			roots: [LEARN, STUDY],
 		});
 	});

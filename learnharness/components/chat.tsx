@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
-import { visibleQueuedSteers } from "@/components/session-core";
+import { STREAM_DROPPED, visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import {
 	Conversation,
 	ConversationContent,
 	ConversationEmptyState,
-	ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
@@ -71,6 +70,8 @@ import {
 	teachStepIndex,
 	toolQuestionKind,
 	questionNeedsReveal,
+	doneTonightAtEnd,
+	replyNeverCame,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
@@ -85,6 +86,17 @@ import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
+import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
+import { ScrollCueButton } from "@/components/lesson/scroll-cue";
+import { showsWorking } from "@/components/lesson/working-sign";
+import { formDraftText, strandedDraft } from "@/components/lesson/stranded-draft";
+import { LESSON_WORDS } from "@/components/study-words";
+import { ReplyCut } from "@/components/lesson/reply-cut";
+import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
+import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
+
+/** The transcript's own column inside the scroller (the docks have their own find roots). */
+const TRANSCRIPT_COLUMN = "[data-transcript-column]";
 
 // The dock overlay's gradient band (h-24) — part of the reserved tail.
 const GRADIENT_H = 96;
@@ -209,11 +221,54 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send, continueIfOwed, steer, steerQueue, submitAnswer, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
+
+	/* THE SCROLL MODEL (components/lesson/reading-position.ts): every action
+	 * of his that starts a turn passes here, so the lesson goes to its end
+	 * and the reply that follows holds at its own first line. Automatic
+	 * continuations go straight to the session and anchor nothing. */
+	const replyAnchorRef = useRef<ReplyAnchor>(null);
+	/* What he has typed in the open dock (stranded-draft.ts): cleared the
+	 * moment this window sends, so words still here when the dock's question
+	 * leaves were overtaken by another window. */
+	const liveDraftRef = useRef<{ key: string; form: string; reading: string } | null>(null);
+	const [answeredElsewhere, setAnsweredElsewhere] = useState(false);
+	// The dock this window last sent from: its question leaving is his doing.
+	const dockKeyRef = useRef<string | null>(null);
+	const sentFromDockRef = useRef<string | null>(null);
+	const followAction = useCallback(() => {
+		const context = scrollContextRef.current;
+		if (!context) return;
+		replyAnchorRef.current = sessionFindScopeRef.current?.querySelector<HTMLElement>(TRANSCRIPT_COLUMN)?.lastElementChild as HTMLElement | null ?? null;
+		void context.scrollToBottom();
+	}, []);
+	const followTargetScrollTop = useCallback((bottom: number, { scrollElement }: { scrollElement: HTMLElement }) =>
+		followTarget(bottom, replyStart(replyAnchorRef.current, scrollElement)), []);
+	const jumpToLatest = useCallback(() => {
+		replyAnchorRef.current = null;
+		void scrollContextRef.current?.scrollToBottom();
+	}, []);
+	const send = useCallback<typeof sendInput>((...args) => {
+		liveDraftRef.current = null;
+		sentFromDockRef.current = dockKeyRef.current;
+		setAnsweredElsewhere(false);
+		followAction();
+		return sendInput(...args);
+	}, [sendInput, followAction]);
+	const steer = useCallback<typeof steerInput>((...args) => {
+		followAction();
+		return steerInput(...args);
+	}, [steerInput, followAction]);
+	const submitAnswer = useCallback<typeof submitInput>((...args) => {
+		liveDraftRef.current = null;
+		sentFromDockRef.current = dockKeyRef.current;
+		followAction();
+		return submitInput(...args);
+	}, [submitInput, followAction]);
 	const sourceTextParts = useMemo(() => firstSourceTextParts(messages), [messages]);
 
 	// The reattach settled terminal → the sync-and-continue seam (below).
@@ -325,8 +380,17 @@ export function Chat({
 	// the plan popup, or the setup dialog over a pending question must not
 	// dismiss the question underneath.
 	const [abortAsk, setAbortAsk] = useState<AbortMode | null>(null);
+	// Bumped when something that held focus goes away (a rename ends, a
+	// confirm closes): the dock puts focus back where he types (focus-home.ts).
+	const [focusEpoch, setFocusEpoch] = useState(0);
+	const settledFocusRef = useRef({ renaming: false, abortAsk: null as AbortMode | null });
 	const abortAskRef = useRef<AbortMode | null>(null);
 	abortAskRef.current = abortAsk;
+	useEffect(() => {
+		const was = settledFocusRef.current;
+		settledFocusRef.current = { renaming, abortAsk };
+		if ((was.renaming && !renaming) || (was.abortAsk !== null && abortAsk === null)) setFocusEpoch((n) => n + 1);
+	}, [renaming, abortAsk]);
 	useEffect(() => {
 		const onAbort = () => {
 			const target = escAbortTarget({
@@ -361,6 +425,8 @@ export function Chat({
 			// 2026-10-04 — the GLM loop): the question can only dangle because a
 			// turn is STILL RUNNING, so the discard ALSO kills that turn; the
 			// route parks the dismissal (202) and the settle applies it.
+			liveDraftRef.current = null;
+			sentFromDockRef.current = dockKeyRef.current;
 			const p = pendingRef.current;
 			if (p) {
 				const question = (p.input as { question?: string } | null)?.question ?? "";
@@ -498,6 +564,13 @@ export function Chat({
 	}, []);
 	const applyReadingThinking = useCallback((v: string) => {
 		readingThinkingRef.current = v;
+		const key = pendingRef.current ? `q:${pendingRef.current.key}` : null;
+		if (key) liveDraftRef.current = { key, form: liveDraftRef.current?.key === key ? liveDraftRef.current.form : "", reading: v };
+	}, []);
+	const recordDockDraft = useCallback((key: string, form: string) => {
+		const live = liveDraftRef.current;
+		if (live === null && form === "") return;
+		liveDraftRef.current = { key, form, reading: live?.key === key ? live.reading : "" };
 	}, []);
 	const clearReadingThinking = useCallback(() => {
 		readingThinkingRef.current = "";
@@ -533,6 +606,24 @@ export function Chat({
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
 	}, []);
+
+	// ANSWERED IN ANOTHER WINDOW (stranded-draft.ts): the open question or
+	// problem left without this window sending what he typed in it, so the
+	// words go to the composer and one line says why.
+	const dockKey = pending ? `q:${pending.key}` : activeProblem ? `p:${activeProblem.toolCallId}` : null;
+	dockKeyRef.current = dockKey;
+	const prevDockKeyRef = useRef(dockKey);
+	useEffect(() => {
+		const before = prevDockKeyRef.current;
+		prevDockKeyRef.current = dockKey;
+		if (before === dockKey) return;
+		const live = liveDraftRef.current;
+		const words = before === sentFromDockRef.current ? null : strandedDraft(before, dockKey, live && { key: live.key, text: formDraftText([live.form, live.reading]) });
+		liveDraftRef.current = null;
+		if (words === null) return;
+		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${words}` : words);
+		setAnsweredElsewhere(true);
+	}, [dockKey, applyText]);
 	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The last explicitly-sent draft (composer send): the
@@ -678,13 +769,32 @@ export function Chat({
 	const retryFailedTurn = () => retryFailedResponse(send, draftRef);
 	const failure = failedResponseAtEnd(nativeMessages);
 	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
+	// A turn that ended with no word after his input (a restart, a stop
+	// before the reply began) says so, with Try again (turn-cut.ts).
+	const replyCut = status === "ready" && !busy && !compacting && !error && replyNeverCame(nativeMessages);
 	const sendAllowed = !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
 	 * has ever been posed (the fresh session's opening turn is owed, not
 	 * the move-on). Enter-on-empty and the Next chip both key on it. */
+	// Done for tonight (done-tonight.tsx): stops the session whatever is
+	// open; until he writes again, the session waits on nothing.
+	const doneTonight = doneTonightAtEnd(nativeMessages);
+	const sendTonight = useCallback(() => {
+		if (busy || compacting || doneTonight) return;
+		void send({ type: "tonight" });
+	}, [busy, compacting, doneTonight, send]);
+	const sendTonightRef = useRef(sendTonight);
+	sendTonightRef.current = sendTonight;
+	useEffect(() => {
+		const onTonight = () => sendTonightRef.current();
+		window.addEventListener(kbdEventForChat("done-tonight"), onTonight);
+		return () => window.removeEventListener(kbdEventForChat("done-tonight"), onTonight);
+	}, []);
+
 	const nextReady =
+		!doneTonight &&
 		mode === "practice" &&
 		!pending &&
 		!activeProblem &&
@@ -986,7 +1096,13 @@ export function Chat({
 		}, 250);
 	});
 	// Reconnect catch-up: events missed while the channel was down.
-	useServerResync(() => fetchJobsRef.current());
+	useServerResync(() => {
+		fetchJobsRef.current();
+		// The channel came back after the app restarted: a turn the restart
+		// cut never settles, so the dropped stream's line would stand
+		// forever. Ask the record what is true now.
+		if (statusRef.current === "error" && errorMessageRef.current === STREAM_DROPPED) void healDroppedStreamRef.current();
+	});
 	useEffect(
 		() => () => {
 			if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
@@ -1003,6 +1119,24 @@ export function Chat({
 	// between renders, and a ref holds the live value at event time.
 	const statusRef = useRef(status);
 	statusRef.current = status;
+	const errorMessageRef = useRef(error?.message);
+	errorMessageRef.current = error?.message;
+	const healDroppedStreamRef = useRef(async () => {});
+	healDroppedStreamRef.current = async () => {
+		try {
+			const res = await fetch(`/api/chats/${chatId}`);
+			if (!res.ok) return;
+			const record = (await res.json()) as { turnInFlight?: boolean };
+			if (record.turnInFlight === true) {
+				attachToRunningTurn();
+				return;
+			}
+			clearError();
+			void syncFromServer();
+		} catch {
+			/* still unreachable: the next resync asks again */
+		}
+	};
 	/** Fix B (2026-10-02): turn-settled arrived for OUR OWN turn — the
 	 * record is durable (endTurn fires only after persistTurn); the ready
 	 * flip consumes this flag to canonize the view onto the record. See the
@@ -1225,6 +1359,7 @@ export function Chat({
 						courseHref={course ? courseHref(course.workspace) : undefined}
 						phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
+						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
 						details={
 							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
 						}
@@ -1233,10 +1368,10 @@ export function Chat({
 
 				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
-				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
+				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef} targetScrollTop={followTargetScrollTop}>
 					<SessionMessageNavigation />
 					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-						<div data-session-find-root="" className={`${LESSON_COLUMN} flex flex-1 flex-col gap-4 pt-6`}>
+						<div data-session-find-root="" data-transcript-column="" className={`${LESSON_COLUMN} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="New session"
@@ -1292,6 +1427,8 @@ export function Chat({
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16).
 												return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
+											case "data-done-tonight":
+												return <DoneTonightLine key={pi} />;
 											// data-compaction (the moment the summary ran) stays
 											// unmarked: the cut's hairline is enough.
 											default:
@@ -1451,7 +1588,8 @@ export function Chat({
 						    the THINKING placeholder by construction (the gate sits
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{(status === "submitted" || turnInFlight) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{replyCut && <ReplyCut onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
@@ -1487,6 +1625,12 @@ export function Chat({
 					onReadingThinking={applyReadingThinking}
 					phase={phases.at(-1) ?? "probe"}
 					onReserve={setDockReserve}
+					busy={busy}
+					focusEpoch={focusEpoch}
+					onDockDraft={recordDockDraft}
+					answeredElsewhere={answeredElsewhere}
+					replyAnchorRef={replyAnchorRef}
+					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
 					setupCta={
 						unconnected && <SignInPill onOpen={() => setSetupOpen(true)} />
@@ -1687,6 +1831,12 @@ function DockOverlay({
 	composer,
 	onSubmitAnswer,
 	onReserve,
+	busy,
+	focusEpoch,
+	onDockDraft,
+	answeredElsewhere,
+	replyAnchorRef,
+	onJumpToLatest,
 	setupCta,
 	queuedSteers,
 }: {
@@ -1718,6 +1868,18 @@ function DockOverlay({
 	/** Reports the dock's settled height (block + gradient) — ChatView's
 	 *  dockReserve state feeds the transcript's spacer from it. */
 	onReserve: (h: number) => void;
+	/** Where the reply to his latest action starts (reading-position.ts);
+	 *  the cue lets go of it once he reads to the end. */
+	/** A turn is running for this lesson (the practice dock waits). */
+	busy: boolean;
+	/** Changes when something that held focus went away (focus-home.ts). */
+	focusEpoch: number;
+	/** What he types in the open dock, keyed by its question or problem. */
+	onDockDraft: (key: string, text: string) => void;
+	/** Another window answered the question he was typing in. */
+	answeredElsewhere: boolean;
+	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
+	onJumpToLatest: () => void;
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
 	 *  already filtered by visibleQueuedSteers — only undrained steers. */
 	queuedSteers: QueuedSteerLine[];
@@ -1906,6 +2068,34 @@ function DockOverlay({
 		return () => root.removeEventListener("wheel", onWheel);
 	}, [scrollRef]);
 
+	// FOCUS HOME (focus-home.ts): when the lesson opens, the dock swaps or
+	// folds, a turn ends, or a rename or confirm lets go, focus lands where
+	// he types next, if nothing holds it.
+	useEffect(() => {
+		const block = blockRef.current;
+		if (block) landFocus(document, block);
+	}, [mode, expanded, busy, focusEpoch]);
+
+	// An empty field's arrows and page keys read the lesson (focus-home.ts):
+	// the field he was put in must not swallow the keys he reads with.
+	useEffect(() => {
+		const block = blockRef.current;
+		const el = scrollRef.current;
+		if (!block || !el) return;
+		const onKeyDown = (e: KeyboardEvent) => {
+			const field = e.target as HTMLTextAreaElement | null;
+			if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+			if (field?.tagName !== "TEXTAREA" || !block.contains(field)) return;
+			const by = readingKeyScroll(e.key, field.value.length === 0, el.clientHeight);
+			if (by === null) return;
+			e.preventDefault();
+			if (by < 0) replyAnchorRef.current = null;
+			el.scrollBy({ top: by });
+		};
+		document.addEventListener("keydown", onKeyDown);
+		return () => document.removeEventListener("keydown", onKeyDown);
+	}, [scrollRef, replyAnchorRef]);
+
 	// Explicit expand (bar click): the smooth scroll to the bottom takes
 	// hundreds of ms, during which the position is still legitimately inside
 	// the collapse zone — the machine would instantly re-collapse the dock
@@ -2070,6 +2260,9 @@ function DockOverlay({
 					    rounding starts, truncated, no background, no container. A
 					    line dies when its card lands (visibleQueuedSteers). */}
 					<QueuedSteersBody steers={queuedSteers} />
+					{answeredElsewhere && !pending && !practice && (
+						<p data-testid="answered-elsewhere" className="px-4 pb-2 text-row text-muted-foreground">{LESSON_WORDS.answeredElsewhere}</p>
+					)}
 					{/* The reading-thinking field (owner 2026-10-03): mounted while a
 					    teach-phase check waits — the same cue that collapses it.
 					    Rides the check answer on submit. */}
@@ -2105,6 +2298,7 @@ function DockOverlay({
 									onSubmit={onSubmitAnswer}
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
+									onDraftChange={(text) => onDockDraft(`q:${pending.key}`, text)}
 									compactionRunning={compactionRunning}
 								/>
 							) : practice ? (
@@ -2118,7 +2312,9 @@ function DockOverlay({
 									}}
 									onSubmit={onSubmitThinking}
 									onRequest={onPracticeRequest}
+									onDraftChange={(text) => onDockDraft(`p:${practice.toolCallId}`, text)}
 									compactionRunning={compactionRunning}
+									busy={busy}
 								/>
 							) : (
 								composer
@@ -2138,7 +2334,7 @@ function DockOverlay({
 					    overlay is none by default. The isAtBottom/scrollToBottom
 					    context still reaches it — DockOverlay is a Conversation
 					    child. */}
-					<ConversationScrollButton className="pointer-events-auto bottom-full mb-2" />
+					<ScrollCueButton anchorRef={replyAnchorRef} onJump={onJumpToLatest} className="bottom-full mb-2" />
 				</div>
 			</div>
 		</div>

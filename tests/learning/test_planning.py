@@ -164,6 +164,30 @@ def test_plan_all_covers_registered_courses_and_contains_broken_ones(
     broken = plan(algebra, tmp_path / "vault", everywhere=True, days=7)
     assert broken["courses"][1]["workspace"] == str(analysis.directory)
     assert "invalid JSON" in broken["courses"][1]["error"]
+    assert broken["courses"][1]["problem"] == "damaged"
+
+
+def test_plan_all_reports_a_course_whose_folder_cannot_be_opened(
+    tmp_path: Path,
+) -> None:
+    algebra = course(tmp_path / "algebra", ALGEBRA)
+    closed = course(tmp_path / "closed", {"title": "Closed"})
+    damaged = course(tmp_path / "damaged", {"title": "Damaged"})
+    (damaged.root / "workspace.json").write_text("{", encoding="utf-8")
+    closed.root.chmod(0)
+    try:
+        result = plan(None, tmp_path / "vault", everywhere=True, days=7)
+    finally:
+        closed.root.chmod(0o755)
+    entries = {entry["workspace"]: entry for entry in result["courses"]}
+    assert list(entries) == [
+        str(algebra.directory),
+        str(closed.directory),
+        str(damaged.directory),
+    ]
+    assert entries[str(closed.directory)]["problem"] == "denied"
+    assert entries[str(damaged.directory)]["problem"] == "damaged"
+    assert "error" in entries[str(closed.directory)]
 
 
 def test_plan_of_a_new_course_and_invalid_windows(tmp_path: Path) -> None:

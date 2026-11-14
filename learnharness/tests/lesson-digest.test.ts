@@ -137,7 +137,7 @@ const KNOWN = { handle: "rank-notation", text: "The course writes rank as $r(A)$
 function memoryCourse(refuse: (changes: Record<string, unknown>) => string | null = () => null) {
 	const saves: Array<Record<string, unknown>> = [];
 	const records: CourseRecords = {
-		list: async () => ({ available: true, courses: [] }),
+		list: async () => ({ available: true, courses: [], unreadable: [] }),
 		map: async () => ({ ok: true, map: MAP }),
 		create: async () => ({ ok: true, workspace: "/courses/linalg" }),
 		run: async (_workspace, verb) => {

@@ -10,6 +10,7 @@ import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
+import { formDraftText } from "@/components/lesson/stranded-draft";
 import {
 	buildAnswer,
 	kbdEventForAction,
@@ -75,6 +76,8 @@ export interface QuestionDockProps {
 	/** Restore only this call's unconfirmed submission after recovery. */
 	initialDraft?: QuestionFormDraft;
 	onSaveDraft?: (draft: QuestionFormDraft) => void;
+	/** What he has typed so far, on every change (stranded-draft.ts). */
+	onDraftChange?: (text: string) => void;
 	/** The keyboard machine (wave B) is armed only while the dock is
 	 *  expanded — the collapsed bar keeps its native Enter-to-expand. */
 	active?: boolean;
@@ -98,6 +101,7 @@ export function QuestionDock({
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
+	onDraftChange,
 	phase = "probe",
 	compactionRunning = false,
 }: QuestionDockProps) {
@@ -143,6 +147,7 @@ export function QuestionDock({
 					onSubmit={onSubmit}
 					initialDraft={initialDraft}
 					onSaveDraft={onSaveDraft}
+					onDraftChange={onDraftChange}
 					compactionRunning={compactionRunning}
 				/>
 			</div>
@@ -228,6 +233,7 @@ function QuestionDockForm({
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
+	onDraftChange,
 	compactionRunning = false,
 }: Omit<QuestionDockProps, "expanded" | "onExpand" | "reveal">) {
 	const kind = toolQuestionKind(toolName);
@@ -266,6 +272,11 @@ function QuestionDockForm({
 	// between questions, so each question starts fresh at neutral.
 	const [confidence, setConfidence] = useState<Confidence>(initialDraft?.confidence ?? DEFAULT_CONFIDENCE);
 	const selectMode: SelectMode = qd.mode === "multi-select" ? "multi-select" : "single-select";
+	const draftChangeRef = useRef(onDraftChange);
+	draftChangeRef.current = onDraftChange;
+	useEffect(() => {
+		draftChangeRef.current?.(formDraftText([text, other, thinking]));
+	}, [text, other, thinking]);
 
 	const toggle = (idx: number) => setSel(toggleOption(selectMode, sel, idx));
 

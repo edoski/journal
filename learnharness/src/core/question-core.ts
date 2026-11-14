@@ -281,8 +281,15 @@ export interface QuestionAnswerData {
 	 *  committed answer is revealed and no confidence is read. */
 	hintRequested?: boolean;
 	dismissed?: boolean;
+	/** Why a dismissal happened: "tonight" when Done for tonight closed the
+	 *  session with this question open. Set only through dismissedAnswer,
+	 *  so it never rides an answer. */
+	reason?: DismissReason;
 	answeredAt: string;
 }
+
+/** The one reason a dismissal names. A plain Esc skip names none. */
+export type DismissReason = "tonight";
 
 /** What the dock passes to buildAnswer when the learner answers. */
 export interface AnswerRequest {
@@ -421,15 +428,20 @@ export function buildAnswer(qd: QuestionData, req: AnswerRequest, tool?: string)
  *  renders the question text + "skipped". Rides the same answer path —
  *  the teacher acknowledges the skip in its next turn, exactly like any
  *  answer. */
-export function dismissedAnswer(kind: QuestionKind, questionText: string): QuestionAnswerData {
+export function dismissedAnswer(kind: QuestionKind, questionText: string, reason?: DismissReason): QuestionAnswerData {
 	return {
 		kind,
 		questionText,
 		answers: [],
 		dismissed: true,
+		...(reason ? { reason } : {}),
 		answeredAt: new Date().toISOString(),
 	};
 }
+
+/** What the agent reads for a question left open by Done for tonight. */
+export const LEFT_FOR_TONIGHT_TEXT =
+	"He stopped for tonight with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
 
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):
@@ -441,7 +453,7 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string): Quest
  * actually reads.
  */
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
-	if (ad.dismissed) return { kind: ad.kind, dismissed: true };
+	if (ad.dismissed) return ad.reason === "tonight" ? { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT } : { kind: ad.kind, dismissed: true };
 	const out: Record<string, unknown> = { kind: ad.kind };
 	if (ad.hintRequested) {
 		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";

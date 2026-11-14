@@ -38,8 +38,8 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
-import { hasProbeDone, hasUnresolvedQuestion, resumesLesson, sessionModeOf, type LhMessage } from "../core/native-messages.ts";
-import type { ChatRecord, SessionMode } from "../core/contracts/chat.ts";
+import { hasUnresolvedQuestion, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
+import type { ChatRecord } from "../core/contracts/chat.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { catalogContextLimits } from "./model-catalog.ts";
@@ -151,16 +151,8 @@ export function agentEngine(): PiEngine {
 	return claudeEngine(effectiveSettings().claude.account);
 }
 
-/** The agent a turn over these messages runs: practice in practice mode;
- *  in teaching the prober until its probe concludes, then the teacher. A
- *  session that picks up an earlier lesson starts with the teacher. */
-function agentKindOf(messages: readonly LhMessage[], startedIn?: SessionMode): AgentKind {
-	if (sessionModeOf(messages, startedIn) === "practice") return "practice";
-	return hasProbeDone(messages) || resumesLesson(messages) ? "teacher" : "prober";
-}
-
 function compactionKind(record: ChatRecord): "teach" | "practice" | "probe" {
-	const agent = agentKindOf(record.messages, record.kind);
+	const agent = respondingAgentOf(record.messages, record.kind);
 	return agent === "practice" ? "practice" : agent === "teacher" ? "teach" : "probe";
 }
 
@@ -270,7 +262,7 @@ export async function handleChatInput(
 			thresholdTokens: effectiveThresholdTokens(
 				catalogContextLimits().get(modelIdForCompaction),
 			),
-			systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(record.messages, record.kind)).length / 4),
+			systemPromptTokens: Math.ceil(composeInstructions(respondingAgentOf(record.messages, record.kind)).length / 4),
 		},
 		chatId,
 	);
@@ -339,9 +331,15 @@ export async function handleChatInput(
 	}
 
 	// The brief precedes the learner's words; an answer's result must stay
-	// adjacent to its question call, so there the brief follows it.
+	// adjacent to its question call, so there the brief follows it. Done
+	// for tonight may lead with withheld results: its brief sits just
+	// before the marker.
 	const briefMarker = courseBriefMarker(courseBrief, [...record.messages, ...appends]);
-	if (briefMarker) appends = input.type === "answer" ? [...appends, briefMarker] : [briefMarker, ...appends];
+	if (briefMarker) {
+		appends = input.type === "answer" ? [...appends, briefMarker]
+			: input.type === "tonight" ? [...appends.slice(0, -1), briefMarker, ...appends.slice(-1)]
+			: [briefMarker, ...appends];
+	}
 
 	// One turn per chat, ever. A second request while a turn runs means a
 	// stale/remounted client raced a live one — letting it through would
@@ -409,7 +407,7 @@ export async function handleChatInput(
 	// else the PROBER (quiz/ask + probe_done). All three share this whole
 	// composition (write-ahead persist, liveness, steers, usage) — only the
 	// agent differs.
-	const agentKind = agentKindOf(agentMessages, record.kind);
+	const agentKind = respondingAgentOf(agentMessages, record.kind);
 	const teaching = agentKind === "teacher";
 	// Built once above the compaction gate; reused verbatim.
 	const engine = conversationEngine;
@@ -631,7 +629,7 @@ export async function handleChatInput(
 							thresholdTokens: effectiveThresholdTokens(
 								catalogContextLimits().get(kickModelId),
 							),
-							systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(freshRecord.messages, freshRecord.kind)).length / 4),
+							systemPromptTokens: Math.ceil(composeInstructions(respondingAgentOf(freshRecord.messages, freshRecord.kind)).length / 4),
 						};
 					}, chatId);
 			},

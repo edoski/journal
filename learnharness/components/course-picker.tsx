@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronDownIcon, GraduationCapIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,6 +214,10 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 }) {
 	const picked = courses.find((c) => c.workspace === workspace);
 	const [open, setOpen] = useState(false);
+	// A course was chosen: focus goes on to the composer's field, where
+	// he types his question next, not back to this chip (focus-home.ts).
+	const chosenRef = useRef(false);
+	const triggerRef = useRef<HTMLButtonElement>(null);
 	useEffect(() => {
 		if (asked > 0) setOpen(true);
 	}, [asked]);
@@ -226,6 +230,7 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<DropdownMenuTrigger
+				ref={triggerRef}
 				data-testid="course-picker"
 				data-slot="composer-chip"
 				aria-label="Course"
@@ -238,12 +243,24 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 				<span className="max-w-[16rem] truncate">{picked ? courseLabel(picked) : "Pick a course"}</span>
 				<ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-64" data-testid="course-menu">
+			<DropdownMenuContent
+				align="start"
+				className="w-64"
+				data-testid="course-menu"
+				onCloseAutoFocus={(e) => {
+					if (!chosenRef.current) return;
+					chosenRef.current = false;
+					const field = triggerRef.current?.closest('[data-testid="composer"]')?.querySelector("textarea");
+					if (!field) return;
+					e.preventDefault();
+					field.focus();
+				}}
+			>
 				{courses.length > 0 && (
 					<>
 						<DropdownMenuRadioGroup value={picked ? workspace : ""} onValueChange={onChange}>
 							{courses.map((c) => (
-								<DropdownMenuRadioItem key={c.workspace} value={c.workspace} data-testid="course-option">
+								<DropdownMenuRadioItem key={c.workspace} value={c.workspace} data-testid="course-option" onSelect={() => { chosenRef.current = true; }}>
 									<span className="min-w-0 flex-1 truncate">{courseLabel(c)}</span>
 								</DropdownMenuRadioItem>
 							))}

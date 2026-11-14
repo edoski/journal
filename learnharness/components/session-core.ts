@@ -19,6 +19,7 @@ import {
 	needsContinuation,
 	pendingQuestionOf,
 	failedResponseAtEnd,
+	isQuestionTool,
 	measuredContextTokens,
 	newAnswerResult,
 	newNextMessage,
@@ -27,6 +28,7 @@ import {
 	newPracticeRequestMessage,
 	newUserMessage,
 	projectView,
+	tonightAppends,
 	type ChatInput,
 	type LhMarkerMessage,
 	type LhMessage,
@@ -84,7 +86,7 @@ async function turnInFlight(model: SessionModel): Promise<boolean | null> {
 	}
 }
 
-const STREAM_DROPPED = "The connection dropped before the turn completed.";
+export const STREAM_DROPPED = "The connection dropped before the turn completed.";
 
 /** Mark transport failures without confusing JSON/application bugs with drops. */
 class StreamReadError extends Error {
@@ -719,6 +721,13 @@ export class SessionModel {
 			// The move-on signal (owner round 16): the NEXT PROBLEM line
 			// renders the instant the chip/Enter fires.
 			optimistic.push({ ...newNextMessage(), id: localId() });
+		} else if (input.type === "tonight") {
+			// Done for tonight: the withheld questions, a dropped problem and
+			// the line land at once. A dropped problem's synthesized conclude
+			// pair waits for the record.
+			for (const m of tonightAppends({ messages: [...this.base, ...this.tail] })) {
+				if (m.role === "custom" || (m.role === "toolResult" && isQuestionTool(m.toolName))) optimistic.push({ ...m, id: localId() });
+			}
 		} else if (input.type === "answer") {
 			const tool = pendingCallTool([...this.base, ...this.tail], input.toolCallId) ?? "explain";
 			const result = { ...newAnswerResult(input.toolCallId, tool, input.answer), id: localId() };
@@ -791,7 +800,7 @@ export class SessionModel {
 			// existing setup recovery. A newer send/reattach ALWAYS owns errors
 			// and status instead, even if that request has since been stopped.
 			// Ordinary text and answer teardown behavior stays unchanged.
-			if (input.type === "answer") {
+			if (input.type === "answer" || input.type === "tonight") {
 				const ids = new Set(optimistic.map(m => m.id));
 				this.mutate(() => {
 					this.tail = this.tail.filter(m => !ids.has(m.id));

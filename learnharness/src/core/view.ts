@@ -532,6 +532,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "done-tonight": {
+			// His Done for tonight: a quiet section break, its words in the
+			// renderer. The model reads the content; the transcript never does.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-done-tonight", id: `dt_${marker.id}`, data: null }],
+			});
+			return;
+		}
 		case "problem-dismissed":
 			// UI-only (the ask-style dismissal): the synthesized conclude
 			// pair — which rides the NEXT input — carries the record's face.
