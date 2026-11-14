@@ -56,8 +56,9 @@ on to the next; the plan says why it waits past the day memory asks for it
 before were full.
 
 An exam day is planned like any other day of its weekday, less the examined
-course. Whether he does less on a day he sits an exam is his to show, as on
-any day: stopping short lowers that weekday's limit. A lighter exam day by
+course: neither its reviews nor its new topics. Whether he does less on a
+day he sits an exam is his to show, as on any day: stopping short lowers that
+weekday's limit. A lighter exam day by
 assumption would be a guessed share.
 
 New topics come only from the ready set: topics whose prerequisites are all
@@ -109,8 +110,11 @@ less those it leaves out, with or without arcs (``progress.examining``):
 only those take its review dates, its final review and its run-up, while its
 pace, its gates and what does not fit hold them and their untaught
 prerequisites (``progress.exam_topics``). The rest of the course is planned
-as with no exam while the exam is ahead, and after it the whole course is,
-what it examined but he never started included.
+as with no exam while the exam is ahead, but for the topics it leaves out
+(``exam.leaves_out``): those wait for the exam's day to pass, since they are
+in the material the run-up studies and the exam does not ask them. After the
+exam the whole course is planned as with no exam, what it examined but he
+never started included.
 """
 
 from __future__ import annotations
@@ -255,19 +259,33 @@ class _Course:
         examines and their untaught prerequisites (``progress.exam_topics``)."""
         return [key for key in self.untaught if self.scope is None or key in self.scope]
 
+    @property
+    def left_out(self) -> frozenset[str]:
+        """Untaught topics the next exam leaves out (``exam.leaves_out``) and
+        none of its topics needs: they wait for the exam's day to pass."""
+        left = self.record.get("exam", {}).get("leaves_out") or ()
+        return frozenset(
+            key for key in left if self.scope is None or key not in self.scope
+        )
+
     def outside(self, day: date) -> list[str]:
-        """Untaught topics no exam ahead needs: outside the next exam's scope,
-        or, once an exam with a scope (arcs, or topics it leaves out) has
-        passed, all of them, what it examined but he never started included.
-        They are planned as in a course with no exam. After a whole-course
-        exam nothing is, until the next exam is set."""
-        if self.exam is None:
+        """Untaught topics no exam ahead needs: outside the next exam's scope
+        but for those it leaves out, or, once an exam with a scope (arcs, or
+        topics it leaves out) has passed, all of them, what it examined but he
+        never started included. They are planned as in a course with no exam.
+        After a whole-course exam nothing is, until the next exam is set. The
+        exam's own day starts none: it is planned less the examined course."""
+        if self.exam is None or self.exam.day == day:
             return []
         if not self.ahead(day):
             return list(self.untaught) if self.examined is not None else []
         if self.scope is None:
             return []
-        return [key for key in self.untaught if key not in self.scope]
+        return [
+            key
+            for key in self.untaught
+            if key not in self.scope and key not in self.left_out
+        ]
 
     def arc(self, topic: str) -> str | None:
         arc: str | None = self.record["topics"][topic].get("arc")
@@ -356,8 +374,10 @@ class _Course:
 
     def startable(self, day: date) -> list[str]:
         """The untaught topics the plan may start on ``day``."""
-        if self.exam is None or self.ahead(day):
+        if self.exam is None:
             return self.untaught
+        if self.ahead(day):
+            return [key for key in self.untaught if key not in self.left_out]
         return self.outside(day)
 
     @property
