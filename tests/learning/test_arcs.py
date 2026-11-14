@@ -659,6 +659,37 @@ def test_a_held_arc_is_not_re_cut_without_his_words(workspace: Workspace) -> Non
     )
 
 
+def test_a_held_arc_is_removed_only_on_his_words(workspace: Workspace) -> None:
+    formed(workspace)
+    records.save(workspace, {"observations": [attempt("riemann")]})
+    dissolve = {
+        "arcs": dict.fromkeys(ARCS),
+        "path": {"arcs": None},
+        "topics": {key: {"arc": None} for key in TOPICS},
+    }
+    refused(
+        workspace,
+        {**dissolve, "arc_change": REASON},
+        'arcs.limits: "Limits and continuity" is an arc he is in or has studied; '
+        "only he can ask to remove it",
+        "arc_change.asked",
+    )
+    asked = {**REASON, "asked": "Drop the arcs, I'd rather see one list"}
+    records.save(workspace, {**dissolve, "arc_change": asked})
+    record = records.load(workspace)
+    assert record["arcs"] == {}
+    assert [event["arc"] for event in record["arc_log"][-3:]] == ORDER
+
+
+def test_cleanup_after_a_removal_drops_a_held_arc_without_his_words(
+    workspace: Workspace,
+) -> None:
+    formed(workspace, path={"arcs": ORDER, "current": "riemann"})
+    assert "integrals" in arcs.held(records.load(workspace))
+    records.save(workspace, {"topics": {"riemann": None, "ftc": None}})
+    assert "integrals" not in records.load(workspace)["arcs"]
+
+
 def test_moving_an_unstudied_topic_between_arcs_he_is_not_in_needs_a_reason(
     workspace: Workspace,
 ) -> None:

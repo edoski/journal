@@ -136,6 +136,12 @@ def _guard(
                 "to re-cut it, so place new topics instead, or put his request in "
                 "arc_change.asked"
             )
+        if kind == "removed" and event["arc"] in kept:
+            raise ValueError(
+                f'arcs.{event["arc"]}: "{arc_rules.title(before, event["arc"])}" is '
+                "an arc he is in or has studied; only he can ask to remove it: keep "
+                "it, or put his request in arc_change.asked"
+            )
         if kind == "renamed" and event["arc"] in kept:
             raise ValueError(
                 f'arcs.{event["arc"]}: "{event["from"]}" is an arc he is in or has '
