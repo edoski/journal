@@ -89,6 +89,9 @@ export type CourseVerb =
 	| { verb: "show"; handles: string[] | "all" }
 	| { verb: "search"; query: string }
 	| { verb: "save"; changes: unknown }
+	/** Run a patch through every step of a save and write nothing: the
+	 *  refusal a save would give, or ok. */
+	| { verb: "check"; changes: unknown }
 	| { verb: "plan"; days?: number }
 	/** Register files as the course's material; paths are relative to the
 	 *  course folder. */
