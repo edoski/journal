@@ -25,7 +25,9 @@ from learning import clock, schema, storage
 from learning import workspace as workspaces
 from learning.workspace import Workspace
 
-PREVIOUS = schema.SCHEMA - 1
+# The two schemas this module moves between. A schema bump writes the next
+# step; it never re-labels this one.
+PREVIOUS, CURRENT = 6, 7
 # The fields schema 7 added, all optional: dropping them is a schema 6 record.
 _RECORD_ARC_FIELDS = ("arcs", "arc_log")
 _NESTED_ARC_FIELDS = {"path": ("arcs",), "exam": ("arcs", "leaves_out")}
@@ -59,9 +61,7 @@ def _batch(name: str) -> Path:
 
 
 def _up(stored: dict[str, Any]) -> dict[str, Any]:
-    return {
-        name: schema.SCHEMA if name == "schema" else v for name, v in stored.items()
-    }
+    return {name: CURRENT if name == "schema" else v for name, v in stored.items()}
 
 
 def _strip(item: Any, names: tuple[str, ...]) -> Any:
@@ -114,13 +114,13 @@ def _move(workspace: Workspace, to: int, batch: Path) -> str:
         version = stored.get("schema")
         if version == to:
             return "current"
-        if {version, to} != {PREVIOUS, schema.SCHEMA}:
+        if {version, to} != {PREVIOUS, CURRENT}:
             raise ValueError(
                 f"{path} has schema {version!r}; this engine moves schema "
-                f"{PREVIOUS} to {schema.SCHEMA} and back (--to {PREVIOUS})"
+                f"{PREVIOUS} to {CURRENT} and back (--to {PREVIOUS})"
             )
-        moved = _up(stored) if to == schema.SCHEMA else _down(stored)
-        schema.validate_record({**moved, "schema": schema.SCHEMA})
+        moved = _up(stored) if to == CURRENT else _down(stored)
+        schema.validate_record({**moved, "schema": CURRENT})
         _backup(batch, workspace, path.read_text(encoding="utf-8"))
         storage.publish_text(path, storage.encode(moved))
     return "migrated"
@@ -129,7 +129,7 @@ def _move(workspace: Workspace, to: int, batch: Path) -> str:
 def _report(
     courses: list[Workspace], to: int, failed: dict[str, str]
 ) -> dict[str, Any]:
-    batch = _batch(f"v{PREVIOUS if to == schema.SCHEMA else schema.SCHEMA}")
+    batch = _batch(f"v{PREVIOUS if to == CURRENT else CURRENT}")
     moved: dict[str, str] = {}
     for course in courses:
         try:
@@ -149,9 +149,9 @@ def migrate(workspace: Workspace | None, *, to: int | None = None) -> dict[str, 
     schema ``to`` (this engine's by default). A course that fails is reported
     and left as it was; the others still move, and a rerun moves only what is
     left."""
-    to = schema.SCHEMA if to is None else to
-    if to not in (PREVIOUS, schema.SCHEMA):
-        raise ValueError(f"--to takes {schema.SCHEMA} or {PREVIOUS}, not {to}")
+    to = CURRENT if to is None else to
+    if to not in (PREVIOUS, CURRENT):
+        raise ValueError(f"--to takes {CURRENT} or {PREVIOUS}, not {to}")
     if workspace is not None:
         return _report([workspace], to, {})
     failed = {str(path): str(error) for path, error in workspaces.unreadable()}

@@ -2,6 +2,7 @@
 explicit migration between schema 6 and 7."""
 
 import ast
+import importlib
 from copy import deepcopy
 from datetime import date
 import json
@@ -1089,6 +1090,32 @@ def test_a_record_of_another_schema_is_reported_and_left_alone(tmp_path: Path) -
         in report["failed"][str(workspace.directory)]
     )
     assert json.loads(workspace.record.read_text()) == {"schema": 5}
+
+
+def test_migrate_moves_this_engine_s_schema_and_the_one_before() -> None:
+    assert migrate.CURRENT == schema.SCHEMA, (
+        "a schema bump writes the next migrate step"
+    )
+
+
+def test_after_a_schema_bump_migrate_still_moves_only_6_and_7(
+    workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    formed(workspace)
+    eight = {**json.loads(workspace.record.read_text()), "schema": 8}
+    workspace.record.write_text(storage.encode(eight), encoding="utf-8")
+    before = workspace.record.read_bytes()
+    monkeypatch.setattr(schema, "SCHEMA", 8)
+    try:
+        bumped = importlib.reload(migrate)
+        report = bumped.migrate(workspace, to=7)
+    finally:
+        monkeypatch.undo()
+        importlib.reload(migrate)
+    assert (
+        "this engine moves schema 6 to 7" in report["failed"][str(workspace.directory)]
+    )
+    assert workspace.record.read_bytes() == before, "--to 7 keeps a newer record's arcs"
 
 
 def test_migrating_down_strips_every_arc_field_and_keeps_every_other_save(
