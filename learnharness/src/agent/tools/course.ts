@@ -83,7 +83,7 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
 			if (recordsAnAnswer(rest)) {
 				refuse(
 					`observations[${i}]: name the answer it records with question, the id his answer carried, or "his-message" for an answer he gave in words in his message. ` +
-						"A re-mark names none and names the attempt it corrects with corrects.",
+						"A re-mark names none and names the attempt it corrects with corrects. An answer a save or a problem's conclude already recorded is saved: never save it again.",
 				);
 			}
 			questions.push(null);
