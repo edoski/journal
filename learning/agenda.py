@@ -950,15 +950,15 @@ def _waited(courses: list[_Course], chosen: dict[str, list[str]], day: date) -> 
     the topics it starts next."""
     starters = [course.title for course in courses if chosen[course.name]]
     for course in courses:
+        startable = course.startable(day)
+        front = course.front(startable)
         if chosen[course.name]:
             if course.pending:
                 for topic in chosen[course.name]:
                     course.starts_after[topic] = list(course.pending)
                 course.pending.clear()
         elif any(
-            course.ready(topic) and course.opens(topic, course.front(startable))
-            for startable in [course.startable(day)]
-            for topic in startable
+            course.ready(topic) and course.opens(topic, front) for topic in startable
         ):
             course.pending.extend(t for t in starters if t not in course.pending)
 
