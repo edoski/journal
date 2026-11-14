@@ -9,7 +9,7 @@ Thesis: the sidebar's top is exactly Home's Today. One card per line, in the sam
 | Rule | Source |
 |---|---|
 | Today's lines (`needsYouNow(...).lines`, under the course filter `nowFor`), in Home's order, at most five; Home's "Also today" lines are not drawn and their topics stay on the shelves | `../study-home/needs-you.ts` |
-| A session's line is its session card (`now-card.md`, "The session card"), one per session however many topics its lesson touched; it takes its own topic off the shelves (`claimedKeys`) | `todayTop`, `claimedKeys` |
+| A session's line is its session card (`now-card.md`, "The session card"), one per session however many topics its lesson touched; it takes every topic it stands for (its own and those it worked on) off the shelves, so a review of two topics never leaves a second row under Working or Learning (`claimedKeys`) | `todayTop`, `claimedKeys` |
 | A course's line with a lead topic is that topic's card (`NowCard`): the inbox's unit, else `unitFor` (a lead not started yet, resting on Learning). The lead is the topic the line's reason is about, so title and reason agree: a lapse's lapsed topic ("Missed last time"), an open task's current topic ("At part (c)" on Rank and the column space, the sheet's topic), else the line's first | `topicUnit` in `now-inbox.ts`; `leadOf` in `../study-home/needs-you.ts` |
 | A course line with nothing to take up (step `none`, Home's "Start a lesson") has no card | `todayTop` |
 | A topic is listed once, at the first line that leads with it; a topic on top is on no shelf | `restShelves(inbox, keys)` with `itemKey` |

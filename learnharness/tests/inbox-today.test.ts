@@ -164,6 +164,19 @@ describe("one lesson, one card", () => {
 	});
 });
 
+describe("one review, one row", () => {
+	it("a review of two topics is its card alone, while the tutor writes and on his turn: neither topic is a second row", () => {
+		const review = chat("rev", { title: "Review Rank, Linear independence", course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["rank", "independence"], ownTopics: ["rank", "independence"], pendingProblem: true, updatedAt: "2026-11-08T09:30:00.000Z" });
+		for (const chats of [[review], [{ ...review, pendingProblem: false, busy: true }]]) {
+			const { inbox, top } = topOf([LINALG], chats);
+			const drawn = steadyTop(topOf([LINALG], [review]).top, top, inbox, chats);
+			const shelves = restShelves(inbox, new Set(drawn.flatMap(claimedKeys)));
+			const rows = [...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.topic.handle);
+			assert.ok(!rows.includes("rank" as TopicHandle) && !rows.includes("independence" as TopicHandle), `no second row (${chats[0]!.busy ? "writing" : "his turn"})`);
+		}
+	});
+});
+
 /** The sessions with one of them as the tutor writes in it, then as it
  *  waits on him again, answered at `at`. */
 const writing = (chats: readonly ChatListItem[], id: string) => chats.map((c) => (c.id === id ? { ...c, pendingQuestion: false, pendingProblem: false, busy: true } : c));
