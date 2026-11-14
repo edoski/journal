@@ -283,10 +283,12 @@ describe("the map pane's surface and where it scrolls", () => {
 		assert.equal(fadeAcross(0, 48), 48);
 	});
 
-	it("opens on what the header's button takes up when it is on the map, else the list's first row", () => {
+	it("opens where he is, else on what the header's button takes up when it is on the map, else the list's first row", () => {
 		const shown = shownGroups(courseGroups(COURSE));
-		assert.equal(aimOf([h("basis")], shown, LAYOUT), "basis");
-		assert.equal(aimOf([h("elsewhere")], shown, LAYOUT), shown[0]!.topics[0]!.topic.handle);
-		assert.equal(aimOf([], [], LAYOUT), null);
+		assert.equal(aimOf(h("eigen"), [h("basis")], shown, LAYOUT), "eigen");
+		assert.equal(aimOf(null, [h("basis")], shown, LAYOUT), "basis");
+		assert.equal(aimOf(h("elsewhere"), [h("basis")], shown, LAYOUT), "basis");
+		assert.equal(aimOf(null, [h("elsewhere")], shown, LAYOUT), shown[0]!.topics[0]!.topic.handle);
+		assert.equal(aimOf(null, [], [], LAYOUT), null);
 	});
 });

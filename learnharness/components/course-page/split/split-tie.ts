@@ -1,5 +1,5 @@
 import type { CourseMapEdge, TopicHandle } from "@/src/core";
-import { NODE_GAP, NODE_SIZE, chainOf, slackOf, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { NODE_GAP, NODE_SIZE, cardFit, chainOf, slackOf, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import type { CourseGroup, CourseTopic } from "@/components/course-page/course-model";
 import type { Tie, TieAnchor } from "@/components/linked-columns/linked-columns";
 import { clearShift, tieShifts, type Box as TieBox } from "@/components/linked-columns/tie-route";
@@ -56,9 +56,11 @@ export function shownGroups(groups: readonly CourseGroup[]): CourseGroup[] {
 		.filter((g) => g.topics.length > 0);
 }
 
-/** The topic the map opens on: the first the header's button takes up
- *  that is on the map, else the list's first row. */
-export function aimOf(next: readonly TopicHandle[], groups: readonly CourseGroup[], layout: TopicMapLayout): TopicHandle | null {
+/** The topic the map opens on, as every course map opens: where he is
+ *  ("You are here"), else the first the header's button takes up that is
+ *  on the map, else the list's first row. */
+export function aimOf(current: TopicHandle | null, next: readonly TopicHandle[], groups: readonly CourseGroup[], layout: TopicMapLayout): TopicHandle | null {
+	if (current && layout.topics.has(current)) return current;
 	return next.find((handle) => layout.topics.has(handle)) ?? groups[0]?.topics[0]?.topic.handle ?? null;
 }
 
@@ -202,7 +204,9 @@ export function scrollOn(boxes: ReadonlyMap<TopicHandle, Box>, target: TopicHand
 	 *  pane too small for that, wholly in view). */
 	const axis = (lo: (b: Box) => number, size: (b: Box) => number, span: number, f: number, max: number, start: number) => {
 		const clamp = (s: number) => Math.round(Math.min(max, Math.max(0, s)));
-		const options = [...new Set([start, 0, max, ...all.flatMap((b) => [lo(b) - f, lo(b) + size(b) + f - span])].map(clamp))];
+		// Each topic's edges on the fade's inner edge and on the pane's edge, from inside and from outside.
+		const edges = (b: Box) => [lo(b) - f, lo(b) + size(b) + f - span, lo(b), lo(b) + size(b), lo(b) + size(b) - span, lo(b) - span];
+		const options = [...new Set([start, 0, max, ...all.flatMap(edges)].map(clamp))];
 		const t0 = lo(at);
 		const t1 = t0 + size(at);
 		const keepsClear = options.filter((s) => t0 >= s + f && t1 <= s + span - f);
@@ -213,16 +217,9 @@ export function scrollOn(boxes: ReadonlyMap<TopicHandle, Box>, target: TopicHand
 	const lefts = axis((b) => b.x, (b) => b.width, view.width, fade.x, maxLeft, view.left);
 	const tops = axis((b) => b.y, (b) => b.height, view.height, fade.y, maxTop, view.top);
 
-	/** How many topics a view cuts: part of one shows past the fade but the pane's edge cuts it. */
-	const cuts = (left: number, top: number) => {
-		let count = 0;
-		for (const b of all) {
-			const showsX = b.x + b.width > left + fade.x && b.x < left + view.width - fade.x;
-			const showsY = b.y + b.height > top + fade.y && b.y < top + view.height - fade.y;
-			if (showsX && showsY && !(b.x >= left && b.x + b.width <= left + view.width && b.y >= top && b.y + b.height <= top + view.height)) count++;
-		}
-		return count;
-	};
+	/** How many topics a view cuts: part of one shows, faded or not, and the pane's edge cuts the rest (`cardFit`). */
+	const cuts = (left: number, top: number) =>
+		all.filter((b) => cardFit({ left: b.x - left, top: b.y - top, right: b.x + b.width - left, bottom: b.y + b.height - top }, view, fade) === "cut").length;
 
 	let best: Scroll = { left: lefts[0]!, top: tops[0]! };
 	let bestCost = Infinity;

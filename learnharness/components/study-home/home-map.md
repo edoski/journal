@@ -8,7 +8,7 @@ The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data
 | course page | a quiet `sm` link between the tabs and the enlarge control: "Course page" in `text-label` with a 14px arrow after it, opening the chosen tab's course page (`courseHref`, course-page.md); its tooltip names the course ("Linear Algebra's course page"). Home's one way into a course page (Edo, 13 Nov 2026: "I can't just select a course and open its page"). The tabs keep selecting and following |
 | enlarge | quiet 32px icon button at the top right (Maximize 2, Minimize 2 while enlarged), its icon on the column's edge; tooltip "Enlarge map", "Back to Home (Esc)" |
 | frame | fills what Today leaves; the edges fade on every side, 64px across and 40px down, as a mask (a vignette); no scrollbars, the map still scrolls and drags inside |
-| camera | the current topic ("You are here") at the frame's centre, and again whenever the frame grows or shrinks; the topic map shows the whole course instead when it fits the frame (topic-map.md) |
+| camera | as every course map opens (topic-map.md): the current topic ("You are here"), its tag and the topics it leads to clear of the fade, as many others whole as fit at 80% or more, and no card cut at the frame's edge; the whole course when it fits; again whenever the frame grows or shrinks |
 | enlarged | the tabs and the map take Home's full width and height; Today hides. Esc or the same control returns |
 | empty | "Topics appear as you study this course." |
 

@@ -34,7 +34,7 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 	const [pointed, setPointed] = useState<Pointed | null>(null);
 	const groups = useMemo(() => shownGroups(view.groups), [view.groups]);
 	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, TOPIC_NODE_SIZE), [map.topics, map.edges]);
-	const aim = useMemo(() => aimOf(view.next.lesson.topics, groups, layout), [view.next.lesson.topics, groups, layout]);
+	const aim = useMemo(() => aimOf(map.current, view.next.lesson.topics, groups, layout), [map.current, view.next.lesson.topics, groups, layout]);
 	const lit = useMemo(() => litOf(pointed, map.edges), [pointed, map.edges]);
 	const handle = pointed?.handle ?? null;
 	const tie = useMemo<Tie | null>(() => (handle ? tieOf(handle) : null), [handle]);
