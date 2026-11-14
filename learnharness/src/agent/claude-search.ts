@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { spawnTiedChild, stopTiedChild } from "./tied-child.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { claudeBaseArgs, claudeChildEnv, claudeWorkDir, resolveClaudeBinary } from "./claude-cli.ts";
@@ -52,7 +53,7 @@ export function claudeWebSearch({ binary = () => resolveClaudeBinary(), env = pr
 			dir = mkdtempSync(join(claudeWorkDir(), "search-"));
 			const systemPromptFile = join(dir, "system-prompt.txt");
 			writeFileSync(systemPromptFile, RELAY_PROMPT, { mode: 0o600 });
-			child = spawn(bin, claudeSearchArgs(systemPromptFile), { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: false, launch }), stdio: ["pipe", "pipe", "pipe"] });
+			child = spawnTiedChild(bin, claudeSearchArgs(systemPromptFile), { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: false, launch }) });
 		} catch (error) {
 			dispose();
 			reject(new Error(claudeErrorMessage({ text: error instanceof Error ? error.message : String(error) })));
@@ -71,8 +72,8 @@ export function claudeWebSearch({ binary = () => resolveClaudeBinary(), env = pr
 			settled = true;
 			signal?.removeEventListener("abort", onAbort);
 			if (child.exitCode === null && child.signalCode === null) {
-				child.kill("SIGTERM");
-				setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); }, 2000).unref();
+				// The whole group: the command and its supervisor (tied-child.ts).
+				stopTiedChild(child);
 			}
 			if (typeof outcome === "string") resolve(outcome);
 			else reject(outcome);

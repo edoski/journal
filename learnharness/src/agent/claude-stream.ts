@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { spawnTiedChild, stopTiedChild } from "./tied-child.ts";
 import {
 	getCurrentSystemPrompt,
 	getCurrentTools,
@@ -408,7 +409,7 @@ export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(),
 		try {
 			files = writeClaudeCallFiles(getCurrentSystemPrompt(context.messages), tools);
 			const args = claudeArgs({ model: model.id, effort, systemPromptFile: files.systemPromptFile, mcpConfigFile: files.mcpConfigFile });
-			child = spawn(bin, args, { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: effort !== undefined, launch }), stdio: ["pipe", "pipe", "pipe"] });
+			child = spawnTiedChild(bin, args, { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: effort !== undefined, launch }) });
 		} catch (error) {
 			files?.dispose();
 			emit(mapper.fail(`Claude Code could not be started (${error instanceof Error ? error.message : String(error)}).${NO_KEY}`));
@@ -428,8 +429,8 @@ export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(),
 			clearTimeout(idle);
 			signal?.removeEventListener("abort", onAbort);
 			if (child.exitCode !== null || child.signalCode !== null) return;
-			child.kill("SIGTERM");
-			setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); }, 2000).unref();
+			// The whole group: the command and its supervisor (tied-child.ts).
+			stopTiedChild(child);
 		};
 		signal?.addEventListener("abort", onAbort, { once: true });
 
