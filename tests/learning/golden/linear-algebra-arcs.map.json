@@ -361,6 +361,7 @@
       "starts_why": {
         "arc": "orthogonality",
         "kind": "early",
+        "behind": "determinants",
         "waiting_on": [
           "rank",
           "determinant"
@@ -384,6 +385,7 @@
       "starts_why": {
         "arc": "orthogonality",
         "kind": "early",
+        "behind": "determinants",
         "waiting_on": [
           "determinant"
         ],

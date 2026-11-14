@@ -54,9 +54,9 @@ def counts(observation: dict[str, Any]) -> bool:
 
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
-# New topics come from the arc he is in and the next one (Edo's ruling of 14
-# Nov 2026): the material keeps its chapters' order, and at most one chapter
-# runs early while the one he is in waits on evidence.
+# New topics come from the earliest arc with topics left and the next one
+# (Edo's ruling of 14 Nov 2026): the material keeps its chapters' order, and
+# at most one chapter runs early while the earliest waits on evidence.
 NEW_TOPIC_ARCS = 2
 RECENT_SOLID_DAYS = 14
 WEEK_DAYS = 7
@@ -697,8 +697,10 @@ def _resync(
     histories: dict[str, _History],
     today: date,
     scheduled: Scheduled,
+    moved: str = "the exam",
 ) -> None:
-    """Re-derive every engine date after the exam or its final review moved.
+    """Re-derive every engine date after ``moved``: the exam or its final
+    review, or the switch back to a course that takes questions.
 
     Each engine date becomes the replayed one, so moving the exam and moving
     it back restores the dates. A tutor date on or after an exam still ahead is
@@ -717,7 +719,20 @@ def _resync(
         if target is not None and target.isoformat() != stored:
             scheduled.reviews[key] = _with_review(record, key, target, "engine")
             scheduled.notes.append(
-                f"{key}: review moved to {target.isoformat()}, after the exam moved"
+                f"{key}: review moved to {target.isoformat()}, after {moved} moved"
+            )
+
+
+def _silenced(record: dict[str, Any], scheduled: Scheduled) -> None:
+    """In a course that takes no questions nothing falls due, so no topic keeps
+    a review date: the record, its due list and its map agree with the plan.
+    Asking again re-derives them (``_resync``)."""
+    for key, topic in list(record["topics"].items()):
+        if "due" in topic.get("review", {}):
+            _clear_due(record, key)
+            scheduled.reviews.pop(key, None)
+            scheduled.notes.append(
+                f"{key}: review date cleared, the course takes no questions"
             )
 
 
@@ -888,8 +903,9 @@ def schedule(
     verdicts this save created or changed is due on its next expected review day,
     unless the same patch dated its review; a practice day leaves the date alone
     unless the review was already due by then. Newly introduced topics without
-    attempts or a date get a first retrieval. Gap or note judged on an earlier
-    day than the new evidence gets a note. A self-report adds no verdict, but
+    attempts or a date get a first retrieval. A course that takes no questions
+    keeps no review date, and switching back re-derives them. Gap or note
+    judged on an earlier day than the new evidence gets a note. A self-report adds no verdict, but
     any observation that supersedes an attempt replays that attempt's topics.
     """
     result = {**record, "topics": dict(record["topics"])}
@@ -898,10 +914,14 @@ def schedule(
     histories = _histories(result["observations"])
     if changes.exam_moved:
         _resync(result, histories, today, scheduled)
+    elif changes.questions_moved:
+        _resync(result, histories, today, scheduled, "the questions preference")
     _clamp_tutor_dates(result, changes, today, scheduled)
     _reschedule(result, changes, histories, scheduled)
     _first_retrievals(result, changes, histories, scheduled)
     _stale_notes(result, changes, histories, scheduled)
+    if not asks(result):
+        _silenced(result, scheduled)
     return result, scheduled
 
 
@@ -944,22 +964,23 @@ def window(
     front: str | None,
     free: frozenset[str] | None = None,
 ) -> frozenset[str] | None:
-    """The arcs new topics may come from: the current arc and the next
-    (``NEW_TOPIC_ARCS``), and every arc that needs nothing from another
-    (``free_arcs``, or ``free`` when the caller has them). None without arcs.
+    """The arcs new topics may come from: the earliest arc with topics left
+    and the next (``NEW_TOPIC_ARCS``), and every arc that needs nothing from
+    another (``free_arcs``, or ``free`` when the caller has them). None
+    without arcs.
 
-    The current arc here is the arc of ``front``, the earliest untaught
-    topic: the arc he is in whenever he studies in order, and the current
-    arc's own rule when "You are here" names no topic (``arcs.current``).
-    "You are here" itself can lag in an arc he has finished, where its
-    window would close every arc with topics left, or lead into the next arc
-    after an early start, where its window would open the arc after that,
-    so early starts would chain away from the material."""
+    The earliest arc with topics left is the arc of ``front``, the earliest
+    untaught topic. It is not the current arc, the arc of "You are here"
+    (``arcs.current``), though the two agree whenever he studies in order.
+    "You are here" can lag in an arc he has finished, where a window read
+    from it would close every arc with topics left, or lead into the next
+    arc after an early start, where it would open the arc after that, so
+    early starts would chain away from the material."""
     arcs = arc_rules.order(record)
     if not arcs:
         return None
-    current = record["topics"][front].get("arc") if front is not None else None
-    last = arcs.index(current) + NEW_TOPIC_ARCS if current in arcs else len(arcs)
+    earliest = record["topics"][front].get("arc") if front is not None else None
+    last = arcs.index(earliest) + NEW_TOPIC_ARCS if earliest in arcs else len(arcs)
     return frozenset(arcs[:last]) | (free_arcs(record) if free is None else free)
 
 

@@ -47,7 +47,8 @@ def untaught(record: dict[str, Any]) -> set[str]:
 def current(record: dict[str, Any], here: str | None = None) -> str | None:
     """The arc of the topic the learner is on (``here``, else ``path.current``);
     when that topic is missing, excluded or has no arc, the earliest arc with
-    an untaught topic, else the last arc. None without arcs."""
+    an untaught topic, else the last arc with a live topic, so it is never
+    an arc drawn nowhere. None without arcs."""
     arcs = arc_rules.order(record)
     if not arcs:
         return None
@@ -57,7 +58,8 @@ def current(record: dict[str, Any], here: str | None = None) -> str | None:
     if "arc" in topic and "excluded" not in topic:
         return str(topic["arc"])
     waiting = {topics[key].get("arc") for key in untaught(record)}
-    return next((arc for arc in arcs if arc in waiting), arcs[-1])
+    live = arc_rules.live(record)
+    return next((arc for arc in arcs if arc in waiting), (live or arcs)[-1])
 
 
 def held(
@@ -119,19 +121,20 @@ def _state(
     checked: set[str],
 ) -> str:
     """``new`` while every topic is; in a course that takes no questions,
-    ``taught`` once every topic is; else ``checked`` when every topic's
-    check stands, ``ready`` when every topic rests on an unaided answer,
-    and ``learning`` otherwise."""
+    ``taught`` once every topic is; else ``ready`` when every topic rests on
+    an unaided answer, ``checked`` when it is also ready and every topic's
+    check stands, and ``learning`` otherwise. A check never counts ahead of
+    the topics' own standing (the engine owner's ruling, 14 Nov 2026), so a
+    solid check on a practice day leaves an arc of assisted topics
+    learning, and the states only climb."""
     found = [levels[key]["level"] for key in keys]
     if all(level == "new" for level in found):
         return "new"
     if record["preferences"].get(preferences.QUESTIONS) == "none":
         taught = all("introduced" in record["topics"][key] for key in keys)
         return "taught" if taught else "learning"
-    if set(keys) <= checked:
-        return "checked"
     if all(level in progress.SECURE for level in found):
-        return "ready"
+        return "checked" if set(keys) <= checked else "ready"
     return "learning"
 
 

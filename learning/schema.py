@@ -389,6 +389,7 @@ class PatchResult:
     judged: list[str] = field(default_factory=list)
     global_preferences: dict[str, str | None] | None = None
     exam_moved: bool = False
+    questions_moved: bool = False
     pruned: dict[str, str] = field(default_factory=dict)
 
 
@@ -1691,4 +1692,7 @@ def apply_patch(
             "the source"
         )
     outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
+    outcome.questions_moved = record["preferences"].get(
+        preferences.QUESTIONS
+    ) != result["preferences"].get(preferences.QUESTIONS)
     return validate_record(result, placing=True), outcome

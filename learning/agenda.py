@@ -80,20 +80,23 @@ waits while other courses' new topics take the days names them
 (``When.starts_after``).
 
 New topics follow the material. The path runs arc by arc, and a start comes
-from the window: the current arc (the arc of the earliest untaught topic),
-the next arc, and any arc that needs nothing from another
-(``progress.window``). Without arcs the path bounds it: a topic ahead of the
+from the window: the earliest arc with topics left (the arc of the earliest
+untaught topic he may start), the next arc, and any arc that needs nothing
+from another (``progress.window``). That arc is not the current arc, the
+arc of "You are here" (``arcs.current``): the two differ once he studies
+ahead. Without arcs the path bounds it: a topic ahead of the
 earliest untaught one starts only when it builds on one, so a topic that
 needs nothing waits its place (``progress.opens``). An exam's pace passes the
 window only on a day when holding would raise the pace it needs. Each start
 says why it comes then (``When.why``): next in its arc, after what it waited
-on, or early, with what the current arc waits on.
+on, or early, with the earliest arc with topics left and what it waits on.
 
 An exam that names arcs examines only their topics (``progress.examining``):
 only those take its review dates, its final review and its run-up, while its
 pace, its gates and what does not fit hold them and their untaught
 prerequisites (``progress.exam_topics``). The rest of the course is planned
-as with no exam, while the exam is ahead and after it.
+as with no exam while the exam is ahead, and after it the whole course is,
+what it examined but he never started included.
 """
 
 from __future__ import annotations
@@ -121,14 +124,15 @@ class Why(TypedDict, total=False):
     start), ``after`` (on a day the plan reached it, it waited for ``needs``,
     prerequisites not yet solid, or ``partners``, competing methods not yet
     solid, to be told apart from them), or ``early`` (ahead of its place:
-    from a later ``arc`` while the current arc has topics left, or, without
-    arcs, ahead of an earlier topic; ``waiting_on`` names what those wait
-    to be solid, ``exam`` that the exam's pace took it). ``arc`` is its
-    arc. Another course's new topics taking the days before it are
+    from a later ``arc`` while ``behind``, the earliest arc with topics left,
+    waits, or, without arcs, ahead of an earlier topic; ``waiting_on`` names
+    what those wait on to be solid, ``exam`` that the exam's pace took it).
+    ``arc`` is its arc. Another course's new topics taking the days before it are
     ``When.starts_after``, beside this."""
 
     kind: str
     arc: str
+    behind: str
     needs: list[str]
     partners: list[str]
     waiting_on: list[str]
@@ -181,6 +185,7 @@ class _Course:
     waits: dict[str, Why] = field(default_factory=dict)
     fresh: set[str] = field(default_factory=set)
     why: dict[str, Why] = field(default_factory=dict)
+    missed: list[str] | None = None
     began: date | None = None
 
     @classmethod
@@ -222,13 +227,17 @@ class _Course:
 
     def outside(self, day: date) -> list[str]:
         """Untaught topics no exam ahead needs: outside the next exam's scope,
-        or, once an exam over named arcs has passed, outside what it examined.
-        They are planned as in a course with no exam. After a whole-course
-        exam nothing is, until the next exam is set."""
-        bound = self.scope if self.ahead(day) else self.examined
-        if self.exam is None or bound is None:
+        or, once an exam over named arcs has passed, all of them, what it
+        examined but he never started included. They are planned as in a
+        course with no exam. After a whole-course exam nothing is, until the
+        next exam is set."""
+        if self.exam is None:
             return []
-        return [key for key in self.untaught if key not in bound]
+        if not self.ahead(day):
+            return list(self.untaught) if self.examined is not None else []
+        if self.scope is None:
+            return []
+        return [key for key in self.untaught if key not in self.scope]
 
     def arc(self, topic: str) -> str | None:
         arc: str | None = self.record["topics"][topic].get("arc")
@@ -244,8 +253,9 @@ class _Course:
 
     def opens(self, topic: str, front: str | None) -> bool:
         """Whether ``topic`` is in the window new topics come from, read from
-        ``front`` (``progress.opens``): the current arc, the next and any arc
-        that needs nothing from another; without arcs, the path's own order."""
+        ``front`` (``progress.opens``): the earliest arc with topics left, the
+        next and any arc that needs nothing from another; without arcs, the
+        path's own order."""
         window = progress.window(self.record, front, self.free)
         return progress.opens(self.record, topic, window, front)
 
@@ -282,16 +292,17 @@ class _Course:
         """Why ``topic`` starts now (``Why``), read before it starts, with
         ``front`` the earliest untaught topic of what it was picked from."""
         arc = self.arc(topic)
-        current = self.arc(front) if front is not None else None
+        earliest = self.arc(front) if front is not None else None
         why: Why = {"arc": arc} if arc is not None else {}
         chapters = arc_rules.order(self.record)
-        if arc is not None and current is not None:
-            if chapters.index(arc) > chapters.index(current):
-                behind = [t for t in self.untaught if self.arc(t) == current]
-                return {**why, "kind": "early", **self._waiting_on(behind, pace)}
+        if arc is not None and earliest is not None:
+            if chapters.index(arc) > chapters.index(earliest):
+                passed = [t for t in self.untaught if self.arc(t) == earliest]
+                waiting = self._waiting_on(passed, pace)
+                return {**why, "kind": "early", "behind": earliest, **waiting}
         elif arc is None and front is not None and topic != front:
-            behind = self.untaught[: self.untaught.index(topic)]
-            return {"kind": "early", **self._waiting_on(behind, pace)}
+            passed = self.untaught[: self.untaught.index(topic)]
+            return {"kind": "early", **self._waiting_on(passed, pace)}
         if topic in self.waits:
             return {**why, "kind": "after", **self.waits[topic]}
         return {**why, "kind": "next"}
@@ -778,16 +789,19 @@ def _new(
         count: float,
         among: set[str] | None = None,
         *,
+        pool: Collection[str] | None = None,
         bound: bool = True,
         pace: bool = False,
     ) -> int:
-        """Up to ``count`` ready topics in path order from the window
-        (``_Course.opens``; all of them when not ``bound``), those related to
-        one it starts today first: a second topic on one day builds on what
-        the first does."""
+        """Up to ``count`` ready topics of ``among`` in path order from the
+        window (``_Course.opens``; all of them when not ``bound``), those
+        related to one it starts today first: a second topic on one day builds
+        on what the first does. The window is read from the earliest untaught
+        topic of ``pool`` (of ``among`` when None), so narrowing the
+        candidates never moves where he is in the material."""
         taken = 0
         while taken < count:
-            front = course.front(among)
+            front = course.front(among if pool is None else pool)
             ready = [
                 topic
                 for topic in course.untaught
@@ -804,15 +818,17 @@ def _new(
             taken += 1
         return taken
 
-    def spare(course: _Course, among: list[str]) -> int:
-        """One topic of ``among`` beyond what the paces and the gaps need. Two
-        unrelated topics on one day split his attention, so it starts one only
-        on a day that starts none yet, or one related to a topic this course
-        starts today, unless his own rate that weekday holds two."""
+    def spare(course: _Course, among: list[str], pool: list[str]) -> int:
+        """One topic of ``among`` beyond what the paces and the gaps need, from
+        the window read from ``pool``. Two unrelated topics on one day split
+        his attention, so it starts one only on a day that starts none yet, or
+        one related to a topic this course starts today, unless his own rate
+        that weekday holds two."""
         if not any(chosen.values()) or week.on(day).new.value >= 2:
-            return take(course, 1, set(among))
+            return take(course, 1, set(among), pool=pool)
         started = chosen[course.name]
-        return take(course, 1, {t for t in among if course.related(t, started)})
+        related = {t for t in among if course.related(t, started)}
+        return take(course, 1, related, pool=pool)
 
     exams = sorted(
         (course for course in courses if course.new_end(day) is not None),
@@ -827,9 +843,11 @@ def _new(
             paces[course.name] = math.ceil(len(course.scoped) / left)
     if begun is not None:
         room = max(room, sum(paces.values()) - begun)
-    for course in [*exams, *(course for course in courses if course.exam is None)]:
-        if room > 0 and course.gaps:
-            room -= take(course, room, course.gaps, bound=False)
+    others = [course for course in courses if course.new_end(day) is None]
+    for course in [*exams, *others]:
+        gaps = course.gaps.intersection(course.startable(day))
+        if room > 0 and gaps:
+            room -= take(course, room, gaps, bound=False)
     for course in exams:
         if room > 0 and course.name in paces:
             pace = paces[course.name]
@@ -847,7 +865,7 @@ def _new(
                 more = min(room, pace - taken)
                 room -= take(course, more, scoped, bound=False, pace=True)
     for course in exams:
-        while room > 0 and spare(course, course.scoped):
+        while room > 0 and spare(course, course.scoped, course.scoped):
             room -= 1
     open_ = sorted(
         (course for course in courses if course.exam is None or course.outside(day)),
@@ -857,7 +875,7 @@ def _new(
         started = []
         for course in open_:
             among = course.untaught if course.exam is None else course.outside(day)
-            if room > 0 and spare(course, among):
+            if room > 0 and spare(course, among, course.startable(day)):
                 started.append(course)
                 room -= 1
         open_ = started
@@ -976,6 +994,9 @@ def plan(
         if offset == 0:
             reviews_room = max(reviews_room - spent, 0)
             new_room = max(new_room - done.new, 0)
+        for course in courses:
+            if course.missed is None and course.ahead(today) and not course.ahead(day):
+                course.missed = course.scoped
         reviews = _reviews(courses, day, reviews_room, week)
         for course in courses:
             for topic in reviews[course.name]:
@@ -993,9 +1014,10 @@ def plan(
     return Plan(
         {course.name: course.days for course in courses},
         {
-            course.name: course.scoped
+            course.name: missed
             for course in courses
-            if course.ahead(today) and course.scoped
+            if course.ahead(today)
+            and (missed := course.scoped if course.missed is None else course.missed)
         },
         {course.name: dict(course.held) for course in courses if course.held},
         {

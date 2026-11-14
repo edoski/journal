@@ -975,6 +975,17 @@ def test_an_arc_is_checked_when_each_topics_latest_check_item_stands_solid(
     assert states(workspace)["limits"] == "ready", "never on a teaching day"
 
 
+def test_an_arc_is_checked_only_once_it_is_ready(workspace: Workspace) -> None:
+    with_arcs(workspace)
+    taught(workspace, -10, "limit", "continuity")
+    answered(workspace, -9, "limit", "continuity", help="Hint")
+    answered(workspace, -8, "limit", "continuity", checkpoint="limits")
+    path = retrieval.resume(workspace)["path"]["topics"]
+    levels = {topic[0]: topic[1] for topic in path}
+    assert levels["limit"] == levels["continuity"] == "assisted"
+    assert states(workspace)["limits"] == "learning", "a practice day's check"
+
+
 def test_a_course_that_takes_no_questions_reads_new_learning_or_taught(
     workspace: Workspace,
 ) -> None:
@@ -1018,6 +1029,35 @@ def test_an_arcs_entry_is_what_it_needs_from_earlier_arcs_lapsed_first(
     ], "a hidden arc is drawn nowhere"
 
 
+def test_with_every_live_topic_taught_the_current_arc_is_the_last_drawn_one(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    taught(workspace, -20, "limit", "continuity", "derivative", "chain-rule")
+    integrals = ("riemann", "substitution", "parts")
+    hide = {key: {"excluded": "Not examined"} for key in integrals}
+    records.save(workspace, {"topics": hide})
+    mapped = retrieval.course_map(workspace)
+    assert mapped["current_arc"] == "derivatives", "never an arc drawn nowhere"
+    assert [arc["arc"] for arc in mapped["arcs"] if arc["current"]] == ["derivatives"]
+
+
+def test_a_scoped_exam_names_the_untaught_earlier_topics_it_needs(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace, exam={"date": day(30), "arcs": ["integrals"]})
+    block = retrieval.course_map(workspace)["exam"]
+    assert block["arcs"] == ["integrals"]
+    assert block["needed"] == ["limit", "derivative", "chain-rule"]
+    taught(workspace, -1, "limit")
+    assert retrieval.course_map(workspace)["exam"]["needed"] == [
+        "derivative",
+        "chain-rule",
+    ], "a taught topic is needed no more"
+    records.save(workspace, {"exam": {"date": day(30), "arcs": None}})
+    assert "needed" not in retrieval.course_map(workspace)["exam"], "the whole course"
+
+
 def test_the_current_arc_follows_the_lesson_in_progress(
     workspace: Workspace,
 ) -> None:
@@ -1042,6 +1082,16 @@ def test_the_current_arc_follows_the_lesson_in_progress(
         "first": True,
     }
     assert brief["path"]["topics"][0] == ["limit", "new", "limits"]
+
+
+def test_an_arc_stays_first_until_one_of_its_topics_is_taught(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    answered(workspace, -2, "riemann", result="incorrect")
+    assert retrieval.resume(workspace, here="parts")["arc"]["first"] is True
+    taught(workspace, -1, "riemann")
+    assert retrieval.resume(workspace, here="parts")["arc"]["first"] is False
 
 
 def test_the_brief_offers_each_ready_arcs_check_with_its_pairs(
