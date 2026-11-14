@@ -80,6 +80,7 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 					}
 					map={
 						<SplitMap
+							key={map.workspace}
 							ref={drawing}
 							map={map}
 							layout={layout}

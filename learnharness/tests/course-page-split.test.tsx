@@ -16,7 +16,8 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap, NODE_WIDTH, slackOf } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { OPEN_AT_FIRST, aimOf, boxesOf, walkStops, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
+import { OPEN_AT_FIRST, aimOf, boxesOf, walkStops, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, wholeSurfaceOf, type Box } from "../components/course-page/split/split-tie.ts";
+import { WholeCourseButton } from "../components/course-map/topic-map/whole-course-button.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
@@ -167,8 +168,9 @@ describe("the map pane", () => {
 		const document = drawMap();
 		const pane = document.querySelector('[data-slot="course-split-map"]')!;
 		assert.equal(pane.getAttribute("aria-label"), "Linear Algebra map");
-		assert.match(pane.getAttribute("style") ?? "", /mask-image/);
-		assert.ok(document.querySelector('[data-slot="course-split-map-scroller"]')!.className.includes("overflow-auto"), "the pane scrolls the map");
+		const scroller = document.querySelector('[data-slot="course-split-map-scroller"]')!;
+		assert.match(scroller.parentElement!.getAttribute("style") ?? "", /mask-image/, "the map fades at its edges");
+		assert.ok(scroller.className.includes("overflow-auto"), "the pane scrolls the map");
 		assert.ok(!pane.className.includes("border"));
 		assert.equal(document.querySelectorAll('[data-slot="course-map-node"]').length, MAP.topics.length);
 	});
@@ -273,6 +275,30 @@ describe("the map pane's surface and where it scrolls", () => {
 		const boxes = boxesOf(LAYOUT, surface);
 		const at = LAYOUT.topics.get(h("vectors"))!;
 		assert.deepEqual(boxes.get(h("vectors")), { x: (1000 - LAYOUT.width) / 2 + at.x, y: (600 - LAYOUT.height) / 2 + at.y, width: NODE_WIDTH, height: 64 });
+	});
+
+	it("zooms out to the whole course in the pane, every topic clear of the fade, only when it opens on less", () => {
+		const layout = { ...LAYOUT, width: 2000, height: 1200 };
+		const pane = { width: 696, height: 757 };
+		const fade = { x: 82, y: 32 };
+		const opened = surfaceOf(layout, pane, room, 20, 0.8);
+		const whole = wholeSurfaceOf(layout, pane, opened, fade, room, 20)!;
+		assert.ok(whole.width <= pane.width && whole.height <= pane.height, "nothing to scroll");
+		const drawn = { left: (whole.width - layout.width * whole.zoom) / 2, top: (whole.height - layout.height * whole.zoom) / 2 };
+		assert.ok(drawn.left >= fade.x && drawn.left + layout.width * whole.zoom <= pane.width - fade.x + 0.5, "clear of the fade across");
+		assert.ok(drawn.top >= fade.y + 20 - 0.5 && drawn.top + layout.height * whole.zoom <= pane.height - fade.y - 20 + 0.5, "clear of the fade and the tag's room down");
+		const small = { ...LAYOUT, width: 400, height: 200 };
+		assert.equal(wholeSurfaceOf(small, pane, surfaceOf(small, pane, room, 20), fade, room, 20), null, "a course that opens whole offers nothing more");
+		assert.equal(wholeSurfaceOf({ ...LAYOUT, width: 400, height: 300 }, { width: 696, height: 900 }, surfaceOf({ ...LAYOUT, width: 400, height: 300 }, { width: 696, height: 900 }, room, 20), fade, room, 20), null);
+	});
+
+	it("names the zoom out in words beside its icon, and the way back once pressed", () => {
+		const shown = (whole: boolean) => render(<WholeCourseButton whole={whole} onToggle={noop} />).querySelector('[data-slot="course-map-whole"]')!;
+		assert.equal(shown(false).textContent, "Whole course");
+		assert.equal(shown(false).getAttribute("aria-pressed"), "false");
+		assert.ok(shown(false).querySelector("svg"), "an icon beside the words");
+		assert.equal(shown(true).textContent, "Back to where you are");
+		assert.equal(shown(true).getAttribute("aria-pressed"), "true");
 	});
 
 	// Three topics side by side, 224 wide, 24 apart, on a surface with room to scroll past them.

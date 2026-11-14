@@ -5,7 +5,8 @@ import type { CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { framedCamera, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
-import { boxesOf, fadeAcross, scrollOfCamera, scrollOn, surfaceOf, topicAt, type Scroll, type Size } from "@/components/course-page/split/split-tie";
+import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
+import { boxesOf, fadeAcross, scrollOfCamera, scrollOn, surfaceOf, topicAt, wholeSurfaceOf, type Scroll, type Size } from "@/components/course-page/split/split-tie";
 
 /** What the page asks of the map: focus a topic's node. */
 export interface SplitMapHandle {
@@ -39,7 +40,7 @@ function reducedMotion(): boolean {
  * map (topic-map.md) on a surface the map fits whole (`surfaceOf`), in a
  * pane that scrolls it with no bar, no outline and no header, its edges
  * faded into the page. It opens as every course map opens (`framedCamera`):
- * the whole course when it fits at 75% or more, else framed on `aim` with
+ * the whole course when it fits at 80% or more, else framed on `aim` with
  * its neighbours whole and as few topics cut as it can, at the scale that
  * shows the most. The map never moves its own camera; the pane moves
  * instead, always to a view that cuts as few topics at its edges as it
@@ -47,6 +48,10 @@ function reducedMotion(): boolean {
  * once he rests on it for 120ms) glides into view in 200ms when it is not
  * already clear of the fade, and so does a node the keyboard reaches; its
  * card glows at once (the map's `marked`).
+ * Once nothing is pointed at for 400ms, a pane a row moved glides back to
+ * its opening view. When the course opens on less than all of it, the
+ * maps' Whole course control (`WholeCourseButton`) sits in the top right
+ * corner and swaps the surface for one the whole course fits in the pane.
  * Wheel, trackpad and a drag on the background scroll it. `lit` lights
  * the row's topic and prerequisites. Pointing at or focusing a node tells
  * the page its topic (`onPoint`), so the list marks its row; Escape on a
@@ -88,11 +93,17 @@ export function SplitMap({
 	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, layout.node), y: FADE.y }), [pane.width, layout.node]);
 	/** How the course opens in the pane: its scale and where it sits. */
 	const opening = useMemo(() => (pane.width > 0 ? framedCamera(layout, aim, pane, fade, TAG_ROOM, "top") : null), [layout, aim, pane, fade]);
-	const surface = useMemo(() => surfaceOf(layout, pane, FADE, TAG_ROOM, opening?.zoom), [layout, pane, opening?.zoom]);
+	const opened = useMemo(() => surfaceOf(layout, pane, FADE, TAG_ROOM, opening?.zoom), [layout, pane, opening?.zoom]);
+	/** The Whole course surface, when the course opens on less than all of it; held for the visit only. */
+	const wholeSurface = useMemo(() => (pane.width > 0 ? wholeSurfaceOf(layout, pane, opened, fade, FADE, TAG_ROOM) : null), [layout, pane, opened, fade]);
+	const [whole, setWhole] = useState(false);
+	const zoomedOut = whole && wholeSurface !== null;
+	const surface = zoomedOut ? wholeSurface : opened;
 	const boxes = useMemo(() => boxesOf(layout, { width: surface.width, height: surface.height, zoom: surface.zoom }), [layout, surface.width, surface.height, surface.zoom]);
 
-	/** Where the pane rests: the opening view. */
-	const home = useMemo(() => (opening ? scrollOfCamera(layout, surface, pane, opening) : null), [layout, surface, pane, opening]);
+	/** Where the pane rests: the opening view, or the whole course from the top left. */
+	const home = useMemo<Scroll | null>(() => (zoomedOut ? { left: 0, top: 0 } : opening ? scrollOfCamera(layout, surface, pane, opening) : null), [zoomedOut, layout, surface, pane, opening]);
+	const toggleWhole = useCallback(() => setWhole((w) => !w), []);
 
 	/** Glides the pane over 200ms to `to`, at once under reduced motion. */
 	const glideTo = useCallback((to: Scroll) => {
@@ -234,7 +245,6 @@ export function SplitMap({
 			aria-label={`${map.title} map`}
 			data-slot="course-split-map"
 			className="relative min-h-0 flex-1"
-			style={mapFade(fade.x, fade.y)}
 			onPointerOver={(e) => point(topicAt(e.target))}
 			onPointerLeave={() => point(null)}
 			onFocus={(e) => {
@@ -257,12 +267,16 @@ export function SplitMap({
 				onLeave(handle);
 			}}
 		>
-			<div ref={scroller} data-slot="course-split-map-scroller" className={`size-full overflow-auto overscroll-contain ${NO_BAR}`}>
-				{/* The surface's size, from the course's layout: the map fits it whole. */}
-				<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-					<TopicMap map={map} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
+			<div className="absolute inset-0" style={mapFade(fade.x, fade.y)}>
+				<div ref={scroller} data-slot="course-split-map-scroller" className={`size-full overflow-auto overscroll-contain ${NO_BAR}`}>
+					{/* The surface's size, from the course's layout: the map fits it whole. */}
+					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
+						<TopicMap map={map} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
+					</div>
 				</div>
 			</div>
+			{/* Outside the fade, in the pane's top right corner, where the fade leaves the map clear. */}
+			{wholeSurface && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} className="absolute top-0 right-0" />}
 		</section>
 	);
 }

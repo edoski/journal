@@ -1,5 +1,5 @@
 import type { CourseMapEdge, TopicHandle } from "@/src/core";
-import { NODE_GAP, NODE_SIZE, cardFit, chainOf, slackOf, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { NODE_GAP, NODE_SIZE, cardFit, chainOf, slackOf, wholeZoom, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import type { CourseGroup, CourseTopic, GroupId } from "@/components/course-page/course-model";
 
 /**
@@ -151,6 +151,15 @@ export function surfaceOf(layout: TopicMapLayout, pane: Size, room: { x: number;
 		height: height > pane.height ? Math.ceil(height + slack.y * 2 * zoom) : Math.floor(height),
 		zoom,
 	};
+}
+
+/** The surface for the pane's Whole course: every topic in the pane, clear
+ *  of the fade and the tag's room, at whatever scale fits, never above full
+ *  size; null when the surface the course opens on already fits the pane,
+ *  so there is no more to see. Pure. */
+export function wholeSurfaceOf(layout: TopicMapLayout, pane: Size, opening: Surface, fade: { x: number; y: number }, room: { x: number; y: number }, tag: number): Surface | null {
+	if (opening.width <= pane.width && opening.height <= pane.height) return null;
+	return surfaceOf(layout, pane, room, tag, wholeZoom(layout, pane, { x: fade.x, y: fade.y + tag }));
 }
 
 /** Where the pane scrolls so the surface shows the course as `camera`
