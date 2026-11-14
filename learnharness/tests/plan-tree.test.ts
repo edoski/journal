@@ -16,6 +16,7 @@ import { derivePlanStatuses, derivedNodeStatus, type PlanTree, type PlanToolResu
 import { createTree, emptyTree, PlanTreeError } from "../src/core/plan-tree.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
 import { nameSessionTool } from "../src/agent/tools/name-session.ts";
+import { nameFromFirstTurn } from "../src/server/session-naming.ts";
 import { parseMermaidPlan } from "../src/agent/tools/mermaid-plan.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { PATHS } from "../config.ts";
@@ -188,6 +189,36 @@ describe("name_session names a session on its first turn, once", () => {
 		const [kept, own] = [onTopic.id, renamed].map((id) => chatStore.listChats().find((c) => c.id === id)!);
 		assert.deepEqual([kept!.title, kept!.ownTopics], ["Review Rank and the column space", ["rank"]]);
 		assert.deepEqual([own!.title, own!.ownTopics], ["My eigen night", ["eigen"]], "his name stays; the topic it is about is set");
+	});
+});
+
+describe("a first turn that did not name its session", () => {
+	const STAMPS = { api: "faux", provider: "test", model: "test", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+	const map = { ok: true as const, map: { topics: [{ handle: "the-derivative", title: "The derivative" }, { handle: "chain-rule", title: "Chain rule" }] } } as never;
+	const records = { map: async () => map };
+	const answered = (handles: unknown) => [
+		{ id: "u", role: "user", content: "why does the chain rule multiply?", timestamp: 1 },
+		{ id: "a1", role: "assistant", content: [{ type: "toolCall", id: "s", name: "course_show", arguments: { handles } }], stopReason: "toolUse", timestamp: 2, ...STAMPS },
+		{ id: "r", role: "toolResult", toolCallId: "s", toolName: "course_show", content: [{ type: "text", text: "{}" }], details: null, isError: false, timestamp: 3 },
+		{ id: "a2", role: "assistant", content: [{ type: "text", text: "Because…" }], stopReason: "stop", timestamp: 4, ...STAMPS },
+	] as never;
+
+	it("takes the name of the course topic that turn looked up, its first on the map", async () => {
+		const chat = chatStore.createChat("quick one: why does the chain rule multiply the derivatives instead of adding them?", { workspace: "/s/calc", title: "Calculus" });
+		createdChats.push(chat.id);
+		chatStore.saveMessages(chat.id, answered('["chain-rule", "the-derivative"]'));
+		assert.equal(await nameFromFirstTurn({ chatStore, courseRecords: records }, chat.id), true);
+		const named = chatStore.listChats().find((c) => c.id === chat.id)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Chain rule", ["chain-rule"]]);
+	});
+
+	it("leaves a session the tutor named, or one he renamed, as it is", async () => {
+		const chat = chatStore.createChat("why does the chain rule multiply?", { workspace: "/s/calc", title: "Calculus" });
+		createdChats.push(chat.id);
+		chatStore.saveMessages(chat.id, answered(["chain-rule"]));
+		chatStore.nameSession(chat.id, { title: "Why the chain rule multiplies" });
+		assert.equal(await nameFromFirstTurn({ chatStore, courseRecords: records }, chat.id), false);
+		assert.equal(chatStore.listChats().find((c) => c.id === chat.id)!.title, "Why the chain rule multiplies");
 	});
 });
 
