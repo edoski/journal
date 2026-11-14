@@ -7,6 +7,7 @@ import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { buildInbox, daysBetween, taskWords as leftOff, type Unit, type UnitNow } from "@/components/unit-inbox/units";
 import { courseShareWords, returnWords } from "@/components/study-words";
+import { lastSessionOf } from "@/components/course-page/course-head/head-facts";
 
 /**
  * The course page's model (spec: course-page.md): one course's topics, each
@@ -193,15 +194,18 @@ export interface CourseFacts {
 	exam: string | null;
 	/** "Studied 2 days ago", "Studied today", "Not studied yet". */
 	studied: string | null;
+	/** His latest session in the course, which "Studied" opens. */
+	lastSession: { id: string; title: string } | null;
 }
 
-/** The facts line, in Home's words. Pure. */
-export function courseFacts(course: StudyCourse): CourseFacts {
+/** The facts line, in Home's words. `chats` are every session. Pure. */
+export function courseFacts(course: StudyCourse, chats: readonly ChatListItem[] = []): CourseFacts {
 	const progress = courseProgress(course);
 	return {
 		progress: progress ? courseShareWords(progress.solid, progress.of) : null,
 		exam: examWords(course),
 		studied: lastStudied({ kind: "course", course, step: { kind: "none" } }),
+		lastSession: lastSessionOf(course.map.workspace, chats),
 	};
 }
 
@@ -242,7 +246,7 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 			}
 			return {
 				status: "ready",
-				view: { course, groups: courseGroups(course, state.chats), facts: courseFacts(course), next: courseNext(course, state.open) },
+				view: { course, groups: courseGroups(course, state.chats), facts: courseFacts(course, state.chats), next: courseNext(course, state.open) },
 			};
 		}
 	}
