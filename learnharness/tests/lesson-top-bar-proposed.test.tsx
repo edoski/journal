@@ -1,17 +1,20 @@
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+// next/link schedules its prefetch on `self`, which linkedom leaves out.
+(globalThis as Record<string, unknown>).self = globalThis;
 
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
-import { LessonDetails, LessonTopBar } from "../components/lesson/lesson-top-bar.tsx";
-import { CLAUDE_MODEL } from "../src/core/index.ts";
-import { roomWords } from "../components/study-words.ts";
+import { LessonTopBar, topicCrumbShown } from "../components/lesson/lesson-top-bar.tsx";
+import { LessonRoadmap } from "../components/lesson/lesson-roadmap.tsx";
+import { DoneTonightButton } from "../components/lesson/done-tonight.tsx";
+import type { RoadmapStep } from "../components/lesson/roadmap-facts.ts";
 
-// The lesson's top bar under the Proposed design on the real Radix layers:
-// the details popover and the plan popover. Fetch is stubbed read-only;
-// nothing is saved.
+// The lesson's top bar on the real Radix layers: the crumbs, Done for
+// today and where the lesson is (the roadmap's strip and panel). Fetch is
+// stubbed read-only; nothing is saved.
 const originalFetch = globalThis.fetch;
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -28,7 +31,6 @@ async function mount(node: React.ReactElement) {
 	globalThis.fetch = async (input, init) => {
 		assert.equal(init?.method ?? "GET", "GET", "opening the top bar's layers must not write");
 		const path = new URL(String(input), "http://localhost").pathname;
-		if (path === "/api/models") return Response.json({ account: "claude-subscription", connected: true, contextWindow: 200000 });
 		throw new Error(`unexpected fetch ${path}`);
 	};
 	host = document.createElement("div");
@@ -65,54 +67,79 @@ async function escapeReachesWindow(): Promise<boolean> {
 	return reached;
 }
 
-const panelOpen = () => !element('[data-testid="session-details-panel"]').hidden;
+const STEPS: RoadmapStep[] = [
+	{ id: "maps", title: "A matrix is a linear map", status: "visited", done: true, next: false, taught: true },
+	{ id: "equation", title: "The eigen-equation", status: "current", done: false, next: false, taught: true },
+	{ id: "compute", title: "Computing a 2×2 spectrum", status: "upcoming", done: false, next: true, taught: false },
+];
+const PLACE = { topic: { handle: "eigen", title: "Eigenvalues and eigenvectors" }, arc: { title: "Spectra" } };
+const COURSE = { title: "Linear Algebra", workspace: "/courses/la" };
 
-describe("Proposed lesson details", () => {
-	const details = <LessonDetails turns={[]} contextTokens={1000} />;
+function Roadmap({ onJump = () => {} }: { onJump?: (id: string) => void }) {
+	const [open, setOpen] = React.useState(false);
+	return <LessonRoadmap steps={STEPS} place={PLACE} course={COURSE} open={open} onOpenChange={setOpen} onJump={onJump} />;
+}
 
-	it("stays mounted while closed, so Esc stays the turn's", async () => {
-		await mount(details);
-		assert.equal(panelOpen(), false);
-		assert.equal(await escapeReachesWindow(), true, "a closed panel leaves Esc to the turn");
+describe("the lesson's top bar", () => {
+	it("names no phase and holds no details menu: the crumbs, the roadmap and Done for today", async () => {
+		await mount(<LessonTopBar title="Eigenvalues" course="Linear Algebra" courseHref="/unit/la" topic={{ title: "Spectra of 2×2 maps", href: "/unit/la/eigen" }} roadmap={<Roadmap />} tonight={<DoneTonightButton onDone={() => {}} />} />);
+		assert.equal(document.querySelector('[data-testid="phase-chip"]'), null);
+		assert.equal(document.querySelector('[data-testid="session-details"]'), null);
+		assert.equal(element('[data-testid="course-label"]').getAttribute("href"), "/unit/la");
+		assert.equal(element('[data-testid="topic-label"]').getAttribute("href"), "/unit/la/eigen");
+		assert.ok(element('[data-testid="roadmap"]'));
+		const done = element('[data-testid="done-tonight"]');
+		assert.ok(done.querySelector("svg"), "Done for today carries its icon");
+		assert.match(done.textContent!, /Done for today/);
 	});
 
-	it("names the one tutor with no picker, and says the room left in words, never a token count", async () => {
-		await mount(details);
-		await click(element('[data-testid="session-details"]'));
-		assert.equal(panelOpen(), true);
-		assert.equal(element('[data-testid="stats-model"]').textContent, CLAUDE_MODEL.name);
-		assert.equal(document.querySelector('[data-testid="stats-model"] button'), null, "no model or thinking control");
-		assert.equal(element('[data-testid="stats-context"]').textContent, "Plenty");
-		assert.doesNotMatch(document.querySelector('[data-testid="session-details-panel"]')!.textContent!, /Context|\d+k|tokens/);
-		assert.equal(await escapeReachesWindow(), false);
-		assert.equal(panelOpen(), false, "one Esc closes the panel, and the turn never hears it");
+	it("shows the topic crumb only when its words are not the title's", () => {
+		assert.equal(topicCrumbShown("Eigenvalues and eigenvectors", "eigenvalues and eigenvectors "), false);
+		assert.equal(topicCrumbShown("Eigenvalues and eigenvectors", "Diagonalising"), true);
+	});
+});
+
+describe("where the lesson is", () => {
+	it("the strip marks each step and names the one he is on", async () => {
+		await mount(<Roadmap />);
+		const trigger = element('[data-testid="roadmap"]');
+		assert.deepEqual([...trigger.querySelectorAll('[data-slot="roadmap-strip"] > span')].map((d) => d.getAttribute("data-status")), ["visited", "current", "upcoming"]);
+		assert.match(trigger.textContent!, /The eigen-equation/);
+		assert.equal(trigger.getAttribute("aria-label"), "Where this lesson is: The eigen-equation");
 	});
 
-	it("⌘K opens the panel", async () => {
-		await mount(details);
+	it("a taught step opens the transcript where it was taught; a step ahead is not a link", async () => {
+		const jumped: string[] = [];
+		await mount(<Roadmap onJump={(id) => jumped.push(id)} />);
+		await click(element('[data-testid="roadmap"]'));
+		const panel = element('[data-testid="roadmap-panel"]');
+		assert.match(element('[data-testid="roadmap-step-maps"]').textContent!, /Done$/);
+		assert.match(element('[data-testid="roadmap-step-equation"]').textContent!, /Now$/);
+		assert.match(element('[data-testid="roadmap-step-compute"]').textContent!, /Next$/);
+		assert.equal(element('[data-testid="roadmap-step-compute"]').querySelector("button"), null);
+		await click(element('[data-testid="roadmap-step-maps"] button'));
+		assert.deepEqual(jumped, ["maps"]);
+		assert.equal(panel.isConnected && document.querySelector('[data-testid="roadmap-panel"]') !== null, false, "the panel closes on the jump");
+	});
+
+	it("leads up to the topic's page and the course map, with the topic's arc as a bubble", async () => {
+		await mount(<Roadmap />);
+		await click(element('[data-testid="roadmap"]'));
+		assert.match(element('[data-testid="roadmap-topic"]').getAttribute("href")!, /^\/unit\/[^/]+\/eigen$/);
+		assert.match(element('[data-testid="roadmap-course"]').getAttribute("href")!, /^\/unit\/[^/]+$/);
+		assert.equal(element('[data-slot="arc-pill"]').textContent, "Spectra");
+	});
+
+	it("Esc closes the panel without reaching the turn, and ⌘K opens it", async () => {
+		await mount(<Roadmap />);
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
-		assert.equal(panelOpen(), true);
-	});
-});
-
-describe("Proposed plan popover", () => {
-	it("the plan toggle opens the plan, and Esc closes it without reaching the turn", async () => {
-		function Harness() {
-			const [open, setOpen] = React.useState(false);
-			return <LessonTopBar title="Eigenvalues" phase="Teaching" details={null} plan={{ open, onOpenChange: setOpen, body: <p>Steps</p> }} />;
-		}
-		await mount(<Harness />);
-		await click(element('[data-testid="plan-chip"]'));
-		assert.equal(element('[data-testid="plan-panel"]').textContent, "Steps");
+		assert.ok(element('[data-testid="roadmap-panel"]'));
 		assert.equal(await escapeReachesWindow(), false);
-		assert.equal(document.querySelector('[data-testid="plan-panel"]'), null);
+		assert.equal(document.querySelector('[data-testid="roadmap-panel"]'), null);
 	});
-});
 
-describe("the room a lesson has left", () => {
-	it("says it in words, plenty until half is used", () => {
-		assert.equal(roomWords(null, 150_000), "Not measured yet");
-		assert.equal(roomWords(9_200, 150_000), "Plenty");
-		assert.equal(roomWords(80_000, 150_000), "Over half used. When it fills, the tutor sums up the lesson so far");
+	it("draws nothing for a lesson with no plan", async () => {
+		await mount(<LessonRoadmap steps={[]} open={false} onOpenChange={() => {}} onJump={() => {}} />);
+		assert.equal(document.querySelector('[data-testid="roadmap"]'), null);
 	});
 });

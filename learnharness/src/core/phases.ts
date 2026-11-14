@@ -108,42 +108,6 @@ function advance(
 }
 
 /**
- * WHERE inside the flipping message teaching begins (owner round 8,
- * 2026-10-05 — the stacked-dividers bug): plan→teach flips at the first
- * tagged explain CALL, but the plan PRESENTATION often lives in the
- * same assistant message — an earlier provider STEP than that call.
- * A message-level seam therefore drew the Teaching divider before the
- * plan presentation too (Planning and Teaching stacked back-to-back).
- * This returns the part index of the STEP BOUNDARY governing the flip
- * call: -1 when the call sits in the message's FIRST step (the divider
- * belongs before the whole message), else the index of the step-start
- * part whose generation contains the call — the divider renders there,
- * between the plan presentation and the teaching block.
- */
-export function teachStepIndex(
-	parts: ReadonlyArray<{ type: string; state?: string; input?: unknown }>,
-): number {
-	let stepStarts = 0; // how many step-start parts seen so far
-	let latest = -1; // index of the latest step-start
-	for (let i = 0; i < parts.length; i++) {
-		const part = parts[i]!;
-		if (part.type === "step-start") {
-			stepStarts++;
-			latest = i;
-			continue;
-		}
-		if (isPositionPart(part.type) && taggedNodeId(part.input)) {
-			// The call's governing step: 0–1 step-starts seen = the message's
-			// FIRST step → -1 (the divider belongs before the whole message);
-			// a later step → that step-start's index (the divider renders at
-			// the boundary, replacing the plain hairline there).
-			return stepStarts <= 1 ? -1 : latest;
-		}
-	}
-	return -1;
-}
-
-/**
  * The phase at EVERY message index, in one forward fold — the transcript
  * dividers render one per boundary, so phaseAt3(m, i) per index would rescan
  * 0..i each time (quadratic); this is the same derivation, linear.
@@ -157,17 +121,6 @@ export function phaseTimeline(messages: readonly PhaseMessage[]): Phase3[] {
 		out.push(phase);
 	}
 	return out;
-}
-
-/** The phase the header chip names, or null for none: a session still in
- *  its opening that has posed no question yet is answering, not quizzing
- *  (a focused question gets a direct answer, prober/05-opening.md), so it
- *  shows no phase until the first question is asked. */
-export function chipPhase(messages: readonly PhaseMessage[], timeline: readonly Phase3[] = phaseTimeline(messages)): Phase3 | null {
-	const phase = timeline.at(-1) ?? "probe";
-	if (phase !== "probe") return phase;
-	const asked = messages.some((m) => m.parts.some((p) => p.type.startsWith("tool-") && (QUESTION_TOOLS as readonly string[]).includes(p.type.slice("tool-".length))));
-	return asked ? phase : null;
 }
 
 // ─── the native fold (Wave D: record-side phase over LhMessage[]) ───────────

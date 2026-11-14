@@ -30,7 +30,7 @@ export type StepFlowNode = Node<
 	"step"
 >;
 
-/** The lesson's Plan list's marks (components/lesson/plan-map.tsx) for
+/** The lesson roadmap's marks (components/lesson/lesson-roadmap.tsx) for
  *  what is known: the step it stopped on, and a step a question was asked
  *  on. Any other step keeps the dot's room and no mark, since nothing says
  *  whether it was taught. */

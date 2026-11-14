@@ -1,38 +1,21 @@
 /**
  * Where his next key belongs in a lesson (round 2, 14 Nov 2026). Tab is
  * dead (owner, 17 Sep 2026), so after anything that takes focus away (the
- * lesson opening, a dock swapping, a turn ending, a rename, a dialog
- * closing) focus lands where he types next:
- *
- * - an open practice problem: its "Your thinking" field;
- * - an open question with a typed answer: its answer field;
- * - an open question with choices: nowhere, because the page's arrows walk
- *   its rows and Enter sends;
- * - a question or problem folded to its bar: nowhere, because Enter opens it;
- * - otherwise the composer, except while the tutor replies to what he just
- *   sent from a question or problem (round 4, 14 Nov 2026): keys typed on
- *   after Enter landed in the message box and waited there unseen behind
- *   the next question, to surface later as a stray draft. The reply ending
- *   puts focus home.
+ * lesson opening, a turn ending, a rename, a dialog closing) focus lands in
+ * the composer, whether it is the message or the answer field, except
+ * while the tutor replies to what he just sent from a question or problem
+ * (round 4, 14 Nov 2026): keys typed on after Enter landed in the box and
+ * waited there unseen behind the next question, to surface later as a
+ * stray draft. The reply ending puts focus home.
  *
  * It moves focus only when nothing has it: a field or menu he is in keeps it.
  */
 
-const FIELD = {
-	practice: '[data-testid="practice-thinking-field"]',
-	answer: '[data-testid="question-dock"] [data-testid="answer-field"]',
-	choices: '[data-testid="question-dock"]',
-	folded: '[data-testid="question-dock-bar"], [data-testid="teach-check-reveal"], [data-testid="practice-dock-bar"]',
-	composer: '[data-testid="composer"] textarea',
-} as const;
+const COMPOSER = '[data-testid="composer"] textarea';
 
-/** The field his next key belongs to, or null where the page's own keys act. */
+/** The field his next key belongs to, or null while the tutor replies. */
 export function focusHomeIn(root: ParentNode, replyingToDock = false): HTMLElement | null {
-	const practice = root.querySelector<HTMLElement>(FIELD.practice);
-	if (practice) return practice;
-	if (root.querySelector(FIELD.choices)) return root.querySelector<HTMLElement>(FIELD.answer);
-	if (root.querySelector(FIELD.folded)) return null;
-	return replyingToDock ? null : root.querySelector<HTMLElement>(FIELD.composer);
+	return replyingToDock ? null : root.querySelector<HTMLElement>(COMPOSER);
 }
 
 /** Whether focus is nowhere a key would do anything: the page itself, or an

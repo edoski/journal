@@ -43,7 +43,6 @@ export function proseQuestionSpec(tool: string, toolCallId: string, input: unkno
 		id: toolCallId,
 		kind,
 		question: parsed.question,
-		context: parsed.details,
 		mode,
 		options,
 		createdAt: new Date().toISOString(),

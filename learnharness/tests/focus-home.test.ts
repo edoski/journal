@@ -5,22 +5,7 @@ import { focusHomeIn, landFocus, readingKeyScroll } from "../components/lesson/f
 
 const page = (dock: string) => parseHTML(`<html><body><main>${dock}</main></body></html>`).document;
 
-test("an open practice problem puts the next key in its thinking field", () => {
-	const doc = page('<div data-testid="practice-dock"><textarea data-testid="practice-thinking-field"></textarea></div>');
-	assert.equal(focusHomeIn(doc)?.getAttribute("data-testid"), "practice-thinking-field");
-});
-
-test("an open question with a typed answer puts it in the answer field", () => {
-	const doc = page('<div data-testid="question-dock"><textarea data-testid="answer-field"></textarea></div>');
-	assert.equal(focusHomeIn(doc)?.getAttribute("data-testid"), "answer-field");
-});
-
-test("a question with choices leaves the keys to its rows, and a folded one to Enter", () => {
-	assert.equal(focusHomeIn(page('<div data-testid="question-dock"><button data-kbdrow="0"></button><textarea data-testid="thinking-field"></textarea></div>')), null);
-	assert.equal(focusHomeIn(page('<button data-testid="teach-check-reveal"></button>')), null);
-});
-
-test("with nothing open the next key goes to the composer", () => {
+test("the next key goes to the composer, the message or the answer field", () => {
 	const doc = page('<form data-testid="composer"><textarea></textarea></form>');
 	assert.equal(focusHomeIn(doc)?.tagName, "TEXTAREA");
 });
