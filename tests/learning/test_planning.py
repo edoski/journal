@@ -102,7 +102,10 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
         "task": {"key": "ex5", "title": "Exercise 5", "step": "Why unique?"},
         "open_tasks": 2,
         "last_activity": {"date": TODAY.isoformat(), "days_ago": 0},
-        "last_studied": {"date": (TODAY - timedelta(days=10)).isoformat(), "days_ago": 10},
+        "last_studied": {
+            "date": (TODAY - timedelta(days=10)).isoformat(),
+            "days_ago": 10,
+        },
         "journal": {"activity": "SMM", "study_minutes": 140, "sessions": 2},
         "week": {"minutes": 140},
         "plan": {
