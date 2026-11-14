@@ -7,6 +7,7 @@ import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/comp
 import { renderMermaid } from "@/components/mermaid-render";
 import { MermaidError } from "@/components/mermaid-error";
 import { Hint } from "@/components/ui/hint";
+import { Button } from "@/components/ui/button";
 import { SvgImage } from "@/components/artifacts/svg-image";
 
 /**
@@ -70,9 +71,7 @@ const L = {
 	root: "absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm",
 	title: "text-row font-medium text-foreground",
 	sub: "text-row text-muted-foreground",
-	close: "ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
 	hint: "text-label text-muted-foreground",
-	zoom: "pointer-events-auto flex size-8 items-center justify-center rounded-md border bg-popover text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
 	loading: "flex h-full items-center justify-center gap-2 text-row text-muted-foreground",
 } as const;
 
@@ -236,15 +235,16 @@ export function MermaidOverlay({
 				<span className={L.title}>Diagram</span>
 				<span className={L.sub}>from this lesson</span>
 				<Hint label="Close" binding="escape" side="left">
-<button
-					type="button"
+<Button
+					variant="quiet"
+					size="icon-row"
 					onClick={onClose}
 					aria-label="Close"
 					data-testid="mermaid-overlay-close"
-					className={L.close}
+					className="ml-auto"
 				>
 					<XIcon className="size-4" />
-				</button>
+				</Button>
 </Hint>
 			</div>
 			<div
@@ -304,34 +304,37 @@ export function MermaidOverlay({
 							<span className={L.hint}>Drag to pan · scroll to zoom</span>
 							<div className="flex gap-1">
 								<Hint label="Zoom out" side="bottom">
-<button
-									type="button"
+<Button
+									variant="quiet"
+									size="icon-row"
 									aria-label="Zoom out"
 									onClick={() => stepZoom(1 / 1.25)}
-									className={L.zoom}
+									className="pointer-events-auto border bg-popover hover:bg-accent"
 								>
 									<MinusIcon className="size-3.5" />
-								</button>
+								</Button>
 </Hint>
 								<Hint label="Fit diagram to view" side="bottom">
-<button
-									type="button"
+<Button
+									variant="quiet"
+									size="icon-row"
 									aria-label="Fit diagram to view"
 									onClick={fitView}
-									className={L.zoom}
+									className="pointer-events-auto border bg-popover hover:bg-accent"
 								>
 									<MaximizeIcon className="size-3.5" />
-								</button>
+								</Button>
 </Hint>
 								<Hint label="Zoom in" side="bottom">
-<button
-									type="button"
+<Button
+									variant="quiet"
+									size="icon-row"
 									aria-label="Zoom in"
 									onClick={() => stepZoom(1.25)}
-									className={L.zoom}
+									className="pointer-events-auto border bg-popover hover:bg-accent"
 								>
 									<PlusIcon className="size-3.5" />
-								</button>
+								</Button>
 </Hint>
 							</div>
 						</div>

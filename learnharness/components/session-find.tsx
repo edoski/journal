@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { kbdEventForAction, stepSessionMatch } from "@/src/core";
 import {
 	sameSessionRange, sessionFindRanges, sessionRangeIdentity, type SessionRangeIdentity,
@@ -166,11 +167,12 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 
 	if (!open) return null;
 	return (
-		<div
+		<InputGroup
+			variant="bare"
 			role="search"
 			aria-label="Session Find"
 			data-testid="session-find"
-			className="lh-no-drag flex h-11 shrink-0 items-center gap-1 border-b border-border px-4 text-control"
+			className="lh-no-drag h-11 shrink-0 gap-1 border-b border-border px-4 text-control"
 			onKeyDown={(event) => {
 				if (event.key === "Enter") {
 					event.stopPropagation(); // NEVER reach question/global Enter submits.
@@ -185,14 +187,14 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 			}}
 		>
 			<SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-			<input
+			<InputGroupInput
 				ref={inputRef}
 				aria-label="Find in session"
 				placeholder="Find in session…"
 				value={query}
 				onChange={(event) => setQuery(event.target.value)}
 				spellCheck={false}
-				className="ml-1 min-w-0 flex-1 bg-transparent text-control text-foreground outline-none placeholder:text-muted-foreground"
+				className="ml-1 h-auto px-0 py-0 text-control text-foreground md:text-control"
 			/>
 			<output aria-live="polite" data-testid="session-find-count" className="mr-1 shrink-0 text-label tabular-nums text-muted-foreground">
 				{query ? `${result.index + 1}/${result.count}` : ""}
@@ -212,6 +214,6 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 					<XIcon aria-hidden />
 				</Button>
 			</Hint>
-		</div>
+		</InputGroup>
 	);
 }
