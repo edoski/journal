@@ -142,7 +142,7 @@ def test_a_new_course_s_whole_path_is_planned_up_to_its_exam(
     assert {item["topic"]: item["starts"] for item in topics} == starts
 
 
-def test_the_map_says_a_review_waits_for_a_nearer_exam(
+def test_the_map_says_why_a_review_waits_and_since_when(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -155,11 +155,42 @@ def test_the_map_says_a_review_waits_for_a_nearer_exam(
         capsys,
         exam,
         "save",
-        stdin={"topics": due, "exam": {"date": day(20)}},
+        stdin={"title": "Probability", "topics": due, "exam": {"date": day(3)}},
     )
     run(monkeypatch, capsys, free, "save", stdin={"topics": due})
 
-    exams = run(monkeypatch, capsys, exam, "map")["topics"]
-    assert [(item["review"], "held" in item) for item in exams] == [(day(0), False)]
+    exams = run(monkeypatch, capsys, exam, "map")
+    assert [(item["review"], "held" in item) for item in exams["topics"]] == [
+        (day(0), False)
+    ]
+    assert exams["exam"]["final_review"] == day(-3)
     frees = run(monkeypatch, capsys, free, "map")["topics"]
-    assert [(item["review"], item.get("held")) for item in frees] == [(day(1), True)]
+    assert [
+        (item["review"], item.get("held"), item.get("held_for"), item.get("due"))
+        for item in frees
+    ] == [(day(1), True, "Probability", day(0))]
+
+
+def test_the_map_names_the_topics_a_final_review_has_no_room_for(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = course(tmp_path / "c")
+    topics = {
+        key: {"introduced": day(-20), "review": {"due": day(0)}}
+        for key in ("a", "b", "c")
+    }
+    order = {"order": ["a", "b", "c"]}
+    exam = {"date": day(2)}
+    run(
+        monkeypatch,
+        capsys,
+        root,
+        "save",
+        stdin={"topics": topics, "path": order, "exam": exam},
+    )
+    mapped = run(monkeypatch, capsys, root, "map")
+    assert mapped["exam"]["unreviewed"] == ["c"]
+    planned = run(monkeypatch, capsys, root, "plan", "--days", "3")["courses"][0]
+    assert planned["plan"]["unreviewed"] == ["c"]

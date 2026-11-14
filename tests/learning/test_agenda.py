@@ -360,22 +360,98 @@ def solid(record: dict[str, Any], due: date) -> dict[str, Any]:
     return save(record, {"topics": pins}, MONDAY)
 
 
-def test_a_review_left_out_while_a_nearer_exams_reviews_fill_the_evening_is_held() -> (
-    None
-):
-    exam = solid(course(4, exam=20), on(-1))
+def titled(record: dict[str, Any], title: str) -> dict[str, Any]:
+    return save(record, {"title": title}, MONDAY)
+
+
+def test_a_review_a_full_day_leaves_out_is_held_and_says_why() -> None:
+    exam = titled(solid(course(4, exam=3), on(-1)), "Probability")
     free = solid(course(2), on(-1))
     together = plan({"exam": exam, "free": free}, 10, week(2, 0, frozenset(range(7))))
     assert together.days["exam"][0]["reviews"] == ["t00", "t01"]
     assert together.days["free"][0]["reviews"] == []
-    assert together.held == {"free": {"t00", "t01"}}
-    assert together.when("free", MONDAY, True).held == frozenset({"t00", "t01"})
-    assert together.when("exam", MONDAY, True).held == frozenset()
+    assert together.held["free"] == {"t00": "Probability", "t01": "Probability"}
+    assert together.when("free", MONDAY, True).held == {
+        "t00": "Probability",
+        "t01": "Probability",
+    }
+    alone = plan(
+        {"free": solid(course(4), on(-1))}, 10, week(2, 0, frozenset(range(7)))
+    )
+    assert alone.days["free"][1]["reviews"] == ["t02", "t03"]
+    assert alone.held == {"free": {"t02": None, "t03": None}}
 
 
-def test_a_review_that_waits_only_on_its_own_course_is_not_held() -> None:
-    free = solid(course(4), on(-1))
-    together = plan({"free": free}, 10, week(2, 0, frozenset(range(7))))
-    assert together.days["free"][0]["reviews"] == ["t00", "t01"]
-    assert together.days["free"][1]["reviews"] == ["t02", "t03"]
-    assert together.held == {}
+def test_a_nearer_exams_final_review_comes_before_a_later_courses_new_topics() -> None:
+    near = solid(course(8, exam=6), on(-1))
+    far = course(8, exam=40)
+    every = {key: {"introduced": True} for key in far["topics"]}
+    far = save(far, {"topics": every}, on(-1))
+    together = plan({"near": near, "far": far}, 7, week(2, 0, frozenset(range(7))))
+    reviewed = {t for day in together.days["near"][:6] for t in day["reviews"]}
+    assert reviewed == set(near["topics"])
+    assert together.unreviewed == {}
+
+
+def test_a_final_review_with_too_little_room_names_what_it_leaves() -> None:
+    record = solid(course(6, exam=3), on(-1))
+    recent = {"observations": [answer("t04"), answer("t05")]}
+    record = save(record, recent, on(-5))
+    record = save(
+        record,
+        {
+            "topics": {
+                t: {"review": {"due": on(0).isoformat()}} for t in record["topics"]
+            }
+        },
+        MONDAY,
+    )
+    together = plan({"c": record}, 4, week(1, 0, frozenset(range(7))))
+    assert together.unreviewed == {"c": ["t03", "t04", "t05"]}
+
+
+def test_a_course_with_no_exam_keeps_the_reviews_memory_needs_most() -> None:
+    exam = solid(course(4, exam=40), MONDAY)
+    free = solid(course(1), on(-1))
+    free = save(
+        free, {"topics": {"t00": {"review": {"due": on(-8).isoformat()}}}}, MONDAY
+    )
+    together = plan({"exam": exam, "free": free}, 1, week(2, 0, frozenset(range(7))))
+    assert together.days["free"][0]["reviews"] == ["t00"]
+    assert len(together.days["exam"][0]["reviews"]) == 1
+
+
+def test_no_course_starves_another_of_reviews_while_its_exam_is_weeks_away() -> None:
+    exam = solid(course(12, exam=60), MONDAY)
+    free = solid(course(4), MONDAY)
+    together = plan({"exam": exam, "free": free}, 14, week(2, 0, frozenset(range(7))))
+    placed = {t for day in together.days["free"] for t in day["reviews"]}
+    assert placed == set(free["topics"])
+
+
+def test_a_topic_taught_topics_need_starts_before_the_rest() -> None:
+    record = course(4, exam=40, needs={"t01": ["t00"], "t03": ["t02"]})
+    record = save(record, {"topics": {"t03": {"introduced": True}}}, on(-3))
+    near = course(6, exam=10)
+    together = plan({"c": record, "near": near}, 2, week(5, 1, frozenset(range(7))))
+    assert together.days["c"][0]["new"] == ["t02"]
+    assert together.days["near"][0]["new"] == []
+
+
+def test_a_start_that_waits_for_nearer_exams_says_which() -> None:
+    near = titled(course(4, exam=10), "Probability")
+    far = course(4, exam=40)
+    together = plan({"near": near, "far": far}, 20, week(5, 1, frozenset(range(7))))
+    first = min(started(together.days["far"]).items(), key=lambda item: item[1])[0]
+    assert together.starts_after["far"][first] == ["Probability"]
+    assert together.when("far", MONDAY, True).starts_after[first] == ["Probability"]
+
+
+def test_a_review_that_an_exams_next_topics_wait_on_comes_first() -> None:
+    near = course(3, exam=12, needs={"t01": ["t00"], "t02": ["t00"]})
+    near = save(near, {"topics": {"t00": {"introduced": True}}}, on(-1))
+    far = course(2, exam=40)
+    far = save(far, {"topics": {"t00": {"introduced": True}}}, on(-5))
+    together = plan({"near": near, "far": far}, 1, week(1, 0, frozenset(range(7))))
+    assert together.days["near"][0]["reviews"] == ["t00"]
+    assert together.days["far"][0]["reviews"] == []

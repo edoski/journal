@@ -109,18 +109,21 @@ def _days(
     today: date,
     days: int,
     planned: list[dict[str, Any]],
-    misfits: list[str],
+    misfits: tuple[list[str], list[str]],
 ) -> dict[str, Any] | None:
-    """The daily plan: each day that proposes something, and what no longer fits."""
+    """The daily plan: each day that proposes something, what no longer fits
+    before the exam, and the taught topics its final review has no room for."""
     exam = progress.exam_plan(record)
     proposed = [day for day in planned[:days] if day["reviews"] or day["new"]]
-    if not proposed and not misfits:
+    late, unreviewed = misfits
+    if not proposed and not late and not unreviewed:
         return None
     return compact(
         {
             "final_review_days": (exam.day - exam.final).days if exam else None,
             "days": proposed,
-            "does_not_fit": misfits,
+            "does_not_fit": late,
+            "unreviewed": unreviewed,
         }
     )
 
@@ -190,7 +193,10 @@ def _course(
                 today,
                 days,
                 together.days[name],
-                together.does_not_fit.get(name, []),
+                (
+                    together.does_not_fit.get(name, []),
+                    together.unreviewed.get(name, []),
+                ),
             ),
         }
     )

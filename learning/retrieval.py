@@ -520,6 +520,36 @@ def show(
 # --- map --------------------------------------------------------------------
 
 
+def _runup(
+    record: dict[str, Any], countdown: dict[str, Any], planned: agenda.When
+) -> dict[str, Any]:
+    """The exam and its run-up: when the final review starts, the path topics
+    the plan cannot start before it (``does_not_fit``), and the taught ones
+    its final review has no room for (``unreviewed``)."""
+    plan = progress.exam_plan(record)
+    return compact(
+        {
+            "date": countdown["date"],
+            "days_left": countdown["days_left"],
+            "final_review": plan.final.isoformat() if plan else None,
+            "does_not_fit": planned.does_not_fit,
+            "unreviewed": planned.unreviewed,
+        },
+        keep=("date", "days_left"),
+    )
+
+
+def _held(
+    key: str, planned: agenda.When, overdue: dict[str, int], stored: str | None
+) -> dict[str, Any]:
+    """Why a review the plan put past memory's day waits: ``held``, with
+    ``held_for`` the course whose final review came first, and ``due``,
+    memory's day."""
+    if stored is None or key not in planned.held or key in overdue:
+        return {}
+    return {"held": True, "held_for": planned.held[key], "due": stored}
+
+
 def course_map(workspace: Workspace) -> dict[str, Any]:
     """Every topic with its edges, level, review and weak verdict, in path order.
 
@@ -527,8 +557,12 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
     projection a map of the course draws from. ``review`` is the day the daily
     plan puts the topic's next review (``when``), ``overdue`` is present
     exactly when that day is today, ``held`` when the plan put it later than
-    memory asks because a nearer exam's reviews filled the evenings before
-    it, and ``starts`` is the day it starts an untaught topic.
+    memory asks because full days left it out (``held_for`` names the course
+    whose final review came first, ``due`` is memory's day), and ``starts``
+    is the day it starts an untaught topic, ``starts_after`` the courses
+    whose new topics take the days before that start. ``exam`` carries the
+    run-up: the final review's first day, the topics that do not fit before
+    the exam and those its final review has no room for.
     """
     record = records.load(workspace)
     today = clock.today()
@@ -556,8 +590,9 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "introduced": topic.get("introduced"),
             "review": planned.review(key, stored),
             "overdue": overdue.get(key),
-            "held": key in planned.held and key not in overdue or None,
+            **_held(key, planned, overdue, stored),
             "starts": starts.isoformat() if starts else None,
+            "starts_after": planned.starts_after.get(key) if starts else None,
             "weak": _is_weak(topic, standing),
             "right": standing.get("right"),
             "gap": topic.get("gap"),
@@ -578,7 +613,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "today": today.isoformat(),
             "revision": record.get("revision", 0),
             "title": record.get("title"),
-            "exam": {"date": countdown["date"], "days_left": countdown["days_left"]}
+            "exam": _runup(record, countdown, planned)
             if countdown and "date" in countdown
             else None,
             "current": record.get("path", {}).get("current"),
