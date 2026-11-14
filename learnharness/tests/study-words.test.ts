@@ -44,14 +44,14 @@ describe("why a slip needs him", () => {
 	it("says each signal on its own", () => {
 		assert.equal(slip({ repaired: true }), "Fixed, check again later");
 		assert.equal(slip({ lapsed: true }), "Not right last time");
-		assert.equal(slip({ gap: "Writes det as ad + bc" }), "Mistake to fix");
+		assert.equal(slip({ gap: "Writes det as ad + bc", mistake: true }), "Mistake to fix");
 		assert.equal(slip({ choiceErrors: { cramer: 2 } }), "Mixed up with Cramer's rule");
 		assert.equal(slip({ confidentErrors: 1 }), "Sure, but wrong");
 		assert.equal(slip({}), "Look again");
 	});
 
 	it("says the first signal when several hold: fixed, missed, a mistake, mixed up, then sure but wrong", () => {
-		const all = { repaired: true, lapsed: true, gap: "sign error", choiceErrors: { cramer: 1 }, confidentErrors: 1 };
+		const all = { repaired: true, lapsed: true, gap: "sign error", mistake: true, choiceErrors: { cramer: 1 }, confidentErrors: 1 };
 		assert.equal(slip(all), "Fixed, check again later");
 		assert.equal(slip({ ...all, repaired: false }), "Not right last time");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false }), "Mistake to fix");
@@ -60,16 +60,30 @@ describe("why a slip needs him", () => {
 	});
 
 	it("never calls a mistake fixed when only help repaired it, nor contradicts the right answer since with words about the ones before it", () => {
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Counts nonzero rows" }), "Mistake to fix");
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true }), "Mistake to fix", "not 'Not right last time' after a right answer");
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, confidentErrors: 1 }), "Mistake to fix", "not 'Sure, but wrong' after a right answer");
-		assert.equal(slipMark({ ...QUIET, repaired: true, repairedWithHelp: true, confidentErrors: 1 }, titleOf).key, "gap", "its icon is a mistake's");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Counts nonzero rows", mistake: true }), "Mistake to fix");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true, mistake: true }), "Mistake to fix", "not 'Not right last time' after a right answer");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, confidentErrors: 1, mistake: true }), "Mistake to fix", "not 'Sure, but wrong' after a right answer");
+		assert.equal(slipMark({ ...QUIET, repaired: true, repairedWithHelp: true, confidentErrors: 1, mistake: true }, titleOf).key, "gap", "its icon is a mistake's");
 	});
 
 	it("gives each slip its own icon, so a fix never wears the mistake's", () => {
-		const keys = [{ repaired: true }, { lapsed: true }, { gap: "g" }, { choiceErrors: { cramer: 1 } }, { confidentErrors: 1 }, {}].map((s) => slipMark({ ...QUIET, ...s }, titleOf).key);
-		assert.deepEqual(keys, ["repaired", "lapsed", "gap", "mixed", "confident", "none"]);
+		const keys = [{ repaired: true }, { lapsed: true }, { gap: "g", mistake: true }, { gap: "g" }, { choiceErrors: { cramer: 1 } }, { confidentErrors: 1 }, {}].map((s) => slipMark({ ...QUIET, ...s }, titleOf).key);
+		assert.deepEqual(keys, ["repaired", "lapsed", "gap", "check", "mixed", "confident", "none"]);
 		assert.equal(new Set(keys.map((k) => SLIP_ICON[k])).size, keys.length);
+	});
+
+	it("calls a gap a mistake only when a wrong answer is open; a gap with none is what is left to check on his own (round 6)", () => {
+		assert.equal(slip({ gap: "Still to check on your own: drawing without replacement" }), "Check on your own");
+		assert.equal(slip({ gap: "Loses the sign", mistake: true }), "Mistake to fix");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Still to check on your own" }), "Check on your own", "two right answers with help and no wrong one");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Loses the sign", mistake: true }), "Mistake to fix");
+		const check = slipMark({ ...QUIET, gap: "g" }, titleOf).key;
+		assert.notEqual(SLIP_ICON[check], SLIP_ICON.gap, "its icon is not a mistake's");
+	});
+
+	it("reads the engine's mistake from the map", () => {
+		const map = courseMapOf("/c", { today: "2026-11-08", topics: [{ topic: "binomial", level: "assisted", gap: "Still to check" }, { topic: "kernel", level: "assisted", gap: "Loses a sign", mistake: true }] });
+		assert.deepEqual(map?.topics.map((t) => [t.handle, t.signals.mistake === true]), [["binomial", false], ["kernel", true]]);
 	});
 
 	it("names a method by its handle when the map has no title for it", () => {

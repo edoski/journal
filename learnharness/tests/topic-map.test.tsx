@@ -72,7 +72,7 @@ const NEEDS: Record<string, string[]> = {
 const STANDINGS: Record<string, Partial<CourseMapTopic>> = {
 	vectors: { title: "Vectors", level: "transferred", review: { kind: "scheduled", date: "2026-11-13" } },
 	span: { title: "Span", level: "retained", review: due(10) },
-	independence: { title: "Linear independence", level: "assisted", weak: true, review: due(16), signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent", confidentErrors: 1 } },
+	independence: { title: "Linear independence", level: "assisted", weak: true, review: due(16), signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent", mistake: true, confidentErrors: 1 } },
 	basis: { title: "Basis and dimension", level: "independent", review: due(0), tasks: ["sheet-4"] },
 	matmul: { title: "Matrix multiplication", level: "independent", weak: true, review: due(2), signals: { ...QUIET, lapsed: true } },
 	elimination: { title: "Gaussian elimination", level: "assisted", weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 } } },

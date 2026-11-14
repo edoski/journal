@@ -60,6 +60,7 @@
       "due": "2026-10-28",
       "weak": true,
       "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
+      "mistake": true,
       "lapsed": true,
       "stale": true,
       "confident_errors": 1,
@@ -97,6 +98,7 @@
       "held": true,
       "due": "2026-11-06",
       "weak": true,
+      "mistake": true,
       "lapsed": true,
       "tasks": []
     },
@@ -113,6 +115,7 @@
       "held": true,
       "due": "2026-11-06",
       "weak": true,
+      "mistake": true,
       "lapsed": true,
       "choice_errors": {
         "cramer": 1
@@ -137,6 +140,7 @@
       "weak": true,
       "right": "helped",
       "gap": "You count nonzero entries instead of pivots, and mix up rank with the number of rows",
+      "mistake": true,
       "stale": true,
       "repaired": true,
       "repaired_with_help": true,
@@ -157,6 +161,7 @@
       "held": true,
       "due": "2026-11-07",
       "weak": true,
+      "mistake": true,
       "confident_errors": 1,
       "tasks": [
         "sheet-4"
@@ -251,6 +256,7 @@
       "review": "2026-11-09",
       "weak": false,
       "right": "partial",
+      "mistake": true,
       "tasks": []
     },
     {

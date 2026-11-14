@@ -50,6 +50,9 @@ export const SLIP_WORDS = {
 	// skipped (round 3). A lapse is an answer that was not right.
 	lapsed: "Not right last time",
 	gap: "Mistake to fix",
+	// A gap with no wrong answer open: two right answers with help left
+	// "still to check on your own" (round 6), never a mistake he made.
+	check: "Check on your own",
 	confident: "Sure, but wrong",
 	none: "Look again",
 } as const;
@@ -64,12 +67,15 @@ export type SlipKey = keyof typeof SLIP_WORDS | "mixed";
  *  else none of those. A repair made only with help is not shown fixed,
  *  since help may have carried it, and is still a mistake to fix: the
  *  signals under it describe answers before that right one, so "Not right
- *  last time" or "Sure, but wrong" would contradict it (round 5). */
+ *  last time" or "Sure, but wrong" would contradict it (round 5). A gap or
+ *  a repair is a mistake only while a wrong answer is open (`mistake`);
+ *  else it is what is left to check on his own (round 6). */
 export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } {
 	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp } = signals;
-	if (repaired) return repairedWithHelp ? { key: "gap", words: SLIP_WORDS.gap } : { key: "repaired", words: SLIP_WORDS.repaired };
+	const toFix = signals.mistake ? ({ key: "gap", words: SLIP_WORDS.gap } as const) : ({ key: "check", words: SLIP_WORDS.check } as const);
+	if (repaired) return repairedWithHelp ? toFix : { key: "repaired", words: SLIP_WORDS.repaired };
 	if (lapsed) return { key: "lapsed", words: SLIP_WORDS.lapsed };
-	if (gap) return { key: "gap", words: SLIP_WORDS.gap };
+	if (gap) return toFix;
 	const [method] = Object.keys(choiceErrors);
 	if (method) return { key: "mixed", words: `Mixed up with ${titleOf(method as TopicHandle)}` };
 	if (confidentErrors > 0) return { key: "confident", words: SLIP_WORDS.confident };

@@ -409,3 +409,40 @@ def test_standing_is_a_read_only_verb(
     assert result["readiness"]["parts"] == [{"not_yet": ["span"]}]
     assert result["mistakes"][0]["topic"] == "span"
     assert (root / ".study" / "course.json").read_bytes() == stored
+
+
+def test_a_gap_with_no_wrong_answer_is_left_to_check_not_a_mistake(
+    workspace: Workspace,
+) -> None:
+    records.save(
+        workspace,
+        {
+            "topics": {
+                "binomial": {"introduced": day(-1)},
+                "kernel": {"introduced": day(-1)},
+            },
+            "observations": [
+                attempt("binomial", 0, help="A hint on the urn"),
+                attempt("binomial", 0, text="Again", help="An Ask on replacement"),
+                attempt("kernel", 0, result="incorrect"),
+                attempt("kernel", 0, text="Again", help="Worked the first line"),
+            ],
+        },
+    )
+    still = "Still to check on your own: drawing without replacement"
+    records.save(
+        workspace,
+        {
+            "topics": {
+                "binomial": {"gap": still},
+                "kernel": {"gap": "Loses a sign in the kernel"},
+            }
+        },
+    )
+    assert [entry["topic"] for entry in standing(workspace)["mistakes"]] == ["kernel"]
+    topics = {item["topic"]: item for item in retrieval.course_map(workspace)["topics"]}
+    assert (topics["binomial"]["gap"], topics["binomial"].get("mistake")) == (
+        still,
+        None,
+    )
+    assert topics["kernel"]["mistake"] is True

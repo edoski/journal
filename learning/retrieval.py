@@ -706,7 +706,10 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     whose new topics take the days before that start, and ``starts_why``
     why it comes then in the material (``agenda.Why``). ``exam`` carries the
     run-up: the final review's first day, the topics that do not fit before
-    the exam and those its final review has no room for.
+    the exam and those its final review has no room for. ``mistake`` marks a
+    topic with a counted answer not right since his latest right answer on
+    his own (``progress.open_mistakes``): a ``gap`` without one is what is
+    left to check, never a mistake.
 
     In a course with arcs, each topic names its ``arc``, ``arcs`` holds each
     arc's title and standing in study order, and ``current_arc`` is the arc
@@ -716,6 +719,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     record = records.load(workspace)
     today = clock.today()
     levels = progress.standings(record)
+    wrong = progress.open_mistakes(record)
     order = progress.path_order(record, everything=True)
     planned = when(workspace, record, today)
     overdue = {
@@ -747,6 +751,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
             "weak": _is_weak(topic, standing),
             "right": standing.get("right"),
             "gap": topic.get("gap"),
+            "mistake": True if key in wrong else None,
             "excluded": topic.get("excluded"),
             **{
                 flag: standing[flag]
@@ -940,17 +945,19 @@ def _mistake(record: dict[str, Any], key: str, item: dict[str, Any]) -> dict[str
 def _mistakes(
     record: dict[str, Any], levels: dict[str, dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Every topic with a mistake still open, the newest first."""
+    """Every topic with a mistake still open, the newest first: a counted
+    answer not right since his latest right answer on his own. A gap with no
+    such answer is what is left to check, not a mistake."""
     wrong = progress.open_mistakes(record)
     rank = {key: at for at, key in enumerate(progress.path_order(record))}
     found = []
     for key in rank:
         topic, standing = record["topics"][key], levels[key]
+        answers = wrong.get(key, [])
+        if not answers:
+            continue
         fixed = standing.get("repaired") and not standing.get("repaired_with_help")
         gap = topic.get("gap") if not fixed else None
-        answers = wrong.get(key, [])
-        if not gap and not answers:
-            continue
         judged = topic.get("judged") if gap else None
         latest = max(
             [item["date"] for _, item in answers] + ([judged] if judged else []),

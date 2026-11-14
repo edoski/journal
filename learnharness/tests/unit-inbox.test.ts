@@ -128,7 +128,7 @@ describe("buildInbox", () => {
 
 describe("unitStatus", () => {
 	const slipped = { ...topic("chain", "retained", due(4), true), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } };
-	const gapped = { ...topic("kernel", "attempted", due(1), true), signals: { gap: "Counts nonzero entries", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } };
+	const gapped = { ...topic("kernel", "attempted", due(1), true), signals: { gap: "Counts nonzero entries", mistake: true, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } };
 	const held = { ...topic("det", "assisted", due(2)), tasks: ["sheet4"] };
 	const mixed = { ...topic("elimination", "assisted", due(2), true), signals: { ...slipped.signals, lapsed: false, choiceErrors: { cramer: 1 } } };
 	const fixed = { ...topic("matmul", "independent", due(2), true), signals: { ...slipped.signals, repaired: true } };
