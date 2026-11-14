@@ -222,24 +222,20 @@ function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, {
 	return (
 		<div data-slot="exam-next" className="flex min-w-0 items-center gap-2">
 			{move.kind === "open" ? (
-				<Button asChild size="sm" className="min-w-0 max-w-full">
+				<Button asChild size="sm" className="h-auto min-h-8 min-w-0 max-w-full justify-start whitespace-normal py-1.5 text-left">
 					<Link href={`/chat/${move.chat.id}`}>
-						<span className="truncate">
 						<MathText>{next.words}</MathText>
-					</span>
 					</Link>
 				</Button>
 			) : (
 				<Button
 					size="sm"
 					disabled={busy}
-					className="min-w-0 max-w-full"
+					className="h-auto min-h-8 min-w-0 max-w-full justify-start whitespace-normal py-1.5 text-left"
 					onClick={() => onStart(move.opening, entry.course.workspace, { topics: move.topics, ...(move.from ? { from: move.from } : {}) })}
 					data-slot="calendar-entry-start"
 				>
-					<span className="truncate">
-						<MathText>{next.words}</MathText>
-					</span>
+					<MathText>{next.words}</MathText>
 				</Button>
 			)}
 		</div>
