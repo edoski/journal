@@ -143,6 +143,7 @@ export function createCourseContexts(deps: CourseContextDeps): CourseContexts {
 			console.error(`[course-context ${workspace}] sources --add: ${added.message}`);
 			return [];
 		}
+		console.info(`[course-context ${workspace}] registered from linked folders: ${fresh.map((f) => path.basename(f)).join(", ")}`);
 		deps.startMap(workspace);
 		return fresh;
 	}
