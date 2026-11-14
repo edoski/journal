@@ -71,8 +71,10 @@ export interface Why {
 	/** "Not right last time: Chain rule". */
 	short: string;
 	/** For a new topic in a course with arcs, why the plan starts it now
-	 *  (the engine's `starts_why`), which picks its own icon. */
-	starts?: StartsWhy["kind"];
+	 *  in a few words (the engine's `starts_why`, `startsWhyShort`) and its
+	 *  kind, which picks its own icon. Home's row shows it in place of
+	 *  `short` only when it fits on one line; the sidebar keeps `short`. */
+	starts?: { kind: StartsWhy["kind"]; words: string };
 }
 
 /** A review's reason from the engine's own fields: a lapse first (the
@@ -101,7 +103,8 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  * long it is overdue), when an open task was left, that the topic is
  * next on the course's map (in a course with arcs, why the plan starts a
  * new topic now: "Next in Matrices", "After Expectation, which it
- * needs", cut to fit as "After Expectation"), or the day the plan dates its next item
+ * needs", cut to "After Expectation", which Home's row shows when it fits),
+ * or the day the plan dates its next item
  * ("Planned Sun 15 Nov", the course page's line when nothing is today). Engine fields only, never the tutor's prose.
  * Pure.
  */
@@ -118,9 +121,9 @@ export function whyOf(row: TodayRow): Why | null {
 			return { kind: "task", short: taskWords(step, course.map.today) };
 		case "topic": {
 			if (step.on) return { kind: "next", short: `Planned ${planDay(step.on)}` };
+			const short = step.planned ? "Planned today" : "Next up";
 			const why = step.fresh && course.map.arcs ? course.map.topics.find((t) => t.handle === step.topics[0])?.startsWhy : undefined;
-			if (why) return { kind: "next", starts: why.kind, short: startsWhyShort(why, course.map) };
-			return { kind: "next", short: step.planned ? "Planned today" : "Next up" };
+			return why ? { kind: "next", short, starts: { kind: why.kind, words: startsWhyShort(why, course.map) } } : { kind: "next", short };
 		}
 		case "none":
 			return null;

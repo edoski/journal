@@ -69,17 +69,28 @@ describe("Home's rows", () => {
 		}
 	});
 
-	it("give a planned new topic its reason with its own icon, cut to fit the row", () => {
+	it("give a planned new topic its reason with its own icon where the reason sits, cut to fit the row, its plain words kept for when it does not fit", () => {
 		const after = planned(LINALG_ARCS, { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] });
-		assert.deepEqual(whyOf(row(after)), { kind: "next", starts: "after", short: "After Eigenvalues and eigenvectors" });
+		assert.deepEqual(whyOf(row(after)), { kind: "next", short: "Planned today", starts: { kind: "after", words: "After Eigenvalues and eigenvectors" } });
 		const next = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
-		assert.equal(whyOf(row(next))?.short, "Next in Eigenvalues");
+		assert.equal(whyOf(row(next))?.starts?.words, "Next in Eigenvalues");
 		const early = planned(LINALG_ARCS, { kind: "early", arc: arc("eigenvalues"), waitingOn: h("rank"), exam: false });
-		assert.deepEqual([whyOf(row(early))?.starts, whyOf(row(early))?.short], ["early", "Early, from Eigenvalues"], "the waiting clause stays on the topic page");
+		assert.deepEqual(whyOf(row(early))?.starts, { kind: "early", words: "Early, from Eigenvalues" }, "the waiting clause stays on the topic page");
 		const doc = render(<HybridRows rows={[row(after)]} busy={false} onContinue={() => {}} />);
 		const why = doc.querySelector('[data-slot="today-why"]')!;
 		assert.equal(why.getAttribute("data-starts"), "after");
 		assert.equal(why.textContent, "After Eigenvalues and eigenvectors");
+		assert.ok(!doc.querySelector('[data-slot="today-line"]')!.textContent!.startsWith("Linear Algebra ·"), "never on the course line");
+	});
+
+	it("leave the sidebar card's status with its plain words", () => {
+		const after = planned(LINALG_ARCS, { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] });
+		const [line] = needsYouNow([after], [], TODAY).lines;
+		assert.equal(line!.slot, "Planned today");
+		const doc = render(<NowCard line={line!} unit={topicUnit(buildInbox([after], [], null), after, line!.lead!, [])} active={false} />);
+		const mark = doc.querySelector('[data-slot="why-mark"]')!;
+		assert.equal(mark.textContent?.replace(", ", ""), "Planned today");
+		assert.equal(mark.getAttribute("data-starts"), null);
 	});
 
 	it("keep today's words for a planned topic in a course without arcs", () => {
