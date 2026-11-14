@@ -56,6 +56,17 @@ export function parseProviderKeyRefusal(message: string | undefined): boolean {
 	}
 }
 
+/** A send refused because the lesson's course was deleted: the chat
+ *  route's 410 body (`code: "course_deleted"`). */
+export function isCourseDeletedRefusal(message: string | undefined): boolean {
+	if (!message?.startsWith("{")) return false;
+	try {
+		return (JSON.parse(message) as { code?: unknown }).code === "course_deleted";
+	} catch {
+		return false;
+	}
+}
+
 export function turnErrorText(message: string): TurnErrorText {
 	const raw = message.trim();
 	if (UNREACHABLE.test(raw)) {

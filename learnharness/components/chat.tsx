@@ -75,7 +75,7 @@ import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { parseProviderKeyRefusal } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, parseProviderKeyRefusal } from "@/components/lesson/turn-error-text";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
@@ -85,7 +85,7 @@ import { showsWorking } from "@/components/lesson/working-sign";
 import { forgetRescue, keepRescue, overtakenDraft, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { carryBox, carryWords, forgetClosedBoxes, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carryBox, carryWords, forgetClosedBoxes, keepForNewLesson, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -731,6 +731,31 @@ export function Chat({
 		// (setMessages is stable per useChat instance — the dep pair
 		//  [error, chatId] is what the flow actually keys on.)
 	}, [error, chatId]);
+	// A DELETED COURSE (course-gone.tsx): the lesson is history and has no
+	// box, so what he wrote there, sent and refused or still in the box,
+	// goes to the New lesson box, and the line says so. A send refused
+	// because the course went (410 course_deleted) leaves the record as it
+	// was: the refused message's bubble goes.
+	const [courseGoneKept, setCourseGoneKept] = useState(false);
+	useEffect(() => {
+		if (!courseGone) return;
+		const words = [draftRef.current, textRef.current].map((w) => w?.trim() ?? "").filter((w, i, all) => w && all.indexOf(w) === i);
+		draftRef.current = null;
+		if (words.length === 0) return;
+		keepForNewLesson(words.join("\n\n"));
+		applyText("");
+		setCourseGoneKept(true);
+	}, [courseGone, applyText]);
+	useEffect(() => {
+		if (!error || !isCourseDeletedRefusal(error.message)) return;
+		setCourseGone(true);
+		clearError();
+		void fetch(`/api/chats/${encodeURIComponent(chatId)}`)
+			.then((res) => (res.ok ? res.json() : null))
+			.then((record: { messages?: LhMessage[] } | null) => { if (Array.isArray(record?.messages)) setMessages(record.messages); })
+			.catch(() => {});
+		// (setMessages and clearError are stable per session.)
+	}, [error, chatId]);
 	// TAB CYCLES THE CHAT'S FIELDS (owner, keyboard round 2026-10-06): the
 	// lesson has one, the composer. Gathered from live DOM at event time.
 	const cycleChatFields = useCallback((): readonly HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-testid="composer"] textarea')), []);
@@ -1211,8 +1236,11 @@ export function Chat({
 			forgetClosedBoxes(chatId, []);
 		}
 	});
-	useServerEvent("courses-changed", () => {
-		// A course was deleted or made: is this lesson's still listed?
+	// Is this lesson's course still listed? Asked when a course is deleted
+	// or made, and when the lesson opens: Back serves the page as it was
+	// before the delete (round 7: a live box that swallowed his message).
+	const checkCourseRef = useRef(() => {});
+	checkCourseRef.current = () => {
 		const workspace = course?.workspace;
 		if (!workspace) return;
 		void fetch("/api/courses")
@@ -1222,7 +1250,9 @@ export function Chat({
 				setCourseGone(![...(listing.courses ?? []), ...(listing.unreadable ?? [])].some((c) => c.workspace === workspace));
 			})
 			.catch(() => {});
-	});
+	};
+	useEffect(() => checkCourseRef.current(), []);
+	useServerEvent("courses-changed", () => checkCourseRef.current());
 	useServerEvent("record-changed", (p) => {
 		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
 		// turn's markers landing at its write-ahead. Idle: adopt the record
@@ -1439,13 +1469,14 @@ export function Chat({
 							)
 						}
 						course={course?.title}
-						courseHref={course ? courseHref(course.workspace) : undefined}
-						topic={course && place?.topic && topicCrumbShown(place.topic.title, titleText) ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined}
+						// A deleted course has no page: its crumb goes Home.
+						courseHref={course ? (courseGone ? "/" : courseHref(course.workspace)) : undefined}
+						topic={course && !courseGone && place?.topic && topicCrumbShown(place.topic.title, titleText) ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined}
 						roadmap={
 							<LessonRoadmap
 								steps={steps}
 								place={place}
-								course={course ? { title: course.title, workspace: course.workspace } : undefined}
+								course={course && !courseGone ? { title: course.title, workspace: course.workspace } : undefined}
 								open={planOpen}
 								onOpenChange={setPlanOpen}
 								onJump={jumpToStep}
@@ -1655,7 +1686,7 @@ export function Chat({
 							{replyCut && !courseGone && !gone && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
-							{courseGone && !gone && <CourseGoneLine />}
+							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={() => setSetupOpen(true)}>

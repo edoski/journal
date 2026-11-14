@@ -429,6 +429,7 @@ export const LESSON_WORDS = {
 	unreadableCourse: "Couldn't read this course's record",
 	unreadableNotSaved: "What you answer here isn't saved until it can be read again.",
 	courseDeleted: "This course was deleted. Its lessons stay as history.",
+	courseDeletedKept: "What you wrote here is in the new lesson box.",
 	startLesson: "Start a new lesson",
 } as const;
 

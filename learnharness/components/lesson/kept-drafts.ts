@@ -16,6 +16,16 @@ import { sameQuestionKey, type Confidence, type Photo, type QuestionFormDraft } 
 
 const PREFIX = "lh.kept.";
 
+/** The New lesson box's scope. */
+export const NEW_LESSON_BOX = "new";
+
+/** Leaves words for a new lesson: added to what the New lesson box holds
+ *  (a deleted course's lesson sends what he wrote there, round 7). */
+export function keepForNewLesson(words: string): void {
+	const held = keptWords(NEW_LESSON_BOX)?.text?.trim();
+	keepWords(NEW_LESSON_BOX, { text: held ? `${held}\n\n${words}` : words });
+}
+
 /** A question form's words as stored: its selection as plain indexes. */
 export interface KeptForm {
 	selected: number[];

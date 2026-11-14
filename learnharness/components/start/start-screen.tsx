@@ -11,7 +11,7 @@ import { useModelSetup } from "@/components/setup-cta";
 import { SessionStarter } from "@/components/start-session";
 import { Button } from "@/components/ui/button";
 import { usePhotoDraft } from "@/components/photos";
-import { keepPhotos, keepWords, keptWords } from "@/components/lesson/kept-drafts";
+import { keepPhotos, keepWords, keptWords, NEW_LESSON_BOX } from "@/components/lesson/kept-drafts";
 
 /** The heading over the composer. It names no mode: the tutor routes the
  *  request to teaching or practice itself. */
@@ -27,7 +27,7 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
  * when something is sent.
  */
 /** The New lesson box's scope in kept-drafts.ts. */
-const START_SCOPE = "new";
+const START_SCOPE = NEW_LESSON_BOX;
 
 export function StartScreen() {
 	const router = useRouter();
