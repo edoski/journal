@@ -73,13 +73,13 @@ export function returnWords(days: number): string {
 	return `Back in ${Math.round(days / 30)}mo`;
 }
 
-/** How much of a course he can do on his own, the topics the course's ring
- *  counts: "5 of 16 topics on your own", "No topics on your own yet", "All
- *  16 topics on your own". */
+/** How much of a course he can do on his own, in words beside the ring
+ *  that draws the share: no count, since the app shows none (Edo's
+ *  rulings; round 2 flagged "5 of 16"). "Most" is more than half. */
 export function courseShareWords(solid: number, of: number): string {
 	if (solid === 0) return "No topics on your own yet";
-	if (solid >= of) return `All ${of} topics on your own`;
-	return `${solid} of ${of} topics on your own`;
+	if (solid >= of) return "Every topic on your own";
+	return solid * 2 > of ? "Most topics on your own" : "Some topics on your own";
 }
 
 /** A folded list's last row: "Show the rest" when one press shows every

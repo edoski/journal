@@ -187,7 +187,7 @@ export function courseNext(course: StudyCourse, open: readonly ChatListItem[]): 
 
 /** The header's facts, each a few words; null where the course has none. */
 export interface CourseFacts {
-	/** "3 of 16 topics on your own": the topics Home's progress ring counts. */
+	/** "Some topics on your own": in words, the share Home's progress ring draws. */
 	progress: string | null;
 	/** "Exam in 21 days", "Exam tomorrow", "Exam today". */
 	exam: string | null;

@@ -31,5 +31,5 @@ Home's line names the lapsed topic when the line is about another one ("Missed C
 
 | Where | Words |
 |---|---|
-| a course's progress (Home's ring, the course page's standing line) | 5 of 16 topics on your own; No topics on your own yet; All 16 topics on your own (`courseShareWords`) |
+| a course's progress (Home's ring, the course page's standing line) | No topics on your own yet; Some topics on your own; Most topics on your own (more than half); Every topic on your own (`courseShareWords`). No count: the ring draws the share |
 | a folded list's last row (the sidebar's shelves, the course page's groups) | Show the rest, when one press shows every hidden row; else Show more (`moreWords`). No number: a bare count told him nothing |
