@@ -93,7 +93,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { DisputeBubble, PlanLine, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
+import { DisputeBubble, PlanLine, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 
 /** The chat routes' answer for a deleted lesson: TurnError reads it as
@@ -492,8 +492,7 @@ export function Chat({
 	// confidence and mode (prose-answer.tsx).
 	const proseOpen = useMemo<ProseOpen | null>(() => {
 		if (pending) return { kind: "question", key: pending.key, tool: pending.tool, toolCallId: pending.toolCallId, input: pending.input };
-		const statement = (activeProblem?.input as { statement?: unknown } | null | undefined)?.statement;
-		return activeProblem ? { kind: "problem", toolCallId: activeProblem.toolCallId, statement: typeof statement === "string" ? statement : "" } : null;
+		return activeProblem ? { kind: "problem", toolCallId: activeProblem.toolCallId, statement: problemStatement(activeProblem.input) ?? "" } : null;
 	}, [pending?.key, pending?.toolCallId, activeProblem?.toolCallId]);
 	const proseAnswer = useProseAnswer({
 		openKey: proseOpenKey(proseOpen),

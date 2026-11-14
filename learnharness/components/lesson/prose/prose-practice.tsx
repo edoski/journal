@@ -20,12 +20,21 @@ export interface PracticeThinkingData {
 	photos?: Photo[];
 }
 
+/** A problem's statement as the tutor saw it: the tool boundary turns a
+ *  number into its digits, and the record keeps the number. Null when
+ *  there is no statement. */
+export function problemStatement(input: unknown): string | null {
+	const statement = (input as { statement?: unknown } | null)?.statement;
+	if (typeof statement === "string") return statement;
+	return typeof statement === "number" && Number.isFinite(statement) ? String(statement) : null;
+}
+
 /** A posed problem in the tutor's message (spec: prose.md): its statement
  *  as prose, under "Your turn" while it is the one he works on. The
  *  commitment never renders, only the statement. */
 export function ProseProblem({ input, active }: { input: unknown; active: boolean }) {
-	const statement = (input as { statement?: unknown } | null)?.statement;
-	if (typeof statement !== "string") return null;
+	const statement = problemStatement(input);
+	if (statement === null) return null;
 	return (
 		<div data-testid="prose-problem" data-slot="prose-question" data-open={active ? "" : undefined} className="mt-2">
 			{active && <YourTurn />}
