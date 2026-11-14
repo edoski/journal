@@ -320,6 +320,10 @@ class PatchResult:
 
     observations: list[str] = field(default_factory=list)
     duplicates: list[str] = field(default_factory=list)
+    # The id each observation of the patch has, in the patch's order: the new
+    # one, or the stored one it repeated. A host pairs an entry with what it
+    # answers by its place in the patch.
+    saved: list[str] = field(default_factory=list)
     tutor_reviews: list[str] = field(default_factory=list)
     introduced: list[str] = field(default_factory=list)
     judged: list[str] = field(default_factory=list)
@@ -1431,11 +1435,13 @@ def _append_observations(
         )
         if duplicate is not None:
             outcome.duplicates.append(duplicate)
+            outcome.saved.append(duplicate)
             continue
         key = f"o{sequence}"
         sequence += 1
         record["observations"][key] = {**item, "recorded": now}
         outcome.observations.append(key)
+        outcome.saved.append(key)
     record["next_observation"] = sequence
 
 

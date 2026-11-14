@@ -1762,12 +1762,15 @@ describe("newAnswerResult two audiences", () => {
 		const msg = newAnswerResult("call-1", "explain", full);
 		const modelSees = JSON.parse((msg.content as { type: "text"; text: string }[])[0]!.text);
 		assert.deepEqual(modelSees, {
+			question: "call-1",
 			kind: "explain",
 			text: "Mercury",
 			confidence: "guessing",
 			thinking: "guessed",
 		});
 		assert.equal(msg.details, full, "details is the full QuestionAnswerData verbatim");
+		const hint = JSON.parse((newAnswerResult("call-2", "explain", { ...full, hintRequested: true }).content as { type: "text"; text: string }[])[0]!.text);
+		assert.equal("question" in hint, false, "a Hint press is no answer, so it carries no id to record against");
 		assert.equal((msg.details as { questionText?: string }).questionText, "Which planet is closest to the Sun?");
 	});
 });

@@ -148,6 +148,7 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
         "changed": changed,
         "observations": outcome.observations,
         "duplicates": outcome.duplicates,
+        "saved": outcome.saved,
         "reviews": scheduled.reviews,
         "levels": levels,
         "focus": final.get("focus"),
