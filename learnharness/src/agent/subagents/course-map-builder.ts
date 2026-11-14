@@ -197,7 +197,7 @@ export type MapOutcome =
 /** Where a course's map stands, for the New course dialog. */
 export type CourseMapStatus =
 	| { state: "building" }
-	| { state: "built"; outcome: string; at: string }
+	| { state: "built"; outcome: string; at: string; unread?: string[] }
 	| { state: "failed"; reason: string; at: string }
 	| { state: "none" };
 
@@ -372,7 +372,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		if (patch) deps.onSaved?.(workspace);
 		const unread = (submit.unread ?? []).map((u) => `${u.source} (${u.reason})`);
 		const outcome = [patch?.summary ?? "nothing new to save", unread.length > 0 ? `could not read ${unread.join(", ")}` : ""].filter(Boolean).join("; ");
-		update(workspace, ({ done }) => ({ done: [...done, { sources, fingerprint: window.fingerprint, at: new Date().toISOString(), outcome, ...(salvaged.length > 0 ? { salvaged } : {}) }] }));
+		update(workspace, ({ done }) => ({ done: [...done, { sources, fingerprint: window.fingerprint, at: new Date().toISOString(), outcome, ...(unread.length > 0 ? { unread } : {}), ...(salvaged.length > 0 ? { salvaged } : {}) }] }));
 		console.info(`[course-map ${workspace}] ${outcome}`);
 		return patch ? { status: "saved", summary: outcome } : { status: "nothing" };
 	}
@@ -456,7 +456,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		const ledger = ledgers.get(workspace);
 		if (ledger?.failed) return { state: "failed", reason: ledger.failed.reason, at: ledger.failed.at };
 		const last = ledger?.done.filter((d) => d.outcome !== ADOPTED && d.outcome !== NOTHING_TO_READ).at(-1);
-		return last ? { state: "built", outcome: last.outcome, at: last.at } : { state: "none" };
+		return last ? { state: "built", outcome: last.outcome, at: last.at, ...(last.unread?.length ? { unread: last.unread } : {}) } : { state: "none" };
 	}
 
 	function resumeCut(): void {
