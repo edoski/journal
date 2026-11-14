@@ -214,15 +214,15 @@ export class VoiceGuard {
 		this.earlier = earlierTexts(messages);
 	}
 
-	/** Whether a tool's calls pass through the guard. */
+	/** Whether a tool's calls pass through the guard: the probe's end too,
+	 *  which it reads only once the probe has ended. */
 	guards(toolName: string): boolean {
-		return toolName === SEND_TO_USER_TOOL || this.endsTurn(toolName);
+		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
 	 *  the live call, so no view ever draws it. */
 	screen(call: ToolCall): void {
-		if (call.name === PROBE_DONE_TOOL) this.probeEnded = true;
 		if (call.name === PRACTICE_CONCLUDE_TOOL && !this.concluded) {
 			this.concluded = true;
 			this.sentAtConclude = this.sent;
@@ -238,7 +238,10 @@ export class VoiceGuard {
 			...tool,
 			execute: async (toolCallId, params, signal, onUpdate) => {
 				const refused = this.decide({ type: "toolCall", id: toolCallId, name: tool.name, arguments: params as ToolCall["arguments"] });
-				return refused ?? tool.execute(toolCallId, params, signal, onUpdate);
+				if (refused) return refused;
+				const result = await tool.execute(toolCallId, params, signal, onUpdate);
+				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
+				return result;
 			},
 		};
 	}

@@ -9,6 +9,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep, type ToolCall } from "@earendil-works/pi-ai";
 import { fakeEngine, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
@@ -186,17 +187,30 @@ describe("the guard's turn", () => {
 		assert.deepEqual(rules(new VoiceGuard(turn), send(answer)), []);
 	});
 
-	it("shows no words after the probe ends: the teacher opens the lesson", () => {
+	/** A probe_done the guard runs, ending the probe or refused as the tool
+	 *  refuses one with a question still open. */
+	const probeDone = (guard: InstanceType<typeof VoiceGuard>, ok: boolean) =>
+		guard
+			.wrap({ name: "probe_done", label: "probe_done", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: "" }], details: ok ? { ok: true } : { ok: false, error: "A question is still open" } }) } as AgentTool<any>)
+			.execute("pd", {});
+
+	it("shows no words after the probe ends: the teacher opens the lesson", async () => {
 		const guard = new VoiceGuard(answering("the sum of 3^k/k! is e^3"));
-		guard.screen({ type: "toolCall", id: "pd", name: "probe_done", arguments: {} });
+		await probeDone(guard, true);
 		assert.deepEqual(rules(guard, send("What you built from the minutes model is the **Poisson distribution**.")), ["after-probe"]);
 	});
 
-	it("lets a rewrite he is owed through after probe_done: it answers what he asked", () => {
+	it("a probe_done the tool refused ends nothing", async () => {
+		const guard = new VoiceGuard(answering("the sum of 3^k/k! is e^3"));
+		await probeDone(guard, false);
+		assert.deepEqual(rules(guard, send("The terms add up to $e^3$.")), []);
+	});
+
+	it("lets a rewrite he is owed through after probe_done: it answers what he asked", async () => {
 		const guard = new VoiceGuard([newUserMessage("Invertible matrices"), assistant([ask("q", "recall")]), newUserMessage("Can you just explain diagonalization to me now?")]);
 		const long = Array.from({ length: 8 }, (_, i) => `Sentence ${i + 1} of the explanation.`).join(" ");
 		assert.deepEqual(rules(guard, send(long)), ["length"]);
-		guard.screen({ type: "toolCall", id: "pd2", name: "probe_done", arguments: {} });
+		await probeDone(guard, true);
 		assert.deepEqual(rules(guard, send("A matrix is diagonalizable when its eigenvectors form a basis.")), []);
 		assert.deepEqual(rules(guard, send("One more word after the probe.")), ["after-probe"]);
 	});
