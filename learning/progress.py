@@ -697,8 +697,10 @@ def _resync(
     histories: dict[str, _History],
     today: date,
     scheduled: Scheduled,
+    moved: str = "the exam",
 ) -> None:
-    """Re-derive every engine date after the exam or its final review moved.
+    """Re-derive every engine date after ``moved``: the exam or its final
+    review, or the switch back to a course that takes questions.
 
     Each engine date becomes the replayed one, so moving the exam and moving
     it back restores the dates. A tutor date on or after an exam still ahead is
@@ -717,7 +719,20 @@ def _resync(
         if target is not None and target.isoformat() != stored:
             scheduled.reviews[key] = _with_review(record, key, target, "engine")
             scheduled.notes.append(
-                f"{key}: review moved to {target.isoformat()}, after the exam moved"
+                f"{key}: review moved to {target.isoformat()}, after {moved} moved"
+            )
+
+
+def _silenced(record: dict[str, Any], scheduled: Scheduled) -> None:
+    """In a course that takes no questions nothing falls due, so no topic keeps
+    a review date: the record, its due list and its map agree with the plan.
+    Asking again re-derives them (``_resync``)."""
+    for key, topic in list(record["topics"].items()):
+        if "due" in topic.get("review", {}):
+            _clear_due(record, key)
+            scheduled.reviews.pop(key, None)
+            scheduled.notes.append(
+                f"{key}: review date cleared, the course takes no questions"
             )
 
 
@@ -888,8 +903,9 @@ def schedule(
     verdicts this save created or changed is due on its next expected review day,
     unless the same patch dated its review; a practice day leaves the date alone
     unless the review was already due by then. Newly introduced topics without
-    attempts or a date get a first retrieval. Gap or note judged on an earlier
-    day than the new evidence gets a note. A self-report adds no verdict, but
+    attempts or a date get a first retrieval. A course that takes no questions
+    keeps no review date, and switching back re-derives them. Gap or note
+    judged on an earlier day than the new evidence gets a note. A self-report adds no verdict, but
     any observation that supersedes an attempt replays that attempt's topics.
     """
     result = {**record, "topics": dict(record["topics"])}
@@ -898,10 +914,14 @@ def schedule(
     histories = _histories(result["observations"])
     if changes.exam_moved:
         _resync(result, histories, today, scheduled)
+    elif changes.questions_moved:
+        _resync(result, histories, today, scheduled, "the questions preference")
     _clamp_tutor_dates(result, changes, today, scheduled)
     _reschedule(result, changes, histories, scheduled)
     _first_retrievals(result, changes, histories, scheduled)
     _stale_notes(result, changes, histories, scheduled)
+    if not asks(result):
+        _silenced(result, scheduled)
     return result, scheduled
 
 

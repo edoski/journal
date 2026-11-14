@@ -245,6 +245,19 @@ def test_a_course_that_takes_no_questions_builds_on_what_was_taught() -> None:
     assert all(not day["reviews"] for day in result.days["c"]), "nothing falls due"
 
 
+def test_a_course_switched_to_no_questions_shows_no_review_anywhere() -> None:
+    record = taught(course(), ["a1", "b1"], on(-10))
+    dates = {key: record["topics"][key]["review"]["due"] for key in ("a1", "b1")}
+    silent = save(record, {"preferences": {"questions": "none"}}, on(-1))
+    assert all("review" not in topic for topic in silent["topics"].values())
+    assert progress.due(silent, MONDAY) == []
+    when = plan({"c": silent}, MONDAY, 5, week(10, 1)).when("c", MONDAY, False)
+    assert when.review("a1", silent["topics"]["a1"].get("review", {}).get("due")) is None
+    asked = save(silent, {"preferences": {"questions": "asked"}}, MONDAY)
+    back = {key: asked["topics"][key]["review"]["due"] for key in ("a1", "b1")}
+    assert back == dates, "asking again brings back the dates memory asks for"
+
+
 # --- the window: the order new topics come in, and why -----------------------
 
 
