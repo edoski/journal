@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { heldWords, overdueWords, returnWords } from "@/components/study-words";
+import { heldExamWords, heldWords, overdueWords, returnWords } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -80,8 +80,9 @@ export interface TopicFacts {
 	/** The engine's diagnosed mistake, else the last attempt of a topic it
 	 *  calls weak when that attempt was not right, in the tutor's words. */
 	mistake: string | null;
-	/** Why its next review waits past the day memory asks for it
-	 *  (`heldWords`); null when nothing holds it back. */
+	/** Why its next review waits past the day memory asks for it, naming
+	 *  the exams it waits for (`waitsWords`); null when nothing holds it
+	 *  back. */
 	waits: string | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
@@ -190,6 +191,31 @@ export function mistakeOf(topic: CourseMapTopic, attempts: readonly TopicAttempt
 	return topic.weak && last && last.result !== "correct" ? last.text : null;
 }
 
+/** Another course's exam, as the topic page names it. */
+export interface OtherExam {
+	course: string;
+	/** YYYY-MM-DD. */
+	date: string;
+}
+
+/**
+ * Why a review waits past the day memory asks for it, naming the exams it
+ * waits for, so he needn't guess which: the engine's held words
+ * (`heldWords`), then every other course's exam still ahead, and before
+ * this course's own when it has one ahead, nearest first. Null when
+ * nothing holds it back. Pure.
+ */
+export function waitsWords(review: CourseMapTopic["review"], exam: string | null, others: readonly OtherExam[], today: string): string | null {
+	const held = heldWords(review, exam);
+	if (held === null) return null;
+	const ahead = exam !== null && exam >= today ? exam : null;
+	const named = others
+		.filter((other) => other.date >= today && (ahead === null || other.date < ahead))
+		.sort((a, b) => a.date.localeCompare(b.date))
+		.map((other) => ({ course: other.course, day: dayOf(other.date) }));
+	return named.length > 0 ? `${held}: ${heldExamWords(named)}` : held;
+}
+
 /** The local day of a moment, YYYY-MM-DD: the engine's study day is the
  *  local date, so a session's day is too. */
 export function localDay(iso: string): string {
@@ -258,7 +284,14 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 
 /** Everything the page draws, from the course, the topic, every
  *  session and the topic read; `read` is null when it failed. */
-export function topicFacts({ course, topic, chats, read }: { course: StudyCourse; topic: CourseMapTopic; chats: readonly ChatListItem[]; read: TopicRead | null }): TopicFacts {
+export function topicFacts({ course, topic, chats, read, exams = [] }: {
+	course: StudyCourse;
+	topic: CourseMapTopic;
+	chats: readonly ChatListItem[];
+	read: TopicRead | null;
+	/** Every other course's exam, which a held review may wait for. */
+	exams?: readonly OtherExam[];
+}): TopicFacts {
 	const { map } = course;
 	const sessions = topicSessions(chats, map.workspace, topic.handle);
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
@@ -276,7 +309,7 @@ export function topicFacts({ course, topic, chats, read }: { course: StudyCourse
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
-		waits: heldWords(topic.review, map.exam?.date ?? null),
+		waits: waitsWords(topic.review, map.exam?.date ?? null, exams, map.today),
 		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,

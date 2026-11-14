@@ -129,6 +129,14 @@ export function heldWords(review: CourseMapTopic["review"], exam: string | null)
 	return exam !== null && exam > review.date ? HELD_WORDS.nearer : HELD_WORDS.exams;
 }
 
+/** Which exams a held review waits for (`heldWords`), named so he needn't
+ *  guess: "Probability on Thu 19 Nov", "Probability on Thu 19 Nov and
+ *  Calculus I on Mon 30 Nov". Empty with none. */
+export function heldExamWords(exams: readonly { course: string; day: string }[]): string {
+	const named = exams.map((exam) => `${exam.course} on ${exam.day}`);
+	return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
+}
+
 /** The lesson's words for what just happened to his work (round 2, 14 Nov
  *  2026): a reply below the fold, a reply that never came (he stopped it,
  *  or the app lost it), a connection that dropped mid-reply, a draft

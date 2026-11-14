@@ -144,19 +144,17 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
  *  holds it, and its day in the date column. A date, not a control. */
 export function ScheduledEntry({ day, waits }: { day: string; waits: string | null }) {
 	return (
-		<p data-slot="pickup-scheduled" className="grid h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4">
+		<p data-slot="pickup-scheduled" className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", waits && "py-2")}>
 			<HistoryIcon aria-hidden className={ICON} />
-			<span className="truncate text-row text-muted-foreground">
-				Review
-				{waits && (
-					<span data-slot="pickup-scheduled-waits" className="ml-2 text-label">
-						{waits}
-					</span>
-				)}
-			</span>
+			<span className="truncate text-row text-muted-foreground">Review</span>
 			<span data-slot="topic-history-date" className="text-label text-muted-foreground tabular-nums">
 				{day}
 			</span>
+			{waits && (
+				<span data-slot="pickup-scheduled-waits" className="col-span-2 col-start-2 text-label text-muted-foreground">
+					{waits}
+				</span>
+			)}
 		</p>
 	);
 }

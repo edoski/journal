@@ -121,7 +121,7 @@ describe("calendar entries", () => {
 		assert.equal(misfitWords([]), null);
 	});
 
-	it("says why a review waits on the day the plan holds it to, and only there", () => {
+	it("says why a review waits on the day the plan holds it to, naming the exams it waits for, and only there", () => {
 		const FREE = course(
 			"/study/calc",
 			"Calculus",
@@ -133,7 +133,7 @@ describe("calendar entries", () => {
 			reviews.map((e) => e.kind === "review" && [e.title, e.day, e.waits]),
 			[
 				["Bayes' rule", "2026-11-09", null],
-				["Limits", "2026-12-03", "Waits for your exams"],
+				["Limits", "2026-12-03", "Waits for your exams: Probability on Thu 19 Nov"],
 				["Limits", "2026-12-20", null],
 			],
 		);

@@ -27,7 +27,9 @@ import {
 	topicFacts,
 	headMarks,
 	localDay,
+	waitsWords,
 } from "../components/unit-inbox/topic-page/topic-facts.ts";
+import { heldExamWords } from "../components/study-words.ts";
 
 const TODAY = "2026-11-08";
 const WORKSPACE = "/study/linalg";
@@ -386,5 +388,27 @@ describe("the facts a candidate draws", () => {
 			read: { record: { attempts: [attempt({ date: "2026-11-03" })], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] }, plans: [] },
 		});
 		assert.deepEqual([rank.studied, rank.attempts.length, rank.pickups.map((p) => p.when)], ["Studied 5 days ago", 1, ["2d ago"]]);
+	});
+});
+
+describe("why a held review waits", () => {
+	const held = { kind: "scheduled" as const, date: "2026-11-12", held: true as const };
+	const others = [
+		{ course: "Linear Algebra", date: "2026-12-03" },
+		{ course: "Probability", date: "2026-11-19" },
+		{ course: "Old course", date: "2026-10-01" },
+	];
+	it("names the nearer exams it waits for: those ahead, before the course's own", () => {
+		assert.equal(waitsWords(held, "2026-11-30", others, "2026-11-08"), "Waits for a nearer exam: Probability on Thu 19 Nov");
+	});
+	it("names every exam ahead for a course with none of its own, nearest first", () => {
+		assert.equal(waitsWords(held, null, others, "2026-11-08"), "Waits for your exams: Probability on Thu 19 Nov and Linear Algebra on Thu 3 Dec");
+	});
+	it("lists two exams or more as a sentence", () => {
+		assert.equal(heldExamWords([{ course: "Probability", day: "Thu 19 Nov" }, { course: "Calculus I", day: "Mon 30 Nov" }, { course: "Logic", day: "Fri 4 Dec" }]), "Probability on Thu 19 Nov, Calculus I on Mon 30 Nov and Logic on Fri 4 Dec");
+	});
+	it("says nothing for a review the plan does not hold, and only the words with no exam to name", () => {
+		assert.equal(waitsWords({ kind: "scheduled", date: "2026-11-12" }, null, others, "2026-11-08"), null);
+		assert.equal(waitsWords(held, null, [], "2026-11-08"), "Waits for your exams");
 	});
 });

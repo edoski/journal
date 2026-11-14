@@ -1,8 +1,7 @@
 import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { heldWords } from "@/components/study-words";
-import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
+import { localDay, topicAction, waitsWords, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, stepWords, type CourseMove } from "@/components/study-home/study-facts";
 
 /**
@@ -159,8 +158,9 @@ export function calendarEntries({
 			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
+		const exams = courses.flatMap((c) => (c !== studied && c.map.exam ? [{ course: c.map.title, date: c.map.exam.date }] : []));
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
-			const waits = topic.review?.date === day ? heldWords(topic.review, map.exam?.date ?? null) : null;
+			const waits = topic.review?.date === day ? waitsWords(topic.review, map.exam?.date ?? null, exams, today) : null;
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, waits, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) => entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, ...facts(topic) });

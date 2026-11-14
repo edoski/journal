@@ -6,8 +6,9 @@ import { useServerEvent } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
 import { useLinkVariant } from "@/components/design-variant";
 import { TopicNotice, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import type { OtherExam } from "@/components/unit-inbox/topic-page/topic-facts";
 
-type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
+type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[]; exams: OtherExam[] };
 
 /** The topic's course and every session, read again when a turn settles,
  *  the list changes, the course record changes or the day turns over. A
@@ -27,8 +28,10 @@ function useUnitRead(workspace: string): Read {
 		])
 			.then(([study, { chats }]) => {
 				if (!live) return;
-				const course = study.available ? study.courses.find((c) => c.map.workspace === workspace) : undefined;
-				setRead(course ? { status: "ready", course, chats } : { status: "missing" });
+				const courses = study.available ? study.courses : [];
+				const course = courses.find((c) => c.map.workspace === workspace);
+				const exams = courses.flatMap((c) => (c !== course && c.map.exam ? [{ course: c.map.title, date: c.map.exam.date }] : []));
+				setRead(course ? { status: "ready", course, chats, exams } : { status: "missing" });
 			})
 			.catch(() => live && setRead((prev) => (prev.status === "ready" ? prev : { status: "missing" })));
 		return () => {
@@ -52,7 +55,7 @@ export function UnitPage({ workspace, handle }: { workspace: string; handle: str
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<div aria-hidden className="h-13 shrink-0" />
 			{read.status === "ready" && topic ? (
-				<TopicPage connected={link === "connected"} course={read.course} topic={topic} chats={read.chats} />
+				<TopicPage connected={link === "connected"} course={read.course} topic={topic} chats={read.chats} exams={read.exams} />
 			) : (
 				<TopicNotice>{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}</TopicNotice>
 			)}
