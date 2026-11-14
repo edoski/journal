@@ -1,14 +1,16 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
-import { ACTION_WORDS, dayOf, dayWords, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import type { TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { FIRST_LESSON, LESSON_WORDS, overdueWords } from "@/components/study-words";
+import { FIRST_LESSON, LESSON_WORDS, overdueWords, startsAfterWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
  * facts: the topic's sessions sorted by what he does with them. Now is the
  * page's one action (`topicAction`, all seven rows); Next is every other
  * place that waits on him; Scheduled is the engine's dated review; Earlier
- * is the rest of the history, by day.
+ * is the rest of the history, by day. While Now starts a topic, Now says
+ * the day the plan starts it, and the pane says why it comes now.
  */
 
 /** The icon Now leads with, the one the rest of the app uses for the same
@@ -50,6 +52,21 @@ export interface PickupSections {
 	scheduled: { kind: "review" | "start"; day: string; waits: string | null } | null;
 	/** The sessions neither Now nor Next hold, and every scored attempt, by day. */
 	earlier: TrailDay[];
+	/** Why the topic comes now, while Now starts it: what it builds on and
+	 *  where it is in his material; null on any other Now. */
+	why: { builds: readonly BuildsOn[]; refs: readonly TopicRef[] } | null;
+}
+
+/** When the plan starts a topic not started, as Now's note: "Planned
+ *  today", "Planned Wed 11 Nov", then which courses' new topics come first
+ *  when it waits behind them (`startsAfterWords`); null when the plan has
+ *  no day for it. */
+export function plannedWords(facts: TopicFacts): string | null {
+	const { starts, startsAfter } = facts.topic;
+	if (!starts) return null;
+	const day = starts <= facts.today ? "Planned today" : `Planned ${dayOf(starts)}`;
+	const after = startsAfterWords(startsAfter);
+	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
 }
 
 /** The step a lesson stopped on, when its tutor planned. */
@@ -94,7 +111,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				: { ...base, icon: "standing", words: "Next lesson" };
 		}
 		case "start":
-			return { ...base, icon: "standing", words: FIRST_LESSON };
+			return { ...base, icon: "standing", words: FIRST_LESSON, note: plannedWords(facts) };
 		case "study":
 			return { ...base, icon: "review", words: "Nothing due" };
 	}
@@ -130,7 +147,7 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 		scheduled:
 			review?.kind === "scheduled"
 				? { kind: "review", day: dayOf(review.date), waits: facts.waits }
-				: facts.starts
+				: facts.starts && now.kind !== "start"
 					? { kind: "start", day: dayOf(facts.starts.day), waits: facts.starts.waits }
 					: null,
 		earlier: trailDays(
@@ -138,5 +155,6 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 			facts.attempts,
 			facts.today,
 		),
+		why: now.kind === "start" ? { builds: facts.builds, refs: facts.refs } : null,
 	};
 }

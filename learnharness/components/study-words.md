@@ -25,7 +25,7 @@ One form each, wherever it shows.
 | a review dated ahead | Back in 5d, Back in 3w, Back in 2mo |
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 2w ago; Unfinished when no day is known. Never the tutor's step text. |
 | a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first (`reviewWords`): Due since 21 Oct |
-| a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started |
+| a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started; under it the day the plan starts it, once (Planned today, Planned Wed 11 Nov) |
 
 ### Which one a topic says
 

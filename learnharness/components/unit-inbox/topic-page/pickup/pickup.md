@@ -12,7 +12,9 @@ Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and 
 |---|---|---|
 | Now | The page's action (`topicAction`, all seven rows): what to pick up, where it stands in a few words, the press, and the session it opens | always |
 | Next | Every other place that waits on him, most pressing first: another session whose turn is his, one the tutor is writing in, a due review the action does not already start, each open task the action does not continue | not empty |
-| Scheduled | The engine's next review when dated ahead: Review, then why it waits that long when the plan held it back (`heldWords` in `components/study-words.ts`, from the engine's `held`: "Waits for your Probability exam" when another course's final review came first, "Earlier days are full" otherwise, after "Due since 21 Oct" once memory's day has passed, `waitsWords` in topic-facts.ts; `data-slot="pickup-scheduled-waits"`, 12 muted, on its own line under Review so it never cuts), its day ("Fri 13 Nov") in the date column. A date, not a control | dated |
+| Builds on | While Now starts the topic: each topic it builds on (the course map's `needs` edges into it, `buildsOn`), in path order, as a one-line row: its pie, its title, where he stands on it in the pie's words ("Right with help"), opening its page; pointing at a row makes its card glow on the map beside | Now is Start and it builds on something |
+| In your material | While Now starts the topic: each place his material covers it, from the engine's record (`refs`, through the topic read): the place ("Section 4.7") over the source's title, a book icon. Words, not a control | Now is Start and the record points somewhere |
+| Scheduled | The engine's next review when dated ahead: Review, then why it waits that long when the plan held it back (`heldWords` in `components/study-words.ts`, from the engine's `held`: "Waits for your Probability exam" when another course's final review came first, "Earlier days are full" otherwise, after "Due since 21 Oct" once memory's day has passed, `waitsWords` in topic-facts.ts; `data-slot="pickup-scheduled-waits"`, 12 muted, on its own line under Review so it never cuts), its day ("Fri 13 Nov") in the date column. A date, not a control. A topic's first lesson shows here only when Now does not start it (a topic not started with a session on it); while Now starts it, Now says the day | dated |
 | Earlier | Every session neither Now nor Next holds, and every scored attempt, newest first on the history's line (`trailDays`), each day's words ("Yesterday", "Tue 3 Nov") in a trailing date column on its first row | not empty |
 
 Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a few words, no sentences), what on top and where under it:
@@ -23,7 +25,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 | Open | the same | Tutor writing |
 | Review | "2d overdue", the head's mark | |
 | Continue a task | the task's title | its step, "Part (c)" |
-| Start | First lesson (the head already says Not started) | |
+| Start | First lesson (the head already says Not started) | the day the plan starts it (`plannedWords`): Planned today, Planned Wed 11 Nov, then the courses whose new topics come first ("Planned Wed 11 Nov, after Probability's new topics"); nothing when the plan has no day for it |
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |
 | Study | Nothing due (Scheduled holds the date) | |
 
@@ -46,4 +48,8 @@ Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (ke
 
 `resumeLine` (now in `pickup-facts.ts`) and `NowIconMark` (now in `pickup-parts.tsx`) moved here from the deleted Resume options.
 
-Tests: `tests/topic-page-pickup.test.tsx` (every action row as Now, the sections' order on the page, the lesson on the map).
+Round 4 (14 Nov 2026) found the unstarted page saying "First lesson" twice (Now and Scheduled) in one wide row with nothing on why the topic comes now: Now carries the day, and Builds on and In your material give the reason, in engine facts only.
+
+- `BuildsOnList` and `MaterialList` (`pickup-parts.tsx`): Builds on's rows (`data-slot="pickup-builds-on"`, the standing `pickup-builds-on-standing`) in Home's one-line row with a hairline between, and In your material's rows (`pickup-material`), two lines when the record names the place.
+
+Tests: `tests/topic-page-pickup.test.tsx` (every action row as Now, the sections' order on the page, the lesson on the map, a topic not started).

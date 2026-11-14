@@ -1,8 +1,9 @@
-import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
+import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord, TopicRef } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { heldWords, LESSON_WORDS, reviewWords, startsAfterWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
+import { unitHref } from "@/components/unit-inbox/unit-href";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
 /**
@@ -66,6 +67,14 @@ export interface HeadMark {
 	slip?: SlipKey;
 }
 
+/** A topic this one builds on (a `needs` edge into it on the course map),
+ *  where he stands on it, and its page. */
+export interface BuildsOn {
+	topic: CourseMapTopic;
+	standing: Standing;
+	href: string;
+}
+
 export interface TopicFacts {
 	course: { workspace: string; title: string };
 	topic: CourseMapTopic;
@@ -97,7 +106,45 @@ export interface TopicFacts {
 	listed: readonly SessionEntry[];
 	/** Newest first; empty without the topic read. */
 	attempts: readonly TopicAttempt[];
+	/** The topics it builds on, in the engine's path order. */
+	builds: readonly BuildsOn[];
+	/** The course map cut to the topic and every topic it builds on, near or
+	 *  far (`buildsMapOf`); null when it builds on none. */
+	buildsMap: CourseMap | null;
+	/** Where it is in his material (the record's refs); empty without the
+	 *  topic read or when the record points nowhere. */
+	refs: readonly TopicRef[];
 	titleOf: (handle: string) => string;
+}
+
+/** The course map cut to a topic and every topic it builds on, near or
+ *  far, with the edges among them, and "You are here" only when the
+ *  current topic is among them; null when it builds on none. */
+export function buildsMapOf(topic: CourseMapTopic, map: CourseMap): CourseMap | null {
+	const chain = new Set<string>([topic.handle]);
+	for (let grew = true; grew; ) {
+		grew = false;
+		for (const edge of map.edges) {
+			if (edge.kind === "needs" && chain.has(edge.topic) && !chain.has(edge.prerequisite)) {
+				chain.add(edge.prerequisite);
+				grew = true;
+			}
+		}
+	}
+	if (chain.size === 1) return null;
+	return {
+		...map,
+		topics: map.topics.filter((t) => chain.has(t.handle)),
+		edges: map.edges.filter((edge) => (edge.kind === "needs" ? chain.has(edge.topic) && chain.has(edge.prerequisite) : edge.pair.every((h) => chain.has(h)))),
+		current: map.current && chain.has(map.current) ? map.current : null,
+	};
+}
+
+/** The topics a topic builds on, from the course map's `needs` edges, in
+ *  the engine's path order, each with where he stands on it. */
+export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
+	const needs = new Set(map.edges.flatMap((edge) => (edge.kind === "needs" && edge.topic === topic.handle ? [edge.prerequisite] : [])));
+	return map.topics.filter((t) => needs.has(t.handle)).map((t) => ({ topic: t, standing: standingOf(t), href: unitHref(map.workspace, t.handle) }));
 }
 
 /** Why the review waits, after since when it was due when memory asked
@@ -295,6 +342,9 @@ export function topicFacts({ course, topic, chats, read }: { course: StudyCourse
 		sessions: entries,
 		listed: entries.filter((entry) => !picked.has(entry.chat.id)),
 		attempts,
+		builds: buildsOn(topic, map),
+		buildsMap: buildsMapOf(topic, map),
+		refs: read?.record?.refs ?? [],
 		titleOf,
 	};
 }
