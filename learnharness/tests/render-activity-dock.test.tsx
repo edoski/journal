@@ -155,7 +155,7 @@ describe("activity section render", () => {
 		assert.match(html, /data-testid="activity-blob-job"/);
 		assert.match(html, /data-testid="activity-blob-run"/);
 		assert.match(html, /Chain-rule demo/);
-		assert.match(html, /Mapping course · Algebra|Mapping course[\s\S]*Algebra/);
+		assert.match(html, /Mapping course[\s\S]*data-testid="activity-blob-for"[^>]*>Algebra</, "what it does, then the course it works for");
 		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g)?.length, 2, "elapsed on every row");
 		assert.equal(html.match(/data-testid="activity-abort"/g)?.length, 2, "END on every row's face, detail-independent");
 		assert.match(html, /aria-label="End Demo builder in Chain-rule demo"/, "the stop button names what it stops");
@@ -190,8 +190,9 @@ describe("activity section render", () => {
 			/>,
 		);
 		const label = html.match(/data-slot="nav-row-label"[^>]*>([^<]*)</)?.[1] ?? "";
+		const forWhat = html.match(/data-testid="activity-blob-for"[^>]*>([^<]*)</)?.[1] ?? "";
 		assert.match(label, /Saving what you learned/);
-		assert.match(label, /Invertible matrices/);
+		assert.equal(forWhat, "Invertible matrices", "the lesson it works for, whole, on the row");
 		assert.doesNotMatch(html, /activity-blob-detail/, "the row is closed");
 	});
 });

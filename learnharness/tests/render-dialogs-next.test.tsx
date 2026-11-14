@@ -103,7 +103,8 @@ describe("background agents", () => {
 		const section = doc.querySelector('[data-testid="activity-section"]');
 		assert.equal(section?.querySelector('[data-slot="nav-section-header"]')?.textContent, "Working in the background");
 		const row = section?.querySelector('[data-testid="activity-blob-job"] [data-slot="nav-row"]');
-		assert.equal(row?.querySelector('[data-slot="nav-row-label"]')?.textContent, "Researcher · Eigenvalues and eigenvectors");
+		assert.equal(row?.querySelector('[data-slot="nav-row-label"]')?.textContent, "Researcher: ", "what it is doing");
+		assert.equal(row?.querySelector('[data-testid="activity-blob-for"]')?.textContent, "Eigenvalues and eigenvectors", "for which session, whole");
 		assert.match(row?.querySelector('[data-testid="activity-blob-elapsed"]')?.textContent ?? "", /^\d+(s|m \d\ds|h \d\dm)$/);
 		assert.equal(row?.getAttribute("aria-expanded"), "false");
 		assert.equal(doc.querySelector('[data-testid="activity-abort"]')?.getAttribute("aria-label"), "End Researcher in Eigenvalues and eigenvectors");

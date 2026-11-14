@@ -10,6 +10,7 @@ import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
+import { MathText, mathPlain } from "@/components/ui/math-text";
 
 /**
  * THE BACKGROUND-AGENTS SECTION (owner, sidebar round — the successor of
@@ -337,7 +338,10 @@ function openTarget(blob: ActivityBlob): { href: string; words: string } {
 /** One process as a sidebar row: kind icon, what it is doing and the
  *  lesson or course it works for, elapsed time, and a stop button at the
  *  right edge; a click opens its detail (what it is doing, for how long,
- *  a link to its lesson or course) under the row. */
+ *  a link to its lesson or course) under the row. What it is doing sits
+ *  on the first line beside the time; the lesson or course it works for,
+ *  the one fact that tells a row from its neighbours, takes the line
+ *  under it at the label's edge and wraps rather than be cut. */
 function ActivityRow({
 	blob,
 	now,
@@ -359,10 +363,23 @@ function ActivityRow({
 	const target = openTarget(blob);
 	return (
 		<div data-testid={`activity-blob-${blob.process}`} className="relative">
-			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="pr-9">
+			<NavRow
+				aria-expanded={detailOpen}
+				onClick={onToggleDetail}
+				highlighted={detailOpen}
+				className="h-auto min-h-8 flex-wrap items-start gap-y-0 py-1.5 [&>svg]:mt-0.5"
+			>
 				<Icon />
-				<NavRowLabel>{`${label} · ${blob.title}`}</NavRowLabel>
-				<NavRowTrailing data-testid="activity-blob-elapsed">{elapsed}</NavRowTrailing>
+				<NavRowLabel data-testid="activity-blob-label">
+					{label}
+					<span className="sr-only">: </span>
+				</NavRowLabel>
+				<NavRowTrailing data-testid="activity-blob-elapsed" className="mr-7 h-5">
+					{elapsed}
+				</NavRowTrailing>
+				<span data-testid="activity-blob-for" className="min-w-0 basis-full pl-6 text-pretty">
+					<MathText>{blob.title}</MathText>
+				</span>
 			</NavRow>
 			<Hint label={abortState === "failed" ? "Couldn't stop it. Try again" : "Stop"} side="right">
 				<Button
@@ -371,7 +388,7 @@ function ActivityRow({
 					data-testid="activity-abort"
 					onClick={onAbort}
 					disabled={abortState !== undefined}
-					aria-label={`End ${label} in ${blob.title}`}
+					aria-label={`End ${label} in ${mathPlain(blob.title)}`}
 					className="absolute right-1 top-1 hover:text-danger"
 				>
 					<SquareIcon />

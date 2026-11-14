@@ -13,7 +13,7 @@ The sidebar's one row: navigation (New lesson, Home, Calendar, Settings), and, w
 
 The trailing column holds exactly one thing, so every row's last character ends on the same edge (239px in the 256px sidebar). A session's item, by priority: the spinner while the tutor writes, "Your turn" in `link` at 12/500 while the tutor waits on the learner, or how long ago (`now`, `40m`, `3h`, `2d`, `3w`, `4mo`, `1y`). A background agent's item is its elapsed time.
 
-A row may also carry an absolutely placed 24px action (`Button size="icon-inline"`) at its right edge, as a background agent's row does for Stop; the row then pads its label clear of it. A background agent's row shows the session it works for and its elapsed time; a click opens its detail (what it is doing, cost, context, model, steps) under the row in 12px muted text on the label's edge.
+A row may also carry an absolutely placed 24px action (`Button size="icon-inline"`) at its right edge, as a background agent's row does for Stop; the row then keeps its first line clear of it. A background agent's row grows past 32px: what it is doing beside its elapsed time on the first line, then the lesson or course it works for, whole, on the label's edge across the row's full width, wrapping rather than cut. A click opens its detail (what it is doing, for how long, a link to its lesson or course) under the row in 12px muted text on the label's edge.
 
 ## States
 
