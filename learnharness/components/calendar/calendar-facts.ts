@@ -37,7 +37,20 @@ export type CalendarEntry =
 			allStarted: boolean;
 			next: NextMove | null;
 	  }
-	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; since: string | null; waits: string | null; action: TopicAction }
+	| {
+			kind: "review";
+			id: string;
+			day: string;
+			title: string;
+			course: CourseRef;
+			topic: CourseMapTopic;
+			overdue: boolean;
+			/** The day memory asked for an overdue review (`dueDay`), else null. */
+			dueOn: string | null;
+			since: string | null;
+			waits: string | null;
+			action: TopicAction;
+	  }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; waits: string | null; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
 	| { kind: "session"; id: string; day: string; title: string; course: CourseRef | null; chat: ChatListItem; type: SessionType; waits: boolean; topic: CourseMapTopic | null };
@@ -78,6 +91,18 @@ export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (h
 		} else weeks.push({ key, from: day.date, to: day.date, titles: day.new.map(titleOf) });
 	}
 	return weeks.map(({ from, to, titles }) => ({ from, to, titles }));
+}
+
+/** The day memory asked for a review: the engine dates a due review on
+ *  the day the plan takes it (today) and counts the days it is overdue, so
+ *  the due day is that many days before (round 4: "Was due Sunday 8
+ *  November" on Sunday 8 November, for a review due since Friday 6).
+ *  Null for a review not due. Pure. */
+export function dueDay(review: CourseMapTopic["review"]): string | null {
+	if (review?.kind !== "due") return null;
+	const date = new Date(`${review.date}T00:00:00Z`);
+	date.setUTCDate(date.getUTCDate() - review.overdue);
+	return date.toISOString().slice(0, 10);
 }
 
 /** How an entry reads: its words, one per look, and where it sits in its
@@ -217,7 +242,7 @@ export function calendarEntries({
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
 			const since = held?.held && held.held.since < today ? reviewWords(held, today) : null;
-			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, since, waits: held ? heldWords(held) : null, ...facts(topic) });
+			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held ? heldWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
 			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? startsAfterWords(topic.startsAfter) : null, ...facts(topic) });
