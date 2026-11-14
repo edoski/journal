@@ -757,3 +757,54 @@ def test_patches_with_invisible_characters_are_rejected() -> None:
         {"knowledge": {"notation": {"text": "Integrale: ∫ f(x) dx\n\tcon dx in fondo"}}}
     )
     assert record["knowledge"]["notation"]["text"].endswith("in fondo")
+
+
+def test_text_the_learner_reads_is_written_to_them() -> None:
+    fails(
+        schema.empty(),
+        {"topics": {"chain": {"gap": "Drops the inner derivative (o133)"}}},
+        "topics.chain.gap",
+        'names the observation "o133"',
+    )
+    fails(
+        schema.empty(),
+        {"topics": {"rank": {"note": "Repaired 2026-11-08 after the explanation"}}},
+        "topics.rank.note",
+        'holds the date "2026-11-08"',
+    )
+    fails(
+        schema.empty(),
+        {"topics": {"walks": {"gap": "In the longest-path argument he assumes"}}},
+        "topics.walks.gap",
+        'as "he"',
+    )
+    fails(
+        schema.empty(),
+        {"tasks": {"rank": {"title": "Rank", "step": "He needs the matrix first"}}},
+        "tasks.rank.step",
+        'as "He"',
+    )
+    fails(
+        schema.empty(),
+        {"tasks": {"rank": {"title": "Rank", "goal": "The learner states it"}}},
+        "tasks.rank.goal",
+        'as "learner"',
+    )
+    fails(
+        course({"topics": {"rank": {"title": "Rank"}}}),
+        {"observations": [attempt("rank", text="Retest of o56")]},
+        "observations[0].text",
+        'names the observation "o56"',
+    )
+    record = course(
+        {
+            "topics": {"walks": {"title": "Walks", "gap": "You stop one step early"}},
+            "tasks": {"sheet-4": {"title": "Sheet 4", "step": "Find a path of length $o(n)$"}},
+        }
+    )
+    assert record["topics"]["walks"]["gap"] == "You stop one step early"
+    asked = apply(
+        record, {"observations": [attempt("walks", text="He flips a coin twice")]}
+    )[0]
+    assert asked["observations"]["o1"]["text"] == "He flips a coin twice"
+    assert course({"tasks": {"t": {"title": "T", "help": "o3, 2026-11-08, he"}}})

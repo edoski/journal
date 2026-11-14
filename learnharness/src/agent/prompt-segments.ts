@@ -89,10 +89,11 @@ export type DoctrinePart =
  *  specifically in its own doctrine. The prober
  *  skips teaching.md's opening: it measures, and the lesson's teaching
  *  rules belong to the teacher. From records.md and course.md every agent
- *  reads only what keeps the record coherent across sessions: tasks and
- *  `focus`, `preferences`, and the exam facts. */
+ *  reads only what keeps the record coherent across sessions: which texts
+ *  the learner reads and how to write them, tasks and `focus`,
+ *  `preferences`, and the exam facts. */
 const ACROSS_SESSIONS: readonly DoctrinePart[] = [
-	{ file: "records.md", sections: ["Path and tasks", "Preferences"], intro: false },
+	{ file: "records.md", sections: ["What the learner reads", "Path and tasks", "Preferences"], intro: false },
 	{ file: "course.md", sections: ["Exam facts"], intro: false },
 ];
 

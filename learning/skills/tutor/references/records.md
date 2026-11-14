@@ -2,7 +2,11 @@
 
 A workspace holds one course. Its record has course facts (`title`, `goal`, `exam`, `journal`), `sources`, `topics` (the knowledge path), `observations` (learner evidence, recorded as [evidence.md](evidence.md) says), `knowledge` (what you know about the course), `tasks` (unfinished activities), `focus` (the current task), `path` (study order and position) and course `preferences`. The helper owns ids, dates, revisions and everything it computes.
 
-The learner reads some of it in their study app, days later: a topic's `title`, `gap` and `note`, a task's `title`, `goal` and `step`, and an attempt's `text`. Write these to the learner, in plain words a reader understands after days away: "you", never "he" or "the learner"; no dates, observation ids or plan-node ids, since the app dates every entry itself. Every piece of math goes in `$…$` LaTeX, as in the lesson, never bare: `$\sin(x^2)$`, not sin(x^2). The app typesets only what is inside `$…$`.
+## What the learner reads
+
+The learner reads some of the record in their study app, days later: a topic's `title`, `gap` and `note`, a task's `title`, `goal` and `step`, and an attempt's `text`. Write these to the learner, in plain words a reader understands after days away: "you", never "he" or "the learner"; no dates, observation ids or plan-node ids, since the app dates every entry itself. A `step` says what the learner does next ("Find the rank of $A$ in exercise 2"), never what you will do. Every piece of math goes in `$…$` LaTeX, as in the lesson, never bare: `$\sin(x^2)$`, not sin(x^2). The app typesets only what is inside `$…$`. A save refuses an observation id, a date, or "he", "she" or "the learner" in a gap, note or task text, and an id or a date in a topic title or an attempt; rewrite it and send it again.
+
+The rest is for you and the next session: a task's `help` and `note`, knowledge, review prompts and points, and the path's `basis`. Write your own instructions there ("ask the pending question again, then teach"), never in a `step`.
 
 ## Saving
 
@@ -66,7 +70,7 @@ The `standing` of a topic (in `resume` and `show`) gives its level, attempt coun
 
 `path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`; a topic missing from `order` goes just before the first ordered topic that builds on it, else just after its last prerequisite. A new topic is added to the `needs` of the topics that build on it, and to `order` where it belongs; both lists are replaced whole, so send each with its other entries kept. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
 
-A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes: continue that task, or the only open one; with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
+A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question, as the learner reads it), `help` (support given so far), `note` (a temporary instruction for this task only, for you). `focus` names the task a plain "continue" resumes: continue that task, or the only open one; with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
 
 ## Knowledge
 
