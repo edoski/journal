@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from learning import progress, records, retrieval, schema
+from learning import capacity, progress, records, retrieval, schema
 from learning.workspace import Workspace
 
 TODAY = date(2026, 10, 10)
@@ -205,7 +205,8 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Workspace:
 
 
 def due(record: dict[str, Any]) -> list[str]:
-    return [item["topic"] for item in progress.due(record, TODAY)]
+    read = capacity.final_reviews({"course": record}, TODAY)["course"]
+    return [item["topic"] for item in progress.due(read, TODAY)]
 
 
 def pinned(offsets: dict[str, int], **extra: Any) -> dict[str, Any]:

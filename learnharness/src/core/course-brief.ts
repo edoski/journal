@@ -206,7 +206,7 @@ export function projectCourseBrief(
 	if (later.length > 0) {
 		const more = typeof r.due_later_more === "number" && r.due_later_more > 0 ? `, and ${r.due_later_more} more` : "";
 		lines.push(
-			`Planned for later days, not overdue: ${later.map((d) => `${str(d.topic) ?? "?"} (${planDay(str(d.planned), str(r.today))})`).join(", ")}${more}`,
+			`Due, but planned for later days: ${later.map((d) => `${str(d.topic) ?? "?"} (${planDay(str(d.planned), str(r.today))})`).join(", ")}${more}`,
 		);
 	}
 	const road = startsByDay(r.starts, str(r.today));

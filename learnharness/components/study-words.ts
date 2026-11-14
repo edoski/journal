@@ -91,6 +91,14 @@ export const ATTEMPT_WORDS = {
 	wrong: "Not right",
 } as const;
 
+/** What an attempt in a topic's history says under it when it is not a
+ *  plain answer: he gave up without one, or it was a prediction before its
+ *  step was taught, which never counts. */
+export const ATTEMPT_HOW_WORDS = {
+	gaveUp: "Gave up",
+	predicted: "Prediction, not counted",
+} as const;
+
 /*
  * Every distance in time counts whole days, one scheme wherever it shows:
  * "3d ago", "13d ago", "45d ago", never weeks or months (round 4: search

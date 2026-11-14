@@ -27,45 +27,73 @@ function result(callId: string, toolName: string, text: string, details: unknown
 }
 
 const answer = (question: string, extra: object = {}) => ({ kind: "explain", tool: "explain", questionText: question, answers: [], text: "rank 2", confidence: "confident", answeredAt: "", ...extra });
-const receipt = (...ids: string[]) => JSON.stringify({ revision: 3, changed: true, observations: ids });
+const receipt = (...ids: string[]) => JSON.stringify({ revision: 3, changed: true, observations: ids, duplicates: [], saved: ids });
+const named = (question: string | null, text = "q") => ({ topics: ["rank"], text, help: "none", result: "correct", ...(question ? { question } : {}) });
 
-/** A check answered, then marked by a save, then the next check asked. */
+/** A check answered and marked by a save naming it, then a hint request
+ *  whose save names it too (and is no answer). */
 function lesson(): LhMessage[] {
 	return [
 		call("q1", "explain", { question: "Rank of A?", correctAnswer: "2" }),
 		result("q1", "explain", "{}", answer("Rank of A?")),
-		call("s1", "course_save", { changes: {} }),
+		call("s1", "course_save", { changes: { observations: [named("q1")] } }),
 		result("s1", "course_save", receipt("o4")),
 		call("q2", "explain", { question: "Kernel of A?", correctAnswer: "span" }),
 		result("q2", "explain", "{}", answer("Kernel of A?", { hintRequested: true })),
-		call("s2", "course_save", { changes: {} }),
+		call("s2", "course_save", { changes: { observations: [named("q2")] } }),
 		result("s2", "course_save", receipt("o5")),
 	];
 }
 
 describe("which attempts mark which answer", () => {
-	it("a save after an answer marks it; a hint request is no answer", () => {
+	it("an attempt marks the answer it names; a hint request is no answer", () => {
 		assert.deepEqual(markLinks(lesson()), { q1: ["o4"] });
 	});
 
-	it("a practice problem's marks are its conclude receipt and any save that re-sends them", () => {
+	it("a late save of an earlier check marks that check, not the prediction answered since (round 4)", () => {
+		const messages = [
+			call("q1", "explain", { question: "Eigenvalues of A?", correctAnswer: "5, 2" }),
+			result("q1", "explain", "{}", answer("Eigenvalues of A?")),
+			call("q2", "explain", { type: "predict", question: "Guess the eigenvectors", correctAnswer: "(1,1), (1,-2)" }),
+			result("q2", "explain", "{}", answer("Guess the eigenvectors", { confidence: "guessing" })),
+			call("s1", "course_save", { changes: JSON.stringify({ observations: [named("q1", "the check")] }) }),
+			result("s1", "course_save", receipt("o37")),
+		];
+		assert.deepEqual(markLinks(messages), { q1: ["o37"] });
+	});
+
+	it("pairs by each observation's place in the save, a repeated one by the stored id", () => {
+		const messages = [
+			call("q1", "explain", { question: "A?", correctAnswer: "a" }),
+			result("q1", "explain", "{}", answer("A?")),
+			call("q2", "explain", { question: "B?", correctAnswer: "b" }),
+			result("q2", "explain", "{}", answer("B?")),
+			call("s1", "course_save", { changes: { observations: [named(null, "said in words"), named("q2"), named("q1")] } }),
+			result("s1", "course_save", JSON.stringify({ observations: ["o8", "o9"], duplicates: ["o3"], saved: ["o8", "o3", "o9"] })),
+		];
+		assert.deepEqual(markLinks(messages), { q2: ["o3"], q1: ["o9"] });
+	});
+
+	it("a practice problem's marks are its conclude receipt and any save that names the conclude", () => {
 		const messages = [
 			call("p1", "problem", { statement: "Find the rank.", topics: ["rank"] }),
 			result("p1", "problem", "posed"),
 			call("c1", "conclude", { outcome: "solved" }),
 			result("c1", "conclude", `Problem concluded.\n\nCourse record: ${receipt("o7", "o8")}`),
-			call("s3", "course_save", {}),
+			call("s3", "course_save", { changes: { observations: [named("c1")] } }),
 			result("s3", "course_save", receipt("o9")),
 		];
 		assert.deepEqual(markLinks(messages), { c1: ["o7", "o8", "o9"] });
 	});
 
-	it("a save after his own message or a dispute marks nothing", () => {
+	it("an attempt that names no answer, or a refused save, marks nothing", () => {
 		const messages = [
 			...lesson().slice(0, 2),
 			{ id: id(), role: "user", content: [{ type: "text", text: "wait" }], timestamp: 0 } as LhMessage,
-			call("s9", "course_save", {}),
+			call("s9", "course_save", { changes: { observations: [named(null)] } }),
 			result("s9", "course_save", receipt("o6")),
+			call("s10", "course_save", { changes: { observations: [named("q1")] } }),
+			result("s10", "course_save", "refused", null, true),
 		];
 		assert.deepEqual(markLinks(messages), {});
 	});
@@ -73,7 +101,7 @@ describe("which attempts mark which answer", () => {
 
 const shown = {
 	o4: { kind: "attempt", topics: ["rank"], result: "incorrect", help: "none", sure: "confident", grade: "missed", corrected_by: ["o6"] },
-	o6: { kind: "attempt", topics: ["rank"], result: "correct", help: "none", sure: "confident", grade: "solid", disputed: "It is 2", ruling: "He is right: the pivots give rank 2." },
+	o6: { kind: "attempt", topics: ["rank"], result: "correct", help: "none", sure: "confident", grade: "solid", disputed: "It is 2", ruling: "You are right: the pivots give rank 2." },
 };
 
 describe("the mark that stands", () => {
@@ -83,7 +111,7 @@ describe("the mark that stands", () => {
 			q1: {
 				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, sure: "confident" }],
 				disputed: true,
-				ruling: "He is right: the pivots give rank 2.",
+				ruling: "You are right: the pivots give rank 2.",
 			},
 		});
 	});

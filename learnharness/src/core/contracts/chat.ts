@@ -46,8 +46,9 @@ export interface ChatRecord {
 	topics?: readonly string[];
 	/** The learner renamed the session: a plan's goal no longer names it. */
 	renamed?: true;
-	/** The session was named once (`ChatStore.nameSession`), on its first
-	 *  turn or by its first plan: nothing names it again. */
+	/** The session was named once (`ChatStore.nameSession`): only its first
+	 *  turn may change the title, so a later turn or its first plan gives
+	 *  at most the topic it lacked, and nothing names it again. */
 	named?: true;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;

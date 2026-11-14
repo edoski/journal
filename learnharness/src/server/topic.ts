@@ -18,6 +18,7 @@ export const TOPIC_READ_SESSIONS = 20;
 const SESSION_ID = /^[A-Za-z0-9_-]+$/;
 const RESULTS = ["correct", "partial", "incorrect"] as const;
 const SURE = ["guess", "neutral", "confident"] as const;
+const GRADES = ["solid", "helped", "missed"] as const;
 
 function record(value: unknown): Record<string, unknown> | null {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -47,6 +48,9 @@ function attemptOf(id: string, entry: unknown): { attempt: TopicAttempt; correct
 			recorded: str(e.recorded),
 			result,
 			unaided: e.kind === "exam" || e.help === "none",
+			grade: GRADES.find((g) => g === e.grade) ?? null,
+			gaveUp: e.gave_up === true,
+			predicted: e.predicted === true,
 			sure: SURE.find((s) => s === e.sure) ?? null,
 			chose: str(e.chose),
 			text,

@@ -21,27 +21,38 @@ Reviews, when there are more than fit:
      by the final review, so each is reviewed before the exam whenever his
      limit leaves room for it; the plan names those it leaves without one
      (``Plan.unreviewed``).
-  2. re-teaching, relearning and first retrievals (a topic not yet solid):
-     such a review is part of learning the topic, and the topics that need
-     it wait on it. One that an exam's untaught topics need comes first,
-     nearest exam first: the rest of that exam's path cannot start before
-     it is solid, so it carries the exam's deadline.
-  3. every other review.
-  4. reviews of courses whose exam has passed, on their spaced dates.
-Within 2 and 3, by memory's own need: how far past its day a review is, as a
-share of the interval that set the day (``progress.late_share``). Each step of
-the ladder is set for the same recall, and forgetting runs with the gap as a
-share of the interval, so ranking by that share keeps the courses' recall
-alike: a course with no exam is not starved by the exam courses, a later
-exam's first retrievals do not wait on a nearer exam's, and a backlog is
-worked off from the most forgotten. The rule needs no share of the day and no
-constant: the reviews he completes set the room, memory sets the order. On
-equal shares, courses with an exam ahead come first, nearest first. The
-nearer exam needs no more: its final review is the deadline, and comes first.
-Then the course's own order (``progress.due``). A review left out of a
-full day goes on to the next; the plan says why it waits past the day memory
-asks for it (``When.held``): another course's final review came first, or
-the days before were full.
+  2. a review an exam's untaught topics wait on (a topic not yet solid that
+     they need, or a competing method of theirs), nearest exam first: the
+     rest of that exam's path cannot start before it is solid, so it carries
+     the exam's deadline.
+  3. every other review, but for those of 4 and 5, by memory's own need: how far
+     past its day a review is, as a share of the interval that set the day
+     (``progress.late_share``). Each step of the ladder is set for the same
+     recall, and forgetting runs with the gap as a share of the interval, so
+     ranking by that share keeps the courses' recall alike and works a
+     backlog off from the most forgotten. On equal shares a topic not yet
+     solid comes first (it is still being learned), then courses with an
+     exam ahead, nearest first.
+  4. a review of a course with an exam ahead that its final review would
+     repeat: answered solid today, its next step falls within the final
+     review, which brings it back before the exam anyway. A course with no
+     exam has no final review to catch up what waits, so its reviews come
+     before these. Ranking these by need alone starved the courses with no
+     exam: a one-day interval gains a whole share each day it waits, and
+     each exam's pace adds such reviews daily, so a review weeks late on a
+     month's interval never had the larger share.
+  5. reviews of courses whose exam has passed, on their spaced dates.
+The rule needs no share of the day and no constant: the reviews he
+completes set the room, memory and the exam set the order. Then the
+course's own order (``progress.due``). Competing methods (``contrasts``) are
+reviewed side by side, since telling them apart is what they need: one due
+the day another is taken comes right after it, and one whose partner falls
+due a little later waits for it, when the wait costs it no larger share of
+its interval than a single day costs the ladder's shortest solid interval
+(``_Course.together``). A review left out of a full day goes
+on to the next; the plan says why it waits past the day memory asks for it
+(``When.held``): another course's final review came first, or the days
+before were full.
 
 An exam day is planned like any other day of its weekday, less the examined
 course. Whether he does less on a day he sits an exam is his to show, as on
@@ -57,7 +68,12 @@ before the exam), nearest exam first, past the pace he has shown until he has
 shown a limit; so a nearer exam's last topics come before a later exam's pace,
 since a topic started late is better known at the exam than one never started.
 Spare new-topic capacity then goes to the nearest exam with topics left; then
-to courses with no exam. A topic a course cannot start before its exam does not
+to courses with no exam, the one that started a topic least recently first.
+Spare capacity starts one topic on a day that starts none, and a second only
+when it belongs with the first (one needs the other, or both rest on the same
+prerequisites) or his own rate that weekday holds two: two unrelated topics in
+one sitting split his attention, and nothing but a pace asks for them. A pace
+that needs two still takes two, related ones first. A topic a course cannot start before its exam does not
 fit. Before any pace, an untaught topic that a taught topic needs starts first,
 nearest exam first: what he has already started stands on it. A start that
 waits while other courses' new topics take the days names them
@@ -120,6 +136,8 @@ class _Course:
     gaps: set[str] = field(default_factory=set)
     pending: list[str] = field(default_factory=list)
     starts_after: dict[str, list[str]] = field(default_factory=dict)
+    paired: dict[str, date] = field(default_factory=dict)
+    began: date | None = None
 
     @classmethod
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
@@ -177,13 +195,57 @@ class _Course:
         )
 
     def gates(self, day: date) -> set[str]:
-        """With the exam ahead, the topics its untaught topics need: until
-        they are solid the rest of its path cannot start."""
+        """With the exam ahead, the topics its untaught topics wait on: what
+        they need, and their competing methods (``ready``). Until those are
+        solid the rest of its path cannot start."""
         if not self.ahead(day):
             return set()
         return {
-            need for key in self.untaught for need in progress.needs(self.record, key)
+            other
+            for key in self.untaught
+            for other in (*progress.needs(self.record, key), *self.partners[key])
         }
+
+    def caught(self, topic: str, day: date) -> bool:
+        """A review its final review would repeat: answered solid today, its
+        next step falls within the final review, which brings it back anyway."""
+        if not self.ahead(day):
+            return False
+        assert self.exam is not None
+        step = progress.interval("solid", self.streaks.get(topic, 0) + 1)
+        return day + timedelta(days=step) >= self.exam.final
+
+    def together(self, topic: str, day: date, week: Capacity) -> bool:
+        """Whether its review waits for a competing method's, so the two are
+        reviewed side by side: one falls due on a later study day before the
+        exam, and the wait costs it no larger share of its interval
+        (``progress.late_share``) than a single day costs the ladder's
+        shortest solid interval. The plan counts in whole days, so that is the
+        least lateness any held review bears; a review on a long interval may
+        wait a few days, one on a short interval none. It waits for one day
+        before each review, so it never chases one method after another."""
+        if topic in self.paired:
+            return day < self.paired[topic]
+        due = self.record["topics"][topic].get("review", {}).get("due")
+        if due is None:
+            return False
+        least = 1 / progress.LADDER[0]
+        for other in self.partners[topic]:
+            then = self.record["topics"][other].get("review", {}).get("due")
+            if self.levels[other]["level"] == "new" or then is None:
+                continue
+            meet = date.fromisoformat(then)
+            if meet <= day:
+                continue
+            while not week.studies(meet):
+                meet += timedelta(days=1)
+            if self.exam is not None and self.ahead(day) and meet >= self.exam.day:
+                continue
+            item = {"due": due, "overdue": (meet - day).days}
+            if progress.late_share(item, self.levels[topic]) <= least:
+                self.paired[topic] = meet
+                return True
+        return False
 
     def reviewing(self, day: date) -> bool:
         """Within its final review: from the final-review day to the exam."""
@@ -242,6 +304,7 @@ class _Course:
         expected = engine or (date.fromisoformat(stored) if stored else None)
         late = progress.late_days(day, expected, self.exam) if expected else 0
         self.projected.add(topic)
+        self.paired.pop(topic, None)
         self.streaks[topic] = self.streaks.get(topic, 0) + 1
         standing = {
             name: value
@@ -256,6 +319,7 @@ class _Course:
         self._set_due(topic, day, step, solid=True)
 
     def start(self, topic: str, day: date) -> None:
+        self.began = day
         self.untaught.remove(topic)
         self.projected.add(topic)
         self.introduced.add(topic)
@@ -266,6 +330,19 @@ class _Course:
             "last": {"date": day.isoformat()},
         }
         self._set_due(topic, day, progress.FIRST_RETRIEVAL_DAYS, solid=False)
+
+    def related(self, topic: str, started: list[str]) -> bool:
+        """Whether it belongs with one of the topics ``started`` today: one
+        needs the other, or both rest on the same prerequisites. Sharing one
+        of several is not enough: a foundation many topics need links
+        topics from different chapters."""
+        needs = set(progress.needs(self.record, topic))
+        return any(
+            other in needs
+            or topic in progress.needs(self.record, other)
+            or (bool(needs) and needs == set(progress.needs(self.record, other)))
+            for other in started
+        )
 
     def new_end(self, day: date) -> date | None:
         """The last day this course takes new topics before its exam."""
@@ -359,9 +436,10 @@ class _Allowance:
 
 def _gaps(record: dict[str, Any], untaught: set[str]) -> set[str]:
     """Untaught topics that a taught topic needs, directly or through others:
-    what he has already started stands on them."""
+    what he has already started stands on them. A topic the course leaves out
+    is off the plan, so nothing he would study stands on what it needs."""
     gaps: set[str] = set()
-    stack = [key for key in record["topics"] if key not in untaught]
+    stack = [key for key in progress.path_order(record) if key not in untaught]
     seen = set(stack)
     while stack:
         for need in progress.needs(record, stack.pop()):
@@ -418,38 +496,86 @@ def _reviews(
             key = (
                 1,
                 tier == EXAM_PASSED,
-                not learning,
                 not gating,
                 distance if gating else 0.0,
+                course.caught(item["topic"], day),
                 -course.need(item),
+                not learning,
                 distance,
                 rank,
             )
             candidates.append((key, course.name, course, item["topic"]))
     candidates.sort(key=lambda item: (item[0], item[1]))
-    chosen: dict[str, list[str]] = {course.name: [] for course in courses}
-    taken: list[tuple[float, _Course]] = []
-    left: list[tuple[_Course, str]] = []
-    for key, _, course, topic in candidates:
+    held = {
+        (course.name, topic)
+        for key, _, course, topic in candidates
+        if key[0] == 1 and key[2] and course.together(topic, day, week)
+    }
+    picked = _select(courses, candidates, day, room, quota, held)
+    for course, topic in picked.left:
+        nearer = [
+            other
+            for _, other in sorted(picked.taken, key=lambda f: f[0])
+            if other is not course
+        ]
+        course.wait(topic, nearer[0].title if nearer else None)
+    return picked.chosen
+
+
+@dataclass
+class _Picked:
+    chosen: dict[str, list[str]]
+    taken: list[tuple[float, _Course]]
+    left: list[tuple[_Course, str]]
+
+
+def _select(
+    courses: list[_Course],
+    candidates: list[tuple[tuple[Any, ...], str, _Course, str]],
+    day: date,
+    room: float,
+    quota: dict[str, int],
+    held: set[tuple[str, str]],
+) -> _Picked:
+    """Take ``candidates`` in order within ``room`` and each final review's
+    quota, less the ``held`` ones, which wait for a competing method rather
+    than for room (not ``When.held``); a competing method due the same day
+    comes right after the one taken, so the two are reviewed side by side. On
+    a day that holds two or more, the last place goes to a review without a
+    partner due, so a pair is never split across days for want of one place."""
+    order = [entry for entry in candidates if (entry[1], entry[3]) not in held]
+    picked = _Picked({course.name: [] for course in courses}, [], [])
+    pairs = room >= 2
+    index = 0
+    while index < len(order):
+        key, _, course, topic = order[index]
+        index += 1
+        partners = [
+            entry
+            for entry in order[index:]
+            if entry[2] is course and entry[3] in course.partners[topic]
+        ]
         if room <= 0:
-            left.append((course, topic))
+            picked.left.append((course, topic))
+            continue
+        if room == 1 and pairs and partners:
+            for entry in [order[index - 1], *partners]:
+                picked.left.append((entry[2], entry[3]))
+            for entry in partners:
+                order.remove(entry)
             continue
         if course.final(topic, day):
             if quota[course.name] <= 0:
                 continue
             quota[course.name] -= 1
         if key[0] == 0:
-            taken.append((key[1], course))
-        chosen[course.name].append(topic)
+            picked.taken.append((key[1], course))
+        picked.chosen[course.name].append(topic)
         room -= 1
-    for course, topic in left:
-        nearer = [
-            other
-            for _, other in sorted(taken, key=lambda f: f[0])
-            if other is not course
-        ]
-        course.wait(topic, nearer[0].title if nearer else None)
-    return chosen
+        for entry in partners:
+            order.remove(entry)
+        order[index:index] = partners
+    return picked
 
 
 def _new(
@@ -465,15 +591,36 @@ def _new(
     chosen: dict[str, list[str]] = {course.name: [] for course in courses}
 
     def take(course: _Course, count: float, among: set[str] | None = None) -> int:
+        """Up to ``count`` ready topics in path order, those related to one it
+        starts today first: a second topic on one day builds on what the
+        first does."""
         taken = 0
-        for topic in list(course.untaught):
-            if taken >= count:
+        while taken < count:
+            ready = [
+                topic
+                for topic in course.untaught
+                if (among is None or topic in among) and course.ready(topic)
+            ]
+            near = [t for t in ready if course.related(t, chosen[course.name])]
+            if not ready:
                 break
-            if (among is None or topic in among) and course.ready(topic):
-                course.start(topic, day)
-                chosen[course.name].append(topic)
-                taken += 1
+            topic = (near or ready)[0]
+            course.start(topic, day)
+            chosen[course.name].append(topic)
+            taken += 1
         return taken
+
+    def spare(course: _Course) -> int:
+        """One topic beyond what the paces and the gaps need. Two unrelated
+        topics on one day split his attention, so it starts one only on a day
+        that starts none yet, or one related to a topic this course starts
+        today, unless his own rate that weekday holds two."""
+        if not any(chosen.values()) or week.on(day).new.value >= 2:
+            return take(course, 1)
+        started = chosen[course.name]
+        return take(
+            course, 1, {t for t in course.untaught if course.related(t, started)}
+        )
 
     exams = sorted(
         (course for course in courses if course.new_end(day) is not None),
@@ -495,13 +642,16 @@ def _new(
         if room > 0 and course.name in paces:
             room -= take(course, min(room, paces[course.name]))
     for course in exams:
-        if room > 0:
-            room -= take(course, room)
-    open_ = [course for course in courses if course.exam is None]
+        while room > 0 and spare(course):
+            room -= 1
+    open_ = sorted(
+        (course for course in courses if course.exam is None),
+        key=lambda course: course.began or date.min,
+    )
     while room > 0 and open_:
         started = []
         for course in open_:
-            if room > 0 and take(course, 1):
+            if room > 0 and spare(course):
                 started.append(course)
                 room -= 1
         open_ = started

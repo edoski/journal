@@ -238,6 +238,27 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 	});
 });
 
+describe("a continue that finds a turn running", () => {
+	it("attaches to that turn and never posts again, so two windows resume one reply", async () => {
+		// Round 4: after a restart both windows sent continue; the loser waited
+		// out the winner's turn, re-posted, and the tutor ran a second time.
+		const posts: string[] = [];
+		let streamed = 0;
+		const m = model({
+			waitMaxMs: 5_000,
+			fetch: dietFetch({
+				post: () => new Response("busy", { status: 409 }),
+				onPost: (body) => posts.push(body),
+				stream: () => { streamed++; return sseResponse({ type: "turn-settled" }, "[DONE]"); },
+			}),
+		});
+		await m.send({ type: "continue" });
+		assert.equal(posts.length, 1, "one POST, no identity retry");
+		assert.equal(streamed, 1, "it watches the running turn instead");
+		assert.equal(m.getState().error, null, "no busy error for an automatic resume");
+	});
+});
+
 // ─── send: optimistic appends + wire consumption ────────────────────────────
 
 describe("send (one input event, verbatim consumption)", () => {
@@ -1762,12 +1783,15 @@ describe("newAnswerResult two audiences", () => {
 		const msg = newAnswerResult("call-1", "explain", full);
 		const modelSees = JSON.parse((msg.content as { type: "text"; text: string }[])[0]!.text);
 		assert.deepEqual(modelSees, {
+			question: "call-1",
 			kind: "explain",
 			text: "Mercury",
 			confidence: "guessing",
 			thinking: "guessed",
 		});
 		assert.equal(msg.details, full, "details is the full QuestionAnswerData verbatim");
+		const hint = JSON.parse((newAnswerResult("call-2", "explain", { ...full, hintRequested: true }).content as { type: "text"; text: string }[])[0]!.text);
+		assert.equal("question" in hint, false, "a Hint press is no answer, so it carries no id to record against");
 		assert.equal((msg.details as { questionText?: string }).questionText, "Which planet is closest to the Sun?");
 	});
 });

@@ -6,10 +6,14 @@ Each counted day of a topic gets one verdict (``solid``, ``helped`` or
 verdicts. Nothing here is stored except the reviews ``schedule`` sets.
 
 An exam bounds the course's schedule: every review before it lands no later
-than the final review, ``final_review_days`` before the exam, and a review that
-would fall on or after the exam, or that follows a ``solid`` answer from the
-final review on, moves to its spaced date after the exam (at the earliest the
-day after it), where the course's reviews go on.
+than the final review, and a review that would fall on or after the exam, or
+that follows a ``solid`` answer from the final review on, moves to its spaced
+date after the exam (at the earliest the day after it), where the course's
+reviews go on. The final review starts ``final_review_days`` before the exam
+when the learner set that course preference; otherwise on the day the plan
+reads from his pace whenever the record is read (``capacity.final_reviews``),
+which the exam keeps as ``final_review`` once that day has come
+(``begun``). A record read without the plan has no final review to go by.
 """
 
 from __future__ import annotations
@@ -32,8 +36,21 @@ RETAINED_VERDICTS = 2
 # Two misses in a row: the second rules out a slip, so asking again would only
 # repeat the failure.
 RELEARN_MISSES = 2
-FINAL_REVIEW_DAYS = 6
+# The shortest final review: a topic missed on its first day comes back after
+# the miss interval and is answered again before the exam.
+SHORTEST_FINAL_REVIEW = INTERVALS["missed"] + 1
 SCHEDULING_KINDS = frozenset({"attempt", "exam"})
+
+
+def counts(observation: dict[str, Any]) -> bool:
+    """An answer that counts for levels and reviews: an attempt or an exam,
+    except a prediction made before its step was taught (``predicted``).
+    Before the teaching a wrong guess is expected, so it says nothing about
+    what is held, and a right one is not yet recall of what was taught; it
+    stays in the history as what happened."""
+    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
+
+
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
 RECENT_SOLID_DAYS = 14
@@ -79,16 +96,81 @@ def new_end(exam: Exam, day: date) -> date:
     return exam.day - timedelta(days=1)
 
 
+def _lead(record: dict[str, Any]) -> int:
+    """The course preference's final review length; 0 when unset."""
+    return preferences.count(record["preferences"], preferences.FINAL_REVIEW_DAYS, 0)
+
+
 def exam_plan(record: dict[str, Any]) -> Exam | None:
-    """The course's exam with its final review, from the course's own preference."""
+    """The course's exam with its final review: ``final_review_days`` before
+    it by the course preference, else from the day the plan reads
+    (``capacity.final_reviews``)."""
     value = record.get("exam", {}).get("date")
     if not value:
         return None
     day = date.fromisoformat(value)
-    lead = preferences.count(
-        record["preferences"], preferences.FINAL_REVIEW_DAYS, FINAL_REVIEW_DAYS
-    )
-    return Exam(day, day - timedelta(days=lead))
+    if lead := _lead(record):
+        return Exam(day, day - timedelta(days=lead))
+    start = record["exam"].get("final_review")
+    if start is None:
+        raise LookupError(
+            f"the final review before the exam on {value} is read with the plan "
+            "(capacity.final_reviews); this record was read without it"
+        )
+    return Exam(day, date.fromisoformat(start))
+
+
+def unplanned(record: dict[str, Any]) -> bool:
+    """An exam whose final review the plan has yet to read: no course
+    preference sets its length and it has not begun."""
+    exam = record.get("exam", {})
+    return "date" in exam and not _lead(record) and "final_review" not in exam
+
+
+def with_final_review(record: dict[str, Any], start: date | None) -> dict[str, Any]:
+    """The record with its final review starting on ``start``, or with none
+    read yet (``None``)."""
+    exam = {k: v for k, v in record.get("exam", {}).items() if k != "final_review"}
+    if start is not None:
+        exam["final_review"] = start.isoformat()
+    return {**record, "exam": exam}
+
+
+def begun(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record as a save stores it: the final review's start only once it
+    has come and no course preference sets it.
+
+    Until then the start is read from his pace on every read, so it follows
+    the evidence. Once a day of the final review has come, its start is
+    history: the plan never starts it before the day it reads it, and his
+    pace, the path and the other exams it is read from keep changing, so no
+    later read could find the day again; yet an answer given in it counts as
+    the final review's (a ``solid`` one sends the next review past the exam)
+    and must stay counted.
+    """
+    start = record.get("exam", {}).get("final_review")
+    if start is None or (not _lead(record) and start <= today.isoformat()):
+        return record
+    return with_final_review(record, None)
+
+
+def redated(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record with every date the engine set re-derived from its final
+    review as now read, while the exam is ahead: what each save would set.
+    A tutor's date stands."""
+    exam = exam_plan(record)
+    if exam is None or exam.day <= today:
+        return record
+    histories = _histories(record["observations"])
+    topics = dict(record["topics"])
+    for key, topic in topics.items():
+        review = topic.get("review", {})
+        if review.get("by") != "engine":
+            continue
+        due = replay(key, topic, histories.get(key, _History()).attempts, exam).due
+        if due is not None and due.isoformat() != review.get("due"):
+            topics[key] = {**topic, "review": {**review, "due": due.isoformat()}}
+    return {**record, "topics": topics}
 
 
 @dataclass
@@ -163,7 +245,7 @@ def _histories(observations: dict[str, Any]) -> dict[str, _History]:
         for topic in item["topics"]:
             history = histories[topic]
             history.latest = max(history.latest, item["date"])
-            if item["kind"] in SCHEDULING_KINDS:
+            if counts(item):
                 history.attempts.append((key, item))
     for history in histories.values():
         history.attempts.sort(
@@ -519,7 +601,7 @@ def _stamp_due(record: dict[str, Any], changes: PatchResult) -> None:
     observations = record["observations"] = dict(record["observations"])
     for key in changes.observations:
         item = observations[key]
-        if item["kind"] not in SCHEDULING_KINDS:
+        if not counts(item):
             continue
         inherited = {
             topic
@@ -740,7 +822,9 @@ def schedule(
 ) -> tuple[dict[str, Any], Scheduled]:
     """Apply a save's engine consequences; returns the new record and what moved.
 
-    A save that moves the exam or its final review re-derives every engine date.
+    The record is read with the plan (``capacity.final_reviews``), so its
+    final review is the one every view shows. A save that moves the exam or
+    its final review re-derives every engine date.
     Tutor-set dates on or after the exam move to the day before it. A topic whose
     verdicts this save created or changed is due on its next expected review day,
     unless the same patch dated its review; a practice day leaves the date alone
@@ -1094,7 +1178,7 @@ def week(record: dict[str, Any], today: date) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     confident = 0
     for item in effective(record["observations"]).values():
-        if item["date"] < first or item["kind"] not in SCHEDULING_KINDS:
+        if item["date"] < first or not counts(item):
             continue
         attempts["unaided" if unaided(item) else "assisted"] += 1
         confident += confident_error(item)

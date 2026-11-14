@@ -15,7 +15,8 @@ _SCHEMA = 1
 
 # The dimension the engine reads as well as the tutor, a count of days.
 # ``final_review_days`` shapes the course's stored review dates, so it belongs
-# to the course, never to the global preferences.
+# to the course, never to the global preferences. Unset, the plan reads the
+# length from his pace whenever the course is read (``capacity.final_reviews``).
 FINAL_REVIEW_DAYS = "final_review_days"
 COUNTS = {FINAL_REVIEW_DAYS: (1, 14)}
 # Whether a course takes questions at all: "none" is a course studied without

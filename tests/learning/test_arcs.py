@@ -103,6 +103,11 @@ def unreadable(workspace: Workspace, record: dict[str, Any], part: str) -> None:
         records.load(workspace)
 
 
+def set_by_him(exam: dict[str, Any]) -> dict[str, Any]:
+    """The exam's fields a save set, without the final review the plan reads."""
+    return {k: v for k, v in exam.items() if k != "final_review"}
+
+
 def record_with(**changes: Any) -> dict[str, Any]:
     record = schema.validate_record(
         {
@@ -378,7 +383,8 @@ def test_a_save_to_a_course_without_arcs_is_told_to_drop_its_arc_fields(
         },
     )
     record = records.load(workspace)
-    assert record["exam"] == {"date": "2026-12-20"} and record["arcs"] == {}
+    assert set_by_him(record["exam"]) == {"date": "2026-12-20"}
+    assert record["arcs"] == {}
 
 
 def test_a_new_exam_date_states_its_scope(workspace: Workspace) -> None:
@@ -403,7 +409,7 @@ def test_a_new_exam_date_states_its_scope(workspace: Workspace) -> None:
     records.save(workspace, {"exam": {"format": "Written, three hours"}})
     records.save(workspace, {"exam": {"date": "2027-01-20", "arcs": None}})
     exam = records.load(workspace)["exam"]
-    assert exam == {"date": "2027-01-20", "format": "Written, three hours"}
+    assert set_by_him(exam) == {"date": "2027-01-20", "format": "Written, three hours"}
     assert arc_rules.examined(records.load(workspace)) is None
     records.save(
         workspace,
@@ -589,7 +595,7 @@ def test_forget_drops_an_emptied_arc_and_then_the_last_but_one(
     assert receipt["removed"] == ["riemann", "ftc", "integrals"]
     record = records.load(workspace)
     assert arc_rules.order(record) == ["limits", "derivatives"]
-    assert record["exam"] == {"date": "2026-12-20"}
+    assert set_by_him(record["exam"]) == {"date": "2026-12-20"}
     assert record["arc_log"][-1] == {
         "day": TODAY,
         "kind": "removed",

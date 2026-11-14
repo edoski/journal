@@ -24,7 +24,7 @@ Work out the chain from what the learner holds to the target: steps that are eac
 
 Each conceptual step, one per message, is predict, teach, check:
 
-1. **Predict.** Before the step, point at the problem it solves and ask what has to give. The prediction need not be answerable yet, and it is not recorded. Skip it when there is nothing to anticipate, as in a repair.
+1. **Predict.** Before the step, point at the problem it solves and ask what has to give. The prediction need not be answerable yet; it is recorded with `predicted: true`, so it never counts against them ([evidence.md](evidence.md)). Skip it when there is nothing to anticipate, as in a repair.
 2. **Teach.** Open by resolving the prediction (what they said, what is true, and why), then give the whole step before any check.
 3. **Check.** Ask a question that needs the step's reason and is answerable from what was taught: "why is that row operation allowed?", not "does that make sense?". Repair a failed check before the next step; never build on a step the learner has not demonstrated.
 

@@ -2,22 +2,21 @@
  * Which recorded attempts mark which answer, and the mark that stands for
  * each (Edo, 14 Nov 2026). Pure.
  *
- * The link is the transcript's own order, never a guess at the text: the
- * attempts a save records after an answer, before the next question,
- * problem, dispute or message of his, mark that answer. A practice
- * problem's are the receipt its `conclude` carries, and any save that
- * re-sends them. The mark itself is the engine's: `answerMarksOf` reads
- * the attempts `show` returned and follows `corrected_by` to the ones
- * that stand.
+ * The link is exact, never the transcript's order (round 4: a late save of
+ * an earlier check showed its mark on the next card). Each saved attempt
+ * names the answer it records: `question`, the id the answer carried to the
+ * tutor, beside the observation in the save, and the receipt's `saved` gives
+ * each observation's id in the save's order. A practice problem's attempts
+ * are the receipt its `conclude` carries; a save that re-sends them names
+ * the conclude. An attempt that names no answer marks no card. The mark
+ * itself is the engine's: `answerMarksOf` reads the attempts `show`
+ * returned and follows `corrected_by` to the ones that stand.
  */
 
-import type { LhMessage } from "./native-messages.ts";
-import { QUESTION_TOOLS } from "./pending.ts";
+import { answeredQuestionsOf, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
 import type { AnswerMark, MarkGrade, MarkRow, MarkSure } from "./contracts/marks.ts";
 import { isMarkResult } from "./contracts/marks.ts";
 
-/** The graded question tools: their answers get marks. */
-const GRADED_TOOLS: readonly string[] = ["explain", "recall"];
 const GRADES: readonly MarkGrade[] = ["solid", "helped", "missed"];
 const SURES: readonly MarkSure[] = ["guess", "neutral", "confident"];
 /** The conclude result's receipt line (tools/practice.ts). */
@@ -28,19 +27,19 @@ function textOf(content: unknown): string {
 	return content.map((part) => (part && typeof part === "object" && (part as { type?: unknown }).type === "text" ? String((part as { text?: unknown }).text ?? "") : "")).join("");
 }
 
-/** The new observation ids a save receipt names. */
-function receiptIds(json: string): string[] {
+const ids = (value: unknown): string[] => (Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []);
+
+/** A receipt's observation ids, one per observation of the save in its
+ *  order (`saved`). A receipt from before `saved` lines up only when it
+ *  repeated nothing. */
+function savedIds(json: string): string[] {
 	try {
-		const ids = (JSON.parse(json) as { observations?: unknown }).observations;
-		return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+		const receipt = JSON.parse(json) as { observations?: unknown; duplicates?: unknown; saved?: unknown };
+		if (Array.isArray(receipt.saved)) return ids(receipt.saved);
+		return ids(receipt.duplicates).length === 0 ? ids(receipt.observations) : [];
 	} catch {
 		return [];
 	}
-}
-
-function realAnswer(details: unknown): boolean {
-	const d = details as { dismissed?: unknown; hintRequested?: unknown } | null;
-	return !!d && typeof d === "object" && d.dismissed !== true && d.hintRequested !== true;
 }
 
 /** Each answer's recorded attempt ids, keyed by the answer's tool call: a
@@ -48,33 +47,28 @@ function realAnswer(details: unknown): boolean {
  *  transcript order. */
 export function markLinks(messages: readonly LhMessage[]): Record<string, string[]> {
 	const links: Record<string, string[]> = {};
-	const saveOwner = new Map<string, string>();
-	let current: string | null = null;
-	const add = (key: string, ids: readonly string[]) => {
-		if (ids.length === 0) return;
+	const answered = answeredQuestionsOf(messages);
+	const named = new Map<string, (string | null)[]>();
+	const add = (key: string, found: readonly string[]) => {
+		if (found.length === 0) return;
 		const seen = links[key] ?? [];
-		links[key] = [...seen, ...ids.filter((id) => !seen.includes(id))];
+		links[key] = [...seen, ...found.filter((id) => !seen.includes(id))];
 	};
 	for (const message of messages) {
-		if (message.role === "user") current = null;
-		else if (message.role === "custom") {
-			if (message.customType === "dispute") current = null;
-		} else if (message.role === "assistant") {
+		if (message.role === "assistant") {
 			for (const block of message.content) {
-				if (block.type !== "toolCall") continue;
-				if (block.name === "course_save" && current) saveOwner.set(block.id, current);
-				else if ((QUESTION_TOOLS as readonly string[]).includes(block.name) || block.name === "problem") current = null;
+				if (block.type === "toolCall" && block.name === "course_save") named.set(block.id, savedQuestionsOf(block.arguments));
 			}
-		} else if (message.role === "toolResult") {
-			if (GRADED_TOOLS.includes(message.toolName)) {
-				current = !message.isError && realAnswer(message.details) ? message.toolCallId : null;
-			} else if (message.toolName === "conclude" && !message.isError) {
+		} else if (message.role === "toolResult" && !message.isError) {
+			if (message.toolName === "conclude") {
 				const receipt = CONCLUDE_RECEIPT.exec(textOf(message.content));
-				current = message.toolCallId;
-				if (receipt) add(current, receiptIds(receipt[1]!));
-			} else if (message.toolName === "course_save" && !message.isError) {
-				const owner = saveOwner.get(message.toolCallId);
-				if (owner) add(owner, receiptIds(textOf(message.content)));
+				if (receipt) add(message.toolCallId, savedIds(receipt[1]!));
+			} else if (message.toolName === "course_save") {
+				const questions = named.get(message.toolCallId) ?? [];
+				const saved = savedIds(textOf(message.content));
+				questions.forEach((question, i) => {
+					if (question && answered.has(question) && saved[i]) add(question, [saved[i]!]);
+				});
 			}
 		}
 	}

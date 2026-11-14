@@ -34,7 +34,7 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { afterAnswer } from "./shown-help.ts";
+import { sameQuestionKey } from "./shown-help.ts";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
@@ -222,7 +222,9 @@ export function newAnswerResult(
 ): LhMessage & ToolResultMessage {
 	// A photo of his working rides the result as image parts after the
 	// answer, and the answer says it is there.
-	const compact = compactAnswerForModel(answer as QuestionAnswerData);
+	// An answer to a graded question carries its id first: the attempt the
+	// tutor saves names it (`question`), so his card shows that mark.
+	const compact = GRADED_QUESTION_TOOLS.includes(toolName) && isRealAnswer(answer) ? { question: toolCallId, ...compactAnswerForModel(answer as QuestionAnswerData) } : compactAnswerForModel(answer as QuestionAnswerData);
 	if (photos?.length) compact.photo = WORKING_PHOTO_NOTE;
 	return {
 		id: newMessageId(),
@@ -735,33 +737,90 @@ function stringList(value: unknown): string[] {
 	}
 }
 
-/** The topics whose solution the session has shown him since his last
- *  answer on each (shown-help.ts): a concluded problem on a topic he did
- *  not answer right, or a saved answer that was not right, whose answer
- *  the question revealed. Only calls that went through count; a problem
- *  dismissed for today revealed nothing. Pure. */
-export function shownTopicsOf(messages: readonly LhMessage[]): Set<string> {
+/** A question he answered in this session, or a practice problem that
+ *  ended: what a saved attempt names as its `question`. */
+export interface AnsweredQuestion {
+	/** The tool the answer came through: `explain`, `recall`, or a
+	 *  problem's `conclude`. */
+	tool: string;
+	/** Its solution was shown to him before it was asked: the same words
+	 *  were asked earlier in the session and answered, or posed as a
+	 *  problem that ended (shown-help.ts). */
+	seenBefore: boolean;
+}
+
+/** The graded question tools: an answer to one is an attempt. */
+export const GRADED_QUESTION_TOOLS: readonly string[] = ["explain", "recall"];
+
+/** A graded question's result that is his answer: not a Hint press, not a
+ *  question left unanswered. */
+export function isRealAnswer(details: unknown): boolean {
+	const d = details as { dismissed?: unknown; hintRequested?: unknown } | null;
+	return !!d && typeof d === "object" && d.dismissed !== true && d.hintRequested !== true;
+}
+
+/** Every question he answered and every problem that ended, keyed by the
+ *  call a saved attempt names: the graded question's call, or the
+ *  problem's `conclude`. Only calls that went through count; a problem
+ *  left for today ended unseen. Pure. */
+export function answeredQuestionsOf(messages: readonly LhMessage[]): Map<string, AnsweredQuestion> {
+	return questionScan(messages).answered;
+}
+
+/** True when the solution of the question or problem a call asked had been
+ *  shown to him before it was asked (`AnsweredQuestion.seenBefore`). Pure. */
+export function seenBeforeAsked(messages: readonly LhMessage[], callId: string): boolean {
+	return questionScan(messages).posed.get(callId)?.seen === true;
+}
+
+function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { key: string; seen: boolean }>; answered: Map<string, AnsweredQuestion> } {
 	const clean = cleanToolCallIds(messages);
-	let shown = new Set<string>();
+	const revealed = new Set<string>();
+	const posed = new Map<string, { key: string; seen: boolean }>();
+	const answered = new Map<string, AnsweredQuestion>();
+	let problem: string | null = null;
+	const pose = (callId: string, text: unknown) => {
+		if (typeof text !== "string") return;
+		const key = sameQuestionKey(text);
+		posed.set(callId, { key, seen: revealed.has(key) });
+	};
 	for (const m of messages) {
-		if (m.role !== "assistant") continue;
-		for (const block of m.content) {
-			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
-			const args = (block.arguments ?? {}) as Record<string, unknown>;
-			if (block.name === PRACTICE_CONCLUDE_TOOL && args.outcome !== "dismissed") {
-				const byTopic = (typeof args.byTopic === "object" && args.byTopic !== null ? args.byTopic : {}) as Record<string, unknown>;
-				for (const topic of stringList(problemInputForConclude(messages, block.id)?.topics)) {
-					const result = byTopic[topic] ?? args.result;
-					shown = afterAnswer(shown, { topics: [topic], result: typeof result === "string" ? result : null });
+		if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
+		else if (m.role === "assistant") {
+			for (const block of m.content) {
+				if (block.type !== "toolCall") continue;
+				const args = (block.arguments ?? {}) as Record<string, unknown>;
+				if (GRADED_QUESTION_TOOLS.includes(block.name)) pose(block.id, args.question);
+				else if (block.name === PRACTICE_PROBLEM_TOOL && clean.has(block.id)) {
+					pose(block.id, args.statement);
+					problem = block.id;
+				} else if (block.name === PRACTICE_CONCLUDE_TOOL && clean.has(block.id) && problem) {
+					const asked = posed.get(problem);
+					problem = null;
+					if (!asked || args.outcome === "dismissed") continue;
+					revealed.add(asked.key);
+					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: asked.seen });
 				}
 			}
-			const changes = block.name === "course_save" ? saveChanges(args) : null;
-			for (const o of Array.isArray(changes?.observations) ? changes.observations : []) {
-				if (typeof o === "object" && o !== null) shown = afterAnswer(shown, o as Record<string, unknown>);
-			}
+		} else if (m.role === "toolResult" && GRADED_QUESTION_TOOLS.includes(m.toolName) && !m.isError && isRealAnswer(m.details)) {
+			const asked = posed.get(m.toolCallId);
+			if (!asked) continue;
+			revealed.add(asked.key);
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen });
 		}
 	}
-	return shown;
+	return { posed, answered };
+}
+
+/** The question each observation of a course_save call names
+ *  (`question`), in order; null where it names none. */
+export function savedQuestionsOf(args: unknown): (string | null)[] {
+	const changes = saveChanges((args ?? {}) as Record<string, unknown>);
+	const listed = Array.isArray(changes?.observations) ? changes.observations : [];
+	return listed.map((o) => {
+		const q = (o as { question?: unknown } | null)?.question;
+		return typeof q === "string" && q.trim() ? q.trim() : null;
+	});
 }
 
 /** The course saves a session made that went through, each as the changes

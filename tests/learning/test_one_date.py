@@ -155,7 +155,12 @@ def test_the_map_says_why_a_review_waits_and_since_when(
         capsys,
         exam,
         "save",
-        stdin={"title": "Probability", "topics": due, "exam": {"date": day(3)}},
+        stdin={
+            "title": "Probability",
+            "topics": due,
+            "exam": {"date": day(3)},
+            "preferences": {"final_review_days": "6"},
+        },
     )
     run(monkeypatch, capsys, free, "save", stdin={"topics": due})
 

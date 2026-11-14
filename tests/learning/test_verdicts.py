@@ -5,6 +5,18 @@ from typing import Any
 
 from learning import progress, schema
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
+
+def planned(record: dict[str, Any]) -> dict[str, Any]:
+    """The record read with the final review these tests were written for."""
+    when = record.get("exam", {}).get("date")
+    start = date.fromisoformat(when) - timedelta(days=LEAD) if when else None
+    return progress.with_final_review(record, start)
+
+
 DAY1 = date(2026, 1, 1)
 TOPICS = {"topics": {"a": {"title": "A"}, "b": {"title": "B"}}}
 
@@ -39,7 +51,9 @@ class Course:
         stamp = datetime(today.year, today.month, today.day, 8, tzinfo=None)
         now = (stamp + timedelta(minutes=self.minute)).isoformat() + "+00:00"
         patched, outcome = schema.apply_patch(self.record, patch, today=today, now=now)
-        self.record, self.scheduled = progress.schedule(patched, outcome, today)
+        self.record, self.scheduled = progress.schedule(
+            planned(patched), outcome, today
+        )
         return self
 
     def attempts(self, day: int, *observations: dict[str, Any]) -> "Course":
@@ -349,7 +363,7 @@ def dispute(result: str, *targets: str, **extra: Any) -> dict[str, Any]:
         result,
         corrects=list(targets),
         disputed=extra.pop("disputed", "My answer was right"),
-        ruling=extra.pop("ruling", "He is right: the answer holds"),
+        ruling=extra.pop("ruling", "You are right: the answer holds"),
         **extra,
     )
 
@@ -489,3 +503,24 @@ def test_with_an_exam_ahead_a_late_review_earns_no_longer_gap() -> None:
     course.attempts(1, att("correct", text="on time"))
     course.attempts(9, att("correct", text="five days late"))
     assert course.due == on(16).isoformat()
+
+
+def test_a_prediction_before_its_step_is_taught_never_counts() -> None:
+    course = started(att("correct"))
+    before = (course.verdicts, course.due, course.standing["level"])
+    course.attempts(
+        2,
+        att("incorrect", text="guess the next step", sure="confident", predicted=True),
+    )
+    assert (course.verdicts, course.due, course.standing["level"]) == before
+    assert "confident_errors" not in course.standing
+    assert "lapsed" not in course.standing
+    assert course.record["observations"]["o2"]["predicted"] is True
+
+
+def test_a_prediction_on_a_due_day_is_not_the_review() -> None:
+    course = started(att("correct"))
+    due = course.due
+    course.attempts(2, att("correct", text="predict the next step", predicted=True))
+    assert "due_topics" not in course.record["observations"]["o2"]
+    assert course.due == due

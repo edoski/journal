@@ -15,7 +15,6 @@ from typing import Any
 import unicodedata
 
 from learning import agenda, capacity, clock, packing, progress, records, schema
-from learning import workspace as workspaces
 from learning.workspace import Workspace
 
 EVIDENCE_BYTES = 6144
@@ -460,6 +459,14 @@ def _topic_item(
     )
 
 
+def _graded(item: dict[str, Any]) -> dict[str, Any]:
+    """An observation with its ``grade`` when it is scored, so a reader shows
+    how each answer counted without judging it again."""
+    if item["kind"] not in progress.SCHEDULING_KINDS:
+        return item
+    return {**item, "grade": progress.grade(item)}
+
+
 def show(
     workspace: Workspace, handles: list[str], limit: int = SHOW_LIMIT, all: bool = False
 ) -> dict[str, Any]:
@@ -501,18 +508,13 @@ def show(
             related.update(ids)
         elif where == "observations":
             item = observations[handle]
-            scored = item["kind"] in progress.SCHEDULING_KINDS
             items[handle] = compact(
-                {
-                    **item,
-                    "grade": progress.grade(item) if scored else None,
-                    "corrected_by": corrected_by.get(handle),
-                }
+                {**_graded(item), "corrected_by": corrected_by.get(handle)}
             )
         else:
             items[handle] = {"kind": ITEM_KINDS[where], **record[where][handle]}
     evidence = {
-        key: observations[key]
+        key: _graded(observations[key])
         for key in _newest({key: observations[key] for key in shown})
         if key not in items
     }
@@ -797,36 +799,21 @@ def _hits(
         yield rank, hit
 
 
-def every_course(workspace: Workspace | None) -> list[Workspace]:
-    """Registered workspaces with a course, plus the selected one, by directory.
-
-    A selected workspace outside the registry, such as a private session over
-    registered material, stands in for the workspaces that study that material.
-    """
-    chosen = {str(item.directory): item for item in workspaces.registered()}
-    if workspace is not None and str(workspace.directory) not in chosen:
-        chosen = {
-            key: item
-            for key, item in chosen.items()
-            if item.sources != workspace.sources
-        }
-        chosen[str(workspace.directory)] = workspace
-    return [chosen[key] for key in sorted(chosen) if chosen[key].record.is_file()]
-
-
 def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
     """When the daily plan, made with every course (``agenda``), next puts
     each of this course's topics: the one day each review and new topic has,
     whichever verb reads it. A course whose record cannot be read is left out
-    of the others' plan, as ``plan`` leaves it out."""
+    of the others' plan, as ``plan`` leaves it out. ``record`` is this
+    course read with the plan (``records.load``)."""
     readable: dict[str, dict[str, Any]] = {}
-    for target in every_course(workspace):
+    for target in records.courses(workspace):
         try:
-            readable[str(target.directory)] = records.load(target)
+            readable[str(target.directory)] = records.read(target)
         except (ValueError, OSError):
             continue
     name = str(workspace.directory)
     readable[name] = record
+    readable = capacity.final_reviews(readable, today)
     week = capacity.of(readable.values(), today)
     together = agenda.plan(readable, today, agenda.MAX_DAYS, week)
     return together.when(name, today, bool(week.study_weekdays))
@@ -852,11 +839,11 @@ def _searched(
 ) -> Iterator[tuple[Workspace, dict[str, Any] | None, str | None]]:
     if not everywhere:
         assert workspace is not None
-        yield workspace, records.load(workspace), None
+        yield workspace, records.read(workspace), None
         return
-    for candidate in every_course(workspace):
+    for candidate in records.courses(workspace):
         try:
-            yield candidate, records.load(candidate), None
+            yield candidate, records.read(candidate), None
         except (ValueError, OSError) as error:
             yield candidate, None, str(error)
 

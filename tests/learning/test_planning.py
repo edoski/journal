@@ -109,7 +109,7 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
         "journal": {"activity": "SMM", "study_minutes": 140, "sessions": 2},
         "week": {"minutes": 140},
         "plan": {
-            "final_review_days": 6,
+            "final_review_days": 2,
             "days": [
                 {"date": day(0), "reviews": ["systems"], "new": []},
                 {"date": day(3), "reviews": ["rank", "systems"], "new": []},
@@ -338,5 +338,5 @@ def test_one_course_is_planned_with_every_other(tmp_path: Path) -> None:
     every = plan(None, tmp_path / "vault", everywhere=True, days=3)
     by_title = {entry["title"]: entry for entry in every["courses"]}
     assert alone["courses"][0]["plan"] == by_title["Far"]["plan"]
-    assert by_title["Near"]["plan"]["days"][0]["new"] == ["a", "b"]
+    assert by_title["Near"]["plan"]["days"][0]["new"] == ["a"]
     assert near is not None

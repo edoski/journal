@@ -11,6 +11,18 @@ from hypothesis import strategies as st
 from learning import agenda, capacity, progress, schema
 from learning.capacity import Capacity, Limit, Weekday
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
+
+def planned(record: dict[str, Any]) -> dict[str, Any]:
+    """The record read with the final review these tests were written for."""
+    when = record.get("exam", {}).get("date")
+    start = date.fromisoformat(when) - timedelta(days=LEAD) if when else None
+    return progress.with_final_review(record, start)
+
+
 START = date(2026, 1, 5)
 ACTIONS = ("introduce", "correct", "incorrect", "partial", "hint", "pin")
 TOPICS = ("a", "b", "c", "d", "e")
@@ -23,8 +35,8 @@ def on(offset: int) -> date:
 def save(record: dict[str, Any], patch: dict[str, Any], day: date) -> dict[str, Any]:
     now = f"{day.isoformat()}T09:00:00+00:00"
     patched, outcome = schema.apply_patch(record, patch, today=day, now=now)
-    planned, _ = progress.schedule(patched, outcome, day)
-    return schema.validate_record(planned)
+    scheduled, _ = progress.schedule(planned(patched), outcome, day)
+    return schema.validate_record(scheduled)
 
 
 def answer(topic: str, action: str) -> dict[str, Any]:

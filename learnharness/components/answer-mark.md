@@ -4,7 +4,7 @@
 
 ## Where the mark comes from
 
-Never the app's judgement. `core/answer-marks.ts` links each answer to the attempts a save recorded after it (a question's call, or a problem's `conclude` and its receipt), and `GET /api/chats/:id/marks` reads them whole from the engine with `show`, following `corrected_by` to the attempts that stand. The session reads the marks again whenever a turn settles.
+Never the app's judgement, and never a guess at which attempt is whose. `core/answer-marks.ts` links each answer to the attempts that name it: the tutor saves each attempt with `question`, the id the answer carried to it, and the save's receipt gives each attempt's id in order (`saved`); a problem's are its `conclude` receipt. An answer no attempt names shows no mark (round 4: a late save of an earlier check showed on the next card). Then `GET /api/chats/:id/marks` reads them whole from the engine with `show`, following `corrected_by` to the attempts that stand. The session reads the marks again whenever a turn settles.
 
 ## The line
 
