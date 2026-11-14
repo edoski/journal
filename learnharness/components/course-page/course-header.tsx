@@ -5,7 +5,7 @@ import { ArrowRightIcon, CalendarIcon, ClockIcon, FilePlusIcon } from "lucide-re
 import { AddMaterialDialog } from "@/components/course-manage-dialogs";
 import { Button } from "@/components/ui/button";
 import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
-import { ProgressPie } from "@/components/study-home/agenda-rows/progress-pie";
+import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
 import { PageAction, PageFact, PageHead } from "@/components/page-frame/page-frame";
 import type { CourseView } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ export function CourseHeader({ view, busy, onContinue, className }: { view: Cour
 			}
 			standing={
 				<>
-					{facts.progress && <PageFact icon={<ProgressPie course={course} />}>{facts.progress}</PageFact>}
+					{facts.progress && <PageFact icon={<ProgressRing course={course} />}>{facts.progress}</PageFact>}
 					{facts.exam && <PageFact icon={<CalendarIcon aria-hidden className="size-4 shrink-0" />}>{facts.exam}</PageFact>}
 					{facts.studied && <PageFact icon={<ClockIcon aria-hidden className="size-4 shrink-0" />}>{facts.studied}</PageFact>}
 				</>

@@ -32,7 +32,7 @@ The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directl
 
 A session on the topic that waits on him says "Your turn" (in the accent) and one the tutor writes in says "Working", whatever the group, as the sidebar's rows do.
 
-The head's count ("3 of 16 topics on your own", `courseShareWords`) is Home's progress pie, which also counts the topics he can do on his own whose review is due; those sit in Needs you, so the count can be larger than the On your own group (decided for him: the count follows the pie, as Home does).
+The head's count ("3 of 16 topics on your own", `courseShareWords`) is Home's progress ring, which also counts the topics he can do on his own whose review is due; those sit in Needs you, so the count can be larger than the On your own group (decided for him: the count follows the ring, as Home does).
 
 ## States
 

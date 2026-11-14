@@ -20,7 +20,7 @@ const FILL: Record<TopicLevel, Fill> = { new: 0, introduced: 0.25, attempted: 0.
 
 /**
  * The standing from the engine's level and weak verdict. A full pie is
- * exactly a topic the course's progress pie counts (Today's rows): one he
+ * exactly a topic the course's progress ring counts (Today's rows): one he
  * can do on his own that the engine does not call weak. A weak topic he
  * could do on his own draws a quarter short of full. Pure.
  */
