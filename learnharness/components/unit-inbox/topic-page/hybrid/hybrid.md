@@ -13,12 +13,12 @@ Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps` and the start's
 
 ## Anatomy
 
-The shared page frame (`PageFrame`, `../../../page-frame/page-frame.md`), the course page's: centred up to 72rem, `px-6 pt-6 pb-6`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls. A start that fails says so under the head (`data-slot="topic-lesson-error"`), where the course page says it.
+The shared page frame (`PageFrame`, `../../../page-frame/page-frame.md`), the course page's: centred up to 80rem, `px-6 pt-6 pb-6`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls. A start that fails says so under the head (`data-slot="topic-lesson-error"`), where the course page says it.
 
 | Block | Shown when | Size |
 |---|---|---|
 | `TopicHead` (the shared `PageHead`), no button: Now holds the action | always | its own height |
-| `data-slot="topic-panes"`: the app's linked columns (`../../../linked-columns/linked-columns.md`, which the course page shares), the full height under the head, the history on the left up to 24rem, the map filling the rest on the right, 24px apart, nothing around them and no line between them (Edo picked Current, 14 Nov 2026): the lesson on the map's row is filled and its step ringed, and while he points at or focuses that row the step glows as the course map's marked card does (`lh-card-mark`'s rule in `app/globals.css`). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
+| `data-slot="topic-panes"`: the app's linked columns (`../../../linked-columns/linked-columns.md`, which the course page shares), the full height under the head, the history on the left up to 20rem, the map filling the rest on the right, 24px apart, nothing around them and no line between them (Edo picked Current, 14 Nov 2026): the lesson on the map's row is filled and its step ringed, and while he points at or focuses that row the step glows as the course map's marked card does (`lh-card-mark`'s rule in `app/globals.css`). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
 | `data-slot="topic-panes"` with the history beside the map of what the topic builds on (`builds-on-map.tsx`, below) | a topic not started that builds on something, while Now starts it | fills |
 | The history alone, the column's width | no session planned, and not a topic not started that builds on something | fills |
 

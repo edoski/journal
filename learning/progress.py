@@ -963,19 +963,20 @@ def needs(record: dict[str, Any], key: str) -> list[str]:
 
 
 def free_arcs(record: dict[str, Any]) -> frozenset[str]:
-    """Arcs whose live topics need nothing from another arc: a strand of the
-    course that stands on its own (Amoreg's GTM, Eve and Check)."""
+    """Every live arc, when none needs anything from another: the course is
+    strands that each stand on their own (Amoreg's GTM, Eve and Check), with
+    no order between them. Once one arc builds on another, the arcs are the
+    chapters of one material, and an arc that happens to need nothing (a last
+    week whose topics link only to each other) keeps its place: empty."""
     topics = record["topics"]
-    return frozenset(
-        arc
-        for arc in arc_rules.live(record)
-        if all(
-            topics[need].get("arc") == arc
-            for key in arc_rules.members(record, arc)
-            if "excluded" not in topics[key]
-            for need in needs(record, key)
-        )
+    arcs = arc_rules.live(record)
+    linked = any(
+        topics[need].get("arc") != topic.get("arc")
+        for key, topic in topics.items()
+        if "excluded" not in topic and topic.get("arc") in arcs
+        for need in needs(record, key)
     )
+    return frozenset() if linked else frozenset(arcs)
 
 
 def window(
@@ -984,9 +985,9 @@ def window(
     free: frozenset[str] | None = None,
 ) -> frozenset[str] | None:
     """The arcs new topics may come from: the earliest arc with topics left
-    and the next (``NEW_TOPIC_ARCS``), and every arc that needs nothing from
-    another (``free_arcs``, or ``free`` when the caller has them). None
-    without arcs.
+    and the next (``NEW_TOPIC_ARCS``), and, in a course whose arcs need
+    nothing from each other, every arc (``free_arcs``, or ``free`` when the
+    caller has them). None without arcs.
 
     The earliest arc with topics left is the arc of ``front``, the earliest
     untaught topic. It is not the current arc, the arc of "You are here"
@@ -1016,10 +1017,17 @@ def opens(
     return key == front or bool(needs(record, key))
 
 
-def holding_raises(left: int, rest: int, pace: int) -> bool:
+def holding_raises(left: int, rest: int, pace: int, room: float | None = None) -> bool:
     """Whether starting none of ``rest`` today would raise the pace an exam
-    needs: its topics over the ``left`` study days, today included."""
-    return left <= 1 or math.ceil(rest / (left - 1)) > pace
+    needs: its topics over the ``left`` study days, today included, or, once
+    he has shown a limit, more of them than the ``room`` his limit holds on
+    the study days after today. A day held for the material that his room
+    cannot make up is a topic the exam loses."""
+    return (
+        left <= 1
+        or math.ceil(rest / (left - 1)) > pace
+        or (room is not None and room < rest)
+    )
 
 
 def _placed(

@@ -71,7 +71,8 @@ Spare new-topic capacity then goes to the nearest exam with topics left; then
 to courses with no exam, the one that started a topic least recently first.
 Spare capacity starts one topic on a day that starts none, and a second only
 when it belongs with the first (one needs the other, or both rest on the same
-prerequisites) or his own rate that weekday holds two: two unrelated topics in
+prerequisites) in the arc the plan is taking from, or his own rate that
+weekday holds two: two unrelated topics in
 one sitting split his attention, and nothing but a pace asks for them. A pace
 that needs two still takes two, related ones first. A topic a course cannot start before its exam does not
 fit. Before any pace, an untaught topic that a taught topic needs starts first,
@@ -81,13 +82,17 @@ waits while other courses' new topics take the days names them
 
 New topics follow the material. The path runs arc by arc, and a start comes
 from the window: the earliest arc with topics left (the arc of the earliest
-untaught topic he may start), the next arc, and any arc that needs nothing
-from another (``progress.window``). That arc is not the current arc, the
-arc of "You are here" (``arcs.current``): the two differ once he studies
-ahead. Without arcs the path bounds it: a topic ahead of the
+untaught topic he may start) and the next arc; in a course whose arcs need
+nothing from each other, strands with no order between them, every arc
+(``progress.window``). Once one arc builds on another the arcs are chapters,
+and a later one that happens to need nothing still waits its place. That arc
+is not the current arc, the arc of "You are here" (``arcs.current``): the two
+differ once he studies ahead. Without arcs the path bounds it: a topic ahead of the
 earliest untaught one starts only when it builds on one, so a topic that
 needs nothing waits its place (``progress.opens``). An exam's pace passes the
-window only on a day when holding would raise the pace it needs. Each start
+window only on a day when holding would raise the pace it needs, or, once he
+has shown a limit, when his limit on the days left cannot make the day up
+(``progress.holding_raises``). Each start
 says why it comes then (``When.why``): next in its arc, after what it waited
 on, or early, with the earliest arc with topics left and what it waits on.
 
@@ -255,8 +260,8 @@ class _Course:
     def opens(self, topic: str, front: str | None) -> bool:
         """Whether ``topic`` is in the window new topics come from, read from
         ``front`` (``progress.opens``): the earliest arc with topics left, the
-        next and any arc that needs nothing from another; without arcs, the
-        path's own order."""
+        next, and every strand of a course whose arcs need nothing from each
+        other; without arcs, the path's own order."""
         window = progress.window(self.record, front, self.free)
         return progress.opens(self.record, topic, window, front)
 
@@ -652,6 +657,15 @@ def _study_days(week: Capacity, first: date, last: date) -> int:
     )
 
 
+def _room_after(week: Capacity, day: date, last: date) -> float | None:
+    """The new topics his shown limit holds from the day after ``day`` to
+    ``last``; None while he has shown none."""
+    if not week.on(day).new.shown:
+        return None
+    days = (day + timedelta(days=n) for n in range(1, (last - day).days + 1))
+    return sum(week.on(other).new.value for other in days if week.studies(other))
+
+
 def _reviews(
     courses: list[_Course], day: date, room: float, week: Capacity
 ) -> dict[str, list[str]]:
@@ -793,20 +807,24 @@ def _new(
         pool: Collection[str] | None = None,
         bound: bool = True,
         pace: bool = False,
+        second: bool = False,
     ) -> int:
         """Up to ``count`` ready topics of ``among`` in path order from the
         window (``_Course.opens``; all of them when not ``bound``), those
         related to one it starts today first: a second topic on one day builds
-        on what the first does. The window is read from the earliest untaught
+        on what the first does, within the arc it would take anyway, so a
+        later arc's topic never passes the earlier arc's next one for sharing
+        a prerequisite. A ``second`` takes only such a topic, or none. The
+        window is read from the earliest untaught
         topic of ``pool`` (of ``among`` when None), so narrowing the
         candidates never moves where he is in the material."""
         taken = 0
         while taken < count:
             front = course.front(among if pool is None else pool)
-            # Ready topics go in path order, arc by arc, so a free arc later in
+            # Ready topics go in path order, arc by arc, so a strand later in
             # the path gives one only when no earlier arc in the window has one
-            # ready, bar one related to today's start. capacity._opened mirrors
-            # this order: change the two together.
+            # ready. capacity._opened mirrors this order: change the two
+            # together.
             ready = [
                 topic
                 for topic in course.untaught
@@ -814,8 +832,15 @@ def _new(
                 and course.ready(topic)
                 and (not bound or course.opens(topic, front))
             ]
-            near = [t for t in ready if course.related(t, chosen[course.name])]
             if not ready:
+                break
+            near = [
+                t
+                for t in ready
+                if course.arc(t) == course.arc(ready[0])
+                and course.related(t, chosen[course.name])
+            ]
+            if second and not near:
                 break
             topic = (near or ready)[0]
             course.start(topic, day, front, pace=pace)
@@ -829,11 +854,8 @@ def _new(
         his attention, so it starts one only on a day that starts none yet, or
         one related to a topic this course starts today, unless his own rate
         that weekday holds two."""
-        if not any(chosen.values()) or week.on(day).new.value >= 2:
-            return take(course, 1, set(among), pool=pool)
-        started = chosen[course.name]
-        related = {t for t in among if course.related(t, started)}
-        return take(course, 1, related, pool=pool)
+        alone = not any(chosen.values()) or week.on(day).new.value >= 2
+        return take(course, 1, set(among), pool=pool, second=not alone)
 
     exams = sorted(
         (course for course in courses if course.new_end(day) is not None),
@@ -865,7 +887,9 @@ def _new(
             if (
                 room > 0
                 and taken < pace
-                and progress.holding_raises(left, len(course.scoped), pace)
+                and progress.holding_raises(
+                    left, len(course.scoped), pace, _room_after(week, day, end)
+                )
             ):
                 scoped = set(course.scoped)
                 more = min(room, pace - taken)
