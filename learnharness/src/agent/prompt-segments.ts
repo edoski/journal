@@ -26,6 +26,26 @@ const PROMPTS_DIR = path.join(PATHS.root, "src", "agent", "prompts");
  *  the same law for every agent that marks him (14 Nov 2026). */
 const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-model.md", "40-formatting.md", "45-photos.md"];
 
+/** The voice's sections that govern every text he reads, a chat turn or a
+ *  record he reads days later: the digest, which writes only the latter,
+ *  composes these and leaves out the turn budgets. */
+export const WRITTEN_VOICE = ["Register", "Punctuation"] as const;
+
+/** The listed `### ` sections of the voice (shared/10-voice.md), for an
+ *  agent that writes records he reads rather than chat turns. Throws when a
+ *  section is missing, so a rename fails the doctrine test, not a digest. */
+export function writtenVoice(titles: readonly string[] = WRITTEN_VOICE): string {
+	const text = fs.readFileSync(path.join(PROMPTS_DIR, "shared", "10-voice.md"), "utf-8").trim();
+	const chunks = text.split(/\r?\n(?=### )/).slice(1);
+	const picked = titles.map((title) => {
+		const chunk = chunks.find((c) => c.split(/\r?\n/, 1)[0]?.trim() === `### ${title}`);
+		if (!chunk) throw new Error(`voice: no "### ${title}" in shared/10-voice.md`);
+		return chunk.trim();
+	});
+	const head = '## Voice: every text he reads\n\n"He" below is the learner; what you write still speaks to him as "you".';
+	return [head, ...picked].join("\n\n");
+}
+
 /** List the SOURCE segments for one agent, in composition order — the
  *  shared base, then the agent's own fragments sorted by filename, then
  *  the shared/ fragments (the 2026-09-27 reorder: the agent's job and

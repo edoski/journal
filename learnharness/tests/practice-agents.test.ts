@@ -271,7 +271,7 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 	it("composes base + doctrine — never the teaching base or question/confidence mechanics", () => {
 		const prompt = composeInstructions("practice");
 		// The base's voice section and the doctrine's spine are present…
-		assert.match(prompt, /Everything in this section deletes a default/);
+		assert.match(prompt, /A sentence earns its place only by teaching, asking or correcting/);
 		assert.match(prompt, /You run practice sessions\./);
 		assert.match(prompt, /## IX\. The session's shape/);
 		// …and nothing from the teaching system prompt or shared fragments.
@@ -297,7 +297,7 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		// the teacher composes the same shared chunks (one law)
 		const teacher = composeInstructions("teacher");
 		assert.match(teacher, /one confidently-delivered hallucination poisons that/);
-		assert.match(teacher, /Everything in this section deletes a default/);
+		assert.match(teacher, /A sentence earns its place only by teaching, asking or correcting/);
 		assert.match(teacher, /The bar is the doubt itself/);
 		assert.match(teacher, /primary data/);
 		// the no-double-plan rule (owner-reported: plan drawn twice)
