@@ -378,6 +378,7 @@ def test_the_brief_keeps_exam_arcs_as_handles_and_adds_their_titles(
         "Europe after 1945",
         "Gli spazi e i sottospazi",
         "Limits of $f_2$",
+        "The court of Louis XIV",
     ],
 )
 def test_a_title_naming_an_idea_passes(title: str) -> None:
@@ -399,6 +400,8 @@ def test_a_title_naming_an_idea_passes(title: str) -> None:
         "2. Limits",
         "II: Derivatives",
         "3) Series",
+        "Derivatives XII",
+        "XI. Series",
     ],
 )
 def test_a_title_that_is_a_label_or_a_number_is_refused(title: str) -> None:

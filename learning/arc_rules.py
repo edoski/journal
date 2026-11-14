@@ -52,9 +52,11 @@ ROMAN = frozenset("I II III IV V VI VII VIII IX X XI XII".split())
 _MATH = re.compile(r"\$\$.*?\$\$|\$.*?\$", re.DOTALL)
 _WORD = re.compile(r"[^\W_]+")
 _NUMBER = re.compile(r"[0-9]+(?:st|nd|rd|th|º|ª)?")
-# A trailing run of four digits is a year ("Europe after 1945"), not numbering.
-_TRAILING = re.compile(r"(?<![^\W_])(?:[0-9]{1,3}|[IVX]+)$")
-_LEADING = re.compile(r"^(?:[0-9]+|[IVX]+)\s*[.:)]")
+_ROMAN = "|".join(sorted(ROMAN, key=lambda numeral: (-len(numeral), numeral)))
+# Four or more trailing digits (a year, a count) are not numbering:
+# "Europe after 1945".
+_TRAILING = re.compile(rf"(?<![^\W_])(?:[0-9]{{1,3}}|{_ROMAN})$")
+_LEADING = re.compile(rf"^(?:[0-9]+|{_ROMAN})\s*[.:)]")
 
 
 # --- reading arcs -----------------------------------------------------------
