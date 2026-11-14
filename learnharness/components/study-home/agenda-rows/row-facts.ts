@@ -91,7 +91,7 @@ function reviewReason(due: readonly CourseMapTopic[]): Why | null {
 const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
 	"your-turn": { kind: "reply", short: "Your turn" },
 	working: { kind: "working", short: TUTOR_WRITING },
-	paused: { kind: "stopped", short: "Stopped mid-reply" },
+	paused: { kind: "stopped", short: "Reply cut off" },
 	left: { kind: "task", short: LESSON_WORDS.leftForTonight },
 	finished: null,
 };

@@ -8,7 +8,7 @@ The one model of where a session stands. Home, the topic page, the calendar and 
 |---|---|---|
 | `working` | a turn or a compaction runs (`busy`, `compacting`) | sidebar, Home, the topic and course pages: "Tutor writing" (`TUTOR_WRITING`, round 4: the sidebar said Working), the line stays where it was; topic page: Open |
 | `your-turn` | a question or problem the tutor posed is unanswered (`pendingQuestion`, `pendingProblem`), or `ended` is `mid-lesson`: it wrote the plan but taught no step, he dismissed its question, a lesson it picked up reached no step yet, its last words ask him something (end in a question mark) while plan steps remain, or practice waits on Next problem with its work unfinished (below) | "Your turn"; topic page: Resume |
-| `paused` | the tutor's turn stopped before it finished (`ended` `cut`): it owes the next word | Home: "Stopped mid-reply"; topic page: Resume |
+| `paused` | the tutor's turn stopped before it finished (`ended` `cut`): it owes the next word | Home: "Reply cut off", true whether he stopped it or the app restarted; topic page: Resume |
 | `left` | his Done for today stopped work still open (`ended` `left`): it set aside a question or a problem, the lesson's plan has a step still to teach, or the session waited on him or owed him a reply just before he pressed it | "Left for next time" (bookmark) on Home, the sidebar and the topic page, however long ago, until he picks it up; topic page: Resume |
 | `finished` | anything else: the lesson closed, a practice round with its work done, a one-off answer, and a sign-off in words such as "Good place to stop" even with plan steps left | nothing waits; no Your turn, no Home line, never resumed |
 

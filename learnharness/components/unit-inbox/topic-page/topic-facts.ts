@@ -288,7 +288,7 @@ export const WRITING = "The tutor is writing";
 
 /** What the pick-up row says of a session the tutor stopped in mid-reply
  *  when no step is known. */
-export const STOPPED = "Stopped mid-reply";
+export const STOPPED = "Reply cut off";
 
 /** Where a session stands: the step its newest tagged question is about;
  *  else, while the tutor writes, that it writes; else that it stopped
