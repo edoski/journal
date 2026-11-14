@@ -259,7 +259,7 @@ describe("the brief's review days are the daily plan's", () => {
 			due_later: [{ topic: "sequences", planned: "2026-11-26" }],
 		};
 		const { text, key } = projectCourseBrief(resume, "teach");
-		assert.match(text, /Due today:\n- rank \(independent\)\nPlanned for later days, not overdue: sequences \(Thursday 26 November, in 3 weeks\)/);
+		assert.match(text, /Due today:\n- rank \(independent\)\nDue, but planned for later days: sequences \(Thursday 26 November, in 3 weeks\)/);
 		assert.doesNotMatch(text, /sequences \(.*overdue/);
 		const moved = projectCourseBrief({ ...resume, due_later: [{ topic: "sequences", planned: "2026-11-27" }] }, "teach").key;
 		assert.notEqual(moved, key, "a review the plan moves re-sends the brief");

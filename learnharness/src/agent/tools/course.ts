@@ -15,6 +15,7 @@ import { healToolRecord } from "./heal.ts";
 import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/course.ts";
 import type { CourseRecords } from "../../core/ports.ts";
 import { shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
+import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 
 /** What the course tools close over. */
@@ -24,18 +25,12 @@ export interface CourseToolContext {
 	/** Whether the record groups its topics into arcs, read when the turn
 	 *  starts: the agent reads the arcs doctrine only then. */
 	arcs: boolean;
-	/** The topics whose solution this session has shown him since his last
-	 *  answer on each (shown-help.ts), read from the session's record when
-	 *  the turn starts and kept by every save in it. The course tools and
-	 *  `conclude` of one turn share it. Absent: nothing shown yet. */
-	shown?: { topics: Set<string> };
-}
-
-/** The turn's shown topics, kept on the context so every tool of the turn
- *  reads and moves the same set. */
-function shownOf(ctx: CourseToolContext): { topics: Set<string> } {
-	ctx.shown ??= { topics: new Set() };
-	return ctx.shown;
+	/** The questions he answered in this session and the problems that
+	 *  ended, by the id a saved attempt names as its `question`
+	 *  (native-messages.ts `answeredQuestionsOf`), read from the session's
+	 *  record when the turn starts: an answer always arrives before the turn
+	 *  that records it. Absent: none yet. */
+	answers?: ReadonlyMap<string, AnsweredQuestion>;
 }
 
 /** A patch as the engine reads it: the object, or its JSON text, which the
@@ -52,28 +47,55 @@ function patchOf(changes: unknown): Record<string, unknown> | null {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
-/** Mark topics whose solution was just shown with no answer saved, as when
- *  a problem ends on Explain instead before any work. */
-export function markShown(ctx: CourseToolContext, topics: readonly string[]): void {
-	for (const topic of topics) shownOf(ctx).topics.add(topic);
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** What a save's `question` fields say: the observations without them, as
+ *  the engine reads them, the question each names, and the first one that
+ *  names no answer of this session. */
+function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string, AnsweredQuestion>): { observations: unknown[]; questions: (string | null)[]; refused: string | null } {
+	const questions: (string | null)[] = [];
+	let refused: string | null = null;
+	const observations = listed.map((o, i) => {
+		if (!isObject(o) || !("question" in o)) {
+			questions.push(null);
+			return o;
+		}
+		const { question, ...rest } = o;
+		const named = typeof question === "string" ? question.trim() : "";
+		if (!answers.has(named) && refused === null) {
+			refused =
+				`observations[${i}].question: ${JSON.stringify(question)} is not an answer of this session. ` +
+				'Copy the "question" id his answer carried, or leave the field out for an answer he gave in words.';
+		}
+		questions.push(named || null);
+		return rest;
+	});
+	return { observations, questions, refused };
 }
 
 /**
  * Save one patch with the shown-solution rule applied (shown-help.ts): an
- * attempt saved as unaided on a topic whose solution was just shown is saved
- * helped, and the receipt says so. The turn's shown topics move only when the
- * save went through. Every save of a session's answers comes through here.
+ * attempt saved as unaided on a question whose solution he saw before it
+ * was asked is saved helped, and the receipt says so. Each observation may
+ * name the answer it records (`question`); the field is the app's, so it is
+ * checked against the session's answers and taken off before the engine
+ * reads the patch. `seen` says the same for attempts that name none, as a
+ * concluded problem's. Every save of a session's answers comes through here.
  */
-export async function saveCourse(ctx: CourseToolContext, changes: unknown): Promise<CourseResult> {
-	const ledger = shownOf(ctx);
+export async function saveCourse(ctx: CourseToolContext, changes: unknown, seen: (o: Record<string, unknown>) => boolean = () => false): Promise<CourseResult> {
 	const patch = patchOf(changes);
 	const listed = patch && Array.isArray(patch.observations) ? patch.observations : null;
-	const ruled = listed ? withShownHelp(listed, ledger.topics) : null;
-	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: ruled ? { ...patch, observations: ruled.observations } : changes });
-	if (!result.ok || !ruled) return result;
-	ledger.topics = ruled.shown;
+	if (!patch || !listed) return ctx.records.run(ctx.course.workspace, { verb: "save", changes });
+	const answers = ctx.answers ?? new Map<string, AnsweredQuestion>();
+	const named = namedQuestions(listed, answers);
+	if (named.refused) return { ok: false, kind: "validation", message: named.refused };
+	const ruled = withShownHelp(named.observations, (o, i) => {
+		const question = named.questions[i];
+		return question ? answers.get(question)?.seenBefore === true : seen(o);
+	});
+	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
 	const note = shownHelpNote(ruled.helped);
-	if (!note || typeof result.json !== "object" || result.json === null) return result;
+	if (!result.ok || !note || typeof result.json !== "object" || result.json === null) return result;
 	const receipt = result.json as Record<string, unknown>;
 	const notes = Array.isArray(receipt.notes) ? receipt.notes : [];
 	return { ...result, json: { ...receipt, notes: [...notes, note] } };
@@ -105,6 +127,7 @@ const saveInput = Type.Object({
 	changes: Type.Record(Type.String(), Type.Unknown(), {
 		description:
 			"One JSON merge patch for the course record: only what changed. `observations` is a list of new entries; " +
+			"an attempt that records his answer to a question names it with `question`, the id that answer carried, so his answer shows its mark (a re-mark names none: `corrects` links it); " +
 			"`topics`, `tasks`, `knowledge` merge by handle (a null entry removes it); `path`, `exam`, `preferences` merge by field; `focus` names the task to continue. " +
 			"Texts the learner reads later (topic titles, gaps and notes, task titles, goals and steps, observation texts) put every piece of math in `$…$` LaTeX, never bare (`$\\sin(x^2)$`, not sin(x^2)).",
 	}),

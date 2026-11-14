@@ -25,12 +25,12 @@ import { teachHandoffTool } from "./handoff.ts";
 import { nameSessionTool } from "./name-session.ts";
 import type { ChatStore } from "../../core/ports.ts";
 import type { SteerMessage } from "../../core/contracts/jobs.ts";
-import { activeProblemOf } from "../../core/native-messages.ts";
+import { activeProblemOf, seenBeforeAsked } from "../../core/native-messages.ts";
 import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
-import { markShown, saveCourse, type CourseToolContext } from "./course.ts";
+import { saveCourse, type CourseToolContext } from "./course.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
@@ -240,7 +240,7 @@ function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: s
 }
 
 /** Save a concluded problem's attempts; a refusal names what to fix. */
-async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): Promise<{ refused?: string; text: string }> {
+async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, concludeCallId: string): Promise<{ refused?: string; text: string }> {
 	if (input.outcome === "dismissed") return { text: "" };
 	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
 	const active = record ? activeProblemOf(record.messages) : null;
@@ -252,7 +252,6 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	}
 	const topics = pose.topics;
 	if (explainedBeforeAnyWork(record.messages, active.toolCallId)) {
-		markShown(rec.course, topics);
 		return { text: "No attempt recorded: he asked to be taught before submitting any work on this problem." };
 	}
 	const conclusion: PracticeConclusion = {
@@ -268,7 +267,6 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	const problem = conclusionProblem(conclusion, topics);
 	if (problem) return { refused: problem, text: "" };
 	if (conclusion.result === null) {
-		markShown(rec.course, topics);
 		return { text: "No attempt recorded: he claimed no answer." };
 	}
 	const observations = practiceObservations(
@@ -276,7 +274,10 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 		conclusion,
 		lastSubmissionConfidence(record.messages, active.toolCallId),
 	);
-	const saved = await saveCourse(rec.course, { observations });
+	// The same problem posed again after its solution was shown: his
+	// answer repeats what he saw (shown-help.ts).
+	const seen = seenBeforeAsked(record.messages, active.toolCallId);
+	const saved = await saveCourse(rec.course, { observations }, () => seen);
 	if (saved.ok) return { text: `Course record: ${JSON.stringify(withDayWords(saved.json, studyDay()))}` };
 	// The problem still concludes: a pose's topics cannot change after the
 	// fact, so holding the problem open would lock the session.
@@ -284,7 +285,9 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 		saved.kind === "validation"
 			? "Repair it with course_save (for example, create the missing topic in the same patch, placed in the path) and send these observations: "
 			: "On your next turn, re-send exactly this with course_save: ";
-	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations })}` };
+	// Each names this conclude, so the problem's card shows the mark.
+	const resend = observations.map((o) => ({ ...o, question: concludeCallId }));
+	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations: resend })}` };
 }
 
 export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording): AgentTool<typeof concludeInputObject> {
@@ -300,11 +303,11 @@ export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording):
 		parameters: concludeInputObject,
 		prepareArguments: (args: unknown) => healEncodedArguments(args, concludeInputObject) as never,
 		executionMode: "sequential",
-		execute: async (_toolCallId, input) => {
+		execute: async (toolCallId, input) => {
 			if (!gate.problemActive) {
 				return invalidInputResult("conclude", ["no active problem to conclude — pose one first"]);
 			}
-			const recorded = recording ? await recordConclusion(recording, input) : { text: "" };
+			const recorded = recording ? await recordConclusion(recording, input, toolCallId) : { text: "" };
 			if (recorded.refused) return invalidInputResult("conclude", [recorded.refused]);
 			gate.problemActive = false;
 			const ack = concludeResult();

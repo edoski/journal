@@ -161,6 +161,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "transfer": _FLAG,
         "shown": _FLAG,
         "gave_up": _FLAG,
+        "predicted": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
         "refs": _REFS,
@@ -302,6 +303,7 @@ class Observation(TypedDict, total=False):
     transfer: bool
     shown: bool
     gave_up: bool
+    predicted: bool
     date: str
     task: str
     refs: list[Reference]
@@ -376,6 +378,10 @@ class PatchResult:
 
     observations: list[str] = field(default_factory=list)
     duplicates: list[str] = field(default_factory=list)
+    # The id each observation of the patch has, in the patch's order: the new
+    # one, or the stored one it repeated. A host pairs an entry with what it
+    # answers by its place in the patch.
+    saved: list[str] = field(default_factory=list)
     tutor_reviews: list[str] = field(default_factory=list)
     introduced: list[str] = field(default_factory=list)
     judged: list[str] = field(default_factory=list)
@@ -686,16 +692,18 @@ def entry(
 # The recorded texts the learner reads in their study app, days later
 # (records.md, "What the learner reads"), and of those the ones written to the
 # learner: a topic's title names an idea and an attempt's text is the question
-# as asked, so a person in a word problem may be "he".
+# as asked, so a person in a word problem may be "he". A re-mark's ruling shows
+# on the answer it re-marks, so it speaks to the learner too.
 LEARNER_READS: dict[str, tuple[str, ...]] = {
     "arc": ("title",),
     "topic": ("title", "gap", "note"),
     "task": ("title", "goal", "step"),
-    "observation": ("text",),
+    "observation": ("text", "ruling"),
 }
 WRITTEN_TO_LEARNER: dict[str, tuple[str, ...]] = {
     "topic": ("gap", "note"),
     "task": ("title", "goal", "step"),
+    "observation": ("ruling",),
 }
 _SHOWN_ID = re.compile(r"\bo[0-9]+\b")
 _SHOWN_DAY = re.compile(r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b")
@@ -785,6 +793,11 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 f"{path}.help: exams count as unaided; omit help, or record a "
                 "helped attempt with kind attempt"
             )
+        if "predicted" in observation:
+            raise ValueError(
+                f"{path}.predicted marks a prediction made in a session before "
+                "its step was taught; an exam is never one"
+            )
     else:
         given = [
             name
@@ -796,6 +809,7 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 "chose",
                 "shown",
                 "gave_up",
+                "predicted",
             )
             if name in observation
         ]
@@ -1572,11 +1586,13 @@ def _append_observations(
         )
         if duplicate is not None:
             outcome.duplicates.append(duplicate)
+            outcome.saved.append(duplicate)
             continue
         key = f"o{sequence}"
         sequence += 1
         record["observations"][key] = {**item, "recorded": now}
         outcome.observations.append(key)
+        outcome.saved.append(key)
     record["next_observation"] = sequence
 
 

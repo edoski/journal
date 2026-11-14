@@ -56,7 +56,9 @@ def test_a_missing_course_loads_empty_and_the_first_save_creates_it(
         "changed": True,
         "observations": ["o1"],
         "duplicates": [],
+        "saved": ["o1"],
         "reviews": {"rank": {"due": "2026-10-11", "by": "engine"}},
+        "reviewed": [],
         "levels": {"rank": {"from": "new", "to": "assisted"}},
         "focus": "ex5",
         "path_current": "rank",
@@ -140,6 +142,36 @@ def test_a_retried_observation_is_reported_as_a_duplicate(workspace: Workspace) 
     assert receipt["observations"] == []
     assert receipt["duplicates"] == ["o1"]
     assert receipt["revision"] == 1
+
+
+def test_saved_names_each_observation_of_the_patch_in_its_order(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {**COURSE, "observations": [attempt(text="First")]})
+    receipt = records.save(
+        workspace,
+        {
+            "observations": [
+                attempt(text="Second"),
+                attempt(text="First"),
+                attempt(text="Third"),
+            ]
+        },
+    )
+    assert receipt["observations"] == ["o2", "o3"]
+    assert receipt["duplicates"] == ["o1"]
+    assert receipt["saved"] == ["o2", "o1", "o3"]
+
+
+def test_reviewed_names_only_the_topics_whose_due_review_an_answer_counted_as(
+    workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records.save(workspace, {**COURSE, "observations": [attempt()]})
+    receipt = records.save(workspace, {"observations": [attempt(text="Early")]})
+    assert receipt["reviewed"] == []
+    monkeypatch.setenv("LEARNING_TODAY", "2026-10-11")
+    receipt = records.save(workspace, {"observations": [attempt(text="On the day")]})
+    assert receipt["reviewed"] == ["rank"]
 
 
 def test_invalid_patches_fail_before_anything_is_written(workspace: Workspace) -> None:

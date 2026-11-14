@@ -349,7 +349,7 @@ def dispute(result: str, *targets: str, **extra: Any) -> dict[str, Any]:
         result,
         corrects=list(targets),
         disputed=extra.pop("disputed", "My answer was right"),
-        ruling=extra.pop("ruling", "He is right: the answer holds"),
+        ruling=extra.pop("ruling", "You are right: the answer holds"),
         **extra,
     )
 
@@ -489,3 +489,24 @@ def test_with_an_exam_ahead_a_late_review_earns_no_longer_gap() -> None:
     course.attempts(1, att("correct", text="on time"))
     course.attempts(9, att("correct", text="five days late"))
     assert course.due == on(16).isoformat()
+
+
+def test_a_prediction_before_its_step_is_taught_never_counts() -> None:
+    course = started(att("correct"))
+    before = (course.verdicts, course.due, course.standing["level"])
+    course.attempts(
+        2,
+        att("incorrect", text="guess the next step", sure="confident", predicted=True),
+    )
+    assert (course.verdicts, course.due, course.standing["level"]) == before
+    assert "confident_errors" not in course.standing
+    assert "lapsed" not in course.standing
+    assert course.record["observations"]["o2"]["predicted"] is True
+
+
+def test_a_prediction_on_a_due_day_is_not_the_review() -> None:
+    course = started(att("correct"))
+    due = course.due
+    course.attempts(2, att("correct", text="predict the next step", predicted=True))
+    assert "due_topics" not in course.record["observations"]["o2"]
+    assert course.due == due
