@@ -13,6 +13,8 @@
  * reach the agent through the save receipts.
  */
 
+import { plannedDayWords } from "./day-words.ts";
+
 export type BriefRole = "teach" | "practice";
 
 type Json = Record<string, unknown>;
@@ -27,6 +29,12 @@ function dayWithWeekday(day: string | undefined): string {
 	if (!day) return "?";
 	const weekday = WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()];
 	return weekday ? `${day} (${weekday})` : day;
+}
+
+/** A plan day as the tutor says it: "tomorrow, Monday 9 November",
+ *  "Thursday 12 November, in 4 days" (`plannedDayWords`). */
+function planDay(day: string | undefined, today: string | undefined): string {
+	return day && today ? plannedDayWords(day, today) : dayWithWeekday(day);
 }
 
 const daysOverdue = (n: number): string => `${n} ${n === 1 ? "day" : "days"} overdue`;
@@ -131,12 +139,12 @@ const handles = (v: unknown): string[] => list(v).filter((h): h is string => typ
 
 /** `resume.starts`, the daily plan's day for each untaught topic, as one
  *  entry per day: "2026-11-09 (Monday): poisson, geometric". */
-function startsByDay(starts: unknown): string[] {
+function startsByDay(starts: unknown, today: string | undefined): string[] {
 	const days = new Map<string, string[]>();
 	for (const [topic, day] of Object.entries(obj(starts))) {
 		if (typeof day === "string") days.set(day, [...(days.get(day) ?? []), topic]);
 	}
-	return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, topics]) => `${dayWithWeekday(day)}: ${topics.join(", ")}`);
+	return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, topics]) => `${planDay(day, today)}: ${topics.join(", ")}`);
 }
 
 /** What the engine's `path_health` lists, in the brief's words: the gaps a
@@ -196,10 +204,10 @@ export function projectCourseBrief(
 	if (later.length > 0) {
 		const more = typeof r.due_later_more === "number" && r.due_later_more > 0 ? `, and ${r.due_later_more} more` : "";
 		lines.push(
-			`Planned for later days, not overdue: ${later.map((d) => `${str(d.topic) ?? "?"} (${dayWithWeekday(str(d.planned))})`).join(", ")}${more}`,
+			`Planned for later days, not overdue: ${later.map((d) => `${str(d.topic) ?? "?"} (${planDay(str(d.planned), str(r.today))})`).join(", ")}${more}`,
 		);
 	}
-	const road = startsByDay(r.starts);
+	const road = startsByDay(r.starts, str(r.today));
 	if (road.length > 0) lines.push(`New topics on the days the daily plan starts them: ${road.join("; ")}`);
 	const misfits = handles(r.does_not_fit);
 	if (misfits.length > 0) lines.push(`No room before the exam to start: ${misfits.join(", ")}`);

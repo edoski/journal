@@ -29,6 +29,7 @@ import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
 import { markShown, saveCourse, type CourseToolContext } from "./course.ts";
+import { studyDay, withDayWords } from "../../core/day-words.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
 import { CONFIDENCE_STATES } from "../../core/contracts/course.ts";
@@ -274,7 +275,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 		lastSubmissionConfidence(record.messages, active.toolCallId),
 	);
 	const saved = await saveCourse(rec.course, { observations });
-	if (saved.ok) return { text: `Course record: ${JSON.stringify(saved.json)}` };
+	if (saved.ok) return { text: `Course record: ${JSON.stringify(withDayWords(saved.json, studyDay()))}` };
 	// The problem still concludes: a pose's topics cannot change after the
 	// fact, so holding the problem open would lock the session.
 	const repair =

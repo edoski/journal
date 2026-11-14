@@ -15,6 +15,7 @@ import { healToolRecord } from "./heal.ts";
 import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/course.ts";
 import type { CourseRecords } from "../../core/ports.ts";
 import { shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
+import { studyDay, withDayWords } from "../../core/day-words.ts";
 
 /** What the course tools close over. */
 export interface CourseToolContext {
@@ -108,7 +109,7 @@ const saveInput = Type.Object({
 
 async function call(ctx: CourseToolContext, verb: CourseVerb): Promise<string> {
 	const result: CourseResult = verb.verb === "save" ? await saveCourse(ctx, verb.changes) : await ctx.records.run(ctx.course.workspace, verb);
-	if (result.ok) return JSON.stringify(result.json);
+	if (result.ok) return JSON.stringify(withDayWords(result.json, studyDay()));
 	if (result.kind === "validation") throw new Error(`Nothing was saved or read. ${result.message}`);
 	throw new Error(result.message);
 }

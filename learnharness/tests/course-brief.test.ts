@@ -259,7 +259,7 @@ describe("the brief's review days are the daily plan's", () => {
 			due_later: [{ topic: "sequences", planned: "2026-11-26" }],
 		};
 		const { text, key } = projectCourseBrief(resume, "teach");
-		assert.match(text, /Due today:\n- rank \(independent\)\nPlanned for later days, not overdue: sequences \(2026-11-26 \(Thursday\)\)/);
+		assert.match(text, /Due today:\n- rank \(independent\)\nPlanned for later days, not overdue: sequences \(Thursday 26 November, in 3 weeks\)/);
 		assert.doesNotMatch(text, /sequences \(.*overdue/);
 		const moved = projectCourseBrief({ ...resume, due_later: [{ topic: "sequences", planned: "2026-11-27" }] }, "teach").key;
 		assert.notEqual(moved, key, "a review the plan moves re-sends the brief");
@@ -276,7 +276,7 @@ describe("the brief's road is the daily plan's", () => {
 		const { text, key } = projectCourseBrief(resume, "teach");
 		assert.match(
 			text,
-			/New topics on the days the daily plan starts them: 2026-11-09 \(Monday\): poisson; 2026-11-11 \(Wednesday\): geometric, expectation\nNo room before the exam to start: covariance/,
+			/New topics on the days the daily plan starts them: tomorrow, Monday 9 November: poisson; Wednesday 11 November, in 3 days: geometric, expectation\nNo room before the exam to start: covariance/,
 		);
 		assert.notEqual(projectCourseBrief({ ...resume, starts: { poisson: "2026-11-10" } }, "teach").key, key, "a moved start re-sends the brief");
 	});
