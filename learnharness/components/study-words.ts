@@ -290,7 +290,7 @@ export const EXAM_GAP_WHY: {
 	},
 	review: {
 		no_study_day: "No study day is left in the final review",
-		too_late: "Started too close to the exam for a review",
+		too_late: "Starts too close to the exam for a review",
 		full: "Every day of the final review is full at your pace",
 	},
 };
