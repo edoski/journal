@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # THE EXACT NEW-USER SIMULATOR (owner, interlude 2026-09-22): one command,
-# a fresh instance with no ChatGPT sign-in and zero data. Claude Code's
-# sign-in is the user's own and stays visible.
+# a fresh instance with zero data. Claude Code's sign-in is the user's own
+# and stays visible.
 #
 #   bash scripts/dev-fresh.sh            # http://localhost:3005
 #   npm run dev:fresh                    # the same, via package.json
@@ -11,8 +11,6 @@
 #                                        (multi-session testing)
 #
 #   LH_DATA_DIR     → .fresh-data/ (wiped each launch unless --keep)
-#   LH_CREDENTIALS_DIR → .fresh-data/ (NEVER the repo root, which may hold
-#                        the real ChatGPT sign-in)
 #
 # Safe to rerun. The data dir is disposable scratch — never copy it back.
 
@@ -76,13 +74,12 @@ fi
 mkdir -p "$DATA_DIR"
 
 export LH_DATA_DIR="$DATA_DIR"
-export LH_CREDENTIALS_DIR="$DATA_DIR"
 export PORT
 
 echo "── fresh-user instance ─────────────────────────────────"
 echo "  URL      : http://localhost:$PORT"
 echo "  data dir : $DATA_DIR ($( [ "$KEEP" = "true" ] && echo 'kept across runs' || echo 'wiped next launch unless --keep' ))"
-echo "  sign-in  : no ChatGPT credentials (Claude Code uses your own sign-in)"
+echo "  sign-in  : Claude Code uses your own sign-in"
 echo "─────────────────────────────────────────────────────────"
 
 cd "$ROOT"

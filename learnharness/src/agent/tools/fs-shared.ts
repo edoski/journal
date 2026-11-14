@@ -91,10 +91,11 @@ const SENSITIVE_HOME_PREFIX = /^\.claude(?:$|[-_.\d])/i;
 
 /** Templates are deliberately included: their names do not guarantee safe contents. */
 const ENV_FILE = /^\.env(\..*)?$/i;
-/** auth.json is the retired API-key store: a key saved before the app went
- *  subscription-only may still sit there. */
+/** Retired sign-in stores a copy of which may remain: auth.json held API keys
+ *  saved before the app went subscription-only, chatgpt-credentials.json the
+ *  removed ChatGPT sign-in. Nothing reads them now; the agent must not either. */
 const CREDENTIAL_FILES = ["chatgpt-credentials.json", "auth.json"];
-// Matches electron/chatgpt.cjs's atomic writes.
+// That sign-in's atomic-write temporary files.
 const CREDENTIAL_TEMP = /^chatgpt-credentials\.json\.[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/i;
 
 /** Windows namespace aliases and alternate data streams must not change policy.

@@ -7,8 +7,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 const name = "chatgpt-credentials.json";
-for (const secret of [name, `${name}.fixture.tmp`]) test(`payload curator refuses web credentials: ${secret}`, () => {
-	const root = mkdtempSync(path.join(tmpdir(), "lh-sub-payload-"));
+for (const secret of [name, `${name}.fixture.tmp`]) test(`payload curator refuses the old sign-in file: ${secret}`, () => {
+	const root = mkdtempSync(path.join(tmpdir(), "lh-secret-payload-"));
 	try {
 		mkdirSync(path.join(root, "scripts")); mkdirSync(path.join(root, ".next", "standalone"), { recursive: true }); mkdirSync(path.join(root, ".next", "static"));
 		copyFileSync(new URL("../scripts/build-server.mjs", import.meta.url), path.join(root, "scripts", "build-server.mjs"));

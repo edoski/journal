@@ -28,7 +28,7 @@ describe("turnErrorText", () => {
 	});
 
 	it("shows prose already written for people as it is, with no details", () => {
-		const curated = "Your ChatGPT session expired. Reconnect in Providers. No API-key fallback was used.";
+		const curated = "Claude Code is not signed in to your Claude plan. Run `claude` in a terminal and sign in, then press Refresh in Settings, Accounts.";
 		assert.deepEqual(turnErrorText(curated), { kind: "written", sentence: curated, details: null });
 		const claude = "Claude is limiting requests right now. Wait a minute, then retry. See https://claude.ai/settings/usage. No API key was used.";
 		assert.equal(turnErrorText(claude).kind, "written");
@@ -72,7 +72,7 @@ describe("TurnError", () => {
 	});
 
 	it("offers neither Settings nor Details when the message is already plain, and no Retry when it cannot run", () => {
-		const doc = render("Your ChatGPT session expired. Reconnect in Providers. No API-key fallback was used.");
+		const doc = render("This lesson could not start. Close it and start a new one.");
 		assert.deepEqual([...doc.querySelectorAll("button")].map((b) => b.textContent), []);
 	});
 });
