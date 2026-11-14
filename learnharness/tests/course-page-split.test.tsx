@@ -158,7 +158,7 @@ describe("the map pane", () => {
 
 	it("dims every topic but the ones a row lights", () => {
 		const document = drawMap(litOf({ handle: h("span"), from: "list" }, MAP.edges));
-		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-35")).map((n) => n.getAttribute("data-testid"));
+		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-60")).map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(dimmed.sort(), ["map-node-basis", "map-node-eigen", "map-node-independence"]);
 	});
 });

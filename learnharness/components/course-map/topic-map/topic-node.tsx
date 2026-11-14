@@ -102,7 +102,8 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 		<div
 			className={cn(
 				"relative size-full transition-opacity duration-[120ms] motion-safe:animate-[lh-card-enter_180ms_cubic-bezier(0.19,1,0.22,1)_backwards] motion-reduce:transition-none",
-				dim && "opacity-35",
+				// Faded, yet its muted line still reads at 3.2:1 on the page (WCAG 1.4.3's floor for large text, 1.4.11's for marks).
+				dim && "opacity-60",
 			)}
 			style={{ animationDelay: `${Math.min(layer * STAGGER_MS, STAGGER_CAP_MS)}ms` }}
 		>
