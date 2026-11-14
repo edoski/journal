@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { overdueWords, returnWords, slipWords, STANDING_WORDS, type Fill } from "../components/study-words.ts";
+import { courseShareWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, type Fill } from "../components/study-words.ts";
 
 // The app's one wording for where he stands and why a topic needs him
 // (study-words.ts), which every surface reads.
@@ -50,5 +50,18 @@ describe("why a review needs him", () => {
 
 	it("says when a dated review comes back in days, then weeks, then months", () => {
 		assert.deepEqual([1, 5, 13, 14, 21, 59, 60, 90].map(returnWords), ["Back in 1d", "Back in 5d", "Back in 13d", "Back in 2w", "Back in 3w", "Back in 8w", "Back in 2mo", "Back in 3mo"]);
+	});
+});
+
+describe("counts in plain words", () => {
+	it("says a course's share with its noun, and none or all in words", () => {
+		assert.equal(courseShareWords(5, 16), "5 of 16 topics on your own");
+		assert.equal(courseShareWords(0, 16), "No topics on your own yet");
+		assert.equal(courseShareWords(16, 16), "All 16 topics on your own");
+	});
+
+	it("says what Show does without a number", () => {
+		assert.equal(moreWords(23, 25), "Show the rest");
+		assert.equal(moreWords(40, 25), "Show more");
 	});
 });

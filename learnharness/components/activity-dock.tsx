@@ -62,7 +62,7 @@ export interface FeedJob extends JobRecord {
 }
 
 /** A background run: a lesson digest or a course-map build. */
-export interface FeedExtraction {
+export interface FeedRun {
 	/** Unique row id (the registry key). */
 	id: string;
 	chatId: string;
@@ -73,10 +73,10 @@ export interface FeedExtraction {
 
 export interface ActivityFeed {
 	jobs: FeedJob[];
-	extractions: FeedExtraction[];
+	runs: FeedRun[];
 }
 
-const EMPTY_FEED: ActivityFeed = { jobs: [], extractions: [] };
+const EMPTY_FEED: ActivityFeed = { jobs: [], runs: [] };
 
 // ─── The activity feed (composition root: the root layout) ───────────────────
 
@@ -112,7 +112,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 				if (res.ok) {
 					const data = (await res.json()) as Partial<ActivityFeed>;
 					if (alive)
-						setFeed({ jobs: data.jobs ?? [], extractions: data.extractions ?? [] });
+						setFeed({ jobs: data.jobs ?? [], runs: data.runs ?? [] });
 				}
 			} catch {
 				// transport blip: keep the last feed, announce again next event
@@ -167,11 +167,11 @@ export function useActivity(): { feed: ActivityFeed; refresh: () => void } {
 // ─── Pure presentation helpers (exported for tests) ──────────────────────────
 
 /** One dock blob: the unified view of a job or a background run (process
- *  "extraction", the name the feed and the abort route keep). */
+ *  "run", the feed's `runs` and the abort route's kind). */
 export interface ActivityBlob {
 	/** job.id, or the background run's registry key. */
 	id: string;
-	process: "job" | "extraction";
+	process: "job" | "run";
 	/** Sub-agent kind for jobs (background runs have none). */
 	jobKind?: JobKind;
 	/** A background run's phase (digesting, mapping); jobs carry none. */
@@ -234,10 +234,10 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 			steps: usage?.steps,
 		};
 	});
-	for (const run of feed.extractions) {
+	for (const run of feed.runs) {
 		blobs.push({
 			id: run.id,
-			process: "extraction",
+			process: "run",
 			phase: run.phase,
 			title: run.title,
 			chatId: run.chatId,
@@ -305,7 +305,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 				body: JSON.stringify({
 					kind: blob.process,
 					// A background run aborts by its chatId (the registry key's chat or course).
-					id: blob.process === "extraction" ? blob.chatId : blob.id,
+					id: blob.process === "run" ? blob.chatId : blob.id,
 				}),
 			});
 			if (!res.ok) {
@@ -353,7 +353,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
  *  background run is a finished lesson's digest or a course's map being
  *  built from its material. */
 function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "extraction") return blob.phase === "mapping" ? "Mapping course" : "Saving what you learned";
+	if (blob.process === "run") return blob.phase === "mapping" ? "Mapping course" : "Saving what you learned";
 	switch (blob.jobKind) {
 		case "research":
 			return "Researcher";
@@ -387,7 +387,7 @@ function ActivityRow({
 	abortState: AbortState | undefined;
 	onAbort: () => void;
 }) {
-	const Icon = blob.process === "extraction" ? WaypointsIcon : (blob.jobKind && KIND_ICON[blob.jobKind]) || BotIcon;
+	const Icon = blob.process === "run" ? WaypointsIcon : (blob.jobKind && KIND_ICON[blob.jobKind]) || BotIcon;
 	const label = blobLabel(blob);
 	const elapsed = formatElapsed(now - blob.startedAt);
 	return (

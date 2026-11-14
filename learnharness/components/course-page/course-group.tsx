@@ -4,6 +4,7 @@ import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { moreWords } from "@/components/study-words";
 
 /**
  * One group of a course page (spec: course-group.md): a 28px header with
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
  * sidebar's NavSection but with its label on the rows' glyph edge, then its
  * rows (`CourseTopicRow`s). `foldable` makes the header a button that folds
  * the rows away, the sidebar's Known shelf; `limit` shows the first rows and
- * "Show N more" for the rest. Neither is stored: each visit starts as the
+ * "Show the rest" (`moreWords`) for the rest. Neither is stored: each visit starts as the
  * page draws it, so there is nothing to keep tidy.
  */
 export function CourseGroup<T>({
@@ -29,7 +30,7 @@ export function CourseGroup<T>({
 	renderItem: (item: T) => React.ReactNode;
 	foldable?: boolean;
 	defaultFolded?: boolean;
-	/** Rows shown before "Show N more". */
+	/** Rows shown before "Show the rest". */
 	limit?: number;
 }) {
 	const headerId = React.useId();
@@ -75,7 +76,7 @@ export function CourseGroup<T>({
 					className="-mx-3 h-9 w-[calc(100%+1.5rem)] gap-4 px-3 duration-150"
 				>
 					<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
-					Show {more} more
+					{moreWords(more, Infinity)}
 				</Button>
 			)}
 		</section>

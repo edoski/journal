@@ -1,9 +1,9 @@
 /**
  * POST /api/activity/abort — the dock's END/ABORT control, uniform across
- * process kinds (user-decided contract): body {kind: "job"|"extraction"|"turn", id}
+ * process kinds (user-decided contract): body {kind: "job"|"run"|"turn", id}
  * where id is the jobId for sub-agent jobs, the run's chatId for background
- * runs (lesson digests and course-map builds; the dock still sends them as
- * kind "extraction"), and the chatId for turns
+ * runs (lesson digests and course-map builds, kind "run"), and the chatId
+ * for turns
  * (background-turn wave, 2026-09-25: a running turn is a background
  * object — any client may stop it here; a view leaving NEVER kills it).
  * Mechanisms live in their domains — abortJob (server/jobs.ts, agents
@@ -28,8 +28,8 @@ export async function POST(req: Request) {
 		return Response.json({ error: "Invalid JSON body" }, { status: 400 });
 	}
 	const { kind, id } = (body ?? {}) as { kind?: string; id?: string };
-	if ((kind !== "job" && kind !== "extraction" && kind !== "turn") || typeof id !== "string" || id === "") {
-		return Response.json({ error: 'Body must be {kind: "job"|"extraction"|"turn", id: string}' }, { status: 400 });
+	if ((kind !== "job" && kind !== "run" && kind !== "turn") || typeof id !== "string" || id === "") {
+		return Response.json({ error: 'Body must be {kind: "job"|"run"|"turn", id: string}' }, { status: 400 });
 	}
 	if (!/^[A-Za-z0-9:_-]+$/.test(id)) {
 		return Response.json({ error: "Invalid id" }, { status: 400 });
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 		if (!outcome.ok) return Response.json({ ok: false, reason: outcome.reason }, { status: 409 });
 		return Response.json({ ok: true });
 	}
-	// kind === "extraction", a background run: true cancellation;
+	// kind === "run", a background run: true cancellation;
 	// idempotent (nothing in flight is success — same dock outcome)
 	abortRuns(id);
 	return Response.json({ ok: true });

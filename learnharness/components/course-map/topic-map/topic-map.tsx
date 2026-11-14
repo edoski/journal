@@ -6,7 +6,7 @@ import type { CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import { NeedEdge, type NeedFlowEdge } from "./need-edge";
-import { MIN_ZOOM, TOPIC_NODE_SIZE as node, cameraAt, centreOf, chainOf, isWalkKey, layoutTopicMap, neighbourOf, openingCamera, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
+import { MIN_ZOOM, TOPIC_NODE_SIZE as node, WHOLE_COURSE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, layoutTopicMap, neighbourOf, slackOf, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, TopicNode, type TopicFlowNode, type TopicMapState } from "./topic-node";
 import { standingOf, statusOf, topicLabel } from "./topic-standing";
 
@@ -30,8 +30,10 @@ function reducedMotion(): boolean {
  * prerequisites above the topics that need them, drawn with React Flow
  * over the layout's own geometry. Each node says where he stands and
  * whether it needs him, and opens the topic's page. The map opens on the
- * whole course when that fits, else on the current topic; it pans by drag
- * or scroll and zooms by pinch. Hover or focus lights a topic's
+ * whole course when that fits, else framed on the current topic with its
+ * neighbours whole (`framedCamera`), or at `zoom` with the whole course in
+ * its middle, for a page that frames the map itself; it pans by drag or
+ * scroll and zooms by pinch. Hover or focus lights a topic's
  * prerequisite chain; arrows walk the edges. `highlight` lights a set of
  * topics while nothing is hovered or focused, for a page that points at
  * them from elsewhere; off by default.
@@ -40,11 +42,16 @@ export function TopicMap({
 	map,
 	margin = ROOM,
 	highlight = null,
+	zoom,
 }: {
 	map: CourseMap;
 	margin?: { x: number; y: number };
 	/** Topics to light, the rest dimmed as a hover dims them; null lights none. */
 	highlight?: ReadonlySet<TopicHandle> | null;
+	/** The scale to draw the whole course at, in the frame's middle, for a
+	 *  page that sizes the frame to it and scrolls it; unset, the map
+	 *  frames itself. */
+	zoom?: number;
 }) {
 	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node), [map.topics, map.edges]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
@@ -100,7 +107,7 @@ export function TopicMap({
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} />
+			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} zoom={zoom} />
 		</ReactFlowProvider>
 	);
 }
@@ -113,6 +120,7 @@ function Flow({
 	titleOf,
 	margin: frameMargin,
 	highlight,
+	zoom: fixedZoom,
 }: {
 	map: CourseMap;
 	layout: TopicMapLayout;
@@ -121,6 +129,7 @@ function Flow({
 	titleOf: (handle: TopicHandle) => string;
 	margin: { x: number; y: number };
 	highlight: ReadonlySet<TopicHandle> | null;
+	zoom: number | undefined;
 }) {
 	const captionId = useId();
 	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y]);
@@ -134,22 +143,31 @@ function Flow({
 	// A hovered or focused topic's chain, else the page's highlight.
 	const lit = useMemo(() => (active ? chainOf(active, map.edges) : highlight), [active, map.edges, highlight]);
 
-	const extent = useMemo<CoordinateExtent>(
-		() => [
-			[-margin.x, -margin.y],
-			[layout.width + margin.x, layout.height + margin.y],
-		],
-		[layout, margin.x, margin.y],
-	);
+	// As far as a framed opening may look (`framedCamera`): the room at the smallest scale it opens at, and one topic past it.
+	const extent = useMemo<CoordinateExtent>(() => {
+		const slack = slackOf(layout.node);
+		const x = margin.x / WHOLE_COURSE_ZOOM + slack.x;
+		const y = margin.y / WHOLE_COURSE_ZOOM + slack.y;
+		return [
+			[-x, -y],
+			[layout.width + x, layout.height + y],
+		];
+	}, [layout, margin.x, margin.y]);
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
-	const minZoom = frame ? Math.max(MIN_ZOOM, Math.min(1, wholeZoom(layout, frame, margin))) : 1;
+	const fitted = frame ? Math.max(MIN_ZOOM, Math.min(1, wholeZoom(layout, frame, margin))) : 1;
+	const minZoom = fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
 
 	// The camera returns to its opening view whenever the frame grows or shrinks.
 	const [placed, setPlaced] = useState(false);
 	useEffect(() => {
 		if (frameWidth <= 0 || frameHeight <= 0) return;
-		void flow.setViewport(openingCamera(layout, map.current, { width: frameWidth, height: frameHeight }, margin)).then(() => setPlaced(true));
-	}, [flow, layout, map.current, frameWidth, frameHeight, margin]);
+		const size = { width: frameWidth, height: frameHeight };
+		const camera =
+			fixedZoom === undefined
+				? framedCamera(layout, map.current, size, frameMargin, TAG_ROOM)
+				: cameraAt(layout, [layout.width / 2, layout.height / 2], fixedZoom, size, margin);
+		void flow.setViewport(camera).then(() => setPlaced(true));
+	}, [flow, layout, map.current, frameWidth, frameHeight, margin, frameMargin, fixedZoom]);
 
 	/** Brings a topic the keyboard reached into view, when part of it is out of the frame. */
 	const follow = useCallback(

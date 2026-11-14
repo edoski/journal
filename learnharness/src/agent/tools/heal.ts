@@ -4,7 +4,7 @@
  *
  * Every weak-model argument wobble incident produced a heal wired ONLY
  * to the tool where it landed — parseOptionsIfString (questions,
- * 2026-09-26), healStringifiedArrays (extraction),
+ * 2026-09-26), a stringified-array heal (the deleted extraction),
  * healEncodedArguments (practice, 2026-10-04) — and the whitehead death
  * loop (2026-10-09: quiz `type: "\"predict\""` rejected ten times,
  * byte-identical, in a session the lesson never reached) happened

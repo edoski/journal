@@ -6,6 +6,7 @@ import { useLinkVariant } from "@/components/design-variant";
 import type { TopicHandle } from "@/src/core";
 import { TOPIC_NODE_SIZE, layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
 import { CourseFrame } from "@/components/course-page/course-frame";
+import { PageFrame } from "@/components/page-frame/page-frame";
 import { CourseHeader } from "@/components/course-page/course-header";
 import type { CourseView } from "@/components/course-page/course-model";
 import { SplitList, type SplitListHandle } from "@/components/course-page/split/split-list";
@@ -13,8 +14,8 @@ import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/sp
 import { aimOf, litOf, markedOf, revealOf, shownGroups, tieOf, type Pointed } from "@/components/course-page/split/split-tie";
 
 /**
- * The course page candidate "split" (spec: split-course.md): the shared
- * header across the page, then the course's topics in their groups on the
+ * The course page (spec: split-course.md), in the shared page frame: the
+ * head across the column, then the course's topics in their groups on the
  * left and its topic map filling the right, tied together. Pointing at a
  * row lights its topic and prerequisites on the map and brings it into
  * view; pointing at a node marks its row. A click on either opens the
@@ -22,7 +23,7 @@ import { aimOf, litOf, markedOf, revealOf, shownGroups, tieOf, type Pointed } fr
  */
 export function SplitCourse({ workspace }: { workspace: string }) {
 	return (
-		<CourseFrame workspace={workspace} className="flex h-full w-full flex-col gap-6 px-8 pt-5 pb-6">
+		<CourseFrame workspace={workspace}>
 			{({ view, busy, onContinue }) => <SplitBody view={view} header={<CourseHeader view={view} busy={busy} onContinue={onContinue} />} />}
 		</CourseFrame>
 	);
@@ -60,7 +61,7 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 	};
 
 	return (
-		<>
+		<PageFrame className="h-full">
 			<div ref={headerBox} className="contents" onKeyDown={onHeaderKeyDown}>
 				{header}
 			</div>
@@ -97,6 +98,6 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 					}
 				/>
 			)}
-		</>
+		</PageFrame>
 	);
 }

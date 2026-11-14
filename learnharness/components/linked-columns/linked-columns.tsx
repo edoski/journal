@@ -105,6 +105,7 @@ export function LinkedColumns({
 		path.setAttribute("d", route.d);
 		path.setAttribute("data-side", route.side);
 		path.setAttribute("data-clear", String(route.clear));
+		path.setAttribute("data-around", String(route.around));
 		path.removeAttribute("visibility");
 	}, [tie]);
 

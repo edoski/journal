@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import type { CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
-import type { TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { framedCamera, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
-import { besideRow, boxesOf, fadeAcross, scrollOn, surfaceOf, topicAt, type Scroll, type Size } from "@/components/course-page/split/split-tie";
+import { besideRow, boxesOf, fadeAcross, scrollOfCamera, scrollOn, surfaceOf, topicAt, type Scroll, type Size } from "@/components/course-page/split/split-tie";
 import { useTieAnchor } from "@/components/linked-columns/linked-columns";
 
 /** What the page asks of the map: focus a topic's node. */
@@ -35,10 +35,12 @@ function reducedMotion(): boolean {
  * The split page's right pane (spec: split-course.md): the course's topic
  * map (topic-map.md) on a surface the map fits whole (`surfaceOf`), in a
  * pane that scrolls it with no bar, no outline and no header, its edges
- * faded into the page. The map draws a small course whole at 75% or more
- * and any other at 100%, and never moves its own camera; the pane moves
+ * faded into the page. It opens as every course map opens (`framedCamera`):
+ * the whole course when it fits at 75% or more, else framed on `aim` with
+ * its neighbours whole and as few topics cut as it can, at the scale that
+ * shows the most. The map never moves its own camera; the pane moves
  * instead, always to a view that cuts as few topics at its edges as it
- * can (`scrollOn`). It opens on `aim`; `reveal` (the row he points at,
+ * can (`scrollOn`). `reveal` (the row he points at,
  * once he rests on it for 120ms) glides into view in 200ms when it is not
  * already clear of the fade, and so does a node the keyboard reaches.
  * Wheel, trackpad and a drag on the background scroll it. `lit` lights
@@ -75,10 +77,11 @@ export function SplitMap({
 	const glide = useRef(0);
 	const [pane, setPane] = useState<Size>({ width: 0, height: 0 });
 
-	const surface = surfaceOf(layout, pane, FADE, TAG_ROOM, tieAnchor !== null);
-	/** The room the surface keeps above and below the course for the tie (`surfaceOf`). */
-	const beside = tieAnchor !== null ? pane.height : 0;
 	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, layout.node), y: FADE.y }), [pane.width, layout.node]);
+	/** How the course opens in the pane: its scale and where it sits. */
+	const opening = useMemo(() => (pane.width > 0 ? framedCamera(layout, aim, pane, fade, TAG_ROOM, "top") : null), [layout, aim, pane, fade]);
+	const tied = tieAnchor !== null;
+	const surface = useMemo(() => surfaceOf(layout, pane, FADE, TAG_ROOM, tied, opening?.zoom), [layout, pane, tied, opening?.zoom]);
 	const boxes = useMemo(() => boxesOf(layout, { width: surface.width, height: surface.height, zoom: surface.zoom }), [layout, surface.width, surface.height, surface.zoom]);
 
 	const point = (handle: TopicHandle | null) => {
@@ -87,23 +90,19 @@ export function SplitMap({
 		onPoint(handle);
 	};
 
-	/** Scrolls the pane to show a topic: at once for the opening view, else over 200ms (at once under reduced motion).
-	 *  A topic a row points at also comes beside that row when the tie's line would otherwise have no clear route. */
+	/** Glides the pane over 200ms (at once under reduced motion) to show a topic he points at or reaches, beside the row
+	 *  pointing at it when the tie's line would otherwise have no clear route. */
 	const show = useCallback(
-		(handle: TopicHandle, settle: "near" | "centre") => {
+		(handle: TopicHandle) => {
 			const el = scroller.current;
 			if (!el || el.clientWidth === 0) return;
 			const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
-			// The opening view stays on the course itself; the room the tie keeps above and below is only for bringing a topic beside its row.
-			const room = settle === "centre" ? beside : 0;
-			const inCourse = room ? new Map([...boxes].map(([key, box]) => [key, { ...box, y: box.y - room }])) : boxes;
-			let to = scrollOn(inCourse, handle, { ...view, top: view.top - room }, { width: el.scrollWidth, height: el.scrollHeight - room * 2 }, fade, settle);
-			if (to && room) to = { left: to.left, top: to.top + room };
-			const anchor = settle === "near" ? tieAnchor?.() : null;
+			let to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade);
+			const anchor = tieAnchor?.();
 			if (anchor) to = besideRow(boxes, handle, anchor, to ?? view, { ...view, maxTop: el.scrollHeight - el.clientHeight }, fade, map.current) ?? to;
 			cancelAnimationFrame(glide.current);
 			if (!to) return;
-			if (settle === "centre" || reducedMotion()) return el.scrollTo(to);
+			if (reducedMotion()) return el.scrollTo(to);
 			const from: Scroll = { left: el.scrollLeft, top: el.scrollTop };
 			const start = performance.now();
 			const step = (now: number) => {
@@ -114,7 +113,7 @@ export function SplitMap({
 			};
 			glide.current = requestAnimationFrame(step);
 		},
-		[boxes, fade, tieAnchor, map.current, beside],
+		[boxes, fade, tieAnchor, map.current],
 	);
 
 	// The pane's size sets the surface's width and where it opens.
@@ -131,15 +130,18 @@ export function SplitMap({
 		};
 	}, []);
 
-	// The pane opens on its aim, and returns to it whenever it grows or shrinks.
+	// The pane opens framed on its aim, and returns there whenever it grows or shrinks.
 	useEffect(() => {
-		if (aim && pane.width > 0) show(aim, "centre");
-	}, [aim, pane.width, pane.height, show]);
+		const el = scroller.current;
+		if (!el || !opening) return;
+		cancelAnimationFrame(glide.current);
+		el.scrollTo(scrollOfCamera(layout, surface, pane, opening));
+	}, [layout, opening, surface, pane]);
 
 	// A row he rests on for a moment, not one the pointer crosses on its way.
 	useEffect(() => {
 		if (!reveal) return;
-		const wait = setTimeout(() => show(reveal, "near"), REVEAL_DWELL_MS);
+		const wait = setTimeout(() => show(reveal), REVEAL_DWELL_MS);
 		return () => clearTimeout(wait);
 	}, [reveal, show]);
 
@@ -205,7 +207,7 @@ export function SplitMap({
 				const handle = topicAt(e.target);
 				point(handle);
 				// The map's own follow has nothing to do on a surface it fits; the pane brings the topic in instead.
-				if (handle && (e.target as Element).matches(":focus-visible")) show(handle, "near");
+				if (handle && (e.target as Element).matches(":focus-visible")) show(handle);
 			}}
 			onBlur={(e) => {
 				if (!e.currentTarget.contains(e.relatedTarget as Node | null)) point(null);
@@ -221,7 +223,7 @@ export function SplitMap({
 			<div ref={scroller} data-slot="course-split-map-scroller" className={`size-full overflow-auto overscroll-contain ${NO_BAR}`}>
 				{/* The surface's size, from the course's layout: the map fits it whole. */}
 				<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-					<TopicMap map={map} margin={FADE} highlight={lit} />
+					<TopicMap map={map} margin={FADE} highlight={lit} zoom={surface.zoom} />
 				</div>
 			</div>
 		</section>

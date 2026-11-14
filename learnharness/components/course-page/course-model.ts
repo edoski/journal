@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { buildInbox, daysBetween, taskWords as leftOff, type Unit, type UnitNow } from "@/components/unit-inbox/units";
-import { returnWords } from "@/components/study-words";
+import { courseShareWords, returnWords } from "@/components/study-words";
 
 /**
  * The course page's model (spec: course-page.md): one course's topics, each
@@ -187,7 +187,7 @@ export function courseNext(course: StudyCourse, open: readonly ChatListItem[]): 
 
 /** The header's facts, each a few words; null where the course has none. */
 export interface CourseFacts {
-	/** "3 of 16 on your own": the topics Home's progress pie counts. */
+	/** "3 of 16 topics on your own": the topics Home's progress ring counts. */
 	progress: string | null;
 	/** "Exam in 21 days", "Exam tomorrow", "Exam today". */
 	exam: string | null;
@@ -199,7 +199,7 @@ export interface CourseFacts {
 export function courseFacts(course: StudyCourse): CourseFacts {
 	const progress = courseProgress(course);
 	return {
-		progress: progress ? `${progress.solid} of ${progress.of} on your own` : null,
+		progress: progress ? courseShareWords(progress.solid, progress.of) : null,
 		exam: examWords(course),
 		studied: lastStudied({ kind: "course", course, step: { kind: "none" } }),
 	};

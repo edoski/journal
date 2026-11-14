@@ -2,7 +2,7 @@
 
 The files are the user's record, not an import format to rewrite. Work read-only.
 The bundled readers make common views convenient; they are not required for custom
-analysis. This reference describes native session/graph format **1**. An absent
+analysis. This reference describes native session format **1**. An absent
 version stamp means v1. Older fields within that format are described below;
 pre-native `parts`/UIMessage transcripts are a different, unsupported dialect.
 
@@ -12,18 +12,12 @@ Paths below are relative to the selected **data** directory:
 
 ```text
 chats/<session-id>.json    Full session: messages, optional plan, usage metadata
-graph/nodes.jsonl          Proposition assertions; IDs can repeat
-graph/chains.jsonl         Reasoning-chain assertions; logical chains can repeat
-graph/sources.json        Imported-note source metadata, keyed by source ID
-graph/format.json         Graph-family format stamp: {"version": 1}
-graph/sessions.jsonl       Extraction checkpoints, NOT the session index
-graph/coverage.jsonl       Extraction fingerprints, NOT learner assessment
-graph/positions.json      Canvas layout, not semantic relationships
-graph/render-settings.json  Presentation preferences, not learning evidence
 jobs/<job-id>.json        Background work records; delivered artifacts also appear in sessions
 ```
 
-`settings.json`, downloaded models, caches, and provider debug logs are not needed
+An older data folder may still hold a `graph/` folder from the app's deleted
+knowledge graph. Nothing reads it any more; it is not evidence of what the learner
+knows. `settings.json`, downloaded models, caches, and provider debug logs are not needed
 to interpret learning history. `auth.json` is normally one directory above data;
 do not read it. Imported-note paths, research URLs, and artifact references are not
 automatically followed by the readers.
@@ -43,7 +37,7 @@ Each `chats/*.json` file is an object with:
 | `turns`, `extractions` | Parallel usage/cost-observation logs, not learner answers |
 | `settings` | Per-session model/thinking overrides, not an understanding assessment |
 
-The plan is session scaffolding, not the persistent knowledge graph. Its visited
+The plan is session scaffolding, not a record of what the learner knows. Its visited
 or current positions are not proof of mastery. Context compaction changes what the
 teaching model sees; it does **not** mean earlier messages were deleted from this
 stored history.
@@ -171,60 +165,10 @@ artifacts to describe, not commands to execute while reading. Binary/image block
 can be large; their existence should be noted without dumping encoded bytes. No
 reader needs to open the original PDF or notes file merely to read these records.
 
-## The graph: assertions must be merged, not counted as unique lines
-
-### Propositions (`nodes.jsonl`)
-
-Each line contains `id`, `name`, `statement`, `aliases`, `createdAt`, and
-`provenance`—an array of `{chatId, messageId}` points.
-
-- A short `name` is a display label, **not** a unique identity or full claim.
-- The **first line for an ID** defines its name, statement, and creation date.
-- Later lines' nonempty statements and aliases join the aliases with exact-string
-  deduplication. Later names do not replace the name or become aliases.
-- Provenance unions by exact `(chatId, messageId)` pair, retaining encounter order.
-- Do not deduplicate different node IDs just because their labels look alike.
-
-### Reasoning chains (`chains.jsonl`)
-
-Each line contains `id`, `premises` (node IDs), `conclusion` (node ID), `createdAt`,
-and `provenance`. **All premises within a chain are used together.** Different
-chains with the same conclusion are separate arguments, not one pooled premise
-set. Merge repeated assertions by the sorted premise list plus conclusion, keeping
-the first assertion's ID, premise order, and date; union provenance.
-
-The graph canvas derives arrows and implication junctions from these records.
-Those visual edges are not the stored truth and can lose the joint-premise
-structure. Read chains directly. Missing endpoints are reported as missing, not
-silently substituted or repaired.
-
-### Sources, birth sessions, and provenance
-
-A node's **birth source** is `provenance[0].chatId` after merging—the first surviving
-point, not the earliest timestamp and not every session that mentioned it.
-Graph session listings and `propositions --session` use this rule. A node with no
-provenance remains readable/searchable but belongs to no birth session.
-
-- `chat_…` IDs usually refer to session files. Use the matching `messageId` when
-  present to find the exact source message. Empty message IDs in older data are
-  chat-level attribution; they do not identify an exact message.
-- Imported notes use `src_…` source IDs. `sources.json` supplies `id`, `filePath`,
-  and `importedAt`; these source paths are references only.
-- Missing/deleted source metadata can leave a valid graph. The session index then
-  uses the source ID as its label and `file` as its fallback kind; this fallback
-  alone does not prove the source was an imported file.
-- Chat deletion and chain simplification can rewrite ledgers. They are normally
-  appended during extraction, but do not assume the files are immutable logs.
-
-Graph `sessions.jsonl` records extraction checkpoints, and `coverage.jsonl` records
-fingerprints of extracted teacher text. Neither is a session catalog, quiz-event
-ledger, mastery scale, or record of every idea the learner personally endorsed.
-Practice does not itself write new propositions to the graph.
-
 ## Reader limits
 
 The readers intentionally stop short of analysis: no inferred mastery, scoring,
-semantic search, transitive traversal, or automatic report generation. Their JSON
+semantic search, or automatic report generation. Their JSON
 output can be processed further, or you can read the native files directly.
 
 Malformed/unsupported records must be identified, not silently counted as valid.

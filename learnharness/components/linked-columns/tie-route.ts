@@ -37,14 +37,18 @@ export interface TieGeometry {
 export type Side = "left" | "top" | "bottom";
 
 export interface TieRoute {
-	/** An SVG path: `M`, then one cubic `C`. */
+	/** An SVG path: `M`, then one cubic `C`, or two for a route around. */
 	d: string;
 	side: Side;
 	/** Where it meets the node. */
 	end: Point;
-	/** False when no curve keeps every rule; the route then crosses the
+	/** False when no route keeps every rule; the route then crosses the
 	 *  fewest nodes, and the map's nodes paint over it. */
 	clear: boolean;
+	/** The route goes around a node in its way (`detourTie`): two curves
+	 *  joined in a lane beside that node, where one smooth curve found no
+	 *  clear way. */
+	around: boolean;
 }
 
 /** How far the curve keeps from a node it passes. */
@@ -135,9 +139,9 @@ function hits(points: readonly Point[], boxes: readonly Box[]): number {
 }
 
 /** How far a polyline climbs or falls inside the gutter, or near it
- *  (`GUTTER_REACH`). Pure. */
-export function gutterRun(points: readonly Point[], gutter: TieGeometry["gutter"]): number {
-	const within = (p: Point) => p.x >= gutter.left - GUTTER_REACH.list && p.x <= gutter.right + GUTTER_REACH.map;
+ *  (`reach`, `GUTTER_REACH` by default). Pure. */
+export function gutterRun(points: readonly Point[], gutter: TieGeometry["gutter"], reach: { list: number; map: number } = GUTTER_REACH): number {
+	const within = (p: Point) => p.x >= gutter.left - reach.list && p.x <= gutter.right + reach.map;
 	// A sample either side of the band's edge counts too, so a coarse sampling never hides a climb.
 	const inside = points.filter((p, i) => within(p) || (i > 0 && within(points[i - 1]!)));
 	if (inside.length === 0) return 0;
@@ -202,9 +206,10 @@ function crosses(points: readonly Point[], boxes: readonly Box[]): boolean {
  * it never climbs or falls more than `GUTTER_RUN` in the gutter; it never
  * turns back towards the list. When none keeps them all, the one that
  * crosses the fewest nodes, marked not clear. Null when the node sits
- * behind the row (nothing to the right of it). Pure.
+ * behind the row (nothing to the right of it). Pure. `routeTie` adds the
+ * route around a node in the way.
  */
-export function routeTie(geometry: TieGeometry): TieRoute | null {
+function curveTie(geometry: TieGeometry): TieRoute | null {
 	const { to, obstacles, gutter } = geometry;
 	const walls = obstacles.map((box) => grow(box, CLEARANCE));
 	const tried = candidates(geometry)
@@ -214,7 +219,7 @@ export function routeTie(geometry: TieGeometry): TieRoute | null {
 		})
 		.filter(({ points }) => points.every((p, i) => i === 0 || p.x >= points[i - 1]!.x - 0.01))
 		.sort((a, b) => a.cost - b.cost);
-	const route = ({ side, curve }: (typeof tried)[number], clear: boolean): TieRoute => ({ d: cubicPath(curve), side, end: curve[3], clear });
+	const route = ({ side, curve }: (typeof tried)[number], clear: boolean): TieRoute => ({ d: cubicPath(curve), side, end: curve[3], clear, around: false });
 	// The last few samples meet the node; before them the curve must not pass through it.
 	const clear = tried.find(({ points }) => gutterRun(points, gutter) <= GUTTER_RUN && !crosses(points.slice(0, -3), [to]) && !crosses(points, walls));
 	if (clear) return route(clear, true);
@@ -224,6 +229,65 @@ export function routeTie(geometry: TieGeometry): TieRoute | null {
 		if (!fallback || score < fallback.score) fallback = { at, score };
 	}
 	return fallback ? route(fallback.at, false) : null;
+}
+
+/** How far the lane of a route around runs from the node it passes. */
+const LANE_GAP = 16;
+/** Where along the lane the route around turns, as shares of the drop. */
+const TURNS = [0.25, 0.4, 0.5, 0.6, 0.75];
+const LANE_HANDLES = [0.35, 0.55, 0.75];
+
+/**
+ * A route around a node in the way (spec: linked-columns.md, "The
+ * connector"), for when no one curve keeps the rules: out of the row
+ * heading right as the one curve does, across the gutter into a vertical
+ * lane 16px left of a node it would have crossed, down (or up) that lane,
+ * and out of it into the node's left edge, square to it: two cubics that
+ * meet in the lane, tangent to it, so the line stays one smooth stroke.
+ * The lane lies past the gutter's reach into the map, and the line turns
+ * into it only once past the gutter, so it never runs along the gutter. Of every route that keeps the rules, the shortest; null
+ * when none does. Pure.
+ */
+export function detourTie(geometry: TieGeometry): TieRoute | null {
+	const { from, to, obstacles, gutter } = geometry;
+	const walls = obstacles.map((box) => grow(box, CLEARANCE));
+	const cy = (to.top + to.bottom) / 2;
+	const drop = cy - from.y;
+	if (Math.abs(drop) < 1) return null;
+	const sign = Math.sign(drop);
+	const lanes = [...new Set(obstacles.map((box) => box.left - LANE_GAP))].filter((x) => x >= gutter.right + GUTTER_REACH.map && x < to.left - LANE_GAP);
+	let best: { d: string; cost: number } | null = null;
+	for (const lane of lanes) {
+		for (const turn of TURNS) {
+			const y = from.y + drop * turn;
+			for (const a of LANE_HANDLES) {
+				for (const b of LANE_HANDLES) {
+					const first: Cubic = [from, { x: from.x + (lane - from.x) * a, y: from.y }, { x: lane, y: y - sign * Math.abs(y - from.y) * b }, { x: lane, y }];
+					const second: Cubic = [{ x: lane, y }, { x: lane, y: y + sign * Math.abs(cy - y) * b }, { x: to.left - (to.left - lane) * a, y: cy }, { x: to.left, y: cy }];
+					const points = [...sampleCubic(first), ...sampleCubic(second).slice(1)];
+					if (!points.every((p, i) => i === 0 || p.x >= points[i - 1]!.x - 0.01)) continue;
+					// The lane runs inside the map, so only the gutter itself (and the list's edge) holds the run down.
+					if (gutterRun(points, gutter, { list: GUTTER_REACH.list, map: 0 }) > GUTTER_RUN || crosses(points.slice(0, -3), [to]) || crosses(points, walls)) continue;
+					const cost = length(points);
+					if (!best || cost < best.cost) best = { d: `${cubicPath(first)} ${cubicPath(second).replace(/^M [^C]*/, "")}`, cost };
+				}
+			}
+		}
+	}
+	return best && { d: best.d, side: "left", end: { x: to.left, y: cy }, clear: true, around: true };
+}
+
+/**
+ * The connector's route from the row to its node: one smooth curve when
+ * one keeps the rules (see `curveTie`), else the route around the node in
+ * its way (`detourTie`), else the curve that crosses the fewest nodes,
+ * marked not clear, which the map's nodes paint over. Null when the node
+ * sits behind the row. Pure.
+ */
+export function routeTie(geometry: TieGeometry): TieRoute | null {
+	const curve = curveTie(geometry);
+	if (!curve || curve.clear) return curve;
+	return detourTie(geometry) ?? curve;
 }
 
 /** Where the row may sit beside its node: level with its middle, or in the
@@ -246,13 +310,14 @@ export function tieShifts(from: Point, to: Box): number[] {
 
 const shift = (box: Box, dy: number): Box => ({ ...box, top: box.top + dy, bottom: box.bottom + dy });
 
-/** Of the vertical shifts given, in order, the first that gives the tie a
- *  clear route once the map's drawing (the node and every obstacle) has
- *  moved by it; null when none does. Pure. */
+/** Of the vertical shifts given, in order, the first that gives the tie
+ *  one clear curve once the map's drawing (the node and every obstacle)
+ *  has moved by it; null when none does. A route around a node is the last
+ *  resort, never a reason not to move. Pure. */
 export function clearShift(geometry: TieGeometry, shifts: readonly number[]): number | null {
 	for (const dy of shifts) {
 		const moved = { ...geometry, to: shift(geometry.to, dy), obstacles: geometry.obstacles.map((box) => shift(box, dy)) };
-		if (routeTie(moved)?.clear) return dy;
+		if (curveTie(moved)?.clear) return dy;
 	}
 	return null;
 }

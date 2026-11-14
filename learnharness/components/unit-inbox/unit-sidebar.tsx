@@ -17,6 +17,7 @@ import type { NowListProps } from "@/components/unit-inbox/now-list-props";
 import { NowSkeleton } from "@/components/unit-inbox/now-skeleton";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { SessionItem } from "@/components/unit-inbox/session-item";
+import { SidebarRail } from "@/components/unit-inbox/sidebar-rail";
 import { SidebarResizeHandle } from "@/components/unit-inbox/sidebar-resize-handle";
 import { onSidebarTreeKeyDown } from "@/components/unit-inbox/sidebar-tree";
 import { useSidebarWidth } from "@/components/unit-inbox/sidebar-width";
@@ -74,13 +75,14 @@ const navLinkClass = (here: boolean) =>
  * now as a card that opens its page, with everything else on the folded
  * shelves at the foot (inbox-today.md). Background work shows only while
  * one runs; Settings is the footer's icon. Its right edge drags to resize,
- * as T3 Code's does; the width lasts across reloads.
+ * as T3 Code's does; the width lasts across reloads. Folded, it is a rail
+ * of icons (`SidebarRail`).
  */
 export function UnitSidebar() {
 	const { open, toggle } = useSidebar();
 	const { open: openSettings } = useSettingsDialog();
 	const { feed } = useActivity();
-	const running = feed.jobs.length > 0 || feed.extractions.length > 0;
+	const running = feed.jobs.length > 0 || feed.runs.length > 0;
 	const s = useSessionsSidebar({ open, toggle });
 	const { state, scope, setScope, folded, fold } = useUnitInbox(s.chats);
 	const query = s.query.trim();
@@ -120,10 +122,13 @@ export function UnitSidebar() {
 				ref={sidebarRef}
 				id={sidebarId}
 				style={{ "--sidebar-width": `${width}px` } as React.CSSProperties}
-				className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-(--sidebar-width)" : "w-0")}
-				aria-hidden={!open}
+				className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-(--sidebar-width)" : "lh-rail w-12")}
 				data-testid="sidebar"
+				data-state={open ? "open" : "folded"}
 			>
+				{!open ? (
+					<SidebarRail pathname={s.pathname} onOpen={toggle} onNewLesson={() => s.router.push("/chat/new")} onSettings={openSettings} />
+				) : (
 				<div className="flex h-full w-(--sidebar-width) flex-col border-r bg-background">
 					<div className="lh-drag lh-lights-band shrink-0" />
 
@@ -264,6 +269,7 @@ export function UnitSidebar() {
 						</Hint>
 					</div>
 				</div>
+				)}
 
 				<DeleteSessionDialog chat={s.deleting} onClose={() => s.setDeleting(null)} onDeleted={s.onDeleted} />
 			</aside>

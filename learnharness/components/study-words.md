@@ -26,3 +26,10 @@ One form each, wherever it shows.
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 2w ago; Unfinished when no day is known. Never the tutor's step text. |
 
 Home's line names the lapsed topic when the line is about another one ("Missed Chain rule", `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Missed) is not a reason and keeps its own words.
+
+## Counts
+
+| Where | Words |
+|---|---|
+| a course's progress (Home's ring, the course page's standing line) | 5 of 16 topics on your own; No topics on your own yet; All 16 topics on your own (`courseShareWords`) |
+| a folded list's last row (the sidebar's shelves, the course page's groups) | Show the rest, when one press shows every hidden row; else Show more (`moreWords`). No number: a bare count told him nothing |

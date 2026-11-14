@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { ActivitySection, formatElapsed, toBlobs, type ActivityFeed, type FeedExtraction } from "../components/activity-dock.tsx";
+import { ActivitySection, formatElapsed, toBlobs, type ActivityFeed, type FeedRun } from "../components/activity-dock.tsx";
 import { formatTokens, formatUsd } from "../components/usage-format.ts";
 import { jobCost } from "../src/server/pricing.ts";
 import { providerKeyMissing } from "../src/core/settings.ts";
@@ -43,23 +43,23 @@ describe("activity dock pure layer", () => {
 	it("merges jobs + background runs oldest-first (the stable blob order)", () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "new", createdAt: new Date(NOW - 10_000).toISOString() })],
-			extractions: [{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 100_000 }],
+			runs: [{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 100_000 }],
 		};
 		const blobs = toBlobs(feed);
 		assert.equal(blobs.length, 2);
 		const first = blobs[0]!;
 		assert.equal(first.id, "cx#digest"); // the digest started first
-		assert.equal(first.process, "extraction");
+		assert.equal(first.process, "run");
 		assert.equal(first.phase, "digesting");
 		assert.equal(blobs[1]!.id, "new");
 	});
 
 	it("a digest and a map build are one row each, keyed by their registry key", () => {
-		const rows: FeedExtraction[] = [
+		const rows: FeedRun[] = [
 			{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 1000 },
 			{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 500 },
 		];
-		const blobs = toBlobs({ jobs: [], extractions: rows });
+		const blobs = toBlobs({ jobs: [], runs: rows });
 		assert.deepEqual(blobs.map((b) => b.id), ["cx#digest", "algebra#course-map"], "unique row ids — no duplicate React keys");
 		assert.deepEqual(blobs.map((b) => b.chatId), ["cx", "algebra"], "the abort sends the key's chat or course");
 	});
@@ -76,12 +76,12 @@ describe("activity dock pure layer", () => {
 				steps: 2,
 			},
 		});
-		const blob = toBlobs({ jobs: [priced], extractions: [] })[0]!;
+		const blob = toBlobs({ jobs: [priced], runs: [] })[0]!;
 		// Pi-normalized fresh input is priced directly, never reduced by reads.
 		assert.equal(blob.cost, 0.00215);
-		const missingProjection = toBlobs({ jobs: [{ ...priced, costUsd: undefined }], extractions: [] })[0]!;
+		const missingProjection = toBlobs({ jobs: [{ ...priced, costUsd: undefined }], runs: [] })[0]!;
 		assert.equal(missingProjection.cost, null, "the browser must not invent a fallback price");
-		const absent = toBlobs({ jobs: [job()], extractions: [] })[0]!;
+		const absent = toBlobs({ jobs: [job()], runs: [] })[0]!;
 		assert.equal(absent.cost, null);
 	});
 
@@ -92,13 +92,13 @@ describe("activity dock pure layer", () => {
 			// the runner composes the envelope's error verbatim
 			error: providerKeyMissing("claude-subscription").error,
 		});
-		const blob = toBlobs({ jobs: [refused], extractions: [] })[0]!;
+		const blob = toBlobs({ jobs: [refused], runs: [] })[0]!;
 		assert.equal(blob.activity, "needs a sign-in");
 	});
 
 	it("a real failure keeps the runner's honest wording", () => {
 		const crashed = job({ status: "error", activity: "failed", error: "FAILED: headless crashed" });
-		const real = toBlobs({ jobs: [crashed], extractions: [] })[0]!;
+		const real = toBlobs({ jobs: [crashed], runs: [] })[0]!;
 		assert.equal(real.activity, "failed");
 	});
 
@@ -118,17 +118,17 @@ describe("activity dock pure layer", () => {
 			// live-catalog join riding the feed — the dock never resolves it.
 			contextLimit: 131_072,
 		});
-		const blob = toBlobs({ jobs: [withLast], extractions: [] })[0]!;
+		const blob = toBlobs({ jobs: [withLast], runs: [] })[0]!;
 		assert.equal(blob.context?.used, 92_000);
 		assert.equal(blob.context?.limit, 131_072);
 		// No lastStep yet (capture pending) → "—", even though usage exists.
-		const stripped = toBlobs({ jobs: [job({ usage: { ...base } })], extractions: [] })[0]!;
+		const stripped = toBlobs({ jobs: [job({ usage: { ...base } })], runs: [] })[0]!;
 		assert.equal(stripped.context, null);
 		// Model missing from the live catalog (historical session,
 		// package update) → the feed carries null → no context line.
 		const uncatalogued = toBlobs({
 			jobs: [job({ usage: { ...base, model: "nope/unknown", lastStep: step(5, 5), } })],
-			extractions: [],
+			runs: [],
 		})[0]!;
 		assert.equal(uncatalogued.context, null);
 		// The numerator is the same cache-inclusive fold the session meter
@@ -151,7 +151,7 @@ describe("activity dock pure layer", () => {
 					contextLimit: 200_000,
 				}),
 			],
-			extractions: [],
+			runs: [],
 		})[0]!;
 		assert.equal(cached.context?.used, 160_500);
 		assert.equal(cached.context?.limit, 200_000);
@@ -160,7 +160,7 @@ describe("activity dock pure layer", () => {
 	it("background-run blobs carry no money/context (—, the doctrine)", () => {
 		const blob = toBlobs({
 			jobs: [],
-			extractions: [{ id: "cx#digest", chatId: "cx", title: "T", phase: "digesting", startedAt: NOW }],
+			runs: [{ id: "cx#digest", chatId: "cx", title: "T", phase: "digesting", startedAt: NOW }],
 		})[0]!;
 		assert.equal(blob.cost, null);
 		assert.equal(blob.context, null);
@@ -210,22 +210,22 @@ async function openDetail(feed: ActivityFeed, title: string) {
 
 describe("activity section render", () => {
 	it("renders the ALWAYS-PRESENT header when idle — empty means empty, nothing hides", () => {
-		const html = renderToStaticMarkup(<ActivitySection feed={{ jobs: [], extractions: [] }} />);
+		const html = renderToStaticMarkup(<ActivitySection feed={{ jobs: [], runs: [] }} />);
 		assert.match(html, /data-testid="activity-section"/);
 		assert.match(html, /Working in the background/);
-		assert.doesNotMatch(html, /activity-blob-(job|extraction)/, "no rows while idle");
+		assert.doesNotMatch(html, /activity-blob-(job|run)/, "no rows while idle");
 		assert.doesNotMatch(html, /activity-total-cost/, "the cost span is population, not decoration");
 	});
 
 	it("renders one row per running process with elapsed time and the abort affordance; the detail carries activity and cost", async () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "j1", kind: "demo", activity: "building sandbox…", title: "Chain-rule demo" })],
-			extractions: [{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 60_000 }],
+			runs: [{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 60_000 }],
 		};
 		const html = renderToStaticMarkup(<ActivitySection feed={feed} />);
 		assert.match(html, /data-testid="activity-section"/);
 		assert.match(html, /data-testid="activity-blob-job"/);
-		assert.match(html, /data-testid="activity-blob-extraction"/);
+		assert.match(html, /data-testid="activity-blob-run"/);
 		assert.match(html, /Chain-rule demo/);
 		assert.match(html, /Mapping course · Algebra|Mapping course[\s\S]*Algebra/);
 		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g)?.length, 2, "elapsed on every row");
@@ -259,7 +259,7 @@ describe("activity section render", () => {
 					job({ id: "a", usage, title: "Limits lesson" }),
 					job({ id: "b", usage, title: "Series lesson", createdAt: new Date(NOW - 20_000).toISOString() }),
 				],
-				extractions: [],
+				runs: [],
 			},
 			"Limits lesson",
 		);
@@ -271,7 +271,7 @@ describe("activity section render", () => {
 	it("a running digest's sidebar row says what it is doing before it is opened", () => {
 		const html = renderToStaticMarkup(
 			<ActivitySection
-				feed={{ jobs: [], extractions: [{ id: "cx#digest", chatId: "cx", title: "Invertible matrices", phase: "digesting", startedAt: NOW }] }}
+				feed={{ jobs: [], runs: [{ id: "cx#digest", chatId: "cx", title: "Invertible matrices", phase: "digesting", startedAt: NOW }] }}
 			/>,
 		);
 		const label = html.match(/data-slot="nav-row-label"[^>]*>([^<]*)</)?.[1] ?? "";

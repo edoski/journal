@@ -169,7 +169,7 @@ describe("every topic once, in the group he would act on it from", () => {
 
 describe("the header's facts and next lesson", () => {
 	it("counts what Home's pie counts, names the exam once and when he last studied", () => {
-		assert.deepEqual(courseFacts(course()), { progress: "3 of 10 on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago" });
+		assert.deepEqual(courseFacts(course()), { progress: "3 of 10 topics on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago" });
 	});
 
 	it("leaves out an exam that is not set and a count for a course with no topics", () => {
@@ -239,20 +239,20 @@ describe("the course header", () => {
 		assert.equal(document.querySelector('[data-slot="course-title"]')!.textContent, "Linear Algebra");
 		assert.equal(document.querySelector('[data-slot="course-action"]')!.textContent, "Review");
 		assert.deepEqual(
-			[...document.querySelectorAll('[data-slot="course-fact"]')].map((f) => f.textContent),
-			["3 of 10 on your own", "Exam in 21 days", "Studied 2 days ago"],
+			[...document.querySelectorAll('[data-slot="page-fact"]')].map((f) => f.textContent),
+			["3 of 10 topics on your own", "Exam in 21 days", "Studied 2 days ago"],
 		);
 		assert.equal(document.querySelector('[data-slot="course-next"]')!.textContent, "Review Span1w overdue");
 		assert.deepEqual(
 			[...document.querySelectorAll("button, a")].map((c) => c.getAttribute("data-slot")),
 			["course-add-material", "course-action"],
-			"two controls: Add material, then the lesson button at the far right",
+			"two controls: Add material, then the page's press at the far right",
 		);
 	});
 
 	it("leaves the exam out when there is none, and its skeleton keeps the header's three rows", () => {
 		const document = render(<CourseHeader view={viewOf(course({ exam: null }))} busy={false} onContinue={() => {}} />);
-		assert.equal(document.querySelectorAll('[data-slot="course-fact"]').length, 2);
+		assert.equal(document.querySelectorAll('[data-slot="page-fact"]').length, 2);
 		const skeleton = render(<CourseHeaderSkeleton />);
 		assert.equal(skeleton.querySelector('[role="status"]')!.children.length, 3);
 	});
@@ -265,7 +265,7 @@ describe("the course header", () => {
 				</CourseLessonError>,
 			);
 		assert.equal(header(null).querySelector('[role="alert"]'), null);
-		const alert = header("Couldn’t open the session. Try again.").querySelector('[data-slot="course-header"] [role="alert"]');
+		const alert = header("Couldn’t open the session. Try again.").querySelector('[data-slot="page-head"] [role="alert"]');
 		assert.equal(alert?.textContent, "Couldn’t open the session. Try again.");
 	});
 });
@@ -290,14 +290,14 @@ describe("the course topic row and group", () => {
 		assert.equal(document.querySelector('[data-slot="course-topic-fact"] .sr-only')!.textContent, "You are here");
 	});
 
-	it("heads a group with its name and no count, folds it, and shows the first rows then Show N more", () => {
+	it("heads a group with its name and no count, folds it, and shows the first rows then Show the rest", () => {
 		const items = ["a", "b", "c", "d", "e"];
 		const draw = (props: Partial<React.ComponentProps<typeof CourseGroup<string>>>) =>
 			render(<CourseGroup title="Not started" items={items} renderItem={(i) => <li key={i}>{i}</li>} {...props} />);
 		const open = draw({ limit: 3 });
 		assert.equal(open.querySelector('[data-slot="course-group-header"]')!.textContent, "Not started");
 		assert.equal(open.querySelectorAll("li").length, 3);
-		assert.equal(open.querySelector('[data-slot="course-group-more"]')!.textContent, "Show 2 more");
+		assert.equal(open.querySelector('[data-slot="course-group-more"]')!.textContent, "Show the rest");
 		const folded = draw({ foldable: true, defaultFolded: true });
 		assert.equal(folded.querySelector('[data-slot="course-group-header"]')!.getAttribute("aria-expanded"), "false");
 		assert.equal(folded.querySelectorAll("li").length, 0);
@@ -307,7 +307,7 @@ describe("the course topic row and group", () => {
 describe("the topic map's highlight", () => {
 	const map = course().map;
 	const dimmed = (document: Document) =>
-		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-35")).map((n) => n.getAttribute("data-testid"));
+		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-60")).map((n) => n.getAttribute("data-testid"));
 
 	it("dims nothing by default, as Home draws it", () => {
 		assert.deepEqual(dimmed(render(<TopicMap map={map} />) as unknown as Document), []);

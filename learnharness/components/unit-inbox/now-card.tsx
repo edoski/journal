@@ -90,7 +90,6 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 				status={running ? <UnitStatusText status={{ kind: "working" }} /> : reason}
 				title={chat.title}
 				recede={running}
-				capStatus
 			/>
 		);
 	}
@@ -107,7 +106,6 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 			title={unit.topic.title}
 			action={<NowAction line={line} title={unit.topic.title} className={CARD_ACTION_PLACE} />}
 			recede={working}
-			capStatus
 		/>
 	);
 }

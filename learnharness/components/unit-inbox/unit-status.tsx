@@ -20,23 +20,28 @@ const ICON: Record<Exclude<UnitStatus["kind"], "working" | "studied" | "none">, 
 
 /** A row's status (units.ts `unitStatus`), T3 Code's status label: a 12px
  *  icon and a few words. "Your turn" wears the accent at 500, the spinner
- *  shows while the tutor writes, and every other fact is muted at 400. */
+ *  shows while the tutor writes, and every other fact is muted at 400. The
+ *  root is `contents`, so the icon and the words are the status slot's own
+ *  items and the words can give way (`STATUS_SLOT`). */
 export function UnitStatusText({ status }: { status: UnitStatus }) {
 	switch (status.kind) {
 		case "none":
 			return null;
 		case "working":
 			return (
-				<span data-slot="unit-status" data-kind="working" className="inline-flex items-center gap-1">
-					<BrailleSpinner />
-					<span className="sr-only">, </span>Working
+				<span data-slot="unit-status" data-kind="working" className="contents">
+					<span className="flex h-4 shrink-0 items-center">
+						<BrailleSpinner />
+					</span>
+					<span className="sr-only">, </span>
+					<span className="whitespace-nowrap">Working</span>
 				</span>
 			);
 		case "studied":
 			return (
-				<span data-slot="unit-status" data-kind="studied">
+				<span data-slot="unit-status" data-kind="studied" className="contents">
 					<span className="sr-only">, studied </span>
-					{status.words}
+					<span className="whitespace-nowrap">{status.words}</span>
 				</span>
 			);
 		default: {
@@ -46,11 +51,13 @@ export function UnitStatusText({ status }: { status: UnitStatus }) {
 				<span
 					data-slot="unit-status"
 					data-kind={status.kind}
-					className={cn("inline-flex min-w-0 items-center gap-1", status.kind === "your-turn" && "font-medium text-link")}
+					className={cn("contents", status.kind === "your-turn" && "font-medium text-link")}
 				>
-					<Icon aria-hidden className="size-3 shrink-0" />
+					<span className="flex h-4 shrink-0 items-center">
+						<Icon aria-hidden className="size-3" />
+					</span>
 					<span className="sr-only">, </span>
-					<span className="truncate">{words}</span>
+					<span className="whitespace-nowrap">{words}</span>
 				</span>
 			);
 		}

@@ -16,8 +16,8 @@ import { MathText, mathPlain } from "@/components/ui/math-text";
 
 export { rowSurface };
 
-/** Where a one-line row's action sits: over its status slot. */
-export const SLIM_ACTION_PLACE = "inset-y-0 right-2.5 my-auto h-6";
+/** Where a shelf row's action sits: over its status slot, on the title's first line. */
+export const SLIM_ACTION_PLACE = "right-2.5 top-1.5 h-6";
 
 /** A course's 16px mark, T3 Code's project monogram: its initials in a
  *  rounded tile tinted 14% by its own ink, in SF Pro at 500. The letters
@@ -101,7 +101,6 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 			title={unit.topic.title}
 			action={<RowAction unit={unit} className={CARD_ACTION_PLACE} />}
 			recede={unit.now === "working"}
-			capStatus
 		/>
 	);
 }
@@ -109,6 +108,8 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 /**
  * A known topic on its shelf, T3 Code's one-line shelf row (36px): the
  * course's mark, greyed until hovered, the title, and when it comes back.
+ * The title takes the room it needs and wraps onto a second line rather
+ * than be cut; the status gives way to its icon first (`STATUS_SLOT`).
  * A click opens the topic's page; the action starts a review now.
  * `status` and `action` replace the slot's fact and the action (the
  * shelves under Today).
@@ -137,18 +138,18 @@ export function TopicSlimRow({
 				data-sidebar-row={unit.key}
 				data-sidebar-parent={parent}
 				data-testid="unit-row"
-				className={cn(rowSurface(active), "flex h-9 items-center gap-2 px-2.5")}
+				className={cn(rowSurface(active), "flex min-h-9 items-start gap-2 px-2.5 py-1.5")}
 			>
 				<CourseMark
 					title={unit.course.title}
-					className={cn(!active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
+					className={cn("mt-1", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
 				/>
 				<span
-					className={cn("min-w-0 flex-1 truncate text-control", active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}
+					className={cn("min-w-0 py-0.5 text-control text-pretty", active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}
 				>
 					<MathText>{unit.topic.title}</MathText>
 				</span>
-				<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-6 max-w-[50%]")}>
+				<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-6 py-1")}>
 					{status ?? <UnitStatusText status={unitStatus(unit, today)} />}
 				</span>
 			</Link>
@@ -199,34 +200,32 @@ export function SessionSlimRow({
 				onOpen();
 				blurAfterPointerClick(e);
 			}}
-			className={cn(rowSurface(active), "h-9 gap-2 px-2.5", active && "hover:bg-fill-selected", highlighted && "bg-fill-hover")}
+			className={cn(rowSurface(active), "h-auto min-h-9 items-start gap-2 px-2.5 py-1.5 whitespace-normal", active && "hover:bg-fill-selected", highlighted && "bg-fill-hover")}
 		>
 			{chat.course ? (
 				<CourseMark
 					title={chat.course.title}
-					className={cn(!active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
+					className={cn("mt-1", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
 				/>
 			) : (
-				<CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+				<CircleDashedIcon aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
 			)}
 			<span
 				className={cn(
-					"flex min-w-0 flex-1 items-baseline gap-1.5 text-control",
+					"min-w-0 py-0.5 text-control text-pretty",
 					active || state === "your-turn" ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground",
 					state === "your-turn" && "font-medium",
 				)}
 			>
-				<span className="min-w-0 truncate">
-					<MathText>{chat.title}</MathText>
-				</span>
+				<MathText>{chat.title}</MathText>
 				{twin && (
-					<span data-slot="session-twin" className="shrink-0 text-label font-normal text-muted-foreground">
+					<span data-slot="session-twin" className="ml-1.5 text-label font-normal whitespace-nowrap text-muted-foreground">
 						<span className="sr-only">, </span>
 						{twin}
 					</span>
 				)}
 			</span>
-			<span data-testid={state === "your-turn" ? "session-waiting" : undefined} className={cn(TRAILING_SLOT, "h-6")}>
+			<span data-testid={state === "your-turn" ? "session-waiting" : undefined} className={cn(TRAILING_SLOT, "h-6 py-1")}>
 				<UnitStatusText
 					status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
 				/>

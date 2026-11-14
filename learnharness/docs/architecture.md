@@ -461,7 +461,7 @@ The researcher's `web_search` is the engine model's own search, looked up by pro
 
 ## 10. Observability and change delivery (the push model, owner ruling 2026-10-02)
 
-Structured-logging frameworks are still deferred; the baseline is one correlation-tagged log line per event at the seams (`[chat <id>]` on turn services, `[extraction <id>]` on the pipeline, `[job <id>]` on runners, `[graph]` on reads). What has grown past log lines is the **activity feed** (`server/observability.ts` → `GET /api/activity` → the activity dock): running jobs, extraction runs, and practice runs (per-set rows: generation/grading phases), per-run usage (money channel), and true abort (`POST /api/activity/abort` — kind `job`/`extraction`/`practice`). When structured logging lands, it goes behind these seams — no call sites change.
+Structured-logging frameworks are still deferred; the baseline is one correlation-tagged log line per event at the seams (`[chat <id>]` on turn services, `[extraction <id>]` on the pipeline, `[job <id>]` on runners, `[graph]` on reads). What has grown past log lines is the **activity feed** (`server/observability.ts` → `GET /api/activity` → the activity dock): running jobs and background runs (lesson digests and course-map builds, the feed's `runs`), per-run usage (money channel), and true abort (`POST /api/activity/abort` — kind `job`/`run`/`turn`). When structured logging lands, it goes behind these seams — no call sites change.
 
 ### 10.1 The events channel — how the client learns truth moved
 

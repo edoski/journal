@@ -59,9 +59,13 @@ function DropdownMenuTrigger({
   )
 }
 
+/** How close a menu may come to the window's edge: never flush against it. */
+const WINDOW_GUTTER = 8
+
 function DropdownMenuContent({
   className,
   sideOffset = 4,
+  collisionPadding = WINDOW_GUTTER,
   onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
@@ -71,6 +75,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         {...OVERLAY_ATTRS}
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
         className={cn(
           OVERLAY_LAYER,
