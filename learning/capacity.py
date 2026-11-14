@@ -408,3 +408,64 @@ def estimate(days: dict[date, Done], today: date) -> Capacity:
 
 def of(records: Iterable[dict[str, Any]], today: date) -> Capacity:
     return estimate(activity(records, today), today)
+
+
+# --- the final review ---------------------------------------------------------
+
+
+def final_review_days(
+    record: dict[str, Any],
+    others: Iterable[dict[str, Any]],
+    week: Capacity,
+    today: date,
+) -> int | None:
+    """How many days before its exam a course's final review starts, from his
+    pace: the fewest that hold one review of each of its path topics, at the
+    reviews he does on each study day (``Weekday.reviews``), less what a
+    nearer exam's final review takes of those days, and never fewer than the
+    shortest final review (``progress.SHORTEST_FINAL_REVIEW``).
+
+    The final review comes before every other review, nearest exam first, and
+    spreads its topics over its days by what each holds, so this is the
+    shortest one with room for every topic; a longer one would ask him to
+    review topics further from the exam than his pace needs, and a shorter one
+    leaves some with no review before it. It starts no earlier than today:
+    days gone hold nothing. With no review on record yet he has shown no
+    limit, and the plan proposes every review owed, so the shortest stands
+    until his record shows his pace. None without an exam date.
+    """
+    when = record.get("exam", {}).get("date")
+    if not when:
+        return None
+    exam = date.fromisoformat(when)
+    shortest = progress.SHORTEST_FINAL_REVIEW
+    if not any(weekday.reviews.value for weekday in week.weekdays):
+        return shortest
+    nearer = []
+    for other in others:
+        plan = progress.exam_plan(other)
+        if plan is not None and today < plan.day < exam:
+            days = [
+                plan.final + timedelta(days=n)
+                for n in range((plan.day - plan.final).days)
+            ]
+            total = sum(week.on(day).reviews.value for day in days if week.studies(day))
+            nearer.append((plan, len(progress.path_order(other)), total))
+    topics = len(progress.path_order(record))
+    room = 0.0
+    lead = 0
+    while room < topics or lead < shortest:
+        lead += 1
+        day = exam - timedelta(days=lead)
+        if day < today:
+            return max(lead - 1, shortest)
+        if not week.studies(day):
+            continue
+        rate = week.on(day).reviews.value
+        taken = sum(
+            count * rate / total
+            for plan, count, total in nearer
+            if total and plan.final <= day < plan.day
+        )
+        room += max(rate - taken, 0.0)
+    return lead

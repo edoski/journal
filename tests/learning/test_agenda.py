@@ -5,6 +5,10 @@ from typing import Any
 from learning import agenda, capacity, progress, schema
 from learning.capacity import Capacity, Done, Limit, Weekday
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
 MONDAY = date(2026, 1, 5)
 WEEKDAYS = frozenset(range(5))
 
@@ -16,7 +20,7 @@ def on(offset: int) -> date:
 def save(record: dict[str, Any], patch: dict[str, Any], day: date) -> dict[str, Any]:
     now = f"{day.isoformat()}T09:00:00+00:00"
     patched, outcome = schema.apply_patch(record, patch, today=day, now=now)
-    planned, _ = progress.schedule(patched, outcome, day)
+    planned, _ = progress.schedule(patched, outcome, day, LEAD)
     return schema.validate_record(planned)
 
 
@@ -493,7 +497,9 @@ def test_a_review_the_final_review_repeats_waits_behind_a_course_with_no_exam() 
 def test_a_review_a_competing_methods_start_waits_on_comes_first() -> None:
     exam = course(3, exam=40, contrasts={"t01": ["t00"]})
     exam = save(exam, {"topics": {"t00": {"introduced": True}}}, on(-3))
-    exam = save(exam, {"topics": {"t00": {"review": {"due": on(-1).isoformat()}}}}, MONDAY)
+    exam = save(
+        exam, {"topics": {"t00": {"review": {"due": on(-1).isoformat()}}}}, MONDAY
+    )
     free = solid(course(1), on(-30))
     together = plan({"exam": exam, "free": free}, 1, week(1, 0, frozenset(range(7))))
     assert together.days["exam"][0]["reviews"] == ["t00"]
@@ -501,7 +507,9 @@ def test_a_review_a_competing_methods_start_waits_on_comes_first() -> None:
 
 def test_competing_methods_due_together_are_reviewed_side_by_side() -> None:
     record = solid(course(2, contrasts={"t00": ["t01"]}), on(-1))
-    record = save(record, {"topics": {"t00": {"review": {"due": on(-8).isoformat()}}}}, MONDAY)
+    record = save(
+        record, {"topics": {"t00": {"review": {"due": on(-8).isoformat()}}}}, MONDAY
+    )
     free = solid(course(1), on(-6))
     together = plan({"c": record, "free": free}, 1, week(2, 0, frozenset(range(7))))
     assert together.days["c"][0]["reviews"] == ["t00", "t01"]
@@ -557,3 +565,51 @@ def test_a_review_that_an_exams_next_topics_wait_on_comes_first() -> None:
     together = plan({"near": near, "far": far}, 1, week(1, 0, frozenset(range(7))))
     assert together.days["near"][0]["reviews"] == ["t00"]
     assert together.days["far"][0]["reviews"] == []
+
+
+def test_the_final_review_is_as_long_as_his_pace_needs_for_every_topic() -> None:
+    every = frozenset(range(7))
+    record = course(16, exam=30)
+    assert capacity.final_review_days(record, [], week(2, 0, every), MONDAY) == 8
+    assert capacity.final_review_days(record, [], week(4, 0, every), MONDAY) == 4
+    assert capacity.final_review_days(record, [], week(2, 0), MONDAY) == 12
+    assert capacity.final_review_days(record, [], week(0, 0, every), MONDAY) == (
+        progress.SHORTEST_FINAL_REVIEW
+    )
+    assert (
+        capacity.final_review_days(course(16, exam=5), [], week(2, 0, every), MONDAY)
+        == 5
+    )
+    assert capacity.final_review_days(course(16), [], week(2, 0, every), MONDAY) is None
+
+
+def test_a_nearer_exams_final_review_lengthens_a_later_one_it_overlaps() -> None:
+    every = frozenset(range(7))
+    near = save(course(8, exam=27), {"exam": {"date": on(27).isoformat()}}, MONDAY)
+    far = course(16, exam=30)
+    alone = capacity.final_review_days(far, [], week(4, 0, every), MONDAY)
+    beside = capacity.final_review_days(far, [near], week(4, 0, every), MONDAY)
+    assert alone == 4 and beside is not None and beside > alone
+
+
+def test_a_save_stores_the_final_review_his_pace_needs_and_keeps_it_once_begun() -> (
+    None
+):
+    record = save(course(1, exam=8), {"topics": {"t00": {"introduced": True}}}, on(-3))
+    record = save(record, {"observations": [answer("t00")]}, on(-2))
+    record = save(record, {"observations": [answer("t00")]}, on(1))
+    assert record["topics"]["t00"]["review"]["due"] == on(2).isoformat()
+
+    def resaved(day: date, lead: int) -> tuple[dict[str, Any], progress.Scheduled]:
+        now = f"{day.isoformat()}T09:00:00+00:00"
+        patched, outcome = schema.apply_patch(
+            record, {"focus": None}, today=day, now=now
+        )
+        return progress.schedule(patched, outcome, day, lead)
+
+    later, moved = resaved(on(1), 4)
+    assert later["exam"]["final_review_days"] == 4
+    assert moved.reviews == {"t00": {"due": on(4).isoformat(), "by": "engine"}}
+    record = later
+    kept, _ = resaved(on(5), 2)
+    assert kept["exam"]["final_review_days"] == 4

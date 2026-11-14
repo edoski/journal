@@ -5,6 +5,10 @@ from typing import Any
 
 from learning import progress, schema
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
 DAY1 = date(2026, 1, 1)
 TOPICS = {"topics": {"a": {"title": "A"}, "b": {"title": "B"}}}
 
@@ -39,7 +43,7 @@ class Course:
         stamp = datetime(today.year, today.month, today.day, 8, tzinfo=None)
         now = (stamp + timedelta(minutes=self.minute)).isoformat() + "+00:00"
         patched, outcome = schema.apply_patch(self.record, patch, today=today, now=now)
-        self.record, self.scheduled = progress.schedule(patched, outcome, today)
+        self.record, self.scheduled = progress.schedule(patched, outcome, today, LEAD)
         return self
 
     def attempts(self, day: int, *observations: dict[str, Any]) -> "Course":

@@ -175,7 +175,7 @@ def test_resume_selects_the_focused_task_and_its_topics(workspace: Workspace) ->
     result = retrieval.resume(workspace)
     assert result["course"] == {
         "title": "Algebra",
-        "exam": {"date": day(23), "days_left": 23},
+        "exam": {"date": day(23), "final_review_days": 2, "days_left": 23},
         "journal": "SMM",
     }
     assert result["last_activity"] == {"date": TODAY.isoformat(), "days_ago": 0}
@@ -597,7 +597,7 @@ def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
     result = retrieval.course_map(workspace)
     assert (workspace.root / "course.json").read_bytes() == stored
     assert result["today"] == TODAY.isoformat()
-    assert result["exam"] == {"date": day(23), "days_left": 23, "final_review": day(17)}
+    assert result["exam"] == {"date": day(23), "days_left": 23, "final_review": day(21)}
     assert result["current"] == "step-3" and result["focus"] == "sheet"
     assert result["tasks"] == [
         {"key": "sheet", "title": "Sheet 1", "updated": TODAY.isoformat()}

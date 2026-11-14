@@ -610,7 +610,9 @@ def _new(
         if not any(chosen.values()) or week.on(day).new.value >= 2:
             return take(course, 1)
         started = chosen[course.name]
-        return take(course, 1, {t for t in course.untaught if course.related(t, started)})
+        return take(
+            course, 1, {t for t in course.untaught if course.related(t, started)}
+        )
 
     exams = sorted(
         (course for course in courses if course.new_end(day) is not None),

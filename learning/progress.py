@@ -6,10 +6,13 @@ Each counted day of a topic gets one verdict (``solid``, ``helped`` or
 verdicts. Nothing here is stored except the reviews ``schedule`` sets.
 
 An exam bounds the course's schedule: every review before it lands no later
-than the final review, ``final_review_days`` before the exam, and a review that
-would fall on or after the exam, or that follows a ``solid`` answer from the
-final review on, moves to its spaced date after the exam (at the earliest the
-day after it), where the course's reviews go on.
+than the final review, and a review that would fall on or after the exam, or
+that follows a ``solid`` answer from the final review on, moves to its spaced
+date after the exam (at the earliest the day after it), where the course's
+reviews go on. The final review starts ``final_review_days`` before the exam:
+the course preference when the learner set one, else the lead a save derived
+from his pace and stored on the exam (``capacity.final_review_days``), else the
+shortest final review.
 """
 
 from __future__ import annotations
@@ -32,7 +35,9 @@ RETAINED_VERDICTS = 2
 # Two misses in a row: the second rules out a slip, so asking again would only
 # repeat the failure.
 RELEARN_MISSES = 2
-FINAL_REVIEW_DAYS = 6
+# The shortest final review: a topic missed on its first day comes back after
+# the miss interval and is answered again before the exam.
+SHORTEST_FINAL_REVIEW = INTERVALS["missed"] + 1
 SCHEDULING_KINDS = frozenset({"attempt", "exam"})
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
@@ -78,14 +83,15 @@ def new_end(exam: Exam, day: date) -> date:
 
 
 def exam_plan(record: dict[str, Any]) -> Exam | None:
-    """The course's exam with its final review, from the course's own preference."""
+    """The course's exam with its final review: the course preference, else
+    the lead a save derived from his pace, else the shortest final review."""
     value = record.get("exam", {}).get("date")
     if not value:
         return None
     day = date.fromisoformat(value)
     lead = preferences.count(
-        record["preferences"], preferences.FINAL_REVIEW_DAYS, FINAL_REVIEW_DAYS
-    )
+        record["preferences"], preferences.FINAL_REVIEW_DAYS, 0
+    ) or record["exam"].get("final_review_days", SHORTEST_FINAL_REVIEW)
     return Exam(day, day - timedelta(days=lead))
 
 
@@ -542,31 +548,55 @@ def _after_exam(key: str, replayed: Replay, exam: Exam | None) -> str | None:
     return f"{key}: next review {replayed.due.isoformat()}, after the exam"
 
 
+def _led(record: dict[str, Any], lead: int | None, today: date, moved: bool) -> bool:
+    """Store the final review's lead a save derived from his pace; whether it
+    changed. A final review under way keeps its start, so an answer it counted
+    stays counted, unless the exam itself moved."""
+    exam = record.get("exam")
+    if lead is None or not exam or "date" not in exam:
+        return False
+    stored = exam.get("final_review_days")
+    day = date.fromisoformat(exam["date"])
+    if stored == lead or (
+        stored is not None and day - timedelta(days=stored) <= today and not moved
+    ):
+        return False
+    record["exam"] = {**exam, "final_review_days": lead}
+    return True
+
+
 def _resync(
     record: dict[str, Any],
     histories: dict[str, _History],
     today: date,
     scheduled: Scheduled,
+    *,
+    moved: bool = True,
 ) -> None:
-    """Re-derive every engine date after the exam or its final review moved.
+    """Re-derive every engine date after the exam (``moved``) or only its
+    final review moved.
 
     Each engine date becomes the replayed one, so moving the exam and moving
-    it back restores the dates. A tutor date on or after an exam still ahead is
-    handed to the engine.
+    it back restores the dates. When the exam moved, a tutor date on or after
+    an exam still ahead is handed to the engine.
     """
     exam = exam_plan(record)
+    why = "after the exam moved" if moved else "after its final review moved"
     for key, topic in list(record["topics"].items()):
         review = topic.get("review", {})
         stored = review.get("due")
         if review.get("by") == "tutor" and not (
-            exam is not None and exam.day > today and stored >= exam.day.isoformat()
+            moved
+            and exam is not None
+            and exam.day > today
+            and stored >= exam.day.isoformat()
         ):
             continue
         target = replay(key, topic, histories.get(key, _History()).attempts, exam).due
         if target is not None and target.isoformat() != stored:
             scheduled.reviews[key] = _with_review(record, key, target, "engine")
             scheduled.notes.append(
-                f"{key}: review moved to {target.isoformat()}, after the exam moved"
+                f"{key}: review moved to {target.isoformat()}, {why}"
             )
 
 
@@ -723,11 +753,16 @@ def _stale_notes(
 
 
 def schedule(
-    record: dict[str, Any], changes: PatchResult, today: date
+    record: dict[str, Any],
+    changes: PatchResult,
+    today: date,
+    lead: int | None = None,
 ) -> tuple[dict[str, Any], Scheduled]:
     """Apply a save's engine consequences; returns the new record and what moved.
 
-    A save that moves the exam or its final review re-derives every engine date.
+    ``lead`` is the final review's length his pace asks for
+    (``capacity.final_review_days``); the save stores it on the exam. A save
+    that moves the exam or its final review re-derives every engine date.
     Tutor-set dates on or after the exam move to the day before it. A topic whose
     verdicts this save created or changed is due on its next expected review day,
     unless the same patch dated its review; a practice day leaves the date alone
@@ -740,8 +775,11 @@ def schedule(
     _stamp_due(result, changes)
     scheduled = Scheduled()
     histories = _histories(result["observations"])
+    led = _led(result, lead, today, changes.exam_moved)
     if changes.exam_moved:
         _resync(result, histories, today, scheduled)
+    elif led:
+        _resync(result, histories, today, scheduled, moved=False)
     _clamp_tutor_dates(result, changes, today, scheduled)
     _reschedule(result, changes, histories, scheduled)
     _first_retrievals(result, changes, histories, scheduled)

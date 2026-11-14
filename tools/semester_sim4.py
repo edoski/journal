@@ -128,7 +128,13 @@ class Run:
         patched, outcome = self.schema.apply_patch(
             course.record, patch, today=day(n), now=now
         )
-        planned, _ = self.progress.schedule(patched, outcome, day(n))
+        others = [
+            other.record
+            for other in getattr(self, "courses", [])
+            if other is not course
+        ]
+        lead = sim.final_review_days(self.capacity, patched, others, n)
+        planned, _ = self.progress.schedule(patched, outcome, day(n), *lead)
         course.record = self.schema.validate_record(planned)
 
     def plan(self, n: int) -> dict[str, tuple[list[str], list[str]]]:

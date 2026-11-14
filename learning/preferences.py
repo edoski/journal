@@ -15,7 +15,8 @@ _SCHEMA = 1
 
 # The dimension the engine reads as well as the tutor, a count of days.
 # ``final_review_days`` shapes the course's stored review dates, so it belongs
-# to the course, never to the global preferences.
+# to the course, never to the global preferences. Unset, a save derives the
+# length from his pace (``capacity.final_review_days``).
 FINAL_REVIEW_DAYS = "final_review_days"
 COUNTS = {FINAL_REVIEW_DAYS: (1, 14)}
 COURSE_ONLY = frozenset({FINAL_REVIEW_DAYS})
