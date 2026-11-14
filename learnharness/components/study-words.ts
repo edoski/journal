@@ -60,3 +60,19 @@ export function returnWords(days: number): string {
 	if (days < 60) return `Back in ${Math.round(days / 7)}w`;
 	return `Back in ${Math.round(days / 30)}mo`;
 }
+
+/** How much of a course he can do on his own, the topics the course's ring
+ *  counts: "5 of 16 topics on your own", "No topics on your own yet", "All
+ *  16 topics on your own". */
+export function courseShareWords(solid: number, of: number): string {
+	if (solid === 0) return "No topics on your own yet";
+	if (solid >= of) return `All ${of} topics on your own`;
+	return `${solid} of ${of} topics on your own`;
+}
+
+/** A folded list's last row: "Show the rest" when one press shows every
+ *  hidden row, else "Show more". How many is left out: a bare number told
+ *  him nothing (Edo, 13 Nov 2026). */
+export function moreWords(hidden: number, page: number): string {
+	return hidden <= page ? "Show the rest" : "Show more";
+}
