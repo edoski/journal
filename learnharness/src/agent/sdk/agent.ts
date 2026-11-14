@@ -36,6 +36,9 @@ export interface SdkAgentConfig {
 	/** A background job: no session file, at most this many model calls. */
 	ephemeral?: { maxTurns: number };
 	onUsage?: (usage: Usage) => void;
+	/** Reads each call as it finishes streaming, before any view sees it
+	 *  (the voice guard, voice-guard.ts). */
+	screen?: (call: ToolCall) => void;
 }
 
 type Listener = (event: AgentEvent) => void;
@@ -249,7 +252,10 @@ export class SdkAgent {
 					}
 					for (const fn of held.splice(0)) fn();
 				} else {
-					if (event.type === "toolcall_end") calls.set(event.toolCall.id, { call: event.toolCall, assistant: stream.message });
+					if (event.type === "toolcall_end") {
+						this.config.screen?.(event.toolCall);
+						calls.set(event.toolCall.id, { call: event.toolCall, assistant: stream.message });
+					}
 					this.emit({ type: "message_update", message: stream.message, assistantMessageEvent: event });
 				}
 			}

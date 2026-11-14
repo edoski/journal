@@ -8,10 +8,11 @@
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { recordHasArcs } from "../core/contracts/course.ts";
-import type { CourseMap } from "../core/contracts/course-map.ts";
 import { projectCourseBrief, type CoursePlans } from "../core/course-brief.ts";
 import { newCourseContextMessage, sessionModeOf, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
+import { planDays, plannedOf } from "./calendar.ts";
 import { stores } from "./stores.ts";
+import { readCourses } from "./study.ts";
 
 export type CourseBrief = { key: string; text: string };
 
@@ -20,17 +21,12 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 	const { workspace } = record.course;
 	const role = sessionModeOf(record.messages, record.kind);
 	try {
-		// Practice also reads the exam run-up, which only `plan` reports; the
-		// engine calls run side by side, and a failed `plan` only drops the
-		// run-up line, a failed plan read only the daily plan.
-		const [resumed, planned, plan] = await Promise.all([
-			stores.courseRecords.run(workspace, { verb: "resume" }),
-			role === "practice" ? stores.courseRecords.run(workspace, { verb: "plan" }).catch(() => null) : null,
-			fetchCoursePlans(record.id, workspace),
-		]);
-		if (planned && !planned.ok) console.error(`[chat ${record.id}] exam run-up skipped: ${planned.message}`);
-		const runup = planned?.ok ? { plan: planned.json, workspace } : undefined;
-		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan, opened: openedOn(record) });
+		// The engine calls run side by side; a failed plan read drops only the
+		// daily plan, and with it practice's exam run-up, which only `plan`
+		// reports: the open course's own plan carries it.
+		const [resumed, read] = await Promise.all([stores.courseRecords.run(workspace, { verb: "resume" }), fetchCoursePlans(record.id, workspace)]);
+		const runup = role === "practice" && read?.own ? { plan: read.own, workspace } : undefined;
+		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan: read?.plans, opened: openedOn(record) });
 		console.error(`[chat ${record.id}] course brief skipped: ${resumed.message}`);
 	} catch (err) {
 		console.error(`[chat ${record.id}] course brief skipped:`, err);
@@ -38,27 +34,23 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 	return null;
 }
 
-/** Every registered course's `map`, the open course's included: the daily
- *  plan of each, which the engine makes with every course together. All or
- *  nothing, so the brief never presents part of the plan as all of it. */
-async function fetchCoursePlans(chatId: string, workspace: string): Promise<CoursePlans | undefined> {
+/** Every registered course's map and daily plan, the open course's
+ *  included, read as the calendar reads them (`readCourses` with its
+ *  `planDays`): the plan the engine makes with every course together, up
+ *  to each exam and six weeks at least, every review of every topic. A
+ *  course that cannot be read is named, never silently left out. `own` is
+ *  the open course's `plan` output, which carries its exam run-up. */
+async function fetchCoursePlans(chatId: string, workspace: string): Promise<{ plans: CoursePlans; own: unknown } | undefined> {
 	try {
-		const listing = await stores.courseRecords.list();
+		const listing = await readCourses(planDays);
 		if (!listing.available) {
 			console.error(`[chat ${chatId}] daily plan skipped: ${listing.reason}`);
 			return undefined;
 		}
-		const others = listing.courses.map((c) => c.workspace).filter((w) => w !== workspace);
-		const read = await Promise.all([workspace, ...others].map((w) => stores.courseRecords.map(w)));
-		const maps: CourseMap[] = [];
-		for (const result of read) {
-			if (!result.ok) {
-				console.error(`[chat ${chatId}] daily plan skipped: ${result.message}`);
-				return undefined;
-			}
-			maps.push(result.map);
-		}
-		return { workspace, maps };
+		return {
+			plans: { workspace, courses: listing.read.map(({ map, plan }) => ({ map, days: plannedOf(plan, map) })), unread: listing.failed.map((c) => c.title) },
+			own: listing.read.find(({ map }) => map.workspace === workspace)?.plan ?? null,
+		};
 	} catch (err) {
 		console.error(`[chat ${chatId}] daily plan skipped:`, err);
 		return undefined;
