@@ -98,15 +98,15 @@ describe("background agents", () => {
 		runs: [],
 	};
 
-	it("one row per process under a quiet header: what it is doing and for which session, elapsed time and a named stop button; cost waits in the detail", () => {
+	it("one row per process under a quiet header: what it is doing and for which session, in full, and a named stop button; no timer, no cost", () => {
 		const doc = documentFor(<ActivitySection feed={feed} />);
 		const section = doc.querySelector('[data-testid="activity-section"]');
-		assert.equal(section?.querySelector('[data-slot="nav-section-header"]')?.textContent, "Working in the background");
+		assert.equal(section?.querySelector('[data-slot="nav-section-header"]')?.textContent, "Background work");
 		const row = section?.querySelector('[data-testid="activity-blob-job"] [data-slot="nav-row"]');
-		assert.equal(row?.querySelector('[data-slot="nav-row-label"]')?.textContent, "Researcher · Eigenvalues and eigenvectors");
-		assert.match(row?.querySelector('[data-testid="activity-blob-elapsed"]')?.textContent ?? "", /^\d+(s|m \d\ds|h \d\dm)$/);
+		assert.equal(row?.querySelector('[data-slot="nav-row-label"]')?.textContent, "Looking things up for Eigenvalues and eigenvectors");
+		assert.doesNotMatch(row?.textContent ?? "", /\d/, "no timer");
 		assert.equal(row?.getAttribute("aria-expanded"), "false");
-		assert.equal(doc.querySelector('[data-testid="activity-abort"]')?.getAttribute("aria-label"), "End Researcher in Eigenvalues and eigenvectors");
+		assert.equal(doc.querySelector('[data-testid="activity-abort"]')?.getAttribute("aria-label"), "Stop: Looking things up for Eigenvalues and eigenvectors");
 		assert.equal(doc.querySelector('[data-testid="activity-blob-cost"]'), null, "no cost on the row's face");
 		assert.equal(doc.querySelector('[data-testid="activity-total-cost"]'), null, "no running total in the header");
 	});

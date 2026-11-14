@@ -49,6 +49,10 @@ Home's line names the lapsed topic when the line is about another one ("Missed C
 | a question's card and folded bar (`QUESTION_WORDS`) | Check (a check after teaching), Prediction, Recall, else Question; never Explain, the tool's name |
 | Esc's confirm (`STOP_WORDS`) | Stop the tutor's reply? What it has written so far stays. Stop / Skip this question? The tutor goes on without your answer. Skip / Skip this problem? The tutor moves on, and the solution stays hidden. Skip; while the tutor writes, The tutor's reply stops too. |
 
+## Background work
+
+`BACKGROUND_WORDS`: one name, Background work, for the sidebar's foot and every mention of it ("You can follow it under Background work in the sidebar and start studying now."). Each piece says what it does for which lesson or course in full, never cut and never timed (`backgroundWorkWords`): Building the topic map of Graph Theory; Saving what you learned in Eigenvalues; Drawing a figure for, Looking things up for, Building a demo for, Reading a PDF for a lesson.
+
 ## Counts
 
 | Where | Words |

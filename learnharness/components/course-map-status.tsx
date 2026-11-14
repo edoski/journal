@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useNotifyHub } from "@/components/server-events";
 import { courseLabel, type CourseSummary } from "@/src/core";
+import { BACKGROUND_WORDS } from "@/components/study-words";
 
 /** Where the new course's map stands, as GET /api/courses/map reports it. */
 export type MapStatus =
@@ -24,7 +25,7 @@ export function mapStatusWords(status: MapStatus | null): { text: string; retry:
 		case "none":
 			return { text: "Its topic map has not been built yet.", retry: true };
 		default:
-			return { text: "Its topic map is being built from your material. You can follow it in Activity and start studying now.", retry: false };
+			return { text: `Its topic map is being built from your material. ${BACKGROUND_WORDS.followIt}`, retry: false };
 	}
 }
 

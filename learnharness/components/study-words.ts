@@ -177,6 +177,36 @@ export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {
 	unreadable: "Its file can't be opened.",
 };
 
+/** What the sidebar's foot calls the work the app does on its own (a
+ *  figure, a course's topic map, what a finished lesson taught), one name
+ *  wherever it is mentioned (round 3: "Activity" against "Working in the
+ *  background"). */
+export const BACKGROUND_WORDS = {
+	name: "Background work",
+	followIt: "You can follow it under Background work in the sidebar and start studying now.",
+} as const;
+
+/** One piece of background work in full: what it does, for which lesson or
+ *  course. */
+export function backgroundWorkWords(kind: JobKind | "mapping" | "digest" | "unknown", title: string): string {
+	switch (kind) {
+		case "mapping":
+			return `Building the topic map of ${title}`;
+		case "digest":
+			return `Saving what you learned in ${title}`;
+		case "visual":
+			return `Drawing a figure for ${title}`;
+		case "research":
+			return `Looking things up for ${title}`;
+		case "demo":
+			return `Building a demo for ${title}`;
+		case "pdf":
+			return `Reading a PDF for ${title}`;
+		default:
+			return `Working on ${title}`;
+	}
+}
+
 /** How much of a course he can do on his own, in words beside the ring
  *  that draws the share: no count, since the app shows none (Edo's
  *  rulings; round 2 flagged "5 of 16"). "Most" is more than half. */

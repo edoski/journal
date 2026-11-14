@@ -6,7 +6,8 @@ import type { CallUsage, JobKind, JobRecord } from "@/src/core";
 import { isProviderKeyRefusal } from "@/src/core";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { useServerEvent, useServerResync } from "@/components/server-events";
-import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
+import { NavRow } from "@/components/nav/nav-row";
+import { BACKGROUND_WORDS, backgroundWorkWords } from "@/components/study-words";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -24,8 +25,8 @@ import { Hint } from "@/components/ui/hint";
  * Data: ONE feed of GET /api/activity (jobs across ALL chats, title-joined,
  * oldest-first + background runs), fetched when truth moves (events
  * channel, S5). The dock speaks plain words only: what a process is
- * doing, what it works for, and for how long; no cost, tokens, model or
- * step counts.
+ * doing and what it works for, in full; no timer, cost, tokens, model or
+ * step counts (round 3: "0s" and "Running for 0s" were counts).
  *
  * Quiet/ambient by design: no entry animations, stable keys, updates land
  * in place — refreshes never flicker. ALWAYS present (owner, sidebar round):
@@ -34,11 +35,11 @@ import { Hint } from "@/components/ui/hint";
  * the session list). The sidebar's closed state means the learner opted
  * out — no ambient signal while closed (user decision: invisibility until
  * a clearer observability story wants building). Per blob: kind icon,
- * the session it works for, elapsed, an explicit END button (POST
+ * what it does for which lesson or course, an explicit END button (POST
  * /api/activity/abort — the wave-4 backend is live): 404/409 mean the
  * process is already gone (refresh, no error); real failures degrade to
  * an inline "Abort failed", never a dead control. Detail (what it is
- * doing, for how long, a link to its lesson or course) EXPANDS INLINE —
+ * doing, a link to its lesson or course) EXPANDS INLINE —
  * the section scrolls, so a floating popover would clip at its bounds.
  */
 
@@ -176,7 +177,7 @@ export interface ActivityBlob {
 	phase?: string;
 	title: string;
 	chatId: string;
-	/** ms epoch — blobs order oldest-first and elapsed counts from it. */
+	/** ms epoch — blobs order oldest-first. */
 	startedAt: number;
 	/** Latest human-readable activity line (""). */
 	activity: string;
@@ -211,27 +212,7 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 	return blobs;
 }
 
-/** Elapsed as a compact ticking string: 45s / 3m 04s / 1h 12m. */
-export function formatElapsed(ms: number): string {
-	const s = Math.max(0, Math.floor(ms / 1000));
-	if (s < 60) return `${s}s`;
-	const m = Math.floor(s / 60);
-	if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
-	return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
-}
-
 // ─── The section (the sidebar's bottom strip) ─────────────────────────────────
-
-/** A 1s heartbeat while the section is populated — elapsed lines tick. */
-function useNow(active: boolean): number {
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		if (!active) return;
-		const t = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(t);
-	}, [active]);
-	return now;
-}
 
 const KIND_ICON: Record<JobKind, typeof SearchIcon> = {
 	research: SearchIcon,
@@ -250,7 +231,6 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	const blobs = useMemo(() => toBlobs(feed), [feed]);
 	const [openBlob, setOpenBlob] = useState<string | null>(null); // detail, inline-expanded
 	const [abortStates, setAbortStates] = useState<Record<string, AbortState>>({});
-	const now = useNow(blobs.length > 0);
 	// Refs for stable abort handlers (no re-created closures per tick).
 	const abortRef = useRef({ blobs, refresh, setAbortStates });
 	abortRef.current = { blobs, refresh, setAbortStates };
@@ -290,13 +270,12 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	// The sidebar's own anatomy (nav-section.md, nav-row.md): a quiet
 	// header and one 32px row per process, its detail opening under it.
 	return (
-		<NavSection data-testid="activity-section" title="Working in the background" className="shrink-0 px-2 pt-2">
+		<NavSection data-testid="activity-section" title={BACKGROUND_WORDS.name} className="shrink-0 px-2 pt-2">
 			<div className="flex max-h-[40dvh] flex-col overflow-y-auto">
 				{blobs.map((blob) => (
 					<ActivityRow
 						key={blob.id}
 						blob={blob}
-						now={now}
 						detailOpen={openBlob === blob.id}
 						onToggleDetail={() => setOpenBlob((id) => (id === blob.id ? null : blob.id))}
 						abortState={abortStates[blob.id]}
@@ -308,23 +287,12 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	);
 }
 
-/** What a blob is, in words: "Researcher", "Saving what you learned". A
- *  background run is a finished lesson's digest or a course's map being
- *  built from its material. */
-function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "run") return blob.phase === "mapping" ? "Mapping course" : "Saving what you learned";
-	switch (blob.jobKind) {
-		case "research":
-			return "Researcher";
-		case "demo":
-			return "Demo builder";
-		case "visual":
-			return "Figure maker";
-		case "pdf":
-			return "PDF reader";
-		default:
-			return "Sub-agent";
-	}
+/** What a blob does, for which lesson or course, in full
+ *  (`backgroundWorkWords`): "Drawing a figure for Eigenvalues", "Building
+ *  the topic map of Graph Theory". */
+function blobWords(blob: ActivityBlob): string {
+	if (blob.process === "run") return backgroundWorkWords(blob.phase === "mapping" ? "mapping" : "digest", blob.title);
+	return backgroundWorkWords(blob.jobKind ?? "unknown", blob.title);
 }
 
 /** Where a process's detail links: a course-map build to its course's
@@ -334,35 +302,31 @@ function openTarget(blob: ActivityBlob): { href: string; words: string } {
 	return { href: `/chat/${blob.chatId}`, words: "Open the lesson" };
 }
 
-/** One process as a sidebar row: kind icon, what it is doing and the
- *  lesson or course it works for, elapsed time, and a stop button at the
- *  right edge; a click opens its detail (what it is doing, for how long,
- *  a link to its lesson or course) under the row. */
+/** One process as a sidebar row: kind icon, what it does for which
+ *  lesson or course in full (the words wrap, never cut), and a stop button
+ *  at the right edge; a click opens its detail (what it is doing, a link
+ *  to its lesson or course) under the row. */
 function ActivityRow({
 	blob,
-	now,
 	detailOpen,
 	onToggleDetail,
 	abortState,
 	onAbort,
 }: {
 	blob: ActivityBlob;
-	now: number;
 	detailOpen: boolean;
 	onToggleDetail: () => void;
 	abortState: AbortState | undefined;
 	onAbort: () => void;
 }) {
 	const Icon = blob.process === "run" ? WaypointsIcon : (blob.jobKind && KIND_ICON[blob.jobKind]) || BotIcon;
-	const label = blobLabel(blob);
-	const elapsed = formatElapsed(now - blob.startedAt);
+	const words = blobWords(blob);
 	const target = openTarget(blob);
 	return (
 		<div data-testid={`activity-blob-${blob.process}`} className="relative">
-			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="pr-9">
+			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="h-auto min-h-8 items-start py-1.5 pr-9 [&>svg]:mt-0.5">
 				<Icon />
-				<NavRowLabel>{`${label} · ${blob.title}`}</NavRowLabel>
-				<NavRowTrailing data-testid="activity-blob-elapsed">{elapsed}</NavRowTrailing>
+				<span data-slot="nav-row-label" className="min-w-0 flex-1 break-words">{words}</span>
 			</NavRow>
 			<Hint label={abortState === "failed" ? "Couldn't stop it. Try again" : "Stop"} side="right">
 				<Button
@@ -371,7 +335,7 @@ function ActivityRow({
 					data-testid="activity-abort"
 					onClick={onAbort}
 					disabled={abortState !== undefined}
-					aria-label={`End ${label} in ${blob.title}`}
+					aria-label={`Stop: ${words}`}
 					className="absolute right-1 top-1 hover:text-danger"
 				>
 					<SquareIcon />
@@ -380,7 +344,6 @@ function ActivityRow({
 			{detailOpen && (
 				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground">
 					{blob.activity && <p className="break-words text-foreground">{blob.activity}</p>}
-					<p>{`Running for ${elapsed}`}</p>
 					<a href={target.href} className="w-fit text-link underline-offset-2 hover:underline">
 						{target.words}
 					</a>
