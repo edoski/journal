@@ -191,7 +191,8 @@ def _opened(
     free: frozenset[str],
 ) -> list[str]:
     """Up to ``pace`` of ``ready`` as the plan takes them from its window
-    (``progress.opens``), which each start moves on."""
+    (``progress.opens``), which each start moves on, in the order the plan
+    takes them (``agenda._new``'s ``take``)."""
     left, taken = list(untaught), list[str]()
     while len(taken) < pace and left:
         front = left[0]

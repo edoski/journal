@@ -802,6 +802,10 @@ def _new(
         taken = 0
         while taken < count:
             front = course.front(among if pool is None else pool)
+            # Ready topics go in path order, arc by arc, so a free arc later in
+            # the path gives one only when no earlier arc in the window has one
+            # ready, bar one related to today's start. capacity._opened mirrors
+            # this order: change the two together.
             ready = [
                 topic
                 for topic in course.untaught
