@@ -1,7 +1,7 @@
 import { currentArc, examCovers, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapArc, type CourseMapTopic, type StudyCourse, type TopicHandle, type UnreadableCourse } from "@/src/core";
 import { CURRENT_TAG, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { courseProgress, lastStudied, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
-import { examWords, todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { examWords, planDay, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -95,7 +95,9 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		const group = place ? GROUP_OF[place] : "not-started";
 		// "You are here" in place of when it comes back or was studied, never in place of what needs him.
 		const here = current && group !== "needs-you" && (fact === null || fact.kind === "back" || fact.kind === "studied");
-		return { topic, group, fact: here ? HERE : fact, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
+		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5).
+		const planned: TopicFact | null = group === "not-started" && fact === null && topic.starts ? { kind: "next", words: topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` } : null;
+		return { topic, group, fact: here ? HERE : (planned ?? fact), standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };
 }

@@ -240,6 +240,12 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(courseNext(today, []).action, "Start");
 	});
 
+	it("gives each topic not started the day the plan starts it, not the group's own words", () => {
+		const groups = courseGroups(course({ topics: [...TOPICS, topic("diag", { starts: "2026-11-11" })] }));
+		const diag = groupOf(groups, "not-started").topics.find((t) => t.topic.handle === "diag")!;
+		assert.deepEqual(diag.fact, { kind: "next", words: "Planned Wed 11 Nov" });
+	});
+
 	it("takes up Home's next step for the course: today's reviews first, in Today's words", () => {
 		const next = courseNext(course(), []);
 		assert.equal(next.action, "Review");

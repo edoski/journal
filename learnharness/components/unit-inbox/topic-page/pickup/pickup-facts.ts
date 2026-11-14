@@ -61,11 +61,13 @@ export interface PickupSections {
 
 /** When the plan starts a topic not started, as Now's note: "Planned
  *  today", "Planned Wed 11 Nov", then which courses' new topics come first
- *  when it waits behind them (`startsAfterWords`); null when the plan has
- *  no day for it. */
+ *  when it waits behind them (`startsAfterWords`); for a topic the course
+ *  leaves out, which the plan never starts, the reason it is left out;
+ *  null when the plan has no day for it. */
 export function plannedWords(facts: TopicFacts): string | null {
-	const { starts, startsAfter } = facts.topic;
-	if (!starts) return null;
+	const { starts, startsAfter, excluded } = facts.topic;
+	// The plan starts no topic the course leaves out; its reason says why (round 5: Covariance read as ordinary work).
+	if (!starts) return excluded ?? null;
 	const day = starts <= facts.today ? "Planned today" : `Planned ${dayOf(starts)}`;
 	const after = startsAfterWords(startsAfter);
 	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
