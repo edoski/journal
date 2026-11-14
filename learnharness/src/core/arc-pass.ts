@@ -372,6 +372,23 @@ export function stripPrefixes(arcs: readonly { topics: readonly string[] }[], ti
 	return stripped;
 }
 
+/** An arc's topics in the answer's order, each after its prerequisites in
+ *  the same arc. Pure. */
+function studyOrder(listed: readonly string[], topics: ArcPassView["topics"]): string[] {
+	const inArc = new Set(listed);
+	const done = new Set<string>();
+	const out: string[] = [];
+	const visit = (t: string, path: Set<string>) => {
+		if (done.has(t) || path.has(t)) return;
+		path.add(t);
+		for (const n of topics[t]?.needs ?? []) if (inArc.has(n)) visit(n, path);
+		done.add(t);
+		out.push(t);
+	};
+	for (const t of listed) visit(t, new Set());
+	return out;
+}
+
 /** What a formation save holds, beyond the engine patch. */
 export interface Formation {
 	changes: Json;
@@ -392,8 +409,10 @@ export interface Formation {
  * - Each topic the answer places and the course still has gets its `arc`.
  *   A topic added since the agent read the course gets none, and the engine
  *   places it.
- * - `path.order` is re-derived arc by arc, each arc's topics in their order
- *   before: a hint the engine's own order agrees with.
+ * - `path.order` is re-derived arc by arc, each arc's topics in the order
+ *   the answer lists them (the material's, read by the agent), moved only
+ *   so a prerequisite in the same arc comes first: a hint the engine's own
+ *   order agrees with.
  * - Titles only for topics that have none, and the label strip. No `needs`,
  *   ever: an edge the cut doubts goes in its note.
  * - `exam.arcs` and `exam.leaves_out` when the answer states the scope and
@@ -422,7 +441,7 @@ export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { ed
 	const rank = (t: string) => index.get(t) ?? Number.MAX_SAFE_INTEGER;
 	const onPath = (t: string) => index.has(t) || !view.topics[t]!.excluded;
 	const order = [
-		...arcs.flatMap((a) => [...a.topics].sort((x, y) => rank(x) - rank(y))),
+		...arcs.flatMap((a) => studyOrder(a.topics, view.topics)),
 		...Object.keys(view.topics)
 			.filter((t) => !placed.has(t))
 			.sort((x, y) => rank(x) - rank(y)),

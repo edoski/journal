@@ -192,6 +192,14 @@ describe("the cut's shape rules", () => {
 		});
 	});
 
+	it("the path takes each arc's topics in the answer's order, a prerequisite in the same arc first", () => {
+		const listed = { ...good, arcs: [arc("limits-continuity", "Limits and continuity", ["continuity", "limits"]), arc("derivatives", "Derivatives", ["riemann", "derivative", "chain"])] };
+		const formation = arcPassChanges(listed, view(CALC, { order: ["limits", "continuity", "chain", "derivative", "riemann"] }))!;
+		assert.deepEqual((formation.changes.path as { order: string[] }).order, ["limits", "continuity", "derivative", "chain", "riemann"]);
+		const free = { ...CALC, riemann: topic("Riemann sums", ["limits"]) };
+		assert.deepEqual((arcPassChanges(listed, view(free))!.changes.path as { order: string[] }).order, ["limits", "continuity", "riemann", "derivative", "chain"]);
+	});
+
 	it("re-derives on the record read at save time: a topic added since gets no arc, one gone is left out, and the path reads arc by arc", () => {
 		const now = { ...CALC, implicit: topic("Implicit differentiation", ["chain"]) };
 		delete (now as Partial<typeof now>).continuity;

@@ -70,7 +70,7 @@ This is the grouping pass's job: it forms the arcs of a course that has topics a
    - No arc spans more than one unit of the material unless the material joins them.
    - At least two arcs, or none. A course of about five topics usually gets none: form arcs only when the material has two units that each group at least two topics under their own question and boundary. A unit shows in a source's headings or a topic's `refs` locator; a path basis or a course description names none. When the course gets none, say why.
    - When several cuts pass all of this, prefer the one whose arcs need the most even work in lesson steps, else in topics.
-7. **Order.** Arcs follow rule 2; among the orders it allows, the material's order; then the nearer exam's arcs first; then broad before narrow, and tool before use. `path.order` reads as the arcs one after another.
+7. **Order.** Arcs follow rule 2; among the orders it allows, the material's order; then the nearer exam's arcs first; then broad before narrow, and tool before use. `path.order` reads as the arcs one after another. List each arc's topics in study order, prerequisites first, then the material's order; the path takes that order.
 8. **Names and purpose lines** as *What an arc is* says. Use the material's chapter title when it fits the topics. Every topic title reads naturally as part of its arc's name, and no topic fits another arc's name better than its own.
 
 Edge cases:
