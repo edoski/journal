@@ -1515,8 +1515,9 @@ export function Chat({
 							) : (
 									<Fragment key={m.id || `m-${mi}`}>
 									{m.role === "user" ? (
-										// His words: a bubble on the right.
-										<LearnerBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} photos={m.parts.filter((p) => p.type === "photos").flatMap((p) => p.data as Photo[])} />
+										// His words: a bubble on the right, with the mark of an
+										// answer he gave in words (HIS_MESSAGE) under it.
+										<LearnerBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} photos={m.parts.filter((p) => p.type === "photos").flatMap((p) => p.data as Photo[])} markId={m.id} />
 									) : (
 									<Message from="assistant" className="max-w-full">
 									{/* Visible overflow: a quiet row's hover fill reaches past the

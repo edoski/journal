@@ -779,14 +779,20 @@ function stringList(value: unknown): string[] {
 /** A question he answered in this session, or a practice problem that
  *  ended: what a saved attempt names as its `question`. */
 export interface AnsweredQuestion {
-	/** The tool the answer came through: `explain`, `recall`, or a
-	 *  problem's `conclude`. */
+	/** The tool the answer came through: `explain`, `recall`, a problem's
+	 *  `conclude`, or `message` for an answer in words (`HIS_MESSAGE`). */
 	tool: string;
 	/** Its solution was shown to him before it was asked: the same words
 	 *  were asked earlier in the session and answered, or posed as a
 	 *  problem that ended (shown-help.ts). */
 	seenBefore: boolean;
 }
+
+/** The name a save gives an answer he gave in words, in a message of his
+ *  rather than through a question (round 5: such an answer was recorded
+ *  and showed no mark). It stands for his newest message before the save:
+ *  the message the turn answers. */
+export const HIS_MESSAGE = "his-message";
 
 /** The graded question tools: an answer to one is an attempt. */
 export const GRADED_QUESTION_TOOLS: readonly string[] = ["explain", "recall"];
@@ -800,8 +806,9 @@ export function isRealAnswer(details: unknown): boolean {
 
 /** Every question he answered and every problem that ended, keyed by the
  *  call a saved attempt names: the graded question's call, or the
- *  problem's `conclude`. Only calls that went through count; a problem
- *  left for today ended unseen. Pure. */
+ *  problem's `conclude`; and `HIS_MESSAGE` once he has sent a message.
+ *  Only calls that went through count; a problem left for today ended
+ *  unseen. Pure. */
 export function answeredQuestionsOf(messages: readonly LhMessage[]): Map<string, AnsweredQuestion> {
 	return questionScan(messages).answered;
 }
@@ -818,13 +825,15 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 	const posed = new Map<string, { key: string; seen: boolean }>();
 	const answered = new Map<string, AnsweredQuestion>();
 	let problem: string | null = null;
+	let said = false;
 	const pose = (callId: string, text: unknown) => {
 		if (typeof text !== "string") return;
 		const key = sameQuestionKey(text);
 		posed.set(callId, { key, seen: revealed.has(key) });
 	};
 	for (const m of messages) {
-		if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
+		if (m.role === "user") said = true;
+		else if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
 		else if (m.role === "assistant") {
 			for (const block of m.content) {
 				if (block.type !== "toolCall") continue;
@@ -848,6 +857,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen });
 		}
 	}
+	if (said) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false });
 	return { posed, answered };
 }
 

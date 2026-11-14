@@ -4,7 +4,7 @@
 
 ## Where the mark comes from
 
-Never the app's judgement, and never a guess at which attempt is whose. `core/answer-marks.ts` links each answer to the attempts that name it: the tutor saves each attempt with `question`, the id the answer carried to it, and the save's receipt gives each attempt's id in order (`saved`); a problem's are its `conclude` receipt. An answer no attempt names shows no mark (round 4: a late save of an earlier check showed on the next card). Then `GET /api/chats/:id/marks` reads them whole from the engine with `show`, following `corrected_by` to the attempts that stand. The session reads the marks again whenever a turn settles.
+Never the app's judgement, and never a guess at which attempt is whose. `core/answer-marks.ts` links each answer to the attempts that name it: the tutor saves each attempt with `question`, the id the answer carried to it, and the save's receipt gives each attempt's id in order (`saved`); a problem's are its `conclude` receipt. An answer he gave in words, in a message of his rather than through a question, is named `his-message` by the save, which stands for his newest message before it (round 5: such answers were recorded and showed no mark, after Explain instead and on a same-day return); his bubble then carries the mark like any answer. An answer no attempt names shows no mark (round 4: a late save of an earlier check showed on the next card). Then `GET /api/chats/:id/marks` reads them whole from the engine with `show`, following `corrected_by` to the attempts that stand. The session reads the marks again whenever a turn settles.
 
 ## The line
 

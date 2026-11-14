@@ -368,10 +368,13 @@ export function inputAppends(
 	}
 }
 
-/** The question an answer answered: a graded question's text, or the
- *  statement of the problem a conclude ended. Null when the record holds
- *  no such answer. Pure. */
+/** The question an answer answered: a graded question's text, the
+ *  statement of the problem a conclude ended, or for an answer he gave in
+ *  words what the tutor asked before it. Null when the record holds no
+ *  such answer. Pure. */
 export function answeredQuestionText(messages: readonly LhMessage[], answerId: string): string | null {
+	const said = messages.findIndex((m) => m.role === "user" && m.id === answerId);
+	if (said >= 0) return askedBefore(messages, said);
 	const at = messages.findIndex((m) => m.role === "toolResult" && m.toolCallId === answerId && !m.isError);
 	if (at < 0) return null;
 	const result = messages[at] as LhMessage & { role: "toolResult" };
@@ -387,6 +390,18 @@ export function answeredQuestionText(messages: readonly LhMessage[], answerId: s
 		const args = typeof pose.arguments === "string" ? (JSON.parse(pose.arguments) as unknown) : pose.arguments;
 		const statement = (args as { statement?: unknown } | null)?.statement;
 		return typeof statement === "string" ? statement : "";
+	}
+	return "";
+}
+
+/** What the tutor asked before an answer he gave in words: the last
+ *  paragraph of its newest words before his message ("" when none). */
+function askedBefore(messages: readonly LhMessage[], at: number): string {
+	for (let i = at - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const words = m.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();
+		if (words) return words.split(/\n\s*\n/).at(-1)!.trim();
 	}
 	return "";
 }

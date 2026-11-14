@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { answerMarksOf, correctorsToRead, latestMarkedAnswer, markLinks } from "../src/core/answer-marks.ts";
 import { ChatInputError, inputAppends, parseChatInput } from "../src/core/input-events.ts";
-import { toLlmMessages, type LhMessage } from "../src/core/native-messages.ts";
+import { answeredQuestionsOf, toLlmMessages, type LhMessage } from "../src/core/native-messages.ts";
 import { markHow } from "../src/core/contracts/marks.ts";
 import { MARK_HOW_WORDS } from "../components/study-words.ts";
 
@@ -87,6 +87,27 @@ describe("which attempts mark which answer", () => {
 			result("s3", "course_save", receipt("o9")),
 		];
 		assert.deepEqual(markLinks(messages), { c1: ["o7", "o8", "o9"] });
+	});
+
+	it("an answer he gave in words marks his message when the save names his-message (round 5)", () => {
+		const said = (text: string) => ({ id: id(), role: "user", content: text, timestamp: 0 }) as LhMessage;
+		const first = said("Both parts: rank 3, nullity 1");
+		const later = said("thanks, next");
+		const messages = [
+			call("p1", "problem", { statement: "Rank and nullity?", topics: ["rank"] }),
+			result("p1", "problem", "posed"),
+			call("c1", "conclude", { outcome: "movedOn" }),
+			result("c1", "conclude", "No attempt recorded: he asked to be taught."),
+			first,
+			call("s1", "course_save", { changes: { observations: [named("his-message")] } }),
+			result("s1", "course_save", receipt("o38")),
+			later,
+		];
+		assert.deepEqual(markLinks(messages), { [first.id]: ["o38"] }, "the message the save answered, never one sent after it");
+		assert.equal(answeredQuestionsOf(messages).has("his-message"), true, "the course tool accepts the name");
+		assert.equal(answeredQuestionsOf(messages.slice(0, 4)).has("his-message"), false, "with no message of his there is nothing to name");
+		const disputed = inputAppends({ messages }, { type: "dispute", answerId: first.id, observations: ["o38"], said: "both parts are right" });
+		assert.match(String((disputed.at(-1) as { content: string }).content), /\[MARK DISPUTED\]/, "its mark can be disputed like any other");
 	});
 
 	it("an attempt that names no answer, or a refused save, marks nothing", () => {

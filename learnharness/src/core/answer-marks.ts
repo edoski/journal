@@ -8,12 +8,14 @@
  * tutor, beside the observation in the save, and the receipt's `saved` gives
  * each observation's id in the save's order. A practice problem's attempts
  * are the receipt its `conclude` carries; a save that re-sends them names
- * the conclude. An attempt that names no answer marks no card. The mark
+ * the conclude. An answer he gave in words is his message: the save names
+ * `HIS_MESSAGE`, the newest message of his before it. An attempt that
+ * names no answer marks no card. The mark
  * itself is the engine's: `answerMarksOf` reads the attempts `show`
  * returned and follows `corrected_by` to the ones that stand.
  */
 
-import { answeredQuestionsOf, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
+import { answeredQuestionsOf, HIS_MESSAGE, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
 import type { AnswerMark, MarkGrade, MarkRow } from "./contracts/marks.ts";
 import { chosenSure, isMarkResult } from "./contracts/marks.ts";
 
@@ -53,10 +55,16 @@ export function markLinks(messages: readonly LhMessage[]): Record<string, string
 		const seen = links[key] ?? [];
 		links[key] = [...seen, ...found.filter((id) => !seen.includes(id))];
 	};
+	// An answer in words names his message (`HIS_MESSAGE`): the newest one
+	// before the save, the message that turn answered.
+	const theirs = new Set(messages.flatMap((m) => (m.role === "user" ? [m.id] : [])));
+	let said: string | null = null;
 	for (const message of messages) {
-		if (message.role === "assistant") {
+		if (message.role === "user") said = message.id;
+		else if (message.role === "assistant") {
 			for (const block of message.content) {
-				if (block.type === "toolCall" && block.name === "course_save") named.set(block.id, savedQuestionsOf(block.arguments));
+				if (block.type !== "toolCall" || block.name !== "course_save") continue;
+				named.set(block.id, savedQuestionsOf(block.arguments).map((question) => (question === HIS_MESSAGE ? said : question)));
 			}
 		} else if (message.role === "toolResult" && !message.isError) {
 			if (message.toolName === "conclude") {
@@ -66,7 +74,7 @@ export function markLinks(messages: readonly LhMessage[]): Record<string, string
 				const questions = named.get(message.toolCallId) ?? [];
 				const saved = savedIds(textOf(message.content));
 				questions.forEach((question, i) => {
-					if (question && answered.has(question) && saved[i]) add(question, [saved[i]!]);
+					if (question && (answered.has(question) || theirs.has(question)) && saved[i]) add(question, [saved[i]!]);
 				});
 			}
 		}
