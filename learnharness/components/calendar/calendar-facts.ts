@@ -111,6 +111,18 @@ export function sessionType(chat: ChatListItem): SessionType {
 	return chat.phase === "probe" ? "check-in" : chat.phase === "plan" ? "plan" : "lesson";
 }
 
+/** The topics a session worked on that its course's map lists. */
+function sessionTopics(chat: ChatListItem, courses: readonly CalendarCourse[]): string[] {
+	const map = courses.find((c) => c.map.workspace === chat.course?.workspace)?.map;
+	return map ? (chat.topics ?? []).filter((handle) => map.topics.some((t) => t.handle === handle)) : [];
+}
+
+/** True when every topic is in today's review: work on them today is
+ *  that review, which its entry opens (`topicAction`). */
+function inReview(topics: readonly string[], reviewing: ReadonlySet<string> | undefined): boolean {
+	return topics.length > 0 && reviewing !== undefined && topics.every((t) => reviewing.has(t));
+}
+
 /** The first topic the session worked on that its course's map lists. */
 function sessionTopic(chat: ChatListItem, courses: readonly CalendarCourse[]): CourseMapTopic | null {
 	const map = courses.find((c) => c.map.workspace === chat.course?.workspace)?.map;
@@ -131,7 +143,9 @@ function sessionTopic(chat: ChatListItem, courses: readonly CalendarCourse[]): C
  *   - each later day's reviews and new topics as the daily plan proposes;
  *   - each open task today, since the engine dates none;
  *   - each session on the day of its last message (a day after the
- *     engine's counts as today).
+ *     engine's counts as today);
+ * one review once: a task or a session of today that holds only topics
+ * in today's review folds into that review's entry, which opens it.
  * `chats` are every session, each with its topics; `scope` keeps one
  * course, and with it no session outside a course.
  */
@@ -147,6 +161,10 @@ export function calendarEntries({
 	const shown = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const today = courses[0]?.map.today ?? "";
 	const entries: CalendarEntry[] = [];
+	/** Each course's topics in today's review: a task or a session of
+	 *  today that holds only those is that review, so it is not its own
+	 *  entry (round 3 saw one review as Overdue, Unfinished and Quiz). */
+	const reviewedToday = new Map<string, ReadonlySet<string>>();
 	for (const studied of shown) {
 		const { map, due, planned, doesNotFit, finalReview } = studied;
 		const course = { workspace: map.workspace, title: map.title };
@@ -180,21 +198,26 @@ export function calendarEntries({
 				if (topic) fresh(topic, day.date);
 			}
 		}
+		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));
+		reviewedToday.set(map.workspace, reviewing);
 		for (const task of map.tasks) {
-			const topic = map.topics.find((t) => t.tasks.includes(task.key)) ?? null;
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: task.title, course, task, topic, opening: `Continue ${task.title}` });
+			const holders = map.topics.filter((t) => t.tasks.includes(task.key));
+			if (inReview(holders.map((t) => t.handle), reviewing)) continue;
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
 		}
 	}
 	for (const chat of chats) {
 		const workspace = chat.course?.workspace;
 		if (scope !== null && workspace !== scope) continue;
+		const local = localDay(chat.updatedAt);
+		const day = today && local > today ? today : local;
+		if (day === today && workspace && inReview(sessionTopics(chat, courses), reviewedToday.get(workspace))) continue;
 		const listed = courses.find((c) => c.map.workspace === workspace);
 		const course = workspace ? { workspace, title: listed?.map.title ?? chat.course!.title } : null;
-		const local = localDay(chat.updatedAt);
 		entries.push({
 			kind: "session",
 			id: `session:${chat.id}`,
-			day: today && local > today ? today : local,
+			day,
 			title: chat.title,
 			course,
 			chat,

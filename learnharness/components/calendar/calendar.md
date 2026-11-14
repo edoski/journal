@@ -14,6 +14,8 @@ The engine owns every date; the page invents none (`calendar-facts.ts`, pure, te
 | Unfinished | today, since the engine dates no task (an open task) | `map`'s `tasks` |
 | Lesson, Practice, Plan, Quiz | the day of the session's last message (a day after the engine's counts as today) | the session store: practice, else the teaching session's phase (the prober's questions, the plan, the lesson) |
 
+One review is one entry: an open task, or a session of today, that holds only topics in today's review is that review, so it folds into the review's entry, whose action opens it (round 3 saw one review as Overdue, Unfinished and Quiz).
+
 A week's day head says Day off on a weekday the engine has learned he does not study (`plan`'s `capacity.study_days`), else the Journal's study windows for that day (`journal.upcoming_schedule`, read by `src/server/calendar.ts`). The one clock is the engine's study day.
 
 The daily plan is the engine's projection (`learning/agenda.py`): every course together, each day holding what he gets through on that weekday as his record shows, nothing on a day off, paced to each exam, assuming each planned review succeeds. A stored review date the plan does not propose that day (one that did not fit) is not drawn. Not in the engine, so not on the page: a date for an open task, and practice on a date.
