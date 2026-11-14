@@ -182,6 +182,14 @@ describe("activity section render", () => {
 		assert.equal(detail.totalCost, null, "no running total in the header");
 	});
 
+	it("a grouping run names its course on the row, and its detail says what it does and opens the course page", async () => {
+		const feed: ActivityFeed = { jobs: [], runs: [{ id: "calculus#arc-pass", chatId: "calculus", title: "Calculus", phase: "grouping", startedAt: NOW - 5_000 }] };
+		assert.match(renderToStaticMarkup(<ActivitySection feed={feed} />), /Grouping the topics of Calculus into arcs/);
+		const detail = await openDetail(feed, "Calculus");
+		assert.match(detail.text, /Settling what each topic builds on, then grouping the topics into arcs/);
+		assert.equal(detail.href, courseHref("calculus"));
+	});
+
 	it("a running digest's sidebar row says what it is doing before it is opened", () => {
 		const html = renderToStaticMarkup(
 			<ActivitySection

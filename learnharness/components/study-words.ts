@@ -324,10 +324,12 @@ export const BACKGROUND_WORDS = {
 
 /** One piece of background work in full: what it does, for which lesson or
  *  course. */
-export function backgroundWorkWords(kind: JobKind | "mapping" | "digest" | "unknown", title: string): string {
+export function backgroundWorkWords(kind: JobKind | "mapping" | "grouping" | "digest" | "unknown", title: string): string {
 	switch (kind) {
 		case "mapping":
 			return `Building the topic map of ${title}`;
+		case "grouping":
+			return `Grouping the topics of ${title} into arcs`;
 		case "digest":
 			return `Saving what you learned in ${title}`;
 		case "visual":
