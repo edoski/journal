@@ -415,7 +415,11 @@ function OpenQuote({ open, spec, selected, onPick }: { open: ProseOpen; spec: Pr
 		const el = scrollRef.current;
 		if (!el) return;
 		const read = () => {
-			const block = el.querySelector<HTMLElement>('[data-slot="prose-question"][data-open]');
+			const questions = [...el.querySelectorAll<HTMLElement>('[data-slot="prose-question"]')];
+			const at = questions.findIndex((q) => q.hasAttribute("data-open"));
+			// A question asked again after a hint draws its words in the
+			// question above the hint, so those words are the ones to watch.
+			const block = at > 0 && questions[at]!.hasAttribute("data-repeat") ? questions[at - 1] : questions[at];
 			if (!block) return setQuoted(false);
 			const top = block.getBoundingClientRect().top - el.getBoundingClientRect().top;
 			setQuoted((was) => (was ? top < 40 : top < 0));

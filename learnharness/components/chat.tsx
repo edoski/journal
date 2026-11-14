@@ -93,6 +93,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
+import { reaskedAfterHint } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 
@@ -921,6 +922,7 @@ export function Chat({
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
+	const reasked = useMemo(() => reaskedAfterHint(messages), [messages]);
 	const steps = useMemo(() => {
 		if (!planTree) return [];
 		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()));
@@ -1588,6 +1590,7 @@ export function Chat({
 																photos={part.photos as Photo[] | undefined}
 																open={pending?.toolCallId === part.toolCallId && part.state !== "output-available"}
 																stepAnchor={stepAnchor}
+																repeat={reasked.has(part.toolCallId!)}
 															/>
 														);
 													}
