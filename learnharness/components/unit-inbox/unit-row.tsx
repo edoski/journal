@@ -10,6 +10,7 @@ import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
 import { monogram, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
 import { CARD_ACTION_PLACE, ROW_ACTION, RowCard, rowSurface, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MathText, mathPlain } from "@/components/ui/math-text";
 
@@ -52,15 +53,18 @@ function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 	} as const;
 	if (resume) {
 		return (
-			<Link href={`/chat/${resume.id}`} onClick={blurAfterPointerClick} {...props}>
-				<Icon aria-hidden />
-				{label}
-			</Link>
+			<Button asChild variant="quiet" size="xs" {...props}>
+				<Link href={`/chat/${resume.id}`} onClick={blurAfterPointerClick}>
+					<Icon aria-hidden />
+					{label}
+				</Link>
+			</Button>
 		);
 	}
 	return (
-		<button
-			type="button"
+		<Button
+			variant="quiet"
+			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
 				start(unit);
@@ -70,7 +74,7 @@ function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 		>
 			<Icon aria-hidden />
 			{label}
-		</button>
+		</Button>
 	);
 }
 
@@ -170,7 +174,7 @@ export function SessionSlimRow({
 	onOpen,
 	parent,
 	...props
-}: Omit<React.ComponentProps<"button">, "onClick"> & {
+}: Omit<React.ComponentProps<typeof Button>, "onClick" | "variant"> & {
 	chat: ChatListItem;
 	/** The engine's study day, for how long ago. */
 	today: string;
@@ -183,8 +187,9 @@ export function SessionSlimRow({
 }) {
 	const state = sessionState(chat);
 	return (
-		<button
-			type="button"
+		<Button
+			variant="list"
+			size="row"
 			{...props}
 			aria-current={active ? "page" : undefined}
 			data-sidebar-row={`chat:${chat.id}`}
@@ -194,7 +199,7 @@ export function SessionSlimRow({
 				onOpen();
 				blurAfterPointerClick(e);
 			}}
-			className={cn(rowSurface(active), "flex h-9 items-center gap-2 px-2.5", highlighted && "bg-fill-hover")}
+			className={cn(rowSurface(active), "h-9 gap-2 px-2.5", active && "hover:bg-fill-selected", highlighted && "bg-fill-hover")}
 		>
 			{chat.course ? (
 				<CourseMark
@@ -226,6 +231,6 @@ export function SessionSlimRow({
 					status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
 				/>
 			</span>
-		</button>
+		</Button>
 	);
 }

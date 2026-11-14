@@ -21,6 +21,10 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         quiet:
           "text-muted-foreground transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+        // A list's full-width row (the sidebar's shelves, the course page's
+        // groups): left-aligned regular text, the hover fill, the inset ring.
+        list:
+          "w-full min-w-0 justify-start text-left font-normal text-muted-foreground transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
