@@ -476,6 +476,29 @@ def test_a_review_a_competing_methods_start_waits_on_comes_first() -> None:
     assert together.days["exam"][0]["reviews"] == ["t00"]
 
 
+def test_competing_methods_due_together_are_reviewed_side_by_side() -> None:
+    record = solid(course(2, contrasts={"t00": ["t01"]}), on(-1))
+    record = save(record, {"topics": {"t00": {"review": {"due": on(-8).isoformat()}}}}, MONDAY)
+    free = solid(course(1), on(-6))
+    together = plan({"c": record, "free": free}, 1, week(2, 0, frozenset(range(7))))
+    assert together.days["c"][0]["reviews"] == ["t00", "t01"]
+    assert together.days["free"][0]["reviews"] == []
+
+
+def test_a_review_waits_a_short_while_for_its_competing_method() -> None:
+    def days(partner_due: int) -> dict[str, str]:
+        record = solid(course(2, contrasts={"t00": ["t01"]}), MONDAY)
+        pins = {"t01": {"review": {"due": on(partner_due).isoformat()}}}
+        record = save(record, {"topics": pins}, MONDAY)
+        planned = plan({"c": record}, 7, week(10, 0, frozenset(range(7))))
+        return {
+            topic: day["date"] for day in planned.days["c"] for topic in day["reviews"]
+        }
+
+    assert days(2) == {"t00": on(2).isoformat(), "t01": on(2).isoformat()}
+    assert days(5) == {"t00": on(0).isoformat(), "t01": on(5).isoformat()}
+
+
 def test_a_topic_taught_topics_need_starts_before_the_rest() -> None:
     record = course(4, exam=40, needs={"t01": ["t00"], "t03": ["t02"]})
     record = save(record, {"topics": {"t03": {"introduced": True}}}, on(-3))

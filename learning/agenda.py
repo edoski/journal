@@ -44,7 +44,12 @@ Reviews, when there are more than fit:
   5. reviews of courses whose exam has passed, on their spaced dates.
 The rule needs no share of the day and no constant: the reviews he
 completes set the room, memory and the exam set the order. Then the
-course's own order (``progress.due``). A review left out of a full day goes
+course's own order (``progress.due``). Competing methods (``contrasts``) are
+reviewed side by side, since telling them apart is what they need: one due
+the day another is taken comes right after it, and one whose partner falls
+due a little later waits for it, when the wait costs it no larger share of
+its interval than a single day costs the ladder's shortest solid interval
+(``_Course.together``). A review left out of a full day goes
 on to the next; the plan says why it waits past the day memory asks for it
 (``When.held``): another course's final review came first, or the days
 before were full.
@@ -127,6 +132,7 @@ class _Course:
     gaps: set[str] = field(default_factory=set)
     pending: list[str] = field(default_factory=list)
     starts_after: dict[str, list[str]] = field(default_factory=dict)
+    paired: dict[str, date] = field(default_factory=dict)
 
     @classmethod
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
@@ -204,6 +210,38 @@ class _Course:
         step = progress.interval("solid", self.streaks.get(topic, 0) + 1)
         return day + timedelta(days=step) >= self.exam.final
 
+    def together(self, topic: str, day: date, week: Capacity) -> bool:
+        """Whether its review waits for a competing method's, so the two are
+        reviewed side by side: one falls due on a later study day before the
+        exam, and the wait costs it no larger share of its interval
+        (``progress.late_share``) than a single day costs the ladder's
+        shortest solid interval. The plan counts in whole days, so that is the
+        least lateness any held review bears; a review on a long interval may
+        wait a few days, one on a short interval none. It waits for one day
+        before each review, so it never chases one method after another."""
+        if topic in self.paired:
+            return day < self.paired[topic]
+        due = self.record["topics"][topic].get("review", {}).get("due")
+        if due is None:
+            return False
+        least = 1 / progress.LADDER[0]
+        for other in self.partners[topic]:
+            then = self.record["topics"][other].get("review", {}).get("due")
+            if self.levels[other]["level"] == "new" or then is None:
+                continue
+            meet = date.fromisoformat(then)
+            if meet <= day:
+                continue
+            while not week.studies(meet):
+                meet += timedelta(days=1)
+            if self.exam is not None and self.ahead(day) and meet >= self.exam.day:
+                continue
+            item = {"due": due, "overdue": (meet - day).days}
+            if progress.late_share(item, self.levels[topic]) <= least:
+                self.paired[topic] = meet
+                return True
+        return False
+
     def reviewing(self, day: date) -> bool:
         """Within its final review: from the final-review day to the exam."""
         return self.exam is not None and self.exam.final <= day < self.exam.day
@@ -261,6 +299,7 @@ class _Course:
         expected = engine or (date.fromisoformat(stored) if stored else None)
         late = progress.late_days(day, expected, self.exam) if expected else 0
         self.projected.add(topic)
+        self.paired.pop(topic, None)
         self.streaks[topic] = self.streaks.get(topic, 0) + 1
         standing = {
             name: value
@@ -448,29 +487,67 @@ def _reviews(
             )
             candidates.append((key, course.name, course, item["topic"]))
     candidates.sort(key=lambda item: (item[0], item[1]))
-    chosen: dict[str, list[str]] = {course.name: [] for course in courses}
-    taken: list[tuple[float, _Course]] = []
-    left: list[tuple[_Course, str]] = []
-    for key, _, course, topic in candidates:
+    held = {
+        (course.name, topic)
+        for key, _, course, topic in candidates
+        if key[0] == 1 and key[2] and course.together(topic, day, week)
+    }
+    picked = _select(courses, candidates, day, room, quota, held)
+    for course, topic in picked.left:
+        nearer = [
+            other
+            for _, other in sorted(picked.taken, key=lambda f: f[0])
+            if other is not course
+        ]
+        course.wait(topic, nearer[0].title if nearer else None)
+    return picked.chosen
+
+
+@dataclass
+class _Picked:
+    chosen: dict[str, list[str]]
+    taken: list[tuple[float, _Course]]
+    left: list[tuple[_Course, str]]
+
+
+def _select(
+    courses: list[_Course],
+    candidates: list[tuple[tuple[Any, ...], str, _Course, str]],
+    day: date,
+    room: float,
+    quota: dict[str, int],
+    held: set[tuple[str, str]],
+) -> _Picked:
+    """Take ``candidates`` in order within ``room`` and each final review's
+    quota, less the ``held`` ones, which wait for a competing method rather
+    than for room (not ``When.held``); a competing method due the same day
+    comes right after the one taken, so the two are reviewed side by side."""
+    order = [entry for entry in candidates if (entry[1], entry[3]) not in held]
+    picked = _Picked({course.name: [] for course in courses}, [], [])
+    index = 0
+    while index < len(order):
+        key, _, course, topic = order[index]
+        index += 1
         if room <= 0:
-            left.append((course, topic))
+            picked.left.append((course, topic))
             continue
         if course.final(topic, day):
             if quota[course.name] <= 0:
                 continue
             quota[course.name] -= 1
         if key[0] == 0:
-            taken.append((key[1], course))
-        chosen[course.name].append(topic)
+            picked.taken.append((key[1], course))
+        picked.chosen[course.name].append(topic)
         room -= 1
-    for course, topic in left:
-        nearer = [
-            other
-            for _, other in sorted(taken, key=lambda f: f[0])
-            if other is not course
+        partners = [
+            entry
+            for entry in order[index:]
+            if entry[2] is course and entry[3] in course.partners[topic]
         ]
-        course.wait(topic, nearer[0].title if nearer else None)
-    return chosen
+        for entry in partners:
+            order.remove(entry)
+        order[index:index] = partners
+    return picked
 
 
 def _new(
