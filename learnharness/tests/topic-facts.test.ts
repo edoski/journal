@@ -313,6 +313,17 @@ describe("when a topic comes up", () => {
 		assert.equal(factsOf(next).startsWhy, null);
 	});
 
+	it("says what the exam means for a topic its plan has no room for, before any other reason (round 7: Variance, Poisson and Random variables never mentioned the exam)", () => {
+		const exam = { date: "2026-11-19", daysLeft: 2, doesNotFit: [h("variance")], unreviewed: [h("poisson"), h("bayes")], reasons: { variance: "not_ready", poisson: "too_late", bayes: "full" } as const };
+		const examOf = (t: CourseMapTopic) => topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, t] } }, topic: t, chats: [], read: null });
+		const variance = examOf(topic("variance", { starts: "2026-12-13", startsAfter: ["Linear Algebra"], startsWhy: { kind: "after", needs: [h("expectation")], partners: [] } }));
+		assert.equal(variance.startsWhy?.words, "Not before the exam, what it needs won’t be solid in time");
+		assert.equal(variance.starts?.waits, null, "the exam is why, not another course");
+		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "No review before the exam, it starts too close to it");
+		const bayes = topic("bayes", { level: "independent", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-12-15", held: { exam: null, since: "2026-11-11" } } });
+		assert.equal(examOf(bayes).waits, "No review before the exam, the final review is full at your pace");
+	});
+
 	it("says from when a review moved past the day memory asked for it, and why", () => {
 		const moved = topic("series", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-22", held: { exam: null, since: "2026-11-09" } } });
 		assert.equal(factsOf(moved).waits, "Moved from 9 Nov, earlier days are full");

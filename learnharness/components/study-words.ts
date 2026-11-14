@@ -322,6 +322,38 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
 	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
 }
 
+/** What the exam's plan means for a topic it leaves out (`examGaps`), on
+ *  the topic's own page, in the engine's reason (`exam.reasons`). */
+export const EXAM_GAP_TOPIC_WORDS: {
+	start: Readonly<Record<ExamGapReason | "none", string>>;
+	review: Readonly<Record<ExamGapReason | "none", string>>;
+} = {
+	start: {
+		none: "Not before the exam",
+		no_study_day: "Not before the exam, no study day is left",
+		not_ready: "Not before the exam, what it needs won’t be solid in time",
+		full: "Not before the exam, every study day is full at your pace",
+		too_late: "Not before the exam",
+	},
+	review: {
+		none: "No review before the exam",
+		no_study_day: "No review before the exam, no study day is left in the final review",
+		not_ready: "No review before the exam",
+		full: "No review before the exam, the final review is full at your pace",
+		too_late: "No review before the exam, it starts too close to it",
+	},
+};
+
+/** The words for `topic` when the exam ahead has no room to start it
+ *  (`doesNotFit`) or to review it (`unreviewed`); null otherwise. Pure. */
+export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "daysLeft" | "doesNotFit" | "unreviewed" | "reasons"> | null): string | null {
+	if (!exam || exam.daysLeft < 0) return null;
+	const reason = exam.reasons?.[topic.handle] ?? "none";
+	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.start[reason];
+	if (exam.unreviewed?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.review[reason];
+	return null;
+}
+
 /** The map's fields the words of a start read: its arcs' names and
  *  order, and where he is (`currentArc`). */
 type StartsMap = Pick<CourseMap, "title" | "topics" | "arcs" | "current" | "currentArc">;

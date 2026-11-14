@@ -1,6 +1,6 @@
 import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -171,11 +171,15 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 /** Why the review waits past the day memory asked for it, after from
  *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
  *  from 9 Nov, earlier days are full". */
-/** `TopicFacts.startsWhy`: the exam's scope first, since a topic it leaves
- *  out waits for the exam whatever else it waits on. */
+/** What the exam ahead means for the topic: it leaves it out, or its plan
+ *  has no room to start or review it; null otherwise. */
+const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam);
+
+/** `TopicFacts.startsWhy`: the exam first, since a topic it leaves out, or
+ *  has no room for, waits for the exam whatever else it waits on. */
 function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | null {
-	const leftOut = leftOutWords(topic, map.exam);
-	if (leftOut) return { kind: "after", words: leftOut };
+	const exam = examWords(topic, map);
+	if (exam) return { kind: "after", words: exam };
 	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null;
 }
 
@@ -384,8 +388,8 @@ export function topicFacts({
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
-		waits: waitsWords(topic.review, map.today),
-		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,
+		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam) : null) ?? waitsWords(topic.review, map.today),
+		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : startsAfterWords(topic.startsAfter) } : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		action: topicAction(topic, map, chats),
 		pickups,
