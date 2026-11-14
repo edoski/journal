@@ -84,14 +84,12 @@ Edge cases:
 - With no prerequisite edges, boundaries come only from the material's locators and rule 3.
 - A project course with branches gets one arc per branch. When every topic of an arc carries the same leading label ("Eve:"), the pass's code drops it from their titles, since the arc now names it.
 
-Worked example, Calculus with true edges and the OpenStax contents (Volume 1 chapters 2 to 6, Volume 2 chapter 3):
-1. *Limits and continuity* (V1 ch. 2): limits, one-sided limits, continuity, intermediate value theorem.
-2. *Derivatives* (V1 ch. 3): the derivative, product rule, quotient rule, chain rule, implicit differentiation.
-3. *Applications of derivatives* (V1 ch. 4, the material's title): related rates, mean value theorem, monotonicity, concavity, curve sketching, optimisation, L'Hôpital's rule, antiderivatives. Its pieces (rates, the shape of a graph, limits by derivatives) share the chapter's question, "What can derivatives tell us about how quantities and graphs change?", and antiderivatives closes it as OpenStax closes chapter 4. A midterm on chapters 2 to 4 then needs no partial arc.
-4. *Integrals* (V1 ch. 5): Riemann sums, fundamental theorem, substitution, area between curves. Area between curves (V1 6.1) alone would be a one-topic arc, so it joins the arc whose question it answers.
-5. *Techniques of integration* (V2 ch. 3, the material's title): integration by parts, partial fractions, improper integrals.
+Worked example, an algorithms course with true edges and a textbook's contents (Foundations: ch. 2 Getting started, ch. 3 Growth of functions, ch. 4 Divide and conquer; Sorting: ch. 6 Heapsort, ch. 7 Quicksort, ch. 8 Sorting in linear time; Data structures: ch. 11 Hash tables, ch. 12 Binary search trees, ch. 13 Red-black trees), with treaps (a chapter 13 problem) excluded:
+1. *Analysing algorithms* (ch. 2 to 4): loop invariants, asymptotic notation, recurrences, master theorem. Its question: "How do we show an algorithm is correct and say how fast it runs?" Chapter 3 holds one topic, so it joins the neighbours whose question it serves. Insertion sort and merge sort sit in chapter 2, but the name sort puts them in *Sorting*, and nothing here needs them, so they move there. The part's own title, "Foundations", fails the days-away test.
+2. *Sorting* (ch. 6 to 8, with 2.1 and 2.3): insertion sort, merge sort, heaps, heapsort, quicksort, the comparison lower bound, counting sort. Heaps would sort into *Data structures* by name, but heapsort needs them, so rule 2 homes them here, just before their first use: the one explained miss.
+3. *Data structures* (ch. 11 to 13, with 6.5): priority queues, hash tables, binary search trees, red-black trees, treaps. Priority queues (6.5) need heaps, which come earlier, and serve this arc's question, "How do we store a set so we can find, add and remove items fast?", so they move here. Treaps join the arc whose question they extend.
 
-Every edge passes rule 2 (L'Hôpital's rule needs the derivative and limits, not optimisation), and every arc has a check that reads as one exercise.
+Three arcs, below the usual four to eight, because the course covers three parts of one book; the basis says so. Every edge passes rule 2, every name passes the sort with one explained miss, and every arc has a check that reads as one exercise.
 
 ## Placing a new topic
 
