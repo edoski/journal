@@ -23,7 +23,8 @@ import { courseHref, unitHref, workspaceOf } from "../components/unit-inbox/unit
 import { buildInbox, unitStatus, type Unit } from "../components/unit-inbox/units.ts";
 import { nowFor, plannedKeys, restShelves, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
 import { claimedKeys, todayTop } from "../components/unit-inbox/today/today-top.ts";
-import { statusOf } from "../components/course-map/topic-map/topic-standing.ts";
+import { cardLine } from "../components/course-map/topic-map/topic-standing.ts";
+import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
 import { headMarks } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 
@@ -179,8 +180,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
 		assert.deepEqual(row.fact, { kind: "task", words: "Left off 7d ago" });
 		assert.equal(sidebar(map).get(`${WS}#basis`), "On your own: Left off 7d ago");
-		const basis = map.map.topics.find((t) => t.handle === "basis")!;
-		assert.equal(statusOf(basis, map.map.tasks, (x) => x, map.map.today)?.words, "Left off 7d ago");
+		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis")))?.words, "Left off 7d ago");
 	});
 
 	it("says since when a review held past its day was due, in the words the sidebar and the topic page use", () => {
@@ -336,11 +336,11 @@ describe("the topic map's highlight", () => {
 		[...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-50")).map((n) => n.getAttribute("data-testid"));
 
 	it("dims nothing by default, as Home draws it", () => {
-		assert.deepEqual(dimmed(render(<TopicMap map={map} />) as unknown as Document), []);
+		assert.deepEqual(dimmed(render(<TopicMap map={map} said={new Map()} />) as unknown as Document), []);
 	});
 
 	it("lights the topics it is given and dims the rest", () => {
-		const document = render(<TopicMap map={map} highlight={new Set([h("span"), h("independence")])} />) as unknown as Document;
+		const document = render(<TopicMap map={map} said={new Map()} highlight={new Set([h("span"), h("independence")])} />) as unknown as Document;
 		const lit = TOPICS.filter((t) => !["span", "independence"].includes(t.handle)).map((t) => `map-node-${t.handle}`);
 		assert.deepEqual(dimmed(document).sort(), lit.sort());
 	});

@@ -29,7 +29,7 @@ One form each, wherever it shows.
 
 ### Which one a topic says
 
-A topic often has more than one reason, and a row says one. Every surface takes them in the same order (`unitStatus` in `unit-inbox/units.ts`, the map card's `statusOf`, Home's `whyOf`), so a topic says the same thing wherever it shows (Edo's brief, 14 Nov 2026: one fact per topic across surfaces):
+A topic often has more than one reason, and a row says one. Every surface takes them in the same order (`unitStatus` in `unit-inbox/units.ts`, Home's `whyOf`), and the course page's rows and the map's cards read the sidebar's own words for each topic (`sidebarSays` in `unit-inbox/sidebar-says.ts`), so a topic says the same thing wherever it shows (Edo's brief, 14 Nov 2026: one fact per topic across surfaces):
 
 1. a session on it waits on him, or the tutor writes in it (Your turn, Working);
 2. a slip;

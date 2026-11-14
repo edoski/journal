@@ -31,7 +31,9 @@ import {
 	type Camera,
 	type TopicMapLayout,
 } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { needOf, standingOf, topicLabel } from "../components/course-map/topic-map/topic-standing.ts";
+import { standingOf, topicLabel } from "../components/course-map/topic-map/topic-standing.ts";
+import { slipMark } from "../components/study-words.ts";
+import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
 import { courseProgress } from "../components/study-home/agenda-rows/row-facts.ts";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
 
@@ -123,7 +125,8 @@ describe("where he stands on a topic", () => {
 });
 
 describe("why a topic needs him", () => {
-	const words = (handle: string) => needOf(byHandle(handle), titleOf)?.words ?? null;
+	const slip = (t: CourseMapTopic) => (t.weak ? slipMark(t.signals, titleOf).words : null);
+	const words = (handle: string) => slip(byHandle(handle));
 
 	it("gives a weak topic its first reason: a miss, a diagnosed mistake, a method chosen in its place, a sure wrong answer", () => {
 		assert.equal(words("matmul"), "Not right last time");
@@ -134,15 +137,9 @@ describe("why a topic needs him", () => {
 	});
 
 	it("says a mistake he has answered right since is fixed, to be checked again", () => {
-		const fixed = (signals: { gap?: string; lapsed?: boolean }) => needOf(topic("t", { level: "assisted", weak: true, signals: { ...QUIET, ...signals, repaired: true } }), titleOf)!.words;
+		const fixed = (signals: { gap?: string; lapsed?: boolean }) => slip(topic("t", { level: "assisted", weak: true, signals: { ...QUIET, ...signals, repaired: true } }))!;
 		assert.equal(fixed({ gap: "Writes det as ad + bc" }), "Fixed, check again later");
 		assert.equal(fixed({ lapsed: true }), "Fixed, check again later");
-	});
-
-	it("says how overdue the review of a topic he can do on his own is, in Home's words", () => {
-		const overdue = (days: number) => needOf(topic("t", { level: "retained", review: due(days) }), titleOf)!;
-		assert.deepEqual(overdue(0), { kind: "review", words: "Due today" });
-		assert.deepEqual([1, 3, 10, 16].map((d) => overdue(d).words), ["1d overdue", "3d overdue", "1w overdue", "2w overdue"]);
 	});
 
 	it("says nothing for a topic still being learned, one resting until its review, or one not started", () => {
@@ -151,9 +148,9 @@ describe("why a topic needs him", () => {
 		assert.equal(words("eigen"), null);
 	});
 
-	it("names a node for a screen reader: title, that he is there, the standing, the reason", () => {
-		assert.equal(topicLabel(byHandle("rank"), true, titleOf), "Rank, You are here, Right with help, Look again");
-		assert.equal(topicLabel(byHandle("vectors"), false, titleOf), "Vectors, On your own");
+	it("names a node for a screen reader: title, that he is there, the standing, the card's line", () => {
+		assert.equal(topicLabel(byHandle("rank"), true, { kind: "your-turn", words: "Your turn" }), "Rank, You are here, Right with help, Your turn");
+		assert.equal(topicLabel(byHandle("vectors"), false, null), "Vectors, On your own");
 	});
 });
 
@@ -381,7 +378,8 @@ describe("topic map drawing", () => {
 	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 	const render = (node: React.ReactNode) =>
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
-	const document = render(<TopicMap map={MAP} />);
+	const said = sidebarSays([{ map: MAP, unready: null, due: [], lastActiveDaysAgo: 0, newToday: [] }], [], MAP.workspace);
+	const document = render(<TopicMap map={MAP} said={said} />);
 	const nodes = [...document.querySelectorAll('[data-slot="course-map-node"]')];
 	const node = (handle: string) => document.querySelector(`[data-testid="map-node-${handle}"]`)!;
 
@@ -394,11 +392,11 @@ describe("topic map drawing", () => {
 		assert.equal(node("eigen").getAttribute("aria-label"), "eigen, Not started");
 	});
 
-	it("shows a title and its pie on every node, and under it why the topic needs him, overdue in Home's words, or else where he stands", () => {
+	it("shows a title and its pie on every node, and under it what the sidebar says when it needs him, or else where he stands", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
-			["1w overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Look again", "Sure, but wrong"],
+			["1w overdue", "Mistake to fix", "Unfinished", "Not right last time", "Mixed up with Cramer's rule", "Look again", "Sure, but wrong"],
 		);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-need"]'), null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");

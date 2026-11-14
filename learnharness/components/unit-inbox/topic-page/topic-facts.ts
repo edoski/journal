@@ -1,9 +1,10 @@
-import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord, TopicRef } from "@/src/core";
-import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { heldWords, LESSON_WORDS, reviewWords, startsAfterWords, type SlipKey } from "@/components/study-words";
+import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicHandle, TopicRecord, TopicRef } from "@/src/core";
+import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { heldWords, LESSON_WORDS, reviewWords, slipMark, startsAfterWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
+import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
 /**
@@ -111,6 +112,9 @@ export interface TopicFacts {
 	/** The course map cut to the topic and every topic it builds on, near or
 	 *  far (`buildsMapOf`); null when it builds on none. */
 	buildsMap: CourseMap | null;
+	/** What the sidebar says for each topic of the course (`sidebarSays`),
+	 *  for the cards of the map of what it builds on. */
+	said: ReadonlyMap<TopicHandle, Said>;
 	/** Where it is in his material (the record's refs); empty without the
 	 *  topic read or when the record points nowhere. */
 	refs: readonly TopicRef[];
@@ -226,9 +230,9 @@ export function studiedWords(days: number): string {
  * say it (`reviewWords`). `today` is the engine's study day.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {
-	const need = topic.weak ? needOf(topic, titleOf) : null;
+	const slip = topic.weak ? slipMark(topic.signals, titleOf) : null;
 	const review = topic.review ? reviewWords(topic.review, today) : null;
-	return [...(need ? [{ kind: "slip" as const, words: need.words, ...(need.slip ? { slip: need.slip } : {}) }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
+	return [...(slip ? [{ kind: "slip" as const, words: slip.words, slip: slip.key }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }
 
 /** The latest day anything says he studied the topic: its newest attempt,
@@ -315,9 +319,22 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	return { result, words: attempt.unaided ? null : "With a hint" };
 }
 
-/** Everything the page draws, from the course, the topic, every
- *  session and the topic read; `read` is null when it failed. */
-export function topicFacts({ course, topic, chats, read }: { course: StudyCourse; topic: CourseMapTopic; chats: readonly ChatListItem[]; read: TopicRead | null }): TopicFacts {
+/** Everything the page draws, from the course, every course (Today
+ *  weighs them together), the topic, every session and the topic read;
+ *  `read` is null when it failed. */
+export function topicFacts({
+	course,
+	courses = [course],
+	topic,
+	chats,
+	read,
+}: {
+	course: StudyCourse;
+	courses?: readonly StudyCourse[];
+	topic: CourseMapTopic;
+	chats: readonly ChatListItem[];
+	read: TopicRead | null;
+}): TopicFacts {
 	const { map } = course;
 	const sessions = topicSessions(chats, map.workspace, topic.handle);
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
@@ -344,6 +361,7 @@ export function topicFacts({ course, topic, chats, read }: { course: StudyCourse
 		attempts,
 		builds: buildsOn(topic, map),
 		buildsMap: buildsMapOf(topic, map),
+		said: sidebarSays(courses, chats, map.workspace),
 		refs: read?.record?.refs ?? [],
 		titleOf,
 	};

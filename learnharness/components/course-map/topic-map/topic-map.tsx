@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { NeedEdge, type NeedFlowEdge } from "./need-edge";
 import { READABLE_ZOOM, TOPIC_NODE_SIZE as node, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, layoutTopicMap, neighbourOf, slackOf, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, TopicNode, type TopicFlowNode, type TopicMapState } from "./topic-node";
-import { standingOf, statusOf, topicLabel } from "./topic-standing";
+import { cardLine, standingOf, topicLabel } from "./topic-standing";
+import type { Said } from "@/components/unit-inbox/sidebar-says";
 
 const nodeTypes = { topic: TopicNode };
 const edgeTypes = { need: NeedEdge };
@@ -28,8 +29,9 @@ function reducedMotion(): boolean {
 /**
  * One course as a map (spec: topic-map.md): its topics in layers,
  * prerequisites above the topics that need them, drawn with React Flow
- * over the layout's own geometry. Each node says where he stands and
- * whether it needs him, and opens the topic's page. The map opens on the
+ * over the layout's own geometry. Each node says where he stands and,
+ * from `said` (`sidebarSays`), what the sidebar says for it when that
+ * needs him, and opens the topic's page. The map opens on the
  * whole course when that fits, else framed on the current topic with its
  * neighbours whole (`framedCamera`), or at `zoom` with the whole course in
  * its middle, for a page that frames the map itself; `whole` shows the
@@ -42,6 +44,7 @@ function reducedMotion(): boolean {
  */
 export function TopicMap({
 	map,
+	said,
 	margin = ROOM,
 	highlight = null,
 	marked = null,
@@ -50,6 +53,9 @@ export function TopicMap({
 	onOpensWhole,
 }: {
 	map: CourseMap;
+	/** What the sidebar says for each topic (`sidebarSays`), so each card's
+	 *  line is the sidebar row's. */
+	said: ReadonlyMap<TopicHandle, Said>;
 	margin?: { x: number; y: number };
 	/** Topics to light, the rest dimmed as a hover dims them; null lights none. */
 	highlight?: ReadonlySet<TopicHandle> | null;
@@ -73,6 +79,7 @@ export function TopicMap({
 			map.topics.flatMap((topic) => {
 				const placed = layout.topics.get(topic.handle);
 				if (!placed) return [];
+				const line = cardLine(said.get(topic.handle));
 				const needs = map.edges.flatMap((e) => (e.kind === "needs" && e.topic === topic.handle ? [titleOf(e.prerequisite)] : []));
 				return {
 					id: topic.handle,
@@ -93,14 +100,14 @@ export function TopicMap({
 						topic,
 						current: map.current === topic.handle,
 						standing: standingOf(topic),
-						status: statusOf(topic, map.tasks, titleOf, map.today),
-						label: topicLabel(topic, map.current === topic.handle, titleOf),
+						line,
+						label: topicLabel(topic, map.current === topic.handle, line),
 						needs: needs.length ? `Needs ${needs.join(", ")}` : null,
 						href: unitHref(map.workspace, topic.handle),
 					},
 				};
 			}),
-		[map, layout, titleOf],
+		[map, said, layout, titleOf],
 	);
 	const edges = useMemo<NeedFlowEdge[]>(
 		() =>

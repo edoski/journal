@@ -16,7 +16,7 @@ import { HomeMap } from "../components/study-home/home-map.tsx";
 import { courseHref } from "../components/unit-inbox/unit-href.ts";
 
 const course = (workspace: string, title: string) =>
-	({ map: { workspace, title, today: "2026-11-08", revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [] } }) as unknown as StudyCourse;
+	({ map: { workspace, title, today: "2026-11-08", revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [] }, unready: null, due: [], lastActiveDaysAgo: null, newToday: [] }) as StudyCourse;
 const COURSES = [course("/s/linalg", "Linear Algebra"), course("/s/calc", "Calculus I")];
 
 describe("Home's map header", () => {
@@ -25,7 +25,7 @@ describe("Home's map header", () => {
 		parseHTML(
 			`<html><body>${renderToStaticMarkup(
 				<AppRouterContext.Provider value={router as never}>
-					<HomeMap courses={COURSES} workspace={workspace} onSelect={() => {}} enlarged={false} onEnlarge={() => {}} />
+					<HomeMap courses={COURSES} chats={[]} workspace={workspace} onSelect={() => {}} enlarged={false} onEnlarge={() => {}} />
 				</AppRouterContext.Provider>,
 			)}</body></html>`,
 		).document;
