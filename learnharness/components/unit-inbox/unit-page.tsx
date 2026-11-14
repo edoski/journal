@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { useServerEvent } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
-import { SidebarToggle } from "@/components/sidebar";
 import { useLinkVariant } from "@/components/design-variant";
-import { TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import { TopicNotice, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
 
@@ -41,8 +40,8 @@ function useUnitRead(workspace: string): Read {
 
 /**
  * The topic page's route body (spec: topic-page/topic-page.md), what a
- * sidebar row or a map node opens: the band with the sidebar toggle, then
- * the topic page once its course is read.
+ * sidebar row or a map node opens: the window's 52px band, then the topic
+ * page once its course is read.
  */
 export function UnitPage({ workspace, handle }: { workspace: string; handle: string }) {
 	const read = useUnitRead(workspace);
@@ -51,15 +50,11 @@ export function UnitPage({ workspace, handle }: { workspace: string; handle: str
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<header className="relative flex h-13 shrink-0 items-center gap-2 px-3">
-				<SidebarToggle />
-			</header>
+			<div aria-hidden className="h-13 shrink-0" />
 			{read.status === "ready" && topic ? (
 				<TopicPage connected={link === "connected"} course={read.course} topic={topic} chats={read.chats} />
 			) : (
-				<p className="mx-auto w-full max-w-[46rem] px-6 pt-6 text-row text-muted-foreground">
-					{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}
-				</p>
+				<TopicNotice>{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}</TopicNotice>
 			)}
 		</div>
 	);

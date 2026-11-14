@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
+import { PageFrame } from "@/components/page-frame/page-frame";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
 import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-page";
@@ -10,10 +10,6 @@ import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/
 import { LessonMap } from "@/components/unit-inbox/topic-page/hybrid/lesson-map";
 import { LinkedColumns, type Tie } from "@/components/linked-columns/linked-columns";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
-
-/** The hybrid page's column, which its error line shares: wide enough
- *  for the history beside a map two steps wide plus the frame's fade. */
-export const HYBRID_COLUMN = "max-w-[60rem]";
 
 /** The step the lesson on the map stopped on, which its row is tied to. */
 const TIED_STEP = '[data-slot="topic-step"][aria-current="step"]';
@@ -34,8 +30,10 @@ export interface HybridPaneProps {
 }
 
 /**
- * The topic page's body (spec: hybrid.md): the page fits the
- * window. The shared head over two bounded panes side by side, each the
+ * The topic page's body (spec: hybrid.md): the page fits the window, in
+ * the shared page frame (`PageFrame`, page-frame.md) the course page
+ * wears. The shared head, with a start's error under it, over two bounded
+ * panes side by side, each the
  * full height under it: the topic's history sorted into Pick up's sections
  * on the left, which holds the page's action, and the steps of the lesson
  * picked in it as a map on the right, since a lesson's steps run down with
@@ -43,7 +41,7 @@ export interface HybridPaneProps {
  * planned, the history takes the width. `connected` (the Link switch)
  * draws the line from the lesson's row to the step it stopped on.
  */
-export function HybridTopic({ facts, busy, onAct, onTask, connected = true }: TopicPageProps & { connected?: boolean }) {
+export function HybridTopic({ facts, busy, error = null, onAct, onTask, connected = true }: TopicPageProps & { error?: string | null; connected?: boolean }) {
 	const planned = facts.sessions.filter(isPlanned);
 	const [chosen, setChosen] = useState(() => mapLessonAtFirst(facts.sessions, facts.action));
 	const shown = planned.find((entry) => entry.chat.id === chosen) ?? planned.find((entry) => entry.chat.id === mapLessonAtFirst(facts.sessions, facts.action)) ?? null;
@@ -51,9 +49,15 @@ export function HybridTopic({ facts, busy, onAct, onTask, connected = true }: To
 	const tie = useMemo<Tie | null>(() => (shownId ? { key: shownId, row: "[data-shown]", node: TIED_STEP } : null), [shownId]);
 	const side = (className?: string) => <SectionsPane facts={facts} busy={busy} onAct={onAct} onTask={onTask} shown={shown?.chat.id ?? null} onShow={setChosen} className={className} />;
 	return (
-		<div data-testid="unit-page" data-topic-candidate="hybrid" className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 pb-6 pt-6", HYBRID_COLUMN)}>
+		<PageFrame data-testid="unit-page" data-topic-candidate="hybrid">
 			{/* Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
-			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null }} />
+			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null }}>
+				{error && (
+					<p role="alert" data-slot="topic-lesson-error" className="flex min-h-5 items-center text-row text-danger">
+						{error}
+					</p>
+				)}
+			</TopicHead>
 			{shown ? (
 				<LinkedColumns
 					data-slot="topic-panes"
@@ -65,6 +69,6 @@ export function HybridTopic({ facts, busy, onAct, onTask, connected = true }: To
 			) : (
 				side("flex-1")
 			)}
-		</div>
+		</PageFrame>
 	);
 }
