@@ -19,7 +19,7 @@ The lesson screen, picked by Edo over Current and Slot on 14 Nov 2026. **Thesis:
 
 | Moment | Prose draws |
 |---|---|
-| A question waits | its words end the tutor's message under "Your turn" (13px muted); a choice's options are plain rows, a digit then the words, filled when picked; rows never take focus |
+| A question waits | its words end the tutor's message under "Your turn" (13px muted); a check re-asked after a hint, its words already above the hint, draws no label: "Your turn" never heads nothing; a choice's options are plain rows, a digit then the words, filled when picked; rows never take focus |
 | The composer while open | `data-mode="answer"`; placeholder by what is asked ("Your prediction, and why", "Your answer", "Pick one above, or write your own answer", "Anything to add?", "Work here, think out loud."); icons beside attach: Hint (a lightbulb, checks), Hint, Show me (an eye) and Explain instead (a book) on problems, each its words and key in its tooltip; beside Send, how sure he is (a meter of three bars: one lit for Guessing, two for Neutral, three for Confident, its words in the tooltip) and the Answer or Ask toggle (`data-slot="composer-mode"`: a segmented pair, the pen for answering, the question bubble for asking, the chosen one filled); photos on text answers and problems |
 | He answers | his answer is his bubble; the mark's line sits under it, its facts ending where his words do, Dispute before them on hover; "The answer" (a check's committed answer) behind a disclosure |
 | Hint | his bubble with a lightbulb and "Hint" and his words so far; the re-asked check opens with them in the field |

@@ -114,7 +114,7 @@ interface QuestionPart {
 /** The question calls that ask again, word for word, the question he just
  *  pressed Hint on. The tutor re-asks after every hint (a hint is not an
  *  answer, so the question must come back open), and the transcript draws
- *  those words once, above the hint, so the re-ask shows only "Your turn"
+ *  those words once, above the hint, so the re-ask draws nothing of its own
  *  (round 5, 14 Nov 2026: the whole question printed twice). A re-ask in
  *  new words is a rephrasing and draws them. */
 export function reaskedAfterHint(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
