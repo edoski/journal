@@ -302,6 +302,9 @@ export function arcPassProblems(submit: ArcSubmit, view: ArcPassView): string | 
 		handles.add(a.handle);
 		for (const field of ["title", "question", "purpose"] as const) if (!a[field]?.trim()) problems.push(`arc "${a.handle}" has no ${field}.`);
 		if (a.topics.length === 0) problems.push(`arc "${a.handle}" holds no topic.`);
+		else if (a.topics.every((t) => view.topics[t]?.excluded)) {
+			problems.push(`arc "${a.handle}" holds only topics no exam examines, so it would be hidden: put them in the arc whose question they extend.`);
+		}
 		if (a.topics.length === 1 && !a.single?.trim()) {
 			problems.push(`arc "${a.handle}" holds one topic: merge it with the neighbour whose question it serves, or say in single why it stands alone (the edge-case rule).`);
 		}

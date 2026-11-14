@@ -51,7 +51,7 @@ A save that adds an arc for a new chapter of the material, with two of its topic
 
 This is the grouping pass's job: it forms the arcs of a course that has topics and none. It runs on edges already settled, and never changes `needs`. An edge you think false goes in your doubts with its reason; it is recorded, never applied. Read first: every topic with its `title`, `needs`, `contrasts`, `refs`, `aliases` and `excluded`; every source's headings (table of contents, chapters, syllabus units, lecture weeks, slide ranges, exercise sheets); the exam's `coverage`, `format` and `refs`; `path.order` and `path.basis`.
 
-1. **One home.** Each topic, excluded ones included, sits in exactly one arc.
+1. **One home.** Each topic, excluded ones included, sits in exactly one arc. A topic no exam examines (`excluded`) joins the arc whose question it extends, else the latest arc holding its prerequisites. It never forms an arc alone: an arc of excluded topics is hidden and gives nothing to orient by. It is in no exam's scope, so it never makes an arc straddle one.
 2. **No topic needs a later arc.** For every topic B that needs A, A's arc is B's or an earlier one: arcs 1 to j together hold every prerequisite of every topic in them. When a topic's theme says one arc but a topic that needs it sits earlier, the edge wins: home the topic in the earliest arc that needs it, just before its first use.
 3. **One idea per arc.** Write the arc's focus question before its name. Every topic in it helps answer that question; a topic that serves another arc's question better goes there, if rule 2 allows.
 4. **Where to cut**, from these signals, strongest first; keep a boundary only if rule 2 still holds:

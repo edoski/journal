@@ -140,6 +140,14 @@ describe("the cut's shape rules", () => {
 		assert.match(arcPassProblems(twice, view(CALC))!, /"limits" is in both/);
 	});
 
+	it("R1: a topic no exam examines joins an arc whose question it extends, never one of its own", () => {
+		const left = { ...CALC, extra: topic("Extra", ["chain"], { excluded: "not examined" }) };
+		const alone = { ...good, arcs: [...good.arcs, arc("extra-arc", "Extras", ["extra"], { single: "outside the exam" })] };
+		assert.match(arcPassProblems(alone, view(left))!, /holds only topics no exam examines/);
+		const joined = { ...good, arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: [...good.arcs[1]!.topics, "extra"] }] };
+		assert.equal(arcPassProblems(joined, view(left)), null);
+	});
+
 	it("R6: two arcs or none, and a one-topic arc only with its reason", () => {
 		assert.match(arcPassProblems({ ...good, arcs: [arc("all", "Calculus", Object.keys(CALC))] }, view(CALC))!, /form at least two/);
 		const lone = { ...good, arcs: [arc("a", "Limits", ["limits"]), arc("b", "The rest", ["continuity", "derivative", "chain", "riemann"])] };
