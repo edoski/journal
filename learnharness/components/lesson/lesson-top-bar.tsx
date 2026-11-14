@@ -64,7 +64,7 @@ export function LessonTopBar({
 				<Popover open={plan.open} onOpenChange={plan.onOpenChange}>
 					<Hint label="Open the plan" side="bottom">
 						<PopoverTrigger asChild>
-							<Button variant="quiet" size="sm" data-slot="plan-toggle" data-testid="plan-chip" className="h-8 gap-1.5 px-2 text-row font-normal">
+							<Button variant="quiet" size="row" data-slot="plan-toggle" data-testid="plan-chip" className="font-normal">
 								<WaypointsIcon />
 								Plan
 							</Button>

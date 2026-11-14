@@ -33,6 +33,13 @@ const buttonVariants = cva(
         "icon-lg": "size-10",
         "icon-row": "size-8 rounded-md [&_svg:not([class*='size-'])]:size-4",
         "icon-inline": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3.5",
+        // The design's own sizes: the 13px row text on a 32px row, the
+        // docks' 32px pill, the settings rows' 28px action, and the 28px
+        // icon of the sidebar's and the lesson's bars.
+        row: "h-8 gap-1.5 rounded-md px-2 text-row",
+        pill: "h-8 gap-1.5 rounded-full px-3.5 text-row font-medium has-[>svg]:px-2.5",
+        compact: "h-7 gap-1.5 rounded-md px-3",
+        "icon-bar": "size-7 rounded-md [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

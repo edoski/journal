@@ -49,7 +49,7 @@ export function ClaudeLimitPrompt({ failure, onContinue }: {
 	const left = next.usage ? ` (${next.usage.percentLeft}% left)` : "";
 
 	return <span className="flex flex-wrap items-center gap-2">
-		<Button variant="quiet" size="sm" className="h-8 px-2 text-row font-medium text-foreground" data-testid="claude-limit-continue" disabled={busy} onClick={() => void continueOn(next.account.providerId)}>
+		<Button variant="quiet" size="row" className="text-foreground" data-testid="claude-limit-continue" disabled={busy} onClick={() => void continueOn(next.account.providerId)}>
 			Continue on {next.account.label}{left}
 		</Button>
 		{error && <span role="alert" className="text-row text-danger">{error}</span>}

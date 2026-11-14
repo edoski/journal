@@ -96,11 +96,10 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				<Button
 					type="button"
 					variant="quiet"
-					size="sm"
+					size="pill"
 					data-testid={`practice-request-${kind}`}
 					disabled={compactionRunning}
 					onClick={() => request(kind)}
-					className="h-8 rounded-full px-3 text-row"
 				>
 					<Icon />
 					{label}
@@ -172,7 +171,8 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 					data-testid="practice-send"
 					disabled={thinking.trim().length === 0 || compactionRunning}
 					onClick={() => submit()}
-					className="ml-auto h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+					size="pill"
+						className="ml-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
 				>
 					Submit
 				</Button>

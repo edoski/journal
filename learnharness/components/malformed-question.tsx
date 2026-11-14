@@ -18,7 +18,7 @@ export function MalformedQuestion({ onRetry, disabled, reason }: {
 			{reason && <p className="mt-1">{reason}</p>}
 			{onRetry && (
 				<Hint label={reason ?? "Requests a replacement from the model."}>
-					<Button type="button" variant="quiet" size="sm" className="-ml-2 mt-2 h-8 px-2 text-row font-medium text-foreground" disabled={disabled}
+					<Button type="button" variant="quiet" size="row" className="-ml-2 mt-2 text-foreground" disabled={disabled}
 						data-testid="retry-malformed-question" onClick={onRetry}>
 						Retry question
 					</Button>
