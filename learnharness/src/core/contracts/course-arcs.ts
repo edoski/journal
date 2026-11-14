@@ -40,13 +40,12 @@ export function currentArc(map: Pick<CourseMap, "current" | "topics" | "currentA
 }
 
 /** How much of an arc the next exam examines: null with no exam, so
- *  nothing on screen mentions one; `all` when the exam is over the whole
- *  course or over the arc whole; `part` when it leaves some of the arc's
- *  topics out; `none` when it examines none of them. Pure. */
+ *  nothing on screen mentions one; `all` when the exam examines the arc
+ *  whole; `part` when it leaves some of the arc's topics out; `none` when
+ *  it examines none of them. Pure. */
 export function examCovers(exam: CourseExam | null, arc: CourseMapArc, topics: readonly CourseMapTopic[]): "all" | "part" | "none" | null {
 	if (!exam) return null;
-	if (!exam.arcs) return "all";
-	if (!exam.arcs.includes(arc.handle)) return "none";
+	if (exam.arcs && !exam.arcs.includes(arc.handle)) return "none";
 	const live = topics.filter((t) => t.arc === arc.handle && t.excluded === undefined);
 	const examined = live.filter((t) => !exam.leavesOut?.includes(t.handle));
 	if (examined.length === 0) return "none";

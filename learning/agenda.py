@@ -91,7 +91,8 @@ window only on a day when holding would raise the pace it needs. Each start
 says why it comes then (``When.why``): next in its arc, after what it waited
 on, or early, with the earliest arc with topics left and what it waits on.
 
-An exam that names arcs examines only their topics (``progress.examining``):
+An exam with a scope examines only its topics, those of the arcs it names
+less those it leaves out, with or without arcs (``progress.examining``):
 only those take its review dates, its final review and its run-up, while its
 pace, its gates and what does not fit hold them and their untaught
 prerequisites (``progress.exam_topics``). The rest of the course is planned
@@ -227,10 +228,10 @@ class _Course:
 
     def outside(self, day: date) -> list[str]:
         """Untaught topics no exam ahead needs: outside the next exam's scope,
-        or, once an exam over named arcs has passed, all of them, what it
-        examined but he never started included. They are planned as in a
-        course with no exam. After a whole-course exam nothing is, until the
-        next exam is set."""
+        or, once an exam with a scope (arcs, or topics it leaves out) has
+        passed, all of them, what it examined but he never started included.
+        They are planned as in a course with no exam. After a whole-course
+        exam nothing is, until the next exam is set."""
         if self.exam is None:
             return []
         if not self.ahead(day):

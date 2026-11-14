@@ -351,7 +351,13 @@ describe("course map arcs (E2's goldens)", () => {
 		const golden = goldenMap("linear-algebra-arcs");
 		const exam = { ...(golden.exam as object), arcs: ["spaces", "systems", "gone"], leaves_out: ["kernel", "nope"] };
 		assert.deepEqual(parsed({ ...golden, exam }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-14", arcs: ["spaces", "systems"], leavesOut: ["kernel"] });
-		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-14" }, "null is the whole course");
+		assert.deepEqual(parsed({ ...golden, exam: { ...exam, arcs: null } }).exam, { date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-14", leavesOut: ["kernel"] }, "null is the whole course, less what it leaves out");
+	});
+
+	it("the topics an exam leaves out in a course without arcs", () => {
+		const golden = goldenMap("linear-algebra");
+		const exam = { ...(golden.exam as object), leaves_out: ["kernel", "nope"] };
+		assert.deepEqual(parsed({ ...golden, exam }).exam?.leavesOut, ["kernel"]);
 	});
 });
 
@@ -389,6 +395,9 @@ describe("how much of an arc the exam covers", () => {
 		assert.equal(examCovers(scoped, arc("eigenvalues"), map.topics), "none");
 		const emptied = { ...scoped, leavesOut: ["elimination", "rank", "kernel"] as TopicHandle[] };
 		assert.equal(examCovers(emptied, arc("systems"), map.topics), "none", "an arc whose every topic it leaves out");
+		const whole = { ...exam, leavesOut: ["kernel" as TopicHandle] };
+		assert.equal(examCovers(whole, arc("systems"), map.topics), "part", "an exam over the whole course that leaves a topic out");
+		assert.equal(examCovers(whole, arc("spaces"), map.topics), "all");
 	});
 });
 

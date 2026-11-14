@@ -1,6 +1,6 @@
 import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, heldWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -113,8 +113,8 @@ export interface TopicFacts {
 	starts: { day: string; waits: string | null } | null;
 	/** Why the plan starts a topic not started then ("After Expectation
 	 *  and linearity, which it needs", "Early, ahead of its place, while
-	 *  earlier topics wait on Change of basis"); null once taught and with
-	 *  no plan for it. */
+	 *  earlier topics wait on Change of basis"), or for a topic the exam leaves out ("Not on
+	 *  the exam; after it"); null once taught and with no plan for it. */
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
@@ -171,6 +171,14 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 /** Why the review waits past the day memory asked for it, after from
  *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
  *  from 9 Nov, earlier days are full". */
+/** `TopicFacts.startsWhy`: the exam's scope first, since a topic it leaves
+ *  out waits for the exam whatever else it waits on. */
+function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | null {
+	const leftOut = leftOutWords(topic, map.exam);
+	if (leftOut) return { kind: "after", words: leftOut };
+	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null;
+}
+
 function waitsWords(review: CourseMapTopic["review"], today: string): string | null {
 	const why = heldWords(review);
 	const moved = movedWords(review, today);
@@ -378,7 +386,7 @@ export function topicFacts({
 		mistake: mistakeOf(topic, attempts),
 		waits: waitsWords(topic.review, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,
-		startsWhy: topic.level === "new" && topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null,
+		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,

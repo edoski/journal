@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -179,6 +179,15 @@ describe("why a topic starts then", () => {
 		assert.equal(why(plain, "inner-product"), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
 		const orthogonality = "orthogonality" as ArcHandle;
 		assert.equal(startsWhyWords({ kind: "early", arc: orthogonality, waitingOn: [], exam: false }, arcs), "Early, from Orthogonality");
+	});
+	it("says a topic the exam ahead leaves out is not on it, and after it when the plan starts it then", () => {
+		const exam = { date: "2026-11-19", daysLeft: 11, leavesOut: ["covariance" as TopicHandle] };
+		const covariance = { handle: "covariance" as TopicHandle, starts: "2026-11-23" };
+		assert.equal(leftOutWords(covariance, exam), "Not on the exam; after it");
+		assert.equal(leftOutWords({ ...covariance, starts: "2026-11-16" }, exam), "Not on the exam", "nothing the exam examines waits");
+		assert.equal(leftOutWords({ ...covariance, handle: "variance" as TopicHandle }, exam), null);
+		assert.equal(leftOutWords(covariance, { ...exam, daysLeft: -1 }), null, "once the exam has passed");
+		assert.equal(leftOutWords(covariance, null), null);
 	});
 	it("says next in its arc, else in the course", () => {
 		assert.equal(startsWhyWords({ kind: "next", arc: "systems" as ArcHandle }, arcs), "Next in Linear systems");
