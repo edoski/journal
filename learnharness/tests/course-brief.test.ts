@@ -3,6 +3,7 @@
  * when its key changes, and injected by the turn handler after the input.
  */
 
+import { onFake } from "./helpers/fake-sdk.ts";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -204,7 +205,7 @@ describe("course brief injection", () => {
 		faux.setResponses([fauxAssistantMessage([fauxText("Where shall we start?")]), fauxAssistantMessage([fauxText("Go on.")])]);
 		const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
 		const factory = (opts: never) =>
-			createProberAgent({ chatId: chat.id, chatStore, deliver: () => {}, jobStore: {} as never, spawn: () => {} }, { ...(opts as object), engine });
+			createProberAgent({ chatId: chat.id, chatStore, deliver: () => {}, jobStore: {} as never, spawn: () => {} }, { ...(opts as object), ...onFake(engine, opts as never) });
 		for (const text of ["teach me rank", "ok"]) {
 			const ack = await handleChatRequest(new Request("http://t/api/chat", { method: "POST", body: JSON.stringify({ chatId: chat.id, input: { type: "text", text } }) }), factory as never);
 			assert.equal(ack.status, 200);
@@ -231,7 +232,7 @@ describe("course brief injection", () => {
 		const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
 		const factory = (opts: { agent: string }) => {
 			assert.equal(opts.agent, "practice");
-			return createPracticeAgent({ chatId: chat.id, chatStore }, { ...(opts as object), engine });
+			return createPracticeAgent({ chatId: chat.id, chatStore }, { ...(opts as object), ...onFake(engine, opts as never) });
 		};
 		const steer = buildModeHandoffSteer(chat.id, "call-h1", "practice");
 		const ack = await handleChatInput(chat.id, { type: "steers", steers: [steer] }, factory as never);

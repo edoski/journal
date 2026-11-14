@@ -66,7 +66,8 @@ import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import { createTeacherAgent } from "../src/agent/teacher-agent.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
+import { fakeEngine, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 /**
  * A fake deliver seam + a runner wired like the chat-handler's, per test:
@@ -121,10 +122,11 @@ after(() => {
 	visualModelOverride.current = undefined;
 });
 
-/** A scripted pi engine (faux provider): the response queue replaces the old
- *  doGenerate turn counter — one queued response per model call (tool-call
- *  turn or final text), consumed in order. */
-function scriptedModel(turns: Array<{ toolCalls?: Array<{ toolCallId: string; toolName: string; input: unknown }>; text?: string }>): PiEngine {
+type Turn = { toolCalls?: Array<{ toolCallId: string; toolName: string; input: unknown }>; text?: string };
+
+/** A scripted model (faux provider): one queued response per model call
+ *  (tool-call turn or final text), consumed in order. */
+function scriptedTurns(turns: Turn[]): ScriptedModel {
 	const steps: FauxResponseStep[] = turns.map((step) => {
 		if (step.toolCalls) {
 			return fauxAssistantMessage(
@@ -137,6 +139,11 @@ function scriptedModel(turns: Array<{ toolCalls?: Array<{ toolCallId: string; to
 	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
 	faux.setResponses(steps);
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
+}
+
+/** The scripted model as an engine, played through the fake Agent SDK. */
+function scriptedModel(turns: Turn[]): SdkEngine {
+	return fakeEngine(scriptedTurns(turns));
 }
 
 // ─── fake headless ───────────────────────────────────────────────────────────
@@ -675,13 +682,28 @@ describe("visual maker (fake model + fake headless)", () => {
 		const headless = fakeHeadless();
 		const model = scriptedModel([
 			{ toolCalls: [{ toolCallId: "w1", toolName: "write_svg", input: { svg: SVG_1 } }] },
-			{ text: "Done." }, // premature finish — no render yet
-			{ text: "Looked at it — correct." }, // after the forced look
+			{ toolCalls: [{ toolCallId: "f1", toolName: "finish", input: { notes: "Done." } }] }, // premature finish — no render yet
+			{ toolCalls: [{ toolCallId: "r1", toolName: "render_svg", input: {} }] },
+			{ toolCalls: [{ toolCallId: "f2", toolName: "finish", input: { notes: "Looked at it — correct." } }] },
 		]);
 		const result = await runVisualMaker({ brief: "b" }, { engine: model, headless });
 		assert.equal(result.svg, SVG_1, "delivered after the forced look");
-		assert.equal(result.notes, "Looked at it — correct.");
-		assert.equal(headless.svgRenders.length, 1, "the gate rendered the svg once itself");
+		assert.equal(result.notes, "Looked at it — correct.", "the unlooked finish was refused");
+		assert.equal(headless.svgRenders.length, 1, "the svg was rendered once before delivery");
+	});
+
+	it("never delivers an svg changed after its last render", async () => {
+		const headless = fakeHeadless();
+		const model = scriptedModel([
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_svg", input: { svg: SVG_1 } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "render_svg", input: {} }] },
+			{ toolCalls: [{ toolCallId: "e1", toolName: "edit_svg", input: { old_text: '<line x1="10"', new_text: '<line x1="20"' } }] },
+			{ toolCalls: [{ toolCallId: "f1", toolName: "finish", input: { notes: "Done." } }] },
+			{ text: "Out of turns." },
+		]);
+		const result = await runVisualMaker({ brief: "b" }, { engine: model, headless, maxIterations: 5 });
+		assert.equal(result.svg, "", "the edited svg was never looked at");
+		assert.match(result.notes ?? "", /^FAILED: the maker stopped without looking/);
 	});
 
 	it("edit_svg: exact-match single replacement, with fuzzy context on a miss", async () => {
@@ -899,7 +921,7 @@ describe("demo/visual job runners", () => {
 		createdChats.push(chat.id);
 
 		// A teacher that calls demo on turn 1, then continues in the SAME turn.
-		const teacher = scriptedModel([
+		const teacher = scriptedTurns([
 			{ toolCalls: [{ toolCallId: "call-d2", toolName: "demo", input: DEMO_INPUT }] },
 			{ text: "Here it is." },
 		]);
@@ -931,8 +953,7 @@ describe("demo/visual job runners", () => {
 				// state — no adapter conversion).
 				(opts) =>
 					createTeacherAgent(undefined, {
-						engine: teacher,
-						messages: opts.messages,
+						...onFake(teacher, opts),
 						tools: createTeacherTools({
 							chatId: chat.id,
 							chatStore,

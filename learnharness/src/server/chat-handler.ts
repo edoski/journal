@@ -8,9 +8,9 @@ import {
 	type AgentKind,
 	type TeachingAgent,
 } from "../agent/teacher-agent.ts";
-import { claudeEngine, type PiEngine } from "../agent/models.ts";
+import { claudeEngine, type SdkEngine } from "../agent/models.ts";
 import { connectionBackgroundAllowed } from "../agent/subscription-connections.ts";
-import { CLAUDE_MODEL_MISSING, claudeTurnError } from "../agent/claude-stream.ts";
+import { CLAUDE_MODEL_MISSING, claudeTurnError } from "../agent/claude-errors.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createLessonDigest } from "../agent/subagents/lesson-digest.ts";
 import { onLessonEvents, resumeCutDigests } from "./lesson-finish.ts";
@@ -27,8 +27,6 @@ import {
 	unregisterLiveAgent,
 } from "./jobs.ts";
 import { runPiTurn } from "./pi/ui-stream.ts";
-import { collectToolCallIds } from "./pi/call-ids.ts";
-import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefMarker, fetchCourseArcs, fetchCourseBrief } from "./course-brief.ts";
 import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
@@ -39,8 +37,10 @@ import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.t
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { answeredQuestionsOf, hasUnresolvedQuestion, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
-import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
+import { PATHS } from "../../config.ts";
+import { nextChatSession } from "../core/sdk-session.ts";
+import type { SessionStore } from "../agent/sdk/session-files.ts";
 import { catalogContextLimits } from "./model-catalog.ts";
 import { refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { emit } from "../core/events.ts";
@@ -151,13 +151,29 @@ setTurnRunner(async (chatId, input) => {
  *  2026-11-14): CLAUDE_MODEL at its fixed thinking level on the settings'
  *  Claude account, read FRESH so an account switch lands on the next call.
  *  The conversation builds the same engine on the account its gate read. */
-export function agentEngine(): PiEngine {
+export function agentEngine(): SdkEngine {
 	return claudeEngine(effectiveSettings().claude.account);
 }
 
 function compactionKind(record: ChatRecord): "teach" | "practice" | "probe" {
 	const agent = respondingAgentOf(record.messages, record.kind);
 	return agent === "practice" ? "practice" : agent === "teacher" ? "teach" : "probe";
+}
+
+/** Where the app keeps its copy of a lesson's Claude Code session: beside the record. */
+function sessionStoreFor(chatId: string): SessionStore {
+	return { dir: PATHS.chats, chatId };
+}
+
+function compactionDeps(chatId: string, record: ChatRecord, engine: SdkEngine, account: string) {
+	return {
+		chatStore: stores.chatStore,
+		engine,
+		canStart: () => connectionBackgroundAllowed(account),
+		kind: compactionKind(record),
+		thresholdTokens: effectiveThresholdTokens(catalogContextLimits().get(`${engine.model.provider}:${engine.model.id}`)),
+		sessionStore: sessionStoreFor(chatId),
+	};
 }
 
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
@@ -258,24 +274,10 @@ export async function handleChatInput(
 	// placement mirrors the connection gate — BEFORE appends and
 	// beginTurn, no liveness effects — and the record re-reads after
 	// because compaction appends the marker.
-	let conversationEngine: PiEngine;
+	let conversationEngine: SdkEngine;
 	try { conversationEngine = claudeEngine(account); }
 	catch { return Response.json({ error: CLAUDE_MODEL_MISSING }, { status: 503 }); }
-	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
-	await ensureCompacted(
-		{
-			chatStore: stores.chatStore,
-			engine: conversationEngine,
-			canStart: () => connectionBackgroundAllowed(account),
-			modelId: modelIdForCompaction,
-			kind: compactionKind(record),
-			thresholdTokens: effectiveThresholdTokens(
-				catalogContextLimits().get(modelIdForCompaction),
-			),
-			systemPromptTokens: Math.ceil(composeInstructions(respondingAgentOf(record.messages, record.kind)).length / 4),
-		},
-		chatId,
-	);
+	await ensureCompacted(compactionDeps(chatId, record, conversationEngine, account), chatId);
 	// The course brief rides learner input only, fetched before the record
 	// is re-read below. A question recovery is a retry: its results must stay
 	// adjacent to their calls and end the record, so it carries no brief.
@@ -435,9 +437,9 @@ export async function handleChatInput(
 		engine,
 		messages: asAgentMessages(agentMessages),
 		onUsage: collectUsage,
-		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
-		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
-		chatId,
+		// The lesson's Claude Code session: the model's memory of it.
+		session: record.session,
+		sessionStore: sessionStoreFor(chatId),
 		// A course-linked session reads and writes the learner's course
 		// record through the engine, whatever the agent kind, with the
 		// answers a save may name (answeredQuestionsOf), read from the
@@ -511,22 +513,12 @@ export async function handleChatInput(
 		// a streamed response, which never happens inside the constructor.
 		registerLiveAgent(chatId, constructed, input.type !== "steers" && input.type !== "continue",
 			input.type === "steers" ? new Set(appends.map((message) => message.id)) : undefined);
-		// Debug recorder run marker (owner, 2026-10-04): correlates the
-		// JSONL event stream with the record's turns; no-op unless
-		// LH_PROVIDER_EVENTS=1.
-		providerEventNote(chatId, "turn", `run start (base: ${agentMessages.length} messages)`);
 		const handle = runPiTurn({
 			agent: constructed,
 			// The coalescing window seam (COMPACTION LAW, 2026-10-09): tests
 			// tighten it via LH_UPDATE_FLUSH_MS; production rides the 100ms
 			// default in ui-stream.
 			...(process.env.LH_UPDATE_FLUSH_MS ? { updateFlushMs: Number(process.env.LH_UPDATE_FLUSH_MS) } : {}),
-			// THE LACAN FIX (2026-10-04): seed the uniquifier with every
-			// tool-call id the record already holds — a provider that resets
-			// ids per response (DeepSeek) then gets fresh unique ids for this
-			// turn's calls at the wire boundary, on the wire, in the record,
-			// and in the next turn's context alike.
-			usedToolCallIds: new Set(collectToolCallIds(merged)),
 			// Stream-level failures are provider/transport internals — masked,
 			// like the SDK defaults. Tool-input validation messages never
 			// route through here: they ride the error-result path and reach the
@@ -559,6 +551,9 @@ export async function handleChatInput(
 				// Wave B: append only messages past the temporary agent prefix.
 				// Retry's saved record still includes its earlier failed attempts.
 				const stamped = persistTurn(stores.chatStore, chatId, persistBaseCount, turnMessages, isAborted);
+				// The record's map to the session moves to what the turn left there.
+				const sessionEnd = constructed.sessionEnd();
+				if (sessionEnd) stores.chatStore.saveSession(chatId, nextChatSession(record.session, sessionEnd, stores.chatStore.getChat(chatId)?.messages ?? stamped));
 				noteSteersDurable(chatId, stores.chatStore.getChat(chatId)?.messages ?? stamped);
 				// usage log append (idempotent per turn id) — the stats bar
 				// refolds this on the client after the turn settles. The
@@ -612,22 +607,10 @@ export async function handleChatInput(
 					kickCompaction(() => {
 						const kickAccount = effectiveSettings().claude.account;
 						if (!connectionBackgroundAllowed(kickAccount)) return null;
-						let kickEngine: PiEngine;
+						let kickEngine: SdkEngine;
 						try { kickEngine = claudeEngine(kickAccount); } catch { return null; }
-						const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
 						const freshRecord = stores.chatStore.getChat(chatId);
-						if (!freshRecord) return null;
-						return {
-							chatStore: stores.chatStore,
-							engine: kickEngine,
-							canStart: () => connectionBackgroundAllowed(kickAccount),
-							modelId: kickModelId,
-							kind: compactionKind(freshRecord),
-							thresholdTokens: effectiveThresholdTokens(
-								catalogContextLimits().get(kickModelId),
-							),
-							systemPromptTokens: Math.ceil(composeInstructions(respondingAgentOf(freshRecord.messages, freshRecord.kind)).length / 4),
-						};
+						return freshRecord ? compactionDeps(chatId, freshRecord, kickEngine, kickAccount) : null;
 					}, chatId);
 			},
 		});

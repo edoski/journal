@@ -5,6 +5,7 @@
  * whose ledger is not `new` never running live).
  */
 
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -33,7 +34,7 @@ import {
 import { duplicateOf, type ViewTopic } from "../src/core/course-map-build.ts";
 import { createArcPass, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
 import { mapRuns } from "../src/agent/subagents/course-map-builder.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
 import { arcPassLedgersAt } from "../src/store/arc-pass-ledgers.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import type { ArcPassLedgers } from "../src/core/ports.ts";
@@ -298,7 +299,7 @@ function memoryLedgers(): ArcPassLedgers & { all: Map<string, ArcPassLedger> } {
 
 /** A model that answers the edge step with `edges` and the cut with each of
  *  `cuts` in turn (the next one after a refusal), and counts its calls. */
-function scriptedModel(edges: EdgeSubmit, cuts: ArcSubmit[], hook?: () => void): PiEngine & { calls: number; refusals: string[] } {
+function scriptedModel(edges: EdgeSubmit, cuts: ArcSubmit[], hook?: () => void): SdkEngine & { calls: number; refusals: string[] } {
 	const faux = createFauxCore({});
 	const state = { calls: 0, refusals: [] as string[] };
 	let cut = 0;
@@ -312,7 +313,7 @@ function scriptedModel(edges: EdgeSubmit, cuts: ArcSubmit[], hook?: () => void):
 		return fauxAssistantMessage([fauxToolCall("submit_arcs", answer as unknown as ToolCall["arguments"], { id: `cut-${state.calls}` })], { stopReason: "toolUse" });
 	};
 	faux.setResponses(Array.from({ length: 20 }, () => step));
-	return Object.assign(state, { model: faux.getModel(), streamFn: faux.streamSimple });
+	return Object.assign(state, fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }));
 }
 
 describe("the grouping pass (real engine, scripted model)", { skip: !realEngine && "learning engine not installed" }, () => {

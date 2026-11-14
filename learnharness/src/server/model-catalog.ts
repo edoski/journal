@@ -7,7 +7,7 @@
  */
 
 import { claudeConnected, refreshClaudeConnections } from "../agent/claude-connection.ts";
-import { claudeSubscriptionModel, claudeSubscriptionModels } from "../agent/claude-stream.ts";
+import { claudeSubscriptionModel, claudeSubscriptionModels } from "../agent/sdk/engine.ts";
 import type { ModelStatus } from "../core/contracts/models.ts";
 import { effectiveSettings } from "./stores.ts";
 

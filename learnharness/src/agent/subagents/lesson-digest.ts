@@ -33,7 +33,7 @@ import {
 	type DigestSubmit,
 	type DigestWindow,
 } from "../../core/lesson-digest.ts";
-import type { PiEngine } from "../models.ts";
+import type { SdkEngine } from "../models.ts";
 import { DIGEST_DOCTRINE, composeDoctrine, writtenVoice, type CourseShape } from "../prompt-segments.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
 import { finishRun, setRunPhase } from "./background-runs.ts";
@@ -157,11 +157,11 @@ export interface LessonDigestDeps {
 	chatStore: ChatStore;
 	courseRecords: CourseRecords;
 	/** Test seam: a scripted engine, checked first. */
-	engine?: PiEngine;
+	engine?: SdkEngine;
 	/** The lesson's engine, resolved fresh per run: the app's default model
 	 *  (Opus 5.5 at high effort). Undefined when it cannot run, and the
 	 *  digest skips. */
-	engineFor?: (record: ChatRecord) => PiEngine | undefined;
+	engineFor?: (record: ChatRecord) => SdkEngine | undefined;
 	/** The subscription's background consent for the engine's provider. */
 	backgroundAllowed?: (provider: string) => boolean;
 }
@@ -263,7 +263,6 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 				prompt: digestPrompt(record, window, map, view),
 				engine,
 				signal,
-				chatId,
 				onStep: (usage, model, step) =>
 					console.info(`[digest ${chatId}] step ${step} ${model}: ${usage.input} in, ${usage.output} out`),
 				neverSubmitted: "The digest agent never submitted.",

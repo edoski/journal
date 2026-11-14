@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createArcPass, type ArcPass } from "../agent/subagents/arc-former.ts";
 import { createCourseMapBuilder, type CourseMapBuilder, type CourseMapStatus } from "../agent/subagents/course-map-builder.ts";
-import { claudeEngine, type PiEngine } from "../agent/models.ts";
+import { claudeEngine, type SdkEngine } from "../agent/models.ts";
 import { emit, subscribe, type ServerEvent } from "../core/events.ts";
 import { sourcesRegisteredInLastTurn } from "../core/native-messages.ts";
 import { effectiveSettings, stores } from "./stores.ts";
@@ -29,7 +29,7 @@ import { createCourseContexts, watchLinkedFolders, type CourseContexts } from ".
 
 /** The app's one model on its Claude account; undefined when that account
  *  cannot run it, so the build reports it instead of starting. */
-function defaultEngine(): PiEngine | undefined {
+function defaultEngine(): SdkEngine | undefined {
 	try {
 		return claudeEngine(effectiveSettings().claude.account);
 	} catch {

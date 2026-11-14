@@ -3,9 +3,9 @@
  * on the retired knowledge map carries its context as a separate custom
  * message before the learner's first user message. Nothing writes it any
  * more, but those records still open: the model reads the marker's content
- * (toLlmMessages flattens it to a user message like every marker) and the
- * transcript shows its collapsible GraphContextCard. A new session never
- * gets one, whatever the creation body carries.
+ * (sdkInputBlocks gives it as text in the turn's user message, like every
+ * marker) and the transcript shows its collapsible GraphContextCard. A new
+ * session never gets one, whatever the creation body carries.
  */
 
 import assert from "node:assert/strict";
@@ -21,7 +21,7 @@ process.env.LH_DATA_DIR = TMP_DATA;
 const COURSE = { workspace: "/study/course" };
 useFakeEngine(TMP_DATA, [{ ...COURSE, title: "Course" }]);
 
-const { toLlmMessages } = await import("../src/core/native-messages.ts");
+const { sdkInputBlocks } = await import("../src/core/sdk-session.ts");
 import type { LhMessage } from "../src/core/native-messages.ts";
 const { projectView } = await import("../src/core/view.ts");
 const { POST } = await import("../app/api/chats/route.ts");
@@ -49,11 +49,11 @@ const MARKER = {
 } as unknown as LhMessage;
 
 describe("an older session's graph-context marker", () => {
-	it("toLlmMessages flattens it to a user message (the model's face)", () => {
-		const wire = toLlmMessages([MARKER] as never);
-		assert.equal(wire.length, 1);
-		assert.equal(wire[0]!.role, "user");
-		assert.ok(String((wire[0]!.content as { text?: string }[])[0]!.text).includes("[Session context]"));
+	it("sdkInputBlocks gives its content as a text block of the turn's user message (the model's face)", () => {
+		const blocks = sdkInputBlocks([MARKER]);
+		assert.equal(blocks.length, 1);
+		assert.equal(blocks[0]!.type, "text");
+		assert.ok((blocks[0] as { text: string }).text.includes("[Session context]"));
 	});
 
 	it("projectView: a user-side data part — never a text bubble", () => {

@@ -25,7 +25,7 @@ import {
 	type FauxResponseStep,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
+import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { createPracticeAgent } from "../src/agent/teacher-agent.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
@@ -119,16 +119,16 @@ async function drainTurn(req: Request, factory: Parameters<typeof handleChatRequ
 
 /** The practice agent with the scripted engine, built only where the
  *  handler's mode fold picked practice. */
-function practiceFactory(chatId: string, engine: PiEngine): Parameters<typeof handleChatRequest>[1] {
+function practiceFactory(chatId: string, engine: ScriptedModel): Parameters<typeof handleChatRequest>[1] {
 	return (opts) => {
 		assert.equal(opts.agent, "practice", "the handler runs the practice agent");
-		return createPracticeAgent({ chatId, chatStore }, { engine, messages: opts.messages });
+		return createPracticeAgent({ chatId, chatStore }, onFake(engine, opts));
 	};
 }
 
 /** Each step records the prompt it received — the transcript the model
  *  saw (the chat-flow capture idiom). */
-function scripted(steps: FauxResponseStep[]): { engine: PiEngine; calls: string[] } {
+function scripted(steps: FauxResponseStep[]): { engine: ScriptedModel; calls: string[] } {
 	const calls: string[] = [];
 	const faux = createFauxCore({});
 	const wrap = (step: FauxResponseStep) =>
@@ -244,6 +244,6 @@ describe("practice flow (scripted model)", () => {
 			(synth.content[0] as { text: string }).text.includes(CONCLUDE_ACK_TEXT),
 			"the pair carries the shared conclude ack text",
 		);
-		assert.ok(lastSaw(calls, "dismissed"), "the model saw the dismissed outcome");
+		assert.ok(lastSaw(calls, '<app_note tool=\\"conclude\\" outcome=\\"dismissed\\" problem=\\"call-p3\\">'), "the model read the app-made conclude as a note with the dismissed outcome");
 	});
 });

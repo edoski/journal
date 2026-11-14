@@ -13,7 +13,6 @@ import { describe, it } from "node:test";
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import {
 	activeProblemOf,
-	asAgentMessages,
 	concludedByDismissalPair,
 	newProblemDismissedMarker,
 	newNextMessage,
@@ -21,7 +20,6 @@ import {
 	needsContinuation,
 	newUserMessage,
 	pendingProblemDismissalOf,
-	toLlmMessages,
 	PRACTICE_CONCLUDE_TOOL,
 	PRACTICE_PROBLEM_TOOL,
 	type LhMessage,
@@ -30,6 +28,7 @@ import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
 import { dismissAppends, inputAppends, parseChatInput, parseDismissInput } from "../src/core/input-events.ts";
 import { modelSolutionForConclude } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/index.ts";
+import { sdkInputBlocks } from "../src/core/sdk-session.ts";
 
 // ── builders (native-shaped test fixtures) ───────────────────────────────────
 
@@ -310,25 +309,24 @@ describe("the dismiss-problem input (ask-style discard)", () => {
 
 // ── the model-facing seam ────────────────────────────────────────────────────
 
-describe("toLlmMessages (practice shapes)", () => {
-	it("the thinking marker flattens to a labeled user message", () => {
-		const out = toLlmMessages(asAgentMessages([newThinkingMessage("call_p1", "It is 42")]));
+describe("sdkInputBlocks (practice shapes)", () => {
+	it("the thinking marker reaches the model as one labeled text block", () => {
+		const out = sdkInputBlocks([newThinkingMessage("call_p1", "It is 42") as LhMessage]);
 		assert.equal(out.length, 1);
-		const user = out[0] as { role: string; content: Array<{ type: string; text: string }> };
-		assert.equal(user.role, "user");
-		assert.match(user.content[0]!.text, /^Your thinking:\nIt is 42$/);
+		assert.equal(out[0]!.type, "text");
+		assert.match((out[0] as { text: string }).text, /^Your thinking:\nIt is 42$/);
 	});
 
 	it("the dismissal marker is UI-only (the synthesized pair carries the face)", () => {
-		const out = toLlmMessages(asAgentMessages([newProblemDismissedMarker("call_p1")]));
-		assert.equal(out.length, 0);
+		assert.deepEqual(sdkInputBlocks([newProblemDismissedMarker("call_p1") as LhMessage]), []);
 	});
 
-	it("the synthesized pair passes through natively", () => {
-		const out = toLlmMessages(asAgentMessages(concludedByDismissalPair("call_p1")));
-		assert.equal(out.length, 2);
-		assert.equal(out[0]!.role, "assistant");
-		assert.equal(out[1]!.role, "toolResult");
+	it("the synthesized pair reads as one app note naming the dismissed problem", () => {
+		const out = sdkInputBlocks(concludedByDismissalPair("call_p1"));
+		assert.equal(out.length, 1);
+		const text = (out[0] as { text: string }).text;
+		assert.ok(text.startsWith('<app_note tool="conclude" outcome="dismissed" problem="call_p1">'), text);
+		assert.ok(text.includes(CONCLUDE_ACK_TEXT), "the note carries the shared conclude ack");
 	});
 });
 

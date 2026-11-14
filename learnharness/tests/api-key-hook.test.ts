@@ -20,6 +20,7 @@
  * sub-agent suite's faux engines.
  */
 
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createProberAgent, createTeacherAgent, type TeachingAgent } from "../src/agent/teacher-agent.ts";
@@ -27,13 +28,13 @@ import type { ProberToolContext } from "../src/agent/tools.ts";
 import { jobStore } from "../src/store/jobs.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { createFauxCore } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
 
 /** A scripted pi engine — the agent builds need an injected engine since
  * BYOK removed the factory pins (owner, 2026-09-22). */
-function fauxEngine(): PiEngine {
+function fauxEngine(): SdkEngine {
 	const faux = createFauxCore({});
-	return { model: faux.getModel(), streamFn: faux.streamSimple };
+	return fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 }
 
 describe("the getApiKey-hook fix (native per-provider key resolution)", () => {

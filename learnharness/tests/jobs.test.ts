@@ -48,6 +48,7 @@ import {
 import { composeInstructions, createTeacherAgent } from "../src/agent/teacher-agent.ts";
 import { createTeacherTools } from "../src/agent/tools.ts";
 import { createWebTools } from "../src/agent/tools/web.ts";
+import { runResearcherAgent } from "../src/agent/subagents/researcher.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import {
@@ -73,13 +74,14 @@ import { jobStore } from "../src/store/jobs.ts";
 import { createJobRunner, demoModelOverride, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
 import { headlessOverride, type HeadlessApi } from "../src/agent/subagents/headless.ts";
 import { providerKeyMissing } from "../src/core/settings.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
 import { PATHS } from "../config.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
 import { emit, subscribe } from "../src/core/events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { SteerInput, TurnInput } from "../src/core/input-events.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
+import { fakeEngine, fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 const JOBS_DIR = path.join(PATHS.data, "jobs");
 
@@ -175,14 +177,19 @@ after(() => {
 	researchModelOverride.current = undefined;
 });
 
-/** A scripted pi engine (faux provider): the response queue replaces the
+/** A scripted model (faux provider): the response queue replaces the
  *  old doStream/doGenerate turn counters. tokenSize is set so every test
  *  string streams as ONE delta — the SSE-body assertions ("Back with the
  *  brief.") read contiguous text. */
-function fauxEngine(steps: FauxResponseStep[]): PiEngine {
+function fauxScripted(steps: FauxResponseStep[]): ScriptedModel {
 	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
 	faux.setResponses(steps);
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
+}
+
+/** The scripted model behind the fake Agent SDK: the engine a job runs on. */
+function fauxEngine(steps: FauxResponseStep[]): SdkEngine {
+	return fakeEngine(fauxScripted(steps));
 }
 
 /** A scripted response factory whose model call never resolves until its
@@ -487,8 +494,8 @@ const RESEARCH_INPUT = {
 };
 
 /** A teacher that calls research (text → call), then plain text thereafter. */
-function researchCallingTeacher(): PiEngine {
-	return fauxEngine([
+function researchCallingTeacher(): ScriptedModel {
+	return fauxScripted([
 		fauxAssistantMessage(
 			[fauxText("Let me check the current state of the library."), fauxToolCall("research", RESEARCH_INPUT, { id: "call-r1" })],
 			{ stopReason: "toolUse" },
@@ -516,7 +523,7 @@ describe("dispatch (async protocol §2)", () => {
 		// The handler hands the factory the native build options — the
 		// record IS the agent state (Wave B: no adapter conversion).
 		const agent: Parameters<typeof handleChatRequest>[1] = (opts) =>
-			createTeacherAgent(undefined, { engine, tools, messages: opts.messages });
+			createTeacherAgent(undefined, { ...onFake(engine, opts), tools });
 
 		researchModelOverride.current = researcherModel();
 		const body = await drainTurn(post(chat.id, { type: "text", text: "teach me graph rendering" }), agent);
@@ -565,7 +572,7 @@ sigma.js v3 is current.
 
 /** The researcher loop's scripted engine. Turn 1: a web_search tool call;
  *  turn 2: the final text brief. */
-function researcherModel(): PiEngine {
+function researcherModel(): SdkEngine {
 	return fauxEngine([fauxAssistantMessage([fauxText(BRIEF)])]);
 }
 
@@ -659,11 +666,13 @@ describe("research runner (async protocol §3)", () => {
 
 		const errored = jobStore.getJob(job.id)!;
 		assert.equal(errored.status, "error");
-		assert.match(errored.error ?? "", /model exploded/);
+		// A provider failure reaches the app through Claude Code, which reads
+		// it as Claude's plain failure line, not the raw provider text.
+		assert.match(errored.error ?? "", /^Claude request failed\./);
 
 		const steer = delivery.steers[0]!;
 		assert.ok(steer, "failure still delivers a steer");
-		assert.ok(steer.content.includes("Research failed: model exploded"), "failure brief on the steer text");
+		assert.ok(steer.content.includes("Research failed: Claude request failed."), "failure brief on the steer text");
 		assert.deepEqual(((steer.details as { result: ResearchResult }).result).sources, []);
 	});
 
@@ -729,7 +738,7 @@ describe("pdf runner (sources v0)", () => {
 	});
 
 	/** A pdf-reader that triages, extracts pages 1-2, then briefs. */
-	function pdfReaderModel(): PiEngine {
+	function pdfReaderModel(): SdkEngine {
 		return fauxEngine([
 			fauxAssistantMessage([fauxToolCall("pdf_info", {}, { id: "i1" })], { stopReason: "toolUse" }),
 			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "1-2" }, { id: "e1" })], { stopReason: "toolUse" }),
@@ -848,16 +857,26 @@ describe("pdf runner (sources v0)", () => {
 });
 
 describe("researcher agent", () => {
-	it("runs with the web tool set (no network touched)", () => {
-		const webTools = createWebTools(async () => "");
-		assert.deepEqual(Object.keys(webTools).sort(), ["web_fetch", "web_search"], "ONLY the web tools — no question/plan tools");
+	it("runs with the web tool set (no network touched)", async () => {
+		let seen: string[] = [];
+		const scripted = fauxScripted([
+			((context: { messages: { role: string; toolsAdded?: { name: string }[] }[] }) => {
+				seen = (context.messages.find((m) => m.role === "system")?.toolsAdded ?? []).map((t) => t.name).sort();
+				return fauxAssistantMessage([fauxText(BRIEF)]);
+			}) as unknown as FauxResponseStep,
+		]);
+		const brief = await runResearcherAgent("which sigma version?", { engine: fakeEngine(scripted) });
+		assert.equal(brief, BRIEF);
+		assert.deepEqual(seen, Object.keys(createWebTools()).sort(), "ONLY the web tools — no question/plan tools");
+		assert.deepEqual(seen, ["web_fetch"]);
+		assert.deepEqual(fakeFor(scripted).calls.map((c) => c.tools), [["WebSearch"]], "search is Claude Code's own WebSearch, and nothing else of Claude Code's");
 		// reset any accidental global override
 		researchModelOverride.current = undefined;
 	});
 
 	it("the pdf-reader declares exactly the four skill tools (sources v0)", async () => {
 		const { createPdfTools } = await import("../src/agent/subagents/pdf-reader.ts");
-		const tools = createPdfTools(path.join(import.meta.dirname, "fixtures", "sample-3page.pdf"));
+		const tools = createPdfTools(path.join(import.meta.dirname, "fixtures", "sample-3page.pdf"), { consulted: new Set(), read: new Set() }, {} as HeadlessApi, fauxEngine([]));
 		assert.deepEqual(Object.keys(tools).sort(), ["pdf_extract", "pdf_info", "pdf_render", "pdf_search"]);
 		// reset any accidental global override
 		pdfModelOverride.current = undefined;
@@ -1540,14 +1559,14 @@ describe("prompt composition", () => {
 describe("abort (src/server/jobs.ts abortJob)", () => {
 	/** A hanging model whose call never resolves until its abort signal
 	 *  fires — the real-kill path: the in-flight call itself is killed. */
-	function hangingModel(): PiEngine {
+	function hangingModel(): SdkEngine {
 		return fauxEngine([abortableFactory()]);
 	}
 
 	/** One step (billed) then a hang — proves usage-so-far survives the kill. */
-	function oneStepThenHangModel(): PiEngine {
+	function oneStepThenHangModel(): SdkEngine {
 		return fauxEngine([
-			fauxAssistantMessage([fauxToolCall("web_search", { query: "anything" }, { id: "ws1" })], {
+			fauxAssistantMessage([fauxToolCall("WebSearch", { query: "anything" }, { id: "ws1" })], {
 				stopReason: "toolUse",
 			}),
 			abortableFactory(),
