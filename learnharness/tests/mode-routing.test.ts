@@ -91,7 +91,7 @@ describe("a focused question gets a direct answer", () => {
 		const prober = composeInstructions("prober");
 		const opening = prober.indexOf("# The opening — answer, practise or probe");
 		assert.ok(opening >= 0 && opening < prober.indexOf("# The probe"), "the opening's choice comes before the probe");
-		for (const pin of ["## A focused question — answer it", "**When it is unclear**", "**A direct answer records nothing.**", "**End on the next step, in one line**", "## Practice — `practice`", "**Back from practice.**"]) {
+		for (const pin of ["## A focused question — answer it", "**When it is unclear**", "**A direct answer records nothing.**", "**End on one offer, in one line, when a next step is clearly useful**", "## Practice — `practice`", "**Back from practice.**"]) {
 			assert.ok(prober.includes(pin), `the opening lost: ${pin}`);
 		}
 		assert.ok(!prober.includes("Anything else is a lesson: probe as below."), "the old everything-is-a-lesson routing is gone");
@@ -320,7 +320,7 @@ describe("routing end to end (scripted model)", () => {
 				assert.equal(seen.agent, "prober");
 				assert.ok(seen.tools.includes("practice") && seen.prompt.includes(ROUTING_STEP));
 				assert.match(seen.last, /explain eigenvalues/);
-				return fauxAssistantMessage([fauxText("An eigenvector of $A$ is a direction $A$ only stretches: $Av = \\lambda v$. Want a quick question to check it, or a full lesson on eigenvalues?")]);
+				return fauxAssistantMessage([fauxText("An eigenvector of $A$ is a direction $A$ only stretches: $Av = \\lambda v$. Want a lesson on eigenvalues?")]);
 			},
 			(seen) => {
 				assert.equal(seen.agent, "prober", "a direct answer concludes no probe: a full lesson still starts with the probe");
