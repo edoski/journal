@@ -24,6 +24,8 @@ import { NowCard } from "../components/unit-inbox/now-card.tsx";
 import { topicUnit, unitFor } from "../components/unit-inbox/now-inbox.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
 import { TopicCard } from "../components/unit-inbox/unit-row.tsx";
+import { CourseResultRow } from "../components/unit-inbox/course-result-row.tsx";
+import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 import { arcHref, courseHref } from "../components/unit-inbox/unit-href.ts";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
@@ -150,5 +152,24 @@ describe("the topic page", () => {
 		const plain = topicFacts({ course: { ...LINALG, map: { ...LINALG.map, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? diag : t)) } }, topic: diag, chats: [], read: null });
 		assert.equal(plain.startsWhy, null, "a course without arcs says what it said before");
 		assert.equal(pickupSections(plain).now.why, null);
+	});
+});
+
+describe("search", () => {
+	it("finds an arc by name as a course result reading 'Linear systems, in Linear Algebra' that opens its place", () => {
+		const inbox = buildInbox([LINALG_ARCS], [], null);
+		const found = searchInbox(inbox, [], "systems", [LINALG_ARCS]);
+		assert.deepEqual(
+			found.arcs.map((f) => [f.course.map.title, f.arc.handle]),
+			[["Linear Algebra", "systems"]],
+		);
+		const doc = render(<CourseResultRow course={found.arcs[0]!.course} arc={found.arcs[0]!.arc} active={false} />);
+		const link = doc.querySelector('[data-testid="course-result"]')!;
+		assert.equal(link.querySelector(":scope > span:last-child")?.textContent, "Linear systems, in Linear Algebra");
+		assert.equal(link.getAttribute("href"), arcHref("/s/linalg", "systems"));
+	});
+
+	it("finds no arcs in a course without them", () => {
+		assert.deepEqual(searchInbox(buildInbox([LINALG], [], null), [], "systems", [LINALG]).arcs, []);
 	});
 });
