@@ -3,13 +3,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCalendarController, type CalendarController, type DayHeaderInfo, type EventInput } from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/react/daygrid";
-import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, MoonIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, MoonIcon, XIcon } from "lucide-react";
 import { kbdEventForAction, type CalendarCourse, type KeyAction, type ScheduledDay } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EventCalendarViews } from "@/components/ui/event-calendar-views";
-import { EventCalendarCloseIcon } from "@/components/event-calendar-icons";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
 import { CalendarEntryView, PANEL_WIDTH, type StartSession } from "@/components/calendar/calendar-entry";
 import { longDayWords, moreWords, quietBetween, studyTimeWords, type CalendarEntry } from "@/components/calendar/calendar-facts";
@@ -56,6 +55,11 @@ const DAY_PANEL = cn("m-1 overflow-hidden rounded-xl border bg-popover text-popo
  *  and inset as the panel's rows (12 + 6) so the date starts where their
  *  marks do; clear of the ✕ at the right. */
 const DAY_PANEL_HEAD = "flex h-12 w-full items-center ps-3 pe-12";
+
+/** The day panel's ✕, the app's quiet 32 icon button (as Settings' ✕):
+ *  8 in from the panel's corner, its 16 icon muted until pointed at. */
+const DAY_PANEL_CLOSE =
+	"group absolute top-2 end-2 flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
 
 const VIEW_KEY = "lh:calendar-view";
 
@@ -279,7 +283,8 @@ export function CalendarView({
 					dayRowClass="border-border/60"
 					tableHeaderClass="bg-background"
 					popoverClass={DAY_PANEL}
-					popoverCloseContent={() => <EventCalendarCloseIcon />}
+					popoverCloseClass={DAY_PANEL_CLOSE}
+					popoverCloseContent={() => <XIcon aria-hidden className="size-4" />}
 				/>
 				{quiet && (
 					<p data-slot="calendar-quiet" className="pointer-events-none absolute inset-0 flex items-center justify-center text-row text-muted-foreground">
