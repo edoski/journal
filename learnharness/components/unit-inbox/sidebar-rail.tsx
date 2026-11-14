@@ -67,9 +67,13 @@ export function SidebarRail({ pathname, onOpen, onNewLesson, onSettings }: { pat
 	return (
 		<nav aria-label="Sidebar" data-slot="sidebar-rail" className="flex h-full w-full flex-col items-center border-r bg-background pb-2">
 			<div className="lh-drag lh-lights-band w-full shrink-0" />
-			<div className="lh-drag flex w-full flex-1 flex-col items-center gap-1 pt-2">
+			{/* The open button's head is as tall as a page's top bar, so its
+			    rule sits on the top bar's bottom edge (lh-rail-head). */}
+			<div className="lh-drag lh-rail-head relative flex w-full shrink-0 items-center justify-center">
 				<RailButton icon={PanelLeftOpenIcon} label="Open sidebar" action="toggle-sidebar" onClick={onOpen} testId="sidebar-open" />
-				<span aria-hidden className="my-1 h-px w-5 bg-border" />
+				<span aria-hidden className="lh-rail-rule absolute left-1/2 h-px w-5 -translate-x-1/2 bg-border" />
+			</div>
+			<div className="lh-drag flex w-full flex-1 flex-col items-center gap-1 pt-2">
 				<RailButton icon={HouseIcon} label="Home" href="/" here={pathname === "/"} />
 				<RailButton icon={CalendarDaysIcon} label="Calendar" href="/calendar" here={pathname === "/calendar"} />
 				<RailButton icon={SearchIcon} label="Search" action="sessions-search" onClick={() => window.dispatchEvent(new Event(kbdEventForAction("sessions-search")))} />
