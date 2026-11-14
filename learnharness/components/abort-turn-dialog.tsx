@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	AlertDialog,
@@ -70,22 +69,12 @@ export function AbortTurnBody({
 	busy?: boolean;
 }) {
 	const copy = COPY[mode];
-	const cancelRef = useRef<HTMLButtonElement>(null);
-	const confirmRef = useRef<HTMLButtonElement>(null);
 	// Tab is dead, so the footer is an arrow pair: ← Cancel, → the action,
-	// Enter presses the focused one, and ⌘↵ confirms from anywhere in it.
-	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-			e.preventDefault();
-			onConfirm();
-		} else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-			e.preventDefault();
-			(e.key === "ArrowRight" ? confirmRef : cancelRef).current?.focus();
-		}
-	};
+	// Enter presses the focused one, and ⌘↵ confirms from anywhere in it
+	// (the shared alert dialog's keys, alert-dialog.tsx).
 	return (
 		<AlertDialog open onOpenChange={(open) => !open && onClose()}>
-			<AlertDialogContent data-testid="abort-turn-dialog" className="max-w-sm" onKeyDown={onKeyDown}>
+			<AlertDialogContent data-testid="abort-turn-dialog" className="max-w-sm">
 				<AlertDialogHeader>
 					<AlertDialogTitle data-testid="abort-turn-title">{copy.title}</AlertDialogTitle>
 					<AlertDialogDescription data-testid="abort-turn-line">
@@ -94,8 +83,8 @@ export function AbortTurnBody({
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter className="pt-2">
-					<AlertDialogCancel ref={cancelRef} data-testid="abort-turn-cancel">Cancel</AlertDialogCancel>
-					<Button ref={confirmRef} variant="destructive" data-testid="abort-turn-confirm" onClick={onConfirm}>
+					<AlertDialogCancel data-testid="abort-turn-cancel">Cancel</AlertDialogCancel>
+					<Button variant="destructive" data-testid="abort-turn-confirm" onClick={onConfirm}>
 						{copy.action}
 					</Button>
 				</AlertDialogFooter>

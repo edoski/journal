@@ -48,6 +48,11 @@ import { useSpatialArrows } from "@/components/spatial-arrows";
 // spelling here is how the ⌘B bug happened.
 export { kbdEventForAction };
 
+/** A dialog or confirmation is open over the page. */
+function modalOpen(): boolean {
+	return document.querySelector('[role="alertdialog"], [role="dialog"]') !== null;
+}
+
 export function KeyboardShortcuts() {
 	const router = useRouter();
 	const [cheatOpen, setCheatOpen] = useState(false);
@@ -76,7 +81,9 @@ export function KeyboardShortcuts() {
 				// composer-bearing page answers with its own chain. The quiz
 				// dock's rows↔thinking claim stops propagation at document
 				// level, so a claimed Tab never reaches this dispatch.
-				if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey)
+				// An open dialog is modal: Tab never reaches the fields
+				// behind it (round 3: typing landed in the composer).
+				if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && !modalOpen())
 					window.dispatchEvent(new CustomEvent("lh:kbd-cycle-fields"));
 				return;
 			}
