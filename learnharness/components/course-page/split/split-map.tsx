@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
-import type { CourseMap, TopicHandle } from "@/src/core";
+import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
-import { framedCamera, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { framedCamera, wholeZoom, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
 import { boxesOf, fadeAcross, scrollOfCamera, scrollOn, surfaceOf, topicAt, wholeSurfaceOf, type Scroll, type Size } from "@/components/course-page/split/split-tie";
@@ -56,12 +56,18 @@ function reducedMotion(): boolean {
  * Wheel, trackpad and a drag on the background scroll it. `lit` lights
  * the row's topic and prerequisites. Pointing at or focusing a node tells
  * the page its topic (`onPoint`), so the list marks its row; Escape on a
- * focused node hands the walk back to that row (`onLeave`).
+ * focused node hands the walk back to that row (`onLeave`). With `arc`,
+ * the map draws that arc (`layout` is its drawing) and Whole course always
+ * shows: it swaps in every topic of the course (`wholeLayout`). `header`
+ * (the arc strip) is a row above the pane, holding Whole course at its end.
  */
 export function SplitMap({
 	map,
+	arc,
+	header,
 	said,
-	layout,
+	layout: arcLayout,
+	wholeLayout = arcLayout,
 	lit,
 	aim,
 	reveal,
@@ -70,10 +76,16 @@ export function SplitMap({
 	ref,
 }: {
 	map: CourseMap;
+	/** The arc the map draws; unset, the whole course. */
+	arc?: ArcHandle;
+	/** A row above the map (the arc strip), with Whole course at its end. */
+	header?: React.ReactNode;
 	/** What the sidebar says for each topic (`sidebarSays`), for the cards. */
 	said: ReadonlyMap<TopicHandle, Said>;
-	/** The map's layout (`layoutTopicMap`), which sizes the surface. */
+	/** The map's layout (`layoutTopicMap`; with `arc`, that arc's drawing), which sizes the surface. */
 	layout: TopicMapLayout;
+	/** The whole course's layout, for Whole course in a course with arcs. */
+	wholeLayout?: TopicMapLayout;
 	lit: ReadonlySet<TopicHandle> | null;
 	/** The topic the pane opens on. */
 	aim: TopicHandle | null;
@@ -94,15 +106,26 @@ export function SplitMap({
 	const homing = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const [pane, setPane] = useState<Size>({ width: 0, height: 0 });
 
-	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, layout.node), y: FADE.y }), [pane.width, layout.node]);
+	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, arcLayout.node), y: FADE.y }), [pane.width, arcLayout.node]);
 	/** How the course opens in the pane: its scale and where it sits. */
-	const opening = useMemo(() => (pane.width > 0 ? framedCamera(layout, aim, pane, fade, TAG_ROOM, "top") : null), [layout, aim, pane, fade]);
-	const opened = useMemo(() => surfaceOf(layout, pane, FADE, TAG_ROOM, opening?.zoom), [layout, pane, opening?.zoom]);
-	/** The Whole course surface, when the course opens on less than all of it; held for the visit only. */
-	const wholeSurface = useMemo(() => (pane.width > 0 ? wholeSurfaceOf(layout, pane, opened, fade, FADE, TAG_ROOM) : null), [layout, pane, opened, fade]);
+	const opening = useMemo(() => (pane.width > 0 ? framedCamera(arcLayout, aim, pane, fade, TAG_ROOM, "top") : null), [arcLayout, aim, pane, fade]);
+	const opened = useMemo(() => surfaceOf(arcLayout, pane, FADE, TAG_ROOM, opening?.zoom), [arcLayout, pane, opening?.zoom]);
+	/** The Whole course surface, when the course opens on less than all of it, or on one arc of it; held for the visit only. */
+	const wholeSurface = useMemo(() => {
+		if (pane.width <= 0) return null;
+		if (!arc) return wholeSurfaceOf(arcLayout, pane, opened, fade, FADE, TAG_ROOM);
+		return surfaceOf(wholeLayout, pane, FADE, TAG_ROOM, wholeZoom(wholeLayout, pane, { x: fade.x, y: fade.y + TAG_ROOM }));
+	}, [arc, arcLayout, wholeLayout, pane, opened, fade]);
 	const [whole, setWhole] = useState(false);
+	// Another arc opens on its own opening view, not the whole course.
+	const [wholeFor, setWholeFor] = useState(arc);
+	if (wholeFor !== arc) {
+		setWholeFor(arc);
+		setWhole(false);
+	}
 	const zoomedOut = whole && wholeSurface !== null;
 	const surface = zoomedOut ? wholeSurface : opened;
+	const layout = zoomedOut ? wholeLayout : arcLayout;
 	const boxes = useMemo(() => boxesOf(layout, { width: surface.width, height: surface.height, zoom: surface.zoom }), [layout, surface.width, surface.height, surface.zoom]);
 
 	/** Where the pane rests: the opening view, or the whole course from the top left. */
@@ -243,7 +266,15 @@ export function SplitMap({
 		[],
 	);
 
+	const wholeButton = wholeSurface && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} className={header ? "-mr-2 shrink-0" : "absolute top-0 right-0"} />;
 	return (
+		<>
+		{header && (
+			<div data-slot="course-split-map-head" className="mb-2 flex h-9 shrink-0 items-center gap-4">
+				<div className="flex min-w-0 flex-1">{header}</div>
+				{wholeButton}
+			</div>
+		)}
 		<section
 			ref={root}
 			aria-label={`${map.title} map`}
@@ -275,12 +306,13 @@ export function SplitMap({
 				<div ref={scroller} data-slot="course-split-map-scroller" className={`size-full overflow-auto overscroll-contain ${NO_BAR}`}>
 					{/* The surface's size, from the course's layout: the map fits it whole. */}
 					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-						<TopicMap map={map} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
+						<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
 					</div>
 				</div>
 			</div>
 			{/* Outside the fade, in the pane's top right corner, where the fade leaves the map clear. */}
-			{wholeSurface && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} className="absolute top-0 right-0" />}
+			{!header && wholeButton}
 		</section>
+		</>
 	);
 }
