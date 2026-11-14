@@ -15,6 +15,8 @@ import { openingArc, type CourseArcSection, type CourseView } from "@/components
 import { WhatNextRows } from "@/components/course-page/what-next";
 import { SplitList, type SplitListHandle } from "@/components/course-page/split/split-list";
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
+import { useStandingVariant } from "@/components/course-page/standing-variant";
+import { StandingBody } from "@/components/course-page/standing/standing-body";
 import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Pointed } from "@/components/course-page/split/split-tie";
 
 /**
@@ -30,14 +32,37 @@ import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Poin
  * Above its arcs, where he picks up and what comes next (`WhatNextRows`).
  */
 export function SplitCourse({ workspace }: { workspace: string }) {
+	const standing = useStandingVariant();
 	return (
 		<CourseFrame workspace={workspace}>
-			{({ view, busy, onContinue }) => <SplitBody view={view} busy={busy} onContinue={onContinue} header={<PaceHead view={view} busy={busy} onContinue={onContinue} />} />}
+			{({ view, busy, onContinue }) =>
+				standing === "current" ? (
+					<SplitBody view={view} busy={busy} onContinue={onContinue} header={<PaceHead view={view} busy={busy} onContinue={onContinue} />} />
+				) : (
+					<StandingBody variant={standing} view={view} busy={busy} onContinue={onContinue} />
+				)
+			}
 		</CourseFrame>
 	);
 }
 
-function SplitBody({ view, busy, onContinue, header }: { view: CourseView; busy: boolean; onContinue: (workspace: string) => void; header: React.ReactNode }) {
+/** The page under its head; `arcExam` and `after` are the Exam & mistakes
+ *  candidates' (standing/standing.md). */
+export function SplitBody({
+	view,
+	busy,
+	onContinue,
+	header,
+	arcExam,
+	after,
+}: {
+	view: CourseView;
+	busy: boolean;
+	onContinue: (workspace: string) => void;
+	header: React.ReactNode;
+	arcExam?: (section: CourseArcSection) => React.ReactNode;
+	after?: React.ReactNode;
+}) {
 	const { map } = view.course;
 	const { arcs } = view;
 	const [pointed, setPointed] = useState<Pointed | null>(null);
@@ -135,6 +160,8 @@ function SplitBody({ view, busy, onContinue, header }: { view: CourseView; busy:
 							onPoint={pointFrom("list")}
 							onEnterMap={(to) => drawing.current?.focus(to)}
 							onExitTop={() => action()?.focus()}
+							arcExam={arcExam}
+							after={after}
 						/>
 						</>
 					}

@@ -832,6 +832,179 @@ def course_arcs(
     )
 
 
+# --- standing ---------------------------------------------------------------
+
+
+def _ready_part(
+    keys: list[str],
+    levels: dict[str, dict[str, Any]],
+    behind: set[str],
+    misfits: set[str],
+) -> dict[str, list[str]]:
+    """One part's topics sorted for the exam (``course_standing``)."""
+    part: dict[str, list[str]] = {
+        "solid": [],
+        "not_yet": [],
+        "to_start": [],
+        "wont_fit": [],
+    }
+    for key in keys:
+        if key in misfits:
+            part["wont_fit"].append(key)
+        elif levels[key]["level"] == "new":
+            part["to_start"].append(key)
+        elif agenda.solid(levels[key]) and key not in behind:
+            part["solid"].append(key)
+        else:
+            part["not_yet"].append(key)
+    return part
+
+
+def _readiness(
+    record: dict[str, Any],
+    today: date,
+    levels: dict[str, dict[str, Any]],
+    planned: agenda.When,
+) -> dict[str, Any] | None:
+    """The exam's parts and where each topic stands for it; None without an
+    exam ahead."""
+    countdown = exam(record, today)
+    if not countdown or "date" not in countdown or countdown["days_left"] < 0:
+        return None
+    examined = arc_rules.examined(record)
+    order = [
+        key
+        for key in progress.path_order(record)
+        if examined is None or key in examined
+    ]
+    behind = progress.unready(record, today)
+    misfits = set(planned.does_not_fit)
+    parts: list[dict[str, Any]]
+    if record["arcs"]:
+        parts = [
+            {
+                "arc": arc,
+                "title": arc_rules.title(record, arc),
+                **_ready_part(keys, levels, behind, misfits),
+            }
+            for arc in arc_rules.live(record)
+            if (keys := arcs.live_topics(record, arc, order))
+        ]
+    else:
+        parts = [_ready_part(order, levels, behind, misfits)]
+    return {
+        "date": countdown["date"],
+        "days_left": countdown["days_left"],
+        "parts": [compact(part, keep=("arc",)) for part in parts],
+    }
+
+
+def _mistake(record: dict[str, Any], key: str, item: dict[str, Any]) -> dict[str, Any]:
+    """One answer that was not right, as ``course_standing`` lists it."""
+    task = record["tasks"].get(item.get("task", ""), {})
+    sources = record["sources"]
+    return compact(
+        {
+            "id": key,
+            "date": item["date"],
+            "text": item["text"],
+            "response": item.get("response"),
+            "result": item["result"],
+            "helped": not schema.unaided(item),
+            "confident": item.get("sure") == "confident" or None,
+            "gave_up": item.get("gave_up"),
+            "chose": item.get("chose"),
+            "task": task.get("title", item.get("task")),
+            "where": [
+                compact(
+                    {
+                        "source": sources.get(ref["source"], {}).get(
+                            "title", ref["source"]
+                        ),
+                        "locator": ref.get("locator"),
+                    }
+                )
+                for ref in item.get("refs", ())
+            ],
+        }
+    )
+
+
+def _mistakes(
+    record: dict[str, Any], levels: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Every topic with a mistake still open, the newest first."""
+    wrong = progress.open_mistakes(record)
+    rank = {key: at for at, key in enumerate(progress.path_order(record))}
+    found = []
+    for key in rank:
+        topic, standing = record["topics"][key], levels[key]
+        fixed = standing.get("repaired") and not standing.get("repaired_with_help")
+        gap = topic.get("gap") if not fixed else None
+        answers = wrong.get(key, [])
+        if not gap and not answers:
+            continue
+        judged = topic.get("judged") if gap else None
+        latest = max(
+            [item["date"] for _, item in answers] + ([judged] if judged else []),
+            default=None,
+        )
+        found.append(
+            compact(
+                {
+                    "topic": key,
+                    "title": topic.get("title"),
+                    "arc": topic.get("arc"),
+                    "gap": gap,
+                    "judged": judged,
+                    "latest": latest,
+                    "answers": [_mistake(record, at, item) for at, item in answers],
+                },
+                keep=("answers",),
+            )
+        )
+    found.sort(key=lambda entry: entry.get("latest", ""), reverse=True)
+    return found
+
+
+def course_standing(workspace: Workspace) -> dict[str, Any]:
+    """Where the learner stands for the exam and what is left to fix,
+    derived on every read and never stored.
+
+    ``readiness`` (absent without an exam ahead) holds the exam's ``date``,
+    ``days_left`` and its ``parts`` in study order: each arc it examines,
+    or the whole course as one part in a course without arcs. Each part
+    sorts the topics the exam examines, in path order, into ``solid``
+    (resting on an unaided answer, neither lapsed nor to re-teach, and
+    inside the run-up solid in the last 14 days: ``progress.unready``),
+    ``not_yet`` (taught and not solid), ``to_start`` (untaught, and the
+    daily plan starts it before the exam) and ``wont_fit`` (untaught, and
+    the plan has no room for it before the exam: ``does_not_fit``).
+
+    ``mistakes`` lists every topic with a mistake still open, the newest
+    first: its ``gap`` (the tutor's diagnosis, until he answers it right on
+    his own after the day it was ``judged``) and its ``answers`` that were
+    not right since his latest right answer with no help
+    (``progress.open_mistakes``), newest first, each with the tutor's
+    ``text``, his ``response``, the ``task`` and the places in his material
+    (``where``) it was on, whether it had help (``helped``), whether he was
+    sure of it (``confident``), and the method he reached for in its place
+    (``chose``). ``latest`` is the day of its newest mistake.
+    """
+    record = records.load(workspace)
+    today = clock.today()
+    levels = progress.standings(record)
+    planned = when(workspace, record, today)
+    return compact(
+        {
+            "today": today.isoformat(),
+            "readiness": _readiness(record, today, levels, planned),
+            "mistakes": _mistakes(record, levels),
+        },
+        keep=("mistakes",),
+    )
+
+
 # --- search -----------------------------------------------------------------
 
 
