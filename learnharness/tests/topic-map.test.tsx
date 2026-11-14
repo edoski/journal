@@ -19,7 +19,9 @@ import {
 	NODE_GAP,
 	NODE_HEIGHT,
 	NODE_WIDTH,
+	TOPIC_NODE_SIZE,
 	chainOf,
+	framedCamera,
 	layoutTopicMap,
 	neighbourOf,
 	openingCamera,
@@ -278,6 +280,51 @@ describe("where the map opens", () => {
 		const chain = layoutTopicMap([topic("a"), topic("b"), topic("c"), topic("d"), topic("e"), topic("f")], edgesOf({ b: ["a"], c: ["b"], d: ["c"], e: ["d"], f: ["e"] }));
 		const camera = openingCamera(chain, null, { width: 896, height: 350 }, ROOM);
 		assert.deepEqual(camera, { x: (896 - NODE_WIDTH) / 2, y: ROOM.y, zoom: 1 });
+	});
+});
+
+describe("where a course map opens framed", () => {
+	const layout = layoutTopicMap(MAP.topics, MAP.edges, TOPIC_NODE_SIZE);
+	const FADE = { x: 64, y: 40 };
+	const TAG = 20;
+	/** Every topic's box on screen under a camera, sorted into wholly clear of the fade, cut by the frame's edge where
+	 *  it shows, or out of view (only in the fade, or past the frame). */
+	const sort = (camera: Camera, frame: { width: number; height: number }) => {
+		const out = { clear: [] as string[], cut: [] as string[] };
+		for (const [handle, at] of layout.topics) {
+			const left = at.x * camera.zoom + camera.x;
+			const top = at.y * camera.zoom + camera.y;
+			const right = left + TOPIC_NODE_SIZE.width * camera.zoom;
+			const bottom = top + TOPIC_NODE_SIZE.height * camera.zoom;
+			if (right <= FADE.x + 1 || left >= frame.width - FADE.x - 1 || bottom <= FADE.y + 1 || top >= frame.height - FADE.y - 1) continue;
+			if (left < 0 || right > frame.width || top < 0 || bottom > frame.height) out.cut.push(handle);
+			else if (left >= FADE.x - 1 && right <= frame.width - FADE.x + 1 && top >= FADE.y - 1 && bottom <= frame.height - FADE.y + 1) out.clear.push(handle);
+		}
+		return out;
+	};
+
+	it("shows the whole course when it fits at three quarters or more", () => {
+		const camera = framedCamera(layout, MAP.current, { width: 1600, height: 900 }, FADE, TAG);
+		assert.ok(camera.zoom >= 0.75);
+		assert.equal(sort(camera, { width: 1600, height: 900 }).clear.length, layout.topics.size);
+	});
+
+	it("frames the current topic clear of the fade, with its tag, and cuts none of the others at the frame's edge", () => {
+		const frame = { width: 896, height: 413 };
+		const camera = framedCamera(layout, MAP.current, frame, FADE, TAG);
+		const { clear, cut } = sort(camera, frame);
+		assert.ok(clear.includes("rank"), "the current topic is clear");
+		assert.ok(layout.topics.get(h("rank"))!.y * camera.zoom + camera.y - TAG >= FADE.y - 1, "its tag too");
+		assert.deepEqual(cut, []);
+		assert.ok(camera.zoom >= 0.75 && camera.zoom <= 1);
+	});
+
+	it("shows more topics than centring the current one at full size would", () => {
+		const frame = { width: 784, height: 700 };
+		const framed = sort(framedCamera(layout, MAP.current, frame, FADE, TAG), frame);
+		const centred = sort(openingCamera(layout, MAP.current, frame, { x: FADE.x, y: FADE.y + TAG }), frame);
+		assert.ok(framed.clear.length > centred.clear.length, `${framed.clear.length} against ${centred.clear.length}`);
+		assert.ok(framed.cut.length <= centred.cut.length);
 	});
 });
 

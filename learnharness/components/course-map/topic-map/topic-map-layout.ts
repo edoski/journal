@@ -235,3 +235,86 @@ export function openingCamera(layout: TopicMapLayout, current: TopicHandle | nul
 	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
 	return cameraAt(layout, at ? centreOf(layout, at) : middle, 1, frame, room);
 }
+
+/** The scales a map may open at when the whole course does not fit: full
+ *  size, down to the floor where titles stay readable. */
+const FRAMED_ZOOMS = [1, 0.9, 0.8, WHOLE_COURSE_ZOOM];
+/** What a view is worth, per topic: one wholly clear of the fade earns its
+ *  place, more for a prerequisite or a next step of the topic it opens on;
+ *  one partly in the fade costs a little; one the frame's edge cuts where
+ *  it shows costs most. Zooming out costs per step below full size, and
+ *  each pixel of empty room shown past the drawing's room costs one. */
+const VIEW_WORTH = { whole: 450, near: 250, faded: 120, cut: 1000, zoom: 3000 };
+/** The empty room a view may show past the drawing's room on an axis the
+ *  course overflows: one topic and its gap, so a topic at the course's
+ *  edge can sit clear of the fade with the one beside it wholly out of
+ *  view instead of cut. */
+export function slackOf(node: NodeSize): { x: number; y: number } {
+	return { x: node.width + NODE_GAP, y: node.height + LAYER_GAP };
+}
+
+/**
+ * Where a map opens (spec: topic-map.md, Behaviour): the whole course
+ * when it fits the frame at 75% or more; else the view that frames `focus`
+ * (the first topic when null) clear of the fade, with its tag above it,
+ * and around it as many whole topics as it can, its prerequisites and next
+ * steps first, while cutting as few as it can at the frame's edge: at full
+ * size, or as near it as the floor allows when a smaller scale shows more.
+ * It may look past the drawing's room by one topic (`slackOf`).
+ * `fade` is how far the frame fades in from its sides and from its top and
+ * bottom; `tag` the room the current topic's tag takes above its node;
+ * `fitsDown` where a course shorter than the frame sits, framed or whole.
+ * Pure.
+ */
+export function framedCamera(layout: TopicMapLayout, focus: TopicHandle | null, frame: Frame, fade: Room, tag = 0, fitsDown: "middle" | "top" = "middle"): Camera {
+	const room = { x: fade.x, y: fade.y + tag };
+	const whole = wholeZoom(layout, frame, room);
+	const middle: Point = [layout.width / 2, layout.height / 2];
+	const atTop = (camera: Camera): Camera => (fitsDown === "top" && (layout.height + room.y * 2) * camera.zoom <= frame.height ? { ...camera, y: room.y * camera.zoom } : camera);
+	if (whole >= WHOLE_COURSE_ZOOM) return atTop(cameraAt(layout, middle, whole, frame, room));
+	const target = (focus && layout.topics.get(focus)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
+	if (!target) return cameraAt(layout, middle, 1, frame, room);
+	const near = new Set(layout.routes.flatMap((r) => (r.topic === target.handle ? [r.prerequisite] : r.prerequisite === target.handle ? [r.topic] : [])));
+	const { width: w, height: h } = layout.node;
+	const placed = [...layout.topics.values()];
+	const slack = slackOf(layout.node);
+	let best: { camera: Camera; cost: number } | null = null;
+	for (const zoom of FRAMED_ZOOMS) {
+		/** One axis's candidates: the focus at the middle, and each topic's edge just clear of the fade on either side,
+		 *  inside the drawing, its room (in the frame's pixels at any scale) and `slack` past it; the middle of a drawing
+		 *  that fits. */
+		const axis = (at: (p: PlacedTopic) => number, size: number, span: number, f: number, extent: number, pad: number, slack: number, mid: number, top = false) => {
+			const drawn = extent * zoom;
+			if (drawn + pad * 2 <= span) return [Math.round(top ? pad * zoom : (span - drawn) / 2)];
+			const clamp = (v: number) => Math.round(Math.min(pad + slack * zoom, Math.max(span - drawn - pad - slack * zoom, v)));
+			return [...new Set([span / 2 - mid * zoom, ...placed.flatMap((p) => [f - at(p) * zoom, span - f - (at(p) + size) * zoom])].map(clamp))];
+		};
+		const centre = centreOf(layout, target);
+		const xs = axis((p) => p.x, w, frame.width, fade.x, layout.width, room.x, slack.x, centre[0]);
+		const ys = axis((p) => p.y, h, frame.height, fade.y, layout.height, room.y, slack.y, centre[1], fitsDown === "top");
+		const centred = { x: xs[0]!, y: ys[0]! };
+		for (const x of xs) {
+			for (const y of ys) {
+				const left = target.x * zoom + x;
+				const top = target.y * zoom + y;
+				// The focus wholly clear of the fade, its tag too (to the pixel: candidates are rounded).
+				if (left < fade.x - 1 || left + w * zoom > frame.width - fade.x + 1 || top - tag < fade.y - 1 || top + h * zoom > frame.height - fade.y + 1) continue;
+				const past = Math.max(0, x - room.x) + Math.max(0, frame.width - room.x - (x + layout.width * zoom)) + Math.max(0, y - room.y) + Math.max(0, frame.height - room.y - (y + layout.height * zoom));
+				let cost = (1 - zoom) * VIEW_WORTH.zoom + past + (Math.abs(x - centred.x) + Math.abs(y - centred.y)) / 4;
+				for (const p of placed) {
+					if (p === target) continue;
+					const l = p.x * zoom + x;
+					const t = p.y * zoom + y;
+					const r = l + w * zoom;
+					const b = t + h * zoom;
+					if (r <= fade.x + 1 || l >= frame.width - fade.x - 1 || b <= fade.y + 1 || t >= frame.height - fade.y - 1) continue;
+					if (l < 0 || r > frame.width || t < 0 || b > frame.height) cost += VIEW_WORTH.cut;
+					else if (l < fade.x - 1 || r > frame.width - fade.x + 1 || t < fade.y - 1 || b > frame.height - fade.y + 1) cost += VIEW_WORTH.faded;
+					else cost -= VIEW_WORTH.whole + (near.has(p.handle) ? VIEW_WORTH.near : 0);
+				}
+				if (!best || cost < best.cost) best = { camera: { x, y, zoom }, cost };
+			}
+		}
+	}
+	return best?.camera ?? cameraAt(layout, centreOf(layout, target), 1, frame, room);
+}

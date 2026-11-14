@@ -15,8 +15,8 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
-import { layoutTopicMap, NODE_WIDTH } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { aimOf, besideRow, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOn, scrollToShow, shownGroups, slackOf, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
+import { layoutTopicMap, NODE_WIDTH, slackOf } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { aimOf, besideRow, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
@@ -208,13 +208,24 @@ describe("the map pane's surface and where it scrolls", () => {
 		assert.equal(surfaceOf({ ...layout, width: 224, height: 2000 }, { width: 600, height: 700 }, room, 20).width, 600, "a narrow course in the pane's middle");
 	});
 
-	it("draws a course that fits at 75% or more whole, from the pane's top, with nothing to scroll", () => {
+	it("draws the course at the scale it opens at: the pane's width and the course's height where it fits, with nothing to scroll", () => {
 		const layout = { ...LAYOUT, width: 744, height: 304 };
-		const surface = surfaceOf(layout, { width: 696, height: 692 }, room, 20);
-		assert.equal(surface.width, 696);
-		assert.ok(surface.zoom > 0.8 && surface.zoom < 0.84, String(surface.zoom));
-		assert.equal(surface.height, Math.floor((304 + 104) * surface.zoom));
-		assert.equal(surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20).zoom, 1, "below 75% it stays at 100% and scrolls");
+		const surface = surfaceOf(layout, { width: 696, height: 692 }, room, 20, false, 0.8);
+		assert.deepEqual(surface, { width: 696, height: Math.floor((304 + 104) * 0.8), zoom: 0.8 });
+		const wide = surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20, false, 0.8);
+		assert.equal(wide.width, Math.ceil((2000 + 96 + slackOf(LAYOUT.node).x * 2) * 0.8), "too wide: the course and its slack at that scale, to scroll");
+	});
+
+	it("scrolls the pane to show the course as the camera frames it, inside the surface", () => {
+		const layout = { ...LAYOUT, width: 1000, height: 400 };
+		const pane = { width: 600, height: 700 };
+		const surface = surfaceOf(layout, pane, room, 20);
+		const camera = { x: -300, y: 52 };
+		const to = scrollOfCamera(layout, surface, pane, camera);
+		const boxes = boxesOf(layout, surface);
+		const at = layout.topics.get(h("vectors"))!;
+		assert.equal(boxes.get(h("vectors"))!.x - to.left, at.x + camera.x, "a topic sits where the camera puts it across");
+		assert.deepEqual(scrollOfCamera(layout, surface, pane, { x: 5000, y: 0 }).left, 0, "never past the surface");
 	});
 
 	it("keeps the pane's height of room above and below while the tie is drawn, so any topic can scroll beside its row", () => {
@@ -251,12 +262,12 @@ describe("the map pane's surface and where it scrolls", () => {
 	const fade = { x: 48, y: 32 };
 
 	it("leaves a topic already clear of the fade where it is", () => {
-		assert.equal(scrollOn(row([300, 548, 796]), h("t1"), { left: 200, top: 0, width: 696, height: 400 }, surface, fade, "near"), null);
+		assert.equal(scrollOn(row([300, 548, 796]), h("t1"), { left: 200, top: 0, width: 696, height: 400 }, surface, fade), null);
 	});
 
 	it("brings a topic into view cutting none at the pane's edges when it can, moving as little as it can", () => {
 		const boxes = row([300, 548, 796]);
-		const to = scrollOn(boxes, h("t2"), { left: 0, top: 0, width: 600, height: 400 }, surface, fade, "near")!;
+		const to = scrollOn(boxes, h("t2"), { left: 0, top: 0, width: 600, height: 400 }, surface, fade)!;
 		const view = { left: to.left, right: to.left + 600 };
 		assert.ok(796 >= view.left + 48 && 1020 <= view.right - 48, "the target clear of the fade");
 		for (const b of boxes.values()) {
@@ -264,14 +275,6 @@ describe("the map pane's surface and where it scrolls", () => {
 			const whole = b.x >= view.left && b.x + b.width <= view.right;
 			assert.ok(!showsPastFade || whole, `topic at ${b.x} is not cut`);
 		}
-	});
-
-	it("opens on the aim with as many whole topics in view as it can", () => {
-		const boxes = row([100, 348, 596, 844]);
-		const to = scrollOn(boxes, h("t1"), { left: 0, top: 0, width: 696, height: 400 }, surface, fade, "centre")!;
-		const whole = [...boxes.values()].filter((b) => b.x >= to.left && b.x + b.width <= to.left + 696).length;
-		assert.equal(whole, 2);
-		assert.equal(scrollOn(boxes, h("nowhere"), { left: 0, top: 0, width: 696, height: 400 }, surface, fade, "centre"), null);
 	});
 
 	it("widens the fade across a pane too narrow for two topics, so the ones beside hide in it", () => {

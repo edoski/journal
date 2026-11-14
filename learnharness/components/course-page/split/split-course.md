@@ -15,13 +15,12 @@ The course page (course-page.md): the list and the map side by side in the app's
 
 ## The map's surface
 
-The map sits on a surface the pane scrolls (`surfaceOf`), sized so `TopicMap` fits it whole and never moves its own camera:
+The map sits on a surface the pane scrolls (`surfaceOf`), sized so `TopicMap` fits it whole at the scale it opens at and never moves its own camera:
 
-- A course that fits the pane whole at the map's own floor for a whole course (75%) or more draws whole, from the pane's top, with nothing to scroll (Real Analysis at 1440x900, 83%).
-- Any other course draws at 100%.
-- While the Link switch is on, the surface keeps the pane's height of room above and below the course, so the pane can bring any topic beside the row pointing at it (`besideRow`). On an axis it overflows, the surface is the course, its room, and one topic and gap of empty room on each side (`slackOf`), so the pane can always scroll a topic at the course's edge wholly out of view. On an axis it fits, the course sits in the pane's middle across, or from its top down.
-- Wherever the pane scrolls to (`scrollOn`), it keeps the topic it shows clear of the fade, then cuts as few other topics at its edges as it can (a topic cut where it shows reads as overflow), then, for the opening view, shows as many whole topics as it can near that topic, or, for a topic he points at, moves as little as it can.
-- It opens on the first topic the header's button takes up that is on the map (Calculus I: Chain rule), else the list's first row (`aimOf`), and returns there when the window grows or shrinks.
+- It opens as every course map does (`framedCamera`, topic-map.md): the whole course when it fits at 75% or more, else framed on the first topic the header's button takes up that is on the map (Calculus I: Chain rule), else the list's first row (`aimOf`), with its neighbours whole and as few topics cut as it can, at full size or down to 75% (Probability at Edo's 1512x982: 80%, the current topic with Binomial, Expectation, Poisson and Variance whole, nothing cut). The pane scrolls to that view (`scrollOfCamera`) and returns there when the window grows or shrinks.
+- On an axis the course fits at that scale, the surface is the pane's width (the course in its middle), or the course's height from the pane's top; on one it overflows, the course, its room and one topic and gap of empty room on each side (`slackOf`), so the pane can always scroll a topic at the course's edge wholly out of view.
+- While the Link switch is on, the surface keeps the pane's height of room above and below the course, so the pane can bring any topic beside the row pointing at it (`besideRow`).
+- A topic he points at or reaches comes into view (`scrollOn`) clear of the fade, cutting as few other topics at the pane's edges as it can (a topic cut where it shows reads as overflow), moving as little as it can.
 - Wheel and trackpad scroll the pane; a drag on the background scrolls it too; a pinch stays the map's (its zoom is fixed at the surface's scale).
 
 ## The tie
