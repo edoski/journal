@@ -38,7 +38,7 @@ import {
 	type EdgeSubmit,
 	type Formation,
 } from "../../core/arc-pass.ts";
-import { courseView, openLessonsOf, sourcesOf, type MapCourseView } from "../../core/course-map-build.ts";
+import { courseView, NO_STANDING, openLessonsOf, sourcesOf, type MapCourseView } from "../../core/course-map-build.ts";
 import type { ChatSummary } from "../../core/contracts/chat.ts";
 import { recordHasArcs } from "../../core/contracts/course.ts";
 import type { ArcPassLedgers, CourseRecords } from "../../core/ports.ts";
@@ -289,7 +289,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 
 	async function viewNow(workspace: string): Promise<{ record: unknown; view: ArcPassView }> {
 		const record = await readRecord(workspace);
-		return { record, view: arcPassView({ ...courseView(record), studied: await studiedOf(workspace, record) }, record) };
+		return { record, view: arcPassView({ ...courseView(record, NO_STANDING), studied: await studiedOf(workspace, record) }, record) };
 	}
 
 	async function run(workspace: string, options: ArcPassOptions): Promise<ArcPassResult> {

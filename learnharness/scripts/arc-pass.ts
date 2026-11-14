@@ -32,7 +32,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { LEARNING_ENGINE } from "../config.ts";
 import { againstCut, arcPassChanges, arcPassView, edgeChanges, edgeWords, type ArcSubmit, type EdgeDiff } from "../src/core/arc-pass.ts";
-import { courseView } from "../src/core/course-map-build.ts";
+import { courseView, NO_STANDING } from "../src/core/course-map-build.ts";
 import { createArcPass, type EdgeMode, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
 import { loadClaudeAccounts } from "../src/agent/claude-accounts.ts";
 import { claudeEngine } from "../src/agent/models.ts";
@@ -158,7 +158,7 @@ async function apply(): Promise<void> {
 	if (!shown.ok) fail(`the course record: ${shown.message}`);
 	const record = obj(shown.ok ? shown.json : {});
 	if (Object.keys(obj(record.arcs)).length > 0) fail(`${workspace} has arcs already`);
-	const view = arcPassView(courseView(record), record);
+	const view = arcPassView(courseView(record, NO_STANDING), record);
 	const settled = accepted.length > 0 ? edgeChanges(accepted, view) : null;
 	const day = new Date().toISOString().slice(0, 10);
 	const formation = arcPassChanges(answer, view, { edges: edgeWords(settled?.applied ?? []), asked: approval, reason: `approved by Edo on ${day}: ${approval}` }) ?? fail(`${runDir} forms no arcs`);
