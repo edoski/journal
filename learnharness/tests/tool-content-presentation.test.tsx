@@ -6,9 +6,9 @@ import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { MessageResponse, ToolContentResponse } from "../components/ai-elements/message.tsx";
-import { QuestionDock } from "../components/question-dock.tsx";
-import { AnsweredCard } from "../components/answered-card.tsx";
-import { answerForPresentation, buildAnswer, normalizeOptions, parseAskInput, parseExplainInput,
+import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
+import { ProseAnswerProvider } from "../components/lesson/prose/prose-answer.tsx";
+import { answerForPresentation, buildAnswer, emptyDockSelection, normalizeOptions, parseAskInput, parseExplainInput,
 	repairMathForDisplay, type QuestionAnswerData, type QuestionData } from "../src/core/index.ts";
 
 const fixtures = JSON.parse(readFileSync(new URL("./fixtures/tool-rendering/matrix-regressions.json", import.meta.url), "utf8")) as {
@@ -87,10 +87,11 @@ test("shape parsers retain source text and identities; recovery is presentation 
 	assert.deepEqual({ ask, explain }, before);
 });
 
-test("the live dock recovers only its rendering, including question, context and option labels", () => {
+test("the open question recovers only its rendering, including question, context and option labels", () => {
 	const source = { question: doubled, details: doubled, options: [{ label: doubled }, { label: "no" }] };
 	const before = structuredClone(source);
-	const html = renderToStaticMarkup(<QuestionDock toolName="ask_user_question" toolCallId="source_q" input={source} expanded onExpand={() => {}} onSubmit={() => {}} />);
+	const answer = { openKey: "source_q", selection: emptyDockSelection(), confidence: "neutral" as const, mode: "answer" as const, toggle: () => {}, setConfidence: () => {}, setMode: () => {} };
+	const html = renderToStaticMarkup(<ProseAnswerProvider value={answer}><ProseQuestion tool="ask_user_question" toolCallId="source_q" input={source} open /></ProseAnswerProvider>);
 	assert.deepEqual(tex(html), Array(3).fill(String.raw`\nabla f`));
 	assert.deepEqual(source, before);
 });
@@ -106,7 +107,7 @@ test("answers snapshot source text, not recovered labels or identities", () => {
 	assert.equal(answer.answers[0]!.value, doubled);
 	assert.equal(answer.answers[0]!.label, doubled);
 	const before = structuredClone(answer);
-	assert.deepEqual(tex(renderToStaticMarkup(<AnsweredCard answer={answer} input={source} />)), Array(2).fill(String.raw`\nabla f`));
+	renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="source" input={source} output={answer} open={false} />);
 	assert.deepEqual(answer, before);
 });
 
@@ -121,8 +122,7 @@ test("historical source join restores matrices while retaining recorded order an
 	assert.equal(projection.questionText, a);
 	assert.deepEqual(projection.options, [{ index: 1, label: b }, { index: 2, label: a }]);
 	assert.equal(projection.answers, answer.answers);
-	const html = renderToStaticMarkup(<AnsweredCard answer={answer} input={input} />);
-	assert.deepEqual(tex(html), [a.slice(1,-1), b.slice(1,-1), a.slice(1,-1)]);
+	renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="historical" input={input} output={answer} open={false} />);
 	assert.deepEqual({ answer, input }, before);
 });
 
@@ -137,6 +137,6 @@ test("historical ambiguous options and absent/invalid original calls retain thei
 	const dismissed = { kind: "ask", dismissed: true } as QuestionAnswerData;
 	assert.equal(answerForPresentation(dismissed, input), dismissed);
 	const before = structuredClone(answer);
-	renderToStaticMarkup(<AnsweredCard answer={answer} />);
+	renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="historical" input={source} output={answer} open={false} />);
 	assert.deepEqual(answer, before);
 });

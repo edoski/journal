@@ -4,16 +4,10 @@
  * every agent that teaches reads the same ladder.
  */
 
-import React from "react";
-(globalThis as Record<string, unknown>).React = React;
-
 import assert from "node:assert/strict";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 
 import { buildAnswer, compactAnswerForModel, type QuestionData } from "../src/core/question-core.ts";
-import { AnsweredCard } from "../components/answered-card.tsx";
-import { QuestionDock } from "../components/question-dock.tsx";
 import { composeInstructions } from "../src/agent/teacher-agent.ts";
 import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 
@@ -31,26 +25,6 @@ describe("a Hint press on a check", () => {
 	it("tells the agent it is a request for the next rung, not an answer", () => {
 		const model = compactAnswerForModel(buildAnswer(check, { text: "stuck", hint: true }, "recall"));
 		assert.match(String(model.hintRequested), /not an answer.*next rung/);
-	});
-
-	it("never reveals the proof in the transcript, while a real answer still does", () => {
-		const input = { question: check.question, correctAnswer: PROOF };
-		const hinted = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(check, { text: "stuck", hint: true }, "recall")} input={input} />);
-		assert.doesNotMatch(hinted, /The answer/);
-		assert.match(hinted, /You asked for a hint/);
-		const answered = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(check, { text: "e = ee' = e'" }, "recall")} input={input} />);
-		assert.match(answered, /The answer/);
-	});
-
-	it("the check box offers Hint beside Submit, and a plain question does not", () => {
-		const explain = renderToStaticMarkup(
-			<QuestionDock toolName="explain" toolCallId="q1" input={{ question: "Why?", correctAnswer: "Because.", nodeId: "a", type: "check" } as never} expanded onExpand={() => {}} onSubmit={() => {}} />,
-		);
-		assert.match(explain, /data-testid="question-hint"/);
-		const ask = renderToStaticMarkup(
-			<QuestionDock toolName="ask_user_question" toolCallId="q2" input={{ question: "Which?" }} expanded onExpand={() => {}} onSubmit={() => {}} />,
-		);
-		assert.doesNotMatch(ask, /data-testid="question-hint"/);
 	});
 });
 

@@ -21,7 +21,3 @@ export function strandedDraft(before: string | null, after: string | null, draft
 	return text === "" ? null : text;
 }
 
-/** The words of a question's form, the answer first, as one draft. */
-export function formDraftText(parts: readonly (string | undefined)[]): string {
-	return parts.map((part) => part?.trim() ?? "").filter((part) => part !== "").join("\n\n");
-}

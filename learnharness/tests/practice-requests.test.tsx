@@ -1,22 +1,16 @@
 /**
- * The practice dock's requests (Hint, Show me, Explain instead) reach the
+ * A problem's requests (Hint, Show me, Explain instead) reach the
  * practice agent as the request they are, never as an answer, and an
  * Explain instead before any work records no attempt.
  */
 
-import React from "react";
-(globalThis as Record<string, unknown>).React = React;
-
 import assert from "node:assert/strict";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 
 import { ChatInputError, inputAppends, parseChatInput } from "../src/core/input-events.ts";
 import { PRACTICE_PROBLEM_TOOL, newThinkingMessage, newPracticeRequestMessage, type LhMarkerMessage, type LhMessage } from "../src/core/native-messages.ts";
 import { concludeTool, createPracticeGate } from "../src/agent/tools/practice.ts";
-import { PracticeDock } from "../components/practice-dock.tsx";
-import { RequestCard } from "../components/practice-cards.tsx";
 
 const STAMPS = {
 	api: "faux",
@@ -41,7 +35,7 @@ function posed(): LhMessage[] {
 	return [pose, ack];
 }
 
-describe("the practice dock's requests", () => {
+describe("a problem's requests", () => {
 	it("a Hint press becomes a request marker the agent reads as a request, not a thinking submission", () => {
 		const input = parseChatInput({ type: "request", problemCallId: "call_p1", request: "hint", text: "  rows 1 and 3 look related " });
 		const [marker] = inputAppends({ messages: posed(), kind: "practice" }, input) as LhMarkerMessage[];
@@ -103,23 +97,5 @@ describe("concluding after Explain instead", () => {
 		const { tool, saves } = recorder([...posed(), newThinkingMessage("call_p1", "rank 3", "neutral"), newPracticeRequestMessage("call_p1", "explain")]);
 		await tool.execute("c1", MOVED_ON as never);
 		assert.equal(saves.length, 1);
-	});
-});
-
-describe("the problem box and the transcript", () => {
-	it("the problem box offers Hint, Show me and Explain instead beside Submit", () => {
-		const html = renderToStaticMarkup(
-			<PracticeDock problemCallId="call_p1" input={{ statement: "Find the rank." }} expanded onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} />,
-		);
-		for (const [id, label] of [["hint", "Hint"], ["show", "Show me"], ["explain", "Explain instead"]]) {
-			assert.match(html, new RegExp(`data-testid="practice-request-${id}"[^>]*>(?:<svg.*?</svg>)?${label}<`));
-		}
-		assert.match(html, /data-testid="practice-send"/);
-	});
-
-	it("a request reads in the transcript as what he asked for, with his work", () => {
-		const html = renderToStaticMarkup(<RequestCard data={{ problemCallId: "call_p1", request: "hint", text: "rows 1 and 3" }} />);
-		assert.match(html, /You asked for a hint/);
-		assert.match(html, /rows 1 and 3/);
 	});
 });

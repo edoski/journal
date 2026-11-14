@@ -6,7 +6,6 @@ import { AppShell, SidebarProvider } from "@/components/sidebar";
 import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
-import { PolishHost } from "@/components/dev/polish-host";
 
 export const metadata: Metadata = {
 	title: "Learning Harness",
@@ -28,7 +27,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 					</SidebarProvider>
 				</AppearanceProvider>
 			</ServerEventsProvider>
-			{process.env.NODE_ENV === "development" && <PolishHost />}
 		</body>
 		</html>
 	);

@@ -6,8 +6,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { parseHTML } from "linkedom";
 import type { Root } from "react-dom/client";
-import { ChatSessionComposer } from "../components/composer.tsx";
-import { ReadingThinkingField } from "../components/reading-thinking.tsx";
+import { LessonSessionComposer } from "../components/lesson/lesson-composer.tsx";
 
 const { window, document } = parseHTML("<html><body><div id='root'></div></body></html>");
 // React wires onChange to the input event only where `oninput` is supported.
@@ -78,7 +77,7 @@ describe("session text fields keep keystrokes local", () => {
 			const [external, setExternal] = useState({ value: "", revision: 0 });
 			reset = (value) => setExternal((previous) => ({ value, revision: previous.revision + 1 }));
 			return (
-				<ChatSessionComposer
+				<LessonSessionComposer
 					busy={false}
 					value={external.value}
 					revision={external.revision}
@@ -106,35 +105,6 @@ describe("session text fields keep keystrokes local", () => {
 		assert.equal(parentRenders, 2);
 	});
 
-	it("updates reading thoughts locally while forwarding drafts for submit", async () => {
-		let parentRenders = 0;
-		let latest = "";
-		let reset!: (value: string) => void;
-		function Parent() {
-			parentRenders++;
-			const [external, setExternal] = useState({ value: "", revision: 0 });
-			reset = (value) => setExternal((previous) => ({ value, revision: previous.revision + 1 }));
-			return (
-				<ReadingThinkingField
-					value={external.value}
-					revision={external.revision}
-					onChange={(value) => { latest = value; }}
-				/>
-			);
-		}
-
-		const host = await mount(<Parent />);
-		const field = fieldIn(host);
-		await typeText(field, "thinking while reading");
-		assert.equal(field.value, "thinking while reading");
-		assert.equal(latest, "thinking while reading");
-		assert.equal(parentRenders, 1, "typing doesn't rerender the chat owner");
-
-		await act(async () => { reset("restored thought"); });
-		assert.equal(field.value, "restored thought", "explicit per-question resets still reach the field");
-		assert.equal(parentRenders, 2);
-	});
-
 	it("a dictated multi-paragraph paste lands whole in one input event and is what gets sent", async () => {
 		const paragraph = [
 			"The derivative is zero at the vertex, so the tangent there is horizontal.",
@@ -150,7 +120,7 @@ describe("session text fields keep keystrokes local", () => {
 			const draft = useRef("");
 			const [revision, setRevision] = useState(0);
 			return (
-				<ChatSessionComposer
+				<LessonSessionComposer
 					busy={false} value={draft.current} revision={revision}
 					onChange={(value) => { draft.current = value; }}
 					onSend={() => {
@@ -190,7 +160,7 @@ describe("session text fields keep keystrokes local", () => {
 				draft.current = value;
 				setRevision((previous) => previous + 1);
 			};
-			return visible ? <ChatSessionComposer
+			return visible ? <LessonSessionComposer
 				busy={false} value={draft.current} revision={revision}
 				onChange={(value) => { draft.current = value; }}
 				onSend={() => { sent.push(draft.current); replace(""); }}
@@ -232,7 +202,7 @@ describe("session text fields keep keystrokes local", () => {
 		function Parent() {
 			const [state, setState] = useState(flags);
 			update = (patch) => { flags = { ...flags, ...patch }; setState(flags); };
-			return <ChatSessionComposer {...state} value="" revision={0} onChange={() => {}}
+			return <LessonSessionComposer {...state} value="" revision={0} onChange={() => {}}
 				onSend={() => { sends++; }} onStop={() => { stops++; }} onNext={() => { nexts++; }} />;
 		}
 		const host = await mount(<Parent />);
@@ -253,48 +223,5 @@ describe("session text fields keep keystrokes local", () => {
 		assert.equal(host.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.disabled, true);
 		await submit(host);
 		assert.equal(sends, 1, "a closed send gate must win over local text");
-	});
-
-	it("reading thoughts survive unrelated renders and explicit same-value restoration", async () => {
-		let refresh!: () => void;
-		let replace!: (value: string) => void;
-		let latest = "";
-		function Parent() {
-			const [seed, setSeed] = useState({ value: "", revision: 0 });
-			const [, setTick] = useState(0);
-			refresh = () => setTick((tick) => tick + 1);
-			replace = (value) => { latest = value; setSeed((previous) => ({ value, revision: previous.revision + 1 })); };
-			return <ReadingThinkingField {...seed} onChange={(value) => { latest = value; }} />;
-		}
-		const host = await mount(<Parent />);
-		const field = fieldIn(host);
-		await typeText(field, "reading draft");
-		await act(async () => { refresh(); });
-		assert.equal(field.value, "reading draft");
-		assert.equal(latest, "reading draft");
-		await act(async () => { replace(""); });
-		assert.equal(field.value, "");
-		await act(async () => { replace("saved question thoughts"); });
-		await typeText(field, "edited after restoration");
-		await act(async () => { replace("saved question thoughts"); });
-		assert.equal(field.value, "saved question thoughts");
-		assert.equal(latest, "saved question thoughts");
-	});
-
-	it("reading appends reach the owner synchronously, before React commits", async () => {
-		let latest = "";
-		let forwardedEdits = 0;
-		const host = await mount(<ReadingThinkingField value="" revision={0}
-			onChange={(value) => { latest = value; forwardedEdits++; }} />);
-		const field = fieldIn(host);
-		await typeText(field, "typed thoughts");
-		await act(async () => {
-			inputEvent(field, "typed thoughts appended tail");
-			assert.equal(latest, "typed thoughts appended tail", "a submit right after the append sees the tail");
-			inputEvent(field, "typed thoughts appended tail and a second burst");
-			assert.equal(latest, "typed thoughts appended tail and a second burst");
-		});
-		assert.equal(field.value, "typed thoughts appended tail and a second burst");
-		assert.equal(forwardedEdits, 3, "each edit forwards its synchronous snapshot exactly once");
 	});
 });

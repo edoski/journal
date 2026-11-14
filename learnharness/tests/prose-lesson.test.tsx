@@ -153,12 +153,9 @@ describe("the Prose composer", () => {
 });
 
 describe("the cheat sheet in the Prose lesson", () => {
-	it("lists the digits and Esc in Prose, and the row keys elsewhere", () => {
-		const ids = (lesson: string) => cheatSheetSections(lesson).flatMap((s) => s.actions.map((a) => a.id));
-		assert.ok(ids("prose").includes("question-pick-digit"));
-		assert.ok(ids("prose").includes("question-ask-instead"));
-		assert.ok(!ids("prose").includes("question-pick-row"));
-		assert.ok(ids("current").includes("question-pick-row"));
-		assert.ok(!ids("current").includes("question-pick-digit"));
+	it("lists the digits and Esc", () => {
+		const ids = cheatSheetSections().flatMap((s) => s.actions.map((a) => a.id));
+		assert.ok(ids.includes("question-pick-digit"));
+		assert.ok(ids.includes("question-ask-instead"));
 	});
 });

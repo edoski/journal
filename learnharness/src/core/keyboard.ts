@@ -28,13 +28,8 @@ export type KeyAction =
 	| "rename-session"
 	| "cheat-sheet"
 	| "find"
-	| "question-next-row"
-	| "question-prev-row"
-	| "question-pick-row"
-	| "question-pick-number"
 	| "question-submit"
 	| "open-settings"
-	| "toggle-user-thinking"
 	| "page-move"
 	| "page-open"
 	| "calendar-today"
@@ -84,9 +79,6 @@ export interface KeyActionDef {
 	displayOnly?: boolean;
 	/** The Proposed cheat sheet's finer heading inside the scope. */
 	group?: KeyGroup;
-	/** The lessons whose keys these are (the Lesson switch's values); the
-	 *  cheat sheet lists the action only while one of them is drawn. */
-	lessons?: readonly string[];
 }
 
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
@@ -105,7 +97,6 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// surface listens.
 	{ id: "find", label: "Find in this lesson", scope: "lesson", binding: "mod+f" },
 	{ id: "rename-session", label: "Rename this lesson", scope: "lesson", binding: "f2" },
-	{ id: "toggle-user-thinking", label: "Show or hide your thinking", scope: "lesson", binding: "mod+t" },
 	{ id: "open-model-picker", label: "Lesson details", scope: "lesson", binding: "mod+k" },
 	// The practice problem's requests: the mounted problem box answers them.
 	{ id: "practice-hint", label: "Problem or check · hint", scope: "lesson", binding: "mod+shift+h" },
@@ -119,20 +110,10 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "attach-photo", label: "Attach a photo of your working", scope: "lesson", binding: "mod+shift+p" },
 	{ id: "try-again", label: "Try again after a reply that never came", scope: "lesson", binding: "enter", displayOnly: true },
 	{ id: "dialog-confirm", label: "Confirm a stop or skip (← → pick a button)", scope: "lesson", binding: "mod+enter", displayOnly: true },
-	// The question dock's row machine (wave B) — displayOnly: the dock owns
-	// the keys while a question is open; the registry never dispatches
-	// them, so bare arrows stay free everywhere else. Tab is dead (Edo, 17
-	// Sep 2026), so ↓ past the last choice reaches his thinking and ↑ at
-	// its start comes back (round 4: the sheet still listed ⇥).
-	{ id: "question-next-row", label: "Next choice, then your thinking", scope: "question", binding: "arrowdown", displayOnly: true, lessons: ["current", "slot"] },
-	{ id: "question-prev-row", label: "Previous choice, or back from your thinking", scope: "question", binding: "arrowup", displayOnly: true, lessons: ["current", "slot"] },
-	{ id: "question-pick-row", label: "Choose", scope: "question", binding: "space", displayOnly: true, lessons: ["current", "slot"] },
-	// The Prose lesson's question (components/lesson/prose/prose.md): its
-	// choices are rows in the tutor's message, and the composer answers.
-	{ id: "question-pick-digit", label: "Pick a choice by its number", scope: "question", binding: "1–9", displayOnly: true, lessons: ["prose"] },
-	{ id: "question-ask-instead", label: "Ask the tutor instead of answering, and back", scope: "question", binding: "escape", displayOnly: true, lessons: ["prose"] },
-	// The Slot lesson's answer line picks a choice by the digit beside it.
-	{ id: "question-pick-number", label: "Choose by its number", scope: "question", binding: "digits", displayOnly: true, lessons: ["slot"] },
+	// A question (components/lesson/prose/prose.md): its choices are rows
+	// in the tutor's message, and the composer answers.
+	{ id: "question-pick-digit", label: "Pick a choice by its number", scope: "question", binding: "1–9", displayOnly: true },
+	{ id: "question-ask-instead", label: "Ask the tutor instead of answering, and back", scope: "question", binding: "escape", displayOnly: true },
 	{ id: "question-submit", label: "Send your answer", scope: "question", binding: "enter", displayOnly: true },
 	// Keyboard reach (13 Nov 2026): the page's own arrows (spatial-arrows.ts)
 	// walk its rows and links, and Enter opens them natively.
@@ -278,8 +259,6 @@ const KEY_GLYPH: Record<string, string> = {
 	space: "Space",
 	// Display-only: the four arrows as one cheat-sheet row (page-move).
 	arrows: "↑ ↓ ← →",
-	// Display-only: a choice's digit (question-pick-number).
-	digits: "1–9",
 };
 
 /** Format a binding for display: "mod+shift+f" → "⌘⇧F". */
