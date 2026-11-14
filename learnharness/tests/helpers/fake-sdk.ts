@@ -5,10 +5,12 @@
  * stream function for each model request, streams the reply as the SDK's
  * raw `stream_event`s, and runs tool calls through the app's real in-process
  * tool server over an in-memory MCP link. A tool result carrying
- * `claude/endTurn` ends the turn after its batch, as Claude Code does.
+ * `claude/endTurn` ends the turn after its batch, as Claude Code does. A
+ * session it never ran but whose file holds Claude Code's transcript format
+ * (a seeded one) resumes from that file's turns.
  */
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Options, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
@@ -46,6 +48,35 @@ function contentOf(message: SDKUserMessage): (TextContent | ImageContent)[] {
 		}
 		return [];
 	});
+}
+
+/** A session file in Claude Code's transcript format as model-facing
+ *  history: its user and assistant entries along their chain. Undefined
+ *  when the file is not such a transcript. */
+function transcriptHistory(file: string, toolPrefix: string): Entry[] | undefined {
+	const entries = readFileSync(file, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as Record<string, any>);
+	const turns = entries.filter((e) => (e.type === "user" || e.type === "assistant") && e.message);
+	if (!turns.length) return undefined;
+	const names = new Map<string, string>();
+	const unprefixed = (name: string) => name.startsWith(toolPrefix) ? name.slice(toolPrefix.length) : name;
+	const parts = (blocks: any[]): (TextContent | ImageContent)[] => blocks.flatMap((b): (TextContent | ImageContent)[] => b.type === "text" ? [{ type: "text", text: b.text }] : b.type === "image" ? [{ type: "image", data: b.source.data, mimeType: b.source.media_type }] : []);
+	const history: Entry[] = [];
+	for (const e of turns) {
+		const content = e.message.content;
+		if (e.type === "assistant") {
+			const blocks = (content as any[]).map((b) => b.type === "tool_use" ? (names.set(b.id, unprefixed(b.name)), { type: "toolCall" as const, id: b.id, name: unprefixed(b.name), arguments: b.input }) : { type: "text" as const, text: b.text });
+			history.push({ uuid: e.uuid, message: { role: "assistant", content: blocks, api: "anthropic-messages", provider: "seed", model: e.message.model, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: blocks.some((b) => b.type === "toolCall") ? "toolUse" : "stop", timestamp: Date.parse(e.timestamp) } as AssistantMessage });
+			continue;
+		}
+		if (typeof content === "string") { history.push({ uuid: e.uuid, message: { role: "user", content: [{ type: "text", text: content }], timestamp: Date.parse(e.timestamp) } }); continue; }
+		for (const b of content as any[]) {
+			if (b.type !== "tool_result") continue;
+			history.push({ uuid: e.uuid, message: { role: "toolResult", toolCallId: b.tool_use_id, toolName: names.get(b.tool_use_id) ?? "unknown", content: parts(b.content ?? []), isError: b.is_error === true, timestamp: Date.parse(e.timestamp) } satisfies ToolResultMessage });
+		}
+		const rest = parts((content as any[]).filter((b) => b.type !== "tool_result"));
+		if (rest.length) history.push({ uuid: e.uuid, message: { role: "user", content: rest, timestamp: Date.parse(e.timestamp) } });
+	}
+	return history;
 }
 
 /** The reply as the raw Anthropic events the SDK forwards. */
@@ -99,6 +130,10 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 		async function* run(): AsyncGenerator<SDKMessage> {
 			const result = (subtype: string, errors?: string[]) => ({ type: "result", subtype, is_error: subtype !== "success", ...(errors ? { errors } : {}), result: "", session_id: id }) as unknown as SDKMessage;
 			let id = options.resume ?? randomUUID();
+			if (options.resume && !sessions.has(options.resume) && existsSync(sessionFile(configDir, options.resume))) {
+				const seeded = transcriptHistory(sessionFile(configDir, options.resume), "mcp__lh__");
+				if (seeded) sessions.set(options.resume, seeded);
+			}
 			if (options.resume && (!sessions.has(options.resume) || !existsSync(sessionFile(configDir, options.resume)))) {
 				yield result("error_during_execution", [`No conversation found with session ID: ${options.resume}`]);
 				return;

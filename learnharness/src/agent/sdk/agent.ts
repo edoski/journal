@@ -5,16 +5,16 @@ import type { Api, AssistantMessage, AssistantMessageEvent, Model, ToolCall, Too
 import { CLAUDE_MODEL } from "../../core/contracts/claude.ts";
 import { newCompactionMarker } from "../../core/compaction.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
-import { CONTINUE_TEXT, owedMessages, sdkInputBlocks, sessionResume, type ChatSession, type SdkInputBlock, type SessionTurnEnd } from "../../core/sdk-session.ts";
+import { CONTINUE_TEXT, owedMessages, sdkInputBlocks, sessionResume, sessionSeed, type ChatSession, type SdkInputBlock, type SessionTurnEnd } from "../../core/sdk-session.ts";
 import { CLAUDE_ABORTED, CLAUDE_API_KEY_REFUSAL, CLAUDE_MODEL_MISSING, CLAUDE_TOOLS_MISSING, NO_KEY, claudeErrorMessage, type ClaudeRateLimit } from "../claude-errors.ts";
 import { recordClaudeModelMissing, recordClaudeRateLimit } from "../claude-usage.ts";
 import { AssistantStream } from "./assistant-stream.ts";
 import { SDK_TOOL_PREFIX, SDK_TOOL_SERVER, type SdkEngine, type SdkLaunch, type SdkQuery } from "./engine.ts";
-import { keepSession, restoreSession, type SessionStore } from "./session-files.ts";
+import { keepSession, restoreSession, seedSession, type SessionStore } from "./session-files.ts";
 import { sdkToolServer } from "./tool-server.ts";
 
-/** Shown when a lesson's model memory is gone: its session was deleted from
- *  Claude Code and from the app's copy, or the lesson predates sessions. */
+/** Shown when a lesson has no session to resume and none could be seeded
+ *  from its record. */
 export const SESSION_GONE = `This lesson's conversation with Claude is no longer stored, so it cannot continue. Pick the topic up again from its topic page: the new lesson carries this one's plan and tasks.${NO_KEY}`;
 
 export interface SdkAgentConfig {
@@ -26,7 +26,8 @@ export interface SdkAgentConfig {
 	/** A clean call of this tool ends the turn, once every such call in the
 	 *  same reply resolved cleanly (a failed one is retried within the turn). */
 	endsTurn: (toolName: string) => boolean;
-	/** The record's map to its Claude Code session; absent on a new lesson. */
+	/** The record's map to its Claude Code session; absent on a new lesson
+	 *  and on one from before sessions (the turn seeds one from the record). */
 	session?: ChatSession;
 	/** Where the app keeps its copy of the session; absent: no copy. */
 	sessionStore?: SessionStore;
@@ -71,6 +72,7 @@ export class SdkAgent {
 	private query: SdkQuery | undefined;
 	private aborted = false;
 	private end: SessionTurnEnd | undefined;
+	private seeded: ChatSession | undefined;
 
 	constructor(private readonly config: SdkAgentConfig) {
 		this.state = { messages: [...config.messages], model: config.engine.model, systemPrompt: config.systemPrompt, tools: config.tools };
@@ -130,14 +132,36 @@ export class SdkAgent {
 	}
 
 	private async run(): Promise<void> {
-		const { engine, session, sessionStore } = this.config;
+		const { engine, sessionStore } = this.config;
+		let session = this.config.session;
 		let launch: SdkLaunch;
 		if (this.aborted) return this.fail(CLAUDE_ABORTED, "aborted");
 		try { launch = engine.launch(); } catch (error) { return this.fail((error as Error).message); }
-		const owed = owedMessages(this.state.messages as LhMessage[], session);
-		if (owed === null) return this.fail(SESSION_GONE);
-		const resume = sessionResume(session);
-		if (resume.resume && !restoreSession(sessionStore, launch.configDir, resume.resume)) return this.fail(SESSION_GONE);
+		const lesson = this.state.messages as LhMessage[];
+		let owed = owedMessages(lesson, session);
+		let resume = sessionResume(session);
+		// A record its session cannot carry (a lesson from before sessions, or
+		// one whose session file and app copy are both gone) gets a session
+		// seeded from the record, once: the map the turn leaves moves from it.
+		if (owed === null || (resume.resume && !restoreSession(sessionStore, launch.configDir, resume.resume))) {
+			const why = owed === null ? "no session of its own holds its replies" : `its session ${resume.resume} is gone from Claude Code and from the app's copy`;
+			let seeded: ChatSession | undefined;
+			try {
+				const seed = sessionSeed(lesson, (name) => name === "WebSearch" ? name : `${SDK_TOOL_PREFIX}${name}`);
+				seeded = seed ? seedSession(sessionStore, launch.configDir, seed) : undefined;
+			} catch (error) {
+				console.error(`[sdk] could not seed a session for the lesson (${why}):`, error);
+				return this.fail(SESSION_GONE);
+			}
+			owed = owedMessages(lesson, seeded);
+			if (owed === null) {
+				console.error(`[sdk] could not seed a session for the lesson (${why}): the seed does not cover its replies`);
+				return this.fail(SESSION_GONE);
+			}
+			if (seeded) console.info(`[sdk] seeded session ${seeded.id} from the lesson's record, through ${seeded.synced}, because ${why}`);
+			session = this.seeded = seeded;
+			resume = sessionResume(seeded);
+		}
 		for (const steer of this.queued.splice(0)) this.append(steer.message);
 		const queuedSteers = this.state.messages.slice(this.config.messages.length) as LhMessage[];
 		const blocks = sdkInputBlocks([...owed, ...queuedSteers]);
@@ -362,9 +386,10 @@ export class SdkAgent {
 			query.close();
 		}
 		if (!sessionId) return;
+		const seeded = this.seeded ? { seeded: this.seeded } : {};
 		this.end = outcome === "success"
-			? { id: sessionId, anchor, held: "all" }
-			: { id: sessionId, anchor: keptAnchor, held: heldThrough ? { through: heldThrough } : "none" };
+			? { id: sessionId, anchor, held: "all", ...seeded }
+			: { id: sessionId, anchor: keptAnchor, held: heldThrough ? { through: heldThrough } : "none", ...seeded };
 		if (sessionStore) {
 			try { keepSession(sessionStore, launch.configDir, sessionId); } catch (error) { console.error("[sdk] session copy failed:", error); }
 		}

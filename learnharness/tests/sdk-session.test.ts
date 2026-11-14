@@ -5,7 +5,10 @@ import {
 	nextChatSession,
 	owedMessages,
 	sdkInputBlocks,
+	QUESTION_POSED_TEXT,
+	SEED_INTERRUPTED_TEXT,
 	sessionResume,
+	sessionSeed,
 	type ChatSession,
 } from "../src/core/sdk-session.ts";
 import { concludedByDismissalPair, newAnswerResult, newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
@@ -85,5 +88,48 @@ describe("the session map after a turn", () => {
 	it("a failed turn that kept nothing keeps the previous point, and is cut", () => {
 		assert.deepEqual(nextChatSession({ id: "s", synced: "a0", anchor: "z" }, { id: "s", held: "none" }, record), { id: "s", synced: "a0", anchor: "z", cut: true });
 		assert.deepEqual(nextChatSession(undefined, { id: "s2", held: "none" }, record), { id: "s2", synced: null, cut: true });
+	});
+});
+
+describe("seeding a session from a record that has none", () => {
+	const prefixed = (name: string) => `mcp__lh__${name}`;
+	const texts = (blocks: readonly unknown[]) => JSON.stringify(blocks);
+
+	it("replies become assistant turns with their results; the inputs between them, user turns; inputs after the last reply stay owed", () => {
+		const record = [user("teach me"), reply("a1", [{ id: "q1", name: "ask_user_question" }]), result("r1", "q1", "ask_user_question"), reply("a2", [{ id: "l1", name: "lookup" }]), result("r2", "l1", "lookup"), reply("a3"), user("next")];
+		const seed = sessionSeed(record, prefixed)!;
+		assert.deepEqual(seed.turns.map((t) => t.role), ["user", "assistant", "user", "user", "assistant", "user", "assistant"]);
+		assert.match(texts(seed.turns[1]!.content), /"type":"tool_use","id":"q1","name":"mcp__lh__ask_user_question"/);
+		assert.match(texts(seed.turns[2]!.content), new RegExp(`"tool_use_id":"q1","content":\\[\\{"type":"text","text":"${QUESTION_POSED_TEXT.slice(0, 15)}`), "a question returns what the tool server returns");
+		assert.match(texts(seed.turns[3]!.content), /<answer tool=\\"ask_user_question\\" call=\\"q1\\">\\nok/, "its answer is the next input");
+		assert.match(texts(seed.turns[5]!.content), /"tool_use_id":"l1","content":\[\{"type":"text","text":"ok"\}\]/);
+		assert.equal(seed.synced, "a3");
+		assert.deepEqual(owedMessages(record, { id: "s", synced: seed.synced })!.map((m) => m.id), ["u_next"]);
+	});
+
+	it("failed and app-made replies are left out, a call that never returned reads as interrupted, and two replies in a row get a continue between them", () => {
+		const record = [user("hi"), reply("bad", [{ id: "x", name: "lookup" }], "error"), reply("a1", [{ id: "l1", name: "lookup" }]), reply("a2"), user("more")];
+		const seed = sessionSeed(record, prefixed)!;
+		assert.deepEqual(seed.turns.map((t) => t.role), ["user", "assistant", "user", "assistant"]);
+		assert.doesNotMatch(texts(seed.turns.flatMap((t) => t.content)), /"id":"x"/);
+		assert.match(texts(seed.turns[2]!.content), new RegExp(SEED_INTERRUPTED_TEXT.slice(0, 20)));
+		const textOnly = sessionSeed([user("hi"), reply("a1"), reply("a2")], prefixed)!;
+		assert.deepEqual(textOnly.turns.map((t) => t.role), ["user", "assistant", "user", "assistant"]);
+		assert.match(texts(textOnly.turns[2]!.content), new RegExp(CONTINUE_TEXT));
+	});
+
+	it("the record's compaction cut holds: its summary opens the session and what came before it is gone", () => {
+		const marker = { ...newCompactionMarker("He knows chaining.", { firstKeptMessageId: "u_kept", tokensBefore: 9, model: "m", at: "" }), id: "c1" } as LhMessage;
+		const record = [user("old"), reply("a0"), user("kept"), reply("a1"), marker, user("now")];
+		const seed = sessionSeed(record, prefixed)!;
+		assert.deepEqual(seed.turns.map((t) => t.role), ["user", "assistant"]);
+		assert.match(texts(seed.turns[0]!.content), /He knows chaining\..*kept/s);
+		assert.doesNotMatch(texts(seed.turns.flatMap((t) => t.content)), /"old"/);
+		assert.equal(seed.synced, "a1");
+		assert.deepEqual(owedMessages(record, { id: "s", synced: seed.synced })!.map((m) => m.id), ["c1", "u_now"], "the marker gives nothing, his words are owed");
+	});
+
+	it("a record with no reply has nothing to seed", () => {
+		assert.equal(sessionSeed([user("hi"), reply("f", [], "error")], prefixed), null);
 	});
 });

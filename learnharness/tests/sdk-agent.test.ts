@@ -4,7 +4,7 @@
  * how a lesson's Claude Code session is resumed, restored or refused.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, realpathSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -17,7 +17,7 @@ import { CLAUDE_API_KEY_REFUSAL } from "../src/agent/claude-errors.ts";
 import { SESSION_GONE, SdkAgent } from "../src/agent/sdk/agent.ts";
 import type { SdkEngine } from "../src/agent/sdk/engine.ts";
 import type { SessionStore } from "../src/agent/sdk/session-files.ts";
-import { nextChatSession, type ChatSession } from "../src/core/sdk-session.ts";
+import { nextChatSession, QUESTION_POSED_TEXT, type ChatSession } from "../src/core/sdk-session.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { fakeSdk, type FakeSdk } from "./helpers/fake-sdk.ts";
 
@@ -134,17 +134,19 @@ describe("resuming a lesson's session", () => {
 		return { record, session };
 	}
 
-	it("a session whose file is gone, with no app copy, fails with SESSION_GONE without starting Claude Code", async () => {
-		const { fake } = scripted([fauxAssistantMessage("Hi."), fauxAssistantMessage("never asked for")]);
+	it("a session whose file is gone, with no app copy, is seeded from the record and the lesson continues", async () => {
+		const { fake, seen } = scripted([fauxAssistantMessage("Hi."), fauxAssistantMessage("Where were we.")]);
 		const { record, session } = await firstTurn(fake);
 		rmSync(liveFile(fake, session.id));
 		fake.forget(session.id);
 		const agent = agentOn(fake.engine, [...record, user("next")], { session });
 		await agent.continue();
-		const last = agent.state.messages.at(-1) as AssistantMessage;
-		assert.equal(last.stopReason, "error");
-		assert.equal(last.errorMessage, SESSION_GONE);
-		assert.equal(fake.calls.length, 1, "no second Claude Code run");
+		assert.equal((agent.state.messages.at(-1) as AssistantMessage).stopReason, "stop");
+		const seeded = fake.calls[1]!.resume!;
+		assert.notEqual(seeded, session.id, "a new session, seeded from the record");
+		assert.deepEqual(seen[1]!.filter((m) => m.role !== "system").map((m) => m.role), ["user", "assistant", "user"]);
+		assert.match(JSON.stringify(seen[1]), /teach me.*Hi\..*next/s, "the model kept the first turn");
+		assert.equal(nextChatSession(session, agent.sessionEnd()!, persisted(agent.state.messages)).id, seeded, "the record maps to the seeded session");
 	});
 
 	it("with the app's copy, a gone session file is restored and the lesson resumes", async () => {
@@ -182,6 +184,114 @@ describe("resuming a lesson's session", () => {
 		const context = seen[2]!.filter((m) => m.role !== "system");
 		assert.deepEqual(context.map((m) => m.role), ["user", "assistant", "user"], "the failed turn's entries are gone");
 		assert.match(JSON.stringify(context[2]), /go on.*retry/s, "its input is owed again with the new words");
+	});
+});
+
+describe("continuing a lesson from before sessions", () => {
+	const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+	const reply = (id: string, content: AssistantMessage["content"]): LhMessage => ({ id, role: "assistant", api: "anthropic-messages", provider: "claude-subscription", model: "claude-opus-5-5", content, stopReason: content.some((b) => b.type === "toolCall") ? "toolUse" : "stop", usage, timestamp: 1 } as LhMessage);
+	const resultOf = (id: string, toolCallId: string, toolName: string, text: string): LhMessage => ({ id, role: "toolResult", toolCallId, toolName, content: [{ type: "text", text }], isError: false, timestamp: 1 } as LhMessage);
+	/** A record the app wrote before sessions: a question card answered, a
+	 *  tool call, a reply, then his next message. No `session`. */
+	const oldRecord = (): LhMessage[] => [
+		user("teach me hashing"),
+		reply("a1", [{ type: "text", text: "Hash tables map keys to slots." }, { type: "toolCall", id: "toolu_q1", name: "ask_user_question", arguments: { question: "Why hash a key?" } }]),
+		resultOf("r1", "toolu_q1", "ask_user_question", "To find it fast"),
+		reply("a2", [{ type: "toolCall", id: "toolu_l1", name: "lookup", arguments: {} }]),
+		resultOf("r2", "toolu_l1", "lookup", "found"),
+		reply("a3", [{ type: "text", text: "Right: constant time on average." }]),
+		user("go on"),
+	];
+	const store = (chatId: string): SessionStore => ({ dir: mkdtempSync(join(tmpdir(), "lh-session-store-")), chatId });
+
+	it("an old-format lesson record continues on a session seeded from it, kept as the app's copy", async () => {
+		const { fake } = scripted([fauxAssistantMessage("Collisions next.")]);
+		const sessionStore = store("chat_old");
+		const agent = agentOn(fake.engine, oldRecord(), { sessionStore });
+		await agent.continue();
+		const last = agent.state.messages.at(-1) as AssistantMessage;
+		assert.equal(last.stopReason, "stop");
+		assert.equal(fake.calls.length, 1);
+		const seeded = fake.calls[0]!.resume;
+		assert.ok(seeded, "the turn resumes a seeded session instead of failing");
+		assert.ok(existsSync(join(sessionStore.dir, "chat_old.session.jsonl")), "the seed is kept beside the record");
+		const saved = persisted(agent.state.messages);
+		const map = nextChatSession(undefined, agent.sessionEnd()!, saved);
+		assert.deepEqual([map.id, map.synced, map.cut], [seeded, saved.at(-1)!.id, undefined], "the record maps to the seeded session, through the new reply");
+	});
+
+	it("its first SDK turn sees the earlier exchange as turns, and the next turn resumes it without seeding again", async () => {
+		const { fake, seen } = scripted([fauxAssistantMessage("Collisions next."), fauxAssistantMessage("Chaining.")]);
+		const record = oldRecord();
+		const first = agentOn(fake.engine, record);
+		await first.continue();
+		const context = seen[0]!.filter((m) => m.role !== "system");
+		assert.deepEqual(context.map((m) => m.role), ["user", "assistant", "toolResult", "user", "assistant", "toolResult", "assistant", "user"]);
+		const text = (i: number) => JSON.stringify(context[i]);
+		assert.match(text(0), /teach me hashing/);
+		assert.match(text(1), /Hash tables map keys.*ask_user_question.*Why hash a key/s, "his question card, as the tutor's own call");
+		assert.match(text(2), new RegExp(QUESTION_POSED_TEXT.slice(0, 20)), "the call returned what the tool server returns");
+		assert.match(text(3), /<answer tool=\\"ask_user_question\\" call=\\"toolu_q1\\">\\nTo find it fast/, "his answer, tagged with the call");
+		assert.match(text(5), /found/, "the tool result the record kept");
+		assert.match(text(6), /constant time on average/);
+		assert.match(text(7), /go on/, "the prompt is his new message, as on any resumed lesson");
+
+		const persistedFirst = persisted(first.state.messages);
+		const session = nextChatSession(undefined, first.sessionEnd()!, persistedFirst);
+		const second = agentOn(fake.engine, [...persistedFirst, user("and then?")], { session });
+		await second.continue();
+		assert.equal(fake.calls[1]!.resume, session.id, "the seeded session is resumed like any other");
+		assert.equal(second.sessionEnd()!.seeded, undefined, "seeded once");
+		assert.match(JSON.stringify(seen[1]), /teach me hashing.*Collisions next\..*and then\?/s);
+	});
+
+	it("a seeded first turn that fails resumes the seed at its last entry on retry, without seeding again", async () => {
+		const { fake, seen } = scripted([fauxAssistantMessage("", { stopReason: "error", errorMessage: "overloaded" }), fauxAssistantMessage("Back.")]);
+		const first = agentOn(fake.engine, oldRecord());
+		await first.continue();
+		const afterFail = persisted(first.state.messages);
+		const cut = nextChatSession(undefined, first.sessionEnd()!, afterFail);
+		assert.equal(cut.id, fake.calls[0]!.resume);
+		assert.equal(cut.cut, true);
+		assert.ok(cut.anchor, "the seed's last entry");
+		const retry = agentOn(fake.engine, [...afterFail, user("retry")], { session: cut });
+		await retry.continue();
+		assert.equal(fake.calls[1]!.resume, cut.id);
+		assert.equal(fake.calls[1]!.resumeSessionAt, cut.anchor);
+		assert.equal(retry.sessionEnd()!.seeded, undefined);
+		assert.match(JSON.stringify(seen[1]!.at(-1)), /go on.*retry/s, "the failed turn's input is owed again");
+	});
+
+	it("a failed seed falls back to SESSION_GONE, says why, and never starts Claude Code", async (t) => {
+		const { fake } = scripted([fauxAssistantMessage("never asked for")]);
+		const blocker = join(mkdtempSync(join(tmpdir(), "lh-blocked-")), "file");
+		writeFileSync(blocker, "");
+		const engine: SdkEngine = { ...fake.engine, launch: () => ({ options: {}, configDir: join(blocker, "config") }) };
+		const logged = t.mock.method(console, "error", () => undefined);
+		const agent = agentOn(engine, oldRecord());
+		await agent.continue();
+		const last = agent.state.messages.at(-1) as AssistantMessage;
+		assert.equal(last.errorMessage, SESSION_GONE);
+		assert.equal(fake.calls.length, 0);
+		assert.match(String(logged.mock.calls[0]?.arguments[0]), /could not seed a session for the lesson \(no session of its own holds its replies/);
+	});
+
+	it("a lesson made on the SDK is unchanged: it resumes its own session and nothing is seeded", async () => {
+		const { fake } = scripted([fauxAssistantMessage("Hi."), fauxAssistantMessage("Again.")]);
+		const sessionStore = store("chat_sdk");
+		const first = agentOn(fake.engine, [user("teach me")], { sessionStore });
+		await first.continue();
+		const record = persisted(first.state.messages);
+		const session = nextChatSession(undefined, first.sessionEnd()!, record);
+		assert.equal(first.sessionEnd()!.seeded, undefined);
+		const kept = readFileSync(join(sessionStore.dir, "chat_sdk.session.jsonl"), "utf8");
+		assert.doesNotMatch(kept, /msg_seed_/, "the app's copy is Claude Code's own file");
+		const second = agentOn(fake.engine, [...record, user("next")], { session, sessionStore });
+		await second.continue();
+		assert.equal(fake.calls[1]!.resume, session.id);
+		assert.equal(second.sessionEnd()!.seeded, undefined);
+		const project = join(fake.configDir, "projects", realpathSync(claudeWorkDir()).replace(/[^a-zA-Z0-9]/g, "-"));
+		assert.deepEqual(readdirSync(project), [`${session.id}.jsonl`], "one session, no seed");
 	});
 });
 
