@@ -19,10 +19,9 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
-import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, spanWords, unreviewedWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, misfitWords, spanWords, unreviewedWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
-import { overdueWords } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<EntryLook, LucideIcon> = {
@@ -81,7 +80,7 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 				<Icon aria-hidden={!waits} aria-label={waits ? LOOKS[look].words : undefined} className={cn("size-3.5 shrink-0", ICON_INK[look])} />
 				{!waits && (
 					<span className={cn("truncate", LOOK_INK[look], look === "exam" && "font-medium")}>
-						{entry.kind === "exam" ? `Exam, ${distanceWords(entry.day, today).toLowerCase()}` : LOOKS[look].words}
+						{entry.kind === "exam" ? `Exam, ${distanceWords(entry.day, today).toLowerCase()}` : lookWords(entry, today)}
 					</span>
 				)}
 				{waits && (
@@ -156,7 +155,8 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 		if (misfit) lines.push(misfit);
 		if (entry.allStarted) lines.push("Every topic started");
 	} else if (entry.kind === "review") {
-		lines.push(entry.overdue ? `Was due ${longDayWords(entry.dueOn ?? entry.day)}` : entry.day === today ? overdueWords(0) : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		if (entry.overdue) lines.push(`Was due ${longDayWords(entry.dueOn ?? entry.day)}`);
+		else if (entry.day !== today) lines.push(`Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
 		if (entry.since) lines.push(entry.since);
 		if (entry.waits) lines.push(entry.waits);
 	} else if (entry.kind === "new") {
@@ -177,7 +177,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 				</p>
 				<p className={cn("flex items-center gap-1 text-label text-muted-foreground", LOOK_INK[look])}>
 					<Icon aria-hidden className={cn("size-3.5 shrink-0", ICON_INK[look])} />
-					{LOOKS[look].words}
+					{lookWords(entry, today)}
 				</p>
 				{lines.map((line) => (
 					<p key={line} className="text-label text-muted-foreground">

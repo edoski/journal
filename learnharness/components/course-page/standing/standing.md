@@ -10,7 +10,7 @@ Two candidates, the options of the Exam & mistakes switch (`../standing-variant.
 | each arc's line | unchanged | in place of its exam words, how it stands for the exam (`PART_WORDS`): "Solid for the exam", "Not solid yet", "Won't all fit" in the warning ink, each with its mark; an arc off the exam keeps "Not on the exam". The words give way before the arc's name |
 | mistakes | Mistakes, a quiet press before Context, opens a popover of the rows | Mistakes to fix, one foldable group under the list, open on arrival |
 
-Both: topics with no room before the exam lead the line in the warning ink, in the run-up's words ("No room before the exam to start Kernel"); a course the page shows without arcs names the topics not yet solid ("Not yet solid for the exam: Basis and Rank"), else those still to start; "No exam day set" without an exam; nothing while the engine is read.
+Both: topics with no room before the exam lead the line in the warning ink, in the run-up's words ("No room before the exam to start Kernel"); a course the page shows without arcs names the topics not yet solid ("Not yet solid for the exam: Basis and Rank"), else those still to start; without an exam, what the plan does with its reviews (`noExamWords`); nothing while the engine is read.
 
 ## A mistake's row
 

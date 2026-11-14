@@ -163,7 +163,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 	it("keeps a weak topic Today does not take up in Learning, as the sidebar's Learning shelf does, saying why it is weak", () => {
 		const learning = groupOf(groups, "learning");
 		const kernel = learning.topics.find((t) => t.topic.handle === "kernel")!;
-		assert.deepEqual(kernel.fact, { kind: "slip", words: "Sure, but wrong" });
+		assert.deepEqual(kernel.fact, { kind: "slip", words: "Sure, but wrong", slip: "confident" });
 		assert.equal(groupOf(groups, "needs-you").topics.some((t) => t.topic.weak), false, "a slip alone does not need him today");
 	});
 
@@ -229,6 +229,21 @@ describe("the header's facts and next lesson", () => {
 	it("leaves out an exam that is not set and a count for a course with no topics", () => {
 		const facts = courseFacts(course({ exam: null, topics: [] }, { lastActiveDaysAgo: null }));
 		assert.deepEqual(facts, { progress: null, exam: null, studied: "Not studied yet", lastSession: null });
+	});
+
+	it("says when a course not studied yet gives its first lesson and why then, and offers Start, never Continue", () => {
+		const fresh = [topic("ode-intro", { starts: "2026-11-19", startsAfter: ["Probability", "Linear Algebra"] }), topic("ode-sep", { starts: "2026-11-20" })];
+		const odes = course({ exam: { date: "2026-12-18", daysLeft: 40 }, current: null, focus: null, tasks: [], topics: fresh, edges: [] }, { lastActiveDaysAgo: null, due: [] });
+		assert.equal(courseFacts(odes).studied, "First lesson Thu 19 Nov, after Probability's and Linear Algebra's new topics");
+		const today = course({ exam: null, current: null, focus: null, tasks: [], topics: [topic("ode-intro", { starts: "2026-11-08" })], edges: [] }, { lastActiveDaysAgo: null, due: [] });
+		assert.equal(courseFacts(today).studied, "First lesson today");
+		assert.equal(courseNext(today, []).action, "Start");
+	});
+
+	it("gives each topic not started the day the plan starts it, not the group's own words", () => {
+		const groups = courseGroups(course({ topics: [...TOPICS, topic("diag", { starts: "2026-11-11" })] }));
+		const diag = groupOf(groups, "not-started").topics.find((t) => t.topic.handle === "diag")!;
+		assert.deepEqual(diag.fact, { kind: "next", words: "Planned Wed 11 Nov" });
 	});
 
 	it("takes up Home's next step for the course: today's reviews first, in Today's words", () => {

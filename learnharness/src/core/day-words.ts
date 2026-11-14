@@ -8,6 +8,7 @@
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const LONG = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+const SHORT = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
 const at = (day: string) => new Date(`${day}T00:00:00Z`);
 
@@ -16,14 +17,19 @@ export function longDay(day: string): string {
 	return LONG.format(at(day)).replace(",", "");
 }
 
+/** "Thu 12 Nov". */
+export function shortDay(day: string): string {
+	return SHORT.format(at(day)).replace(",", "");
+}
+
 /** A planned day against the study day: "today", "tomorrow, Monday 9
- *  November", "Thursday 12 November, in 4 days", "Sunday 22 November, in 2
- *  weeks". */
+ *  November", "Thursday 12 November, in 4 days", "Sunday 22 November, in 14
+ *  days". Always days, as the app counts every distance. */
 export function plannedDayWords(day: string, today: string): string {
 	const days = Math.round((at(day).getTime() - at(today).getTime()) / 86_400_000);
 	if (days <= 0) return days === 0 ? "today" : `${longDay(day)}, ${-days === 1 ? "yesterday" : `${-days} days ago`}`;
 	if (days === 1) return `tomorrow, ${longDay(day)}`;
-	return `${longDay(day)}, in ${days < 14 ? `${days} days` : `${Math.round(days / 7)} weeks`}`;
+	return `${longDay(day)}, in ${days} days`;
 }
 
 /** The engine's study day, as its clock reads it (`learning/clock.py`):

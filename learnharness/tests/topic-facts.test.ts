@@ -286,6 +286,39 @@ describe("what went wrong", () => {
 	it("is nothing for a topic the engine does not call weak, even after a miss", () => {
 		assert.equal(mistakeOf(TOPICS.span, [missed]), null);
 	});
+
+	it("is nothing once he fixed it on his own, so it never sits under 'Fixed, check again later' as a mistake still open", () => {
+		const gap = "Forgot why det(A - lambda I) = 0 and guessed the reason backwards";
+		const fixed = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true } });
+		assert.deepEqual(headMarks(fixed, (x) => x, TODAY).map((mark) => mark.words), ["Fixed, check again later"]);
+		assert.equal(mistakeOf(fixed, [missed]), null);
+		const helped = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true, repairedWithHelp: true } });
+		assert.equal(mistakeOf(helped, [missed]), gap, "help may have carried the right answer: still a mistake to fix");
+	});
+});
+
+describe("when a topic comes up", () => {
+	const factsOf = (t: CourseMapTopic) => topicFacts({ course: { ...COURSE, map: { ...COURSE.map, topics: [...COURSE.map.topics, t] } }, topic: t, chats: [], read: null });
+
+	it("says why the plan starts a topic not started then, in a course without arcs too", () => {
+		const early = topic("inner-product", { title: "Inner products", starts: "2026-11-15", startsWhy: { kind: "early", waitingOn: [h("rank")], exam: false } });
+		assert.equal(COURSE.map.arcs ?? null, null, "a course without arcs");
+		assert.deepEqual(factsOf(early).startsWhy, { kind: "early", words: "Early, ahead of its place, while earlier topics wait on Rank and the column space" });
+		const after = topic("projection", { title: "Projection", starts: "2026-11-16", startsWhy: { kind: "after", needs: [h("rank")], partners: [] } });
+		assert.equal(factsOf(after).startsWhy?.words, "After Rank and the column space, which it needs");
+	});
+
+	it("says nothing for plain next in a course without arcs, which would only name the course", () => {
+		const next = topic("projection", { starts: "2026-11-16", startsWhy: { kind: "next" } });
+		assert.equal(factsOf(next).startsWhy, null);
+	});
+
+	it("says from when a review moved past the day memory asked for it, and why", () => {
+		const moved = topic("series", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-22", held: { exam: null, since: "2026-11-09" } } });
+		assert.equal(factsOf(moved).waits, "Moved from 9 Nov, earlier days are full");
+		const late = topic("series", { level: "independent", introduced: "2026-09-01", review: { kind: "scheduled", date: "2026-11-13", held: { exam: "Probability", since: "2026-10-02" } } });
+		assert.equal(factsOf(late).waits, "Due since 2 Oct, waits for your Probability exam");
+	});
 });
 
 describe("where to pick the topic back up", () => {

@@ -13,11 +13,12 @@ import { plannedDayWords, studyDay, withDayWords } from "../src/core/day-words.t
 import { RIGHT_WORDS, STANDING_WORDS } from "../components/study-words.ts";
 
 describe("a planned day in words", () => {
-	it("says today, tomorrow, a day this fortnight and a later one, each with its date", () => {
+	it("says today, tomorrow, or any later day with its date and its distance in days, as the app counts it", () => {
 		assert.equal(plannedDayWords("2026-11-08", "2026-11-08"), "today");
 		assert.equal(plannedDayWords("2026-11-09", "2026-11-08"), "tomorrow, Monday 9 November");
 		assert.equal(plannedDayWords("2026-11-12", "2026-11-08"), "Thursday 12 November, in 4 days");
-		assert.equal(plannedDayWords("2026-11-22", "2026-11-08"), "Sunday 22 November, in 2 weeks");
+		assert.equal(plannedDayWords("2026-11-22", "2026-11-08"), "Sunday 22 November, in 14 days");
+		assert.equal(plannedDayWords("2026-12-03", "2026-11-08"), "Thursday 3 December, in 25 days");
 	});
 
 	it("puts words beside every planned day and start the course tools return, from the output's own today", () => {

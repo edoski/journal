@@ -139,6 +139,17 @@ describe("calendar entries", () => {
 		);
 	});
 
+	it("says from when a review moved when the day memory asked for is still ahead, so a day the tutor named never moves in silence", () => {
+		const MOVED = course(
+			"/study/calc",
+			"Calculus",
+			{ topics: [topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } } })] },
+			{ planned: [{ date: "2026-11-11", reviews: ["eigen" as TopicHandle], new: [] }] },
+		);
+		const [review] = calendarEntries({ courses: [MOVED], chats: [], scope: null }).filter((e) => e.kind === "review");
+		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", "Moved from 9 Nov", "Earlier days are full"]);
+	});
+
 	it("gives a review the topic page's action and an open task its opening and topic", () => {
 		const entries = calendarEntries({ courses: [LINALG], chats: [], scope: null });
 		const span = entries.find((e) => e.kind === "review" && e.title === "Span");

@@ -1,20 +1,25 @@
 /**
  * The course brief: what a lesson's agent sees of the learner's course
- * record without asking. A field projection of the engine's `resume`, never
- * a rule: levels, due dates and gaps are the engine's verdicts, copied.
- * Everything else (evidence, whole topics, knowledge) is fetched on demand
- * with the course tools.
+ * record without asking. A field projection of the engine's `resume` and of
+ * every course's `map`, never a rule: levels, due dates, planned days and
+ * gaps are the engine's verdicts, copied. Everything else (evidence, whole
+ * topics, knowledge) is fetched on demand with the course tools.
+ *
+ * The daily plan is every course's together, and the course tools read only
+ * the open course, so the brief carries every course's planned days: a plan
+ * question about any course has its answer here.
  *
  * The brief's key is the part that changes the lesson's opening move: the
  * course's description in his words (the record's `goal`, written in the
- * course page's Context), the study day, the due topics and backlog, the reviews the daily plan puts
- * on later days and the days it starts each new topic, the open tasks (with their steps
- * when none is in focus) and the current path topic. A new brief enters the transcript only when the key changes, so
- * the cached prompt prefix holds between saves; level changes in between
- * reach the agent through the save receipts.
+ * course page's Context), the study day, the due topics and backlog, every
+ * course's daily plan, the open tasks (with their steps when none is in
+ * focus) and the current path topic. A new brief enters the transcript only
+ * when the key changes, so the cached prompt prefix holds between saves;
+ * level changes in between reach the agent through the save receipts.
  */
 
-import { plannedDayWords } from "./day-words.ts";
+import type { CourseMap, CourseMapTopic, StartsWhy, TopicHandle } from "./contracts/course-map.ts";
+import { shortDay } from "./day-words.ts";
 
 export type BriefRole = "teach" | "practice";
 
@@ -30,12 +35,6 @@ function dayWithWeekday(day: string | undefined): string {
 	if (!day) return "?";
 	const weekday = WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()];
 	return weekday ? `${day} (${weekday})` : day;
-}
-
-/** A plan day as the tutor says it: "tomorrow, Monday 9 November",
- *  "Thursday 12 November, in 4 days" (`plannedDayWords`). */
-function planDay(day: string | undefined, today: string | undefined): string {
-	return day && today ? plannedDayWords(day, today) : dayWithWeekday(day);
 }
 
 const daysOverdue = (n: number): string => `${n} ${n === 1 ? "day" : "days"} overdue`;
@@ -138,14 +137,91 @@ function runupLine(plan: unknown, workspace: string): string | null {
 
 const handles = (v: unknown): string[] => list(v).filter((h): h is string => typeof h === "string");
 
-/** `resume.starts`, the daily plan's day for each untaught topic, as one
- *  entry per day: "2026-11-09 (Monday): poisson, geometric". */
-function startsByDay(starts: unknown, today: string | undefined): string[] {
-	const days = new Map<string, string[]>();
-	for (const [topic, day] of Object.entries(obj(starts))) {
-		if (typeof day === "string") days.set(day, [...(days.get(day) ?? []), topic]);
+/** Every course's daily plan, as each course's `map` gives it, and which
+ *  of them is the lesson's own course. */
+export interface CoursePlans {
+	workspace: string;
+	maps: readonly CourseMap[];
+}
+
+/** How overdue a review due today is, or, for one the plan holds later
+ *  (the engine's `held`), the day memory asked for it and the exam whose
+ *  final review came first; without an exam, earlier days are full, which
+ *  the section's heading says once. */
+function reviewNote(review: NonNullable<CourseMapTopic["review"]>): string | null {
+	if (review.kind === "due") return review.overdue > 0 ? daysOverdue(review.overdue) : null;
+	if (!review.held) return null;
+	return `due ${shortDay(review.held.since)}${review.held.exam ? `; waits for your ${review.held.exam} exam` : ""}`;
+}
+
+/** Why the plan starts a new topic then, in the material's terms (`StartsWhy`). */
+function startNote(why: StartsWhy | undefined, title: (handle: TopicHandle) => string): string | null {
+	if (!why) return null;
+	switch (why.kind) {
+		case "next":
+			return why.arc ? "next in its arc" : "next in the course";
+		case "after": {
+			const waited = [...why.needs, ...why.partners];
+			return waited.length > 0 ? `after ${waited.map(title).join(", ")}` : null;
+		}
+		case "early":
+			return [
+				"ahead of its place",
+				why.exam ? "for the exam's pace" : null,
+				why.waitingOn.length > 0 ? `while the topics before it wait on ${why.waitingOn.map(title).join(", ")}` : null,
+			]
+				.filter(Boolean)
+				.join(", ");
 	}
-	return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, topics]) => `${planDay(day, today)}: ${topics.join(", ")}`);
+}
+
+const noted = (title: string, note: string | null) => (note ? `${title} (${note})` : title);
+
+/** One course's plan: its exam and final review, then each planned day's
+ *  reviews and new topics by title. Empty when it plans nothing. */
+function coursePlanLines(map: CourseMap, own: boolean): string[] {
+	const titles = new Map(map.topics.map((t) => [t.handle, t.title]));
+	const title = (handle: TopicHandle) => titles.get(handle) ?? handle;
+	const days = new Map<string, { reviews: string[]; starts: string[] }>();
+	const day = (date: string) => days.get(date) ?? days.set(date, { reviews: [], starts: [] }).get(date)!;
+	for (const t of map.topics) {
+		if (t.excluded) continue;
+		if (t.review) day(t.review.date).reviews.push(noted(t.title, reviewNote(t.review)));
+		if (t.starts) day(t.starts).starts.push(noted(t.title, startNote(t.startsWhy, title)));
+	}
+	const exam = map.exam;
+	if (days.size === 0 && !exam) return [];
+	const head = [`${map.title}${own ? " (this course)" : ""}`];
+	if (exam) {
+		head.push(`exam ${shortDay(exam.date)}`);
+		if (exam.finalReview) {
+			const missed = exam.unreviewed ?? [];
+			head.push(
+				`final review from ${shortDay(exam.finalReview)} to the exam, ${missed.length > 0 ? `no room for ${missed.map(title).join(", ")}` : "with room for every taught topic"}`,
+			);
+		}
+		if (exam.doesNotFit?.length) head.push(`no room before the exam to start ${exam.doesNotFit.map(title).join(", ")}`);
+	}
+	const dayLines = [...days]
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([date, { reviews, starts }]) => {
+			const parts = [reviews.length > 0 ? `review ${reviews.join(", ")}` : null, starts.length > 0 ? `start ${starts.join(", ")}` : null];
+			return `- ${shortDay(date)}: ${parts.filter(Boolean).join("; ")}`;
+		});
+	return [head.join(" · "), ...dayLines];
+}
+
+/** The daily plan of every course, the lesson's own first. Empty when no
+ *  course plans anything. */
+function planLines(plans: CoursePlans | undefined): string[] {
+	if (!plans) return [];
+	const ordered = [...plans.maps].sort((a, b) => Number(b.workspace === plans.workspace) - Number(a.workspace === plans.workspace));
+	const courses = ordered.flatMap((map) => coursePlanLines(map, map.workspace === plans.workspace));
+	if (courses.length === 0) return [];
+	return [
+		'Daily plan of every course, each review on its planned day. "due" beside a review is the day memory asked for it, when the plan holds it later because earlier days are full, or for the exam it names:',
+		...courses,
+	];
 }
 
 /** What the engine's `path_health` lists, in the brief's words: the gaps a
@@ -188,12 +264,12 @@ function arcCheckLines(arcsReady: unknown, arc: string | undefined): string[] | 
  *  Practice also reads the run-up from the engine's `plan` for the course
  *  at `workspace`; its figures move with the day (in the key) and with
  *  saves (in the receipts), as levels do. `arcCheck` is the arc a session
- *  started from Check it checks: the brief then carries that arc's check. */
+ *  started from Check it checks: the brief then carries that arc's check.
+ *  `plan` is every course's daily plan; without it the brief has none. */
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	runup?: { plan: unknown; workspace: string },
-	arcCheck?: string,
+	{ runup, arcCheck, plan }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -224,17 +300,8 @@ export function projectCourseBrief(
 	} else {
 		lines.push("Due today: nothing.");
 	}
-	const later = list(r.due_later).map(obj);
-	if (later.length > 0) {
-		const more = typeof r.due_later_more === "number" && r.due_later_more > 0 ? `, and ${r.due_later_more} more` : "";
-		lines.push(
-			`Due, but planned for later days: ${later.map((d) => `${str(d.topic) ?? "?"} (${planDay(str(d.planned), str(r.today))})`).join(", ")}${more}`,
-		);
-	}
-	const road = startsByDay(r.starts, str(r.today));
-	if (road.length > 0) lines.push(`New topics on the days the daily plan starts them: ${road.join("; ")}`);
-	const misfits = handles(r.does_not_fit);
-	if (misfits.length > 0) lines.push(`No room before the exam to start: ${misfits.join(", ")}`);
+	const planned = planLines(plan);
+	lines.push(...planned);
 	const weak = list(r.weak);
 	if (weak.length > 0) lines.push("Weak:", ...weak.map((w) => weakLine(withDetail(w, detail), role)));
 	lines.push(...taskLines(r));
@@ -250,9 +317,7 @@ export function projectCourseBrief(
 		task ? [task.key ?? null, task.step ?? null] : null,
 		r.due_more ?? null,
 		obj(r.due_oldest).topic ?? null,
-		list(r.due_later).map((d) => [obj(d).topic ?? null, obj(d).planned ?? null]),
-		r.starts ?? null,
-		handles(r.does_not_fit),
+		planned,
 		list(r.tasks)
 			.map((t) => [str(obj(t).key) ?? "", task ? null : (obj(t).step ?? null)])
 			.sort(([a], [b]) => String(a).localeCompare(String(b))),

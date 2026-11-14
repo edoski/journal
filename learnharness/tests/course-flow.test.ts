@@ -349,7 +349,8 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });
 		const linked = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === LINALG);
 		const verbs = linked.map((c) => c.args[2]);
-		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.equal(verbs.filter((v) => v === "map").length, 2, "each brief reads every course's daily plan");
 		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
 		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each practice brief also reads the exam run-up");
 		const save = linked.find((c) => c.args[2] === "save")!;

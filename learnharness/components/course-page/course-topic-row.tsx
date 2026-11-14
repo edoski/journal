@@ -5,7 +5,7 @@ import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { Hint } from "@/components/ui/hint";
-import { FACT_ICON } from "@/components/unit-inbox/fact-icon";
+import { factIcon } from "@/components/unit-inbox/fact-icon";
 import type { CourseTopic } from "@/components/course-page/course-model";
 import type { TopicFact } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  *  accent, as in the sidebar and on Today. `iconOnly` keeps the words for
  *  the hint and a screen reader. */
 function Fact({ fact, iconOnly: compact }: { fact: TopicFact; iconOnly: boolean }) {
-	const Icon = fact.kind === "working" || fact.kind === "studied" ? null : FACT_ICON[fact.kind];
+	const Icon = factIcon(fact);
 	// A fact with no mark (how long ago) keeps its words even on a compact row.
 	const iconOnly = compact && fact.kind !== "studied";
 	const mark = (

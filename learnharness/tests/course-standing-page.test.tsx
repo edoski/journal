@@ -129,9 +129,9 @@ describe("the head's readiness line", () => {
 		assert.equal(doc.querySelectorAll("[data-slot=arc-pill]").length, 0);
 	});
 
-	it("without an exam says so, and while the engine is read says nothing", () => {
+	it("without an exam says what the plan does with its reviews, and while the engine is read says nothing", () => {
 		const plain = course(false, false);
-		assert.equal(render(<ReadyLine course={plain} readiness={null} arcs={null} mode="where" />).querySelector("[data-slot=course-ready]")?.textContent, "No exam day set");
+		assert.match(render(<ReadyLine course={plain} readiness={null} arcs={null} mode="where" />).querySelector("[data-slot=course-ready]")?.textContent ?? "", /^No exam: reviews /);
 		assert.equal(render(<ReadyLine course={course(false)} readiness={undefined} arcs={null} mode="where" />).querySelector("[data-slot=course-ready]")?.textContent, "");
 	});
 });

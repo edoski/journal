@@ -2,18 +2,18 @@
 
 import { CalendarClockIcon, type LucideIcon } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
+import { SLIP_ICON } from "@/components/slip-icons";
 import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import { TUTOR_WRITING } from "@/components/study-words";
 import type { UnitStatus } from "@/components/unit-inbox/units";
 import { cn } from "@/lib/utils";
 
 /** Each fact's 12px icon, Home's reason icons where Home gives the same
- *  reason; a known topic's next review wears a calendar, since the
+ *  reason (a slip wears its own, `SLIP_ICON`); a known topic's next review wears a calendar, since the
  *  calendar's alarm clock means overdue. How long ago has no icon, as on
  *  Home's rows. */
-const ICON: Record<Exclude<UnitStatus["kind"], "working" | "studied" | "none">, LucideIcon> = {
+const ICON: Record<Exclude<UnitStatus["kind"], "working" | "studied" | "none" | "slip">, LucideIcon> = {
 	"your-turn": WHY_ICON.reply,
-	slip: WHY_ICON.missed,
 	review: WHY_ICON.review,
 	task: WHY_ICON.task,
 	returns: CalendarClockIcon,
@@ -51,7 +51,7 @@ export function UnitStatusText({ status }: { status: UnitStatus }) {
 				</span>
 			);
 		default: {
-			const Icon = ICON[status.kind];
+			const Icon = status.kind === "slip" ? SLIP_ICON[status.slip] : ICON[status.kind];
 			const words = status.kind === "your-turn" ? "Your turn" : status.words;
 			return (
 				<span
