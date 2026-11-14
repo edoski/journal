@@ -16,7 +16,7 @@ No line has a button: the first row's blue Open looked ugly and every line alrea
 
 ## Order
 
-Each session to pick up since yesterday (it waits on the learner, the tutor writes in it, or it stopped mid-reply) has its own line, most recent first, and keeps it while the tutor writes, its reason saying so. Then each course's next step, most urgent first (`byUrgency`: in the exam run-up, nearest exam, most recent activity), unless a session shown works on that step (it holds the task, or was started on or worked on every topic of the step); a lesson waiting on another topic never hides a due review. A finished session, a sign-off included, has no line. An older session to pick up stays in the sidebar. Home reads again whenever a turn starts or settles, a record or the session list changes.
+Each session to pick up since yesterday (it waits on the learner, the tutor writes in it, or it stopped mid-reply), and each one left for next time however long ago, has its own line, most recent first, and keeps it while the tutor writes, its reason saying so. Then each course's next step for today, most urgent first (`byUrgency`: in the exam run-up, nearest exam, most recent activity), unless a session shown works on that step. A course with nothing today (nothing to take up, or a next item the plan dates on a later day, `laterOnly`) has no line on Today, in its fold or on the sidebar's top; the course page still names its next item with the plan's day ("Review Cauchy sequences", "Planned Sun 15 Nov"), and Home's tabs still list it (`todayCourses`) (it holds the task, or was started on or worked on every topic of the step); a lesson waiting on another topic never hides a due review. A finished session, a sign-off included, has no line. An older session to pick up stays in the sidebar. Home reads again whenever a turn starts or settles, a record or the session list changes.
 
 A course's line, pressed (`courseMove`): a review opens a session on those topics that is still to pick up, else starts a review of them, titled and opened "Review A and B" and created on those topics; never an older lesson. An open task or the current topic continues the lesson that holds it (`continueMove`), else starts one; a topic not started reads "Start <title>".
 
@@ -37,7 +37,8 @@ What needs the learner now is exactly Today's lines: `needs-you.ts` (`needsYouNo
 
 | Field | Notes |
 |---|---|
-| `rows` | `todayRows(courses, openSessions(chats), today)`: what Today draws |
+| `rows` | `todayRows(courses, openSessions(chats), today)` without the lines that hold nothing today (`laterOnly`): what Today draws |
+| `NowLine.title` | the line's one name, Home's lesson (`lessonTitle`), for every surface that draws the line |
 | `lines`, `also` | `foldLines(rows)`'s shown and folded lines, each a `NowLine` |
 | `NowLine.why` | Home's reason, `whyOf(row)` |
 | `NowLine.topics` | `lineTopics(row)` on the line's course map: a waiting session's topics on its course's map, in map order (none with no course); a course's step topics (a review in the plan's order, at most five; a task's held topics, else the current topic; the topic step's topic; none for "none") |

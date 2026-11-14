@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing, UnreadableCourse } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
-import { openSessions } from "@/components/study-home/study-facts";
+import { openSessions, withLessonHere } from "@/components/study-home/study-facts";
 
 /** The home's data: every course's map with its run-up, the sessions to
  *  pick up, and every session (newest first), which a course's line picks
@@ -25,7 +25,7 @@ async function readHome(): Promise<StudyHomeState> {
 			.catch(() => [] as ChatListItem[]),
 	]);
 	if (!study.available) return { status: "unavailable", reason: study.reason };
-	return { status: "ready", courses: study.courses, failed: study.failed, open: openSessions(chats), chats };
+	return { status: "ready", courses: withLessonHere(study.courses, chats), failed: study.failed, open: openSessions(chats), chats };
 }
 
 /** Reads the home on each visit and again whenever a turn starts or

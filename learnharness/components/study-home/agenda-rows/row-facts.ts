@@ -1,8 +1,8 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { overdueWords, returnWords } from "@/components/study-words";
+import { LESSON_WORDS, overdueWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
-import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
-import { daysBetween, taskWords } from "@/components/unit-inbox/units";
+import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
+import { taskWords } from "@/components/unit-inbox/units";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
@@ -87,15 +87,17 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
 	"your-turn": { kind: "reply", short: "Your turn" },
 	working: { kind: "working", short: "Tutor writing" },
 	paused: { kind: "stopped", short: "Stopped mid-reply" },
+	left: { kind: "task", short: LESSON_WORDS.leftForTonight },
 	finished: null,
 };
 
 /**
  * Why a line is on Today, in words that need no memory of the system: a
- * session waiting on the learner, the tutor writing in it or stopped
- * mid-reply in it, why a review is due (a lapse, or how
- * long it is overdue) or when one dated ahead comes back, when an open task
- * was left, or that the topic is next on the course's map. Engine fields only, never the tutor's prose.
+ * session waiting on the learner, the tutor writing in it, stopped
+ * mid-reply in it or left for next time, why a review is due (a lapse, or how
+ * long it is overdue), when an open task was left, that the topic is
+ * next on the course's map, or the day the plan dates its next item
+ * ("Planned Sun 15 Nov", the course page's line when nothing is today). Engine fields only, never the tutor's prose.
  * Pure.
  */
 export function whyOf(row: TodayRow): Why | null {
@@ -103,26 +105,37 @@ export function whyOf(row: TodayRow): Why | null {
 	const { course, step } = row;
 	switch (step.kind) {
 		case "review": {
-			// A review dated ahead, the course's next with nothing due: when it comes back.
-			if (step.back !== undefined) return { kind: "review", short: returnWords(daysBetween(course.map.today, step.back)) };
+			if (step.on) return { kind: "review", short: `Planned ${planDay(step.on)}` };
 			const handles = new Set<string>(step.topics);
 			return reviewReason(course.map.topics.filter((t) => handles.has(t.handle)));
 		}
 		case "task":
 			return { kind: "task", short: taskWords(step, course.map.today) };
 		case "topic":
-			return { kind: "next", short: step.planned ? "Planned today" : "Next up" };
+			return { kind: "next", short: step.on ? `Planned ${planDay(step.on)}` : step.planned ? "Planned today" : "Next up" };
 		case "none":
 			return null;
 	}
 }
 
-/** How long since the learner last studied a line's course, short enough
- *  for a trailing column: "Today", "Yesterday", "3d ago", "2w ago", "3mo
- *  ago"; null for a course never studied or a line with no course. Pure. */
+/** The line's one clock, short enough for a trailing column: "Today",
+ *  "Yesterday", "3d ago", "2w ago", "3mo ago". A session's line says when
+ *  he last wrote in that session, so one started minutes ago reads Today;
+ *  a course's line says when he last studied the course; an open task's
+ *  line says nothing there, since its reason already dates it ("Left off
+ *  2d ago"), so a row never shows two days at once. Null for a course
+ *  never studied or a line with no course. Pure. */
 export function studiedAgo(row: TodayRow): string | null {
-	const days = row.course?.lastActiveDaysAgo;
-	return days === null || days === undefined ? null : agoWords(days);
+	if (row.kind === "session") {
+		const today = row.course?.map.today;
+		if (!today) return null;
+		const at = new Date(row.chat.updatedAt);
+		const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+		return agoWords(Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000)));
+	}
+	if (row.step.kind === "task") return null;
+	const days = row.course.lastActiveDaysAgo;
+	return days === null ? null : agoWords(days);
 }
 
 /** Some days ago in Home's words: "Today", "Yesterday", "3d ago", "2w

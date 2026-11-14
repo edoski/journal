@@ -1,7 +1,7 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { overdueWords } from "@/components/study-words";
+import { LESSON_WORDS, overdueWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -69,11 +69,12 @@ export function nowItem(facts: TopicFacts): NowItem {
 		case "resume":
 		case "open": {
 			const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
+			const left = entry?.state === "left";
 			return {
 				...base,
-				icon: action.kind === "resume" ? "reply" : "writing",
+				icon: action.kind === "open" ? "writing" : left ? "task" : "reply",
 				words: stoppedOn(entry) ?? action.chat.title,
-				note: action.kind === "resume" ? "Your turn" : "Tutor writing",
+				note: action.kind === "open" ? "Tutor writing" : left ? LESSON_WORDS.leftForTonight : "Your turn",
 				chat: action.chat.id,
 			};
 		}
@@ -99,11 +100,12 @@ export function nowItem(facts: TopicFacts): NowItem {
 }
 
 /** Every place after Now, most pressing first: another session that waits
- *  on him, then one the tutor is writing in, a due review the action does
- *  not already start, then each open task the action does not continue. */
+ *  on him, then one the tutor is writing in, then one left for next time,
+ *  a due review the action does not already start, then each open task
+ *  the action does not continue. */
 export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	const sessions = facts.sessions.filter((entry) => entry.chat.id !== now.chat && entry.state !== "finished");
-	const waiting = [...sessions.filter((entry) => entry.state === "your-turn"), ...sessions.filter((entry) => entry.state === "working")];
+	const waiting = (["your-turn", "working", "left"] as const).flatMap((state) => sessions.filter((entry) => entry.state === state));
 	const review =
 		facts.action.kind !== "review" && facts.topic.review?.kind === "due"
 			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0), press: { opening: `Review ${facts.topic.title}` } }]

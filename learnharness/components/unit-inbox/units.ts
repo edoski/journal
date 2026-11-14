@@ -1,5 +1,5 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { leftOffWords, overdueWords, returnWords, slipWords } from "@/components/study-words";
+import { LESSON_WORDS, leftOffWords, overdueWords, returnWords, slipWords } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
@@ -19,8 +19,8 @@ export interface UnitCourse {
 }
 
 /** What a unit's sessions are doing now: one waits on the learner, the
- *  tutor writes in one, or nothing runs. */
-export type UnitNow = "your-turn" | "working" | null;
+ *  tutor writes in one, one is left for next time, or nothing runs. */
+export type UnitNow = "your-turn" | "working" | "left" | null;
 
 export interface Unit {
 	/** `<workspace>#<handle>`, unique across courses. */
@@ -98,7 +98,8 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
 export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNow {
 	const states = sessions.filter((c) => (c.ownTopics ?? []).includes(handle)).map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
-	return states.includes("working") ? "working" : null;
+	if (states.includes("working")) return "working";
+	return states.includes("left") ? "left" : null;
 }
 
 /** When the unit was last studied in the app, else first taught. */
@@ -151,8 +152,9 @@ export function daysBetween(from: string, to: string): number {
  * The one fact a topic row ends with, the fact that tells it from its
  * neighbours, in Home's words (spec: unit-inbox.md, "Status slot"). By
  * priority:
- *   - a session waits on the learner ("Your turn"), or the tutor writes
- *     in one (Working), as the session state reads them;
+ *   - a session waits on the learner ("Your turn"), the tutor writes in
+ *     one (Working), or one is left for next time, as the session state
+ *     reads them;
  *   - the engine calls the topic weak ("Missed last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
  *   - a solid topic's review is due ("Due today", "3d overdue");
@@ -190,6 +192,7 @@ export function studiedWords(at: string, today: string): string {
 }
 
 export function unitStatus(unit: Unit, today: string): UnitStatus {
+	if (unit.now === "left") return { kind: "task", words: LESSON_WORDS.leftForTonight };
 	if (unit.now) return { kind: unit.now };
 	const { topic } = unit;
 	if (unit.slip) return { kind: "slip", words: unit.slip };

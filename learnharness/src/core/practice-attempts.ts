@@ -54,7 +54,7 @@ export interface PracticeConclusion extends Omit<GradedAnswer, "result"> {
 /** Each charged topic's result, in pose order. With `brokeAt`, a topic
  *  the answer never reached, or reached on the way to the break with no
  *  result of its own, is not charged. */
-function topicResults(topics: readonly string[], answer: GradedAnswer): [string, AttemptResult][] {
+export function topicResults(topics: readonly string[], answer: GradedAnswer): [string, AttemptResult][] {
 	if (answer.brokeAt !== undefined) {
 		return topics.flatMap((topic): [string, AttemptResult][] => {
 			if (topic === answer.brokeAt) return [[topic, answer.byTopic?.[topic] ?? answer.result]];

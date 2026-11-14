@@ -127,11 +127,29 @@ describe("a session he closed for today", () => {
 		return [...record.messages, ...inputAppends(record, { type: "tonight" })];
 	};
 
-	it("reads done while his Done for today is his latest input", () => {
+	it("reads done while his Done for today is his latest input, left for next time while it set work aside", () => {
 		const closed = [...practice(), assistant("a_bye", [{ type: "text", text: "Good work tonight. Next time: the second lemma." }], "stop")];
 		assert.equal(doneTonightAtEnd(closed), true);
-		assert.equal(closedTonight(closed), true, "a practice session closed by him reads closed");
-		assert.equal(sessionEndOf(closed, undefined, "practice"), "closed");
+		assert.equal(closedTonight(closed), true, "a practice session closed by him reads closed for the digest");
+		assert.equal(sessionEndOf(closed, undefined, "practice"), "left", "the problem it dropped waits for next time");
+	});
+
+	it("a check he left open at Done for today waits for next time", () => {
+		const record = { messages: pendingChecks("call_q1") };
+		const closed = [...record.messages, ...inputAppends(record, { type: "tonight" }), assistant("a_bye", [{ type: "text", text: "Next time we start with that check." }], "stop")];
+		assert.equal(sessionEndOf(closed, undefined), "left");
+	});
+
+	it("Done for today with nothing open closes the session", () => {
+		const wrapped: LhMessage[] = [
+			...problemPose(),
+			assistant("a_c", [{ type: "toolCall", id: "call_c1", name: PRACTICE_CONCLUDE_TOOL, arguments: { outcome: "solved", verdict: "Right.", rung: null, missClass: null, retest: false, result: "correct" } }]),
+			ack("call_c1", PRACTICE_CONCLUDE_TOOL),
+			assistant("a_w", [{ type: "text", text: "Solved." }], "stop"),
+		];
+		const record = { messages: wrapped, kind: "practice" as const };
+		const closed = [...wrapped, ...inputAppends(record, { type: "tonight" }), assistant("a_bye", [{ type: "text", text: "Good work." }], "stop")];
+		assert.equal(sessionEndOf(closed, undefined, "practice"), "closed", "a round he opened on no topics is his to end");
 	});
 
 	it("reopens when he writes again", () => {

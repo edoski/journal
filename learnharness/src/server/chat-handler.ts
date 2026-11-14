@@ -13,6 +13,7 @@ import { CLAUDE_MODEL_MISSING, claudeTurnError } from "../agent/claude-stream.ts
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createLessonDigest } from "../agent/subagents/lesson-digest.ts";
 import { onLessonEvents, resumeCutDigests } from "./lesson-finish.ts";
+import { onSessionNaming } from "./session-naming.ts";
 import {
 	deliverJobResult,
 	noteSteersDurable,
@@ -114,6 +115,7 @@ const lessonFinishDeps = {
 
 interface LhLessonFinishGlobal {
 	__lhLessonFinish?: () => void;
+	__lhSessionNaming?: () => void;
 }
 
 // One subscriber per process: Next dev compiles this module once per route
@@ -123,6 +125,8 @@ if (process.env.NODE_ENV !== "test") {
 	const g = globalThis as typeof globalThis & LhLessonFinishGlobal;
 	g.__lhLessonFinish?.();
 	g.__lhLessonFinish = onLessonEvents(lessonFinishDeps);
+	g.__lhSessionNaming?.();
+	g.__lhSessionNaming = onSessionNaming({ chatStore: stores.chatStore, courseRecords: stores.courseRecords });
 }
 
 /** At app start: finish every lesson digest a quit cut short. */

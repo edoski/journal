@@ -75,3 +75,29 @@ describe("a lesson the tutor moved to practice", () => {
 		assert.equal(sessionEndOf(practised([]), undefined), "closed");
 	});
 });
+
+describe("a review left between problems", () => {
+	const solve = (id: string, topics: string[], outcome: "solved" | "solvedWithHints", rest: Record<string, unknown> = {}): LhMessage[] => [
+		assistant([call(`p_${id}`, "problem", { statement: "?", mode: "recall", topics, modelSolution: "!" })]),
+		result(`p_${id}`, "problem", null),
+		assistant([call(`c_${id}`, "conclude", { outcome, verdict: "ok", rung: outcome === "solved" ? null : "R1", missClass: null, retest: false, result: "correct", ...rest })]),
+		result(`c_${id}`, "conclude", null),
+		assistant([text("Good. Press Next problem when you are ready.")], "stop"),
+	];
+	const review = (...parts: LhMessage[][]): LhMessage[] => [newSessionModeMessage("practice") as LhMessage, newUserMessage("Review A, B"), ...parts.flat()];
+	const next = { id: `n${++n}`, role: "custom", customType: "practice-next", content: "[NEXT PROBLEM]", display: true, details: {}, timestamp: n } as unknown as LhMessage;
+
+	it("waits on him at Next problem while a topic it was opened on has no unaided solve", () => {
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved")), undefined, "practice", ["a", "b"]), "mid-lesson");
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved"), solve("2", ["b"], "solvedWithHints")), undefined, "practice", ["a", "b"]), "mid-lesson", "a hinted solve still owes the retest");
+	});
+
+	it("ends once every topic it was opened on was solved without a hint, or the tutor wrapped the round", () => {
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved"), solve("2", ["b"], "solved")), undefined, "practice", ["a", "b"]), "closed");
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solved"), [next, assistant([text("That's the review done for today.")], "stop")]), undefined, "practice", ["a", "b"]), "closed");
+	});
+
+	it("a round opened on no topics is his to end", () => {
+		assert.equal(sessionEndOf(review(solve("1", ["a"], "solvedWithHints")), undefined, "practice"), "closed");
+	});
+});

@@ -28,9 +28,9 @@ function topOf(courses: readonly StudyCourse[], chats = CHATS, scope: string | n
 	return { inbox, needs, top: todayTop(needs, inbox, chats) };
 }
 
-/** Linear Algebra on a quiet day: nothing due, its current topic not
- *  started yet. */
-const QUIET_LA: StudyCourse = { ...LINALG, due: [], map: { ...LINALG.map, current: "diag" as TopicHandle } };
+/** Linear Algebra on a quiet day: nothing due, today's plan starting its
+ *  current topic, not started yet. */
+const QUIET_LA: StudyCourse = { ...LINALG, due: [], newToday: ["diag" as TopicHandle], map: { ...LINALG.map, current: "diag" as TopicHandle } };
 /** A course with nothing to take up: no review, no task, no current topic. */
 const EMPTY: StudyCourse = { map: map({ workspace: "/s/empty", title: "Empty", topics: [topic("a", "A", "assisted")] }), unready: null, due: [], lastActiveDaysAgo: null, newToday: [] };
 
@@ -53,15 +53,15 @@ describe("todayTop", () => {
 		assert.equal(top.length, 1);
 		const item = top[0];
 		assert.ok(item?.kind === "topic");
-		assert.deepEqual([item.unit.key, item.unit.shelf, item.line.slot], ["/s/linalg#diag", "learning", "Next up"]);
+		assert.deepEqual([item.unit.key, item.unit.shelf, item.line.slot], ["/s/linalg#diag", "learning", "Planned today"]);
 		assert.ok(![...inbox.active, ...inbox.known].some((u) => u.key === item.unit.key), "not on the inbox's own list");
 	});
 
-	it("skips a course line with nothing to take up", () => {
+	it("leaves a course with nothing to take up off Today and the top alike", () => {
 		const { needs, top } = topOf([EMPTY, PROB], []);
 		assert.deepEqual(
 			needs.lines.map((l) => l.key),
-			["/s/prob", "/s/empty"],
+			["/s/prob"],
 		);
 		assert.deepEqual(
 			top.map((i) => i.line.key),
@@ -161,6 +161,19 @@ describe("one lesson, one card", () => {
 		const { top } = topOf([LINALG], chats);
 		const shelves = restShelves(inbox, new Set(top.flatMap(claimedKeys)));
 		assert.ok(!shelves.learning.some((u) => u.topic.handle === "eigen"), "the lesson's own topic is not a second row");
+	});
+});
+
+describe("one review, one row", () => {
+	it("a review of two topics is its card alone, while the tutor writes and on his turn: neither topic is a second row", () => {
+		const review = chat("rev", { title: "Review Rank, Linear independence", course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["rank", "independence"], ownTopics: ["rank", "independence"], pendingProblem: true, updatedAt: "2026-11-08T09:30:00.000Z" });
+		for (const chats of [[review], [{ ...review, pendingProblem: false, busy: true }]]) {
+			const { inbox, top } = topOf([LINALG], chats);
+			const drawn = steadyTop(topOf([LINALG], [review]).top, top, inbox, chats);
+			const shelves = restShelves(inbox, new Set(drawn.flatMap(claimedKeys)));
+			const rows = [...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.topic.handle);
+			assert.ok(!rows.includes("rank" as TopicHandle) && !rows.includes("independence" as TopicHandle), `no second row (${chats[0]!.busy ? "writing" : "his turn"})`);
+		}
 	});
 });
 

@@ -14,6 +14,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
 	byUrgency,
+	laterOnly,
 	nextStepOf,
 	stepWords,
 	titleList,
@@ -21,6 +22,7 @@ import {
 	openSessions,
 	todayCourses,
 	courseMove,
+	withLessonHere,
 	type TodayRow,
 } from "../components/study-home/study-facts.ts";
 import { lessonOf, topicSpan } from "../components/study-home/lesson-facts.ts";
@@ -157,9 +159,29 @@ describe("study facts", () => {
 		};
 		const step = nextStepOf(reviewed);
 		assert.equal(stepWords(step), "Start Poisson distribution");
-		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Next up");
+		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Planned Mon 9 Nov", "the plan's day, not Next up");
 		const done: StudyCourse = { ...reviewed, map: { ...reviewed.map, topics: reviewed.map.topics.slice(0, 1) } };
-		assert.deepEqual(nextStepOf(done), { kind: "review", titles: ["Bayes' rule"], topics: ["bayes"], then: null, back: "2026-11-11" }, "nothing left to start: no Continue on a topic he has on his own, but the review the plan dates next");
+		const back = nextStepOf(done);
+		assert.deepEqual([stepWords(back), whyOf({ kind: "course", course: done, step: back })?.short], ["Review Bayes' rule", "Planned Wed 11 Nov"], "no Continue on a topic he has on his own: its dated review is next");
+	});
+
+	it("names the plan's next item with its day when nothing is today: a held review before a later new topic", () => {
+		const analysis: StudyCourse = {
+			...PROB,
+			due: [],
+			map: {
+				...PROB.map,
+				current: "series" as TopicHandle,
+				topics: [
+					topic("cauchy", "Cauchy sequences", "assisted", { review: { kind: "scheduled", date: "2026-11-15", held: true } }),
+					topic("series", "Series", "retained", { review: { kind: "scheduled", date: "2026-12-04" } }),
+					topic("continuity", "Continuity", "new", { starts: "2026-11-22" }),
+				],
+			},
+		};
+		const step = nextStepOf(analysis);
+		assert.deepEqual([stepWords(step), whyOf({ kind: "course", course: analysis, step })?.short], ["Review Cauchy sequences", "Planned Sun 15 Nov"]);
+		assert.equal(laterOnly(step), true, "Home's Today leaves it out");
 	});
 
 	it("a course never studied comes after every course with reviews tonight, even with the nearer exam", () => {
@@ -229,7 +251,9 @@ describe("lessons", () => {
 		assert.deepEqual(review.place, { from: 2, to: 4, of: 5 });
 		const topic = lesson(PROB);
 		assert.deepEqual([topic.title, topic.detail, topic.action, topic.place], ["Continue Bayes' rule", null, "Continue", { from: 2, to: 2, of: 2 }]);
-		assert.equal(lesson({ ...PROB, map: { ...PROB.map, current: null } }).action, "Start");
+		const later = lesson({ ...PROB, map: { ...PROB.map, current: null } });
+		assert.deepEqual([later.title, later.action], ["Review Conditional probability", "Review"], "with no current topic, the plan's next item, the review it dates first");
+		assert.equal(lesson({ ...PROB, map: { ...PROB.map, current: null, topics: [] } }).action, "Start");
 	});
 
 	it("leaves out a Then that only repeats a review", () => {
@@ -282,7 +306,7 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear Algebra2d agoEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue", "Real Analysis11d agoReview Sequences1d overdue"],
+			["Linear AlgebraTodayEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue", "Real Analysis11d agoReview Sequences1d overdue"],
 		);
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 4);
@@ -329,7 +353,7 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
 	});
 
-	it("names the next dated review, and when it comes back, on a course with every topic his own and nothing due (round 3: \"Calculus I · Start a lesson\")", () => {
+	it("names the next dated review, and the day the plan puts it, on a course with every topic his own and nothing due (round 3: \"Calculus I · Start a lesson\")", () => {
 		const done: StudyCourse = {
 			...ANALYSIS,
 			due: [],
@@ -344,7 +368,7 @@ describe("what a line of Today reads", () => {
 		};
 		const row = rowOf(done);
 		assert.equal(lessonTitle(row), "Review Improper integrals");
-		assert.deepEqual(whyOf(row), { kind: "review", short: "Back in 3w" });
+		assert.deepEqual(whyOf(row), { kind: "review", short: "Planned Sun 29 Nov" }, "the plan's day, the same words as every course line with nothing today");
 		const empty = rowOf({ ...done, map: { ...done.map, topics: done.map.topics.map((t) => ({ ...t, review: null })) } });
 		assert.equal(lessonTitle(empty), "Start a lesson", "with no review dated at all, the tutor proposes");
 	});
@@ -352,6 +376,14 @@ describe("what a line of Today reads", () => {
 	it("says how long ago a course was studied in a few characters", () => {
 		const ago = (days: number | null) => studiedAgo(rowOf({ ...LINALG, lastActiveDaysAgo: days }));
 		assert.deepEqual([0, 1, 2, 13, 14, 59, 60, null].map(ago), ["Today", "Yesterday", "2d ago", "13d ago", "2w ago", "8w ago", "2mo ago", null]);
+	});
+
+	it("gives each row one clock: a session its own last turn, an open task none beside its Left off", () => {
+		const started = chat({ id: "new", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, updatedAt: new Date(2026, 10, 8, 9, 30).toISOString() });
+		const [row] = todayRows([{ ...LINALG, lastActiveDaysAgo: 3 }], [started], TODAY);
+		assert.equal(studiedAgo(row!), "Today", "a session started minutes ago never reads 3d ago");
+		const task = rowOf({ ...LINALG, due: [], lastActiveDaysAgo: 0 });
+		assert.deepEqual([studiedAgo(task), whyOf(task)?.short], [null, "Left off 3d ago"], "no Today above Left off 3d ago");
 	});
 
 	it("counts how much of a course he can do on his own, weak topics left out", () => {
@@ -380,7 +412,7 @@ describe("what a line of Today reads", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"Linear Algebra2d agoEigen lessonYour turn",
+			"Linear AlgebraTodayEigen lessonYour turn",
 			"Probability4d agoContinue Bayes' ruleNext up",
 			"Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue",
 			"Real Analysis11d agoReview Sequences1d overdue",
@@ -409,5 +441,18 @@ describe("a course whose record can't be read", () => {
 				"Probability Couldn't read this course's record. The app isn't allowed to open its files.",
 			],
 		);
+	});
+});
+
+describe("You are here during a lesson", () => {
+	const la = { workspace: "/s/linalg", title: "Linear Algebra" };
+	it("sits on the topic of the lesson he is in, not the engine's stale current topic, and goes back once it is finished", () => {
+		const lessonOn = (over: Partial<ChatListItem>) => chat({ id: "l", kind: "teach", course: la, topics: ["eigen"], ownTopics: ["eigen"], messageCount: 4, updatedAt: "2026-11-08T09:00:00.000Z", ...over });
+		const [during] = withLessonHere([LINALG], [lessonOn({ pendingQuestion: true })]);
+		assert.equal(during!.map.current, "eigen");
+		const [after] = withLessonHere([LINALG], [lessonOn({ ended: "closed" })]);
+		assert.equal(after!.map.current, LINALG.map.current, "a finished lesson leaves the engine's topic");
+		const [practice] = withLessonHere([LINALG], [lessonOn({ kind: "practice", pendingProblem: true })]);
+		assert.equal(practice!.map.current, LINALG.map.current, "practice leaves it where it is");
 	});
 });

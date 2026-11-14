@@ -1,0 +1,47 @@
+import type { LhMessage } from "./native-messages.ts";
+
+/**
+ * The course topics a session's first turn looked at, in the order it
+ * looked: the topics it showed from the record (`course_show`), posed a
+ * problem on, or saved an attempt or a note on. When the tutor's first
+ * reply did not name the session (`name_session`), the first of them that
+ * is on the course's map names it instead, so a direct answer is never
+ * listed by his raw message (round 3, 14 Nov 2026). Pure.
+ */
+export function firstTurnTopics(messages: readonly LhMessage[]): string[] {
+	const end = messages.findIndex((m) => m.role === "assistant" && m.stopReason === "stop");
+	const turn = end < 0 ? messages : messages.slice(0, end + 1);
+	const seen: string[] = [];
+	const add = (value: unknown) => {
+		for (const handle of handles(value)) if (!seen.includes(handle)) seen.push(handle);
+	};
+	for (const m of turn) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall") continue;
+			const args = (block.arguments ?? {}) as Record<string, unknown>;
+			if (block.name === "course_show") add(args.handles);
+			else if (block.name === "problem") add(args.topics);
+			else if (block.name === "course_save") {
+				const changes = typeof args.changes === "string" ? parse(args.changes) : args.changes;
+				const observations = (changes as { observations?: unknown } | null)?.observations;
+				for (const o of Array.isArray(observations) ? observations : []) add((o as { topics?: unknown } | null)?.topics);
+			}
+		}
+	}
+	return seen;
+}
+
+/** Handles given as a list, a JSON-encoded list, or one handle. */
+function handles(value: unknown): string[] {
+	const list = typeof value === "string" ? (value.trim().startsWith("[") ? parse(value) : [value]) : value;
+	return Array.isArray(list) ? list.filter((h): h is string => typeof h === "string" && h.length > 0) : [];
+}
+
+function parse(text: string): unknown {
+	try {
+		return JSON.parse(text);
+	} catch {
+		return null;
+	}
+}

@@ -14,6 +14,7 @@ import type { JobStore } from "../core/ports.ts";
 import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type VisualInput } from "./tools/jobs.ts";
 import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
+import { nameSessionTool } from "./tools/name-session.ts";
 import { withPracticeHandoff } from "./tools/handoff.ts";
 import { readTool } from "./tools/read.ts";
 import { lsTool } from "./tools/ls.ts";
@@ -200,6 +201,8 @@ export function createProberTools(ctx: ProberToolContext): Record<string, AgentT
 		pdf: jobs.pdf!,
 		recall: probeExplainTool,
 		...done,
+		// The opening names the session in its first reply (name-session.ts).
+		...nameSessionTool(ctx),
 	}), ctx); // the prober routes the opening: a request to practise hands off
 }
 

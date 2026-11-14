@@ -22,6 +22,8 @@ import { findTool } from "./find.ts";
 import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
 import { teachHandoffTool } from "./handoff.ts";
+import { nameSessionTool } from "./name-session.ts";
+import type { ChatStore } from "../../core/ports.ts";
 import type { SteerMessage } from "../../core/contracts/jobs.ts";
 import { activeProblemOf } from "../../core/native-messages.ts";
 import { boundaryParse } from "../../core/tool-parts.ts";
@@ -38,7 +40,7 @@ import { conclusionProblem, practiceObservations, type PracticeConclusion } from
 /** The record-reading context the gates need (the plan-tools idiom). */
 export interface PracticeToolContext {
 	chatId: string;
-	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null };
+	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null } & Partial<Pick<ChatStore, "nameSession">>;
 	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the research +
 	 *  pdf jobs (both keyless). Absent (tests) = absent from the registry. */
 	jobs?: JobToolContext;
@@ -333,5 +335,7 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
 		...(ctx.deliver ? teachHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }, gate) : {}),
+		// A practice session started on no topic names itself in its first reply (name-session.ts).
+		...(ctx.chatStore.nameSession ? nameSessionTool({ chatId: ctx.chatId, chatStore: ctx.chatStore as Pick<ChatStore, "getChat" | "nameSession"> }) : {}),
 	});
 }

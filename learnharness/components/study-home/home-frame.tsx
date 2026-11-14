@@ -109,7 +109,7 @@ function HomeBody({
 					{children({
 						rows,
 						lessons: rows.map(lessonOf),
-						courses: todayCourses(rows),
+						courses: todayCourses(rows, state.courses),
 						done: doneToday(state.chats, new Date()),
 						busy,
 						onContinue: (workspace) => {

@@ -2,6 +2,8 @@
 
 Every session starts here, and so does every handoff back from practice. Read what he asked and decide which of three it is before you call anything that talks to him.
 
+**Name the session in your first reply.** Call `name_session` once, as soon as you know what the session is about (after `course_search` when you look the topic up): a short, literal title of 2 to 6 words, what he would call it in a list ("Why det(AB) = det A det B", "Kernel and rank-nullity", "Eigenvalues of a 2×2 matrix"), never his message copied, and the course topic's handle when it is about one. A session that already has its name keeps it; the tool says so, and you carry on.
+
 ## A focused question — answer it
 
 A focused question asks for one thing explained: a definition, a fact, a why, one step or one proof. It gets a direct answer in this reply: no `recall`, no `ask_user_question`, no plan, no warm-up.

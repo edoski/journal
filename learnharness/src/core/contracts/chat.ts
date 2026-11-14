@@ -45,6 +45,9 @@ export interface ChatRecord {
 	topics?: readonly string[];
 	/** The learner renamed the session: a plan's goal no longer names it. */
 	renamed?: true;
+	/** The session was named once (`ChatStore.nameSession`), on its first
+	 *  turn or by its first plan: nothing names it again. */
+	named?: true;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
 	/** Append-only usage log (observability, 2026-09): one entry per model
@@ -290,9 +293,10 @@ export interface PlanBlockData {
 	edges: Array<{ from: string; to: string }>;
 }
 
-/** What a lesson is for, as its first plan names it: a short `title`, and
- *  the course `topic` it teaches when it teaches one. It names a session
- *  started on no topic, once (`ChatStore.nameSession`). */
+/** What a session is for, as its first turn (`name_session`) or its first
+ *  plan names it: a short `title`, and the course `topic` it is about when
+ *  it is about one. It names a session started on no topic, once
+ *  (`ChatStore.nameSession`). */
 export interface SessionGoal {
 	title: string;
 	topic?: string;
@@ -301,9 +305,10 @@ export interface SessionGoal {
 /** How the tutor's last turn left a session that waits on no question or
  *  problem it posed: its words asked him something, or its plan waits for
  *  his go-ahead, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
- *  the tutor's ("cut"), or it ended the lesson, a practice round or a
- *  one-off answer ("closed"). */
-export type SessionEnd = "mid-lesson" | "cut" | "closed";
+ *  the tutor's ("cut"), his Done for today stopped it with work still open
+ *  ("left", left for next time), or it ended the lesson, a practice round
+ *  or a one-off answer ("closed"). */
+export type SessionEnd = "mid-lesson" | "cut" | "left" | "closed";
 
 /** The list view's shape (messageCount instead of full messages) + the
  *  per-session status the picker renders. `phase` and `pendingQuestion`

@@ -123,12 +123,15 @@ export interface StepMark {
 }
 
 /** Each step's mark: the step the lesson's newest tagged question was
- *  about, steps earlier questions were about, and the rest. */
+ *  about, steps earlier questions were about, and the rest. "Left off
+ *  here" only while the plan has a step still ahead: on a lesson that went
+ *  through every step it would say he stopped partway. */
 export function stepMarks(plan: SessionPlan, waits: boolean): Map<string, StepMark> {
 	const visited = new Set(plan.visited);
+	const ahead = plan.tree.nodes.some((node) => node.id !== plan.current && !visited.has(node.id));
 	return new Map(
 		plan.tree.nodes.map((node): [string, StepMark] => {
-			if (node.id === plan.current) return [node.id, { status: "current", tag: waits ? null : "Left off here" }];
+			if (node.id === plan.current) return [node.id, { status: "current", tag: waits || !ahead ? null : "Left off here" }];
 			return [node.id, { status: visited.has(node.id) ? "visited" : "upcoming", tag: null }];
 		}),
 	);

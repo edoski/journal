@@ -35,16 +35,17 @@ export function todaysReview(course: StudyCourse): CourseMapTopic[] {
 /** What a course's Continue takes up, in the order the doctrine answers
  *  "Let's continue": today's reviews, then the open task at its step, then
  *  the new topics the engine's daily plan starts today, then the current
- *  topic while it is taught but not yet his own, then the next topic the
- *  plan starts, then, with every topic his own and nothing due, the next
- *  review the plan dates (`back`, its day); a current topic he already has
- *  on his own is done, not next. `topics` are the topics it works on. A
- *  topic step is `fresh` when it was never taught, and `planned` when
- *  today's plan starts it. */
+ *  topic while it is taught but not yet his own and the engine has set no
+ *  review for it, then the plan's next item on a later day (`on`, its
+ *  date): the reviews it dates first, or the new topics it starts first,
+ *  whichever comes sooner. A current topic he already has on his own is
+ *  done, not next. `topics` are the topics it works on. A topic step is
+ *  `fresh` when it was never taught, and `planned` when today's plan
+ *  starts it. */
 export type NextStep =
-	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null; back?: string }
+	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null; on?: string }
 	| { kind: "task"; key: string; title: string; updated: string | null; topics: readonly TopicHandle[] }
-	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; fresh: boolean; planned: boolean }
+	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; fresh: boolean; planned: boolean; on?: string }
 	| { kind: "none" };
 
 export function nextStepOf(course: StudyCourse): NextStep {
@@ -63,19 +64,43 @@ export function nextStepOf(course: StudyCourse): NextStep {
 	if (planned.length > 0) {
 		return { kind: "topic", title: titleList(planned.map((t) => t.title)), topics: planned.map((t) => t.handle), fresh: true, planned: true };
 	}
-	if (current && current.level !== "new" && !SOLID.has(current.level)) {
+	if (current && current.level !== "new" && !SOLID.has(current.level) && !current.review) {
 		return { kind: "topic", title: current.title, topics: [current.handle], fresh: false, planned: false };
 	}
-	const next = map.topics.filter((t) => t.starts !== undefined).sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? (current?.level === "new" ? current : undefined);
-	if (next) return { kind: "topic", title: next.title, topics: [next.handle], fresh: true, planned: false };
-	// Every topic his own and nothing due: the review the plan dates next, so the line names a topic and when.
-	const settled = map.topics.length > 0 && map.topics.every((t) => SOLID.has(t.level));
-	const dated = settled ? map.topics.flatMap((t) => (t.review?.kind === "scheduled" ? [{ topic: t, date: t.review.date }] : [])) : [];
-	const back = dated.map((d) => d.date).sort()[0];
-	if (back === undefined) return { kind: "none" };
-	const ahead = dated.filter((d) => d.date === back).map((d) => d.topic);
-	return { kind: "review", titles: ahead.map((t) => t.title), topics: ahead.map((t) => t.handle), then: null, back };
+	return laterStep(course) ?? (current?.level === "new" ? { kind: "topic", title: current.title, topics: [current.handle], fresh: true, planned: false } : { kind: "none" });
 }
+
+/** The plan's next item after today, or null when it dates none: the
+ *  reviews on its first dated day, or the new topics it starts on it,
+ *  whichever day comes first (reviews first on the same day, as Continue
+ *  takes them). Pure. */
+function laterStep(course: StudyCourse): NextStep | null {
+	const { topics, today } = course.map;
+	const reviewDay = (t: CourseMapTopic) => (t.review?.kind === "scheduled" && t.review.date > today ? t.review.date : null);
+	const startDay = (t: CourseMapTopic) => (t.starts !== undefined && t.starts > today ? t.starts : null);
+	const first = (days: (string | null)[]) => days.filter((d): d is string => d !== null).sort()[0] ?? null;
+	const review = first(topics.map(reviewDay));
+	const start = first(topics.map(startDay));
+	if (review !== null && (start === null || review <= start)) {
+		const due = topics.filter((t) => reviewDay(t) === review);
+		return { kind: "review", titles: due.map((t) => t.title), topics: due.map((t) => t.handle), then: null, on: review };
+	}
+	if (start === null) return null;
+	const fresh = topics.filter((t) => startDay(t) === start);
+	return { kind: "topic", title: titleList(fresh.map((t) => t.title)), topics: fresh.map((t) => t.handle), fresh: true, planned: false, on: start };
+}
+
+/** Whether a course's step holds nothing for today: nothing to take up,
+ *  such as a course never studied, or an item the plan dates on a later
+ *  day. Home's Today and the sidebar's top leave such a line out; the
+ *  course page and the exam panel still name it, with its day. Pure. */
+export function laterOnly(step: NextStep): boolean {
+	return step.kind === "none" || ((step.kind === "review" || step.kind === "topic") && step.on !== undefined);
+}
+
+const PLAN_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+/** A plan day as the app writes it: "Sun 15 Nov". Pure. */
+export const planDay = (date: string) => PLAN_DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
 
 /** The step as a short instruction: "Review Linear independence, Rank",
  *  "Continue Problem sheet 4", "Start Poisson distribution" for a topic not
@@ -143,25 +168,17 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
 	return step.topics.every((h) => topics.has(h));
 }
 
-/** Whether a course's line holds nothing for tonight: a course with
- *  nothing to take up, such as one never studied, a new topic the plan
- *  starts on a later day, or a review it dates ahead. Such a line comes
- *  after every line with work tonight, however near its exam. */
-function laterOnly(step: NextStep): boolean {
-	return step.kind === "none" || (step.kind === "topic" && step.fresh && !step.planned) || (step.kind === "review" && step.back !== undefined);
-}
-
 /**
  * Today's lines: each session to pick up since yesterday (it waits on the
- * learner, the tutor writes in it, or stopped mid-reply), most recent
- * first, then each course's next step, most urgent first and a line with
+ * learner, the tutor writes in it, or stopped mid-reply) and each one left
+ * for next time however long ago, most recent first, then each course's next step, most urgent first and a line with
  * nothing for tonight last (`laterOnly`), unless a session shown already
  * works on it. A session stays on its line while the tutor writes. An older
  * session to pick up stays in the sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
-	const recent = open.filter((c) => c.updatedAt.slice(0, 10) >= since);
+	const recent = open.filter((c) => sessionState(c) === "left" || c.updatedAt.slice(0, 10) >= since);
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
 	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
@@ -176,9 +193,13 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 }
 
 /** The courses of Today's lines, each once, in the lines' order: a course
- *  with a waiting lesson and its review on two lines is one course. Pure. */
-export function todayCourses(rows: readonly TodayRow[]): StudyCourse[] {
-	return [...new Set(rows.flatMap((r) => (r.course ? [r.course] : [])))];
+ *  with a waiting lesson and its review on two lines is one course. Then
+ *  every other course of `all` with nothing today, most urgent first, so
+ *  Home's tabs still reach every map. Pure. */
+export function todayCourses(rows: readonly TodayRow[], all: readonly StudyCourse[] = []): StudyCourse[] {
+	const listed = [...new Set(rows.flatMap((r) => (r.course ? [r.course] : [])))];
+	const workspaces = new Set(listed.map((c) => c.map.workspace));
+	return [...listed, ...byUrgency(all).filter((c) => !workspaces.has(c.map.workspace))];
 }
 
 /** The exam in words while the course is in its run-up, else null. Pure. */
@@ -217,9 +238,32 @@ export function courseMove(course: StudyCourse, chats: readonly ChatListItem[]):
 }
 
 /** The states a session is picked up from: it waits on the learner, the
- *  tutor writes in it, or the tutor stopped mid-reply. */
-const PICK_UP: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused"]);
+ *  tutor writes in it, the tutor stopped mid-reply, or he left it for next
+ *  time. */
+const PICK_UP: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused", "left"]);
 const pickUp = (sessions: readonly ChatListItem[]) => sessions.some((c) => PICK_UP.has(sessionState(c)));
+
+/** The states of a lesson he is in now: it waits on him, the tutor writes
+ *  in it, or the tutor stopped mid-reply. */
+const IN_PROGRESS: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused"]);
+
+/**
+ * Each course with "You are here" (`map.current`) on the lesson he is in:
+ * when the course's newest session is a lesson still in progress and
+ * belongs to a topic on the map, that topic; else the engine's current
+ * topic, which moves only when a lesson's digest runs, so during a lesson
+ * on NFAs the map said he was on a topic he had not started. Practice and
+ * reviews leave it where it is. Pure.
+ */
+export function withLessonHere(courses: readonly StudyCourse[], chats: readonly ChatListItem[]): StudyCourse[] {
+	return courses.map((course) => {
+		const { workspace, topics } = course.map;
+		const newest = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+		if (!newest || newest.kind !== "teach" || !IN_PROGRESS.has(sessionState(newest))) return course;
+		const here = topics.find((t) => (newest.ownTopics ?? []).includes(t.handle));
+		return here && here.handle !== course.map.current ? { ...course, map: { ...course.map, current: here.handle } } : course;
+	});
+}
 
 /** The sessions to pick up, most recent first. Pure. */
 export function openSessions(chats: readonly ChatListItem[]): ChatListItem[] {

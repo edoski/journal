@@ -175,7 +175,7 @@ describe("the prober's registry", () => {
 		// Fix wave (2026-09-20): the owner ruling adds research + pdf dispatch
 		// to the probe phase's registry (demo/visual stay teach-only).
 		assert.deepEqual(Object.keys(tools).sort(), [
-			"ask_user_question", "find", "grep", "ls", "pdf", "practice", "probe_done", "read", "recall", "research",
+			"ask_user_question", "find", "grep", "ls", "name_session", "pdf", "practice", "probe_done", "read", "recall", "research",
 		]);
 	});
 });

@@ -16,12 +16,16 @@ export type NowItem = { kind: "topic"; line: NowLine; unit: Unit } | { kind: "se
  *  row name: the unit's key, or `chat:<id>`. Pure. */
 export const itemKey = (item: NowItem): string => (item.kind === "topic" ? item.unit.key : sessionKey(item.chat.id));
 
-/** The keys an item takes off the shelves: its own, and a session's own
- *  topic (`NowLine.lead`), so a waiting lesson is one card and its topic
- *  no second row. Pure. */
+/** The keys an item takes off the shelves: its own, and every topic a
+ *  session's card stands for (`NowLine.topics`: its own topics and those
+ *  it worked on, on its course's map), so one session is one card, never
+ *  a second row under Working or Learning for a review's other topic or
+ *  the lesson's own. Pure. */
 export function claimedKeys(item: NowItem): string[] {
-	const { row, lead } = item.line;
-	return item.kind === "session" && lead && row.course ? [itemKey(item), unitKey(row.course.map.workspace, lead.handle)] : [itemKey(item)];
+	const { row, topics } = item.line;
+	if (item.kind !== "session" || !row.course) return [itemKey(item)];
+	const { workspace } = row.course.map;
+	return [itemKey(item), ...topics.map((t) => unitKey(workspace, t.handle))];
 }
 
 /**
