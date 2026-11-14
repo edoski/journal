@@ -98,6 +98,10 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 	);
 }
 
+/** An exam in the month grid, the one entry that must stand out among a
+ *  day's reviews: a tinted chip with its title in weight. */
+const EXAM_CHIP = "bg-foreground/10 font-medium hover:bg-foreground/15";
+
 const FACE =
 	"flex w-full min-w-0 rounded-md px-1.5 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=open]:bg-fill-selected motion-reduce:transition-none";
 
@@ -118,7 +122,7 @@ export function CalendarEntryView({
 	onStart: StartSession;
 }) {
 	const look = lookOf(entry);
-	const face = cn(FACE, compact ? "items-start gap-1.5 py-0.75" : "flex-col gap-0.5 py-1");
+	const face = cn(FACE, compact ? "items-start gap-1.5 py-0.75" : "flex-col gap-0.5 py-1", compact && look === "exam" && EXAM_CHIP);
 	if (entry.kind === "session") {
 		return (
 			<Link href={`/chat/${entry.chat.id}`} data-slot="calendar-entry" data-look={look} className={face} onClick={blurAfterPointerClick}>

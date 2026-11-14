@@ -98,6 +98,32 @@ export const LOOKS: Record<EntryLook, { words: string; rank: number }> = {
 	"check-in": { words: "Quiz", rank: 4 },
 };
 
+/** Each look as the thing it is, singular and plural, for More's words. */
+const THINGS: Record<EntryLook, [string, string]> = {
+	exam: ["an exam", "exams"],
+	overdue: ["an overdue review", "overdue reviews"],
+	new: ["a new topic", "new topics"],
+	review: ["a review", "reviews"],
+	task: ["unfinished work", "unfinished work"],
+	lesson: ["a lesson", "lessons"],
+	practice: ["practice", "practice"],
+	plan: ["a lesson", "lessons"],
+	"check-in": ["a lesson", "lessons"],
+};
+
+/** What a day's More hides, by kind and never by number: "Also reviews
+ *  and a new topic". `hidden` are the entries the day grid folds away. */
+export function moreWords(hidden: readonly CalendarEntry[]): string {
+	const counts = new Map<string, [string, string, number]>();
+	for (const entry of hidden) {
+		const [one, many] = THINGS[lookOf(entry)];
+		const seen = counts.get(one);
+		counts.set(one, [one, many, (seen?.[2] ?? 0) + 1]);
+	}
+	const things = [...counts.values()].map(([one, many, n]) => (n > 1 ? many : one));
+	return things.length > 0 ? `Also ${listWords(things)}` : "More";
+}
+
 export function lookOf(entry: CalendarEntry): EntryLook {
 	switch (entry.kind) {
 		case "exam":

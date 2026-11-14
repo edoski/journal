@@ -11,7 +11,7 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
-import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, quietBetween, unreviewedWords, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, unreviewedWords, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -338,6 +338,17 @@ describe("the road to an exam", () => {
 });
 
 describe("the plan's reasons and gaps in the calendar", () => {
+	it("names what More folds away by kind, never by number", () => {
+		const entries = calendarEntries({ courses: [LINALG], chats: [], scope: null });
+		const found = entries.find((e) => e.kind === "review")!;
+		const review = { ...found, overdue: false };
+		assert.equal(moreWords([review, review]), "Also reviews");
+		assert.equal(moreWords([{ ...found, overdue: true }]), "Also an overdue review");
+		const fresh = { ...review, kind: "new" as const, waits: null };
+		assert.equal(moreWords([review, fresh, review]), "Also reviews and a new topic");
+		assert.doesNotMatch(moreWords([review, review, fresh]), /\d/);
+	});
+
 	it("names the topics an exam's final review has no room for, and why a first lesson waits", () => {
 		const COURSE = course(
 			"/study/la",
