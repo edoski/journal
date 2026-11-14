@@ -1,4 +1,4 @@
-import type { TopicHandle, TopicSignals } from "@/src/core";
+import type { TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -74,3 +74,11 @@ export const LESSON_WORDS = {
 	leftForTonight: "Left for next time",
 	unreadableCourse: "Couldn't read this course's record",
 } as const;
+
+/** What stops a course's record being read, after
+ *  `LESSON_WORDS.unreadableCourse`, in a student's words. */
+export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {
+	denied: "The app isn't allowed to open its files.",
+	damaged: "Its file is damaged.",
+	unreadable: "Its file can't be opened.",
+};

@@ -36,4 +36,4 @@ Home's line names the lapsed topic when the line is about another one ("Missed C
 | the tutor's turn ended with no reply (a restart, a stop before any words) | The tutor stopped before replying. Try again |
 | another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. |
 | he stops for the night | Done for tonight; a question he left reads Left for next time |
-| a course's record can't be read | Couldn't read this course's record, then why |
+| a course's record can't be read | Couldn't read this course's record, then why (`UNREADABLE_WORDS`): The app isn't allowed to open its files. / Its file is damaged. / Its file can't be opened. |
