@@ -204,6 +204,14 @@ describe("the dispute input", () => {
 		assert.deepEqual((marker as { details: unknown }).details, { answerId: "q1", observations: ["o4"], said: "It is 2", proposed: "correct" });
 	});
 
+	it("tells the tutor how the card words each grade, so the ruling never contradicts the card (round 5)", () => {
+		const content = String((inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q1", observations: ["o4"], said: "It is my own work" }).at(-1) as { content: string }).content);
+		for (const how of ["withHelp", "countedHelped", "predicted", "gaveUp", "ownWork"] as const) {
+			assert.ok(content.includes(`"${MARK_HOW_WORDS[how]}"`), `the dispute names the card's words for ${how}`);
+		}
+		assert.match(content, /never call it his own work/);
+	});
+
 	it("is refused for an answer with no mark", () => {
 		assert.throws(() => inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q2", observations: ["o5"], said: "x" }), /no marked answer/);
 	});
