@@ -147,10 +147,17 @@ describe("the sections' order", () => {
 		assert.deepEqual(next.map((item) => item.kind === "task" && item.key), ["sheet-5"]);
 	});
 
+	it("dates a topic not started on its planned first lesson, with the courses that come first", () => {
+		const later = factsOf(topic("poisson", { title: "Poisson", level: "new", starts: "2026-11-19", startsAfter: ["Linear Algebra"] }));
+		assert.deepEqual(pickupSections(later).scheduled, { kind: "start", day: "Thu 19 Nov", waits: "After Linear Algebra's new topics" });
+		const line = page(later).querySelector('[data-slot="pickup-scheduled"]')!;
+		assert.match(line.textContent ?? "", /First lesson/);
+	});
+
 	it("dates only a review the engine set ahead, as Scheduled", () => {
 		assert.deepEqual(
 			ROWS.map(([, facts]) => pickupSections(facts).scheduled),
-			[null, null, null, null, null, null, { day: "Fri 13 Nov", waits: null }],
+			[null, null, null, null, null, null, { kind: "review", day: "Fri 13 Nov", waits: null }],
 		);
 	});
 });
@@ -180,11 +187,11 @@ describe("the sections drawn", () => {
 		}
 	});
 
-	it("says why the scheduled review waits when a nearer exam holds it, and only then", () => {
-		const held = factsOf({ ...VECTORS, review: { kind: "scheduled", date: "2026-12-03", held: true } });
-		assert.deepEqual(pickupSections(held).scheduled, { day: "Thu 3 Dec", waits: "Waits for your exams" });
+	it("says why the scheduled review waits when something holds it, and only then", () => {
+		const held = factsOf({ ...VECTORS, review: { kind: "scheduled", date: "2026-12-03", held: { exam: "Probability", since: "2026-10-01" } } });
+		assert.deepEqual(pickupSections(held).scheduled, { kind: "review", day: "Thu 3 Dec", waits: "Due since 1 Oct, waits for your Probability exam" });
 		const line = page(held).querySelector('[data-slot="pickup-scheduled"]')!;
-		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Waits for your exams");
+		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Due since 1 Oct, waits for your Probability exam");
 		assert.equal(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]'), null);
 	});
 

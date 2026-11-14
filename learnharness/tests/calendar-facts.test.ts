@@ -11,7 +11,7 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
-import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, quietBetween, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, quietBetween, unreviewedWords, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -125,16 +125,16 @@ describe("calendar entries", () => {
 		const FREE = course(
 			"/study/calc",
 			"Calculus",
-			{ topics: [topic("limits", { title: "Limits", review: { kind: "scheduled", date: "2026-12-03", held: true } })] },
+			{ topics: [topic("limits", { title: "Limits", review: { kind: "scheduled", date: "2026-12-03", held: { exam: "Probability", since: "2026-10-01" } } })] },
 			{ planned: [{ date: "2026-12-03", reviews: ["limits" as TopicHandle], new: [] }, { date: "2026-12-20", reviews: ["limits" as TopicHandle], new: [] }] },
 		);
 		const reviews = calendarEntries({ courses: [FREE, PROB], chats: [], scope: null }).filter((e) => e.kind === "review");
 		assert.deepEqual(
-			reviews.map((e) => e.kind === "review" && [e.title, e.day, e.waits]),
+			reviews.map((e) => e.kind === "review" && [e.title, e.day, e.since, e.waits]),
 			[
-				["Bayes' rule", "2026-11-09", null],
-				["Limits", "2026-12-03", "Waits for your exams"],
-				["Limits", "2026-12-20", null],
+				["Bayes' rule", "2026-11-09", null, null],
+				["Limits", "2026-12-03", "Due since 1 Oct", "Waits for your Probability exam"],
+				["Limits", "2026-12-20", null, null],
 			],
 		);
 	});
@@ -214,7 +214,7 @@ describe("calendar words", () => {
 	it("says how far a day is from the engine's", () => {
 		assert.deepEqual(
 			["2026-11-08", "2026-11-09", "2026-11-07", "2026-11-19", "2026-11-29", "2026-11-01"].map((d) => distanceWords(d, TODAY)),
-			["Today", "Tomorrow", "Yesterday", "In 11 days", "In 3 weeks", "7 days ago"],
+			["Today", "Tomorrow", "Yesterday", "In 11 days", "In 21 days", "7 days ago"],
 		);
 	});
 });
@@ -334,5 +334,25 @@ describe("the road to an exam", () => {
 		assert.equal(planDays({ exam: null }), 42);
 		assert.equal(planDays({ exam: { date: "2027-02-01", daysLeft: 85 } }), 85);
 		assert.equal(planDays({ exam: { date: "2028-02-01", daysLeft: 450 } }), 366, "never past the engine's limit");
+	});
+});
+
+describe("the plan's reasons and gaps in the calendar", () => {
+	it("names the topics an exam's final review has no room for, and why a first lesson waits", () => {
+		const COURSE = course(
+			"/study/la",
+			"Linear Algebra",
+			{
+				exam: { date: "2026-12-03", daysLeft: 25, unreviewed: ["kernel" as TopicHandle] },
+				topics: [topic("kernel", { title: "Kernel", level: "retained" }), topic("det", { title: "Determinants", level: "new", starts: "2026-11-19", startsAfter: ["Probability"] })],
+			},
+			{ planned: [{ date: "2026-11-19", reviews: [], new: ["det" as TopicHandle] }], finalReview: "2026-11-27" },
+		);
+		const entries = calendarEntries({ courses: [COURSE], chats: [], scope: null });
+		const exam = entries.find((e) => e.kind === "exam");
+		assert.deepEqual(exam?.kind === "exam" && exam.unreviewed, ["Kernel"]);
+		assert.equal(unreviewedWords(["Kernel", "Rank"]), "No room in it for Kernel and Rank");
+		const fresh = entries.find((e) => e.kind === "new");
+		assert.equal(fresh?.kind === "new" && fresh.waits, "After Probability's new topics");
 	});
 });

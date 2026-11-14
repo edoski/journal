@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { courseShareWords, heldWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
+import { courseShareWords, distanceWords, heldWords, moreWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
 
 // The app's one wording for where he stands and why a topic needs him
 // (study-words.ts), which every surface reads.
@@ -83,17 +83,34 @@ describe("counts in plain words", () => {
 });
 
 describe("why a review waits", () => {
-	const held = { kind: "scheduled", date: "2026-12-03", held: true } as const;
-	it("says a course with no exam ahead of the review waits for the exam courses", () => {
-		assert.equal(heldWords(held, null), "Waits for your exams");
-		assert.equal(heldWords(held, "2026-11-19"), "Waits for your exams", "its own exam is past by the review");
+	const late = { kind: "scheduled", date: "2026-12-03", held: { exam: null, since: "2026-10-01" } } as const;
+	const behind = { kind: "scheduled", date: "2026-11-20", held: { exam: "Probability", since: "2026-11-13" } } as const;
+	it("names the course whose final review came first, never its own exam as 'your exams'", () => {
+		assert.equal(heldWords(behind), "Waits for your Probability exam");
 	});
-	it("says a course whose own exam is still ahead waits for a nearer one", () => {
-		assert.equal(heldWords(held, "2026-12-10"), "Waits for a nearer exam");
+	it("says the earlier days are full when no final review took them", () => {
+		assert.equal(heldWords(late), "Earlier days are full");
 	});
 	it("says nothing for a review the plan does not hold back", () => {
-		assert.equal(heldWords({ kind: "scheduled", date: "2026-12-03" }, null), null);
-		assert.equal(heldWords({ kind: "due", date: "2026-11-08", overdue: 0 }, null), null);
-		assert.equal(heldWords(null, null), null);
+		assert.equal(heldWords({ kind: "scheduled", date: "2026-12-03" }), null);
+		assert.equal(heldWords({ kind: "due", date: "2026-11-08", overdue: 0 }), null);
+		assert.equal(heldWords(null), null);
+	});
+	it("says since when a held review was due, so weeks late never reads as 'Back in 4w'", () => {
+		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct");
+		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back in 4w");
+		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back in 12d", "memory's day is still ahead");
+		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
+	});
+	it("says which courses' new topics a first lesson waits behind", () => {
+		assert.equal(startsAfterWords(["Probability"]), "After Probability's new topics");
+		assert.equal(startsAfterWords(["Probability", "Linear Algebra"]), "After Probability's and Linear Algebra's new topics");
+		assert.equal(startsAfterWords(undefined), null);
+	});
+	it("says how far a day is in days, one form for an exam and a review", () => {
+		assert.deepEqual(
+			["2026-11-08", "2026-11-09", "2026-11-07", "2026-11-26", "2026-11-01"].map((d) => distanceWords(d, "2026-11-08")),
+			["Today", "Tomorrow", "Yesterday", "In 18 days", "7 days ago"],
+		);
 	});
 });

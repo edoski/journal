@@ -24,7 +24,7 @@ import {
 	type UnreadableCourse,
 	type UnreadableProblem,
 } from "../core/contracts/course.ts";
-import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
+import { isTopicLevel, type CourseExam, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
 
 export interface EngineCommand {
@@ -183,6 +183,24 @@ function examOf(value: unknown): CourseSummary["exam"] {
 	return typeof date === "string" && typeof daysLeft === "number" ? { date, daysLeft } : null;
 }
 
+/** The map's exam with its run-up; topic handles the map does not list
+ *  are dropped. */
+function mapExamOf(value: unknown, listed: ReadonlySet<string>): CourseExam | null {
+	const exam = examOf(value);
+	const e = record(value);
+	if (!exam || !e) return null;
+	const handles = (v: unknown) => strings(v).filter((h) => listed.has(h)) as TopicHandle[];
+	const finalReview = str(e.final_review);
+	const doesNotFit = handles(e.does_not_fit);
+	const unreviewed = handles(e.unreviewed);
+	return {
+		...exam,
+		...(finalReview ? { finalReview } : {}),
+		...(doesNotFit.length > 0 ? { doesNotFit } : {}),
+		...(unreviewed.length > 0 ? { unreviewed } : {}),
+	};
+}
+
 /** One `due` entry, `{topic, title?, overdue, gap?}`; null when it names no topic. */
 function reviewOf(entry: unknown): DueReview | null {
 	if (typeof entry !== "object" || entry === null) return null;
@@ -229,7 +247,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 		review: reviewDate
 			? typeof e.overdue === "number"
 				? { kind: "due", date: reviewDate, overdue: count(e.overdue) }
-				: { kind: "scheduled", date: reviewDate, ...(e.held === true ? { held: true as const } : {}) }
+				: { kind: "scheduled", date: reviewDate, ...(e.held === true && str(e.due) ? { held: { exam: str(e.held_for), since: str(e.due)! } } : {}) }
 			: null,
 		weak: e.weak === true,
 		...(isRightAnswer(e.right) ? { right: e.right } : {}),
@@ -244,6 +262,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 		tasks: strings(e.tasks),
 		...(str(e.excluded) ? { excluded: str(e.excluded)! } : {}),
 		...(str(e.starts) ? { starts: str(e.starts)! } : {}),
+		...(str(e.starts) && strings(e.starts_after).length > 0 ? { startsAfter: strings(e.starts_after) } : {}),
 		needs: strings(e.needs),
 		contrasts: strings(e.contrasts),
 	};
@@ -283,7 +302,7 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 		title: str(m.title) ?? courseLabel({ workspace, title: null }),
 		today: m.today,
 		revision: count(m.revision),
-		exam: examOf(m.exam),
+		exam: mapExamOf(m.exam, listed),
 		current: current && listed.has(current) ? (current as TopicHandle) : null,
 		focus: str(m.focus),
 		tasks,

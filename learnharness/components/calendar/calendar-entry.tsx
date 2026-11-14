@@ -21,7 +21,7 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
-import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, spanWords, unreviewedWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { MathText } from "@/components/ui/math-text";
 import { overdueWords } from "@/components/study-words";
 import { cn } from "@/lib/utils";
@@ -117,8 +117,8 @@ export function CalendarEntryView({
 	busy?: boolean;
 	onStart: StartSession;
 }) {
-	const face = cn(FACE, compact ? "items-start gap-1.5 py-0.75" : "flex-col gap-0.5 py-1");
 	const look = lookOf(entry);
+	const face = cn(FACE, compact ? "items-start gap-1.5 py-0.75" : "flex-col gap-0.5 py-1");
 	if (entry.kind === "session") {
 		return (
 			<Link href={`/chat/${entry.chat.id}`} data-slot="calendar-entry" data-look={look} className={face} onClick={blurAfterPointerClick}>
@@ -152,9 +152,11 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	} else if (entry.kind === "review") {
 		const date = entry.topic.review?.date ?? entry.day;
 		lines.push(entry.overdue ? `Was due ${longDayWords(date)}` : entry.day === today ? overdueWords(0) : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		if (entry.since) lines.push(entry.since);
 		if (entry.waits) lines.push(entry.waits);
 	} else if (entry.kind === "new") {
 		lines.push(entry.day === today ? "Planned for today" : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		if (entry.waits) lines.push(entry.waits);
 	} else if (entry.task.step) {
 		lines.push(`Left at: ${entry.task.step}`);
 	}
@@ -188,6 +190,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
  *  then the final review. Nothing when the plan gives neither. */
 function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }>; today: string }) {
 	const finalReview = finalReviewWords(entry.finalReview, today);
+	const unreviewed = unreviewedWords(entry.unreviewed);
 	if (entry.road.length === 0 && !finalReview) return null;
 	return (
 		<div data-slot="exam-road" className="flex flex-col gap-1.5 border-t border-border pt-3">
@@ -207,7 +210,14 @@ function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }
 				{finalReview && (
 					<li className="flex gap-2 text-label text-muted-foreground">
 						<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-						{finalReview}
+						<span className="min-w-0">
+							{finalReview}
+							{unreviewed && (
+								<span data-slot="exam-unreviewed" className="block text-foreground">
+									<MathText>{unreviewed}</MathText>
+								</span>
+							)}
+						</span>
 					</li>
 				)}
 			</ol>
