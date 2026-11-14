@@ -35,14 +35,17 @@ export function todaysReview(course: StudyCourse): CourseMapTopic[] {
 /** What a course's Continue takes up, in the order the doctrine answers
  *  "Let's continue": today's reviews, then the open task at its step, then
  *  the new topics the engine's daily plan starts today, then the current
- *  topic while it is taught but not yet his own, then the next topic the
- *  plan starts; a current topic he already has on his own is done, not
- *  next. `topics` are the topics it works on. A topic step is `fresh` when
- *  it was never taught, and `planned` when today's plan starts it. */
+ *  topic while it is taught but not yet his own and the engine has set no
+ *  review for it, then the plan's next item on a later day (`on`, its
+ *  date): the reviews it dates first, or the new topics it starts first,
+ *  whichever comes sooner. A current topic he already has on his own is
+ *  done, not next. `topics` are the topics it works on. A topic step is
+ *  `fresh` when it was never taught, and `planned` when today's plan
+ *  starts it. */
 export type NextStep =
-	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null }
+	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null; on?: string }
 	| { kind: "task"; key: string; title: string; updated: string | null; topics: readonly TopicHandle[] }
-	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; fresh: boolean; planned: boolean }
+	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; fresh: boolean; planned: boolean; on?: string }
 	| { kind: "none" };
 
 export function nextStepOf(course: StudyCourse): NextStep {
@@ -61,12 +64,43 @@ export function nextStepOf(course: StudyCourse): NextStep {
 	if (planned.length > 0) {
 		return { kind: "topic", title: titleList(planned.map((t) => t.title)), topics: planned.map((t) => t.handle), fresh: true, planned: true };
 	}
-	if (current && current.level !== "new" && !SOLID.has(current.level)) {
+	if (current && current.level !== "new" && !SOLID.has(current.level) && !current.review) {
 		return { kind: "topic", title: current.title, topics: [current.handle], fresh: false, planned: false };
 	}
-	const next = map.topics.filter((t) => t.starts !== undefined).sort((a, b) => a.starts!.localeCompare(b.starts!))[0] ?? (current?.level === "new" ? current : undefined);
-	return next ? { kind: "topic", title: next.title, topics: [next.handle], fresh: true, planned: false } : { kind: "none" };
+	return laterStep(course) ?? (current?.level === "new" ? { kind: "topic", title: current.title, topics: [current.handle], fresh: true, planned: false } : { kind: "none" });
 }
+
+/** The plan's next item after today, or null when it dates none: the
+ *  reviews on its first dated day, or the new topics it starts on it,
+ *  whichever day comes first (reviews first on the same day, as Continue
+ *  takes them). Pure. */
+function laterStep(course: StudyCourse): NextStep | null {
+	const { topics, today } = course.map;
+	const reviewDay = (t: CourseMapTopic) => (t.review?.kind === "scheduled" && t.review.date > today ? t.review.date : null);
+	const startDay = (t: CourseMapTopic) => (t.starts !== undefined && t.starts > today ? t.starts : null);
+	const first = (days: (string | null)[]) => days.filter((d): d is string => d !== null).sort()[0] ?? null;
+	const review = first(topics.map(reviewDay));
+	const start = first(topics.map(startDay));
+	if (review !== null && (start === null || review <= start)) {
+		const due = topics.filter((t) => reviewDay(t) === review);
+		return { kind: "review", titles: due.map((t) => t.title), topics: due.map((t) => t.handle), then: null, on: review };
+	}
+	if (start === null) return null;
+	const fresh = topics.filter((t) => startDay(t) === start);
+	return { kind: "topic", title: titleList(fresh.map((t) => t.title)), topics: fresh.map((t) => t.handle), fresh: true, planned: false, on: start };
+}
+
+/** Whether a course's step holds nothing for today: nothing to take up,
+ *  such as a course never studied, or an item the plan dates on a later
+ *  day. Home's Today and the sidebar's top leave such a line out; the
+ *  course page and the exam panel still name it, with its day. Pure. */
+export function laterOnly(step: NextStep): boolean {
+	return step.kind === "none" || ((step.kind === "review" || step.kind === "topic") && step.on !== undefined);
+}
+
+const PLAN_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+/** A plan day as the app writes it: "Sun 15 Nov". Pure. */
+export const planDay = (date: string) => PLAN_DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
 
 /** The step as a short instruction: "Review Linear independence, Rank",
  *  "Continue Problem sheet 4", "Start Poisson distribution" for a topic not
@@ -134,14 +168,6 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
 	return step.topics.every((h) => topics.has(h));
 }
 
-/** Whether a course's line holds nothing for tonight: a course with
- *  nothing to take up, such as one never studied, or a new topic the plan
- *  starts on a later day. Such a line comes after every line with work
- *  tonight, however near its exam. */
-function laterOnly(step: NextStep): boolean {
-	return step.kind === "none" || (step.kind === "topic" && step.fresh && !step.planned);
-}
-
 /**
  * Today's lines: each session to pick up since yesterday (it waits on the
  * learner, the tutor writes in it, or stopped mid-reply) and each one left
@@ -167,9 +193,13 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 }
 
 /** The courses of Today's lines, each once, in the lines' order: a course
- *  with a waiting lesson and its review on two lines is one course. Pure. */
-export function todayCourses(rows: readonly TodayRow[]): StudyCourse[] {
-	return [...new Set(rows.flatMap((r) => (r.course ? [r.course] : [])))];
+ *  with a waiting lesson and its review on two lines is one course. Then
+ *  every other course of `all` with nothing today, most urgent first, so
+ *  Home's tabs still reach every map. Pure. */
+export function todayCourses(rows: readonly TodayRow[], all: readonly StudyCourse[] = []): StudyCourse[] {
+	const listed = [...new Set(rows.flatMap((r) => (r.course ? [r.course] : [])))];
+	const workspaces = new Set(listed.map((c) => c.map.workspace));
+	return [...listed, ...byUrgency(all).filter((c) => !workspaces.has(c.map.workspace))];
 }
 
 /** The exam in words while the course is in its run-up, else null. Pure. */

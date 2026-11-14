@@ -106,7 +106,7 @@ function HomeBody({
 					{children({
 						rows,
 						lessons: rows.map(lessonOf),
-						courses: todayCourses(rows),
+						courses: todayCourses(rows, state.courses),
 						busy,
 						onContinue: (workspace) => {
 							const course = state.courses.find((c) => c.map.workspace === workspace);

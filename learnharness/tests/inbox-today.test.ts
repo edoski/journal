@@ -28,9 +28,9 @@ function topOf(courses: readonly StudyCourse[], chats = CHATS, scope: string | n
 	return { inbox, needs, top: todayTop(needs, inbox, chats) };
 }
 
-/** Linear Algebra on a quiet day: nothing due, its current topic not
- *  started yet. */
-const QUIET_LA: StudyCourse = { ...LINALG, due: [], map: { ...LINALG.map, current: "diag" as TopicHandle } };
+/** Linear Algebra on a quiet day: nothing due, today's plan starting its
+ *  current topic, not started yet. */
+const QUIET_LA: StudyCourse = { ...LINALG, due: [], newToday: ["diag" as TopicHandle], map: { ...LINALG.map, current: "diag" as TopicHandle } };
 /** A course with nothing to take up: no review, no task, no current topic. */
 const EMPTY: StudyCourse = { map: map({ workspace: "/s/empty", title: "Empty", topics: [topic("a", "A", "assisted")] }), unready: null, due: [], lastActiveDaysAgo: null, newToday: [] };
 
@@ -53,15 +53,15 @@ describe("todayTop", () => {
 		assert.equal(top.length, 1);
 		const item = top[0];
 		assert.ok(item?.kind === "topic");
-		assert.deepEqual([item.unit.key, item.unit.shelf, item.line.slot], ["/s/linalg#diag", "learning", "Next up"]);
+		assert.deepEqual([item.unit.key, item.unit.shelf, item.line.slot], ["/s/linalg#diag", "learning", "Planned today"]);
 		assert.ok(![...inbox.active, ...inbox.known].some((u) => u.key === item.unit.key), "not on the inbox's own list");
 	});
 
-	it("skips a course line with nothing to take up", () => {
+	it("leaves a course with nothing to take up off Today and the top alike", () => {
 		const { needs, top } = topOf([EMPTY, PROB], []);
 		assert.deepEqual(
 			needs.lines.map((l) => l.key),
-			["/s/prob", "/s/empty"],
+			["/s/prob"],
 		);
 		assert.deepEqual(
 			top.map((i) => i.line.key),

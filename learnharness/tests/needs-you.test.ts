@@ -44,8 +44,7 @@ describe("needsYouNow", () => {
 			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule"],
 		);
 		const empty: StudyCourse = { ...PROB, due: [], map: { ...PROB.map, current: null, topics: [] } };
-		const [line] = needsYouNow([empty], [], TODAY).lines;
-		assert.deepEqual([line!.topics, line!.lead], [[], null]);
+		assert.deepEqual(needsYouNow([empty], [], TODAY).lines, [], "a course with nothing to take up has no line");
 	});
 
 	it("words the status slot as Today does, a lapse on the lead itself as Missed last time and a task up to its colon", () => {
@@ -131,7 +130,7 @@ describe("lineTopics", () => {
 		assert.deepEqual(lineTopics(todayRows([held], [], TODAY)[0]!), ["independence", "det"]);
 		const unheld: StudyCourse = { ...held, map: { ...held.map, topics: LINALG.map.topics } };
 		assert.deepEqual(lineTopics(todayRows([unheld], [], TODAY)[0]!), ["rank"]);
-		const next: StudyCourse = { ...PROB, due: [], map: { ...PROB.map, topics: PROB.map.topics.map((t) => (t.handle === "bayes" ? { ...t, level: "assisted" as const } : t)) } };
+		const next: StudyCourse = { ...PROB, due: [], map: { ...PROB.map, topics: PROB.map.topics.map((t) => (t.handle === "bayes" ? { ...t, level: "assisted" as const, review: null } : t)) } };
 		assert.deepEqual(lineTopics(todayRows([next], [], TODAY)[0]!), ["bayes"]);
 		const none: StudyCourse = { ...PROB, due: [], map: map({ workspace: "/s/none", title: "None" }) };
 		assert.deepEqual(lineTopics(todayRows([none], [], TODAY)[0]!), []);

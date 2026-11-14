@@ -1,7 +1,7 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
 import { LESSON_WORDS, overdueWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
-import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
+import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
@@ -94,8 +94,9 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  * Why a line is on Today, in words that need no memory of the system: a
  * session waiting on the learner, the tutor writing in it, stopped
  * mid-reply in it or left for next time, why a review is due (a lapse, or how
- * long it is overdue), when an open task was left, or that the topic is
- * next on the course's map. Engine fields only, never the tutor's prose.
+ * long it is overdue), when an open task was left, that the topic is
+ * next on the course's map, or the day the plan dates its next item
+ * ("Planned Sun 15 Nov", the course page's line when nothing is today). Engine fields only, never the tutor's prose.
  * Pure.
  */
 export function whyOf(row: TodayRow): Why | null {
@@ -103,13 +104,14 @@ export function whyOf(row: TodayRow): Why | null {
 	const { course, step } = row;
 	switch (step.kind) {
 		case "review": {
+			if (step.on) return { kind: "review", short: `Planned ${planDay(step.on)}` };
 			const handles = new Set<string>(step.topics);
 			return reviewReason(course.map.topics.filter((t) => handles.has(t.handle)));
 		}
 		case "task":
 			return { kind: "task", short: taskWords(step, course.map.today) };
 		case "topic":
-			return { kind: "next", short: step.planned ? "Planned today" : "Next up" };
+			return { kind: "next", short: step.on ? `Planned ${planDay(step.on)}` : step.planned ? "Planned today" : "Next up" };
 		case "none":
 			return null;
 	}

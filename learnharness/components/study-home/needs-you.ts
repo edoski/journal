@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { foldLines, lineKey, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
-import { openSessions, todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { foldLines, lessonTitle, lineKey, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
+import { laterOnly, openSessions, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { SLIP_WORDS } from "@/components/study-words";
 
 /** One of Today's lines with what the sidebar draws it by: its reason, the
@@ -10,6 +10,11 @@ export interface NowLine {
 	/** `lineKey(row)`. */
 	key: string;
 	row: TodayRow;
+	/** The line's one name, the same wherever it is drawn: Home's lesson
+	 *  (`lessonTitle`: the session's title, "Continue Problem sheet 4",
+	 *  "Review A, B"). The sidebar's card shows it, not its lead topic's
+	 *  title, so one item never has two names. */
+	title: string;
 	/** Home's reason, `whyOf(row)`. */
 	why: Why | null;
 	/** `lineTopics(row)`, resolved on the line's course map, the lead
@@ -88,17 +93,19 @@ function nowLine(row: TodayRow): NowLine {
 	const why = whyOf(row);
 	const lead = leadOf(row, taken, why);
 	const topics = lead ? [lead, ...taken.filter((t) => t !== lead)] : taken;
-	return { key: lineKey(row), row, why, topics, lead, slot: slotWords(why, lead) };
+	return { key: lineKey(row), row, title: lessonTitle(row), why, topics, lead, slot: slotWords(why, lead) };
 }
 
 /**
  * What needs the learner now (spec: today.md, "Needs you now"): Home's
  * Today lines, in Today's order and with Today's reasons, each with the
- * topics it takes up. Home draws `rows`; the sidebar's top draws
- * `lines`, each as the topic it leads with. Pure.
+ * topics it takes up. Only today's work: a course whose next item the
+ * plan dates on a later day, or with nothing to take up, has no line, so
+ * neither Today nor its fold ("Also today") names it. Home draws `rows`;
+ * the sidebar's top draws `lines`, each as the topic it leads with. Pure.
  */
 export function needsYouNow(courses: readonly StudyCourse[], chats: readonly ChatListItem[], today: string): NeedsYou {
-	const rows = todayRows(courses, openSessions(chats), today);
+	const rows = todayRows(courses, openSessions(chats), today).filter((row) => row.kind === "session" || !laterOnly(row.step));
 	const { shown, also } = foldLines(rows);
 	return { rows, lines: shown.map(nowLine), also: also.map(nowLine) };
 }

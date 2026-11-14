@@ -14,6 +14,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
 	byUrgency,
+	laterOnly,
 	nextStepOf,
 	stepWords,
 	titleList,
@@ -174,9 +175,29 @@ describe("study facts", () => {
 		};
 		const step = nextStepOf(reviewed);
 		assert.equal(stepWords(step), "Start Poisson distribution");
-		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Next up");
+		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Planned Mon 9 Nov", "the plan's day, not Next up");
 		const done: StudyCourse = { ...reviewed, map: { ...reviewed.map, topics: reviewed.map.topics.slice(0, 1) } };
-		assert.equal(nextStepOf(done).kind, "none", "nothing left to start: no Continue on a topic he has on his own");
+		const back = nextStepOf(done);
+		assert.deepEqual([stepWords(back), whyOf({ kind: "course", course: done, step: back })?.short], ["Review Bayes' rule", "Planned Wed 11 Nov"], "no Continue on a topic he has on his own: its dated review is next");
+	});
+
+	it("names the plan's next item with its day when nothing is today: a held review before a later new topic", () => {
+		const analysis: StudyCourse = {
+			...PROB,
+			due: [],
+			map: {
+				...PROB.map,
+				current: "series" as TopicHandle,
+				topics: [
+					topic("cauchy", "Cauchy sequences", "assisted", { review: { kind: "scheduled", date: "2026-11-15", held: true } }),
+					topic("series", "Series", "retained", { review: { kind: "scheduled", date: "2026-12-04" } }),
+					topic("continuity", "Continuity", "new", { starts: "2026-11-22" }),
+				],
+			},
+		};
+		const step = nextStepOf(analysis);
+		assert.deepEqual([stepWords(step), whyOf({ kind: "course", course: analysis, step })?.short], ["Review Cauchy sequences", "Planned Sun 15 Nov"]);
+		assert.equal(laterOnly(step), true, "Home's Today leaves it out");
 	});
 
 	it("a course never studied comes after every course with reviews tonight, even with the nearer exam", () => {
@@ -246,7 +267,9 @@ describe("lessons", () => {
 		assert.deepEqual(review.place, { from: 2, to: 4, of: 5 });
 		const topic = lesson(PROB);
 		assert.deepEqual([topic.title, topic.detail, topic.action, topic.place], ["Continue Bayes' rule", null, "Continue", { from: 2, to: 2, of: 2 }]);
-		assert.equal(lesson({ ...PROB, map: { ...PROB.map, current: null } }).action, "Start");
+		const later = lesson({ ...PROB, map: { ...PROB.map, current: null } });
+		assert.deepEqual([later.title, later.action], ["Review Conditional probability", "Review"], "with no current topic, the plan's next item, the review it dates first");
+		assert.equal(lesson({ ...PROB, map: { ...PROB.map, current: null, topics: [] } }).action, "Start");
 	});
 
 	it("leaves out a Then that only repeats a review", () => {
