@@ -10,7 +10,7 @@ import { useEnterSubmits } from "@/components/enter-submits";
 import { stepConfidence } from "@/components/confidence-choice";
 import { usePhotoDraft, sentPhotos } from "@/components/photos";
 import { ComposerIcon, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
-import { carriedForm, formToKept, keepPhotos, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carriedForm, carryWords, formToKept, keepPhotos, keepWords, keptWords, takeCarry } from "@/components/lesson/kept-drafts";
 import {
 	CONFIDENCE_CHOICES,
 	DEFAULT_CONFIDENCE,
@@ -150,8 +150,8 @@ function AnswerComposer({
 
 	// Where the field starts, after mount so the server's page and the first
 	// client render agree: this call's unconfirmed submission, else what he
-	// typed here before a reload, else the work Hint or Done for today
-	// carried from the question before, taken once.
+	// typed here before a reload, else the work Hint, a side question or
+	// Done for today left on this same question, taken once.
 	// Saving starts the render after the restore, so the empty first
 	// render never overwrites the box it is about to read.
 	const [restored, setRestored] = useState(false);
@@ -159,16 +159,14 @@ function AnswerComposer({
 		if (!initialDraft) {
 			const kept = keptWords(box);
 			const keptText = kept?.form ? kept.form.text || kept.form.other || kept.form.thinking : kept?.text;
-			const carry = !keptText && !problem && carryScope ? keptWords(carryScope) : undefined;
-			const carried = carry ? carriedForm(carry, true)?.text : undefined;
+			const carry = !keptText && spec && carryScope ? takeCarry(carryScope, spec.data.question) : undefined;
+			const carried = carry ? carriedForm(carry.words, true) : undefined;
 			if (keptText) setText(keptText);
-			else if (carried) setText(carried);
-			if (carry && carryScope) {
-				keepWords(carryScope, null);
-				void takeKeptPhotos(carryScope).then((list) => {
-					if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
-				});
-			}
+			else if (carried) setText(carried.text);
+			if (carried) setConfidence(carried.confidence);
+			void carry?.photos.then((list) => {
+				if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
+			});
 		}
 		setRestored(true);
 		// Once, when the field mounts for this question or problem.
@@ -234,10 +232,7 @@ function AnswerComposer({
 	// as a new question, and his work waits in the carry to fill it.
 	const hint = () => {
 		if (compacting || !spec || spec.kind !== "explain") return;
-		if (carryScope) {
-			keepWords(carryScope, { form: keptForm(text, selection) });
-			void keepPhotos(carryScope, photos.photos.map((p) => p.photo));
-		}
+		if (carryScope) carryWords(carryScope, spec.data.question, { form: keptForm(text, selection) }, photos.photos.map((p) => p.photo));
 		forgetBox();
 		onSubmitAnswer(proseHintRequest(spec, text));
 	};

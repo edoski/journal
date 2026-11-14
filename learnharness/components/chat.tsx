@@ -85,7 +85,7 @@ import { showsWorking } from "@/components/lesson/working-sign";
 import { strandedDraft } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carryBox, forgetClosedBoxes, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -482,7 +482,6 @@ export function Chat({
 	const proseAnswer = useProseAnswer({
 		openKey: proseOpenKey(proseOpen),
 		box: proseBox(chatId, proseOpen),
-		carry: course ? `carry:${course.workspace}` : undefined,
 		draft: pending ? questionDraft(pending.key)?.form : undefined,
 		replying: status === "submitted" || status === "streaming" || turnInFlight,
 		askDraft: () => textRef.current,
@@ -760,12 +759,7 @@ export function Chat({
 		if (busy || compacting || doneTonight) return;
 		// His half-typed answer waits for the same question next time
 		// (kept-drafts.ts); the answer itself stays hidden.
-		if (pending && carryScope) {
-			const box = `${chatId}:q:${pending.key}`;
-			const kept = keptWords(box);
-			if (kept) keepWords(carryScope, kept);
-			void keptPhotos(box).then((photos) => { if (photos.length) void keepPhotos(carryScope, photos); });
-		}
+		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, (pending.input as { question?: string } | null)?.question ?? "");
 		void send({ type: "tonight" });
 	}, [busy, compacting, doneTonight, send, pending, carryScope, chatId]);
 	const sendTonightRef = useRef(sendTonight);

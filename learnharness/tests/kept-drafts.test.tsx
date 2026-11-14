@@ -24,7 +24,7 @@ Object.defineProperty(globalThis, "localStorage", { value: storage, configurable
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
-const { carriedForm, forgetClosedBoxes, formToKept, keepWords, keptWords, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
+const { carriedForm, carryWords, forgetClosedBoxes, formToKept, keepWords, keptWords, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
 const { ProseComposer } = await import("../components/lesson/prose/prose-composer.tsx");
 const { StickToBottom } = await import("use-stick-to-bottom");
 const { emptyDockSelection } = await import("../src/core/index.ts");
@@ -110,8 +110,9 @@ describe("carriedForm", () => {
 const noop = () => {};
 const check = { question: "Why?", correctAnswer: "hidden", type: "check" };
 
-/** The Prose composer answering the check `key`, kept in box `c1:q:<key>`. */
-async function mount(key: string, carryScope?: string) {
+/** The Prose composer answering the question `key` (the check "Why?" unless
+ *  told otherwise), kept in box `c1:q:<key>`. */
+async function mount(key: string, carryScope?: string, input: unknown = check, tool = "explain") {
 	const host = document.createElement("div");
 	document.body.append(host);
 	const root = createRoot(host);
@@ -119,7 +120,7 @@ async function mount(key: string, carryScope?: string) {
 	await act(async () => root.render(
 		<StickToBottom>
 			<ProseComposer
-				open={{ kind: "question", key, tool: "explain", toolCallId: "q2", input: check }}
+				open={{ kind: "question", key, tool, toolCallId: "q2", input }}
 				answer={answer}
 				message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
 				messageText={{ read: () => "", write: noop }}
@@ -142,7 +143,7 @@ async function mount(key: string, carryScope?: string) {
 }
 
 test("a check asked again after Hint opens with the work he had typed, and takes it once", async () => {
-	keepWords("carry:la", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "Av = λv gives (A − λI)v = 0", confidence: "neutral" }) });
+	carryWords("carry:la", "Why?", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "Av = λv gives (A − λI)v = 0", confidence: "neutral" }) }, []);
 	const { field, done } = await mount("new", "carry:la");
 	try {
 		assert.equal(field().value, "Av = λv gives (A − λI)v = 0");
@@ -160,5 +161,27 @@ test("after a reload a check opens with what he typed in it", async () => {
 		assert.equal(field().value, "the trace check");
 	} finally {
 		await done();
+	}
+});
+
+test("a carried answer waits for its own question: another question opens empty and leaves it waiting", async () => {
+	// Round 6 (daily loop N5): the Done-for-today draft filled the next,
+	// unrelated Yes/No question, and Enter would have sent it as its note.
+	const typed = formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "(3,2) = 1·(2,3) + 1·(1,−1)", confidence: "neutral" });
+	carryWords("carry:la", "Why?", { form: typed }, []);
+	const choice = { question: "Pick up the stack question first?", options: [{ label: "Yes" }, { label: "Not now" }] };
+	const other = await mount("yes-no", "carry:la", choice, "ask_user_question");
+	try {
+		assert.equal(other.field().value, "", "another question never inherits it");
+		assert.equal(keptWords("carry:la")?.form?.text, typed.text, "it still waits for its question");
+	} finally {
+		await other.done();
+	}
+	const same = await mount("again", "carry:la", { ...check, question: "  Why?\n" });
+	try {
+		assert.equal(same.field().value, typed.text, "the same question asked again opens with it");
+		assert.equal(keptWords("carry:la"), undefined, "taken once");
+	} finally {
+		await same.done();
 	}
 });

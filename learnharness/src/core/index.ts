@@ -44,6 +44,7 @@ export * from "./answer-presentation.ts";
 export * from "./answer-marks.ts";
 export { closedTonight, doneTonightAtEnd } from "./session-end.ts";
 export { replyCutOf, replyNeverCame } from "./turn-cut.ts";
+export { sameQuestionKey } from "./shown-help.ts";
 export * from "./prices.ts";
 export * from "./context-usage.ts";
 export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";

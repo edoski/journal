@@ -8,11 +8,11 @@
  * A box's scope names it: `new` (the New lesson box), `<chat>:composer`,
  * `<chat>:q:<question key>`, `<chat>:p:<problem call id>`, `<chat>:opening`
  * (photos going with a new lesson's first message), and
- * `carry:<course workspace>` (what the next question in that course opens
- * with, after Hint re-asks a check or Done for today leaves one).
+ * `carry:<course workspace>` (his words for one question, waiting for that
+ * question to be asked again after Hint, a side question or Done for today).
  */
 
-import type { Confidence, Photo, QuestionFormDraft } from "@/src/core";
+import { sameQuestionKey, type Confidence, type Photo, type QuestionFormDraft } from "@/src/core";
 
 const PREFIX = "lh.kept.";
 
@@ -30,6 +30,9 @@ export interface KeptForm {
 export interface KeptWords {
 	text?: string;
 	form?: KeptForm;
+	/** A carry's question, its words as `sameQuestionKey` reads them: only
+	 *  that question asked again takes the carry. */
+	question?: string;
 }
 
 function storage(): Storage | null {
@@ -195,6 +198,45 @@ export function keptToForm(kept: KeptForm): QuestionFormDraft {
 		text: kept.text,
 		confidence: kept.confidence,
 	};
+}
+
+/* ── The carry (round 6, 14 Nov 2026) ───────────────────────────────────
+ * His words for one question wait in the course's carry until the tutor
+ * asks that question again, word for word (the tutor asks a question he
+ * left unanswered "as it was"), in this lesson or the next. Another
+ * question never takes them: the Done-for-today draft once filled the next,
+ * unrelated Yes/No question, where Enter would have sent it as its note.
+ * A newer carry replaces an older one. */
+
+function keepCarry(carryScope: string, question: string, words: KeptWords | undefined): void {
+	keepWords(carryScope, words && holdsWork(words) ? { ...words, question: sameQuestionKey(question) } : null);
+}
+
+/** Leaves his words and photos for the question asked again. */
+export function carryWords(carryScope: string, question: string, words: KeptWords | undefined, photos: readonly Photo[]): void {
+	keepCarry(carryScope, question, words);
+	void keepPhotos(carryScope, photos);
+}
+
+/** Leaves what an open question's box holds for that question asked again:
+ *  its words at once, its photos read before the closed box forgets them. */
+export function carryBox(box: string, carryScope: string, question: string): void {
+	keepCarry(carryScope, question, keptWords(box));
+	void keptPhotos(box).then((photos) => keepPhotos(carryScope, photos));
+}
+
+/** The carry, when it waits for this question. */
+export function carriedFor(carryScope: string, question: string): KeptWords | undefined {
+	const carry = keptWords(carryScope);
+	return carry?.question === sameQuestionKey(question) ? carry : undefined;
+}
+
+/** Takes the carry for this question: its words now, its photos after. */
+export function takeCarry(carryScope: string, question: string): { words: KeptWords; photos: Promise<Photo[]> } | undefined {
+	const words = carriedFor(carryScope, question);
+	if (!words) return undefined;
+	keepWords(carryScope, null);
+	return { words, photos: takeKeptPhotos(carryScope) };
 }
 
 /** The carried work as the next question's draft: a typed answer goes in
