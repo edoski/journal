@@ -117,12 +117,24 @@ export function whyOf(row: TodayRow): Why | null {
 	}
 }
 
-/** How long since the learner last studied a line's course, short enough
- *  for a trailing column: "Today", "Yesterday", "3d ago", "2w ago", "3mo
- *  ago"; null for a course never studied or a line with no course. Pure. */
+/** The line's one clock, short enough for a trailing column: "Today",
+ *  "Yesterday", "3d ago", "2w ago", "3mo ago". A session's line says when
+ *  he last wrote in that session, so one started minutes ago reads Today;
+ *  a course's line says when he last studied the course; an open task's
+ *  line says nothing there, since its reason already dates it ("Left off
+ *  2d ago"), so a row never shows two days at once. Null for a course
+ *  never studied or a line with no course. Pure. */
 export function studiedAgo(row: TodayRow): string | null {
-	const days = row.course?.lastActiveDaysAgo;
-	return days === null || days === undefined ? null : agoWords(days);
+	if (row.kind === "session") {
+		const today = row.course?.map.today;
+		if (!today) return null;
+		const at = new Date(row.chat.updatedAt);
+		const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+		return agoWords(Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000)));
+	}
+	if (row.step.kind === "task") return null;
+	const days = row.course.lastActiveDaysAgo;
+	return days === null ? null : agoWords(days);
 }
 
 /** Some days ago in Home's words: "Today", "Yesterday", "3d ago", "2w

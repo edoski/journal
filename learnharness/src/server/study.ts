@@ -71,8 +71,29 @@ export async function readCourses(
 	};
 }
 
+/** The learner's own calendar day of a moment, YYYY-MM-DD: the engine's
+ *  study day is the local date, so a session's day is too. */
+function localDay(iso: string): string {
+	const at = new Date(iso);
+	return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+}
+
+/** A course's last study counting its sessions too: the engine's
+ *  `last_studied` moves only with an attempt or a topic taught, so a
+ *  session started minutes ago read "3d ago". `sessions` are the days of
+ *  the course's sessions he wrote in. Pure. */
+export function withSessionStudy(course: StudyCourse, sessions: readonly string[]): StudyCourse {
+	const { today } = course.map;
+	const days = sessions.map((day) => Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000)));
+	const newest = days.length > 0 ? Math.min(...days) : null;
+	if (newest === null) return course;
+	return { ...course, lastActiveDaysAgo: course.lastActiveDaysAgo === null ? newest : Math.min(course.lastActiveDaysAgo, newest) };
+}
+
 export async function studyStatus(): Promise<StudyListing> {
 	const listing = await readCourses();
 	if (!listing.available) return listing;
-	return { available: true, courses: listing.read.map((c) => studyCourseOf(c.map, c.plan)), failed: listing.failed };
+	const chats = stores.chatStore.listChats().filter((c) => c.course && c.messageCount > 0);
+	const daysOf = (workspace: string) => chats.filter((c) => c.course!.workspace === workspace).map((c) => localDay(c.updatedAt));
+	return { available: true, courses: listing.read.map((c) => withSessionStudy(studyCourseOf(c.map, c.plan), daysOf(c.map.workspace))), failed: listing.failed };
 }

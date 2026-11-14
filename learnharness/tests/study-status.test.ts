@@ -64,3 +64,14 @@ describe("the study read", () => {
 		]);
 	});
 });
+
+describe("a course's last study counts its sessions", async () => {
+	const { withSessionStudy } = await import("../src/server/study.ts");
+	it("a session he wrote in today makes the course studied today, an older one never moves it back", async () => {
+		const course = { map: { today: "2026-11-08" }, lastActiveDaysAgo: 3 } as unknown as import("../src/core/contracts/study.ts").StudyCourse;
+		assert.equal(withSessionStudy(course, ["2026-11-08"]).lastActiveDaysAgo, 0);
+		assert.equal(withSessionStudy(course, ["2026-11-01"]).lastActiveDaysAgo, 3);
+		assert.equal(withSessionStudy({ ...course, lastActiveDaysAgo: null }, ["2026-11-07"]).lastActiveDaysAgo, 1);
+		assert.equal(withSessionStudy(course, []).lastActiveDaysAgo, 3);
+	});
+});

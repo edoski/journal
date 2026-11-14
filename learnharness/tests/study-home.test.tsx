@@ -322,7 +322,7 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear Algebra2d agoEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue", "Real Analysis11d agoReview Sequences1d overdue"],
+			["Linear AlgebraTodayEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue", "Real Analysis11d agoReview Sequences1d overdue"],
 		);
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 4);
@@ -367,6 +367,14 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual([0, 1, 2, 13, 14, 59, 60, null].map(ago), ["Today", "Yesterday", "2d ago", "13d ago", "2w ago", "8w ago", "2mo ago", null]);
 	});
 
+	it("gives each row one clock: a session its own last turn, an open task none beside its Left off", () => {
+		const started = chat({ id: "new", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, updatedAt: new Date(2026, 10, 8, 9, 30).toISOString() });
+		const [row] = todayRows([{ ...LINALG, lastActiveDaysAgo: 3 }], [started], TODAY);
+		assert.equal(studiedAgo(row!), "Today", "a session started minutes ago never reads 3d ago");
+		const task = rowOf({ ...LINALG, due: [], lastActiveDaysAgo: 0 });
+		assert.deepEqual([studiedAgo(task), whyOf(task)?.short], [null, "Left off 3d ago"], "no Today above Left off 3d ago");
+	});
+
 	it("counts how much of a course he can do on his own, weak topics left out", () => {
 		assert.deepEqual(courseProgress(LINALG), { solid: 2, of: 5 });
 		assert.deepEqual(courseProgress(PROB), { solid: 1, of: 2 });
@@ -393,7 +401,7 @@ describe("what a line of Today reads", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"Linear Algebra2d agoEigen lessonYour turn",
+			"Linear AlgebraTodayEigen lessonYour turn",
 			"Probability4d agoContinue Bayes' ruleNext up",
 			"Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue",
 			"Real Analysis11d agoReview Sequences1d overdue",

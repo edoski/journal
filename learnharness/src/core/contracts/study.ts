@@ -18,9 +18,10 @@ export interface StudyCourse {
 	/** Today's review as the engine planned it (`plan`'s `due`, in its
 	 *  order); null when the plan could not be read. */
 	due: readonly TopicHandle[] | null;
-	/** Days since the record last shows study (the engine's `last_studied`:
-	 *  an observation or a topic taught); null when it shows none, even
-	 *  when the course was saved. */
+	/** Days since he last studied the course: the engine's `last_studied`
+	 *  (an observation or a topic taught) or a session in the course he
+	 *  wrote in, whichever is later; null when neither shows any, even when
+	 *  the course was saved. */
 	lastActiveDaysAgo: number | null;
 	/** The new topics the engine's daily plan starts today, in its order;
 	 *  empty when today starts none or the plan could not be read. */
