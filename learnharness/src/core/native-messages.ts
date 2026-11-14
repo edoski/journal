@@ -588,7 +588,13 @@ export interface DisputeDetails {
 	observations: string[];
 	said?: string;
 	proposed?: MarkResult;
+	/** How he thinks it should count: as his own work, or with help. */
+	proposedHow?: DisputedHow;
 }
+
+/** How a disputed answer should count, as his answer card says it. */
+export type DisputedHow = "ownWork" | "withHelp";
+export const DISPUTED_HOWS: readonly DisputedHow[] = ["ownWork", "withHelp"];
 
 /** His dispute, as its own message to the tutor: the content names the
  *  answer and its attempts, so the agent re-judges them as the course

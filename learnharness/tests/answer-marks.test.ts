@@ -214,6 +214,14 @@ describe("the dispute input", () => {
 		assert.doesNotMatch(content, /Counted as helped/);
 	});
 
+	it("disputes how it counted as well as the mark (round 6 N9)", () => {
+		assert.deepEqual(parseChatInput({ type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "ownWork" }), { type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "ownWork" });
+		assert.throws(() => parseChatInput({ type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "mine" }), ChatInputError);
+		const marker = inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "ownWork" }).at(-1) as { content: string; details: unknown };
+		assert.match(marker.content, /How he thinks it should count: on his own \("On your own": help "none"\)/);
+		assert.deepEqual(marker.details, { answerId: "q1", observations: ["o4"], proposedHow: "ownWork" });
+	});
+
 	it("is refused for an answer with no mark", () => {
 		assert.throws(() => inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q2", observations: ["o5"], said: "x" }), /no marked answer/);
 	});
