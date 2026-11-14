@@ -878,6 +878,32 @@ def test_a_course_that_takes_no_questions_has_no_check(workspace: Workspace) -> 
     )
 
 
+def test_a_re_mark_stays_an_item_of_the_check(workspace: Workspace) -> None:
+    formed(workspace)
+    records.save(
+        workspace,
+        {
+            "observations": [
+                attempt("riemann", result="incorrect", checkpoint="integrals")
+            ]
+        },
+    )
+    records.save(
+        workspace,
+        {
+            "observations": [
+                attempt(
+                    "riemann",
+                    corrects=["o1"],
+                    disputed="It was right",
+                    ruling="The sum is right",
+                )
+            ]
+        },
+    )
+    assert records.load(workspace)["observations"]["o2"]["checkpoint"] == "integrals"
+
+
 # --- migration ------------------------------------------------------------------
 
 

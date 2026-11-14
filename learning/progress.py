@@ -508,7 +508,8 @@ def _stamp_due(record: dict[str, Any], changes: PatchResult) -> None:
     """Record on each new answer which of its topics the engine had due when it
     was saved; a tutor's pin keeps its own rule (``replay``).
 
-    A correction keeps what it corrects had, since it takes that answer's day.
+    A correction keeps what it corrects had, since it takes that answer's day,
+    and stays the item of the arc check its target was (``checkpoint``).
     """
     observations = record["observations"] = dict(record["observations"])
     for key in changes.observations:
@@ -527,7 +528,17 @@ def _stamp_due(record: dict[str, Any], changes: PatchResult) -> None:
         }
         stamped = [topic for topic in item["topics"] if topic in due | inherited]
         if stamped:
-            observations[key] = {**item, "due_topics": stamped}
+            item = observations[key] = {**item, "due_topics": stamped}
+        checkpoint = next(
+            (
+                observations[target]["checkpoint"]
+                for target in item.get("corrects", ())
+                if "checkpoint" in observations.get(target, {})
+            ),
+            None,
+        )
+        if checkpoint is not None and "checkpoint" not in item:
+            observations[key] = {**item, "checkpoint": checkpoint}
 
 
 def _after_exam(key: str, replayed: Replay, exam: Exam | None) -> str | None:

@@ -326,10 +326,20 @@ def test_a_re_mark_days_later_keeps_the_tags_the_engine_stamped_on_the_attempt()
     None
 ):
     course = started(att("correct"))
-    course.attempts(5, att("incorrect", text="the review"))
+    arc = {"title": "Arc", "question": "Why?", "purpose": "To know."}
+    course.save(
+        2,
+        {
+            "arcs": {"first": arc, "second": {**arc, "title": "Second arc"}},
+            "topics": {"a": {"arc": "first"}, "b": {"arc": "second"}},
+            "path": {"arcs": ["first", "second"]},
+        },
+    )
+    course.attempts(5, att("incorrect", text="the review", checkpoint="first"))
     assert course.record["observations"]["o2"]["due_topics"] == ["a"]
     course.attempts(9, dispute("correct", "o2", text="the review"))
     assert course.record["observations"]["o3"]["due_topics"] == ["a"]
+    assert course.record["observations"]["o3"]["checkpoint"] == "first"
     assert progress.replays(course.record)["a"].days[on(5).isoformat()] == "probe"
 
 
