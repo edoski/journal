@@ -70,8 +70,8 @@ describe("the cheat sheet groups them in plain words", () => {
 		]);
 	});
 
-	it("files every action somewhere", () => {
-		const shown = sections.flatMap((s) => s.actions.map((a) => a.id));
+	it("files every action somewhere, in the lesson whose keys it is", () => {
+		const shown = new Set(["current", "prose", "slot"].flatMap((lesson) => cheatSheetSections(lesson).flatMap((s) => s.actions.map((a) => a.id))));
 		assert.deepEqual([...shown].sort(), KEYBOARD_ACTIONS.map((a) => a.id).sort());
 	});
 });

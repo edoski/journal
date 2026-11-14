@@ -53,7 +53,9 @@ export type KeyAction =
 	| "dispute-mark"
 	| "dialog-confirm"
 	| "try-again"
-	| "attach-photo";
+	| "attach-photo"
+	| "question-pick-digit"
+	| "question-ask-instead";
 
 /** Where Settings and the cheat sheet group an action (display only —
  *  dispatch is global; a seam that isn't mounted simply no-ops). */
@@ -82,6 +84,9 @@ export interface KeyActionDef {
 	displayOnly?: boolean;
 	/** The Proposed cheat sheet's finer heading inside the scope. */
 	group?: KeyGroup;
+	/** The lessons whose keys these are (the Lesson switch's values); the
+	 *  cheat sheet lists the action only while one of them is drawn. */
+	lessons?: readonly string[];
 }
 
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
@@ -117,10 +122,14 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// The question dock's row machine (wave B) — displayOnly: the dock owns
 	// the keys while a question is open; the registry never dispatches
 	// them, so bare arrows stay free everywhere else.
-	{ id: "question-focus", label: "Move between the choices and your thinking", scope: "question", binding: "tab", displayOnly: true },
-	{ id: "question-next-row", label: "Next choice", scope: "question", binding: "arrowdown", displayOnly: true },
-	{ id: "question-prev-row", label: "Previous choice", scope: "question", binding: "arrowup", displayOnly: true },
-	{ id: "question-pick-row", label: "Choose", scope: "question", binding: "space", displayOnly: true },
+	{ id: "question-focus", label: "Move between the choices and your thinking", scope: "question", binding: "tab", displayOnly: true, lessons: ["current", "slot"] },
+	{ id: "question-next-row", label: "Next choice", scope: "question", binding: "arrowdown", displayOnly: true, lessons: ["current", "slot"] },
+	{ id: "question-prev-row", label: "Previous choice", scope: "question", binding: "arrowup", displayOnly: true, lessons: ["current", "slot"] },
+	{ id: "question-pick-row", label: "Choose", scope: "question", binding: "space", displayOnly: true, lessons: ["current", "slot"] },
+	// The Prose lesson's question (components/lesson/prose/prose.md): its
+	// choices are rows in the tutor's message, and the composer answers.
+	{ id: "question-pick-digit", label: "Pick a choice by its number", scope: "question", binding: "1–9", displayOnly: true, lessons: ["prose"] },
+	{ id: "question-ask-instead", label: "Ask the tutor instead of answering, and back", scope: "question", binding: "escape", displayOnly: true, lessons: ["prose"] },
 	{ id: "question-submit", label: "Send your answer", scope: "question", binding: "enter", displayOnly: true },
 	// Keyboard reach (13 Nov 2026): the page's own arrows (spatial-arrows.ts)
 	// walk its rows and links, and Enter opens them natively.
