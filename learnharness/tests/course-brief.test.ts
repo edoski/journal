@@ -312,15 +312,38 @@ const LINEAR_ALGEBRA = courseMap(
 	],
 );
 const TODAY = { today: "2026-11-08", due: [{ topic: "binomial", overdue: 2, level: "assisted" }] };
-const plan = (maps: CourseMap[]) => ({ plan: { workspace: "/study/probability", maps } });
+type PlannedDay = import("../src/core/contracts/calendar.ts").PlannedDay;
+const day = (date: string, reviews: string[], starts: string[] = []): PlannedDay => ({ date, reviews: reviews as TopicHandle[], new: starts as TopicHandle[] });
+// The engine's `plan` days for each course, as the calendar reads them:
+// every review of every topic, the reviews of topics not taught yet inside
+// the final review included.
+const DAYS: Record<string, PlannedDay[]> = {
+	"/study/probability": [
+		day("2026-11-08", ["binomial", "random-variables"]),
+		day("2026-11-09", [], ["poisson"]),
+		day("2026-11-13", [], ["expectation"]),
+		day("2026-11-14", ["total-probability", "poisson", "expectation"], ["variance"]),
+		day("2026-11-15", ["binomial"]),
+		day("2026-11-16", ["variance", "bayes"]),
+	],
+	"/study/calculus": [day("2026-11-11", ["chain-rule"]), day("2026-11-19", ["monotonicity"]), day("2026-12-03", ["chain-rule"])],
+	"/study/linalg": [day("2026-11-12", ["kernel"]), day("2026-11-15", [], ["change-basis"]), day("2026-11-17", [], ["inner-product"])],
+};
+const plan = (maps: CourseMap[], unread: string[] = []) => ({ plan: { workspace: "/study/probability", courses: maps.map((map) => ({ map, days: DAYS[map.workspace] ?? [] })), unread } });
 
 describe("the daily plan of every course", () => {
 	it("names each course's planned days, its own course first, so a plan question about any course has an answer", () => {
 		const { text } = projectCourseBrief(TODAY, "teach", plan([CALCULUS, LINEAR_ALGEBRA, PROBABILITY]));
 		const section = text.slice(text.indexOf("Daily plan"));
-		assert.match(section, /^Daily plan of every course[^\n]*"due"[^\n]*earlier days are full/, "the heading says once why a review without an exam waits");
+		assert.match(section, /^Daily plan of every course, as the calendar shows it[^\n]*every review of every topic/, "the heading says the plan is whole");
 		assert.ok(section.indexOf("Probability (this course)") < section.indexOf("Calculus I"), "the open course comes first");
-		assert.match(section, /\nCalculus I\n- Wed 11 Nov: review Chain rule \(due Fri 6 Nov\)\n- Thu 19 Nov: review Monotonicity \(due Fri 2 Oct; waits for your Probability exam\)\n/);
+		assert.match(section, /\nCalculus I\nOverdue: 2 reviews: Monotonicity \(37 days, planned Thu 19 Nov\), Chain rule \(2 days, planned Wed 11 Nov\)\n- Wed 11 Nov: review Chain rule \(due since Fri 6 Nov, earlier days are full\)\n- Thu 19 Nov: review Monotonicity \(due since Fri 2 Oct, waits for your Probability exam\)\n- Thu 3 Dec: review Chain rule\n/);
+	});
+
+	it("gives a topic every review the plan holds, those of topics not taught yet inside the final review included", () => {
+		const { text } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY]));
+		assert.match(text, /\n- Sat 14 Nov: review Law of total probability \(due since Sat 7 Nov, earlier days are full\), Poisson distribution, Expectation and linearity; start Variance \(after Expectation and linearity\)\n/);
+		assert.match(text, /\n- Sun 15 Nov: review Binomial distribution\n- Mon 16 Nov: review Variance, Bayes' rule\n/, "a topic's later review and a new topic's first one have their days");
 	});
 
 	it("gives the final review's days and what it has no room for, and what cannot start before the exam", () => {
@@ -331,10 +354,32 @@ describe("the daily plan of every course", () => {
 
 	it("lists each day's reviews and new topics by title, with why each new topic starts then", () => {
 		const { text } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY, LINEAR_ALGEBRA]));
-		assert.match(text, /\n- Sun 8 Nov: review Random variables and distributions, Binomial distribution \(2 days overdue\)\n- Mon 9 Nov: start Poisson distribution \(next in the course\)\n/);
-		assert.match(text, /\n- Sat 14 Nov: review Law of total probability \(due Sat 7 Nov\); start Variance \(after Expectation and linearity\)\n/);
+		assert.match(text, /\n- Sun 8 Nov: review Binomial distribution \(2 days overdue\), Random variables and distributions\n- Mon 9 Nov: start Poisson distribution \(next in the course\)\n/);
 		assert.match(text, /\n- Tue 17 Nov: start Inner products \(ahead of its place, while the topics before it wait on Change of basis\)/);
 		assert.doesNotMatch(text, /Covariance/, "a topic left out of the course has no day");
+	});
+
+	it("counts each course's overdue reviews for him, so the tutor never counts them itself", () => {
+		const late = courseMap("/study/linalg", "Linear Algebra", null, [
+			topic("matmul", "Matrix multiplication", { review: { kind: "due", date: "2026-11-08", overdue: 12 } }),
+			topic("rank", "Rank", { review: scheduled("2026-11-21", { exam: null, since: "2026-11-06" }) }),
+			topic("eigen", "Eigenvalues", { review: scheduled("2026-11-26", { exam: "Probability", since: "2026-10-28" }) }),
+			topic("basis", "Basis", { review: scheduled("2026-11-09", { exam: null, since: "2026-11-09" }) }),
+			topic("span", "Span", { review: { kind: "due", date: "2026-11-08", overdue: 0 } }),
+		]);
+		const days = { "/study/linalg": [day("2026-11-08", ["matmul", "span"]), day("2026-11-09", ["basis"]), day("2026-11-21", ["rank"]), day("2026-11-26", ["eigen"])] };
+		const { text } = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/probability", courses: [{ map: late, days: days["/study/linalg"] }], unread: [] } });
+		assert.match(text, /\nLinear Algebra\nOverdue: 3 reviews: Matrix multiplication \(12 days, planned today\), Eigenvalues \(11 days, planned Thu 26 Nov\), Rank \(2 days, planned Sat 21 Nov\)\n/);
+		assert.match(text, /- Sat 21 Nov: review Rank \(due since Fri 6 Nov, earlier days are full\)/);
+		assert.match(text, /- Mon 9 Nov: review Basis \(moved from Mon 9 Nov, earlier days are full\)/, "a review held from today or later is not overdue");
+		const calm = projectCourseBrief(TODAY, "teach", plan([LINEAR_ALGEBRA])).text;
+		assert.match(calm, /\nLinear Algebra · [^\n]*\nOverdue: none\n/);
+		assert.match(projectCourseBrief(TODAY, "teach", plan([PROBABILITY])).text, /\nOverdue: 2 reviews: Binomial distribution \(2 days, planned today\), Law of total probability \(1 day, planned Sat 14 Nov\)\n/);
+	});
+
+	it("names a course it could not read, so part of the plan never stands for all of it", () => {
+		const { text } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY], ["Real Analysis"]));
+		assert.match(text, /\nNot in this plan, its record could not be read: Real Analysis\n/);
 	});
 
 	it("re-sends the brief when another course's plan moves, not when only a level changes", () => {
@@ -363,13 +408,19 @@ describe("the brief fetch reads every course's plan", () => {
 
 	it("maps every listed course beside the open one", async () => {
 		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
-		process.env.FAKE_ENGINE_PLAN = JSON.stringify({ today: "2026-11-08", courses: [{ workspace: "/study/calculus", title: "Calculus I" }, { workspace: "/study/probability", title: "Probability" }] });
+		process.env.FAKE_ENGINE_PLAN = JSON.stringify({
+			today: "2026-11-08",
+			courses: [
+				{ workspace: "/study/calculus", title: "Calculus I", plan: { days: [{ date: "2026-11-19", reviews: ["monotonicity"], new: [] }] } },
+				{ workspace: "/study/probability", title: "Probability" },
+			],
+		});
 		process.env.FAKE_ENGINE_MAP = JSON.stringify(MAP);
 		const log = path.join(TMP, "plan-log.jsonl");
 		process.env.FAKE_ENGINE_LOG = log;
 		try {
 			const brief = await fetchCourseBrief(linked("/study/probability"));
-			assert.match(brief!.text, /- Thu 19 Nov: review Monotonicity \(due Fri 2 Oct; waits for your Probability exam\)/);
+			assert.match(brief!.text, /- Thu 19 Nov: review Monotonicity \(due since Fri 2 Oct, waits for your Probability exam\)/);
 			const mapped = fs.readFileSync(log, "utf-8").trim().split("\n").map((l) => JSON.parse(l).args as string[]).filter((a) => a.includes("map")).map((a) => a[1]);
 			assert.deepEqual(mapped.sort(), ["/study/calculus", "/study/probability"]);
 		} finally {

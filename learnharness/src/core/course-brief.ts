@@ -1,13 +1,15 @@
 /**
  * The course brief: what a lesson's agent sees of the learner's course
- * record without asking. A field projection of the engine's `resume` and of
- * every course's `map`, never a rule: levels, due dates, planned days and
- * gaps are the engine's verdicts, copied. Everything else (evidence, whole
+ * record without asking. A field projection of the engine's `resume`, and
+ * of every course's `map` and `plan` days, never a rule: levels, due dates,
+ * planned days and gaps are the engine's verdicts, copied; the one sum it
+ * makes is each course's overdue reviews, so the tutor never counts them. Everything else (evidence, whole
  * topics, knowledge) is fetched on demand with the course tools.
  *
  * The daily plan is every course's together, and the course tools read only
- * the open course, so the brief carries every course's planned days: a plan
- * question about any course has its answer here.
+ * the open course, so the brief carries every course's planned days, every
+ * review of every topic as the calendar shows them: a plan question about
+ * any course has its answer here.
  *
  * The brief's key is the part that changes the lesson's opening move: the
  * course's description in his words (the record's `goal`, written in the
@@ -18,6 +20,7 @@
  * level changes in between reach the agent through the save receipts.
  */
 
+import type { PlannedDay } from "./contracts/calendar.ts";
 import type { CourseMap, CourseMapTopic, StartsWhy, TopicHandle } from "./contracts/course-map.ts";
 import { shortDay } from "./day-words.ts";
 
@@ -137,21 +140,38 @@ function runupLine(plan: unknown, workspace: string): string | null {
 
 const handles = (v: unknown): string[] => list(v).filter((h): h is string => typeof h === "string");
 
-/** Every course's daily plan, as each course's `map` gives it, and which
- *  of them is the lesson's own course. */
+/** Every course's daily plan: each course's map (titles, exam, each
+ *  topic's next review and why it starts when it does) beside the engine's
+ *  `plan` days, which hold every review of every topic as the calendar
+ *  shows them. `unread` names the courses whose record could not be read,
+ *  so part of the plan never stands for all of it. */
 export interface CoursePlans {
 	workspace: string;
-	maps: readonly CourseMap[];
+	courses: ReadonlyArray<{ map: CourseMap; days: readonly PlannedDay[] }>;
+	unread: readonly string[];
 }
 
-/** How overdue a review due today is, or, for one the plan holds later
- *  (the engine's `held`), the day memory asked for it and the exam whose
- *  final review came first; without an exam, earlier days are full, which
- *  the section's heading says once. */
-function reviewNote(review: NonNullable<CourseMapTopic["review"]>): string | null {
+const daysBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+
+/** How late a topic's next review is, from its map: memory's day passed
+ *  and the plan puts it today (`due`) or later (`held` since a past day).
+ *  Null when it is not overdue. */
+function overdueDays(review: CourseMapTopic["review"], today: string): number | null {
+	if (!review) return null;
+	if (review.kind === "due") return review.overdue > 0 ? review.overdue : null;
+	return review.held && review.held.since < today ? daysBetween(review.held.since, today) : null;
+}
+
+/** Beside a topic's next review: how overdue one due today is, or, for
+ *  one the plan holds later (the engine's `held`), memory's day, "due
+ *  since" once it passed and "moved from" while ahead, the words every
+ *  view shows, and what held it: the exam whose final review came first,
+ *  or full days. */
+function reviewNote(review: NonNullable<CourseMapTopic["review"]>, today: string): string | null {
 	if (review.kind === "due") return review.overdue > 0 ? daysOverdue(review.overdue) : null;
 	if (!review.held) return null;
-	return `due ${shortDay(review.held.since)}${review.held.exam ? `; waits for your ${review.held.exam} exam` : ""}`;
+	const since = `${review.held.since < today ? "due since" : "moved from"} ${shortDay(review.held.since)}`;
+	return `${since}, ${review.held.exam ? `waits for your ${review.held.exam} exam` : "earlier days are full"}`;
 }
 
 /** Why the plan starts a new topic then, in the material's terms (`StartsWhy`). */
@@ -177,20 +197,39 @@ function startNote(why: StartsWhy | undefined, title: (handle: TopicHandle) => s
 
 const noted = (title: string, note: string | null) => (note ? `${title} (${note})` : title);
 
-/** One course's plan: its exam and final review, then each planned day's
- *  reviews and new topics by title. Empty when it plans nothing. */
-function coursePlanLines(map: CourseMap, own: boolean): string[] {
-	const titles = new Map(map.topics.map((t) => [t.handle, t.title]));
-	const title = (handle: TopicHandle) => titles.get(handle) ?? handle;
-	const days = new Map<string, { reviews: string[]; starts: string[] }>();
-	const day = (date: string) => days.get(date) ?? days.set(date, { reviews: [], starts: [] }).get(date)!;
-	for (const t of map.topics) {
-		if (t.excluded) continue;
-		if (t.review) day(t.review.date).reviews.push(noted(t.title, reviewNote(t.review)));
-		if (t.starts) day(t.starts).starts.push(noted(t.title, startNote(t.startsWhy, title)));
-	}
+/** The course's overdue reviews, counted and named, most overdue first,
+ *  each with the day the plan now puts it. */
+function overdueLine(map: CourseMap): string {
+	const late = map.topics
+		.flatMap((t) => {
+			const days = t.excluded ? null : overdueDays(t.review, map.today);
+			return days === null || !t.review ? [] : [{ t, days, date: t.review.date }];
+		})
+		.sort((a, b) => b.days - a.days || a.t.title.localeCompare(b.t.title));
+	if (late.length === 0) return "Overdue: none";
+	const each = late.map(({ t, days, date }) => `${t.title} (${days} ${days === 1 ? "day" : "days"}, planned ${date === map.today ? "today" : shortDay(date)})`);
+	return `Overdue: ${late.length} ${late.length === 1 ? "review" : "reviews"}: ${each.join(", ")}`;
+}
+
+/** One course's plan: its exam and final review, its overdue reviews,
+ *  then each planned day's reviews and new topics by title, every review
+ *  of every topic. Empty when it plans nothing. */
+function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boolean): string[] {
+	const byHandle = new Map(map.topics.map((t) => [t.handle, t]));
+	const title = (handle: TopicHandle) => byHandle.get(handle)?.title ?? handle;
+	const shown = (handle: TopicHandle) => byHandle.has(handle) && !byHandle.get(handle)!.excluded;
+	const dayLines = days.flatMap((d) => {
+		const reviews = d.reviews.filter(shown).map((h) => {
+			const review = byHandle.get(h)!.review;
+			return noted(title(h), review && review.date === d.date ? reviewNote(review, map.today) : null);
+		});
+		const starts = d.new.filter(shown).map((h) => noted(title(h), startNote(byHandle.get(h)!.startsWhy, title)));
+		if (reviews.length + starts.length === 0) return [];
+		const parts = [reviews.length > 0 ? `review ${reviews.join(", ")}` : null, starts.length > 0 ? `start ${starts.join(", ")}` : null];
+		return [`- ${shortDay(d.date)}: ${parts.filter(Boolean).join("; ")}`];
+	});
 	const exam = map.exam;
-	if (days.size === 0 && !exam) return [];
+	if (dayLines.length === 0 && !exam) return [];
 	const head = [`${map.title}${own ? " (this course)" : ""}`];
 	if (exam) {
 		head.push(`exam ${shortDay(exam.date)}`);
@@ -202,25 +241,21 @@ function coursePlanLines(map: CourseMap, own: boolean): string[] {
 		}
 		if (exam.doesNotFit?.length) head.push(`no room before the exam to start ${exam.doesNotFit.map(title).join(", ")}`);
 	}
-	const dayLines = [...days]
-		.sort(([a], [b]) => a.localeCompare(b))
-		.map(([date, { reviews, starts }]) => {
-			const parts = [reviews.length > 0 ? `review ${reviews.join(", ")}` : null, starts.length > 0 ? `start ${starts.join(", ")}` : null];
-			return `- ${shortDay(date)}: ${parts.filter(Boolean).join("; ")}`;
-		});
-	return [head.join(" · "), ...dayLines];
+	return [head.join(" · "), overdueLine(map), ...dayLines];
 }
 
 /** The daily plan of every course, the lesson's own first. Empty when no
  *  course plans anything. */
 function planLines(plans: CoursePlans | undefined): string[] {
 	if (!plans) return [];
-	const ordered = [...plans.maps].sort((a, b) => Number(b.workspace === plans.workspace) - Number(a.workspace === plans.workspace));
-	const courses = ordered.flatMap((map) => coursePlanLines(map, map.workspace === plans.workspace));
+	const own = (workspace: string) => workspace === plans.workspace;
+	const ordered = [...plans.courses].sort((a, b) => Number(own(b.map.workspace)) - Number(own(a.map.workspace)));
+	const courses = ordered.flatMap(({ map, days }) => coursePlanLines(map, days, own(map.workspace)));
 	if (courses.length === 0) return [];
 	return [
-		'Daily plan of every course, each review on its planned day. "due" beside a review is the day memory asked for it, when the plan holds it later because earlier days are full, or for the exam it names:',
+		"Daily plan of every course, as the calendar shows it: each day's reviews and new topics, every review of every topic. A day you tell him is one of these, unless a save this turn gave the topic a newer one:",
 		...courses,
+		...(plans.unread.length > 0 ? [`Not in this plan, its record could not be read: ${plans.unread.join(", ")}`] : []),
 	];
 }
 
