@@ -294,7 +294,10 @@ describe("engine doctrine", () => {
 	it("one meaning of excluded: no exam session examines it", () => {
 		const recipe = normalize(courseMapDoctrine(ARCS));
 		assert.ok(recipe.includes("`excluded` is only for what no exam session of the course examines"));
-		assert.ok(normalize(arcSections().get("Changing arcs")!).includes("`excluded` is only for what no exam session of the course ever examines"));
+		const course = fs.readFileSync(path.join(PATHS.tutorReferences, "course.md"), "utf8").split(/\r?\n(?=## )/);
+		const examFacts = course.find((chunk) => chunk.startsWith("## Exam facts"))!;
+		assert.ok(normalize(examFacts).includes("`excluded` is for what no exam session of the course ever examines"), "one text, in every course");
+		assert.match(normalize(arcSections().get("Changing arcs")!), /the same in every course/);
 		assert.doesNotMatch(recipe, /What the exam leaves out stays out of the path/);
 	});
 
