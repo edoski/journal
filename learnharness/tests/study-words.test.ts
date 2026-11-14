@@ -29,7 +29,7 @@ describe("where he stands", () => {
 describe("where he stands, true to the record", () => {
 	it("says how a topic he cannot yet do on his own was best answered, never help he was not given", () => {
 		const assisted = (right?: "unaided" | "helped" | "guess" | "uncertain" | "partial") => standingWords(0.75, { level: "assisted", ...(right ? { right } : {}) });
-		assert.equal(assisted("unaided"), "Right on your own once", "right unaided on the day he learned it");
+		assert.equal(assisted("unaided"), "Right on your own, check another day", "right unaided only on the day he learned it, however many times: never 'once'");
 		assert.equal(assisted("partial"), "Partly right");
 		assert.equal(assisted("guess"), "Right, but a guess");
 		assert.equal(assisted("uncertain"), "Right, not yet confirmed");

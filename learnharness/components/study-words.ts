@@ -22,9 +22,11 @@ export const STANDING_WORDS: Record<Fill, string> = {
 
 /** A topic he cannot yet do on his own, by how he has best answered it
  *  (the engine's `right`): the 3/4 pie's words when help is what kept it
- *  there. */
+ *  there. Right unaided only on the day it was taught says what is left, a
+ *  check on another day, never a count: "once" read false after three
+ *  unaided answers that day (round 5). */
 export const RIGHT_WORDS: Record<RightAnswer, string> = {
-	unaided: "Right on your own once",
+	unaided: "Right on your own, check another day",
 	helped: STANDING_WORDS[0.75],
 	guess: "Right, but a guess",
 	uncertain: "Right, not yet confirmed",
