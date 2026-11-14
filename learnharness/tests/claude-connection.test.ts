@@ -119,7 +119,7 @@ test("the account checks run in parallel, one per account, each with its own env
 	assert.equal(claudeConnected("claude-subscription-gone"), false);
 });
 
-const ALL_CLAUDE_FILES = ["src/agent/claude-accounts.ts", "src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-stream.ts", "src/agent/claude-usage.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "components/claude-limit-prompt.tsx", "src/core/contracts/claude.ts"];
+const ALL_CLAUDE_FILES = ["src/agent/claude-accounts.ts", "src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-errors.ts", "src/agent/sdk/engine.ts", "src/agent/sdk/agent.ts", "src/agent/sdk/session-files.ts", "src/agent/sdk/compact.ts", "src/agent/claude-usage.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "components/claude-limit-prompt.tsx", "src/core/contracts/claude.ts"];
 
 test("no Claude file reads the keychain or Claude Code's credential files, runs setup-token, or passes --bare", async () => {
 	const { readFileSync } = await import("node:fs");
@@ -136,12 +136,14 @@ test("only the accounts module reads T3 Code's files or a Claude config dir's .c
 	for (const file of ALL_CLAUDE_FILES.filter((f) => f !== "src/agent/claude-accounts.ts")) {
 		const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
 		for (const forbidden of [/\.t3\b/, /provider-env-/, /secrets/, /\.claude\.json/, /["'\/]\.claude["'\/]/, /readFileSync/]) {
-			if (file === "src/agent/claude-cli.ts" && forbidden.source === "readFileSync") continue;
+			// A session lives in its account's config dir (~/.claude by default):
+			// the engine names that dir, and nothing else in it.
+			if (file === "src/agent/sdk/engine.ts" && forbidden.source === String.raw`["'\/]\.claude["'\/]`) continue;
 			assert(!forbidden.test(source), `${file} must not contain ${forbidden}`);
 		}
 	}
-	const cli = readFileSync(new URL("../src/agent/claude-cli.ts", import.meta.url), "utf8");
-	assert.equal((cli.match(/readFileSync/g) ?? []).length, 1, "claude-cli.ts reads only the tool list, inside the MCP script");
+	const sessions = readFileSync(new URL("../src/agent/sdk/session-files.ts", import.meta.url), "utf8");
+	assert(/"projects"/.test(sessions) && !/\.claude\.json|credentials/.test(sessions), "the session keeper touches only the config dir's projects folder");
 	const accounts = readFileSync(new URL("../src/agent/claude-accounts.ts", import.meta.url), "utf8");
 	assert(!/writeFileSync|appendFileSync|console\./.test(accounts), "the accounts module never writes or logs");
 });

@@ -10,7 +10,7 @@ import { TopicGlyph } from "./topic-glyph";
 import { CURRENT_TAG, type CardFact, type Standing } from "./topic-standing";
 import { entryCaption } from "./arc-view";
 import { BrailleSpinner } from "@/components/braille-spinner";
-import { FACT_ICON } from "@/components/unit-inbox/fact-icon";
+import { factIcon } from "@/components/unit-inbox/fact-icon";
 import { MathText } from "@/components/ui/math-text";
 import { MathLine } from "@/components/ui/math-line";
 
@@ -61,7 +61,7 @@ export const RECEDED = 0.8;
  *  then its words, on a caption line whose middle is the words' cap
  *  height. */
 function LineMark({ line }: { line: CardFact }) {
-	const Icon = line.kind === "working" ? null : FACT_ICON[line.kind];
+	const Icon = factIcon(line);
 	return (
 		<span data-slot="topic-need" data-kind={line.kind} className="flex h-3.5 min-w-0 items-center gap-1 text-caption text-muted-foreground">
 			{Icon ? <Icon aria-hidden="true" className="size-3 shrink-0" /> : <BrailleSpinner />}

@@ -39,7 +39,7 @@ import { jobStore } from "../src/store/jobs.ts";
 import { buildAnswer, dismissedAnswer, type QuestionData } from "../src/core/question-core.ts";
 import { danglingQuestionOf, endsInDismissal, needsContinuation, newAnswerResult, newUserMessage } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import { fakeEngine, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 
 // Route-level pin (the chat-birth-stamp pattern): the dismiss route's
@@ -68,7 +68,7 @@ const QUESTION_INPUT = {
  *  Each response factory records the prompt it received (the transcript the
  *  model saw) — the old doStream capture, engine-shaped. */
 function scriptedTeacher(steps: (calls: string[][]) => FauxResponseStep[]): {
-	engine: PiEngine;
+	engine: ScriptedModel;
 	calls: string[][];
 } {
 	const calls: string[][] = [];
@@ -98,8 +98,8 @@ function defaultLesson(calls: string[][]): FauxResponseStep[] {
  *  off the record it is about to run — the factory tests inject. Wave B: the
  *  handler hands the factory the NATIVE build options (the record IS the
  *  agent state — no adapter conversion). */
-function agentFactory(engine: PiEngine): Parameters<typeof handleChatRequest>[1] {
-	return (opts) => createTeacherAgent(undefined, { engine, messages: opts.messages });
+function agentFactory(engine: ScriptedModel): Parameters<typeof handleChatRequest>[1] {
+	return (opts) => createTeacherAgent(undefined, onFake(engine, opts));
 }
 
 /** The free-response answer a client sends (the dock's buildAnswer seam). */
@@ -183,7 +183,7 @@ function waitFor(cond: () => boolean, timeoutMs = 8000, what = "condition"): Pro
 
 /** A teacher whose step 1 blocks on an external gate — a turn held mid-run
  *  so view-cancel / reattach / abort timing is deterministic. */
-function gatedTeacher(gate: Promise<void>): PiEngine {
+function gatedTeacher(gate: Promise<void>): ScriptedModel {
 	const faux = createFauxCore({});
 	faux.setResponses([
 		async () => {
@@ -196,7 +196,7 @@ function gatedTeacher(gate: Promise<void>): PiEngine {
 
 /** A teacher that NEVER resolves except on abort (the jobs abortableFactory
  *  pattern): the only way this turn can end is the remote kill. */
-function abortableTeacher(): PiEngine {
+function abortableTeacher(): ScriptedModel {
 	const faux = createFauxCore({});
 	faux.setResponses([
 		((_ctx: unknown, opts: { signal?: AbortSignal } | undefined) =>
@@ -490,7 +490,7 @@ describe("teacher chat flow (scripted model)", () => {
 				return fauxAssistantMessage([fauxText("Folded the marker in.")]);
 			},
 		]);
-		const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 
 		// A wake here would be a BUG (delivery must ride the live run) — the
 		// counter keeps an erroneous wake hermetic and assertable.
@@ -896,7 +896,7 @@ describe("canonical persistence failures", () => {
 		chatStore.appendTurnUsage = () => { throw new Error("synthetic usage write failure"); };
 		try {
 			const body = await drainTurn(post(chat.id, { type: "text", text: "go" }), opts => {
-				const agent = createTeacherAgent(undefined, { engine, messages: opts.messages, onUsage: opts.onUsage });
+				const agent = createTeacherAgent(undefined, { ...onFake(engine, opts), onUsage: opts.onUsage });
 				agent.subscribe(event => {
 					if (event.type === "agent_start") assert.equal(steerLiveChat(chat.id, steer), true);
 				});
@@ -1076,7 +1076,7 @@ describe("background-turn runner (owner ruling 2026-09-25: every turn is a serve
 		const long = "quadratic blowup ".repeat(40); // ~40 faux chunks
 		const faux = createFauxCore({});
 		faux.setResponses([fauxAssistantMessage([fauxText(long)])]);
-		const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 		const chat = createConfiguredChat("Test: compaction law");
 		createdChats.push(chat.id);
 		const body = await drainTurn(post(chat.id, { type: "text", text: "go" }), agentFactory(engine));
@@ -1202,7 +1202,7 @@ it("explain tool call persists as a pending part; the free-text answer reveals t
 	assert.ok(tools.explain && !tools.quiz, "explain is the teacher's only graded tool");
 
 	const factory: Parameters<typeof handleChatRequest>[1] = (opts) =>
-		createTeacherAgent(undefined, { engine, messages: opts.messages, tools });
+		createTeacherAgent(undefined, { ...onFake(engine, opts), tools });
 	await drainTurn(post(chat.id, { type: "text", text: "teach me the solar system" }), factory);
 
 	const saved1 = chatStore.getChat(chat.id)!;
@@ -1239,11 +1239,11 @@ it("explain tool call persists as a pending part; the free-text answer reveals t
 	assert.equal(out.committed, EXPLAIN_INPUT.correctAnswer, "the commitment snapshots into the answer record");
 	assert.equal(out.explanation, undefined, "no explanation remnant — one committed field (owner 2026-09-27)");
 
-	// The model's continuation saw the answer JSON (fork 1: the answer IS
-	// the call's tool result) — his text AND the commitment snapshot ride it.
+	// The model's continuation saw his answer, tagged with the question it
+	// answers, after its own call carrying the committed answer.
 	const seen = calls[1]!.join("\n");
 	assert.match(seen, /It stays near the Sun\./);
-	assert.match(seen, /committed/);
+	assert.match(seen, /<answer tool=\\"explain\\" call=\\"call-1\\">/);
 	assert.match(seen, /small angular separation/);
 	assert.ok(!/"explanation"/.test(seen), "the answer record carries no explanation field");
 	assert.equal(danglingQuestionOf(saved2.messages), null, "no pending question remains");
@@ -1541,78 +1541,3 @@ describe("composer steering: POST /api/chats/[id]/steer", () => {
 	});
 });
 
-// ─── THE LACAN INCIDENT: per-response tool-call ids (owner fix 2026-10-04) ──
-// DeepSeek (via OpenRouter) returns tool-call ids that reset every response —
-// `call_0` for every turn's single call. Before the uniquifier, the duplicate
-// ids corrupted the fold (the quiz answer overwrote the ask card, the ask
-// question vanished), answer routing, and the shuffle seeds. Now the wire
-// boundary remints colliding ids ONCE — the client, the record, the pending
-// gate, and the next turn's provider context all see unique ids.
-describe("duplicate provider tool-call ids (the Lacan fix)", () => {
-	it("every `call_0` turn keeps its identity: ask answered as ask, explain as explain, ids unique in the record", async () => {
-		// the live shape (the real Lacan session): an ask with NO options
-		const ASK = { question: "What do you want from Lacan?" };
-		const QUIZ2 = { ...QUESTION_INPUT, type: "check" };
-		// BOTH turns name their single call `call_0` — the provider's shape.
-		const { engine } = scriptedTeacher(() => [
-			(context) => {
-				void context;
-				return fauxAssistantMessage(
-					[fauxText("First — a question about your goal."), fauxToolCall("ask_user_question", ASK, { id: "call_0" })],
-					{ stopReason: "toolUse" },
-				);
-			},
-			(context) => {
-				void context;
-				return fauxAssistantMessage(
-					[fauxText("The unconscious, then."), fauxToolCall("explain", QUIZ2, { id: "call_0" })],
-					{ stopReason: "toolUse" },
-				);
-			},
-			() => fauxAssistantMessage([fauxText("Right — and that is where Lacan begins.")]),
-		]);
-
-		const chat = createConfiguredChat("Lacan: duplicate call_0 turns");
-		createdChats.push(chat.id);
-		// Turn 1: the ask question.
-		await drainTurn(post(chat.id, { type: "text", text: "teach me Lacan" }), agentFactory(engine));
-		let saved = chatStore.getChat(chat.id)!;
-		let pending = danglingQuestionOf(saved.messages)!;
-		assert.equal(pending.tool, "ask_user_question");
-		// The client answers with the id IT SAW — the persisted one.
-		const askId = pending.toolCallId;
-		await drainTurn(post(chat.id, { type: "answer", toolCallId: askId, answer: { kind: "ask", questionText: ASK.question, dontKnow: false, answers: [], text: "The theory core", answeredAt: new Date().toISOString() }, }), agentFactory(engine));
-
-		// Turn 2: the quiz — ALSO `call_0` from the provider.
-		saved = chatStore.getChat(chat.id)!;
-		pending = danglingQuestionOf(saved.messages)!;
-		assert.equal(pending.tool, "explain");
-		const quizId = pending.toolCallId;
-		assert.notEqual(quizId, askId, "the uniquifier reminted the colliding id at the wire boundary");
-		assert.match(quizId, /^call_0~\d+$/, "mint scheme: orig~n");
-		await drainTurn(post(chat.id, { type: "answer", toolCallId: quizId, answer: answerFor(QUIZ2, "Mercury") }), agentFactory(engine));
-
-		saved = chatStore.getChat(chat.id)!;
-		// The invariant: CALL ids are unique among themselves (a call and its
-		// own result share one id by design — that pair is the point).
-		const callIds = saved.messages.flatMap(
-			(m) =>
-				m.role === "assistant"
-					? (m.content ?? []).filter((c) => c.type === "toolCall").map((c) => c.id)
-					: [],
-		);
-		assert.equal(new Set(callIds).size, callIds.length, "no duplicate tool-call ids persist");
-		assert.deepEqual(callIds, ["call_0", "call_0~2"], "the provider's two call_0s became distinct ids");
-
-		// The fold is the Lacan heal: the ask card carries the ASK answer,
-		// the quiz card the QUIZ answer — no overwrite, order preserved.
-		const view = projectView(saved.messages);
-		const parts = view.flatMap((v) => v.parts).filter((p) => p.type.startsWith("tool-"));
-		const askPart = parts.find((p) => (p as { toolCallId?: string }).toolCallId === askId) as { state?: string; output?: { kind?: string } };
-		const quizPart = parts.find((p) => (p as { toolCallId?: string }).toolCallId === quizId) as { state?: string; output?: { kind?: string } };
-		assert.equal(askPart?.state, "output-available");
-		assert.equal(askPart?.output?.kind, "ask", "the ask card keeps its own answer");
-		assert.equal(quizPart?.state, "output-available");
-		assert.equal(quizPart?.output?.kind, "explain", "the explain card got ITS answer (the pre-fix bug: it landed on the ask card)");
-	});
-});

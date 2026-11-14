@@ -20,11 +20,12 @@ import {
 	fauxText,
 	fauxToolCall,
 	type AssistantMessage,
+	type Context,
 	type Message,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import type { PiEngine } from "../src/agent/models.ts";
+import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { composeInstructions, createPracticeAgent, createProberAgent, createTeacherAgent, type AgentKind } from "../src/agent/teacher-agent.ts";
 import { practiceHandoffTool, teachHandoffTool } from "../src/agent/tools/handoff.ts";
 import { practiceTools } from "../src/agent/tools/practice.ts";
@@ -197,6 +198,8 @@ describe("the handoff tools", () => {
 type Seen = { agent: AgentKind; tools: string[]; prompt: string; last: string };
 type Step = (seen: Seen) => AssistantMessage;
 
+/** The request's system prompt and tools: on the SDK seam the request
+ *  carries them as `systemPrompt` and `tools`, not as a system message. */
 function systemOf(context: TranscriptContext): { tools: string[]; prompt: string } {
 	const system = context.messages.find((m) => m.role === "system");
 	assert.ok(system && system.role === "system");
@@ -217,11 +220,11 @@ function session(chatId: string, steps: Step[]) {
 	faux.setResponses(
 		steps.map((step) => (context: TranscriptContext) => step({ agent: agents.at(-1)!, ...systemOf(context), last: lastInput(context.messages) })),
 	);
-	const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+	const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 	const deliver = (steer: SteerMessage) => void deliverJobResult(steer);
 	const factory: Parameters<typeof handleChatRequest>[1] = (opts) => {
 		agents.push(opts.agent);
-		const built = { ...opts, engine };
+		const built = { ...opts, ...onFake(engine, opts) };
 		if (opts.agent === "practice") return createPracticeAgent({ chatId, chatStore, deliver }, built);
 		if (opts.agent === "teacher") return createTeacherAgent({ chatId, chatStore, jobStore, spawn: () => {}, deliver }, built);
 		return createProberAgent({ chatId, chatStore, jobStore, spawn: () => {}, deliver }, built);

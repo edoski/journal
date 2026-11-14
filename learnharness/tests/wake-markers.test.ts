@@ -12,6 +12,7 @@ import path from "node:path";
 import { after, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createFauxCore, fauxAssistantMessage, fauxText } from "@earendil-works/pi-ai";
+import { onFake } from "./helpers/fake-sdk.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-wake-markers-"));
@@ -42,7 +43,7 @@ it("a wake turn announces its markers as soon as they are written", async () => 
 	const faux = createFauxCore({});
 	faux.setResponses([fauxAssistantMessage([fauxText("Rank first.")])]);
 	const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
-	const factory = (opts: object) => createPracticeAgent({ chatId: chat.id, chatStore }, { ...opts, engine });
+	const factory = (opts: object) => createPracticeAgent({ chatId: chat.id, chatStore }, { ...opts, ...onFake(engine, opts) });
 	const steer = buildModeHandoffSteer(chat.id, "call-h1", "practice");
 	const seen: boolean[] = [];
 	const stop = subscribe((e) => {

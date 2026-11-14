@@ -42,7 +42,7 @@ import { courseView, NO_STANDING, openLessonsOf, sourcesOf, type MapCourseView }
 import type { ChatSummary } from "../../core/contracts/chat.ts";
 import { recordHasArcs } from "../../core/contracts/course.ts";
 import type { ArcPassLedgers, CourseRecords } from "../../core/ports.ts";
-import type { PiEngine } from "../models.ts";
+import type { SdkEngine } from "../models.ts";
 import { ARC_CUT_DOCTRINE, ARC_EDGES_DOCTRINE, composeDoctrine } from "../prompt-segments.ts";
 import { createMaterialTools, measureMaterial, readingRounds, type MaterialFile } from "../tools/material.ts";
 import { finishRun, setRunPhase } from "./background-runs.ts";
@@ -241,9 +241,9 @@ export interface ArcPassDeps {
 	courseRecords: CourseRecords;
 	ledgers: ArcPassLedgers;
 	/** Test seam: a scripted engine, checked first. */
-	engine?: PiEngine;
+	engine?: SdkEngine;
 	/** The app's default model, resolved fresh per run. */
-	engineFor?: () => PiEngine | undefined;
+	engineFor?: () => SdkEngine | undefined;
 	backgroundAllowed?: (provider: string) => boolean;
 	fetchPage?: (url: string) => Promise<string>;
 	/** The app's sessions: an open lesson's topics count as studied. */

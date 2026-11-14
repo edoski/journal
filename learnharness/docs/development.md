@@ -36,7 +36,7 @@ For Windows/Linux packages and the three-OS CI, see [`docs/desktop-release.md`](
 
 ## Environment (`.env.local`)
 
-Machine-specific paths only. The app runs only on the user's Claude plan, through their own signed-in `claude` CLI. No API key is read for a model call, and the `claude` child never sees an `ANTHROPIC_*`, `*_API_KEY` or `*_AUTH_TOKEN` variable (`src/agent/claude-cli.ts`). Model choice and thinking budgets live in **settings** (`models` section: strong/cheap/vision, provider + model id + optional thinking level).
+Machine-specific paths only. The app runs only on the user's Claude plan, through their own signed-in `claude` CLI, driven by the Claude Agent SDK. No API key is read for a model call, and the `claude` child never sees an `ANTHROPIC_*`, `*_API_KEY` or `*_AUTH_TOKEN` variable (`src/agent/claude-cli.ts`). Model choice and thinking budgets live in **settings** (`models` section: strong/cheap/vision, provider + model id + optional thinking level).
 
 | Variable | Purpose |
 |---|---|
@@ -149,8 +149,8 @@ data/                           chats/ · graph/ (nodes/chains/sessions/coverage
 
 ## Key mechanisms
 
-See [compaction and accounting](compaction-accounting.md) for the local Pi cutoff port,
-measurement-only context meter, and server-side current-catalog pricing. There is no
+See [sessions and compaction](sessions-and-compaction.md) for how lessons run on the Agent SDK, and
+[compaction and accounting](compaction-accounting.md) for the measurement-only context meter and server-side current-catalog pricing. There is no
 pricing-generation step: Pi AI's catalog and public calculator are the authority.
 
 **Client-side question tools.** `quiz` and `ask_user_question` have no server `execute`: the tool call streams to the browser, the learner answers in the dock, the client grades via `question-core` and returns the verdict with `addToolOutput` — which fires the SDK continuation so the teacher resumes mid-turn. Options are shuffled deterministically (seeded by toolCallId) so server and client renders match. A pending quiz persisted in the chat record is exactly what makes **resume mid-question free**.

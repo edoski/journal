@@ -35,7 +35,7 @@ The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowS
 | State | List |
 |---|---|
 | loading | three 60px skeleton cards, `aria-busy`, sr-only "Loading"; no shelves |
-| a quiet day | one card per line: "Left off 2d ago" (bookmark) under "Continue Problem sheet 4", opening the topic the task is about (the course's current topic), or the course's page for a task that holds no topic; "Next up" (arrow) for a current topic |
+| a quiet day | one card per line: "Left off 2d ago" (bookmark) under "Continue Problem sheet 4", opening the topic the task is about (the course's current topic when the task holds it), else the course's page, since the record does not say which of its topics the task is at; "Next up" (arrow) for a current topic |
 | nothing needs him | "Nothing needs you today", then the shelves |
 | everything due | still one card per course line (the engine plans at most five reviews a course, Today at most five lines), a lapse's card titled by the lapsed topic with "Not right last time"; every other due topic sits on On your own with Review, or on Learning when the engine calls it weak |
 | a lesson running | a card whose topic the tutor writes in shows the spinner and Tutor writing at 70%, in its place through every turn (`steadyTop`); a topic not on top (or one already running when the sidebar first draws) sits on Tutor writing, whose open row stays in view while folded |

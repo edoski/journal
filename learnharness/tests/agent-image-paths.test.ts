@@ -17,7 +17,9 @@ import {
 	type ImageContent,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { SdkEngine } from "../src/agent/models.ts";
+import { fakeEngine, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { ModelImageResizeOptions } from "../src/agent/image-processing/index.ts";
 import type { HeadlessApi } from "../src/agent/subagents/headless.ts";
 
@@ -85,13 +87,13 @@ function scripted(steps: FauxResponseStep[], resize?: ModelImageResizeOptions, v
 	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
 	faux.setResponses(steps);
 	const base = faux.getModel();
-	const model: PiEngine["model"] = {
+	const model: SdkEngine["model"] = {
 		...base,
 		input: vision ? ["text", "image"] : ["text"],
 		...(resize ? { inputLimits: { ...base.inputLimits, images: { ...base.inputLimits?.images, resize } } } : {}),
 	};
 	const requests: TranscriptContext[] = [];
-	const engine: PiEngine = {
+	const scriptedModel: ScriptedModel = {
 		model,
 		streamFn: (model, context, options) => {
 			// Snapshot the actual provider-facing context, not mutable agent state.
@@ -99,7 +101,12 @@ function scripted(steps: FauxResponseStep[], resize?: ModelImageResizeOptions, v
 			return faux.streamSimple(model, context, options);
 		},
 	};
-	return { engine, requests };
+	return { engine: fakeEngine(scriptedModel), requests };
+}
+
+/** The record a lesson turn starts from: one learner message. */
+function ask(text: string): AgentMessage[] {
+	return [{ role: "user", content: text, timestamp: Date.now(), id: `ask-${text.length}` } as AgentMessage];
 }
 
 function readSteps(file: string): FauxResponseStep[] {
@@ -144,8 +151,8 @@ test("shared teacher read detects valid image content under a non-image extensio
 	const { engine, requests } = scripted(readSteps(file));
 	// Pass the actual shared read tool, exercising the teacher's native clone
 	// of read.execute rather than a pre-bound test-only implementation.
-	const agent = createTeacherAgent(undefined, { engine, tools: { read: readTool } });
-	await agent.prompt("Inspect the supplied local file.");
+	const agent = createTeacherAgent(undefined, { engine, tools: { read: readTool }, messages: ask("Inspect the supplied local file.") });
+	await agent.continue();
 	assert.equal(requests.length, 2);
 	const visible = requests[1]!;
 	assert.equal(images(visible).length, 1);
@@ -161,7 +168,7 @@ test("shared read omits corrupt recognized images without exposing a raw image f
 	const file = path.join(scratch, "corrupt.png");
 	fs.writeFileSync(file, bytes);
 	const { engine, requests } = scripted(readSteps(file));
-	await createTeacherAgent(undefined, { engine, tools: { read: readTool } }).prompt("Inspect the file.");
+	await createTeacherAgent(undefined, { engine, tools: { read: readTool }, messages: ask("Inspect the file.") }).continue();
 	assert.equal(requests.length, 2);
 	assert.deepEqual(images(requests[1]!), []);
 	assert.match(text(requests[1]!), /Image omitted: could not be resized below the inline image size limit/);
@@ -172,7 +179,7 @@ test("shared read supplies the native nonvision-model note", async () => {
 	const file = path.join(scratch, "nonvision.png");
 	fs.writeFileSync(file, png(24, 16));
 	const { engine, requests } = scripted(readSteps(file), undefined, false);
-	await createTeacherAgent(undefined, { engine, tools: { read: readTool } }).prompt("Inspect the file.");
+	await createTeacherAgent(undefined, { engine, tools: { read: readTool }, messages: ask("Inspect the file.") }).continue();
 	assert.equal(requests.length, 2);
 	assert.match(text(requests[1]!), /\[Current model does not support images\. The image will be omitted from this request\.\]/);
 });
@@ -184,10 +191,10 @@ test("teacher read binds independent active-model resize limits without mutating
 	const originalExecute = readTool.execute;
 	const a = scripted(readSteps(file), { maxWidth: 96, maxHeight: 64 });
 	const b = scripted(readSteps(file), { maxWidth: 80, maxHeight: 30 });
-	const agentA = createTeacherAgent(undefined, { engine: a.engine, tools: { read: readTool } });
-	const agentB = createTeacherAgent(undefined, { engine: b.engine, tools: { read: readTool } });
-	await agentB.prompt("Inspect with model B.");
-	await agentA.prompt("Inspect with model A.");
+	const agentA = createTeacherAgent(undefined, { engine: a.engine, tools: { read: readTool }, messages: ask("Inspect with model A.") });
+	const agentB = createTeacherAgent(undefined, { engine: b.engine, tools: { read: readTool }, messages: ask("Inspect with model B.") });
+	await agentB.continue();
+	await agentA.continue();
 	assertProcessedImage(a.requests[1]!, { width: 96, height: 48 }, bytes);
 	assertProcessedImage(b.requests[1]!, { width: 60, height: 30 }, bytes);
 	assert.equal(readTool.execute, originalExecute);
@@ -215,20 +222,21 @@ for (const [role, resize, expected] of [
 		const chatStore = { getChat: () => null };
 		// Only context ports are mocked; no app/store imports or explicit
 		// tool overrides. Job/handoff operations must never execute here.
+		const messages = ask("Inspect the local image, then read the selected text lines.");
 		const agent = role === "prober"
 			? createProberAgent({
 				chatId: "offline-read-prober", chatStore,
 				jobStore: new Proxy({}, { get: forbidden }),
 				spawn: forbidden, deliver: forbidden,
-			} as never, { engine })
-			: createPracticeAgent({ chatId: "offline-read-practice", chatStore }, { engine });
+			} as never, { engine, messages })
+			: createPracticeAgent({ chatId: "offline-read-practice", chatStore }, { engine, messages });
 		const names = agent.state.tools.map((tool) => tool.name);
 		assert.ok(names.includes(role === "prober" ? "probe_done" : "problem"), "real role registry was assembled");
 		const boundRead = agent.state.tools.find((tool) => tool.name === "read");
 		assert.ok(boundRead?.prepareArguments, "model binding preserves the registry's prepareArguments wrapper");
 		assert.notEqual(boundRead.execute, originalExecute, "shared read execute is rebound to the active model");
 		assert.deepEqual(boundRead.prepareArguments({ path: textFile, offset: "2", limit: "2" }), { path: textFile, offset: 2, limit: 2 });
-		await agent.prompt("Inspect the local image, then read the selected text lines.");
+		await agent.continue();
 		assert.equal(requests.length, 3);
 		assertProcessedImage(requests[1]!, expected, bytes);
 		const selected = requests[2]!.messages.find((message) => message.role === "toolResult" && message.toolCallId === "registry-text");
@@ -261,12 +269,13 @@ test("PDF reader preserves both processed image outputs from multiple render cal
 		assert.ok(parts[i]!.data.length < 4.5 * 1024 * 1024);
 		assert.notEqual(parts[i]!.data, [wide, tall][i]!.toString("base64"));
 	}
-	assert.deepEqual(visible.messages.slice(-3).map((message) => message.role), ["toolResult", "toolResult", "user"]);
-	const pageMessage = visible.messages.at(-1)!;
-	assert.ok(Array.isArray(pageMessage.content));
-	assert.deepEqual(pageMessage.content.filter((part) => part.type === "text").map((part) => part.text.split("\n")[0]), [
-		"The rendered page(s), in order (p1, p2):", "Page 1", "Page 2",
+	const renders = visible.messages.slice(-2);
+	assert.deepEqual(renders.map((message) => message.role), ["toolResult", "toolResult"], "each render call's pages ride its own tool result");
+	assert.deepEqual(renders.map((message) => (message.content as { type: string; text?: string }[]).filter((part) => part.type === "text").map((part) => part.text!.split("\n")[0])), [
+		["Rendered 1 page(s) at 150 DPI, in order. Read the images carefully (equations, diagrams, layout).", "Page 1"],
+		["Rendered 1 page(s) at 150 DPI, in order. Read the images carefully (equations, diagrams, layout).", "Page 2"],
 	]);
+	assert.deepEqual(renders.map((message) => (message.content as { type: string }[]).filter((part) => part.type === "image").length), [1, 1]);
 	assert.deepEqual(result.pagesRead, [1, 2]);
 	assert.deepEqual(result.pagesConsulted, [1, 2]);
 });
@@ -290,19 +299,22 @@ for (const [label, resize, expected] of [
 		assert.deepEqual(result.pagesRead, [1]);
 		assert.deepEqual(result.pagesConsulted, [1]);
 		assert.match(result.brief, /visible figure/);
-		const visible = requests[1]!.messages;
-		assert.equal(visible.at(-2)!.role, "toolResult");
-		assert.equal(visible.at(-1)!.role, "user", "processed page images ride the user message after tool results");
+		const render = requests[1]!.messages.at(-1)!;
+		assert.equal(render.role, "toolResult", "processed page images ride the render's tool result");
+		assert.equal((render.content as { type: string }[]).filter((part) => part.type === "image").length, 1);
 	});
 
-	for (const forced of [false, true]) {
-		test(`visual maker ${forced ? "forced-final" : "explicit render_svg"} path processes images using ${label}`, async () => {
+	for (const gated of [false, true]) {
+		test(`visual maker ${gated ? "finish-gate" : "explicit render_svg"} path processes images using ${label}`, async () => {
 			const bytes = png(4800, 120);
 			const { headless, svgCalls } = fakeHeadless(bytes);
-			const steps: FauxResponseStep[] = forced ? [
-				fauxAssistantMessage([fauxToolCall("write_svg", { svg: SVG }, { id: "write-1" })], { stopReason: "toolUse" }),
-				fauxAssistantMessage([fauxText("Premature notes without inspection.")]),
-				fauxAssistantMessage([fauxText("Confirmed after inspecting the final render.")]),
+			const steps: FauxResponseStep[] = gated ? [
+				fauxAssistantMessage([
+					fauxToolCall("write_svg", { svg: SVG }, { id: "write-1" }),
+					fauxToolCall("finish", { notes: "Premature notes without inspection." }, { id: "finish-1" }),
+				], { stopReason: "toolUse" }),
+				fauxAssistantMessage([fauxToolCall("render_svg", {}, { id: "render-1" })], { stopReason: "toolUse" }),
+				fauxAssistantMessage([fauxToolCall("finish", { notes: "Confirmed after inspecting the final render." }, { id: "finish-2" })], { stopReason: "toolUse" }),
 			] : [
 				fauxAssistantMessage([
 					fauxToolCall("write_svg", { svg: SVG }, { id: "write-1" }),
@@ -312,30 +324,30 @@ for (const [label, resize, expected] of [
 			];
 			const { engine, requests } = scripted(steps, resize);
 			const result = await runVisualMaker({ brief: "One precise synthetic figure." }, { engine, headless });
-			assert.equal(requests.length, forced ? 3 : 2);
+			assert.equal(requests.length, gated ? 3 : 2);
 			assert.deepEqual(svgCalls, [SVG]);
 			assertProcessedImage(requests.at(-1)!, expected, bytes);
 			assert.equal(result.svg, SVG);
 			assert.match(result.notes!, /^Confirmed after inspecting/);
-			assert.equal(requests.at(-1)!.messages.at(-1)!.role, "user");
-			if (forced) {
+			const render = requests.at(-1)!.messages.at(-1)!;
+			assert.equal(render.role, "toolResult", "the render reaches the model as the render call's result");
+			assert.match(text({ messages: [render] } as TranscriptContext), /Here is the current render of your SVG/);
+			if (gated) {
 				assert.deepEqual(images(requests[1]!), [], "premature finish did not see an image yet");
-				assert.match(text(requests[2]!), /You finished without looking at a render of your final SVG/);
-			} else {
-				assert.match(text(requests[1]!), /Here is the current render of your SVG/);
-				assert.equal(requests[1]!.messages.at(-2)!.role, "toolResult");
+				assert.match(text(requests[1]!), /you have not looked at a render of the SVG as it now stands/);
 			}
 		});
 	}
 }
 
-for (const forced of [false, true]) {
-	test(`visual maker ${forced ? "forced-final" : "explicit render_svg"} processing failure never verifies or delivers the SVG`, async () => {
+for (const gated of [false, true]) {
+	test(`visual maker ${gated ? "finish-gate" : "explicit render_svg"} processing failure never verifies or delivers the SVG`, async () => {
 		const { headless, svgCalls } = fakeHeadless(Buffer.from("corrupt render"));
 		const steps: FauxResponseStep[] = [
 			fauxAssistantMessage([
 				fauxToolCall("write_svg", { svg: SVG }, { id: "write-1" }),
-				...(!forced ? [fauxToolCall("render_svg", {}, { id: "render-1" })] : []),
+				fauxToolCall("render_svg", {}, { id: "render-1" }),
+				...(gated ? [fauxToolCall("finish", { notes: "Unverified notes." }, { id: "finish-1" })] : []),
 			], { stopReason: "toolUse" }),
 			fauxAssistantMessage([fauxText("Unverified claim that the picture is correct.")]),
 		];
@@ -345,10 +357,10 @@ for (const forced of [false, true]) {
 		assert.equal(requests.length, 2);
 		assert.ok(requests.every((request) => images(request).length === 0));
 		assert.equal(result.svg, "");
-		assert.match(result.notes!, /^FAILED: inspecting the final SVG failed/);
-		assert.match(result.notes!, /Image omitted:/);
+		assert.match(result.notes!, /^FAILED:/);
 		assert.ok(!activity.some((line) => line.includes("inspecting")), "a failed image is never marked inspected");
-		assert.equal(svgCalls.length, forced ? 1 : 2, "an explicit processing failure leaves the final-SVG gate unsatisfied");
-		if (!forced) assert.match(text(requests[1]!), /RENDER ERROR.*Image omitted:/);
+		assert.equal(svgCalls.length, 1);
+		assert.match(text(requests[1]!), /RENDER ERROR.*Image omitted:/);
+		if (gated) assert.match(text(requests[1]!), /you have not looked at a render of the SVG as it now stands/, "finish refuses after a failed render");
 	});
 }

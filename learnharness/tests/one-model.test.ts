@@ -14,15 +14,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, before, beforeEach, describe, it } from "node:test";
-import { createFauxCore, fauxAssistantMessage, normalizeContext } from "@earendil-works/pi-ai";
+import { createFauxCore, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { SETTINGS_FILE } from "../config.ts";
 import { agentEngine, handleChatRequest } from "../src/server/chat-handler.ts";
 import { createTeacherAgent } from "../src/agent/teacher-agent.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
 import { PUT as putSection } from "../app/api/settings/[section]/route.ts";
 import { effectiveSettings, stores } from "../src/server/stores.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import { signInTestClaude } from "./claude-fixture.ts";
+import { onFake } from "./helpers/fake-sdk.ts";
 
 const SLOT_DAYS_RECORD = {
 	version: 1,
@@ -62,16 +63,16 @@ function writeRecord(record: unknown): void {
 }
 
 /** The engine one real turn hands the conversation agent. */
-async function conversationEngine(): Promise<PiEngine> {
+async function conversationEngine(): Promise<SdkEngine> {
 	const chat = stores.chatStore.createChat("Test: which engine");
 	const faux = createFauxCore({});
 	faux.setResponses([fauxAssistantMessage("Hello.")]);
-	let handed: PiEngine | undefined;
+	let handed: SdkEngine | undefined;
 	const res = await handleChatRequest(
 		new Request("http://test/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, input: { type: "text", text: "teach me" } }) }),
 		(opts) => {
 			handed = opts.engine;
-			return createTeacherAgent(undefined, { engine: { model: faux.getModel(), streamFn: faux.streamSimple }, messages: opts.messages });
+			return createTeacherAgent(undefined, onFake({ model: faux.getModel(), streamFn: faux.streamSimple }, opts));
 		},
 	);
 	assert.equal(res.status, 200);
@@ -82,20 +83,22 @@ async function conversationEngine(): Promise<PiEngine> {
 }
 
 /** The arguments one real call on this engine hands `claude`. */
-async function spawnedArgs(engine: PiEngine): Promise<string[]> {
+async function spawnedArgs(engine: SdkEngine): Promise<string[]> {
 	fs.rmSync(argsFile, { force: true });
-	const stream = engine.streamFn(engine.model, normalizeContext({ systemPrompt: "Reply.", messages: [{ role: "user", content: "hi", timestamp: 1 }] }), {});
-	await stream.result();
+	const call = engine.query({ prompt: "hi", options: { ...engine.launch().options, persistSession: false } });
+	try {
+		for await (const _ of call) { /* the stand-in `claude` answers nothing */ }
+	} catch { /* it exits without speaking the protocol */ } finally { call.close(); }
 	return fs.readFileSync(argsFile, "utf8").trim().split("\n");
 }
 
-async function assertOpusHigh(engine: PiEngine, who: string): Promise<void> {
+async function assertOpusHigh(engine: SdkEngine, who: string): Promise<void> {
 	assert.equal(engine.model.id, "claude-opus-5-5", who);
 	assert.equal(engine.model.provider, "claude-subscription", who);
 	assert.equal(engine.level, "high", who);
 	const args = await spawnedArgs(engine);
-	assert.equal(args[args.indexOf("--model") + 1], "claude-opus-5-5", `${who} spawns Opus 5.5`);
-	assert.equal(args[args.indexOf("--effort") + 1], "high", `${who} spawns high effort`);
+	assert.ok(args.includes("--model=claude-opus-5-5"), `${who} spawns Opus 5.5: ${args.join(" ")}`);
+	assert.ok(args.includes("--effort=high"), `${who} spawns high effort: ${args.join(" ")}`);
 }
 
 describe("every agent runs Claude Opus 5.5 at high effort", () => {

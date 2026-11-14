@@ -22,9 +22,11 @@ export const STANDING_WORDS: Record<Fill, string> = {
 
 /** A topic he cannot yet do on his own, by how he has best answered it
  *  (the engine's `right`): the 3/4 pie's words when help is what kept it
- *  there. */
+ *  there. Right unaided only on the day it was taught says what is left, a
+ *  check on another day, never a count: "once" read false after three
+ *  unaided answers that day (round 5). */
 export const RIGHT_WORDS: Record<RightAnswer, string> = {
-	unaided: "Right on your own once",
+	unaided: "Right on your own, check another day",
 	helped: STANDING_WORDS[0.75],
 	guess: "Right, but a guess",
 	uncertain: "Right, not yet confirmed",
@@ -59,11 +61,13 @@ export type SlipKey = keyof typeof SLIP_WORDS | "mixed";
 /** Why the engine calls a topic weak, its first signal: a mistake he has
  *  answered right on his own since, a miss after he had it, a diagnosed
  *  mistake, a method chosen in its place, a wrong answer he was sure of,
- *  else none of those. A repair made only with help is not shown fixed:
- *  help may have carried it, so the signal under it shows. */
+ *  else none of those. A repair made only with help is not shown fixed,
+ *  since help may have carried it, and is still a mistake to fix: the
+ *  signals under it describe answers before that right one, so "Not right
+ *  last time" or "Sure, but wrong" would contradict it (round 5). */
 export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } {
 	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp } = signals;
-	if (repaired && !repairedWithHelp) return { key: "repaired", words: SLIP_WORDS.repaired };
+	if (repaired) return repairedWithHelp ? { key: "gap", words: SLIP_WORDS.gap } : { key: "repaired", words: SLIP_WORDS.repaired };
 	if (lapsed) return { key: "lapsed", words: SLIP_WORDS.lapsed };
 	if (gap) return { key: "gap", words: SLIP_WORDS.gap };
 	const [method] = Object.keys(choiceErrors);
@@ -174,6 +178,15 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
 }
 
+/** A review the plan moved past the day memory asked for it, from when:
+ *  "Due since 1 Oct" once that day has passed, else "Moved from 9 Nov", so
+ *  a day the tutor named that a later review took never changes in
+ *  silence (round 5); null for a review the plan does not hold. */
+export function movedWords(review: CourseMapTopic["review"], today: string): string | null {
+	if (review?.kind !== "scheduled" || !review.held) return null;
+	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : `Moved from ${shortDay(review.held.since)}`;
+}
+
 /** A review that is due: "Due today", "3d overdue"; one the plan holds
  *  past a day memory asked for already says since when, "Due since 1 Oct",
  *  so a review weeks late never reads as spacing; any other dated review
@@ -197,6 +210,35 @@ export function startsAfterWords(courses: readonly string[] | undefined): string
 	if (!courses || courses.length === 0) return null;
 	return `After ${listWords(courses.map((course) => `${course}'s`))} new topics`;
 }
+
+/** What the plan does for a course with no exam, in place of a bare "No
+ *  exam day set" (round 5: Calculus' reviews waited weeks and its head
+ *  said only that): its reviews wait for other courses' exams, whose final
+ *  reviews come first, or for room on earlier days; else they come back
+ *  when memory asks for them. Pure. */
+export function noExamWords(topics: readonly Pick<CourseMapTopic, "review">[]): string {
+	const held = topics.flatMap((t) => (t.review?.kind === "scheduled" && t.review.held ? [t.review.held] : []));
+	const exams = [...new Set(held.flatMap((h) => (h.exam ? [h.exam] : [])))];
+	if (exams.length > 0) return `No exam: reviews wait for your ${listWords(exams)} ${exams.length === 1 ? "exam" : "exams"}`;
+	if (held.length > 0) return `No exam: reviews wait, ${HELD_WORDS.full.toLowerCase()}`;
+	return "No exam: reviews come back when memory asks";
+}
+
+/** When a course he has not studied yet gives its first lesson and why
+ *  then, the plan's day for its earliest start (round 5: a new course had
+ *  nothing in Today and its first lesson 11 days out, with no word why):
+ *  "First lesson today", "First lesson Thu 19 Nov, after Probability's new
+ *  topics"; null when the plan starts none. Pure. */
+export function firstLessonWords(topics: readonly Pick<CourseMapTopic, "starts" | "startsAfter">[], today: string): string | null {
+	const first = topics.filter((t) => t.starts).sort((a, b) => a.starts!.localeCompare(b.starts!))[0];
+	if (!first?.starts) return null;
+	if (first.starts <= today) return "First lesson today";
+	const after = startsAfterWords(first.startsAfter);
+	const day = `First lesson ${SHORT_WEEKDAY.format(new Date(`${first.starts}T00:00:00Z`)).replace(",", "")}`;
+	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
+}
+
+const SHORT_WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
 /** Where an arc stands, in the engine's own states: no count, since the
  *  pie beside it draws the share. `taught` is a course that takes no
@@ -236,6 +278,14 @@ export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "t
 		return `After ${[needs, apart].filter(Boolean).join(", and ")}`;
 	}
 	return `Next in ${arc ?? map.title}`;
+}
+
+/** Whether a start's reason tells him anything its planned day does not:
+ *  every reason but "next" in a course without arcs, which would only say
+ *  "Next in Linear Algebra" beside the course's own name. Pure. */
+export function startsWhyTells(why: StartsWhy): boolean {
+	if (why.arc !== undefined || why.kind === "early") return true;
+	return why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0);
 }
 
 /** `startsWhyWords` cut to fit a row's reason beside its icon, where the

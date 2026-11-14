@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { after, describe, it } from "node:test";
 import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
+import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { signInTestClaude } from "./claude-fixture.ts";
 
@@ -171,14 +171,14 @@ function scripted(steps: FauxResponseStep[]) {
 		histories.push(JSON.stringify(context.messages));
 		return typeof step === "function" ? step(context, options, state, model) : step;
 	}));
-	const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+	const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 	return { engine, histories };
 }
 
-async function turn(engine: PiEngine, chatId: string, input: unknown): Promise<Response> {
+async function turn(engine: ScriptedModel, chatId: string, input: unknown): Promise<Response> {
 	const ack = await handleChatRequest(
 		new Request("http://test/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId, input }) }),
-		(opts) => createTeacherAgent(undefined, { ...opts, engine }),
+		(opts) => createTeacherAgent(undefined, { ...opts, ...onFake(engine, opts) }),
 	);
 	if (ack.status === 200) {
 		const handle = runningTurn(chatId);

@@ -12,8 +12,8 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { TSchema } from "typebox";
 import { invalidInputResult, toToolResult } from "../tool-execute.ts";
 import type { ModelRole } from "../../../config.ts";
-import type { PiEngine } from "../models.ts";
-import { runSubagent } from "./pi-run.ts";
+import type { SdkEngine } from "../models.ts";
+import { runSubagent } from "../sdk/task.ts";
 import { healToolRecord } from "../tools/heal.ts";
 import { healEncodedArguments } from "../../core/argument-heal.ts";
 
@@ -27,7 +27,7 @@ export async function runSubmitAgent<T>(opts: {
 	fill: (input: any) => T;
 	systemPrompt: string;
 	prompt: string;
-	engine: PiEngine | undefined;
+	engine: SdkEngine;
 	signal: AbortSignal | undefined;
 	onStep: (usage: Usage, model: string, step: number, finishReason: string, tools: string) => void;
 	/** Each whole assistant message, for a run that keeps a transcript. */
@@ -39,8 +39,6 @@ export async function runSubmitAgent<T>(opts: {
 	/** Turn budget for the loop (default 4 = retry-only; a builder with
 	 *  extra tools sets its own). */
 	maxTurns?: number;
-	/** Debug: raw provider-event recording key (LH_PROVIDER_EVENTS=1). */
-	chatId?: string;
 	/** Semantic validation at the submit seam: the value is schema-valid
 	 *  but may violate a PIPELINE law (coverage, echo-equality). Returning
 	 *  a problem string yields an isError result (invalidInputResult) →
@@ -71,13 +69,11 @@ export async function runSubmitAgent<T>(opts: {
 			} satisfies AgentTool<any>,
 		],
 		{
-			role: opts.role,
 			engine: opts.engine,
 			systemPrompt: opts.systemPrompt,
 			prompt: opts.prompt,
 			maxTurns: opts.maxTurns ?? 4,
 			abortSignal: opts.signal,
-			chatId: opts.chatId,
 			onAssistantMessage: (message, step) => {
 				opts.onMessage?.(message, step);
 				opts.onStep(
@@ -91,7 +87,7 @@ export async function runSubmitAgent<T>(opts: {
 					message.content.filter((c) => c.type === "toolCall").map((c) => (c as { name: string }).name).join(", ") || "(none)",
 				);
 			},
-			shouldStop: (_message, toolResults) => toolResults.some((r) => r.toolName === opts.toolName && !r.isError),
+			endsTurn: (name) => name === opts.toolName,
 		},
 	);
 	void result;

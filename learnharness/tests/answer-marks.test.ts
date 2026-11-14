@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { answerMarksOf, correctorsToRead, latestMarkedAnswer, markLinks } from "../src/core/answer-marks.ts";
 import { ChatInputError, inputAppends, parseChatInput } from "../src/core/input-events.ts";
-import { answeredQuestionsOf, toLlmMessages, type LhMessage } from "../src/core/native-messages.ts";
+import { answeredQuestionsOf, type LhMessage } from "../src/core/native-messages.ts";
+import { owedMessages, sdkInputBlocks } from "../src/core/sdk-session.ts";
 import { markHow } from "../src/core/contracts/marks.ts";
 import { MARK_HOW_WORDS } from "../components/study-words.ts";
 
@@ -216,12 +217,14 @@ describe("the dispute input", () => {
 		assert.throws(() => inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q2", observations: ["o5"], said: "x" }), /no marked answer/);
 	});
 
-	it("leaves an open question set aside: the wire reads it as interrupted", () => {
+	it("leaves an open question set aside: the next message carries no answer for it", () => {
 		const open = [...lesson().slice(0, 4), call("q3", "explain", { question: "Nullity?", correctAnswer: "1" })];
 		const appends = inputAppends({ messages: open }, { type: "dispute", answerId: "q1", observations: ["o4"], said: "It is 2" });
-		const wire = toLlmMessages([...open, ...appends]);
-		const last = wire.slice(-2);
-		assert.equal(last[0]!.role, "toolResult");
-		assert.equal(last[1]!.role, "user");
+		assert.ok(!appends.some((m) => m.role === "toolResult"), "no result is made up for the open question");
+		const owed = owedMessages([...open, ...appends], { id: "s", synced: open.at(-1)!.id })!;
+		const blocks = sdkInputBlocks(owed);
+		assert.equal(blocks.length, 1);
+		assert.match((blocks[0] as { text: string }).text, /^\[MARK DISPUTED\]/);
+		assert.ok(!blocks.some((b) => b.type === "text" && b.text.includes('call="q3"')), "the model reads the question as set aside");
 	});
 });

@@ -24,6 +24,7 @@ import {
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
+import { fakeEngine, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-flow-")));
@@ -107,7 +108,7 @@ async function turn(chatId: string, input: unknown, factory: Factory): Promise<v
 	if (handle) await new Response(handle.subscribe()).text();
 }
 
-function scripted(steps: FauxResponseStep[]) {
+function scripted(steps: FauxResponseStep[]): ScriptedModel {
 	const faux = createFauxCore({});
 	faux.setResponses(steps.map((step) => async (context: TranscriptContext): Promise<AssistantMessage> =>
 		typeof step === "function" ? await (step as FauxResponseFactory)(context, undefined, undefined as never, undefined as never) : step));
@@ -341,7 +342,7 @@ describe("a course-linked turn", () => {
 		let seenCourse: unknown;
 		const factory: Factory = (opts) => {
 			seenCourse = opts.course?.course;
-			return createPracticeAgent({ chatId: id, chatStore }, { ...opts, engine });
+			return createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
 		};
 		await turn(id, { type: "text", text: "practice rank" }, factory);
 		await turn(id, { type: "thinking", problemCallId: "p1", text: "1, the rows are dependent", confidence: "confident" }, factory);
@@ -349,7 +350,8 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });
 		const linked = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === LINALG);
 		const verbs = linked.map((c) => c.args[2]);
-		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		assert.equal(verbs.filter((v) => v === "map").length, 2, "each brief reads every course's daily plan");
 		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
 		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each practice brief also reads the exam run-up");
 		const save = linked.find((c) => c.args[2] === "save")!;
@@ -376,7 +378,7 @@ describe("a course-linked turn", () => {
 			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "surrendered", verdict: "Given up.", rung: null, missClass: null, retest: false, result: "incorrect", response: "no answer" }, { id: "c2" })], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxText("Here is the solution.")]),
 		]);
-		const factory: Factory = (opts) => createPracticeAgent({ chatId: id, chatStore }, { ...opts, engine });
+		const factory: Factory = (opts) => createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
 		const saves = () => engineCalls().filter((c) => c.args[2] === "save");
 		const before = saves().length;
 		await turn(id, { type: "text", text: "practice rank" }, factory);
@@ -402,7 +404,7 @@ describe("a course-linked turn", () => {
 	it("a course session's file search defaults to the course folder", async () => {
 		const agent = createPracticeAgent(
 			{ chatId: "chat_files", chatStore },
-			{ engine: scripted([]), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never, arcs: false } },
+			{ engine: fakeEngine(scripted([])), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never, arcs: false } },
 		);
 		for (const name of ["find", "grep", "ls"]) {
 			const tool = agent.state.tools.find((t) => t.name === name)!;
@@ -420,7 +422,7 @@ describe("a course-linked turn", () => {
 		const build = (chatId: string): Factory => (opts) => {
 			const agent = createProberAgent(
 				{ chatId, chatStore, deliver: () => {}, jobStore: { createJob: () => { throw new Error("unused"); } } as never, spawn: () => {} },
-				{ ...opts, engine: scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]) },
+				{ ...opts, ...onFake(scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]), opts) },
 			);
 			prompts.push({ arcs: opts.course?.arcs, prompt: agent.state.systemPrompt });
 			return agent;
@@ -444,7 +446,7 @@ describe("a course-linked turn", () => {
 		const build = (chatId: string): Factory => (opts) => {
 			const agent = createProberAgent(
 				{ chatId, chatStore, deliver: () => {}, jobStore: { createJob: () => { throw new Error("unused"); } } as never, spawn: () => {} },
-				{ ...opts, engine: scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]) },
+				{ ...opts, ...onFake(scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]), opts) },
 			);
 			tools.push(agent.state.tools.map((t) => t.name));
 			return agent;

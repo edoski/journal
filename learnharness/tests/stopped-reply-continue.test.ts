@@ -1,6 +1,7 @@
 /**
  * Try again after a stop, and continue from two windows (round 4, 14 Nov
- * 2026). Scripted faux engines: no real provider calls or learning data.
+ * 2026). Scripted faux models on the fake Agent SDK: no real provider
+ * calls or learning data.
  */
 
 import assert from "node:assert/strict";
@@ -9,9 +10,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
 import { createFauxCore, fauxAssistantMessage, fauxText, type FauxResponseStep } from "@earendil-works/pi-ai";
-import type { PiEngine } from "../src/agent/models.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { signInTestClaude } from "./claude-fixture.ts";
+import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 assert.equal(process.env.NODE_ENV, "test", "Run with NODE_ENV=test; these tests must not invoke real providers.");
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-stopped-reply-"));
@@ -35,14 +36,14 @@ function scripted(steps: FauxResponseStep[]) {
 		calls.push(context.messages.map((m) => m.role).filter((role) => role !== "system"));
 		return typeof step === "function" ? step(context, options, state, model) : step;
 	}));
-	const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+	const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 	return { engine, calls };
 }
 
-async function turn(engine: PiEngine, chatId: string, input: unknown): Promise<{ status: number; body: string }> {
+async function turn(engine: ScriptedModel, chatId: string, input: unknown): Promise<{ status: number; body: string }> {
 	const ack = await handleChatRequest(
 		new Request("http://test/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId, input }) }),
-		(opts) => createTeacherAgent(undefined, { ...opts, engine }),
+		(opts) => createTeacherAgent(undefined, onFake(engine, opts)),
 	);
 	const handle = runningTurn(chatId);
 	const body = handle ? await new Response(handle.subscribe()).text() : await ack.text();
@@ -101,7 +102,7 @@ describe("a turn that fails at once", () => {
 		const ack = await handleChatRequest(
 			new Request("http://test/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: chat.id, input: { type: "continue" } }) }),
 			(opts) => {
-				const agent = createTeacherAgent(undefined, { ...opts, engine });
+				const agent = createTeacherAgent(undefined, onFake(engine, opts));
 				agent.continue = () => Promise.reject(new Error("boom"));
 				return agent;
 			},

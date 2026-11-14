@@ -12,6 +12,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { after, beforeEach, describe, it } from "node:test";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall, type ToolCall } from "@earendil-works/pi-ai";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-lesson-digest-"));
 process.env.LH_DATA_DIR = TMP_DATA;
@@ -26,7 +27,7 @@ const { onLessonEvents, resumeCutDigests } = await import("../src/server/lesson-
 type LhMessage = import("../src/core/native-messages.ts").LhMessage;
 type CourseRecords = import("../src/core/ports.ts").CourseRecords;
 type CourseMap = import("../src/core/contracts/course-map.ts").CourseMap;
-type PiEngine = import("../src/agent/models.ts").PiEngine;
+type SdkEngine = import("../src/agent/models.ts").SdkEngine;
 
 after(() => fs.rmSync(TMP_DATA, { recursive: true, force: true }));
 
@@ -168,7 +169,7 @@ const SUBMIT = {
 
 /** A scripted model that answers every run with the digest's submit for
  *  the prompt it read; `onCall` fires at the moment of each call. */
-function submitEngine(input: unknown | ((prompt: string) => unknown), onCall?: (prompt: string) => void): PiEngine {
+function submitEngine(input: unknown | ((prompt: string) => unknown), onCall?: (prompt: string) => void): SdkEngine {
 	const faux = createFauxCore({});
 	const answer = (context: unknown) => {
 		const prompt = JSON.stringify(context);
@@ -177,7 +178,7 @@ function submitEngine(input: unknown | ((prompt: string) => unknown), onCall?: (
 		return fauxAssistantMessage([fauxToolCall("submit_digest", submit as ToolCall["arguments"], { id: `digest-call-${++n}` })], { stopReason: "toolUse" });
 	};
 	faux.setResponses(Array.from({ length: 8 }, () => answer));
-	return { model: faux.getModel(), streamFn: faux.streamSimple };
+	return fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 }
 
 describe("the digest's patch", () => {

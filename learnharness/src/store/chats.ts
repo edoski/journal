@@ -15,6 +15,7 @@ import type { ChatStore } from "../core/ports.ts";
 import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, SessionGoal, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
+import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
 import { onFirstTurn } from "../core/session-naming.ts";
@@ -216,6 +217,9 @@ function deleteChat(id: string): boolean {
 	try {
 		fs.unlinkSync(chatFile(id));
 		removeLeftoverTemps(chatFile(id));
+		// The app's copy of the lesson's Claude Code session (agent/sdk/session-files.ts).
+		fs.rmSync(path.join(PATHS.chats, `${id}.session.jsonl`), { force: true });
+		fs.rmSync(path.join(PATHS.chats, `${id}.session`), { recursive: true, force: true });
 		emit("chats-changed", { deleted: id }); // only a real removal — the present-entry law
 		return true;
 	} catch {
@@ -233,12 +237,21 @@ function saveTree(id: string, tree: PlanTree): void {
 	writeChat(record);
 }
 
+/** Persist the record's map to its Claude Code session; silent, like saveTree. */
+function saveSession(id: string, session: ChatSession): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.session = session;
+	writeChat(record);
+}
+
 export const chatStore: ChatStore = {
 	createChat,
 	getChat,
 	listChats,
 	saveMessages,
 	saveTree,
+	saveSession,
 	linkCourse,
 	renameChat,
 	nameSession,
