@@ -13,8 +13,8 @@ The card's foot, under a hairline, 13px muted, icons with a few words:
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right (the result in `foreground`) |
-| counted | On your own; With help (the attempt records help); Counted as helped (no help, but a guess, an unsure answer or a partly right one) |
-| confidence recorded | Guessing, Neutral, Confident. Once a mark is shown the card's label row drops the confidence he picked: a dispute may have corrected it |
+| counted | `markHow`, the rule Earlier reads too, so both say the same: Prediction, not counted (`predicted`); Gave up (`gave_up`); With help (the attempt records help); Counted as helped (no help, but a guess, an unsure answer or a partly right one); On your own |
+| confidence he chose | Guessing, Confident (`chosenSure`); a recorded `neutral` is the meter left alone and shows nothing. Once a mark is shown the card's label row drops the confidence he picked: a dispute may have corrected it |
 | disputed | Disputed: and the tutor's ruling, math rendered |
 
 A practice problem with two attempts reads two rows, First try and Then; rows split by topic carry the topic's title. Dispute sits at the right: a quiet 32px button with a flag, its tooltip "Dispute this mark ⌘⇧M", off while a turn runs.

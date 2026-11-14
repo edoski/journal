@@ -3,7 +3,10 @@ import { describe, it } from "node:test";
 import { answerMarksOf, correctorsToRead, latestMarkedAnswer, markLinks } from "../src/core/answer-marks.ts";
 import { ChatInputError, inputAppends, parseChatInput } from "../src/core/input-events.ts";
 import { toLlmMessages, type LhMessage } from "../src/core/native-messages.ts";
-import { countedWords } from "../components/study-words.ts";
+import { markHow } from "../src/core/contracts/marks.ts";
+import { MARK_HOW_WORDS } from "../components/study-words.ts";
+
+const countedWords = (row: Parameters<typeof markHow>[0]) => MARK_HOW_WORDS[markHow(row)];
 
 let n = 0;
 const id = () => `m${++n}`;
@@ -109,7 +112,7 @@ describe("the mark that stands", () => {
 		assert.deepEqual(correctorsToRead({ o4: shown.o4 }, ["o4"]), ["o6"]);
 		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, shown), {
 			q1: {
-				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, sure: "confident" }],
+				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, predicted: false, gaveUp: false, sure: "confident" }],
 				disputed: true,
 				ruling: "You are right: the pivots give rank 2.",
 			},
@@ -142,8 +145,8 @@ describe("the mark that stands", () => {
 	});
 
 	it("a right guess counted as helped says so", () => {
-		assert.equal(countedWords({ grade: "helped", helped: false }), "Counted as helped");
-		assert.equal(countedWords({ grade: "solid", helped: false }), "On your own");
+		assert.equal(countedWords({ grade: "helped", helped: false, predicted: false, gaveUp: false }), "Counted as helped");
+		assert.equal(countedWords({ grade: "solid", helped: false, predicted: false, gaveUp: false }), "On your own");
 	});
 
 	it("⌘⇧M picks the newest marked answer", () => {

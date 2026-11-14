@@ -1,4 +1,4 @@
-import type { ArcState, CourseMap, CourseMapTopic, JobKind, MarkResult, MarkRow, MarkSure, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import type { ArcState, CourseMap, CourseMapTopic, JobKind, MarkHow, MarkResult, MarkRow, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -91,13 +91,18 @@ export const ATTEMPT_WORDS = {
 	wrong: "Not right",
 } as const;
 
-/** What an attempt in a topic's history says under it when it is not a
- *  plain answer: he gave up without one, or it was a prediction before its
- *  step was taught, which never counts. */
-export const ATTEMPT_HOW_WORDS = {
-	gaveUp: "Gave up",
+/** How an attempt counted (`markHow`), in the words the answer card and
+ *  the topic page's Earlier both say: a prediction before its step was
+ *  taught never counts; he gave up without an answer; help was given; no
+ *  help, but a guess, an unsure or a partly right answer counts as helped
+ *  all the same; or his own work. */
+export const MARK_HOW_WORDS: Record<MarkHow, string> = {
 	predicted: "Prediction, not counted",
-} as const;
+	gaveUp: "Gave up",
+	withHelp: "With help",
+	countedHelped: "Counted as helped",
+	ownWork: "On your own",
+};
 
 /*
  * Every distance in time counts whole days, one scheme wherever it shows:
@@ -298,10 +303,7 @@ export const LESSON_WORDS = {
  *  recorded, and a dispute. */
 export const MARK_WORDS = {
 	result: { correct: "Right", partial: "Partly right", incorrect: "Not right" } satisfies Record<MarkResult, string>,
-	sure: { guess: "Guessing", neutral: "Neutral", confident: "Confident" } satisfies Record<MarkSure, string>,
-	ownWork: "On your own",
-	withHelp: "With help",
-	countedHelped: "Counted as helped",
+	sure: { guess: "Guessing", confident: "Confident" } satisfies Record<NonNullable<MarkRow["sure"]>, string>,
 	disputed: "Disputed",
 	dispute: "Dispute",
 	disputeTitle: "Dispute this mark",
@@ -312,13 +314,6 @@ export const MARK_WORDS = {
 	youThink: "You think",
 } as const;
 
-/** Whether an attempt counted as his own or as helped, from the engine's
- *  grade and the help it records: a right guess, an unsure answer or a
- *  partly right one with no help counts as helped all the same. */
-export function countedWords(row: Pick<MarkRow, "grade" | "helped">): string {
-	if (row.helped) return MARK_WORDS.withHelp;
-	return row.grade === "helped" ? MARK_WORDS.countedHelped : MARK_WORDS.ownWork;
-}
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
  *  `stopped` when the kind is unknown. */

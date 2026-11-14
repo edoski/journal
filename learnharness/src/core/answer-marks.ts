@@ -14,11 +14,10 @@
  */
 
 import { answeredQuestionsOf, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
-import type { AnswerMark, MarkGrade, MarkRow, MarkSure } from "./contracts/marks.ts";
-import { isMarkResult } from "./contracts/marks.ts";
+import type { AnswerMark, MarkGrade, MarkRow } from "./contracts/marks.ts";
+import { chosenSure, isMarkResult } from "./contracts/marks.ts";
 
 const GRADES: readonly MarkGrade[] = ["solid", "helped", "missed"];
-const SURES: readonly MarkSure[] = ["guess", "neutral", "confident"];
 /** The conclude result's receipt line (tools/practice.ts). */
 const CONCLUDE_RECEIPT = /Course record: (\{[\s\S]*\})\s*$/;
 
@@ -121,7 +120,9 @@ function rowOf(observations: Shown, id: string): MarkRow | null {
 		result: o.result,
 		grade,
 		helped: o.kind === "attempt" && typeof o.help === "string" && o.help !== "none",
-		sure: SURES.find((s) => s === o.sure) ?? null,
+		predicted: o.predicted === true,
+		gaveUp: o.gave_up === true,
+		sure: chosenSure(o.sure),
 	};
 }
 
