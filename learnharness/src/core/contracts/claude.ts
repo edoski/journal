@@ -29,7 +29,8 @@ export interface ClaudeAccount { providerId: string; label: string; email: strin
 /** The weekly window as Claude Code last reported it. resetsAt is Unix seconds. */
 export interface ClaudeUsage { percentLeft: number; resetsAt: number | null; limited: boolean; checkedAt: number }
 
-export interface ClaudeAccountStatus { account: ClaudeAccount; connection: ClaudeConnection; usage: ClaudeUsage | null }
+/** modelMissing: the account's last call found CLAUDE_MODEL unavailable on its plan or Claude Code version. */
+export interface ClaudeAccountStatus { account: ClaudeAccount; connection: ClaudeConnection; usage: ClaudeUsage | null; modelMissing: boolean }
 
 /** The one model every agent runs, at high effort, by the owner's ruling
  * (2026-11-14): there is no model or thinking choice anywhere. */

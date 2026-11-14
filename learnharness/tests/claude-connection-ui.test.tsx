@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
-import { CLAUDE_LABEL, CLAUDE_NOTICE, ClaudeConnectionRow, claudeResetLabel } from "../components/settings/claude-connection.tsx";
+import { CLAUDE_LABEL, CLAUDE_MODEL_MISSING_LINE, CLAUDE_NOTICE, ClaudeConnectionRow, claudeResetLabel } from "../components/settings/claude-connection.tsx";
 import { onSettingsSaved, type SettingsSection } from "../components/settings-signal.ts";
 import type { ClaudeAccountStatus, ClaudeConnection, ModelStatus } from "../src/core/index.ts";
 
@@ -15,7 +15,7 @@ let root: Root | undefined, host: HTMLDivElement | undefined, stopSignals: (() =
 
 const RESET = 1_800_000_000;
 const status = (account: string): ModelStatus => ({ account, connected: true, contextWindow: 1_000_000 });
-const account = (providerId: string, label: string, connection: ClaudeConnection, usage: ClaudeAccountStatus["usage"] = null, email: string | null = null, auth: "token" | "profile" | "default" = "token"): ClaudeAccountStatus => ({ account: { providerId, label, email, auth }, connection, usage });
+const account = (providerId: string, label: string, connection: ClaudeConnection, usage: ClaudeAccountStatus["usage"] = null, email: string | null = null, auth: "token" | "profile" | "default" = "token", modelMissing = false): ClaudeAccountStatus => ({ account: { providerId, label, email, auth }, connection, usage, modelMissing });
 const connected: ClaudeConnection = { state: "connected", email: null, plan: null };
 
 function install(rounds: ClaudeAccountStatus[][]) {
@@ -88,6 +88,17 @@ test("one row per account with its email and weekly usage; Use this account swit
 	await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 	assert.equal(text(row("claude-subscription-work"), "claude-in-use"), "In use");
 	assert(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), "the other account is offered now");
+});
+
+test("an account whose plan lacks the model says so in one line", async () => {
+	install([[
+		account("claude-subscription", "Main", connected, null, null, "default", true),
+		account("claude-subscription-work", "Work", connected),
+	]]);
+	await mount();
+	assert.equal(text(row("claude-subscription"), "claude-model-missing"), CLAUDE_MODEL_MISSING_LINE);
+	assert.match(CLAUDE_MODEL_MISSING_LINE, /^Claude Opus 5\.5 is not available on this account's plan/);
+	assert.equal(text(row("claude-subscription-work"), "claude-model-missing"), null);
 });
 
 test("Refresh forces a fresh check of every account and tells readers the connections changed", async () => {

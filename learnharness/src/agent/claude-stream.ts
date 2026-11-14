@@ -20,7 +20,7 @@ import { CLAUDE_LIMIT_TEXT, CLAUDE_MODEL, CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL 
 import { claudeLaunch, type LoadedClaudeAccount } from "./claude-accounts.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MCP_SERVER, CLAUDE_TOOL_PREFIX, claudeArgs, claudeChildEnv, claudeWorkDir, resolveClaudeBinary, writeClaudeCallFiles, type ClaudeEffort, type ClaudeEnv, type ClaudeLaunch } from "./claude-cli.ts";
 import { claudeAccount, claudeAccountConnections } from "./claude-connection.ts";
-import { recordClaudeRateLimit } from "./claude-usage.ts";
+import { recordClaudeModelMissing, recordClaudeRateLimit } from "./claude-usage.ts";
 
 const NO_KEY = " No API key was used.";
 
@@ -373,11 +373,16 @@ export interface ClaudeStreamDeps {
 export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(), env = process.env, account }: ClaudeStreamDeps = {}): StreamFunction<Api, SimpleStreamOptions> {
 	return (model, context, options) => {
 		const output = new AssistantMessageEventStream();
-		const mapper = new ClaudeStreamMapper(model, Date.now(), getCurrentTools(context.messages).length > 0, (info) => recordClaudeRateLimit(account && account !== "missing" ? account.providerId : model.provider, info));
+		const providerId = account && account !== "missing" ? account.providerId : model.provider;
+		const mapper = new ClaudeStreamMapper(model, Date.now(), getCurrentTools(context.messages).length > 0, (info) => recordClaudeRateLimit(providerId, info));
 		let stop = () => {};
 		let ended = false;
 		const emit = (events: AssistantMessageEvent[]) => {
-			for (const event of events) output.push(event);
+			for (const event of events) {
+				if (event.type === "done") recordClaudeModelMissing(providerId, false);
+				else if (event.type === "error" && event.error.errorMessage === CLAUDE_MODEL_MISSING) recordClaudeModelMissing(providerId, true);
+				output.push(event);
+			}
 			if (mapper.finished && !ended) { ended = true; stop(); output.end(); }
 		};
 		const signal = options?.signal;

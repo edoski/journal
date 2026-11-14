@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { type ClaudeAccount, type ClaudeAccountStatus, type ClaudeConnection, type ClaudeUsage } from "@/src/core";
+import { CLAUDE_MODEL, type ClaudeAccount, type ClaudeAccountStatus, type ClaudeConnection, type ClaudeUsage } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { useModelStatus } from "@/components/model-status";
@@ -61,6 +61,9 @@ export function claudeUsageSentence(usage: ClaudeUsage): string {
 	return usage.limited ? `limit reached${reset}` : `${usage.percentLeft}% left this week${reset}`;
 }
 
+/** The one line under an account whose plan or Claude Code lacks the model. */
+export const CLAUDE_MODEL_MISSING_LINE = `${CLAUDE_MODEL.name} is not available on this account's plan or its Claude Code version, so LearnHarness can't run on it.`;
+
 /** PUTs the account every agent runs on, then tells every reader. */
 export async function chooseClaudeAccount(providerId: string): Promise<void> {
 	const response = await fetch("/api/settings/claude", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ account: providerId }) });
@@ -83,7 +86,7 @@ export async function readClaudeAccounts(refresh: boolean): Promise<ClaudeAccoun
 /** One account: its sign-in, its usage, and whether every agent runs on it.
  * `current` is undefined until the model status loads. Exported for tests. */
 export function AccountRow({ status, current, busy, onUse }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void }) {
-	const { account, connection, usage } = status;
+	const { account, connection, usage, modelMissing } = status;
 	const connected = connection.state === "connected";
 	const inUse = current === account.providerId;
 	return <div className="flex flex-col gap-0.5 pt-1" data-testid="claude-account" data-provider={account.providerId}>
@@ -95,6 +98,7 @@ export function AccountRow({ status, current, busy, onUse }: { status: ClaudeAcc
 		</div>
 		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection, account)}</p>
 		{connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
+		{modelMissing && <p className={connectionNoteClass("danger")} data-testid="claude-model-missing">{CLAUDE_MODEL_MISSING_LINE}</p>}
 	</div>;
 }
 

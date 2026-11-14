@@ -18,7 +18,7 @@ afterEach(async () => { await act(async () => root?.unmount()); host?.remove(); 
 
 const RESET = Math.floor(Date.now() / 1000) + 86_400;
 const connected: ClaudeConnection = { state: "connected", email: null, plan: null };
-const status = (providerId: string, label: string, percentLeft: number, limited = false, resetsAt = RESET): ClaudeAccountStatus => ({ account: { providerId, label, email: null, auth: "token" }, connection: connected, usage: { percentLeft, resetsAt, limited, checkedAt: 1 } });
+const status = (providerId: string, label: string, percentLeft: number, limited = false, resetsAt = RESET): ClaudeAccountStatus => ({ account: { providerId, label, email: null, auth: "token" }, connection: connected, usage: { percentLeft, resetsAt, limited, checkedAt: 1 }, modelMissing: false });
 const EXHAUSTED = "claude-subscription";
 
 function install(statuses: ClaudeAccountStatus[]) {
