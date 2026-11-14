@@ -6,7 +6,7 @@
  * like. The 409 merge-retry died with the full-list body (an input event
  * retries idempotently: nothing was appended when a POST is refused).
  *
- * The four events (the complete client-originated input taxonomy):
+ * The events (the complete client-originated input taxonomy):
  *   text    — a learner-authored user message (composer send, initial
  *             topic, the demo error-fix loop)
  *   answer  — the pending question's graded result (QuestionAnswerData,
@@ -19,6 +19,9 @@
  *   retry   — retry a failed model response (issue #110), without new
  *             input. Failed attempts stay in the record; only the retry's
  *             temporary agent history omits the trailing failures.
+ *   tonight — Done for tonight: whatever he left open resolves unanswered
+ *             (a question as a dismissal, its answer never shown; a
+ *             problem as dismissed, nothing recorded) and the agent closes.
  *
  * (The plan verdict input died 2026-09-26 with the verdict itself — the
  * learner's post-plan reply is a natural text message.)
@@ -28,7 +31,8 @@
  * turn rides one composition.
  */
 
-import type { QuestionAnswerData } from "./question-core.ts";
+import { dismissedAnswer, type QuestionAnswerData } from "./question-core.ts";
+import { parseQuestionInput } from "./tool-parts.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type { SessionMode } from "./contracts/chat.ts";
 import {
@@ -38,6 +42,8 @@ import {
 	danglingQuestionOf,
 	newAnswerResult,
 	newNextMessage,
+	newDoneTonightMessage,
+	respondingAgentOf,
 	newProblemDismissedMarker,
 	newThinkingMessage,
 	newPracticeRequestMessage,
@@ -74,7 +80,9 @@ export type ChatInput =
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
 	 *  only with nothing active (mid-problem input rides the dock). */
-	| { type: "next" };
+	| { type: "next" }
+	/** Done for tonight: he stops now, whatever is open. */
+	| { type: "tonight" };
 
 /** A wake-pipeline steer delivery — same turn composition, server-origin.
  *  Wave C (2026-09-26): the idle wake carries EVERY queued marker as its
@@ -236,6 +244,8 @@ export function parseChatInput(input: unknown): ChatInput {
 			};
 		case "next":
 			return { type: "next" };
+		case "tonight":
+			return { type: "tonight" };
 		default:
 			throw new ChatInputError(`unknown input type: ${String(i.type)}`);
 	}
@@ -299,7 +309,27 @@ export function inputAppends(
 			}
 			return [...dismissalConclusion(record), newNextMessage()];
 		}
+		case "tonight":
+			return tonightAppends(record);
 	}
+}
+
+/** Done for tonight's appends (pure). Every answerable question in the
+ *  newest batch resolves as a dismissal with reason "tonight", adjacent to
+ *  its call, so its answer is never revealed and nothing grades it. An
+ *  active problem is dropped the way a discard drops it, with its conclude
+ *  pair carried now instead of by a later input. The marker comes last:
+ *  the learner input the turn answers. */
+export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMode }): LhMessage[] {
+	const withheld = questionCallsOf(record.messages)
+		.filter((call) => call.status === "answerable")
+		.map((call) => newAnswerResult(call.toolCallId, call.tool,
+			dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight")));
+	const active = activeProblemOf(record.messages);
+	const dropped = active
+		? [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId)]
+		: dismissalConclusion(record);
+	return [...withheld, ...dropped, newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))];
 }
 
 /** Validate before any turn effects, then again against current saved truth.
