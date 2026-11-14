@@ -1,7 +1,8 @@
 /**
  * The Inbox candidate "today" (components/unit-inbox/today/): the sidebar's
- * top is exactly Home's Today, one card per line, each drawn as the topic
- * its line leads with, and every other topic on exactly one shelf.
+ * top is exactly Home's Today, one card per line, a session's line as the
+ * session under its one title and a course's line as the topic it leads
+ * with, and every other topic on exactly one shelf.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -15,8 +16,9 @@ import { needsYouNow } from "../components/study-home/needs-you.ts";
 import { nowFor, restShelves, sessionKey } from "../components/unit-inbox/now-inbox.ts";
 import type { NowListProps } from "../components/unit-inbox/now-list-props.ts";
 import { TodayList } from "../components/unit-inbox/today/today-list.tsx";
-import { steadyTop, itemKey, todayTop, type NowItem } from "../components/unit-inbox/today/today-top.ts";
+import { claimedKeys, steadyTop, itemKey, todayTop, type NowItem } from "../components/unit-inbox/today/today-top.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
+import { sessionState } from "../components/nav/session-state.ts";
 import type { ChatListItem, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { CHATS, chat, COURSES, LINALG, map, PROB, TODAY, topic } from "./fixtures/now-demo.ts";
 
@@ -33,7 +35,7 @@ const QUIET_LA: StudyCourse = { ...LINALG, due: [], map: { ...LINALG.map, curren
 const EMPTY: StudyCourse = { map: map({ workspace: "/s/empty", title: "Empty", topics: [topic("a", "A", "assisted")] }), unready: null, due: [], lastActiveDaysAgo: null, newToday: [] };
 
 describe("todayTop", () => {
-	it("is Today's lines in order, each with a lead topic or a waiting session", () => {
+	it("is Today's lines in order, each session under its own title and each course line as its lead topic", () => {
 		const { needs, top } = topOf(COURSES);
 		assert.deepEqual(
 			top.map((i) => i.line.key),
@@ -41,7 +43,7 @@ describe("todayTop", () => {
 		);
 		assert.deepEqual(
 			top.map((i) => (i.kind === "topic" ? i.unit.topic.title : i.chat.title)),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence"],
+			["Eigenvalues lesson", "Rank practice", "Random variables and distributions", "Linear independence"],
 		);
 		assert.ok(top.length <= 5);
 	});
@@ -82,7 +84,7 @@ describe("todayTop", () => {
 	it("keeps only the chosen course's lines under the course filter", () => {
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/linalg").top.map((i) => itemKey(i)),
-			["/s/linalg#eigen", "/s/linalg#rank", "/s/linalg#independence"],
+			[sessionKey("chat_eigen"), sessionKey("chat_rank"), "/s/linalg#independence"],
 		);
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/calc").top.map((i) => itemKey(i)),
@@ -90,14 +92,15 @@ describe("todayTop", () => {
 		);
 	});
 
-	it("lists a topic two lines lead with once, at the first", () => {
+	it("draws two sessions on one topic as two cards, one per session", () => {
 		const twice = [chat("a", { course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["rank"], pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z" }), chat("b", { course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["rank"], pendingProblem: true, updatedAt: "2026-11-08T08:00:00.000Z" })];
 		const { needs, top } = topOf([LINALG], twice);
 		assert.equal(needs.lines.length, 3);
 		assert.deepEqual(
 			top.map((i) => [i.line.key, itemKey(i)]),
 			[
-				["a", "/s/linalg#rank"],
+				["a", sessionKey("a")],
+				["b", sessionKey("b")],
 				["/s/linalg", "/s/linalg#independence"],
 			],
 		);
@@ -105,8 +108,8 @@ describe("todayTop", () => {
 
 	it("puts every listed topic and every session on the top or on exactly one shelf", () => {
 		const { inbox, top } = topOf(COURSES);
-		const shelves = restShelves(inbox, new Set(top.map(itemKey)));
-		const units = [...top.flatMap((i) => (i.kind === "topic" ? [i.unit.key] : [])), ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.key)];
+		const shelves = restShelves(inbox, new Set(top.flatMap(claimedKeys)));
+		const units = [...top.flatMap((i) => claimedKeys(i).filter((k) => k !== sessionKey(i.line.key))), ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.key)];
 		assert.equal(new Set(units).size, units.length, "no topic twice");
 		for (const u of [...inbox.active, ...inbox.working, ...inbox.known]) assert.ok(units.includes(u.key), `${u.key} placed`);
 		const shown = new Set([...top, ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => ({ kind: "topic" as const, unit: u }))].flatMap((i) => (i.kind === "topic" ? i.unit.sessions.map((c) => c.id) : [i.chat.id])));
@@ -123,6 +126,41 @@ describe("todayTop", () => {
 				["session", "Your turn"],
 			],
 		);
+	});
+});
+
+describe("one lesson, one card", () => {
+	const la = { workspace: "/s/linalg", title: "Linear Algebra" };
+	/** The eigen lesson after its turns took it through prerequisite checks:
+	 *  its transcript touched rank, independence, vectors and diag (never
+	 *  attempted), and it waits on him. */
+	const touring = (touched: readonly string[]) => [chat("tour", { title: "Eigenvalues lesson", course: la, topics: ["eigen", ...touched], ownTopics: ["eigen"], pendingQuestion: true, updatedAt: "2026-11-08T09:30:00.000Z" })];
+
+	it("draws a lesson that touched five topics as one card, under the title Home gives it, at every turn", () => {
+		for (const touched of [[], ["rank"], ["rank", "independence"], ["rank", "independence", "vectors", "diag"]]) {
+			const chats = touring(touched);
+			const { needs, top } = topOf([LINALG], chats);
+			const cards = top.filter((i) => i.kind === "session" || i.line.row.kind === "session");
+			assert.deepEqual(
+				cards.map((i) => [itemKey(i), i.kind === "session" ? i.chat.title : null]),
+				[[sessionKey("tour"), "Eigenvalues lesson"]],
+				`after touching ${touched.join(", ") || "nothing else"}`,
+			);
+			assert.equal(needs.lines[0]!.lead?.handle, "eigen", "its topic is the one it belongs to, never the step it is on");
+		}
+	});
+
+	it("says Your turn only on the lesson's own topic, never on a topic it touched or never attempted", () => {
+		const chats = touring(["rank", "independence", "diag"]);
+		const inbox = buildInbox([LINALG], chats, null);
+		const now = Object.fromEntries([...inbox.active, ...inbox.working, ...inbox.known].map((u) => [u.topic.handle, u.now]));
+		assert.equal(now.eigen, "your-turn");
+		assert.equal(now.rank, null);
+		assert.equal(now.independence, null);
+		assert.equal("diag" in now ? now.diag : null, null);
+		const { top } = topOf([LINALG], chats);
+		const shelves = restShelves(inbox, new Set(top.flatMap(claimedKeys)));
+		assert.ok(!shelves.learning.some((u) => u.topic.handle === "eigen"), "the lesson's own topic is not a second row");
 	});
 });
 
@@ -145,7 +183,7 @@ describe("steadyTop", () => {
 			const during = turn(COURSES, top, writing(CHATS, id));
 			assert.deepEqual(keysOf(during), keysOf(top), `${id} while the tutor writes`);
 			const card = during.find((i) => i.line.key === id);
-			assert.ok(card?.kind === "topic" && card.unit.now === "working", "drawn as Working");
+			assert.ok(card?.kind === "session" && sessionState(card.chat) === "working", "drawn as Working");
 		}
 		for (const id of ["chat_eigen", "chat_rank"]) {
 			const during = turn(COURSES, top, writing(CHATS, id));
@@ -161,13 +199,13 @@ describe("steadyTop", () => {
 		const next = turn(COURSES, top, woke);
 		assert.deepEqual(keysOf(next), keysOf(topOf(COURSES, woke).top));
 		const rankFirst = answered(CHATS, "chat_rank", "2026-11-08T10:00:00.000Z");
-		assert.deepEqual(keysOf(turn(COURSES, [], rankFirst)).slice(0, 2), ["/s/linalg#rank", "/s/linalg#eigen"]);
+		assert.deepEqual(keysOf(turn(COURSES, [], rankFirst)).slice(0, 2), [sessionKey("chat_rank"), sessionKey("chat_eigen")]);
 	});
 
 	it("keeps a course's due review on its own line beside a kept session on another topic, as Today does", () => {
 		const alone = CHATS.filter((c) => c.id !== "chat_rank");
 		const { top } = topOf(COURSES, alone);
-		assert.equal(itemKey(top[0]!), "/s/linalg#eigen");
+		assert.equal(itemKey(top[0]!), sessionKey("chat_eigen"));
 		assert.ok(top.some((i) => i.line.key === "/s/linalg"), "the eigen lesson does not hide Linear Algebra's review");
 		const during = turn(COURSES, top, writing(alone, "chat_eigen"));
 		assert.deepEqual(keysOf(during), keysOf(top));
@@ -219,7 +257,7 @@ describe("TodayList", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence"],
+			["Eigenvalues lesson", "Rank practice", "Random variables and distributions", "Linear independence"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
@@ -234,10 +272,10 @@ describe("TodayList", () => {
 		assert.equal(doc.querySelector('[data-slot="sidebar-note"]'), null);
 	});
 
-	it("marks the open topic's card", () => {
+	it("marks the open session's card", () => {
 		const doc = renderList({ pathname: "/chat/chat_rank" });
 		const open = [...doc.querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute("data-sidebar-row"));
-		assert.deepEqual(open, ["/s/linalg#rank"]);
+		assert.deepEqual(open, [sessionKey("chat_rank")]);
 	});
 
 	it("says what it can when nothing needs him, there are no courses, or the engine is down", () => {

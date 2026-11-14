@@ -2,15 +2,15 @@
 
 The sidebar's list (`unit-inbox.md`, "Today on top"), which Edo picked over Topics on 13 Nov 2026. `today/today-top.ts` (`todayTop`, `steadyTop`, `itemKey`, `NowItem`; `tests/inbox-today.test.ts`) and `today/today-list.tsx` (`TodayList`).
 
-Thesis: the sidebar's top is exactly Home's Today. One card per line, in the same order with the same reason, each drawn as the topic its line leads with; everything else folds onto the shelves at the foot. The system picks; he never sorts.
+Thesis: the sidebar's top is exactly Home's Today. One card per line, in the same order with the same reason: a session's line as the session under the title Home and its header give it, a course's line as the topic it leads with; everything else folds onto the shelves at the foot. The system picks; he never sorts.
 
 ## What is on top
 
 | Rule | Source |
 |---|---|
 | Today's lines (`needsYouNow(...).lines`, under the course filter `nowFor`), in Home's order, at most five; Home's "Also today" lines are not drawn and their topics stay on the shelves | `../study-home/needs-you.ts` |
-| A line with a lead topic is that topic's card (`NowCard`): the inbox's unit, else `unitFor` (a lead not started yet, resting on Learning). The lead is the topic the line's reason is about, so title and reason agree: a lapse's lapsed topic ("Missed last time"), an open task's current topic ("At part (c)" on Rank and the column space, the sheet's topic), else the line's first | `topicUnit` in `now-inbox.ts`; `leadOf` in `../study-home/needs-you.ts` |
-| A waiting session whose transcript holds no topic of its course's map, or that has no course, is its own session card | `now-card.md`, "The session card" |
+| A session's line is its session card (`now-card.md`, "The session card"), one per session however many topics its lesson touched; it takes its own topic off the shelves (`claimedKeys`) | `todayTop`, `claimedKeys` |
+| A course's line with a lead topic is that topic's card (`NowCard`): the inbox's unit, else `unitFor` (a lead not started yet, resting on Learning). The lead is the topic the line's reason is about, so title and reason agree: a lapse's lapsed topic ("Missed last time"), an open task's current topic ("At part (c)" on Rank and the column space, the sheet's topic), else the line's first | `topicUnit` in `now-inbox.ts`; `leadOf` in `../study-home/needs-you.ts` |
 | A course line with nothing to take up (step `none`, Home's "Start a lesson") has no card | `todayTop` |
 | A topic is listed once, at the first line that leads with it; a topic on top is on no shelf | `restShelves(inbox, keys)` with `itemKey` |
 
@@ -26,7 +26,7 @@ No header, no count and no total on top: cards leave as the day's plan empties, 
 | 1100×700 | the same | 554 to 652 | none |
 | 1512×982 | the same | 836 to 934 | none |
 
-The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors; Linear Algebra, Your turn, Rank and the column space; Probability, 3d overdue, Random variables and distributions; Real Analysis, 1w overdue, Convergent sequences; Calculus I, Missed last time, Chain rule. Home's Today shows the same five lines in that order with the same reasons.
+The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors (the lesson); Linear Algebra, Your turn, Rank practice; Probability, 3d overdue, Random variables and distributions; Real Analysis, 1w overdue, Convergent sequences; Calculus I, Missed last time, Chain rule. Home's Today shows the same five lines in that order with the same reasons.
 
 The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowShelves`, `NowSkeleton` and `SidebarNote` (`now-shelves.md`).
 

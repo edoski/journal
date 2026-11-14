@@ -15,7 +15,9 @@ The one model of where a session stands. Home, the topic page, the calendar and 
 
 ## Which session belongs to a topic
 
-A session is on a topic when the engine's records tie it there or it was started there: a problem posed on the topic, an attempt saved on it (a save sent as JSON text counts, as the engine reads it), the topic's introduction, or `topics` on the record, set at creation by `POST /api/chats` (a topic's page, Home's review, the calendar, the sidebar's Study). Never a plan step's name, and never a task covering the topic: a task links its sessions to the task (`taskSessions`), which its own row continues. Chats carry these as `topics` in `/api/chats`.
+A session has one identity, fixed once, never moved by the step its lesson is on: its title and the topic it belongs to (`ownTopics`, the record's `topics`). A session started on topics (a topic's page, Home's review, the calendar, the sidebar's Study, `POST /api/chats` with `topics`) belongs to them and keeps the title it was opened with. A session started from a free message belongs to no topic until its first plan names its goal (`plan_init`'s `goal`, `ChatStore.nameSession`): then it takes the goal's topic and, unless he renamed it, the goal's title. A rewritten plan never renames it. Home's line, the sidebar's card and the header all show that one title.
+
+Only a session's own topic says Your turn for it (`nowOf`); a session with none sits on Other sessions. A session is on a topic's history when the engine's records tie it there or it was started there: a problem posed on the topic, an attempt saved on it (a save sent as JSON text counts, as the engine reads it), the topic's introduction, or its own topics. Never a plan step's name, and never a task covering the topic: a task links its sessions to the task (`taskSessions`), which its own row continues. Chats carry these as `topics` in `/api/chats`.
 
 ## Exports other modules read
 

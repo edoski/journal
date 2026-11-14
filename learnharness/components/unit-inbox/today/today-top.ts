@@ -2,13 +2,13 @@ import type { ChatListItem } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import type { NeedsYou, NowLine } from "@/components/study-home/needs-you";
 import { sessionKey, topicUnit } from "@/components/unit-inbox/now-inbox";
-import type { Unit, UnitInbox } from "@/components/unit-inbox/units";
+import { unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 
 /**
  * One card on the sidebar's top (spec:
- * ../inbox-today.md): a Today line drawn as the topic it leads with, or a
- * waiting session whose transcript holds no topic of its course's map (or
- * that has no course) drawn as itself.
+ * ../inbox-today.md): a course's line drawn as the topic it leads with, or
+ * a session's line drawn as the session itself, under the one title Home
+ * and its header give it.
  */
 export type NowItem = { kind: "topic"; line: NowLine; unit: Unit } | { kind: "session"; line: NowLine; chat: ChatListItem };
 
@@ -16,14 +16,23 @@ export type NowItem = { kind: "topic"; line: NowLine; unit: Unit } | { kind: "se
  *  row name: the unit's key, or `chat:<id>`. Pure. */
 export const itemKey = (item: NowItem): string => (item.kind === "topic" ? item.unit.key : sessionKey(item.chat.id));
 
+/** The keys an item takes off the shelves: its own, and a session's own
+ *  topic (`NowLine.lead`), so a waiting lesson is one card and its topic
+ *  no second row. Pure. */
+export function claimedKeys(item: NowItem): string[] {
+	const { row, lead } = item.line;
+	return item.kind === "session" && lead && row.course ? [itemKey(item), unitKey(row.course.map.workspace, lead.handle)] : [itemKey(item)];
+}
+
 /**
  * The sidebar's top: Today's lines (`needs.lines`, at most five, in Home's
- * order), one card each. A line with a lead topic is that topic's unit, the
- * inbox's own else one built for it (a lead not started yet); a waiting
- * session with no lead is its session card; a course line with no lead
- * (nothing to start) is skipped. A topic two lines lead with is listed
- * once, at the first. Home's "also" lines are not drawn: their topics stay
- * on the shelves. Pure.
+ * order), one card each. A session's line is its session card, one per
+ * session however many topics its lesson touched; a course's line with a
+ * lead topic is that topic's unit, the inbox's own else one built for it
+ * (a lead not started yet); a course line with no lead (nothing to start)
+ * is skipped. A topic two lines lead with is listed once, at the first.
+ * Home's "also" lines are not drawn: their topics stay on the shelves.
+ * Pure.
  */
 export function todayTop(needs: NeedsYou, inbox: UnitInbox, chats: readonly ChatListItem[]): NowItem[] {
 	const seen = new Set<string>();
@@ -31,10 +40,10 @@ export function todayTop(needs: NeedsYou, inbox: UnitInbox, chats: readonly Chat
 	for (const line of needs.lines) {
 		const { row, lead } = line;
 		const item: NowItem | null =
-			lead && row.course
-				? { kind: "topic", line, unit: topicUnit(inbox, row.course, lead, chats) }
-				: row.kind === "session"
-					? { kind: "session", line, chat: row.chat }
+			row.kind === "session"
+				? { kind: "session", line, chat: row.chat }
+				: lead
+					? { kind: "topic", line, unit: topicUnit(inbox, row.course, lead, chats) }
 					: null;
 		if (!item || seen.has(itemKey(item))) continue;
 		seen.add(itemKey(item));
@@ -44,20 +53,15 @@ export function todayTop(needs: NeedsYou, inbox: UnitInbox, chats: readonly Chat
 }
 
 /** A session line's card as it is now while the tutor writes in its
- *  session, or null: its topic, which the inbox now lists as Working, or
- *  the session card's session, running and still in the list's scope (a
- *  session on no listed topic is on the inbox's Other). Pure. */
+ *  session, or null: the session card's session, running and still in the
+ *  list's scope (the inbox lists it on a topic or on Other). Pure. */
 function running(item: NowItem, inbox: UnitInbox, chats: readonly ChatListItem[]): NowItem | null {
 	const { row } = item.line;
-	if (row.kind !== "session") return null;
+	if (row.kind !== "session" || item.kind !== "session") return null;
 	const chat = chats.find((c) => c.id === row.chat.id);
 	if (!chat || sessionState(chat) !== "working") return null;
-	const line = { ...item.line, row: { ...row, chat } };
-	if (item.kind === "topic") {
-		const unit = inbox.working.find((u) => u.key === item.unit.key);
-		return unit ? { kind: "topic", line, unit } : null;
-	}
-	return inbox.other.some((c) => c.id === chat.id) ? { kind: "session", line, chat } : null;
+	const listed = [...inbox.active, ...inbox.working, ...inbox.known].some((u) => u.sessions.some((c) => c.id === chat.id)) || inbox.other.some((c) => c.id === chat.id);
+	return listed ? { kind: "session", line: { ...item.line, row: { ...row, chat } }, chat } : null;
 }
 
 /**

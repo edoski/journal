@@ -137,9 +137,11 @@ describe("a lesson waiting on his typed answer", () => {
 		const action = topicAction(RANK, MAP, listed());
 		assert.equal(action.kind, "resume", "the page of the topic it worked on resumes the lesson");
 		assert.equal("chat" in action ? action.chat.id : null, id);
-		const unit = buildInbox([COURSE], listed(), WS).active.find((u) => u.topic.handle === RANK.handle);
-		assert.equal(unit?.now, "your-turn", "that topic's sidebar row says your turn");
-		assert.equal(resumableSession(unit!.sessions)?.id, id, "and its action resumes it");
+		const inbox = buildInbox([COURSE], listed(), WS);
+		const unit = inbox.active.find((u) => u.topic.handle === RANK.handle);
+		assert.equal(unit?.now, null, "a topic the lesson only worked on is not its turn: the lesson belongs to no topic until its plan names one");
+		assert.ok(inbox.other.some((c) => c.id === id), "so the lesson is a session of its own in the sidebar");
+		assert.equal(resumableSession(unit!.sessions)?.id, id, "and the topic's action resumes it");
 
 		const held = topicAction(KERNEL, MAP, listed());
 		assert.ok(held.kind === "continue" && "chat" in held && held.chat.id === id, "a topic its task holds continues the task in that lesson");
