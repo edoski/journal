@@ -6,11 +6,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+	KEYBOARD_ACTIONS,
 	actionForBinding,
 	formatBinding,
 	IS_MAC,
 	kbdEventForAction,
-	keyActionsFor,
 } from "../src/core/index.ts";
 import { cheatSheetSections } from "../components/keyboard-shortcuts.tsx";
 
@@ -70,8 +70,8 @@ describe("the cheat sheet groups them in plain words", () => {
 		]);
 	});
 
-	it("files every action the Proposed design answers to somewhere", () => {
+	it("files every action somewhere", () => {
 		const shown = sections.flatMap((s) => s.actions.map((a) => a.id));
-		assert.deepEqual([...shown].sort(), keyActionsFor("proposed").map((a) => a.id).sort());
+		assert.deepEqual([...shown].sort(), KEYBOARD_ACTIONS.map((a) => a.id).sort());
 	});
 });

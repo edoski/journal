@@ -24,7 +24,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { ModelRole } from "../../../config.ts";
-import { ROLE_SLOT, modelsNotConfigured, type ModelSlotName, type ProviderKeyMissing } from "../../core/settings.ts";
+import type { ProviderKeyMissing } from "../../core/settings.ts";
 import type { ChatStore, JobStore } from "../../core/ports.ts";
 import { runDemoBuilder } from "./demo-builder.ts";
 import { runPdfReaderAgent } from "./pdf-reader.ts";
@@ -73,19 +73,15 @@ export interface JobRunnerDeps {
 	 * on it. Its persisted pending obligation survives process restart.
 	 */
 	deliver: (steer: SteerMessage) => Promise<void>;
-	/** Settings-resolved engine per role (model slots wave, 2026-09-20):
-	 *  the role-override → slot chain, read FRESH per job (the server
-	 *  wiring passes effectiveSettings-based resolution). Test overrides
-	 *  (below) still win. BYOK (owner, 2026-09-22): the chain may end
-	 *  EMPTY → undefined; runJob then refuses the spawn honestly instead
-	 *  of guessing a model. */
-	engineFor?: (role: ModelRole) => PiEngine | undefined;
-	/** Key-presence gate (provider-key interlude, 2026-09-25): given the
-	 *  resolved engine's provider + the kind's slot tier, return the
-	 *  refusal envelope when the provider's key is missing (null = run).
-	 *  Injected because the agent layer may not read the key store; absent
-	 *  in tests that inject engines directly (test engines never owe a key). */
-	providerKeyMissing?: (provider: string, tier: ModelSlotName) => ProviderKeyMissing | null;
+	/** The engine per role, read FRESH per job (the server wiring resolves
+	 *  the settings' Claude account each time). Test overrides (below)
+	 *  still win. */
+	engineFor?: (role: ModelRole) => PiEngine;
+	/** Connection gate: given the engine's Claude account, the refusal
+	 *  envelope when it is not signed in (null = run). Injected because the
+	 *  agent layer may not read the connection state; absent in tests that
+	 *  inject engines directly (test engines never owe a sign-in). */
+	providerKeyMissing?: (provider: string) => ProviderKeyMissing | null;
 	/** Test seam: per-kind time limits. Production uses JOB_TIME_LIMIT_MS. */
 	timeLimitMs?: Record<JobKind, number>;
 }
@@ -112,8 +108,8 @@ interface LoopContext {
 	onUsage: (step: UsageStepLike) => void;
 }
 
-/** The kind→role table (model slots wave, 2026-09-20): which ModelRole's
- * engine each sub-agent kind runs — the engineFor injection key. */
+/** The kind→role table: which ModelRole each sub-agent kind runs as — the
+ * engineFor injection key. */
 const KIND_ROLE: Record<JobKind, ModelRole> = {
 	research: "researcher",
 	demo: "demoBuilder",
@@ -132,7 +128,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	function makeLoopContext(jobId: string, engine: PiEngine, controller: AbortController): LoopContext {
 		const chatId = jobStore.getJob(jobId)?.chatId;
 		// Provider-qualified stamp: the engine's actual model — the only
-		// thing that ran (BYOK: no config-pin fallback stamps exist).
+		// thing that ran.
 		const model = `${engine.model.provider}:${engine.model.id}`;
 		// Real-kill wiring (2026-09 abort semantics): the controller is what
 		// the abort endpoint fires (agent/subagents/aborts.ts registry); the
@@ -162,8 +158,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	 *  kind-correct by construction; transcript fallbacks are cast after). */
 	/** The engine one job runs on: test override first (the old seam —
 	 *  tests swap scripted engines without touching deps), then the injected
-	 *  settings-resolved engineFor. undefined = the BYOK chain came up
-	 *  empty (owner, 2026-09-22) — runJob refuses below, honestly. */
+	 *  engineFor. undefined = nothing was injected — runJob refuses below. */
 	function pickEngine(kind: JobKind): PiEngine | undefined {
 		const testOverride: Record<string, { current?: PiEngine } | undefined> = {
 			researcher: researchModelOverride,
@@ -207,9 +202,9 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			await failJob(job, input, timeoutReason);
 			return;
 		}
-		// No engine for the kind's tier, its provider key gone, or the
-		// settings naming a model the catalog lacks: each fails the job
-		// before the loop, so the tutor reads why instead of waiting.
+		// No engine injected, its account signed out, or an account T3 Code
+		// no longer has: each fails the job before the loop, so the tutor
+		// reads why instead of waiting.
 		let engine: PiEngine | undefined;
 		try {
 			engine = pickEngine(job.kind);
@@ -220,14 +215,12 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			return;
 		}
 		if (!engine) {
-			const tier = ROLE_SLOT[KIND_ROLE[job.kind]];
-			const envelope = modelsNotConfigured([tier]);
-			console.info(`[job ${jobId}] refused — ${JSON.stringify(envelope)}`);
-			await failJob(job, input, `${envelope.error} (missing: ${tier})`);
+			const reason = `no engine injected for role "${KIND_ROLE[job.kind]}"`;
+			console.info(`[job ${jobId}] refused — ${reason}`);
+			await failJob(job, input, reason);
 			return;
 		}
-		const keyRefusal =
-			deps.providerKeyMissing?.(engine.model.provider, ROLE_SLOT[KIND_ROLE[job.kind]]) ?? null;
+		const keyRefusal = deps.providerKeyMissing?.(engine.model.provider) ?? null;
 		if (keyRefusal) {
 			console.info(`[job ${jobId}] refused — ${JSON.stringify(keyRefusal)}`);
 			await failJob(job, input, keyRefusal.error);

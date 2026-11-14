@@ -1,5 +1,5 @@
 /** Focused synthetic live-UI check. No model/provider calls: /api/chat is
- * intercepted, catalog is a fixture, app HOME/data/auth are throwaway, and
+ * intercepted, the model status is a fixture, app HOME/data/auth are throwaway, and
  * the browser uses a fresh profile. Creates only synthetic session records.
  * Run: node scripts/smoke-opening-prompt.mjs
  */
@@ -52,10 +52,7 @@ try {
 	page = await browser.newPage();
 	page.setDefaultTimeout(45000);
 	page.on("pageerror", err => errors.push(err.message));
-	const model = { id: "synthetic", name: "Synthetic (no calls)", provider: "fixture", input: ["text"], reasoning: false, supportedLevels: ["off"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 };
-	const slot = { model: { provider: model.provider, id: model.id }, thinkingLevel: "off" };
-	const catalog = { models: [model], providers: [{ id: "fixture", label: "Fixture", connected: true }], defaults: null,
-		slots: { strong: slot, cheap: slot, vision: slot }, rolePins: {} };
+	const status = { account: "claude-subscription", connected: true, contextWindow: 1000000 };
 	const posts = [];
 	const creates = [];
 	const accepted = new Map();
@@ -68,7 +65,7 @@ try {
 			if (url.origin !== origin) { await request.abort(); return; }
 			const pathname = url.pathname;
 			const respond = body => request.respond({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
-			if (pathname === "/api/models") return await respond(catalog);
+			if (pathname === "/api/models") return await respond(status);
 			// Notifications are outside this handover check. 204 tells native
 			// EventSource not to reconnect or hold a test connection open.
 			if (pathname === "/api/events") return await request.respond({ status: 204 });
@@ -76,7 +73,7 @@ try {
 				const body = JSON.parse(request.postData()); posts.push(body);
 				if (mode === "held-post") { held.push(request); return; }
 				if (mode === "lost-ack") return await request.abort("failed");
-				if (mode === "refused") return await request.respond({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "models_not_configured", missing: ["strong"] }) });
+				if (mode === "refused") return await request.respond({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "provider_key_missing", provider: "claude-subscription", error: "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts" }) });
 				accepted.set(body.chatId, [{ id: "saved_user", role: "user", content: body.input.text, timestamp: Date.now() }]);
 				return await respond({ ok: true });
 			}
@@ -224,7 +221,7 @@ try {
 	assert.equal(posts.at(-1).input.text, "legacy opening");
 	checks.push("legacy short ?prompt link still sends its complete opening message");
 	assert.deepEqual(errors, []);
-	console.log(JSON.stringify({ checks, pageErrors: errors, isolation: "synthetic catalog/POST+streams; empty auth; no providers", origin }, null, 2));
+	console.log(JSON.stringify({ checks, pageErrors: errors, isolation: "synthetic model status/POST+streams; empty auth; no providers", origin }, null, 2));
 } catch (err) {
 	console.error(err);
 	console.error(JSON.stringify({ checks, errors, url: page?.url(), dom: await page?.evaluate(() => ({ textareas: [...document.querySelectorAll('textarea')].map(e => ({ length: e.value.length, placeholder: e.placeholder })), buttons: [...document.querySelectorAll('button[aria-label="Send"]')].map(e => ({ disabled: e.disabled, label: e.getAttribute('aria-label') })), alerts: [...document.querySelectorAll('[role="alert"]')].map(e => e.textContent), failStorage: window.failOpeningStorage, text: document.body.innerText.slice(-1200) })).catch(() => null) }, null, 2));

@@ -26,10 +26,7 @@ export type Stores = typeof stores;
 
 /**
  * The resolved view of the settings record (core/settings-resolution.ts):
- * every knob concrete over its factory default — EXCEPT MODELS (BYOK all
- * the way down, owner 2026-09-22): no factory pins exist, so unset model
- * slots resolve to null and per-need refusal gates fire downstream. Read
- * fresh on every call — the record is a small file and turns are rare, so
+ * every knob concrete over its factory default. Read fresh on every call — the record is a small file and turns are rare, so
  * no caching layer (stale toggles after a settings PUT would be worse).
  */
 export function effectiveSettings(): EffectiveSettings {

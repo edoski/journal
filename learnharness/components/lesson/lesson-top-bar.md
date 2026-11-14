@@ -15,7 +15,7 @@ The session's top bar, rendered in the shared `TopBar` at `size="slim"` (52px, p
 
 ## Details panel
 
-A `Popover` (components/ui/popover.md), 352px, padding 12, right-aligned under its button. A two-column list at 13/18: Model (the session's `ModelControl`: two 28px field-style triggers, the model opening a picker popover with `ModelCommand` and the thinking level a dropdown menu with `ThinkingMenuItems`, components/settings/model-pickers.md), Context ("19.4k / 1M"), Cost, and in teaching sessions Notes extracted (the coverage ring, whose numbers open in a nested popover). The content is force-mounted and hidden while closed, so the model control keeps reporting the session's model to the send gate and Shift+Tab keeps cycling the level; a closed panel never takes Esc. ⌘K opens the panel with the model picker. Esc or a click outside closes the topmost layer only (components/ui/overlay.md).
+A `Popover` (components/ui/popover.md), 352px, padding 12, right-aligned under its button. A two-column list at 13/18: Model (plain text, "Claude Opus 5.5": every agent runs it at high effort and nothing chooses it, owner 2026-11-14), Context ("19.4k / 1M", the denominator the model's window from GET /api/models), Cost, and in teaching sessions Notes extracted (the coverage ring, whose numbers open in a nested popover). The content is force-mounted and hidden while closed; a closed panel never takes Esc. ⌘K opens the panel. Esc or a click outside closes the topmost layer only (components/ui/overlay.md).
 
 ## Sources
 

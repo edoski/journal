@@ -335,11 +335,3 @@ export function ChatGPTConnection() {
 		{ui.warning && <div role="alert" data-testid="chatgpt-revocation-warning" className="rounded-sm border border-border px-3 py-2 text-xs text-muted-foreground">{ui.warning}<button type="button" className="ml-2 cursor-pointer underline underline-offset-2" onClick={ui.dismissWarning}>Dismiss</button></div>}
 	</div>;
 }
-
-/** Contextual consent discovery belongs beside background model choices only. */
-export function ChatGPTBackgroundAccess({ provider }: { provider: string | undefined }) {
-	const ui = useContext(Context);
-	const account: Account | undefined = ui.status.accounts.find((a) => a.id === ui.status.activeId && a.connected);
-	if (provider !== "chatgpt" || !account || ui.status.allowBackgroundUse) return null;
-	return <Button type="button" size="xs" variant="ghost" className="cursor-pointer" disabled={ui.busy} onClick={() => ui.manage(account.id)}>Enable background use</Button>;
-}

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CLAUDE_ROLE_DEFAULT, MODEL_SLOTS, type ClaudeAccount, type ClaudeAccountStatus, type ClaudeConnection, type ClaudeUsage, type ModelsSettings, type SlotPins } from "@/src/core";
+import { type ClaudeAccount, type ClaudeAccountStatus, type ClaudeConnection, type ClaudeUsage } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { useModelCatalog } from "@/components/model-catalog";
+import { useModelStatus } from "@/components/model-status";
 import { CONNECTION_BLOCK, ConnectionRow, connectionNoteClass } from "./connection-controls";
 
 export const CLAUDE_LABEL = "Claude";
@@ -61,14 +61,14 @@ export function claudeUsageSentence(usage: ClaudeUsage): string {
 	return usage.limited ? `limit reached${reset}` : `${usage.percentLeft}% left this week${reset}`;
 }
 
-export function claudeRoleModels(providerId: string): ModelsSettings {
-	const models: ModelsSettings = {};
-	for (const slot of MODEL_SLOTS) models[slot] = { model: { provider: providerId, id: CLAUDE_ROLE_DEFAULT.id }, thinkingLevel: CLAUDE_ROLE_DEFAULT.thinkingLevel };
-	return models;
-}
-
-function holdsAllRoles(slots: SlotPins | undefined, providerId: string): boolean {
-	return !!slots && MODEL_SLOTS.every((slot) => slots[slot]?.model.provider === providerId && slots[slot]?.model.id === CLAUDE_ROLE_DEFAULT.id);
+/** PUTs the account every agent runs on, then tells every reader. */
+export async function chooseClaudeAccount(providerId: string): Promise<void> {
+	const response = await fetch("/api/settings/claude", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ account: providerId }) });
+	if (!response.ok) {
+		const body = (await response.json().catch(() => ({}))) as { error?: string };
+		throw new Error(body.error ?? `status ${response.status}`);
+	}
+	notifySettingsSaved("claude");
 }
 
 /** Reads every account's status; `refresh` re-checks sign-ins and probes usage. */
@@ -80,20 +80,18 @@ export async function readClaudeAccounts(refresh: boolean): Promise<ClaudeAccoun
 	return body.accounts;
 }
 
-/** Mounted only while signed in, so a signed-out row never reads the catalog. */
-function UseForAllRoles({ providerId, busy, onUse }: { providerId: string; busy: boolean; onUse: () => void }) {
-	const { catalog } = useModelCatalog();
-	if (!catalog || holdsAllRoles(catalog.slots, providerId)) return null;
-	return <Button type="button" size="sm" variant="outline" className="h-7 cursor-pointer px-3 disabled:cursor-not-allowed" data-testid="claude-use-all" disabled={busy} onClick={onUse}>Use for everything</Button>;
-}
-
-function AccountRow({ status, busy, onUse }: { status: ClaudeAccountStatus; busy: boolean; onUse: () => void }) {
+/** One account: its sign-in, its usage, and whether every agent runs on it.
+ * `current` is undefined until the model status loads. Exported for tests. */
+export function AccountRow({ status, current, busy, onUse }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void }) {
 	const { account, connection, usage } = status;
 	const connected = connection.state === "connected";
+	const inUse = current === account.providerId;
 	return <div className="flex flex-col gap-0.5 pt-1" data-testid="claude-account" data-provider={account.providerId}>
 		<div className="flex min-h-7 items-center gap-3">
 			<span className="min-w-0 flex-1 truncate text-row text-foreground">{claudeAccountLabel(account)}</span>
-			{connected && <UseForAllRoles providerId={account.providerId} busy={busy} onUse={onUse} />}
+			{inUse
+				? <span className="text-label text-muted-foreground" data-testid="claude-in-use">In use</span>
+				: connected && current !== undefined && <Button type="button" size="sm" variant="outline" className="h-7 cursor-pointer px-3 disabled:cursor-not-allowed" data-testid="claude-use-account" disabled={busy} onClick={onUse}>Use this account</Button>}
 		</div>
 		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection, account)}</p>
 		{connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
@@ -101,6 +99,7 @@ function AccountRow({ status, busy, onUse }: { status: ClaudeAccountStatus; busy
 }
 
 export function ClaudeConnectionRow() {
+	const current = useModelStatus().status?.account;
 	const [accounts, setAccounts] = useState<ClaudeAccountStatus[] | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -128,17 +127,12 @@ export function ClaudeConnectionRow() {
 		}
 	}
 
-	async function useForAllRoles(providerId: string) {
+	async function switchTo(providerId: string) {
 		setBusy(true); setError(null);
 		try {
-			const response = await fetch("/api/settings/models", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(claudeRoleModels(providerId)) });
-			if (!response.ok) {
-				const body = (await response.json().catch(() => ({}))) as { error?: string };
-				throw new Error(body.error ?? `status ${response.status}`);
-			}
-			notifySettingsSaved("models");
+			await chooseClaudeAccount(providerId);
 		} catch (err) {
-			if (mounted.current) setError(`Could not switch your models to Claude: ${err instanceof Error ? err.message : "try again"}.`);
+			if (mounted.current) setError(`Could not switch to this Claude account: ${err instanceof Error ? err.message : "try again"}.`);
 		} finally {
 			if (mounted.current) setBusy(false);
 		}
@@ -147,7 +141,7 @@ export function ClaudeConnectionRow() {
 	return <div className={CONNECTION_BLOCK} data-testid="claude-connection">
 		<ConnectionRow label={CLAUDE_LABEL} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()} />
 		{!accounts && !error && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
-		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} busy={busy} onUse={() => void useForAllRoles(status.account.providerId)} />)}
+		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} onUse={() => void switchTo(status.account.providerId)} />)}
 		<p className={connectionNoteClass("muted")}>{CLAUDE_NOTICE}</p>
 		{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
 	</div>;

@@ -25,7 +25,6 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
-	useRef,
 	useState,
 } from "react";
 import {
@@ -37,10 +36,9 @@ import {
 import { useAppearance } from "./appearance.tsx";
 import { SettingsGroup, SettingsRow, SettingsSection } from "./controls.tsx";
 import { AgentSection } from "./agent-section.tsx";
-import type { ModelsSettings } from "@/src/core";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
+import { notifySettingsSaved } from "@/components/settings-signal";
 import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection } from "./appearance-section.tsx";
@@ -157,26 +155,12 @@ export function SettingsDialogBody({
 			.catch(() => setRecord(null));
 	}, []);
 
-	// A models write from outside this dialog's own writer (Claude's "Use for
-	// all roles" on the Providers page) must reach the mirror, or the Agent
-	// tab would compose its next slot write from stale siblings.
-	const announcing = useRef(false);
-	useSettingsSaved((section) => {
-		if (section !== "models" || announcing.current) return;
-		fetch("/api/settings")
-			.then((r) => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
-			.then((body: { settings: UserSettings | null }) =>
-				setRecord((prev) => (prev ? { ...prev, models: body.settings?.models } : prev)),
-			)
-			.catch(() => {});
-	});
-
 	/** ONE writer for the whole dialog: PUT the whole section, keep the
 	 *  record mirror in sync, surface route errors inline (a 400 is a
 	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
-			section: "agent" | "models" | "appearance",
+			section: "agent" | "appearance",
 			body: object,
 		) => {
 			setError(null);
@@ -192,11 +176,8 @@ export function SettingsDialogBody({
 				setError(`${section}: ${detail.error ?? res.status}`);
 				return;
 			}
-			// Server truth, never the request body (fix wave, owner repro):
-			// the models section clamps pinned thinking levels on write
-			// (bd68486) — a swap that rides an unsupported level lands
-			// CLAMPED in the record, and the writing surface must show the
-			// stored value in this same interaction, not the optimistic one.
+			// Server truth, never the request body: the record the route
+			// stored is what the surfaces show.
 			const stored = (
 				(await res.json().catch(() => null)) as { settings?: UserSettings } | null
 			)?.settings;
@@ -204,12 +185,7 @@ export function SettingsDialogBody({
 				(prev) =>
 					stored ?? ({ ...(prev ?? {}), [section]: body }) as UserSettings,
 			);
-			announcing.current = true;
-			try {
-				notifySettingsSaved(section);
-			} finally {
-				announcing.current = false;
-			}
+			notifySettingsSaved(section);
 			if (section === "appearance")
 				onAppearanceChange(body as AppearanceSettings);
 		},
@@ -263,10 +239,6 @@ export function SettingsDialogBody({
 								>
 									<AgentSection
 										agent={record.agent}
-										models={record.models}
-										onModelsChange={(next: ModelsSettings) =>
-											void write("models", next)
-										}
 										onSectionChange={(next: AgentSettings) =>
 											void write("agent", next)
 										}

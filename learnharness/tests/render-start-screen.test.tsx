@@ -24,7 +24,7 @@ describe("the start screen", () => {
 		documentFor(
 			<ServerEventsProvider>
 				<AppRouterContext.Provider value={router as never}>
-					<StartScreen initialConfigured />
+					<StartScreen />
 				</AppRouterContext.Provider>
 			</ServerEventsProvider>,
 		);

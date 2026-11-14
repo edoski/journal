@@ -7,22 +7,8 @@ import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { Toggle } from "../components/settings/controls.tsx";
 import { AgentSection } from "../components/settings/agent-section.tsx";
-import type { ModelsSettings } from "../src/core/index.ts";
-import type { ModelCatalogEntry } from "../src/core/contracts/models.ts";
 
-// The settings kit on the real Radix layers: the switch and the
-// Agent section's model and thinking pickers. Fetch is stubbed read-only.
-const MODELS: ModelCatalogEntry[] = ["alpha-large", "beta-small"].map((id) => ({
-	id,
-	name: id,
-	provider: "anthropic",
-	reasoning: true,
-	input: ["text"],
-	supportedLevels: ["low", "high"],
-	cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 200000,
-	maxTokens: 8192,
-}));
+// The settings kit on the real Radix layers. Fetch is stubbed read-only.
 const originalFetch = globalThis.fetch;
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -38,8 +24,7 @@ afterEach(async () => {
 async function mount(node: React.ReactElement) {
 	globalThis.fetch = async (input, init) => {
 		assert.equal(init?.method ?? "GET", "GET", "the kit itself never writes; its host does");
-		const path = new URL(String(input), "http://localhost").pathname;
-		if (path === "/api/models") return Response.json({ providers: [], models: MODELS, slots: {} });
+		void input;
 		return Response.json({});
 	};
 	host = document.createElement("div");
@@ -77,28 +62,11 @@ describe("settings switch", () => {
 	});
 });
 
-describe("Agent pickers", () => {
-	it("the model picker lists the catalog and a pick writes the slot with a populated level", async () => {
-		const writes: ModelsSettings[] = [];
-		await mount(
-			<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={(m) => writes.push(m)} />,
-		);
-		await press(element('[data-testid="slot-model-strong"]'), "click");
-		const options = [...document.querySelectorAll('[data-testid^="model-option-"]')];
-		assert.deepEqual(options.map((o) => o.getAttribute("data-testid")), ["model-option-alpha-large", "model-option-beta-small"]);
-		await press(options[1]!, "click");
-		assert.equal(writes.length, 1);
-		assert.deepEqual(writes[0]!.strong?.model, { provider: "anthropic", id: "beta-small" });
-		assert.equal(document.querySelector('[data-testid="slot-model-menu-strong"]'), null, "a pick closes the picker");
-	});
-
-	it("the thinking menu offers the levels the slot's model supports", async () => {
-		const models: ModelsSettings = { cheap: { model: { provider: "anthropic", id: "alpha-large" }, thinkingLevel: "low" } };
-		await mount(
-			<AgentSection agent={undefined} models={models} onSectionChange={() => {}} onModelsChange={() => {}} />,
-		);
-		await press(element('[data-testid="slot-thinking-cheap"]'), "keydown", { key: "Enter" });
-		const options = [...document.querySelectorAll('[data-testid^="thinking-option-"]')];
-		assert.deepEqual(options.map((o) => [o.textContent, o.getAttribute("aria-checked")]), [["low", "true"], ["high", "false"]]);
+describe("Settings › Tutor", () => {
+	it("has no model or thinking choice, only the tool switches", async () => {
+		await mount(<AgentSection agent={undefined} onSectionChange={() => {}} />);
+		assert.equal(document.querySelector('[data-testid="group-models"]'), null);
+		assert.equal(document.querySelector('[data-testid^="slot-"]'), null);
+		assert.ok(element('[data-testid="group-tools"]'));
 	});
 });

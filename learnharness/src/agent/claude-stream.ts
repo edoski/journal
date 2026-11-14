@@ -16,7 +16,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
-import { CLAUDE_LIMIT_TEXT, CLAUDE_MODEL_IDS, CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL } from "../core/contracts/claude.ts";
+import { CLAUDE_LIMIT_TEXT, CLAUDE_MODEL, CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL } from "../core/contracts/claude.ts";
 import { claudeLaunch, type LoadedClaudeAccount } from "./claude-accounts.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MCP_SERVER, CLAUDE_TOOL_PREFIX, claudeArgs, claudeChildEnv, claudeWorkDir, resolveClaudeBinary, writeClaudeCallFiles, type ClaudeEffort, type ClaudeEnv, type ClaudeLaunch } from "./claude-cli.ts";
 import { claudeAccount, claudeAccountConnections } from "./claude-connection.ts";
@@ -24,23 +24,22 @@ import { recordClaudeRateLimit } from "./claude-usage.ts";
 
 const NO_KEY = " No API key was used.";
 
-/** Pi's Anthropic catalog entries, relabelled as one account's plan models: no
- * per-token cost, same limits and thinking map (so pi's level clamp still
- * works). The default account resolves before the first sign-in check. */
-export function claudeSubscriptionModel(providerId: string, id: string): Model<Api> | undefined {
-	if (!(CLAUDE_MODEL_IDS as readonly string[]).includes(id)) return undefined;
+/** Pi's Anthropic catalog entry for CLAUDE_MODEL, relabelled as one
+ * account's plan model: no per-token cost, same limits and thinking map. The
+ * default account resolves before the first sign-in check. */
+export function claudeSubscriptionModel(providerId: string): Model<Api> | undefined {
 	const account = claudeAccount(providerId);
 	if (!account && providerId !== CLAUDE_SUBSCRIPTION.providerId) return undefined;
-	const base = (ANTHROPIC_MODELS as Record<string, Model<Api> | undefined>)[id];
+	const base = (ANTHROPIC_MODELS as Record<string, Model<Api> | undefined>)[CLAUDE_MODEL.id];
 	if (!base) return undefined;
 	return { ...base, provider: providerId, name: account ? `${base.name} · ${account.label}` : base.name, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
 }
 
-/** Opus 5.5 once per signed-in account. */
+/** CLAUDE_MODEL once per signed-in account. */
 export function claudeSubscriptionModels(): Model<Api>[] {
 	return claudeAccountConnections()
 		.filter((entry) => entry.connection.state === "connected")
-		.flatMap((entry) => CLAUDE_MODEL_IDS.flatMap((id) => claudeSubscriptionModel(entry.account.providerId, id) ?? []));
+		.flatMap((entry) => claudeSubscriptionModel(entry.account.providerId) ?? []);
 }
 
 const isEffort = (value: unknown): value is ClaudeEffort => typeof value === "string" && (CLAUDE_EFFORTS as readonly string[]).includes(value);
@@ -107,10 +106,13 @@ export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rat
 		return `Claude Code is not signed in. Run \`claude\` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts.${NO_KEY}`;
 	}
 	if (code === "model_not_found" || status === 404 || /model\b.*\b(not found|not available|unavailable|does not exist)|(invalid|unknown) model/i.test(text)) {
-		return `The selected Claude model is not available on your plan or this Claude Code version. Choose another Claude model.${NO_KEY}`;
+		return CLAUDE_MODEL_MISSING;
 	}
 	return `Claude request failed. Check that \`claude\` works in a terminal and your plan has usage left, then retry.${NO_KEY}`;
 }
+
+/** LearnHarness runs only CLAUDE_MODEL, so there is nothing to fall back to. */
+export const CLAUDE_MODEL_MISSING = `${CLAUDE_MODEL.name} is not available on this Claude plan or this Claude Code version, and LearnHarness runs only ${CLAUDE_MODEL.name}. Update Claude Code, or use an account whose plan includes it.${NO_KEY}`;
 
 /** resetsAt arrives as Unix seconds. */
 export function claudeResetTime(resetsAt: number): string {
@@ -380,7 +382,7 @@ export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(),
 		};
 		const signal = options?.signal;
 		if (signal?.aborted) { emit(mapper.abort()); return output; }
-		if (account === "missing") { emit(mapper.fail(`This Claude account is no longer set up in T3 Code. Choose another Claude account.${NO_KEY}`)); return output; }
+		if (account === "missing") { emit(mapper.fail(`This Claude account is no longer set up in T3 Code. Choose another one with Use this account in Settings → Accounts.${NO_KEY}`)); return output; }
 		const bin = binary();
 		if (!bin) { emit(mapper.fail(CLAUDE_MISSING)); return output; }
 

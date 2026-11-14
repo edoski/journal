@@ -55,7 +55,6 @@ after(() => {
 
 function newChat(title: string): string {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	createdChats.push(chat.id);
 	return chat.id;
 }

@@ -25,9 +25,8 @@ second pillar of input).
 ## Rules
 
 - **Tab is dead everywhere** (owner decision: browser tab-focus
-  navigation abandoned). Shift+Tab cycles the thinking level — also
-  while typing in a field (modifier combos are the only keys that fire
-  from typing surfaces; bare keys never do).
+  navigation abandoned). Modifier combos are the only keys that fire
+  from typing surfaces; bare keys never do.
 - **Esc priority chain**: topmost popover → cheat sheet → abort turn
   (local stream only — a server-side wake turn has
   no client request to abort). Every element/document-level Esc handler
@@ -41,8 +40,7 @@ second pillar of input).
 
 | Action | Binding | Seam |
 |---|---|---|
-| Model selector | ⌘K | `lh:kbd-open-model-picker` (model-picker.tsx) |
-| Cycle thinking level | Shift+Tab | `lh:kbd-cycle-thinking` (model-picker.tsx) |
+| Lesson details | ⌘K | `lh:kbd-open-model-picker` (lesson-top-bar.tsx; the id predates the details panel and stays, since saved rebinds key on it) |
 | Toggle sidebar | ⌘B | `lh:toggle-sidebar` (sidebar.tsx) |
 | Sessions search | ⌘⇧F | `lh:kbd-sessions-search` (sidebar.tsx) |
 | Walk search results | ↑ / ↓ *in the search field* | sidebar.tsx (cycles the filtered rows, wraps) |
@@ -86,7 +84,7 @@ While a question is expanded, the dock owns ↑/↓/Space/Enter/Tab:
   focuses the walked (or first) row; from the rows it returns to the
   thinking field. Focus follows the walk while the user is in the rows,
   so focused and walked never diverge. Shift+Tab is NOT the dock's —
-  the global thinking-level cycle owns it everywhere.
+  the global handler swallows it everywhere.
 - Guards: keys from a typing surface keep their native meaning (arrows
   move the caret, space types — the thinking field is never hijacked),
   and modifier combos are never the dock's — Alt+arrows cycle sessions

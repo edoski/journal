@@ -15,8 +15,7 @@ import { TOGGLE_TOOLS, AgentSection } from "../components/settings/agent-section
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
-import { KEYBOARD_ACTIONS, keyActionsFor } from "../src/core/index.ts";
-import { SettingsMenuTrigger } from "../components/settings/controls.tsx";
+import { KEYBOARD_ACTIONS } from "../src/core/index.ts";
 
 /** The full opening tag of the element carrying a testid — attribute
  *  order in React output is not contractual, so assertions run on the
@@ -57,53 +56,24 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 	});
 });
 
-describe("the shared settings dropdown trigger", () => {
-	it("preserves native disabling separately from callers' existing click-gated unavailable state", () => {
-		const disabled = tagOf(renderToStaticMarkup(<SettingsMenuTrigger value="English" disabled data-testid="disabled-trigger" />), "disabled-trigger");
-		const unavailable = tagOf(renderToStaticMarkup(<SettingsMenuTrigger value="Automatic" unavailable data-testid="unavailable-trigger" />), "unavailable-trigger");
-		assert.ok(disabled.includes('disabled=""'));
-		assert.ok(!unavailable.includes('disabled=""'));
-		assert.ok(unavailable.includes("cursor-not-allowed"));
-		assert.ok(!unavailable.includes("hover:bg-fill-hover"));
-	});
-});
-
 describe("AgentSection (thin SSR)", () => {
-	it("renders the three model SLOT rows (slots-only, fix wave: unpicked reads —, no Default option)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		for (const slot of ["strong", "cheap", "vision"]) {
-			assert.ok(html.includes(`data-testid="slot-row-${slot}"`), slot);
-			// The shared model-picker dropdown as the opened menu (owner,
-			// 2026-09-20), the thin trigger as the collapsed look.
-			assert.ok(html.includes(`data-testid="slot-model-${slot}"`), `${slot} model trigger`);
-			assert.ok(html.includes(`data-testid="slot-thinking-${slot}"`), `${slot} thinking trigger`);
-			// the roster hint rides every row
-			assert.ok(html.includes("Teaches and quizzes you") || slot !== "strong", "strong roster");
-		}
-		// Fix wave: no Default anywhere — an unpicked slot reads "—"
-		// (the owner's no-factory-fallback language), and no menu
-		// carries a Default row (menu-default testid is retired).
-		assert.equal((html.match(/>Default<\/span>/g) ?? []).length, 0, "no Default trigger");
-		assert.ok(!html.includes('data-testid="menu-default"'), "no Default row");
-		assert.equal((html.match(/>—<\/span>/g) ?? []).length, 6, "three slots × two — triggers");
-		// the per-role rows are GONE (slots-only)
-		for (const role of ["researcher", "demoBuilder", "visualMaker"]) {
-			assert.ok(!html.includes(`data-testid="role-row-${role}"`), `${role} retired`);
-		}
-		assert.ok(html.includes('data-testid="group-models"'), "Models sub-group");
-		assert.ok(html.includes('data-testid="group-tools"'), "Tools sub-group");
+	it("has no model or thinking choice: only the Tools group", () => {
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
+		for (const slot of ["strong", "cheap", "vision"]) assert.ok(!html.includes(`slot-row-${slot}`), `${slot} retired`);
+		assert.ok(!html.includes('data-testid="group-models"'), "no Models group");
+		assert.ok(html.includes('data-testid="group-tools"'), "Tools group");
 		assert.ok(!html.includes("group-prompts") && !html.includes("System prompts"), "no system prompt viewers");
 	});
 
 	it("has no search-engine row", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
 		assert.ok(!html.includes('data-testid="search-engine-row"'));
 	});
 
 	it("the prober graph-tools row: FIRST in the Tools group, default ON, its own key (wave 7)", () => {
 		// Default state: graph on, graphTools absent → ON, the describing
 		// hint rides.
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
 		const toolsGroup = html.split('data-testid="group-tools"')[1] ?? "";
 		const rows = [...toolsGroup.matchAll(/data-testid="(graph-tools-row|tool-row-\w+)"/g)].map((m) => m[1]);
 		assert.equal(rows[0], "graph-tools-row", "graph tools is the FIRST row of the Tools group");
@@ -114,7 +84,7 @@ describe("AgentSection (thin SSR)", () => {
 
 	it("an explicit graphTools off shows stored-off (the record never lies)", () => {
 		const html = renderToStaticMarkup(
-			<AgentSection agent={{ graphTools: { enabled: false } }} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />,
+			<AgentSection agent={{ graphTools: { enabled: false } }} onSectionChange={() => {}} />,
 		);
 		const row = html.split('data-testid="graph-tools-row"')[1] ?? "";
 		assert.ok(row.includes('aria-checked="false"'), "stored-off renders off");
@@ -122,29 +92,19 @@ describe("AgentSection (thin SSR)", () => {
 
 	it("renders the owner's FINAL tool list — research, demo, visual, pdf", () => {
 		assert.deepEqual([...TOGGLE_TOOLS], ["research", "demo", "visual", "pdf"]);
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
 		for (const id of TOGGLE_TOOLS) assert.ok(html.includes(`data-testid="tool-row-${id}"`), id);
 	});
 
 	it("tools default ON (absent key = enabled)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
 		for (const id of TOGGLE_TOOLS) {
 			assert.ok(tagOf(html, `toggle-tool-${id}`).includes('aria-checked="true"'), `${id} defaults on`);
 		}
 	});
 
-	it("an overridden SLOT shows its model in the trigger, tools carry the delta", () => {
-		const html = renderToStaticMarkup(
-			<AgentSection
-				agent={{ tools: { demo: false } }}
-				models={{ strong: { model: { provider: "zai", id: "glm-4.7-flash" } } }}
-				onSectionChange={() => {}}
-				onModelsChange={() => {}}
-			/>,
-		);
-		// The trigger shows the stored id even with no catalog loaded (a
-		// trigger reading "Default" over a live override would lie).
-		assert.ok(html.includes("glm-4.7-flash"), "the override id is visible (prettyModel form, no auto-caps)");
+	it("tools carry the delta", () => {
+		const html = renderToStaticMarkup(<AgentSection agent={{ tools: { demo: false } }} onSectionChange={() => {}} />);
 		assert.ok(tagOf(html, "toggle-tool-demo").includes('aria-checked="false"'), "demo off");
 		assert.ok(tagOf(html, "toggle-tool-visual").includes('aria-checked="true"'), "visual still on");
 	});
@@ -170,7 +130,7 @@ describe("AppearanceSection (thin SSR)", () => {
 describe("KeyboardSection (thin SSR)", () => {
 	it("renders every changeable registry action in its scope group", () => {
 		const html = renderToStaticMarkup(<KeyboardSection />);
-		for (const def of keyActionsFor("proposed").filter((a) => !a.displayOnly)) {
+		for (const def of KEYBOARD_ACTIONS.filter((a) => !a.displayOnly)) {
 			assert.ok(html.includes(`data-testid="kbd-row-${def.id}"`), def.id);
 		}
 		assert.ok(html.includes("kbd-scope-global"));

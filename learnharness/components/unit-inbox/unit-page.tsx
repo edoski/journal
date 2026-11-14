@@ -40,7 +40,7 @@ function useUnitRead(workspace: string): Read {
  * sidebar row or a map node opens: the band with the sidebar toggle, then
  * the topic page once its course is read.
  */
-export function UnitPage({ workspace, handle, initialConfigured }: { workspace: string; handle: string; initialConfigured: boolean }) {
+export function UnitPage({ workspace, handle }: { workspace: string; handle: string }) {
 	const read = useUnitRead(workspace);
 	const link = useLinkVariant();
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
@@ -51,7 +51,7 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 				<SidebarToggle />
 			</header>
 			{read.status === "ready" && topic ? (
-				<TopicPage connected={link === "connected"} course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				<TopicPage connected={link === "connected"} course={read.course} topic={topic} chats={read.chats} />
 			) : (
 				<p className="mx-auto w-full max-w-[46rem] px-6 pt-6 text-row text-muted-foreground">
 					{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}

@@ -7,7 +7,7 @@ import { CourseControl, CoursesUnavailable, useCourseChoice } from "@/components
 import { useFieldCycle } from "@/components/field-cycle";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SetupDialog } from "@/components/setup-dialog";
-import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/components/setup-cta";
+import { useModelSetup } from "@/components/setup-cta";
 import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
  * nothing else. It is the draft at /chat/new; a session is created only
  * when something is sent.
  */
-export function StartScreen({ initialConfigured }: { initialConfigured: boolean }) {
+export function StartScreen() {
 	const router = useRouter();
 	const [text, setText] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -33,7 +33,7 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 	const starterRef = useRef(new SessionStarter());
 	const [startError, setStartError] = useState<string | null>(null);
 	const courseChoice = useCourseChoice();
-	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
+	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 
 	const cycleComposer = useCallback(
@@ -42,19 +42,12 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 	);
 	useFieldCycle(cycleComposer);
 
-	/** The pre-send guards: missing models or keys open setup, an unavailable
-	 *  model opens its picker; nothing is created, so no orphan session. */
+	/** The pre-send guard: a signed-out Claude account opens sign-in;
+	 *  nothing is created, so no orphan session. */
 	const canStart = (): boolean => {
-		if (!configured || unconnected) {
-			setSetupOpen(true);
-			return false;
-		}
-		const strong = catalog?.slots.strong?.model;
-		if (selectedModelUnavailable(catalog, strong ? `${strong.provider}:${strong.id}` : undefined)) {
-			openModelPicker();
-			return false;
-		}
-		return true;
+		if (!unconnected) return true;
+		setSetupOpen(true);
+		return false;
 	};
 
 	// The session is created with no mode: the prober reads the opening and
@@ -64,7 +57,7 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 		setBusy(true);
 		setStartError(null);
 		void starterRef.current
-			.start({ title: opening, course: { workspace: course } }, fetch, JSON.stringify(catalog?.slots.strong))
+			.start({ title: opening, course: { workspace: course } }, fetch)
 			.then((target) => router.push(target))
 			.catch(() => {
 				startingRef.current = false;
@@ -107,20 +100,20 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 					/>
 				</div>
 				<div className="mx-auto flex min-h-0 w-full max-w-[46rem] flex-1 flex-col gap-6 overflow-y-auto pt-4 pb-6">
-					{(startError || courseChoice.notice || unconnected || !configured) && (
+					{(startError || courseChoice.notice || unconnected) && (
 						<div className="flex flex-col items-start gap-2 px-4">
 							{startError && <p role="alert" className="text-row text-danger">{startError}</p>}
 							{courseChoice.notice && (
 								<p role="alert" data-testid="course-notice" className="text-row text-danger">{courseChoice.notice}</p>
 							)}
-							{(unconnected || !configured) && (
+							{unconnected && (
 								<Button
 									variant="quiet"
-									data-testid={unconnected ? "setup-cta-keys" : "setup-cta"}
+									data-testid="setup-cta-keys"
 									onClick={() => setSetupOpen(true)}
 									className="-ml-3 h-8 px-3 text-row font-normal text-link hover:text-link"
 								>
-									{unconnected ? "Sign in to Claude or ChatGPT to start" : "Set up your models to start"}
+									Sign in to Claude to start
 								</Button>
 							)}
 						</div>
@@ -137,7 +130,7 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 					<SidebarToggle />
 				</div>
 			</header>
-			<SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} onDone={() => setSetupOpen(false)} />
+			<SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} />
 		</div>
 	);
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, it } from "node:test";
 import { POST } from "../app/api/graph/import/route.ts";
 import { extraction } from "../src/server/index.ts";
-import { ModelsNotConfiguredError, ProviderKeyMissingError } from "../src/core/settings.ts";
+import { ProviderKeyMissingError } from "../src/core/settings.ts";
 import { createExtractionPipeline, NotesImportError } from "../src/agent/subagents/extraction.ts";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { stores } from "../src/server/stores.ts";
@@ -26,14 +26,13 @@ it("route keeps three-worker batching, request positions and mixed per-file outc
 		active++; peak = Math.max(peak, active);
 		try {
 			await new Promise((resolve) => setTimeout(resolve, filePath === "slow.md" ? 25 : 1));
-			if (filePath === "models.md") throw new ModelsNotConfiguredError(["cheap"]);
-			if (filePath === "key.md") throw new ProviderKeyMissingError("openai", ["cheap"]);
+			if (filePath === "key.md") throw new ProviderKeyMissingError("claude-subscription");
 			if (["failed", "partial", "aborted", "busy"].includes(filePath)) throw new NotesImportError(filePath as NotesImportError["outcome"], { nodes: 2, chains: 1 }, `synthetic ${filePath}`);
 			if (filePath === "unknown.md") throw new Error("synthetic unknown error");
 			return { nodes: 0, chains: 0 };
 		} finally { active--; }
 	};
-	const names = ["slow.md", "same.md", "same.md", "failed", "partial", "aborted", "busy", "models.md", "key.md", "unknown.md"];
+	const names = ["slow.md", "same.md", "same.md", "failed", "partial", "aborted", "busy", "key.md", "unknown.md"];
 	const response = await POST(request(names));
 	assert.equal(response.status, 200);
 	const { results } = await response.json();
@@ -51,9 +50,8 @@ it("route keeps three-worker batching, request positions and mixed per-file outc
 			assert.equal(result.outcome, "completed"); assert.equal(result.ok, true);
 		} else { assert.equal(result.ok, false); assert.equal(result.outcome, "failed"); }
 	}
-	assert.deepEqual(results.find((r: { filePath: string }) => r.filePath === "models.md").missing, ["cheap"]);
 	const key = results.find((r: { filePath: string }) => r.filePath === "key.md");
-	assert.equal(key.code, "provider_key_missing"); assert.equal(key.provider, "openai"); assert.deepEqual(key.slots, ["cheap"]);
+	assert.equal(key.code, "provider_key_missing"); assert.equal(key.provider, "claude-subscription");
 });
 
 it("real route plus in-memory ledgers and faux stages reprocess identical imports for all four filename cases", async () => {

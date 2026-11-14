@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { listCourses, readSettingsRecord } from "@/src/server";
-import { courseLabel, slotsConfigured } from "@/src/core";
+import { listCourses } from "@/src/server";
+import { courseLabel } from "@/src/core";
 import { CoursePage } from "@/components/course-page/course-page";
 import { workspaceOf } from "@/components/unit-inbox/unit-href";
 
@@ -24,5 +24,5 @@ export default async function CourseRoute({ params }: { params: Promise<{ course
 	const { course } = await params;
 	const workspace = workspaceOf(course);
 	if (!workspace) notFound();
-	return <CoursePage key={workspace} workspace={workspace} initialConfigured={slotsConfigured(readSettingsRecord()?.models)} />;
+	return <CoursePage key={workspace} workspace={workspace} />;
 }

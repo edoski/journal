@@ -7,7 +7,7 @@
  *
  * Design (owner-approved plan):
  * - Tab is DEAD: browser tab-focus navigation is abandoned entirely. Tab
- *   does nothing; Shift+Tab alone cycles the thinking level.
+ *   does nothing (Shift+Tab included).
  * - Esc is a layered dismiss: topmost popover (each popover stopPropagation's
  *   its own Esc) → abort in-flight turn.
  * - The key map persists overrides in localStorage (`lh:keymap`, overrides
@@ -21,7 +21,6 @@
 
 export type KeyAction =
 	| "open-model-picker"
-	| "cycle-thinking"
 	| "toggle-sidebar"
 	| "sessions-search"
 	| "jump-graph"
@@ -77,10 +76,6 @@ export interface KeyActionDef {
 	displayOnly?: boolean;
 	/** The Proposed cheat sheet's finer heading inside the scope. */
 	group?: KeyGroup;
-	/** Only the Current design listens (its model picker); the Proposed
-	 *  design keeps model and thinking out of the lesson, so its lists
-	 *  leave the action out. */
-	currentOnly?: boolean;
 }
 
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
@@ -101,7 +96,6 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "rename-session", label: "Rename this lesson", scope: "lesson", binding: "f2" },
 	{ id: "toggle-user-thinking", label: "Show or hide your thinking", scope: "lesson", binding: "mod+t" },
 	{ id: "open-model-picker", label: "Lesson details", scope: "lesson", binding: "mod+k" },
-	{ id: "cycle-thinking", label: "Cycle thinking level", scope: "lesson", binding: "shift+tab", currentOnly: true },
 	// The practice problem's requests: the mounted problem box answers them.
 	{ id: "practice-hint", label: "Problem or check · hint", scope: "lesson", binding: "mod+shift+h" },
 	{ id: "practice-show", label: "Problem · show me", scope: "lesson", binding: "mod+shift+s" },
@@ -129,12 +123,6 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "confidence-down", label: "Less sure", scope: "lesson", binding: "alt+arrowdown", displayOnly: true },
 	{ id: "pick-course", label: "Pick a course", scope: "lesson", binding: "mod+o" },
 ];
-
-/** The actions a design's lists show: the Proposed design leaves out what
- *  only the Current design listens to. */
-export function keyActionsFor(design: "current" | "proposed"): readonly KeyActionDef[] {
-	return design === "proposed" ? KEYBOARD_ACTIONS.filter((a) => !a.currentOnly) : KEYBOARD_ACTIONS;
-}
 
 const STORAGE_KEY = "lh:keymap";
 

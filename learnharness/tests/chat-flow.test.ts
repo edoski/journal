@@ -234,13 +234,8 @@ function dismissPost(chatId: string, toolCallId: string, kind: "ask" | "explain"
 	);
 }
 
-/** BYOK turn gate (owner, 2026-09-22): no factory floor — a chat needs a
- *  conversation model before any turn streams. The scripted tests give
- *  each chat a per-chat pin exactly like the setup flow does in
- *  production (the injected faux engine still runs the loop). */
 function createConfiguredChat(title: string) {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	// nodeId is required on teach quizzes (owner ruling 2026-09-26) — the
 	// scripted lessons quiz against this seeded tree.
 	chatStore.saveTree(chat.id, {
@@ -821,20 +816,6 @@ describe("chat store", () => {
 		assert.equal(loaded.messages.length, 1);
 		assert.equal(loaded.title, "Store test");
 	});
-
-	it("persist the per-chat model settings (replace-whole, no updatedAt churn)", async () => {
-		const chat = chatStore.createChat("Settings test");
-		createdChats.push(chat.id);
-		const before = chatStore.getChat(chat.id)!.updatedAt;
-		chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL }, thinkingLevel: "high" });
-		const saved = chatStore.getChat(chat.id)!;
-		assert.deepEqual(saved.settings, { model: { ...TEST_MODEL }, thinkingLevel: "high" });
-		assert.equal(saved.updatedAt, before, "a picker write is not conversation activity");
-		// replace-whole: a settings-less write clears the override (an empty
-		// object persists — every field absent = config defaults)
-		chatStore.saveSettings(chat.id, {});
-		assert.deepEqual(chatStore.getChat(chat.id)!.settings, {});
-	});
 });
 
 describe("canonical persistence failures", () => {
@@ -1013,74 +994,6 @@ describe("renameChat (the header's click-to-edit title)", () => {
 		const renamed = chatStore.renameChat(chat.id, "   ");
 		assert.equal(renamed.title, "Untitled session");
 	});
-});
-
-describe("the BYOK turn gate (no factory floor — owner, 2026-09-22)", () => {
-	it("a chat with no model refuses the turn with the 503 envelope — nothing lingers", async () => {
-		const chat = chatStore.createChat("Test: unconfigured chat");
-		createdChats.push(chat.id);
-
-		// The record's strong slot belongs to settings-store.test.ts (the
-		// one-fs-owner policy) — READ the resolved truth, never write it.
-		// Refusal holds when the chain is empty; a record-carried strong
-		// slot legitimately opens the gate (the chain is honest both ways).
-		const expectRefusal = effectiveSettings().models.strong === null;
-
-		const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me the solar system" }), agentFactory(scriptedTeacher(defaultLesson).engine));
-
-		if (expectRefusal) {
-			assert.equal(res.status, 503, "the universal turn gate refuses before beginTurn");
-			const body = (await res.json()) as { error: string; code: string; missing: string[] };
-			assert.equal(body.code, "models_not_configured");
-			assert.deepEqual(body.missing, ["strong"]);
-			assert.match(body.error, /No model configured/);
-		} else {
-			assert.equal(res.status, 200, "the record's strong slot satisfies the conversation chain");
-			await drainRunning(chat.id);
-		}
-
-		// Either way: no phantom liveness, nothing durable from a refused turn.
-		if (expectRefusal) {
-			assert.equal(isTurnRunning(chat.id), false, "the refusal never registers a live turn");
-			const saved = chatStore.getChat(chat.id)!;
-			assert.equal(saved.messages.length, 0, "no write-ahead persist before the gate");
-		}
-	});
-
-	it("a per-chat model alone opens the gate (the setup flow's exact write)", async () => {
-		const chat = createConfiguredChat("Test: per-chat pin only");
-		createdChats.push(chat.id);
-		const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me the solar system" }), agentFactory(scriptedTeacher(defaultLesson).engine));
-		assert.equal(res.status, 200, "chat.settings.model satisfies the chain without any record slot");
-		await drainRunning(chat.id);
-	});
-});
-
-// ─── the connection turn gate ───────────────────────────────────────────────
-
-describe("the connection turn gate: subscriptions only", () => {
-	for (const [provider, id, envVar] of [["together", "no-such-model", "TOGETHER_API_KEY"], ["openai", "gpt-4", "OPENAI_API_KEY"]] as const) {
-		it(`${provider}: an API-key provider refuses with 503 even with its key in the environment — nothing lingers`, async () => {
-			const chat = chatStore.createChat(`Test: ${provider} pin`);
-			createdChats.push(chat.id);
-			const saved = process.env[envVar];
-			process.env[envVar] = "test-key-must-not-be-used";
-			try {
-				chatStore.saveSettings(chat.id, { model: { provider, id } });
-				const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me something" }), agentFactory(scriptedTeacher(defaultLesson).engine));
-				assert.equal(res.status, 503, "the gate refuses before beginTurn");
-				const body = (await res.json()) as { error: string; code: string; provider: string; slots: string[] };
-				assert.equal(body.code, "provider_key_missing");
-				assert.equal(body.provider, provider);
-				assert.deepEqual(body.slots, ["strong"], "the conversation tier is the affected slot");
-				assert.equal(body.error, `${provider} runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent`);
-				assert.equal(isTurnRunning(chat.id), false, "the refusal never registers a live turn");
-				assert.equal(chatStore.getChat(chat.id)!.messages.length, 0, "no write-ahead persist before the gate");
-			} finally {
-				if (saved === undefined) delete process.env[envVar]; else process.env[envVar] = saved;
-			}
-		});
-	}
 });
 
 describe("background-turn runner (owner ruling 2026-09-25: every turn is a server-side process, clients are views)", () => {

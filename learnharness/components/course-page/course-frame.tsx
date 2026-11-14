@@ -31,17 +31,15 @@ export interface CourseReady {
  */
 export function CourseFrame({
 	workspace,
-	initialConfigured,
 	className,
 	children,
 }: {
 	workspace: string;
-	initialConfigured: boolean;
 	className: string;
 	children: (ready: CourseReady) => React.ReactNode;
 }) {
 	const { read, chats, retry } = useCourse(workspace);
-	const lesson = useLessonStart(initialConfigured);
+	const lesson = useLessonStart();
 	const router = useRouter();
 	const onContinue = (view: CourseView) => (ws: string) => {
 		const move = courseMove(view.course, chats);
@@ -59,7 +57,7 @@ export function CourseFrame({
 					</CourseLessonError>
 				</div>
 			</ScrollArea>
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} onDone={lesson.closeSetup} />
+			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</CourseChrome>
 	);
 }

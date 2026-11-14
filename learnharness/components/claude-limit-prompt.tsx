@@ -1,55 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MODEL_SLOTS, nextClaudeAccount, soonestClaudeReset, type ChatSettings, type ClaudeAccountStatus, type ModelsSettings } from "@/src/core";
+import { nextClaudeAccount, soonestClaudeReset, type ClaudeAccountStatus } from "@/src/core";
 import { Button } from "@/components/ui/button";
-import { notifySettingsSaved } from "@/components/settings-signal";
-import { claudeResetLabel, readClaudeAccounts } from "@/components/settings/claude-connection";
-
-/** Every slot that ran on `from` now runs the same model and thinking on `to`; null when none did. */
-export function moveClaudeSlots(models: ModelsSettings, from: string, to: string): ModelsSettings | null {
-	let moved = false;
-	const next: ModelsSettings = { ...models };
-	for (const slot of MODEL_SLOTS) {
-		const current = models[slot];
-		if (current?.model?.provider !== from) continue;
-		next[slot] = { ...current, model: { provider: to, id: current.model.id } };
-		moved = true;
-	}
-	return moved ? next : null;
-}
-
-async function json<T>(response: Response): Promise<T> {
-	if (!response.ok) {
-		const body = (await response.json().catch(() => ({}))) as { error?: string };
-		throw new Error(body.error ?? `status ${response.status}`);
-	}
-	return response.json() as Promise<T>;
-}
-
-const put = (path: string, body: unknown) => fetch(path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-
-/** Moves this session, then every slot that used the exhausted account, to `to`. */
-export async function switchClaudeAccount({ chatId, from, to, modelId }: { chatId: string; from: string; to: string; modelId: string }): Promise<void> {
-	const [chat, record] = await Promise.all([
-		fetch(`/api/chats/${chatId}`).then((r) => json<{ settings?: ChatSettings }>(r)),
-		fetch("/api/settings").then((r) => json<{ settings: { models?: ModelsSettings } | null }>(r)),
-	]);
-	const models = record.settings?.models ?? {};
-	const thinkingLevel = chat.settings?.thinkingLevel ?? models.strong?.thinkingLevel;
-	await json(await put(`/api/chats/${chatId}/settings`, { model: { provider: to, id: modelId }, ...(thinkingLevel ? { thinkingLevel } : {}) }));
-	const moved = moveClaudeSlots(models, from, to);
-	if (moved) await json(await put("/api/settings/models", moved));
-	notifySettingsSaved("models");
-}
+import { chooseClaudeAccount, claudeResetLabel, readClaudeAccounts } from "@/components/settings/claude-connection";
 
 type Prompt = { state: "checking" } | { state: "ready"; statuses: ClaudeAccountStatus[] } | { state: "failed" };
 
 /** Shown under a turn that stopped at a Claude account's plan limit. Never
- * switches by itself: the learner clicks. */
-export function ClaudeLimitPrompt({ chatId, failure, onContinue }: {
-	chatId: string;
-	failure: { provider: string; model: string };
+ * switches by itself: the learner clicks, and every agent moves to that
+ * account. */
+export function ClaudeLimitPrompt({ failure, onContinue }: {
+	failure: { provider: string };
 	onContinue: () => void;
 }) {
 	const [prompt, setPrompt] = useState<Prompt>({ state: "checking" });
@@ -68,7 +30,7 @@ export function ClaudeLimitPrompt({ chatId, failure, onContinue }: {
 	async function continueOn(to: string) {
 		setBusy(true); setError(null);
 		try {
-			await switchClaudeAccount({ chatId, from: failure.provider, to, modelId: failure.model });
+			await chooseClaudeAccount(to);
 			onContinue();
 		} catch (err) {
 			if (mounted.current) setError(`Could not switch accounts: ${err instanceof Error ? err.message : "try again"}.`);

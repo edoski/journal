@@ -6,22 +6,11 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { LessonDetails, LessonTopBar } from "../components/lesson/lesson-top-bar.tsx";
-import type { ModelCatalogEntry } from "../src/core/contracts/models.ts";
+import { CLAUDE_MODEL } from "../src/core/index.ts";
 
 // The lesson's top bar under the Proposed design on the real Radix layers:
-// the details popover, its model and thinking pickers, and the plan popover.
-// Fetch is stubbed read-only; nothing is saved.
-const MODEL: ModelCatalogEntry = {
-	id: "fixture-strong",
-	name: "Fixture strong",
-	provider: "anthropic",
-	reasoning: true,
-	input: ["text"],
-	supportedLevels: ["low", "high"],
-	cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 200000,
-	maxTokens: 8192,
-};
+// the details popover and the plan popover. Fetch is stubbed read-only;
+// nothing is saved.
 const originalFetch = globalThis.fetch;
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -38,9 +27,7 @@ async function mount(node: React.ReactElement) {
 	globalThis.fetch = async (input, init) => {
 		assert.equal(init?.method ?? "GET", "GET", "opening the top bar's layers must not write");
 		const path = new URL(String(input), "http://localhost").pathname;
-		if (path === "/api/models") return Response.json({ providers: [], models: [MODEL], slots: {} });
-		if (path === "/api/chats/chat_1") return Response.json({ settings: { model: { provider: "anthropic", id: MODEL.id }, thinkingLevel: "high" } });
-		if (path === "/api/settings") return Response.json({ settings: null });
+		if (path === "/api/models") return Response.json({ account: "claude-subscription", connected: true, contextWindow: 200000 });
 		throw new Error(`unexpected fetch ${path}`);
 	};
 	host = document.createElement("div");
@@ -80,42 +67,29 @@ async function escapeReachesWindow(): Promise<boolean> {
 const panelOpen = () => !element('[data-testid="session-details-panel"]').hidden;
 
 describe("Proposed lesson details", () => {
-	const details = <LessonDetails chatId="chat_1" turns={[]} contextTokens={null} onModelChange={() => {}} />;
+	const details = <LessonDetails turns={[]} contextTokens={1000} />;
 
-	it("stays mounted while closed and reports the session's model", async () => {
-		const reported: Array<string | undefined> = [];
-		await mount(<LessonDetails chatId="chat_1" turns={[]} contextTokens={null} onModelChange={(m) => reported.push(m)} />);
+	it("stays mounted while closed, so Esc stays the turn's", async () => {
+		await mount(details);
 		assert.equal(panelOpen(), false);
-		assert.equal(reported.at(-1), `anthropic:${MODEL.id}`);
 		assert.equal(await escapeReachesWindow(), true, "a closed panel leaves Esc to the turn");
 	});
 
-	it("opens on its button; the model picker inside closes first on Esc, then the panel, and the turn never hears either", async () => {
+	it("names the one model with no picker, and divides the context by its window", async () => {
 		await mount(details);
 		await click(element('[data-testid="session-details"]'));
 		assert.equal(panelOpen(), true);
-		await click(element('[data-testid="stats-model"]'));
-		assert.ok(element('[data-testid="model-option-fixture-strong"]'), "the model picker lists the catalog");
+		assert.equal(element('[data-testid="stats-model"]').textContent, CLAUDE_MODEL.name);
+		assert.equal(document.querySelector('[data-testid="stats-model"] button'), null, "no model or thinking control");
+		assert.match(element('[data-testid="stats-context"]').textContent!, /\/ 200k/);
 		assert.equal(await escapeReachesWindow(), false);
-		assert.equal(document.querySelector('[data-testid="model-menu"]'), null);
-		assert.equal(panelOpen(), true, "one Esc closes one layer");
-		assert.equal(await escapeReachesWindow(), false);
-		assert.equal(panelOpen(), false);
+		assert.equal(panelOpen(), false, "one Esc closes the panel, and the turn never hears it");
 	});
 
-	it("⌘K opens the panel with the model picker", async () => {
+	it("⌘K opens the panel", async () => {
 		await mount(details);
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
 		assert.equal(panelOpen(), true);
-		assert.ok(document.querySelector('[data-testid="model-search"]'));
-	});
-
-	it("the thinking menu lists the model's levels with the session's checked", async () => {
-		await mount(details);
-		await click(element('[data-testid="session-details"]'));
-		await press(element('[data-testid="stats-thinking"]'), "keydown", { key: "Enter" });
-		const options = [...document.querySelectorAll('[data-testid^="thinking-option-"]')];
-		assert.deepEqual(options.map((o) => [o.textContent, o.getAttribute("aria-checked")]), [["low", "false"], ["high", "true"]]);
 	});
 });
 

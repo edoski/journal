@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { AssistantMessage, AssistantMessageEvent, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import {
 	CLAUDE_API_KEY_REFUSAL,
+	CLAUDE_MODEL_MISSING,
 	CLAUDE_TRANSCRIPT_INTRO,
 	ClaudeStreamMapper,
 	claudeEffort,
@@ -12,12 +13,12 @@ import {
 	claudeTranscriptBlocks,
 	claudeTurnError,
 } from "../src/agent/claude-stream.ts";
-import { CLAUDE_MODEL_IDS, isClaudeLimitFailure } from "../src/core/contracts/claude.ts";
+import { isClaudeLimitFailure } from "../src/core/contracts/claude.ts";
 import { subscriptionLabel } from "../src/core/prices.ts";
 import { refreshClaudeConnections, resetClaudeConnections } from "../src/agent/claude-connection.ts";
 import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 
-const model = claudeSubscriptionModel("claude-subscription", "claude-opus-5-5")!;
+const model = claudeSubscriptionModel("claude-subscription")!;
 const NO_KEY = "No API key was used.";
 
 const init = { type: "system", subtype: "init", apiKeySource: "none", model: "claude-opus-5-5", tools: ["mcp__lh__plan_init", "mcp__lh__quiz"] };
@@ -168,7 +169,7 @@ test("signed-out and unknown-model failures get their own guidance", () => {
 	assert.match(signedOut.error.errorMessage!, /not signed in.*run `claude`/i);
 	const model404 = terminal(run([init, { type: "result", is_error: true, api_error_status: 404, result: "There's an issue with the selected model" }]).events);
 	assert(model404.type === "error");
-	assert.match(model404.error.errorMessage!, /model is not available/);
+	assert.equal(model404.error.errorMessage, CLAUDE_MODEL_MISSING);
 });
 
 test("an init that reports an API key source fails at once, before any model output", () => {
@@ -235,9 +236,7 @@ test("plan models clone pi's Anthropic entries per signed-in account, with zero 
 			assert.deepEqual(m.cost, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
 			assert(m.thinkingLevelMap, `${m.id} keeps its thinking map`);
 		}
-		assert.equal(claudeSubscriptionModel("claude-subscription", "claude-sonnet-5-5"), undefined, "only Opus 5.5 is offered");
-		assert.equal(claudeSubscriptionModel("claude-subscription-gone", "claude-opus-5-5"), undefined, "an unknown account has no models");
-		assert.deepEqual(CLAUDE_MODEL_IDS, ["claude-opus-5-5"]);
+		assert.equal(claudeSubscriptionModel("claude-subscription-gone"), undefined, "an unknown account has no model");
 	} finally {
 		resetClaudeConnections();
 	}

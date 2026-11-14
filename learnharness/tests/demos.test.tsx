@@ -91,7 +91,7 @@ function testRunner() {
 	return { steers, runner };
 }
 import { artifactRenderers } from "../components/artifacts/index.ts";
-import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
+import { signInTestClaude } from "./claude-fixture.ts";
 
 await signInTestClaude();
 
@@ -895,9 +895,6 @@ describe("demo/visual job runners", () => {
 	it("dispatch through a teacher turn: the call acks mid-turn and the runner completes in the background", async () => {
 		const chat = chatStore.createChat("Test: demo spawn dispatch");
 		createdChats.push(chat.id);
-		// BYOK turn gate (owner, 2026-09-22): the scripted chat needs a
-		// conversation model — the per-chat pin, exactly like the setup flow.
-		chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 
 		// A teacher that calls demo on turn 1, then continues in the SAME turn.
 		const teacher = scriptedModel([

@@ -4,13 +4,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type, type Static, type TSchema } from "typebox";
 import { toToolResult } from "../tool-execute.ts";
 import type { ModelRole } from "../../../config.ts";
-import {
-	ModelsNotConfiguredError,
-	ProviderKeyMissingError,
-	ROLE_SLOT,
-	type ModelSlotName,
-	type ProviderKeyMissing,
-} from "../../core/settings.ts";
+import { ProviderKeyMissingError, type ProviderKeyMissing } from "../../core/settings.ts";
 import type { PiEngine } from "../models.ts";
 import { runSubagent } from "./pi-run.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
@@ -724,20 +718,15 @@ export interface ExtractionModels {
 	 *  engineFor chain (production wires no direct values). */
 	extractor?: PiEngine;
 	auditor?: PiEngine;
-	/** Settings-resolved engine per role — the same slot treatment the
-	 *  job runner got, read FRESH per stage call (a settings PUT between
-	 *  stages lands). BYOK (owner, 2026-09-22): the chain (role override →
-	 *  slot → NOTHING) may end EMPTY → undefined; the front doors refuse
-	 *  with ModelsNotConfiguredError before any stage runs. */
-	engineFor?: (role: ModelRole) => PiEngine | undefined;
-	/** Key-presence gate (provider-key interlude, 2026-09-25): given a
-	 *  stage engine's provider + the role's slot tier, the injected check
-	 *  returns the refusal envelope when the provider's key is missing
-	 *  (null = run). Same injection discipline as the job runner's seam
-	 *  (the agent layer may not read the key store); absent in tests that
-	 *  inject engines directly (test engines never owe a key). A keyless
-	 *  stage refuses with ProviderKeyMissingError BEFORE any batch runs. */
-	providerKeyMissing?: (provider: string, tier: ModelSlotName) => ProviderKeyMissing | null;
+	/** The engine per role, read FRESH per stage call (the job runner's
+	 *  treatment: the server wiring resolves the settings' Claude account). */
+	engineFor?: (role: ModelRole) => PiEngine;
+	/** Connection gate: given a stage engine's Claude account, the refusal
+	 *  envelope when it is not signed in (null = run). Same injection
+	 *  discipline as the job runner's seam; absent in tests that inject
+	 *  engines directly. A signed-out stage refuses with
+	 *  ProviderKeyMissingError BEFORE any batch runs. */
+	providerKeyMissing?: (provider: string) => ProviderKeyMissing | null;
 }
 
 export interface ExtractionPipelineDeps extends GraphDeps, ExtractionModels {
@@ -800,35 +789,22 @@ export function callUsage(usage: Usage): CallUsage {
 export function createExtractionPipeline(deps: ExtractionPipelineDeps): ExtractionPipeline {
 	const { chatStore, graphStore } = deps;
 	// Stage-engine resolution: a direct test value wins; otherwise the
-	// engineFor chain (role override → slot → nothing, resolved FRESH per
-	// stage call server-side) — the job runner's exact treatment. undefined
-	// = the BYOK chain came up empty; the front-door guards turn that into
-	// an honest refusal.
-	const stageEngine = (role: ModelRole, override?: PiEngine): PiEngine | undefined =>
-		override ?? deps.engineFor?.(role);
-	/** The per-need refusal guard: which slot tiers the pipeline's stages
-	 *  found unset (test values count as configured — they ARE engines),
-	 *  and whether a configured stage's provider key is gone (provider-key
-	 *  interlude, 2026-09-25) — both refuse BEFORE any batch runs. */
+	// engineFor seam, resolved FRESH per stage call server-side — the job
+	// runner's exact treatment.
+	const stageEngine = (role: ModelRole, override?: PiEngine): PiEngine => {
+		const engine = override ?? deps.engineFor?.(role);
+		if (!engine) throw new Error(`no engine injected for role "${role}"`);
+		return engine;
+	};
+	/** The refusal guard: a stage whose Claude account is signed out
+	 *  refuses BEFORE any batch runs (extractor before auditor). */
 	function refuseIfStagesUnready(): void {
-		const stages: readonly [ModelRole, PiEngine | undefined][] = [
-			["extractor", stageEngine("extractor", deps.extractor)],
-			["auditor", stageEngine("auditor", deps.auditor)],
-		];
-		const missing = new Set<ModelSlotName>();
-		for (const [role, engine] of stages) if (!engine) missing.add(ROLE_SLOT[role]);
-		if (missing.size > 0) {
-			console.info(`[extraction] refused — no model configured for: ${[...missing].join(", ")}`);
-			throw new ModelsNotConfiguredError([...missing]);
-		}
-		// Key-presence parity: first offender surfaces (extractor before
-		// auditor); fixing that key re-gates and the next run surfaces the
-		// next offender, if any.
-		for (const [role, engine] of stages) {
-			const refusal = deps.providerKeyMissing?.(engine!.model.provider, ROLE_SLOT[role]);
+		for (const role of ["extractor", "auditor"] as const) {
+			const engine = stageEngine(role, deps[role]);
+			const refusal = deps.providerKeyMissing?.(engine.model.provider);
 			if (refusal) {
 				console.info(`[extraction] refused — ${JSON.stringify(refusal)}`);
-				throw new ProviderKeyMissingError(refusal.provider, refusal.slots);
+				throw new ProviderKeyMissingError(refusal.provider);
 			}
 		}
 	}
@@ -1121,10 +1097,9 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 		try {
 			const record = chatStore.getChat(chatId);
 			if (!record) throw new Error(`Chat not found: ${chatId}`);
-			// BYOK per-need gate (owner, 2026-09-22) + key presence
-			// (2026-09-25): the write channel needs extractor + auditor
-			// engines AND their providers' keys; a refusal lands BEFORE any
-			// stage runs (typed — the trigger skips, routes surface 503).
+			// The connection gate: the write channel needs extractor +
+			// auditor engines on a signed-in account; a refusal lands BEFORE
+			// any stage runs (typed — the trigger skips, routes surface 503).
 			refuseIfStagesUnready();
 			const covered = coverageOf(record.messages, graphStore.readCoverage(), chatId, record.kind);
 			const failedOutputCalls = failedOutputCallIds(record.messages);
@@ -1319,9 +1294,8 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 		const t0 = performance.now();
 		const mergedStats: EmissionStats = { nodes: 0, chains: 0 };
 		try {
-			// BYOK per-need gate (owner, 2026-09-22) + key presence
-			// (2026-09-25): same refusal as the chat front door — no
-			// extractor/auditor engines, or a stage key gone, no run.
+			// The connection gate: same refusal as the chat front door — a
+			// stage's account signed out, no run.
 			refuseIfStagesUnready();
 			// CHUNKED like the chat path (owner, 2026-09-28): each chunk is a
 			// standalone extract → audit → merge, so no single call carries a
@@ -1417,7 +1391,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 			return stats;
 		} catch (err) {
 			console.error(`[extraction ${id}] notes pipeline failed (${Math.round(performance.now() - t0)}ms):`, err);
-			if (err instanceof NotesImportError || err instanceof ModelsNotConfiguredError || err instanceof ProviderKeyMissingError) throw err;
+			if (err instanceof NotesImportError || err instanceof ProviderKeyMissingError) throw err;
 			throw new NotesImportError(err instanceof Error && err.name === "AbortError" ? "aborted" : "failed", mergedStats,
 				err instanceof Error ? err.message : String(err), { cause: err });
 		} finally {
@@ -1437,7 +1411,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 			graphStore.upsertSource({ id, filePath: input.filePath, importedAt });
 			return await runNotesExtraction({ id, ...input, importedAt });
 		} catch (err) {
-			if (err instanceof NotesImportError || err instanceof ModelsNotConfiguredError || err instanceof ProviderKeyMissingError) throw err;
+			if (err instanceof NotesImportError || err instanceof ProviderKeyMissingError) throw err;
 			throw new NotesImportError("failed", { nodes: 0, chains: 0 }, err instanceof Error ? err.message : String(err), { cause: err });
 		} finally {
 			inFlight.delete(id);

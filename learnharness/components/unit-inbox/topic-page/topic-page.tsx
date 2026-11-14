@@ -32,17 +32,15 @@ export function TopicPage({
 	course,
 	topic,
 	chats,
-	initialConfigured,
 }: {
 	/** The Link switch: whether a line ties the lesson's row to its step. */
 	connected?: boolean;
 	course: StudyCourse;
 	topic: CourseMapTopic;
 	chats: readonly ChatListItem[];
-	initialConfigured: boolean;
 }) {
 	const router = useRouter();
-	const lesson = useLessonStart(initialConfigured);
+	const lesson = useLessonStart();
 	const workspace = course.map.workspace;
 	const sessions = topicSessions(chats, workspace, topic.handle);
 	const topicRead = useTopicRead(
@@ -68,7 +66,7 @@ export function TopicPage({
 					{lesson.error}
 				</p>
 			)}
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} onDone={lesson.closeSetup} />
+			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</>
 	);
 }

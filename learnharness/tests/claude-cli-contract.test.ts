@@ -36,7 +36,7 @@ setInterval(() => {}, 1000);
 `);
 chmodSync(fake, 0o755);
 
-const model = claudeSubscriptionModel("claude-subscription", "claude-opus-5-5")!;
+const model = claudeSubscriptionModel("claude-subscription")!;
 const se = (event: unknown) => ({ type: "stream_event", event, parent_tool_use_id: null });
 const init = { type: "system", subtype: "init", apiKeySource: "none", mcp_servers: [{ name: "lh", status: "connected" }] };
 const toolUseLines = [

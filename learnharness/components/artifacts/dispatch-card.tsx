@@ -4,7 +4,7 @@ import { useContext } from "react";
 import { CircleSlashIcon, SettingsIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
-import { isModelsRefusal, isProviderKeyRefusal, type JobKind } from "@/src/core";
+import { isProviderKeyRefusal, type JobKind } from "@/src/core";
 import { ActivityLine } from "@/components/lesson/activity-line";
 
 /**
@@ -48,15 +48,9 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	const label = KIND_LABEL[kind];
 
 	if (!job || job.status === "running") return <ActivityLine testId="dispatch-card" label={KIND_ACTIVITY[kind]} />;
-	// BYOK (owner, 2026-09-22): a job refused for missing models is INFO,
-	// not scary-error — gray glyph + "needs model setup" + the deep-link
-	// into the SetupDialog (the same flow the send interception uses).
-	// The connection refusal twin: a pinned model whose subscription is
-	// signed out reads as a sign-in being needed — the deep-link lands on
-	// the SetupDialog's sign-in stage on its own.
-	if (isModelsRefusal(job.error)) {
-		return <DispatchRefusedCard label={label} line="needs model setup" button="Set up models" />;
-	}
+	// A job refused because the Claude account is signed out is INFO, not
+	// scary-error — gray glyph + "needs a sign-in" + the deep-link into the
+	// SetupDialog (the same flow the send interception uses).
 	if (isProviderKeyRefusal(job.error)) {
 		return <DispatchRefusedCard label={label} line="needs a sign-in" button="Sign in" />;
 	}

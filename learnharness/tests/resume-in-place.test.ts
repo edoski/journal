@@ -114,7 +114,6 @@ function lessonUpTo(last: LhMessage): LhMessage[] {
 
 function seedLesson(last: LhMessage): string {
 	const chat = chatStore.createChat("Problem sheet 4", { workspace: WS, title: "Linear Algebra" });
-	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	chatStore.saveTree(chat.id, TREE);
 	chatStore.saveMessages(chat.id, lessonUpTo(last));
 	return chat.id;

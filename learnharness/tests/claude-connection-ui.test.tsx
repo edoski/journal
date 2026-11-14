@@ -4,9 +4,9 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
-import { CLAUDE_LABEL, CLAUDE_NOTICE, ClaudeConnectionRow, claudeResetLabel, claudeRoleModels } from "../components/settings/claude-connection.tsx";
+import { CLAUDE_LABEL, CLAUDE_NOTICE, ClaudeConnectionRow, claudeResetLabel } from "../components/settings/claude-connection.tsx";
 import { onSettingsSaved, type SettingsSection } from "../components/settings-signal.ts";
-import type { ClaudeAccountStatus, ClaudeConnection, ModelCatalogResponse } from "../src/core/index.ts";
+import type { ClaudeAccountStatus, ClaudeConnection, ModelStatus } from "../src/core/index.ts";
 
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true });
@@ -14,23 +14,19 @@ const originalFetch = globalThis.fetch;
 let root: Root | undefined, host: HTMLDivElement | undefined, stopSignals: (() => void) | undefined;
 
 const RESET = 1_800_000_000;
-const pin = (provider: string, id: string) => ({ model: { provider, id } });
-function catalog(slotProvider: string): ModelCatalogResponse {
-	const slot = pin(slotProvider, slotProvider === "openrouter" ? "vendor/model" : "claude-opus-5-5");
-	return { models: [], defaults: null, rolePins: { researcher: null, demoBuilder: null, visualMaker: null, extractor: null, auditor: null }, slots: { strong: slot, cheap: slot, vision: slot }, providers: [] };
-}
+const status = (account: string): ModelStatus => ({ account, connected: true, contextWindow: 1_000_000 });
 const account = (providerId: string, label: string, connection: ClaudeConnection, usage: ClaudeAccountStatus["usage"] = null, email: string | null = null, auth: "token" | "profile" | "default" = "token"): ClaudeAccountStatus => ({ account: { providerId, label, email, auth }, connection, usage });
 const connected: ClaudeConnection = { state: "connected", email: null, plan: null };
 
 function install(rounds: ClaudeAccountStatus[][]) {
 	const calls: { path: string; method: string; body?: unknown }[] = [];
-	let slotProvider = "openrouter";
+	let current = "claude-subscription";
 	globalThis.fetch = async (input, init) => {
 		const path = String(input), method = init?.method ?? "GET";
 		calls.push({ path, method, ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}) });
 		if (path.startsWith("/api/subscriptions/claude")) return Response.json({ accounts: rounds.length > 1 ? rounds.shift() : rounds[0] });
-		if (path === "/api/models") return Response.json(catalog(slotProvider));
-		if (path === "/api/settings/models" && method === "PUT") { slotProvider = (JSON.parse(String(init!.body)) as { strong: { model: { provider: string } } }).strong.model.provider; return Response.json({ settings: { version: 1, models: JSON.parse(String(init!.body)) } }); }
+		if (path === "/api/models") return Response.json(status(current));
+		if (path === "/api/settings/claude" && method === "PUT") { current = (JSON.parse(String(init!.body)) as { account: string }).account; return Response.json({ settings: { version: 1, claude: { account: current } } }); }
 		return new Response("not found", { status: 404 });
 	};
 	const signals: SettingsSection[] = [];
@@ -67,7 +63,7 @@ test("each non-connected state says what to do, with one Refresh and no sign-in 
 	}
 });
 
-test("one row per account with its email and weekly usage; Use for all roles writes that account to the three slots, then hides on it", async () => {
+test("one row per account with its email and weekly usage; Use this account switches every agent to it, and In use follows", async () => {
 	const { calls, signals } = install([[
 		account("claude-subscription", "Main", { state: "connected", email: "learner@example.com", plan: "max" }, { percentLeft: 62, resetsAt: RESET, limited: false, checkedAt: 1 }, null, "default"),
 		account("claude-subscription-work", "Work", connected, { percentLeft: 0, resetsAt: RESET, limited: true, checkedAt: 1 }, "work@example.com"),
@@ -80,21 +76,21 @@ test("one row per account with its email and weekly usage; Use for all roles wri
 	assert.equal(text(row("claude-subscription"), "claude-usage"), `62% left this week · resets ${claudeResetLabel(RESET)}`);
 	assert.equal(text(row("claude-subscription-work"), "claude-usage"), `limit reached · resets ${claudeResetLabel(RESET)}`);
 	assert.equal(text(row("claude-subscription-spare"), "claude-usage"), null);
-	assert.equal(row("claude-subscription-spare").querySelector('[data-testid="claude-use-all"]'), null, "a signed-out account offers no switch");
+	assert.equal(text(row("claude-subscription"), "claude-in-use"), "In use");
+	assert.equal(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), null, "the account in use offers no switch");
+	assert.equal(row("claude-subscription-spare").querySelector('[data-testid="claude-use-account"]'), null, "a signed-out account offers no switch");
 
-	await click(row("claude-subscription-work").querySelector('[data-testid="claude-use-all"]'));
+	await click(row("claude-subscription-work").querySelector('[data-testid="claude-use-account"]'));
 	const put = calls.find((c) => c.method === "PUT");
-	assert.equal(put?.path, "/api/settings/models");
-	const opusHigh = { ...pin("claude-subscription-work", "claude-opus-5-5"), thinkingLevel: "high" };
-	assert.deepEqual(put?.body, { strong: opusHigh, cheap: opusHigh, vision: opusHigh });
-	assert.deepEqual(put?.body, claudeRoleModels("claude-subscription-work"));
-	assert(signals.includes("models"), "model menus re-read after the write");
+	assert.equal(put?.path, "/api/settings/claude");
+	assert.deepEqual(put?.body, { account: "claude-subscription-work" });
+	assert(signals.includes("claude"), "readers re-read after the switch");
 	await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-	assert.equal(row("claude-subscription-work").querySelector('[data-testid="claude-use-all"]'), null, "hidden on the account that holds every slot");
-	assert(row("claude-subscription").querySelector('[data-testid="claude-use-all"]'), "still offered on the other account");
+	assert.equal(text(row("claude-subscription-work"), "claude-in-use"), "In use");
+	assert(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), "the other account is offered now");
 });
 
-test("Refresh forces a fresh check of every account and tells model menus the connections changed", async () => {
+test("Refresh forces a fresh check of every account and tells readers the connections changed", async () => {
 	const { calls, signals } = install([
 		[account("claude-subscription", "Claude Code", { state: "signed-out" }, null, null, "default")],
 		[account("claude-subscription", "Claude Code", { state: "connected", email: null, plan: "pro" }, null, null, "default")],

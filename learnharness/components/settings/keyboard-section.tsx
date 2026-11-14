@@ -19,8 +19,8 @@
 import { useEffect, useState } from "react";
 import {
 	KEY_SCOPES,
+	KEYBOARD_ACTIONS,
 	eventBinding,
-	keyActionsFor,
 	formatBinding,
 	loadOverrides,
 	saveOverrides,
@@ -93,7 +93,7 @@ export function KeyboardSection() {
 	const action = "h-7 px-2 font-normal";
 	// Settings lists what can be changed; the keys a screen owns (the
 	// question's) stay in the cheat sheet.
-	const changeable = keyActionsFor("proposed").filter((a) => !a.displayOnly);
+	const changeable = KEYBOARD_ACTIONS.filter((a) => !a.displayOnly);
 	return (
 		<>
 			{KEY_SCOPES.map(({ scope, label }) => {

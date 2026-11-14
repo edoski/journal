@@ -28,10 +28,8 @@ test("Next-style IPC is not desktop transport; web ownership works, and an API k
 			(process.emit as (name: string, value: unknown) => boolean)("message", { channel: "lh:chatgpt", kind: "state", stamp: { epoch: 1, authorityRevision: 1, revision: 1 }, status: { available: true, activeId: "fixture", accounts: [{ id: "fixture", connected: true, planEnabled: true }] } });
 			const response = await GET();
 			assert.equal(response.status, 200);
-			const catalog = await response.json();
-			assert.ok(!catalog.models.some((m: { provider: string }) => m.provider === "openai"), "an API key in the environment adds no model");
-			assert.ok(!catalog.providers.some((p: { id: string }) => p.id === "openai"));
-			assert.equal(catalog.providers.find((p: { id: string }) => p.id === "chatgpt").connected, false);
+			const status = await response.json();
+			assert.equal(status.account, "claude-subscription", "an API key in the environment changes nothing the agents run on");
 			assert.equal(chatGPTConnected(), false);
 			assert.deepEqual(chatGPTModels(), []);
 			if (!mode && !capability) {

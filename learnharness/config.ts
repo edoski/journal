@@ -67,18 +67,12 @@ export const LEARNING_ENGINE = {
 } as const;
 
 // ─── Models ────────────────────────────────────────────────────────────────
-// BYOK ALL THE WAY DOWN (owner, 2026-09-22): there are NO factory default
-// models. Every engine resolves from the user's model slots (settings.json
-// models section: strong/cheap/vision) over per-role/ChatSettings overrides,
-// and a chain that ends empty REFUSES honestly (503 models_not_configured).
-// .env stays for secrets (API keys) only. What remains here are ENGINE
-// CONSTRUCTION FACTS: the thinking-level scale and the default order.
+// Every agent runs Claude Opus 5.5 at high effort on one Claude account
+// (owner, 2026-11-14; src/core/contracts/claude.ts CLAUDE_MODEL): there is
+// no model choice anywhere. What remains here is the agent roles.
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-
-/** Every agent role in the app. The conversation pair (prober/teacher)
- *  resolves chat.model → strong slot; background roles resolve their own
- *  override → tier slot (core/settings-resolution.ts ROLE_SLOT). */
+/** Every agent role in the app — the engine-injection key; every role
+ *  runs the same engine (src/server/chat-handler.ts agentEngine). */
 export type ModelRole =
 	| "prober"
 	| "teacher"
@@ -131,17 +125,14 @@ export const GRAPH_FORMAT_FILE = path.join(PATHS.graph, "format.json");
 /**
  * THE USER SETTINGS RECORD (settings-storage wave, 2026-09-19): one
  * versioned, DELTA-shaped JSON blob at the data-dir seam holding every
- * non-secret product preference — general, agent (background
- * model/thinking overrides + tool toggles + prompt-override switches),
- * appearance, graph. Explicit user choices only: ABSENT keys resolve to the
+ * non-secret product preference — agent (tool toggles), claude (the
+ * account every agent runs on), appearance, graph. Explicit user choices only: ABSENT keys resolve to the
  * factory defaults compiled into src/core/settings.ts (FACTORY_SETTINGS), so
  * a software update that adds a knob (new tool, new role, new appearance
  * field) needs no migration — old records simply lack the new keys. The
  * version field is a PRIVATE schema counter for breaking shape changes
  * only (field renamed/meaning changed), unrelated to the app release
- * version. Secrets (login tokens) NEVER live here. (The `chat` default-settings section died
- * with per-session models, owner 2026-09-28 — sessions own their model
- * from birth, stamped from the strong slot.)
+ * version. Secrets (login tokens) NEVER live here.
  */
 export const SETTINGS_FILE = path.join(DATA_ROOT, "settings.json");
 

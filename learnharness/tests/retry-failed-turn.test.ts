@@ -93,7 +93,6 @@ async function turn(engine: PiEngine, chatId: string, input: unknown, buildAgent
 
 function createConfiguredChat(title: string) {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	chatStore.saveTree(chat.id, { nodes: [{ id: "planet-order", title: "Planet order" }], edges: [], version: 1 });
 	return chat;
 }
@@ -429,14 +428,13 @@ describe("retained generations and Pi's native provider filtering", () => {
 describe("Retry refusal and revalidation", () => {
 	it("rejects an invalid Retry before provider gates, turn claims or writes", async () => {
 		const chat = chatStore.createChat("Test: retry refused before subscription refresh");
-		chatStore.saveSettings(chat.id, { model: { provider: "chatgpt", id: "not-a-fixture-model" } });
 		const before = chatStore.getChat(chat.id)!;
 		rememberTurnFailure(chat.id, "Existing settlement notice");
 		const events: string[] = [];
 		const unsubscribe = subscribe((event) => { if ("chatId" in event && event.chatId === chat.id) events.push(event.type); });
 		try {
 			const res = await handleChatRequest(post(chat.id, { type: "retry" }), () => { throw new Error("must not construct an agent"); });
-			assert.equal(res.status, 400, "invalid retry wins even with an unavailable subscription model");
+			assert.equal(res.status, 400, "invalid retry wins before the connection gate");
 			assert.match(await res.text(), /requires a failed turn/);
 			assert.deepEqual(chatStore.getChat(chat.id), before);
 			assert.equal(turnFailure(chat.id), "Existing settlement notice", "beginTurn did not clear recovery state");

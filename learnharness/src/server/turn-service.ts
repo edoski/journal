@@ -24,7 +24,7 @@ import { planBlocksFor } from "../core/plan-blocks.ts";
 import { coverageOf, EXTRACTION_CHUNK_TOKENS } from "../core/coverage.ts";
 import type { ChatStore, GraphStore } from "../core/ports.ts";
 import type { ExtractionPipeline } from "../agent/subagents/extraction.ts";
-import { ModelsNotConfiguredError, ProviderKeyMissingError } from "../core/settings.ts";
+import { ProviderKeyMissingError } from "../core/settings.ts";
 
 /** Distinguish a failed canonical save from later bookkeeping failures. */
 export class TurnPersistenceError extends Error {
@@ -118,14 +118,9 @@ export function triggerExtraction(
 		const covered = coverageOf(record.messages, deps.graphStore.readCoverage(), chatId, record.kind);
 		if (covered.uncoveredTokens < EXTRACTION_CHUNK_TOKENS) return;
 		void extraction.runExtraction(chatId).catch((err) => {
-			// BYOK (owner, 2026-09-22) + key presence (provider-key interlude,
-			// 2026-09-25): an unconfigured OR keyless write channel SKIPS (the
-			// coverage ledger keeps the messages uncovered — the next trigger
-			// retries once slots/keys are set); only real failures log.
-			if (err instanceof ModelsNotConfiguredError) {
-				console.info(`[chat ${chatId}] extraction skipped — ${err.envelope.error} (missing: ${err.envelope.missing.join(", ")})`);
-				return;
-			}
+			// A signed-out account SKIPS (the coverage ledger keeps the
+			// messages uncovered — the next trigger retries once it is signed
+			// in); only real failures log.
 			if (err instanceof ProviderKeyMissingError) {
 				console.info(`[chat ${chatId}] extraction skipped — ${err.envelope.error} (provider: ${err.envelope.provider})`);
 				return;

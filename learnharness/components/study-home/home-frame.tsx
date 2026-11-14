@@ -33,18 +33,16 @@ export interface HomeReady {
  * line that names an unreadable course, while a map fills the page.
  */
 export function HomeFrame({
-	initialConfigured,
 	className,
 	quiet = false,
 	children,
 }: {
-	initialConfigured: boolean;
 	className: string;
 	quiet?: boolean;
 	children: (home: HomeReady) => React.ReactNode;
 }) {
 	const { state, retry } = useStudyHome();
-	const lesson = useLessonStart(initialConfigured);
+	const lesson = useLessonStart();
 
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
@@ -66,7 +64,7 @@ export function HomeFrame({
 					)}
 				</div>
 			</main>
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} onDone={lesson.closeSetup} />
+			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</div>
 	);
 }

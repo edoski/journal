@@ -14,7 +14,7 @@ interface SessionCreation {
 
 /** Per source-composer instance. Retain a successful creation if storage
  * fails, so an unchanged retry does not create another empty session.
- * Changed text/context/settings is a different start, not a stale title.
+ * Changed text or context is a different start, not a stale title.
  * A second press while the first is in flight joins it, so a double press
  * creates one session and sends its opening once.
  */
@@ -22,8 +22,8 @@ export class SessionStarter {
 	private created?: { identity: string; id: string };
 	private pending?: { identity: string; href: Promise<string> };
 
-	start(body: SessionCreation, fetchLike: typeof fetch, settingsIdentity?: string): Promise<string> {
-		const identity = JSON.stringify([body, settingsIdentity]);
+	start(body: SessionCreation, fetchLike: typeof fetch): Promise<string> {
+		const identity = JSON.stringify(body);
 		if (this.pending?.identity === identity) return this.pending.href;
 		const href = this.create(identity, body, fetchLike).finally(() => {
 			if (this.pending?.href === href) this.pending = undefined;

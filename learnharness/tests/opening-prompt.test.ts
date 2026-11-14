@@ -101,16 +101,15 @@ describe("new-session create and handover", () => {
 		assert.equal(await starter.start({ title: "hello" }, fetchLike), "/chat/chat_1");
 		assert.equal(bodies.length, 1);
 	});
-	it("changed text, mode, picks or birth settings create a matching new session", async () => {
+	it("changed text, mode or picks create a matching new session", async () => {
 		const starter = new SessionStarter();
 		const { bodies, fetchLike } = createFetch();
-		await starter.start({ title: "original" }, fetchLike, "model-a");
-		await starter.start({ title: "edited" }, fetchLike, "model-a");
-		await starter.start({ title: "edited", kind: "practice" }, fetchLike, "model-a");
+		await starter.start({ title: "original" }, fetchLike);
+		await starter.start({ title: "edited" }, fetchLike);
+		await starter.start({ title: "edited", kind: "practice" }, fetchLike);
 		const picked = { title: "edited", kind: "practice" as const, graphContext: { propositions: [{ id: "p1", name: "P", statement: "S" }] } };
-		await starter.start(picked, fetchLike, "model-a");
-		await starter.start(picked, fetchLike, "model-b");
-		assert.equal(bodies.length, 5);
+		await starter.start(picked, fetchLike);
+		assert.equal(bodies.length, 4);
 		assert.equal(readOpeningPrompt("chat_1"), undefined);
 	});
 	it("does not stash or navigate on a refused creation or invalid ID", async () => {
