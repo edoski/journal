@@ -53,7 +53,7 @@ This is the grouping pass's job: it forms the arcs of a course that has topics a
 
 1. **One home.** Each topic, excluded ones included, sits in exactly one arc. A topic no exam examines (`excluded`) joins the arc whose question it extends, else the latest arc holding its prerequisites. It never forms an arc alone: an arc of excluded topics is hidden and gives nothing to orient by. It is in no exam's scope, so it never makes an arc straddle one.
 2. **No topic needs a later arc.** For every topic B that needs A, A's arc is B's or an earlier one: arcs 1 to j together hold every prerequisite of every topic in them. When a topic's theme says one arc but a topic that needs it sits earlier, the edge wins: home the topic in the earliest arc that needs it, just before its first use.
-3. **One idea per arc.** Write the arc's focus question before its name. Every topic in it helps answer that question; a topic that serves another arc's question better goes there, if rule 2 allows.
+3. **One idea per arc.** Write the arc's focus question before its name. Every topic in it helps answer that question; a topic that serves another arc's question better goes there, if rule 2 allows. A topic's `refs` locator is evidence of its home, not the rule: when its chapter says one arc and its idea another, its idea decides, if rule 2 allows, and the basis says so.
 4. **Where to cut**, from these signals, strongest first; keep a boundary only if rule 2 still holds:
    1. The material's own units. A chapter, a syllabus unit, a lecture block or a numbered part that groups at least two of the course's topics is a candidate arc. Read it from the topics' `refs` locators and the sources' headings.
    2. The exam's scope, when the material states it. No arc straddles the boundary of an exam whose scope is known now: with a midterm on chapters 1 to 3, a boundary falls after chapter 3, and the midterm's scope goes in `exam.arcs`. A topic outside the scope stays on the path, in its arc; it is not excluded.
@@ -71,7 +71,11 @@ This is the grouping pass's job: it forms the arcs of a course that has topics a
    - At least two arcs, or none. A course of about five topics usually gets none: form arcs only when the material has two units that each group at least two topics under their own question and boundary. A unit shows in a source's headings or a topic's `refs` locator; a path basis or a course description names none. When the course gets none, say why.
    - When several cuts pass all of this, prefer the one whose arcs need the most even work in lesson steps, else in topics.
 7. **Order.** Arcs follow rule 2; among the orders it allows, the material's order; then the nearer exam's arcs first; then broad before narrow, and tool before use. `path.order` reads as the arcs one after another. List each arc's topics in study order, prerequisites first, then the material's order; the path takes that order.
-8. **Names and purpose lines** as *What an arc is* says. Use the material's chapter title when it fits the topics. Every topic title reads naturally as part of its arc's name, and no topic fits another arc's name better than its own.
+8. **Names and purpose lines** as *What an arc is* says.
+   - A name names the arc's one idea, never a list of its topics: "Sorting", not "Heapsort, quicksort and counting sort". Two phrases joined by "and" pass only as one idea the material names so ("Limits and continuity"). When only a list fits, the arc holds several ideas: find the one question they serve, or cut it (rule 3).
+   - Use the material's chapter title when it fits the topics and passes the sort below.
+   - Test the names as the learner will read them, before you submit: sort every topic title, shuffled, into the arc names alone. A topic that lands in another arc than its own means its place or a name is wrong. Move the topic to the arc it lands in when rule 2 allows; rename only when rule 2 holds it where it is. At most one topic may stay a borderline miss, with its reason in the basis.
+   - A purpose line says the one thing the arc lets the learner do, true of every topic in it ("Find the slope of any curve built from familiar functions"), never a list of its topics' tasks.
 
 Edge cases:
 - A topic that fits two arcs goes where rule 2 forces, else where rule 3 fits best, else with its material locator; never in both.

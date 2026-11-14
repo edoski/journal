@@ -128,8 +128,7 @@ How this differs from the text below:
 - Each handle is its own topic. Two topics whose names share words are still two topics, and both keep their handles.
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
-- Before you submit, test your names as the learner will read them: sort the topic titles, shuffled, into your arc names alone. A title that fits another arc's name better means that arc's name is wrong, or the topic's place is (move it if rule 2 allows). Use the material's chapter title only when the sort holds; otherwise name the idea that tells the neighbours apart.
-- Each arc's focus question is one question. If it only reads as two questions joined by "and" for unrelated ideas, the arc holds two ideas: cut it, or find the one question both serve.
+- Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
 - examArcs and leavesOut only when the material states the next exam's scope.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
