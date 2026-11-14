@@ -1063,6 +1063,11 @@ export function Chat({
 		if (p.chatId !== chatId) return;
 		setCompacting(p.running);
 	});
+	useServerEvent("chats-changed", (p) => {
+		// The first plan named this session (ChatStore.nameSession): the
+		// header takes the name the list now shows.
+		if (p.named?.id === chatId) setTitleText(p.named.title);
+	});
 	useServerEvent("record-changed", (p) => {
 		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
 		// turn's markers landing at its write-ahead. Idle: adopt the record

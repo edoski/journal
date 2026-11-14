@@ -39,10 +39,13 @@ export interface ChatRecord {
 	 *  Absent only on sessions older than that rule: they stay readable and
 	 *  take no learner turn until the learner links a course. */
 	course?: CourseLink;
-	/** The course topics the session was started on (a topic's page, Home's
-	 *  review of those topics), set at creation: the session's own topics,
-	 *  on it from its first turn. */
+	/** The session's own topics, the topic it belongs to first: the course
+	 *  topics it was started on (a topic's page, Home's review of those
+	 *  topics), set at creation, else the topic its first plan's goal names
+	 *  (`SessionGoal`). Set once; the step the lesson is on never moves it. */
 	topics?: readonly string[];
+	/** The learner renamed the session: a plan's goal no longer names it. */
+	renamed?: true;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
 	/** Append-only usage log (observability, 2026-09): one entry per model
@@ -310,6 +313,14 @@ export interface PlanBlockData {
 	edges: Array<{ from: string; to: string }>;
 }
 
+/** What a lesson is for, as its first plan names it: a short `title`, and
+ *  the course `topic` it teaches when it teaches one. It names a session
+ *  started on no topic, once (`ChatStore.nameSession`). */
+export interface SessionGoal {
+	title: string;
+	topic?: string;
+}
+
 /** How the tutor's last turn left a session that waits on no question or
  *  problem it posed: its words asked him something, or its plan waits for
  *  his go-ahead, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
@@ -350,6 +361,10 @@ export interface ChatSummary {
 	 *  against the course map.
 	 *  The list always sets it; a summary made elsewhere may leave it out. */
 	topics?: readonly string[];
+	/** The session's own topics (the record's `topics`), the topic it
+	 *  belongs to first: fixed once, never the step the lesson is on. The
+	 *  list always sets it; a summary made elsewhere may leave it out. */
+	ownTopics?: readonly string[];
 	/** How the tutor's last turn left the session (sessionEndOf); a summary
 	 *  made elsewhere may leave it out, which reads as closed. */
 	ended?: SessionEnd;
