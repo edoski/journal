@@ -16,7 +16,7 @@ import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseSt
 import { LEARNING_ENGINE } from "../config.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import { createCourseMapBuilder } from "../src/agent/subagents/course-map-builder.ts";
-import { abortExtraction } from "../src/agent/subagents/extraction.ts";
+import { abortRuns } from "../src/agent/subagents/background-runs.ts";
 import type { PiEngine } from "../src/agent/models.ts";
 import type { CourseMapLedgers } from "../src/core/ports.ts";
 import {
@@ -330,7 +330,7 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		const gate = new Promise<void>((r) => (release = r));
 		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: scriptedModel([FIRST], gate) });
 		const run = builder.buildMap(dir);
-		while (!abortExtraction(dir)) await new Promise((r) => setTimeout(r, 10));
+		while (!abortRuns(dir)) await new Promise((r) => setTimeout(r, 10));
 		release();
 		const outcome = await run;
 		assert.deepEqual(outcome, { status: "failed", reason: "it was stopped before it finished" });

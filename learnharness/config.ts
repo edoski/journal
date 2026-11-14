@@ -18,8 +18,7 @@ function createTestScratch(): string {
 
 /**
  * THE data-location seam (the Electron contract, 2026-09-17): LH_DATA_DIR
- * relocates every MUTABLE record — chat sessions, graph ledgers, the
- * embedding model cache — when set. The desktop shell points it at
+ * relocates every MUTABLE record — chat sessions, jobs, settings — when set. The desktop shell points it at
  * userData so nothing is written inside the read-only .app bundle
  * (macOS translocation guarantees the bundle is read-only anyway).
  * Unset (plain web dev / repo work) it resolves to the repo's data/,
@@ -38,7 +37,6 @@ export const PATHS = {
 	data: DATA_ROOT,
 	/** Chat sessions (AI SDK UIMessage transcripts, one JSON file per chat). */
 	chats: path.join(DATA_ROOT, "chats"),
-	graph: path.join(DATA_ROOT, "graph"),
 	/** Debug artifacts (env-gated): data/debug/provider-events/<chatId>.jsonl
 	 * raw provider stream recordings (src/agent/provider-events.ts). */
 	debug: path.join(DATA_ROOT, "debug"),
@@ -79,54 +77,13 @@ export type ModelRole =
 	| "researcher"
 	| "demoBuilder"
 	| "visualMaker"
-	| "pdfReader"
-	| "extractor"
-	| "auditor";
-
-/**
- * The LIVE graph store (src/store/graph.ts) — owned by the app's extraction
- * pipeline. Line shapes: src/core/contracts.ts. CHAINS ARE THE STORED
- * TRUTH (owner, 2026-09-30): edges are a derived view, never stored.
- */
-export const LEDGER_FILES = {
-	nodes: path.join(PATHS.graph, "nodes.jsonl"),
-	chains: path.join(PATHS.graph, "chains.jsonl"),
-	sessions: path.join(PATHS.graph, "sessions.jsonl"),
-	/** Per-message extraction coverage (contracts/graph.ts CoverageEntry;
-	 *  the checkpoint's replacement for chat extractions — notes keep
-	 *  sessions.jsonl, whole-file as they are). */
-	coverage: path.join(PATHS.graph, "coverage.jsonl"),
-} as const;
-
-/**
- * Notes-import bookkeeping (NOT a ledger): one JSON map, src-id → NotesSource
- * record (contracts/graph.ts) — the file path + import time + the run's usage
- * log. Read-modify-write like a chat file, not append-only like the ledgers.
- */
-export const SOURCES_FILE = path.join(PATHS.graph, "sources.json");
-/** The layout ledger (read-modify-write like sources.json): nodeId →
- *  {x,y} resting positions from the incremental settle (core/layout.ts).
- *  Carries an updatedAt stamp for future live-physics conflict handling. */
-export const POSITIONS_FILE = path.join(PATHS.graph, "positions.json");
-
-/**
- * Graph render settings (the settings-panel controls): one small JSON blob,
- * read-modify-write. Shared shape/sanitizer: src/core/render-settings.ts.
- */
-export const RENDER_SETTINGS_FILE = path.join(PATHS.graph, "render-settings.json");
-
-/** The graph-family FORMAT STAMP sidecar (schema-versioning wave,
- *  2026-10-10): one version for the whole family — the four JSONL ledgers,
- *  sources.json, render-settings.json. LAZY v1: absent = v1; the first
- *  graph-family write creates it. positions.json is REBUILDABLE and rides
- *  along unversioned by design (owner ruling). */
-export const GRAPH_FORMAT_FILE = path.join(PATHS.graph, "format.json");
+	| "pdfReader";
 
 /**
  * THE USER SETTINGS RECORD (settings-storage wave, 2026-09-19): one
  * versioned, DELTA-shaped JSON blob at the data-dir seam holding every
  * non-secret product preference — agent (tool toggles), claude (the
- * account every agent runs on), appearance, graph. Explicit user choices only: ABSENT keys resolve to the
+ * account every agent runs on), appearance. Explicit user choices only: ABSENT keys resolve to the
  * factory defaults compiled into src/core/settings.ts (FACTORY_SETTINGS), so
  * a software update that adds a knob (new tool, new role, new appearance
  * field) needs no migration — old records simply lack the new keys. The

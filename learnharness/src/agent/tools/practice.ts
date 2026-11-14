@@ -21,7 +21,6 @@ import { lsTool } from "./ls.ts";
 import { findTool } from "./find.ts";
 import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
-import { proberGraphTools, type GraphToolContext } from "./graph.ts";
 import { teachHandoffTool } from "./handoff.ts";
 import type { SteerMessage } from "../../core/contracts/jobs.ts";
 import { activeProblemOf } from "../../core/native-messages.ts";
@@ -40,11 +39,8 @@ import { conclusionProblem, practiceObservations, type PracticeConclusion } from
 export interface PracticeToolContext {
 	chatId: string;
 	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null };
-	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the map readers
-	 *  behind the SAME settings gate as the prober's (graphToolsEnabled at
-	 *  the composition root); the research + pdf jobs (both keyless).
-	 *  Each absent context (tests) = absent from the registry. */
-	graph?: GraphToolContext;
+	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the research +
+	 *  pdf jobs (both keyless). Absent (tests) = absent from the registry. */
 	jobs?: JobToolContext;
 	/** Queue a handoff's wake: present = the `teach` handoff is registered
 	 *  (the composition root always passes it). */
@@ -336,7 +332,6 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 		grep: grepTool,
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
-		...(ctx.graph ? proberGraphTools(ctx.graph) : {}),
 		...(ctx.deliver ? teachHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }, gate) : {}),
 	});
 }

@@ -7,9 +7,6 @@
  *   persistTurn        — the canonical state write (Wave B: native history;
  *                        id stamping, placeholder filtering, plan-block
  *                        emission, abort-partial persistence)
- *   triggerExtraction  — the graph write channel: fires the extraction
- *                        pipeline (the sole graph writer) once a chat
- *                        crosses the token-budget threshold.
  *
  * Logs are the minimal-observability baseline: one line per failure, tagged
  * [chat <id>] — structured logging lands behind these seams later.
@@ -21,10 +18,7 @@ import type { LhMessage } from "../core/native-messages.ts";
 import { newMessageId } from "../core/native-messages.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { planBlocksFor } from "../core/plan-blocks.ts";
-import { coverageOf, EXTRACTION_CHUNK_TOKENS } from "../core/coverage.ts";
-import type { ChatStore, GraphStore } from "../core/ports.ts";
-import type { ExtractionPipeline } from "../agent/subagents/extraction.ts";
-import { ProviderKeyMissingError } from "../core/settings.ts";
+import type { ChatStore } from "../core/ports.ts";
 
 /** Distinguish a failed canonical save from later bookkeeping failures. */
 export class TurnPersistenceError extends Error {
@@ -90,50 +84,4 @@ export function persistTurn(
 		console.error(`[chat ${chatId}] persist failed:`, err, { isAborted });
 		throw new TurnPersistenceError(err);
 	}
-}
-
-/**
- * The graph write channel (vision §1 construction): the extraction pipeline
- * (extractor → auditor → merger — the sole graph writer) runs ASYNC once a
- * chat's UNCOVERED transcript tokens reach the chunk budget
- * (vision-extraction-coverage.md, 2026-09-15). Coverage reads through the
- * projection (the record is native history; the extraction view stays
- * client-shaped until Wave D). Fire-and-forget — never blocks the turn;
- * failures are logged by the pipeline and leave coverage untouched, so the
- * next trigger (or the manual extract button) re-runs what's left.
- *
- * Deliberately isolated in this one seam — the pipeline is
- * trigger-agnostic. Skipped under tests: scripted chats are fixtures, not
- * knowledge (the pipeline itself is tested directly with mock models).
- */
-export function triggerExtraction(
-	deps: { chatStore: ChatStore; graphStore: GraphStore },
-	extraction: ExtractionPipeline,
-	chatId: string,
-): void {
-	if (process.env.NODE_ENV === "test") return;
-	try {
-		const record = deps.chatStore.getChat(chatId);
-		if (!record) return;
-		const covered = coverageOf(record.messages, deps.graphStore.readCoverage(), chatId, record.kind);
-		if (covered.uncoveredTokens < EXTRACTION_CHUNK_TOKENS) return;
-		startExtraction(extraction, chatId);
-	} catch (err) {
-		console.error(`[chat ${chatId}] extraction trigger failed:`, err);
-	}
-}
-
-/** Run the extraction over the chat's uncovered teaching, whatever its size,
- *  without waiting: a finished lesson's tail, or a turn over the budget. */
-export function startExtraction(extraction: ExtractionPipeline, chatId: string): void {
-	void extraction.runExtraction(chatId).catch((err) => {
-		// A signed-out account SKIPS (the coverage ledger keeps the
-		// messages uncovered — the next trigger retries once it is signed
-		// in); only real failures log.
-		if (err instanceof ProviderKeyMissingError) {
-			console.info(`[chat ${chatId}] extraction skipped — ${err.envelope.error} (provider: ${err.envelope.provider})`);
-			return;
-		}
-		console.error(`[chat ${chatId}] extraction pipeline failed:`, err);
-	});
 }

@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
+import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
@@ -28,7 +28,7 @@ function chatFile(id: string): string {
 /** THE SILENCE LAW (push S6, 2026-10-02): chats-changed announces ONLY
  *  list-SHAPE mutations — createChat, renameChat, deleteChat (below,
  *  each emits post-write). The content writers (saveMessages,
- *  appendTurnUsage, appendExtractionUsage, saveDigestLedger, saveTree) are
+ *  appendTurnUsage, saveDigestLedger, saveTree) are
  *  DELIBERATELY SILENT: saveMessages fires per turn-persist and would
  *  spam the bus, and every list-visible change it causes (title, order,
  *  phase, busy, pendingQuestion, pendingProblem) is already announced by
@@ -85,15 +85,17 @@ function listChats(): ChatSummary[] {
 			.readdirSync(PATHS.chats)
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
-			.filter((r): r is ChatRecord => r !== null)
-			.map(({ messages, tree, turns, extractions, digest: _digest, ...summary }) => {
+			// Older records may still carry the retired graph extraction's
+			// usage log (`extractions`); it stays out of the list too.
+			.filter((r): r is ChatRecord & { extractions?: unknown } => r !== null)
+			.map(({ messages, tree, turns, extractions: _extractions, digest: _digest, ...summary }) => {
 				// Per-record isolation (Wave B): a record whose messages fail the
 				// projection (e.g. pre-Wave-B UIMessage-format scratch — the
 				// zero-back-compat wipe makes these "corrupt") must not blank the
 				// whole sidebar — same isolation getChat's per-file catch gives.
 				try {
 					return {
-						// turns and extractions stay out of the list payload (list =
+						// turns stay out of the list payload (list =
 						// summaries; usage aggregates ride the full record, the picker
 						// never needs them).
 						...summary,
@@ -154,18 +156,6 @@ function appendTurnUsage(id: string, entry: TurnUsage): void {
 	writeChat(record);
 }
 
-/** Append one extraction-run usage entry to the record's extractions
- * log — idempotent per startedAt: a retry that reaches the append twice
- * (abort replays) does not double-count spend. */
-function appendExtractionUsage(id: string, entry: ExtractionRunUsage): void {
-	const record = getChat(id);
-	if (!record) throw new Error(`Chat not found: ${id}`);
-	record.extractions = record.extractions?.some((r) => r.startedAt === entry.startedAt)
-		? record.extractions
-		: [...(record.extractions ?? []), entry];
-	writeChat(record);
-}
-
 /** Replace the lesson digest's ledger. Silent, and not conversation
  * activity: updatedAt stays put. */
 function saveDigestLedger(id: string, ledger: DigestLedger): void {
@@ -200,8 +190,8 @@ function renameChat(id: string, title: string): ChatRecord {
 
 /** Delete the session record file entirely (session-deletion wave 6,
  *  owner 2026-09-22). False when the id is unknown — the route turns that
- *  into a 404. The record's graph traces and jobs are the route's
- *  choreography (core/graph-deletion.ts), not the store's. */
+ *  into a 404. The session's jobs are the caller's choreography
+ *  (server/chats.ts), not the store's. */
 function deleteChat(id: string): boolean {
 	try {
 		fs.unlinkSync(chatFile(id));
@@ -233,6 +223,5 @@ export const chatStore: ChatStore = {
 	renameChat,
 	deleteChat,
 	appendTurnUsage,
-	appendExtractionUsage,
 	saveDigestLedger,
 };

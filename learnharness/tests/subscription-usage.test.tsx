@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { subscriptionLabel, subscriptionLabels, isSubscriptionModel, type TurnUsage } from "../src/core/index.ts";
 import { sessionCost, callCost } from "../src/server/pricing.ts";
-import { graphCostSummary } from "../src/core/cost-summary.ts";
 import { planCostLabel } from "../components/usage-format.ts";
 const step = { inputTokens: 1000, outputTokens: 100, cacheReadTokens: undefined, cacheWriteTokens: undefined, reasoningTokens: undefined };
 const turn = (model: string, id: string): TurnUsage => ({ id, messageId: id, at: "2026-10-24T00:00:00Z", model, steps: [step] });
@@ -21,9 +20,4 @@ test("mixed session pricing sums only API dollars and retains all subscription p
 	const turns = [turn("claude-subscription:claude-opus-5-5", "claude"), turn("chatgpt:gpt-5", "chatgpt"), turn("openai:gpt-5", "api")];
 	const pricing = sessionCost({ turns }); assert.equal(pricing.subscription, 2); assert.equal(pricing.unpriced, 0); assert.equal(pricing.cost, callCost(step, "openai:gpt-5"));
 	assert.deepEqual(pricing.subscriptionProviders, ["Claude", "ChatGPT"]);
-});
-test("graph stage/recent aggregates retain distinct subscription providers without inventing dollars", () => {
-	const summary = graphCostSummary({ chats: [{ title: "Fixture", extractions: [{ startedAt: 1, at: "2026-10-24T00:00:00Z", durationMs: 1, stages: { extractor: { model: "claude-subscription:claude-haiku-5-5", steps: [step] }, auditor: { model: "chatgpt:gpt-5", steps: [step] } } }] }], sources: [] }, callCost);
-	assert.equal(summary.totalDollars, 0); assert.equal(summary.unpricedRuns, 0); assert.equal(summary.runs[0]!.dollars, null);
-	assert.deepEqual(summary.subscriptionProviders, ["Claude", "ChatGPT"]); assert.deepEqual(summary.runs[0]!.subscriptionProviders, ["Claude", "ChatGPT"]);
 });

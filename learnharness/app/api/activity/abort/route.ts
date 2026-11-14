@@ -1,12 +1,13 @@
 /**
  * POST /api/activity/abort — the dock's END/ABORT control, uniform across
  * process kinds (user-decided contract): body {kind: "job"|"extraction"|"turn", id}
- * where id is the jobId for sub-agent jobs, the chatId for extraction runs
- * (the pipeline registry is chat-keyed), and the chatId for turns
+ * where id is the jobId for sub-agent jobs, the run's chatId for background
+ * runs (lesson digests and course-map builds; the dock still sends them as
+ * kind "extraction"), and the chatId for turns
  * (background-turn wave, 2026-09-25: a running turn is a background
  * object — any client may stop it here; a view leaving NEVER kills it).
  * Mechanisms live in their domains — abortJob (server/jobs.ts, agents
- * stream), abortExtraction (the pipeline module, graph stream), and
+ * stream), abortRuns (agent/subagents/background-runs.ts), and
  * abortTurn (server/turn-runs.ts, the running-turn registry); this route
  * is the thin composition.
  *
@@ -14,10 +15,10 @@
  * A turn mirrors the job semantics: not_running -> 409 (honest "nothing to
  * abort" — the caller refetches), aborted -> 200 (partial persists via
  * the usual settle path, every subscriber closes cleanly).
- * Extraction abort is idempotent by design (aborting with nothing in
+ * A background run's abort is idempotent by design (aborting with nothing in
  * flight is success — the blob is gone either way) -> 200.
  */
-import { abortExtraction, abortJob, abortTurn } from "@/src/server";
+import { abortJob, abortRuns, abortTurn } from "@/src/server";
 
 export async function POST(req: Request) {
 	let body: unknown;
@@ -47,8 +48,8 @@ export async function POST(req: Request) {
 		if (!outcome.ok) return Response.json({ ok: false, reason: outcome.reason }, { status: 409 });
 		return Response.json({ ok: true });
 	}
-	// kind === "extraction": true cancellation; idempotent (nothing in
-	// flight is success — same dock outcome)
-	abortExtraction(id);
+	// kind === "extraction", a background run: true cancellation;
+	// idempotent (nothing in flight is success — same dock outcome)
+	abortRuns(id);
 	return Response.json({ ok: true });
 }

@@ -5,8 +5,8 @@
  *   IS:  a thin launcher + security guard around the app's real server —
  *        `next build`'s standalone server.js (Next 16), spawned as a child
  *        on 127.0.0.1 with the LH_DATA_DIR seam.
- *   NOT: a host for any app logic. Everything — teacher turns, extraction,
- *        the graph — runs in the Next server, unchanged.
+ *   NOT: a host for any app logic. Everything — teacher turns, lesson
+ *        digests, course maps — runs in the Next server, unchanged.
  *
  * Pattern (fact-checked 2026-09-17 against current Electron 44 / Next 16
  * docs — see .memory release-strategy + electron-wrapper notes):

@@ -21,7 +21,7 @@ const { emit, subscribe } = await import("../src/core/events.ts");
 const { newSessionModeMessage, newUserMessage } = await import("../src/core/native-messages.ts");
 const { digestChanges, digestWindow, knowledgeHandle } = await import("../src/core/lesson-digest.ts");
 const { createLessonDigest } = await import("../src/agent/subagents/lesson-digest.ts");
-const { extractionStatuses } = await import("../src/agent/subagents/extraction.ts");
+const { backgroundRuns } = await import("../src/agent/subagents/background-runs.ts");
 const { onLessonEvents, resumeCutDigests } = await import("../src/server/lesson-finish.ts");
 type LhMessage = import("../src/core/native-messages.ts").LhMessage;
 type CourseRecords = import("../src/core/ports.ts").CourseRecords;
@@ -296,7 +296,7 @@ describe("a digest run", () => {
 			courseRecords: course.records,
 			engine: submitEngine(SUBMIT, (p) => {
 				prompt = p;
-				dockRow = extractionStatuses().find((r) => r.chatId === chatId);
+				dockRow = backgroundRuns().find((r) => r.chatId === chatId);
 			}),
 		});
 		const before = chatStore.getChat(chatId)!.messages;
@@ -313,7 +313,7 @@ describe("a digest run", () => {
 		assert.match(prompt, /rank-notation: The course writes rank as/, "the agent reads the course's knowledge with its handles");
 		assert.equal((dockRow as { kind?: string; phase?: string })?.kind, "digest");
 		assert.equal((dockRow as { phase?: string }).phase, "digesting");
-		assert.equal(extractionStatuses().some((r) => r.chatId === chatId), false, "the row leaves when the run ends");
+		assert.equal(backgroundRuns().some((r) => r.chatId === chatId), false, "the row leaves when the run ends");
 		const after = chatStore.getChat(chatId)!;
 		assert.deepEqual(after.messages, before, "nothing posted into the chat");
 		assert.equal(after.digest?.done.length, 1);
@@ -345,26 +345,23 @@ describe("what starts a digest", () => {
 
 	function listen() {
 		const digested: string[] = [];
-		const extracted: string[] = [];
 		const stop = onLessonEvents({
 			chatStore,
 			digest: { digestLesson: async (id) => (digested.push(id), { status: "nothing" }) },
-			extractTail: (id) => void extracted.push(id),
 		});
-		return { digested, extracted, stop };
+		return { digested, stop };
 	}
 
-	it("a turn that closes a lesson starts the digest and the graph's tail, however short the lesson", () => {
+	it("a turn that closes a lesson starts the digest, however short the lesson", () => {
 		const finished = chatWith(closedLesson());
 		const partway = chatWith(lesson(PARTWAY));
 		const signedOff = chatWith(lesson(FINISHED));
-		const { digested, extracted, stop } = listen();
+		const { digested, stop } = listen();
 		emit("turn-settled", { chatId: partway });
 		emit("turn-settled", { chatId: signedOff });
 		emit("turn-settled", { chatId: finished });
 		stop();
 		assert.deepEqual(digested, [finished], "only the tutor's close finishes a lesson, not words that sound final");
-		assert.deepEqual(extracted, [finished], "the tail runs at lesson finish, below the chunk budget");
 	});
 
 	it("a quiz question waiting on his answer never starts it; the close starts it once", () => {
@@ -394,7 +391,7 @@ describe("what starts a digest", () => {
 		}), (p) => void prompts.push(p));
 		const real = createLessonDigest({ chatStore, courseRecords: course.records, engine });
 		const runs: Promise<unknown>[] = [];
-		const stop = onLessonEvents({ chatStore, digest: { digestLesson: (id) => { const run = real.digestLesson(id); runs.push(run); return run; } }, extractTail: () => {} });
+		const stop = onLessonEvents({ chatStore, digest: { digestLesson: (id) => { const run = real.digestLesson(id); runs.push(run); return run; } } });
 		for (const messages of turns) {
 			chatStore.saveMessages(chatId, messages);
 			emit("turn-settled", { chatId });

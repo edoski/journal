@@ -43,7 +43,8 @@ function parseBooleanMap(value: unknown, field: string): { map?: Record<string, 
 	return { map: out };
 }
 
-/** agent: { tools?, graphTools? }. */
+/** agent: { tools? }. A stored graphTools key (the retired knowledge-graph
+ *  tools switch) is ignored, never written back. */
 export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -66,18 +67,6 @@ export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentS
 			}
 		}
 		settings.tools = map;
-	}
-	// Prober graph tools (wave 7, owner ruling 2026-09-23): an agent-section
-	// subsection, not a tool-toggles key — the mechanism is agent capability
-	// (tool registration), the subject is the graph. Strict write side:
-	// object shape only; `enabled` boolean when present. Absent = ON.
-	if (raw.graphTools !== undefined) {
-		const graphTools = asRecord(raw.graphTools);
-		if (!graphTools) return { ok: false, error: "graphTools must be an object" };
-		if (graphTools.enabled !== undefined && typeof graphTools.enabled !== "boolean") {
-			return { ok: false, error: "graphTools.enabled must be a boolean" };
-		}
-		settings.graphTools = graphTools.enabled === undefined ? {} : { enabled: graphTools.enabled };
 	}
 	return { ok: true, settings };
 }

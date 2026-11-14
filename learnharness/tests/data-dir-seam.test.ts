@@ -28,14 +28,13 @@ function resolveInChild(env: { NODE_ENV?: "test"; NODE_TEST_CONTEXT?: string }):
 }
 
 describe("LH_DATA_DIR seam", () => {
-	it("relocates data/chats/graph under LH_DATA_DIR, keeps prompts ROOT-anchored", async () => {
+	it("relocates data/chats under LH_DATA_DIR, keeps prompts ROOT-anchored", async () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-seam-"));
 		process.env.LH_DATA_DIR = dir;
 		try {
 			const { PATHS, ROOT } = await import("../config.ts");
 			assert.equal(PATHS.data, dir, "PATHS.data resolves the env value (resolved absolute)");
 			assert.equal(PATHS.chats, path.join(dir, "chats"));
-			assert.equal(PATHS.graph, path.join(dir, "graph"));
 			assert.equal(
 				PATHS.teacherPrompt,
 				path.join(ROOT, "src", "agent", "system-prompt.md"),

@@ -32,7 +32,7 @@
  *          dangling question — an unanswered client-side tool call breaks
  *          provider conversion), then fire ONE server-side wake turn
  *          carrying EVERY queued marker as its input appends (write-ahead
- *          persist, liveness, extraction — one code path, the same
+ *          persist, liveness — one code path, the same
  *          composition as a client request). A 409 means a client turn
  *          raced in — re-queue and retry with backoff. Idempotent per
  *          jobId (steerDelivered): a crashed wake or a duplicate deliver

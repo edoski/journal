@@ -187,7 +187,7 @@ try {
 	// Marker-only session must still automatically deliver a fresh opening.
 	await open("/chat/new");
 	const markerId = await page.evaluate(async () => {
-		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "marker fixture", graphContext: { propositions: [{ id: "synthetic_node", name: "Fixture", statement: "Synthetic" }] } }) });
+		const res = await fetch("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "marker fixture", kind: "practice" }) });
 		return (await res.json()).id;
 	});
 	await page.evaluate(id => sessionStorage.setItem(`lh.openingPrompt.${id}`, JSON.stringify({ text: "marker opening", attempted: false })), markerId);
@@ -196,7 +196,7 @@ try {
 	await page.waitForFunction(id => !sessionStorage.getItem(`lh.openingPrompt.${id}`), {}, markerId);
 	assert.equal(posts.length, markerCount + 1);
 	assert.equal(posts.at(-1).input.text, "marker opening");
-	checks.push("graph-marker-only record still receives opening text");
+	checks.push("marker-only record still receives opening text");
 	// A real persisted user prevents delivery and cleans a stale copy on mount.
 	const chatFile = path.join(home, "data", "chats", `${markerId}.json`);
 	const record = JSON.parse(fs.readFileSync(chatFile, "utf8"));

@@ -66,10 +66,10 @@ describe("staleVarNames — the removal half of application (owner repro: resets
 
 describe("agent section compose helpers — the replace-whole PUT body", () => {
 	it("composeTool carries the rest of the section verbatim", () => {
-		const before = { tools: { demo: false }, graphTools: { enabled: false } };
+		const before = { tools: { demo: false } };
 		const after = composeTool(before, "visual", false);
 		assert.deepEqual(after.tools, { demo: false, visual: false });
-		assert.deepEqual(after.graphTools, { enabled: false }, "the rest untouched");
+		assert.deepEqual(before.tools, { demo: false }, "the input untouched");
 	});
 });
 

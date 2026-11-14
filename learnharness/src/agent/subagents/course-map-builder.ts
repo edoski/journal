@@ -30,7 +30,7 @@ import type { PiEngine } from "../models.ts";
 import { courseMapDoctrine } from "../prompt-segments.ts";
 import { createMaterialTools, measureMaterial, readingRounds, type MaterialFile } from "../tools/material.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
-import { finishRun, setRunPhase } from "./extraction.ts";
+import { finishRun, setRunPhase } from "./background-runs.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
 
 const SUBMIT_TOOL = "submit_map";

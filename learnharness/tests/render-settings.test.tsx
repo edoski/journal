@@ -70,24 +70,9 @@ describe("AgentSection (thin SSR)", () => {
 		assert.ok(!html.includes('data-testid="search-engine-row"'));
 	});
 
-	it("the prober graph-tools row: FIRST in the Tools group, default ON, its own key (wave 7)", () => {
-		// Default state: graph on, graphTools absent → ON, the describing
-		// hint rides.
+	it("has no Knowledge map row (the knowledge-graph tools are gone)", () => {
 		const html = renderToStaticMarkup(<AgentSection agent={undefined} onSectionChange={() => {}} />);
-		const toolsGroup = html.split('data-testid="group-tools"')[1] ?? "";
-		const rows = [...toolsGroup.matchAll(/data-testid="(graph-tools-row|tool-row-\w+)"/g)].map((m) => m[1]);
-		assert.equal(rows[0], "graph-tools-row", "graph tools is the FIRST row of the Tools group");
-		assert.ok(html.includes("Lets the tutor look back at earlier lessons"), "the describing hint");
-		assert.ok((html.split('data-testid="graph-tools-row"')[1] ?? "").includes('aria-checked="true"'), "absent = on");
-		assert.ok(!tagOf(html, "graph-tools-row").includes("opacity-50"), "never dimmed");
-	});
-
-	it("an explicit graphTools off shows stored-off (the record never lies)", () => {
-		const html = renderToStaticMarkup(
-			<AgentSection agent={{ graphTools: { enabled: false } }} onSectionChange={() => {}} />,
-		);
-		const row = html.split('data-testid="graph-tools-row"')[1] ?? "";
-		assert.ok(row.includes('aria-checked="false"'), "stored-off renders off");
+		assert.ok(!html.includes("graph-tools-row") && !html.includes("Knowledge map"));
 	});
 
 	it("renders the owner's FINAL tool list — research, demo, visual, pdf", () => {

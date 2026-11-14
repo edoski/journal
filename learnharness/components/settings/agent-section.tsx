@@ -30,14 +30,6 @@ export function composeTool(agent: AgentSettings | undefined, id: string, on: bo
 	return { ...agent, tools: { ...agent?.tools, [id]: on } };
 }
 
-/** Compose the prober graph-tools toggle (wave 7): its own key in the
- *  agent section — never in the tool-toggles map (owner ruling). Absent =
- *  ON (the toggle discipline); the write is explicit either way, so an
- *  explicit-off record stays visible as stored. Pure — exported for tests. */
-export function composeGraphTools(agent: AgentSettings | undefined, on: boolean): AgentSettings {
-	return { ...agent, graphTools: { enabled: on } };
-}
-
 export function AgentSection({
 	agent,
 	onSectionChange,
@@ -49,24 +41,6 @@ export function AgentSection({
 	return (
 		<>
 			<SettingsGroup label="Tools" testid="group-tools">
-				{/* The prober's graph tools (wave 7, owner ruling 2026-09-23):
-				    FIRST row of the group — its subject is the map, its
-				    mechanism is agent capability, so it lives in Tools but
-				    NOT in the tool-toggles list. Its own agent-section key
-				    (agent.graphTools), with a
-				    smaller line under it explaining what it is — this
-				    connects prior sessions' knowledge into new ones. */}
-				<SettingsRow
-					label="Knowledge map"
-					hint="Lets the tutor look back at earlier lessons"
-					testid="graph-tools-row"
-				>
-					<Toggle
-						checked={agent?.graphTools?.enabled ?? true}
-						label="graph tools"
-						onChange={(on) => onSectionChange(composeGraphTools(agent, on))}
-					/>
-				</SettingsRow>
 				{TOGGLE_TOOLS.map((id) => (
 					<SettingsRow
 						key={id}

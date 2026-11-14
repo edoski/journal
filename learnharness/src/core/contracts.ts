@@ -1,8 +1,7 @@
 /**
  * Shared contracts — the single source of truth every component codes against.
  *
- * Split by domain (src/core/contracts/): plan.ts (the session plan tree),
- * graph.ts (the global knowledge graph + its extraction pipeline), chat.ts
+ * Split by domain (src/core/contracts/): plan.ts (the session plan tree), chat.ts
  * (session records + UI extension points), jobs.ts (the async sub-agent
  * protocol),  Each domain file is
  * owned outright by its stream; schema changes to a domain you don't own go
@@ -11,7 +10,6 @@
  */
 
 export * from "./contracts/plan.ts";
-export * from "./contracts/graph.ts";
 export * from "./contracts/chat.ts";
 export * from "./contracts/jobs.ts";
 export * from "./contracts/probe.ts";

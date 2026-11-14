@@ -40,29 +40,28 @@ function job(over: Partial<ActivityFeed["jobs"][number]> = {}): ActivityFeed["jo
 }
 
 describe("activity dock pure layer", () => {
-	it("merges jobs + extractions oldest-first (the stable blob order)", () => {
+	it("merges jobs + background runs oldest-first (the stable blob order)", () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "new", createdAt: new Date(NOW - 10_000).toISOString() })],
-			extractions: [{ id: "cx", chatId: "cx", title: "Old lesson", phase: "auditing", startedAt: NOW - 100_000 }],
+			extractions: [{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 100_000 }],
 		};
 		const blobs = toBlobs(feed);
 		assert.equal(blobs.length, 2);
 		const first = blobs[0]!;
-		assert.equal(first.id, "cx"); // extraction started first
+		assert.equal(first.id, "cx#digest"); // the digest started first
 		assert.equal(first.process, "extraction");
-		assert.equal(first.phase, "auditing");
+		assert.equal(first.phase, "digesting");
 		assert.equal(blobs[1]!.id, "new");
 	});
 
-	it("per-chunk jobs (owner, 2026-09-28): one source, N rows — unique ids (React keys), one chatId, part-suffixed titles", () => {
-		const rows = [
-			{ id: "src_a#1", chatId: "src_a", part: { i: 1, n: 2 }, title: "notes.md · 1/2", phase: "extracting", startedAt: NOW - 1000 },
-			{ id: "src_a#2", chatId: "src_a", part: { i: 2, n: 2 }, title: "notes.md · 2/2", phase: "queued", startedAt: NOW - 500 },
-		] as FeedExtraction[];
+	it("a digest and a map build are one row each, keyed by their registry key", () => {
+		const rows: FeedExtraction[] = [
+			{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 1000 },
+			{ id: "algebra#course-map", chatId: "algebra", title: "Mapping Algebra", phase: "mapping", startedAt: NOW - 500 },
+		];
 		const blobs = toBlobs({ jobs: [], extractions: rows });
-		assert.equal(blobs.length, 2, "one blob per chunk job");
-		assert.deepEqual(blobs.map((b) => b.id), ["src_a#1", "src_a#2"], "unique row ids — no duplicate React keys");
-		assert.ok(blobs.every((b) => b.chatId === "src_a"), "abort/link identity stays source-scoped");
+		assert.deepEqual(blobs.map((b) => b.id), ["cx#digest", "algebra#course-map"], "unique row ids — no duplicate React keys");
+		assert.deepEqual(blobs.map((b) => b.chatId), ["cx", "algebra"], "the abort sends the key's chat or course");
 	});
 
 	it("uses the server's Pi price projection; absent pricing is null, never zero", () => {
@@ -158,10 +157,10 @@ describe("activity dock pure layer", () => {
 		assert.equal(cached.context?.limit, 200_000);
 	});
 
-	it("extraction blobs carry no money/context (—, the doctrine)", () => {
+	it("background-run blobs carry no money/context (—, the doctrine)", () => {
 		const blob = toBlobs({
 			jobs: [],
-			extractions: [{ id: "cx", chatId: "cx", title: "T", phase: "extracting", startedAt: NOW }],
+			extractions: [{ id: "cx#digest", chatId: "cx", title: "T", phase: "digesting", startedAt: NOW }],
 		})[0]!;
 		assert.equal(blob.cost, null);
 		assert.equal(blob.context, null);
@@ -221,18 +220,18 @@ describe("activity section render", () => {
 	it("renders one row per running process with elapsed time and the abort affordance; the detail carries activity and cost", async () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "j1", kind: "demo", activity: "building sandbox…", title: "Chain-rule demo" })],
-			extractions: [{ id: "cx", chatId: "cx", title: "Old lesson", phase: "merging", startedAt: NOW - 60_000 }],
+			extractions: [{ id: "algebra#course-map", chatId: "algebra", title: "Mapping Algebra", phase: "mapping", startedAt: NOW - 60_000 }],
 		};
 		const html = renderToStaticMarkup(<ActivitySection feed={feed} />);
 		assert.match(html, /data-testid="activity-section"/);
 		assert.match(html, /data-testid="activity-blob-job"/);
 		assert.match(html, /data-testid="activity-blob-extraction"/);
 		assert.match(html, /Chain-rule demo/);
-		assert.match(html, /Old lesson/);
+		assert.match(html, /Mapping Algebra/);
 		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g)?.length, 2, "elapsed on every row");
 		assert.equal(html.match(/data-testid="activity-abort"/g)?.length, 2, "END on every row's face, detail-independent");
 		assert.match(html, /aria-label="End Demo builder in Chain-rule demo"/, "the stop button names what it stops");
-		assert.match(html, /aria-label="End Extraction — merging in Old lesson"/);
+		assert.match(html, /aria-label="End Building the course map in Mapping Algebra"/);
 		assert.match(html, /Background agents/);
 		assert.doesNotMatch(html, /building sandbox…/, "what it is doing waits in the detail");
 

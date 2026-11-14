@@ -15,13 +15,14 @@ import { Hint } from "@/components/ui/hint";
  * THE BACKGROUND-AGENTS SECTION (owner, sidebar round — the successor of
  * the retired bottom-right floating dock): the bottom strip of the LEFT
  * SIDEBAR, one blob per running BACKGROUND process — session sub-agents
- * (research/demo/visual) and global extraction runs. Teaching turns are
+ * (research/demo/visual) and the background runs (lesson digests,
+ * course-map builds). Teaching turns are
  * deliberately NOT here: the section exists to give background processes
  * the observability the learner can't otherwise see; an in-flight teaching
  * turn is fully visible where it happens (user decision, 2026-09).
  *
  * Data: ONE feed of GET /api/activity (jobs across ALL chats, title-joined,
- * oldest-first + extraction runs), fetched when truth moves (events
+ * oldest-first + background runs), fetched when truth moves (events
  * channel, S5) and folded client-side with core/prices.ts.
  * Cost is INFERRED server-side through Pi; the context line is the LAST model call's
  * input+output against the model's limit (JobUsage.lastStep — pending
@@ -60,11 +61,11 @@ export interface FeedJob extends JobRecord {
 	contextLimit: number | null;
 }
 
+/** A background run: a lesson digest or a course-map build. */
 export interface FeedExtraction {
-	/** Unique row id (source id, or "src#i" for chunk jobs). */
+	/** Unique row id (the registry key). */
 	id: string;
 	chatId: string;
-	part?: { i: number; n: number };
 	title: string;
 	phase: string;
 	startedAt: number;
@@ -87,13 +88,12 @@ const ActivityContext = createContext<{ feed: ActivityFeed; refresh: () => void 
 /**
  * THE ACTIVITY FEED, PUSH-DRIVEN (architecture S5, 2026-10-02): the
  * adaptive poll is RETIRED — the dock refetches exactly when truth moves.
- * Every cause is announced on the events channel: extraction phase
+ * Every cause is announced on the events channel: background-run
  * transitions (activity-changed), job writes
  * (jobs-changed — the running-jobs blobs), and channel resync (reconnect /
  * dev-restart catch-up) — plus the one client-local cause that predates
  * the channel: visibility, a tab becoming visible refetches at once.
- * Announced fetches ride a 250ms trailing debounce (extraction phase
- * bursts); resync and visibility are immediate. A failed
+ * Announced fetches ride a 250ms trailing debounce (event bursts); resync and visibility are immediate. A failed
  * fetch keeps the last feed (the dock never flickers to empty on a blip).
  */
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
@@ -158,24 +158,23 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 }
 
 /** The activity feed seam for the rest of the shell: the dock's data +
- *  its refresh nudge. The remaining nudgers are client-visible causes
- *  (the extract button — extraction-coverage); every
- *  server-side cause announces itself on the events channel now. */
+ *  its refresh nudge. Every server-side cause announces itself on the
+ *  events channel. */
 export function useActivity(): { feed: ActivityFeed; refresh: () => void } {
 	return useContext(ActivityContext);
 }
 
 // ─── Pure presentation helpers (exported for tests) ──────────────────────────
 
-/** One dock blob: the unified view of a job or an extraction run. */
+/** One dock blob: the unified view of a job or a background run (process
+ *  "extraction", the name the feed and the abort route keep). */
 export interface ActivityBlob {
-	/** job.id, or the extraction job's row id (source id, or "src#i" for
-	 *  chunk jobs — unique per row, per-chunk jobs owner 2026-09-28). */
+	/** job.id, or the background run's registry key. */
 	id: string;
 	process: "job" | "extraction";
-	/** Sub-agent kind for jobs (extraction blobs have none). */
+	/** Sub-agent kind for jobs (background runs have none). */
 	jobKind?: JobKind;
-	/** Extraction phase (extracting/auditing/merging/embedding); jobs carry none. */
+	/** A background run's phase (digesting, mapping); jobs carry none. */
 	phase?: string;
 	title: string;
 	chatId: string;
@@ -243,7 +242,7 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 			title: run.title,
 			chatId: run.chatId,
 			startedAt: run.startedAt,
-			cost: null, // extraction runs don't ride the money channel (v1)
+			cost: null, // background runs don't ride the money channel
 			context: null,
 			activity: "",
 		});
@@ -305,8 +304,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({
 					kind: blob.process,
-					// Extractions abort by SOURCE id (chatId) — chunk rows share one
-					// source and die together.
+					// A background run aborts by its chatId (the registry key's chat or course).
 					id: blob.process === "extraction" ? blob.chatId : blob.id,
 				}),
 			});
@@ -351,18 +349,11 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	);
 }
 
-/** A run of the shared background registry in words: a finished lesson's
- *  digest, a course's map being built from its material, or the graph
- *  extraction's phase. */
-function extractionLabel(phase: string | undefined): string {
-	if (phase === "digesting") return "Digesting lesson";
-	if (phase === "mapping") return "Building the course map";
-	return `Extraction — ${phase ?? "running"}`;
-}
-
-/** What a blob is, in words: "Researcher", "Extraction — merging". */
+/** What a blob is, in words: "Researcher", "Digesting lesson". A
+ *  background run is a finished lesson's digest or a course's map being
+ *  built from its material. */
 function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "extraction") return extractionLabel(blob.phase);
+	if (blob.process === "extraction") return blob.phase === "mapping" ? "Building the course map" : "Digesting lesson";
 	switch (blob.jobKind) {
 		case "research":
 			return "Researcher";

@@ -22,9 +22,6 @@ export interface EffectiveSettings {
 	agent: {
 		/** Delta map as stored — consumers resolve absent key → enabled. */
 		tools: Record<string, boolean>;
-		/** Prober graph tools (wave 7): passthrough delta as stored —
-		 * absent/undefined enabled = ON; consumers use graphToolsEnabled. */
-		graphTools: { enabled?: boolean };
 	};
 	/** The Claude account every agent runs CLAUDE_MODEL on. */
 	claude: { account: string };
@@ -42,7 +39,6 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 	return {
 		agent: {
 			tools: agent.tools ?? {},
-			graphTools: agent.graphTools ?? {},
 		},
 		claude: { account: record?.claude?.account ?? CLAUDE_SUBSCRIPTION.providerId },
 		appearance: {
@@ -58,14 +54,4 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 			},
 		},
 	};
-}
-
-/**
- * The PROBER GRAPH TOOLS gate (wave 7, owner ruling 2026-09-23): an
- * agent-capability switch that gates tool registration. Absent = ON.
- */
-export function graphToolsEnabled(effective: {
-	agent: { graphTools: { enabled?: boolean } };
-}): boolean {
-	return effective.agent.graphTools.enabled ?? true;
 }

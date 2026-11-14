@@ -51,11 +51,11 @@ async function press(target: Element, type: string, init: Record<string, unknown
 describe("settings switch", () => {
 	it("is the shadcn switch, named and pinned as before, and flips its value", async () => {
 		const flips: boolean[] = [];
-		await mount(<Toggle checked={false} label="graph tools" onChange={(v) => flips.push(v)} />);
-		const control = element('[data-testid="toggle-graph-tools"]');
+		await mount(<Toggle checked={false} label="tool research" onChange={(v) => flips.push(v)} />);
+		const control = element('[data-testid="toggle-tool-research"]');
 		assert.equal(control.getAttribute("data-slot"), "switch");
 		assert.equal(control.getAttribute("role"), "switch");
-		assert.equal(control.getAttribute("aria-label"), "graph tools");
+		assert.equal(control.getAttribute("aria-label"), "tool research");
 		assert.equal(control.getAttribute("aria-checked"), "false");
 		await press(control, "click");
 		assert.deepEqual(flips, [true]);

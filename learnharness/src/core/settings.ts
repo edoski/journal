@@ -15,7 +15,7 @@
  * There is no model choice (owner, 2026-11-14): every agent runs
  * CLAUDE_MODEL. The record names only the Claude account they run on.
  *
- * Sanitizer contract (mirrors render-settings.ts discipline): whatever
+ * Sanitizer contract: whatever
  * arrives from disk or the network passes through sanitizeUserSettings
  * before use — never trusted raw. Strict on known fields, PRESERVES
  * unknown keys verbatim (a newer record must never be destroyed by an
@@ -81,12 +81,6 @@ export interface AgentSettings {
 	/** Tool toggles keyed by tool id (absent key = enabled). User-level
 	 *  only — no per-chat override (owner decision 2026-09-19). */
 	tools?: Record<string, boolean>;
-	/** Prober graph tools (wave 7, owner ruling 2026-09-23): read-only
-	 *  knowledge-graph views for the prober agent — a session list + the
-	 *  propositions born in each session. Its SUBJECT is the graph but its
-	 *  MECHANISM is agent capability (tool registration), so it lives here
-	 *  in its OWN subsection, not in the tool-toggles map. Absent = enabled (the toggle discipline). */
-	graphTools?: { enabled?: boolean };
 }
 
 /** Markdown-rendering knobs — the bare-bones set (owner decision). */
@@ -210,14 +204,6 @@ function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
 	const out: AgentSettings = {};
 	const tools = sanitizeBooleanMap(raw.tools);
 	if (tools) out.tools = tools;
-	// Prober graph tools (wave 7): its own agent-section subsection —
-	// lenient read side (a bad shape drops the key and the default ON
-	// resumes; the write side's parser is strict).
-	if (raw.graphTools !== null && typeof raw.graphTools === "object" && !Array.isArray(raw.graphTools)) {
-		const enabled = (raw.graphTools as Record<string, unknown>).enabled;
-		if (enabled === undefined) out.graphTools = {};
-		else if (typeof enabled === "boolean") out.graphTools = { enabled };
-	}
 	return out;
 }
 

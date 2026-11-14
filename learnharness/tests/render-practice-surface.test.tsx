@@ -20,7 +20,6 @@ import { describe, it } from "node:test";
 import { PracticeDock } from "../components/practice-dock.tsx";
 import { ConcludeCard, ProblemCard, ThinkingCard } from "../components/practice-cards.tsx";
 import { GraphContextCard } from "../components/graph-context-card.tsx";
-import { newGraphContextMessage } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
 import type { ArtifactPartProps } from "../src/core";
 import {
@@ -219,9 +218,8 @@ describe("GraphContextCard", () => {
 	});
 
 	it("the marker projects to the card's part (projectView fold)", () => {
-		const view = projectView([newGraphContextMessage(
-			[{ id: "n1", name: "A", statement: "S." }], [],
-		) as unknown as LhMessage]);
+		const marker = { id: "gc", role: "custom", customType: "graph-context", content: "", display: true, details: { propositions: [{ id: "n1", name: "A", statement: "S." }], chains: [] }, timestamp: 0 };
+		const view = projectView([marker as unknown as LhMessage]);
 		assert.equal((view[0]!.parts[0] as { type: string }).type, "data-graph-context");
 	});
 });

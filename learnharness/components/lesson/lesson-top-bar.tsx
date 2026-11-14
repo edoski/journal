@@ -81,19 +81,16 @@ export function LessonTopBar({
 }
 
 /** The one place the agent's machinery lives in a lesson: the model every
- *  agent runs (CLAUDE_MODEL, no choice), the context it has used, what it
- *  has cost, and, in teaching sessions, the extraction ring. ⌘K opens it. */
+ *  agent runs (CLAUDE_MODEL, no choice), the context it has used and what
+ *  it has cost. ⌘K opens it. */
 export function LessonDetails({
 	turns,
 	contextTokens,
 	pricing,
-	extraction,
 }: {
 	turns: TurnUsage[];
 	contextTokens: number | null;
 	pricing?: SessionPricing;
-	/** The coverage ring (teaching sessions). */
-	extraction?: ReactNode;
 }) {
 	const [open, setOpen] = useState(false);
 	const limit = useModelStatus().status?.contextWindow ?? null;
@@ -120,12 +117,6 @@ export function LessonDetails({
 					<dd data-testid="stats-context" className="text-right tabular-nums">{contextLabel}</dd>
 					<dt className="text-muted-foreground">Cost</dt>
 					<dd data-testid="stats-cost" className="text-right tabular-nums">{costLabel}</dd>
-					{extraction && (
-						<>
-							<dt className="text-muted-foreground">Notes extracted</dt>
-							<dd className="flex justify-end">{extraction}</dd>
-						</>
-					)}
 				</dl>
 			</PopoverContent>
 		</Popover>

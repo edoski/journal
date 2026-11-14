@@ -12,14 +12,10 @@ export { addMaterial, courseMapStatus, startCourseMap } from "./course-map.ts";
 export * from "./study.ts";
 export * from "./calendar.ts";
 export * from "./topic.ts";
-export * from "./graph.ts";
-export { NotesImportError } from "../agent/subagents/extraction.ts";
 export { convertPdf } from "../agent/subagents/pdf-ops.ts";
 export { joinPages } from "../agent/subagents/pdf-markdown.ts";
-export * from "./commit-positions.ts";
 export * from "./jobs.ts";
 export * from "./stores.ts";
-export { readRenderSettings, writeRenderSettings } from "../store/render-settings.ts";
 // The settings record (settings-storage wave, 2026-09-19).
 // The *Record aliases keep the app/api/settings routes explicit about which
 // seam they touch (the raw record, not the chat-section convenience view).

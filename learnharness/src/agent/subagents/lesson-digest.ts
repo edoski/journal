@@ -31,7 +31,7 @@ import {
 } from "../../core/lesson-digest.ts";
 import type { PiEngine } from "../models.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
-import { finishRun, setRunPhase } from "./extraction.ts";
+import { finishRun, setRunPhase } from "./background-runs.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
 
 const SUBMIT_TOOL = "submit_digest";

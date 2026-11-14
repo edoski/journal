@@ -71,10 +71,10 @@ describe("native app and conversation identity", { concurrency: false }, () => {
 		}
 	});
 
-	it("separate extractor/auditor/compaction invocations own distinct stable unsaved conversations", async () => {
+	it("separate subagent and compaction invocations own distinct stable unsaved conversations", async () => {
 		const ids = new Set<unknown>();
 		// Compaction uses the shared runner with the researcher role.
-		for (const role of ["extractor", "auditor", "researcher"] as const) {
+		for (const role of ["pdfReader", "visualMaker", "researcher"] as const) {
 			const { engine, requests } = recordingEngine();
 			let usage = 0;
 			const result = await runSubagent([again], { role, engine, chatId: "chat_shared_debug_only", systemPrompt: "offline", prompt: "offline", maxTurns: 3, onUsage: () => usage++ });
@@ -144,7 +144,7 @@ describe("native app and conversation identity", { concurrency: false }, () => {
 		const tools = healToolRecord({ check: { name: "check", label: "check", description: "check", parameters: Type.Object({ value: Type.Optional(Type.String()) }), execute: async () => { executed++; return { content: [], details: {} }; } } });
 		const heal = tools.check!.prepareArguments!;
 		tools.check!.prepareArguments = (args) => { prepared++; return heal(args); };
-		const result = await runSubagent(Object.values(tools), { role: "extractor", engine, systemPrompt: "offline", prompt: "offline", maxTurns: 1 });
+		const result = await runSubagent(Object.values(tools), { role: "pdfReader", engine, systemPrompt: "offline", prompt: "offline", maxTurns: 1 });
 		const assistant = result.newMessages.find((m) => m.role === "assistant");
 		assert.ok(assistant?.role === "assistant");
 		const call = assistant.content.find((c) => c.type === "toolCall");

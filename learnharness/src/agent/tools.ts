@@ -16,13 +16,11 @@ import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type Visua
 import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
 import { withPracticeHandoff } from "./tools/handoff.ts";
-import { proberGraphTools } from "./tools/graph.ts";
 import { readTool } from "./tools/read.ts";
 import { lsTool } from "./tools/ls.ts";
 import { findTool } from "./tools/find.ts";
 import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
-import type { GraphStore } from "../core/ports.ts";
 
 export { jobTools };
 export type { ProbeDoneContext } from "./tools/probe.ts";
@@ -169,17 +167,11 @@ export interface ProberToolContext extends ProbeDoneContext {
 	jobStore: JobStore;
 	/** Fire the background runner for a freshly created job. */
 	spawn: (job: JobRecord, input: ResearchInput | DemoInput | VisualInput | PdfInput) => void;
-	/** The prober's graph-map reader (wave 7): present = the two map tools
-	 *  (list_sessions / list_propositions) are registered. The composition
-	 *  root passes it only when graphToolsEnabled(effective) — the graph
-	 *  master switch AND the agent.graphTools toggle (settings-resolution).
-	 *  Absent = the gate is closed, no map tools (tests drive this seam). */
-	graphStore?: GraphStore;
 }
 
 /** The prober's tool set: recall (no nodeId) + ask + the learner-fs
- *  set + probe_done + the two phase-omnipresent job dispatch tools +
- *  (wave 7, gated) the graph-map reader. `enabled` is the resolved
+ *  set + probe_done + the two phase-omnipresent job dispatch tools.
+ *  `enabled` is the resolved
  *  settings seam (core/pending.ts): any tool explicitly false is dropped
  *  from the registry. recall and probe_done stay always-on regardless —
  *  they are how the phase measures and ENDS. */
@@ -218,11 +210,6 @@ export function createProberTools(
 				// context). Same user-toggle filtering as the teacher.
 				...(jobs.research ? { research: jobs.research } : {}),
 				pdf: jobs.pdf!,
-				// The map reader (wave 7): present only when the settings gate
-				// opened.
-				...(ctx.graphStore
-					? proberGraphTools({ chatStore: ctx.chatStore, graphStore: ctx.graphStore })
-					: {}),
 			},
 			enabled,
 		),

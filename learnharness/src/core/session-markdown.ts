@@ -1,23 +1,12 @@
 /**
- * Session → markdown — the ONE formatting engine (owner ruling 2026-09-27).
+ * Session → markdown — the session export's formatting engine (owner ruling
+ * 2026-09-27): a session is rendered as clean, readable markdown — speaker
+ * headers, quiz/check-in blocks, tool notes — with optional message-id
+ * anchors; `anchors: false` mints the same document without them.
  *
- * The extractor's view of a teaching session and the future user-facing
- * session export share this engine: a session is rendered as clean,
- * readable markdown — speaker headers, quiz/check-in blocks, tool notes —
- * with optional message-id anchors. Since the submit-schema slim
- * (2026-09-28) propositions no longer report message ids — the extractor
- * renders anchorless and provenance is chat-level — so the anchors today
- * serve only the future user-facing export; `anchors: false` mints the
- * same document without them.
- *
- * Pure core: native messages in (LhMessage), string out. Content parity
- * with the coverage line builder (core/coverage.ts messageViewLines) is
- * deliberate — every message that produces view lines produces a markdown
- * block, in the same order — but the formats are SEPARATE by design
- * (2026-09-27): coverage fingerprints hash the line format and stay stable
- * (no mass re-extraction when presentation changes); markdown is
- * presentation. A failed tool call renders nothing (retry context, not
- * learning evidence); custom markers are invisible, same as the view.
+ * Pure core: native messages in (LhMessage), string out. A failed tool
+ * call renders nothing (retry context, not learning evidence); custom
+ * markers are invisible, same as the view.
  */
 
 import type { LhMessage } from "./native-messages.ts";

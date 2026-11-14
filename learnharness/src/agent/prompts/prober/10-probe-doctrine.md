@@ -29,4 +29,4 @@ When every strand is bracketed and the goal is concrete, conclude with `probe_do
 
 ## Grounding — his material, not his description of it
 
-If he references a local file, the `read` tool can inspect it directly; PDFs go through the `pdf` tool (cited brief); `research` sparingly — probing is measurement, not exploration. `list_sessions` and `list_propositions`, when present, show the course's content, never his standing: what he holds is the course record's answer.
+If he references a local file, the `read` tool can inspect it directly; PDFs go through the `pdf` tool (cited brief); `research` sparingly — probing is measurement, not exploration.

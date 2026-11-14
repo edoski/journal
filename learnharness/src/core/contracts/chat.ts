@@ -8,7 +8,6 @@
 import type { LhMessage } from "../native-messages.ts";
 import type { Phase3 } from "../phases.ts";
 import type { PlanNodeStatus, PlanTree } from "./plan.ts";
-import type { EmissionStats } from "./graph.ts";
 import type { CourseLink } from "./course.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
@@ -53,11 +52,6 @@ export interface ChatRecord {
 	 * each entry onto its message; aggregates are folds over this log
 	 * (core/prices.ts). */
 	turns?: TurnUsage[];
-	/** Append-only background-extraction usage log (2026-09 observability):
-	 *  one entry per finished pipeline run on THIS chat — extraction is real
-	 *  spend too. Same parallel-log discipline as `turns` (nothing rides
-	 *  inside messages). Keyed by startedAt; idempotent appends. */
-	extractions?: ExtractionRunUsage[];
 	/** The lesson digest's ledger: what the background digest already carried
 	 *  into the course record from this session. */
 	digest?: DigestLedger;
@@ -89,37 +83,6 @@ export interface DigestLedger {
 
 /** The chat record format this build writes and understands. */
 export const CURRENT_CHAT_VERSION = 1;
-
-// ─── Background-extraction usage (the money channel, extraction side) ────────
-
-/** One pipeline stage's model usage — the stage's model + every step it
- *  billed (CallUsage per agent step). Steps, not a sum: cost and context
- *  folds happen at read time (core/prices.ts). */
-export interface ExtractionStageUsage {
-	/** The model that ran this stage, provider-qualified ("provider:id")
-	 * for key-independent Pi catalog lookup at read time. */
-	model: string;
-	steps: CallUsage[];
-}
-
-/** One finished (or failed mid-flight) extraction run's usage record.
- *  Appended to the chat's `extractions` log when the run ends — success or
- *  failure, because money was spent either way; `stats` is present only
- *  when the merger actually ran. */
-export interface ExtractionRunUsage {
-	/** The run's registry startedAt (ms) — the idempotency key. */
-	startedAt: number;
-	at: string;
-	durationMs: number;
-	/** What the run merged into the graph; absent when it failed first. */
-	stats?: EmissionStats;
-	/** Model usage per stage, in pipeline order (merger is deterministic —
-	 *  no model call, no entry). */
-	stages: {
-		extractor: ExtractionStageUsage;
-		auditor: ExtractionStageUsage;
-	};
-}
 
 // ─── Usage accounting (the money channel) ─────────────────────────────────────
 
@@ -400,4 +363,38 @@ export interface ArtifactPartProps {
 		 *  projectView — the reveal is never re-authored. */
 		reveal?: unknown;
 	};
+}
+
+// ─── Titles ──────────────────────────────────────────────────────────────────
+
+/** The auto-title's character cap (owner, 2026-10-06): long enough to
+ *  stay informative in the sidebar and the top bar, short enough that a
+ *  first message never reads as a paragraph. Tunable — one number, one
+ *  place. */
+export const TITLE_MAX_CHARS = 72;
+
+/** Derive a short chat title from the learner's first message (pure).
+ *  Smart truncation (owner, 2026-10-06): the cut snaps to a word boundary
+ *  AT OR UNDER the cap — a title never ends mid-word. The one exception
+ *  is a single word longer than the cap (rare, but real: identifiers,
+ *  URLs): it cuts at the cap, splitting the word. Whitespace collapses to
+ *  single spaces first, so boundaries are always single-space boundaries.
+ *  Used on chat creation; deterministic so tests can pin it. */
+export function titleFromPrompt(prompt: string): string {
+	const oneLine = prompt.replace(/\s+/g, " ").trim();
+	if (oneLine.length <= TITLE_MAX_CHARS) return oneLine;
+	// Last space among the first TITLE_MAX_CHARS characters; the cut sits
+	// before it so no trailing space rides into the title.
+	let cut = -1;
+	for (let i = TITLE_MAX_CHARS; i > 0; i--) {
+		if (oneLine[i - 1] === " ") {
+			cut = i - 1;
+			break;
+		}
+	}
+	// One long word: no boundary exists under the cap — split it (owner's
+	// special case). This also lands correctly when the first word exactly
+	// fills the cap: cutting at the cap IS the boundary.
+	if (cut < 0) cut = TITLE_MAX_CHARS;
+	return `${oneLine.slice(0, cut)}…`;
 }

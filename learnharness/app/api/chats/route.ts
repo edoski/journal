@@ -1,5 +1,4 @@
-import { chainsForSelection, formatChainLine } from "@/src/core";
-import { derivePlanStatusesLh, newGraphContextMessage, newSessionModeMessage, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type GraphContextPick, type LhMessage } from "@/src/core";
+import { derivePlanStatusesLh, newSessionModeMessage, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
 import { compactionInFlight, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
@@ -20,7 +19,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; course?: unknown; resume?: unknown; topics?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
 	// The Current design's Practice switch starts the session in practice;
 	// without it the prober routes the opening, and the agents hand the
@@ -45,25 +44,6 @@ export async function POST(req: Request) {
 	// review of those topics. The lists keep only handles the map has.
 	const topics = Array.isArray(body.topics) ? body.topics.filter((t): t is string => typeof t === "string" && t.length > 0).slice(0, 32) : [];
 	const chat = createChat(titleFromPrompt(title || "Untitled session"), course, topics);
-	// The session's map context (owner, 2026-10-04): the picked
-	// propositions ride the CREATION — message[0] is a graph-context
-	// marker (a separate custom message BEFORE the learner's first user
-	// message), carrying the picks plus the reasoning chains among them.
-	// The picks carry their own name/statement (what the learner saw at
-	// pick time); the chains derive from the CURRENT graph snapshot.
-	const rawPicks = (body.graphContext as { propositions?: unknown } | undefined)?.propositions;
-	const picks: GraphContextPick[] = Array.isArray(rawPicks)
-		? rawPicks
-				.filter(
-						(p): p is GraphContextPick =>
-							typeof p === "object" &&
-							p !== null &&
-							typeof (p as GraphContextPick).id === "string" &&
-							typeof (p as GraphContextPick).name === "string" &&
-							typeof (p as GraphContextPick).statement === "string",
-					)
-					.slice(0, 64)
-			: [];
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the
@@ -73,14 +53,6 @@ export async function POST(req: Request) {
 		if (resumed.tree) stores.chatStore.saveTree(chat.id, resumed.tree);
 		const text = sessionResumeText(resumed.title, steps, steps.find((s) => s.id === at)?.title ?? null);
 		opening.push(newSessionResumeMessage({ id: resumed.id, title: resumed.title }, text, sessionTasksOf(resumed.messages)) as LhMessage);
-	}
-	if (picks.length > 0) {
-		const byId = new Map(stores.graphStore.readNodes().map((n) => [n.id, n]));
-		const pickedNodes = picks.map((p) => byId.get(p.id)).filter((n) => n !== undefined);
-		const chainLines = chainsForSelection(pickedNodes, stores.graphStore.readChains()).map((c) =>
-			formatChainLine(c, Object.fromEntries(byId)),
-		);
-		opening.push(newGraphContextMessage(picks, chainLines) as LhMessage);
 	}
 	if (opening.length > 0) stores.chatStore.saveMessages(chat.id, opening);
 	return Response.json({ id: chat.id, title: chat.title });

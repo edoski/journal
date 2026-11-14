@@ -55,7 +55,6 @@ import type { ArtifactPartProps, Confidence, JobRecord, PracticeRequest, Practic
 import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
 import { CHIP_LABEL, ModeDivider, PhaseDivider } from "@/components/phase-divider";
 import { CompactionCutDivider } from "@/components/compaction-divider";
-import { CoverageRing } from "@/components/extraction-coverage";
 import {
 	activeProblemOf,
 	pendingQuestionOf,
@@ -184,7 +183,7 @@ export function Chat({
 	initialError?: string;
 	/** The mode an older record stored at creation. The mode now is folded
 	 *  over the transcript from it: practice renders a Practice tag in
-	 *  place of the phase chip, and no coverage ring. */
+	 *  place of the phase chip. */
 	startedIn?: SessionMode;
 	initialPrompt?: string;
 	/** A teacher turn is running server-side but attached to no client
@@ -765,9 +764,6 @@ export function Chat({
 	// the top-bar plan chip.
 	const [planOpen, setPlanOpen] = useState(false);
 	const closePlan = useCallback(() => setPlanOpen(false), []);
-	// The coverage ring's refresh chain (extraction-UX redesign): bumped at
-	// turn settle — the moment this session's uncovered mass changes.
-	const [coverageTick, setCoverageTick] = useState(0);
 	// The mermaid focus (chrome-melt wave, 2026-09-19): md-blocks' expand
 	// button registers the chart source here; the overlay (and the plan
 	// popup) mount INSIDE the session-area div — both are session-scoped, so
@@ -826,10 +822,9 @@ export function Chat({
 	}, [syncTurns]);
 	// After the learner's own turn ends the log has a fresh entry — and the
 	// Post-turn settle (the SLIMMED watch — push-architecture S3,
-	// 2026-10-02): our own stream just ended. Two instant LOCAL actions
+	// 2026-10-02): our own stream just ended. One instant LOCAL action
 	// only — the turns-only refetch lands the log entry while the server's
-	// persist/endTurn lags by milliseconds, and the coverage ring re-reads
-	// (this turn's messages just joined the uncovered mass). The ADOPTION
+	// persist/endTurn lags by milliseconds. The ADOPTION
 	// LOOP and the HANDOFF WATCH that lived here are RETIRED: a
 	// server-initiated turn (the probe→teach handoff, a job wake, another
 	// tab) is now ANNOUNCED on the events channel — the turn-started
@@ -845,9 +840,6 @@ export function Chat({
 		// immediate: turns-only refetch — the details update even while
 		// the server's persist/endTurn lags the client by milliseconds
 		void syncTurns();
-		// The coverage ring re-reads at turn settle too (extraction-UX
-		// redesign, 2026-09-24); the ring's own running-poll handles runs.
-		setCoverageTick((t) => t + 1);
 		// CANONIZATION (fix B, the duplicate-previous-message bug, 2026-10-02):
 		// turn-settled for OUR OWN turn arrives while the stream is still open
 		// (endTurn emits from onFinish before the response terminates, so the
@@ -865,8 +857,6 @@ export function Chat({
 			settleAnnouncedRef.current = false;
 			void syncFromServer();
 		}
-		// (The extraction-discovery nudges that lived here died at S5: the
-		// pipeline announces every phase on the events channel.)
 	}, [status, syncTurns, syncFromServer]);
 
 	// A stream that died MID-FLIGHT (network): the runner decoupled the turn
@@ -1233,12 +1223,7 @@ export function Chat({
 						phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
 						details={
-							<LessonDetails
-								turns={turns}
-								contextTokens={contextTokens}
-								pricing={pricing}
-								extraction={mode !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
-							/>
+							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
 						}
 					/>
 				</TopBar>

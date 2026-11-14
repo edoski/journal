@@ -10,13 +10,13 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { ChatDeleteMode, ChatListItem } from "@/src/core";
+import type { ChatListItem } from "@/src/core";
 
 /** A refused delete, by the route's code, in the learner's words. */
 const FAILURE_WORDS: Record<string, string> = {
 	turn_in_flight: "The tutor is still replying. Delete it once the reply ends.",
 	jobs_running: "The tutor is still working in this lesson. Delete it once that ends.",
-	extraction_winding_down: "This lesson is still being saved. Try again in a moment.",
+	digest_winding_down: "This lesson is still being saved. Try again in a moment.",
 	network: "Couldn't reach the app. Check it's running, then try again.",
 };
 
@@ -28,7 +28,7 @@ const FAILURE_WORDS: Record<string, string> = {
  * dialog claims Esc and ignores it while a delete is in flight.
  *
  * Retryable failures render honestly with a Try-again: 409 turn_in_flight /
- * jobs_running ("wait for running work") and 503 extraction_winding_down
+ * jobs_running ("wait for running work") and 503 digest_winding_down
  * ("in a moment") both clear on their own. Try-again is just Delete
  * pressed again.
  */
@@ -41,7 +41,7 @@ export function DeleteSessionDialog({
 	chat: Pick<ChatListItem, "id" | "title"> | null;
 	onClose: () => void;
 	/** Success path — the sidebar owns navigation + list patching. */
-	onDeleted: (id: string, mode: ChatDeleteMode, graphRevision: number) => void;
+	onDeleted: (id: string) => void;
 }) {
 	const [busy, setBusy] = useState(false);
 	const [failure, setFailure] = useState<{ code: string; error: string } | null>(null);
@@ -56,27 +56,23 @@ export function DeleteSessionDialog({
 
 	const run = async () => {
 		if (!chat || busy) return;
-		// The lesson's graph contributions stay (preserve-graph); the route's
-		// delete-nodes mode has no control in the dialog.
-		const mode: ChatDeleteMode = "preserve-graph";
 		setBusy(true);
 		setFailure(null);
 		try {
-			const res = await fetch(`/api/chats/${chat.id}?mode=${mode}`, { method: "DELETE" });
+			const res = await fetch(`/api/chats/${chat.id}`, { method: "DELETE" });
 			const body = (await res.json()) as {
 				ok?: boolean;
 				error?: string;
 				code?: string;
-				graphRevision?: number;
 			};
 			if (!res.ok) {
-				// 409 (turn/jobs running) and 503 (extraction winding down) are
+				// 409 (turn/jobs running) and 503 (digest winding down) are
 				// both retryable — keep the dialog open, show the server's line.
 				setFailure({ code: body.code ?? "error", error: body.error ?? `Delete failed (${res.status})` });
 				setBusy(false);
 				return;
 			}
-			onDeleted(chat.id, mode, body.graphRevision ?? 0);
+			onDeleted(chat.id);
 		} catch {
 			setFailure({ code: "network", error: "Delete failed — network error. Try again." });
 			setBusy(false);

@@ -9,11 +9,10 @@
  *      runs (phases, pending questions/problems, plan tree, summaries);
  *   2. the LLM wire flattening (toLlmMessages) turns each full record into
  *      a legal provider message list — the strongest property a record has;
- *   3. the graph derivation builds from the real ledgers end-to-end;
- *   4. marker COVERAGE: every custom-marker kind of the current contract
+ *   3. marker COVERAGE: every custom-marker kind of the current contract
  *      appears in real data here (a new marker without a fixture update
  *      fails this suite);
- *   5. reads are READ-ONLY: after everything above, the copy is
+ *   4. reads are READ-ONLY: after everything above, the copy is
  *      byte-identical to the fixture source.
  *
  * THE FIXTURE LAW: an intentional format change updates the fixtures in the
@@ -36,12 +35,8 @@ fs.cpSync(GOLDEN, TMP, { recursive: true });
 process.env.LH_DATA_DIR = TMP;
 
 const { chatStore } = await import("../src/store/chats.ts");
-const { graphStore } = await import("../src/store/graph.ts");
 const { jobStore } = await import("../src/store/jobs.ts");
 const { settingsStore } = await import("../src/store/settings.ts");
-const { readRenderSettings } = await import("../src/store/render-settings.ts");
-const { getGraph, deriveView } = await import("../src/core/graph.ts");
-const { sanitizeRenderSettings } = await import("../src/core/render-settings.ts");
 const { toLlmMessages } = await import("../src/core/native-messages.ts");
 const { phaseAt3Lh } = await import("../src/core/phases.ts");
 const { danglingQuestionOf, activeProblemOf } = await import("../src/core/native-messages.ts");
@@ -157,41 +152,6 @@ test("tools: the core tool surface appears in real fixture data", () => {
 	for (const t of ["problem", "conclude"]) {
 		assert.ok(practiceTools.has(t), `practice tool ${t} exercised in the fixture record`);
 	}
-});
-
-// ── the graph: ledgers through the full derivation ──────────────────────────
-
-test("graph: the real ledgers parse through their shape guards", () => {
-	assert.ok(graphStore.readNodes().length >= 250, "nodes parse");
-	assert.ok(graphStore.readChains().length >= 150, "chains parse");
-	assert.ok(graphStore.readCheckpoints().length >= 5, "session checkpoints parse");
-	assert.ok(graphStore.readCoverage().length >= 90, "coverage entries parse");
-	assert.ok(graphStore.readSources().length >= 1, "imported-notes sources parse");
-});
-
-test("graph: getGraph + deriveView build the snapshot end-to-end", () => {
-	const derived = getGraph(graphStore);
-	assert.ok(derived.nodes.length >= 250, "merged nodes");
-assert.ok(derived.chains.length >= 150, "chains survive derivation");
-	const view = deriveView(derived);
-	assert.ok(view.nodes.length >= 250, "the view carries every proposition");
-	// chains are the stored truth; the view renders each as an implication
-	// node with premise→implication→conclusion arrows (the derived image),
-	// and contracts each to direct premise→conclusion LOGICAL edges.
-	assert.ok(view.impLinks.length >= 90, "every unique chain renders into the view (lines merged by premises+conclusion)");
-	assert.ok(view.edges.length >= view.impLinks.length, "premise/conclusion arrows drawn");
-	assert.ok(view.logicalEdges.length > 0, "logical edge contraction runs");
-});
-
-test("graph: render-settings sanitize and positions parse", () => {
-	const raw = readRenderSettings();
-	assert.ok(raw, "render-settings.json reads");
-	const clean = sanitizeRenderSettings(raw);
-	assert.ok(clean.nodeSize > 0 && typeof clean.labelZoom === "number", "sanitizes to concrete knobs");
-	const positionsFile = JSON.parse(fs.readFileSync(path.join(TMP, "graph", "positions.json"), "utf8")) as {
-		positions: Record<string, unknown>;
-	};
-	assert.ok(Object.keys(positionsFile.positions).length >= 300, "positions parse");
 });
 
 // ── jobs + settings ─────────────────────────────────────────────────────────

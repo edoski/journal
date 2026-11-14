@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { graphToolsEnabled, resolveSettings } from "../src/core/settings-resolution.ts";
+import { resolveSettings } from "../src/core/settings-resolution.ts";
 import { sanitizeUserSettings, type UserSettings } from "../src/core/settings.ts";
 
 describe("resolveSettings", () => {
@@ -46,20 +46,5 @@ describe("resolveSettings", () => {
 		}));
 		assert.deepEqual(eff.claude, { account: "claude-subscription-work" });
 		assert.deepEqual(Object.keys(eff).sort(), ["agent", "appearance", "claude"]);
-	});
-});
-
-describe("the prober graph tools gate", () => {
-	it("the agent toggle alone decides; absent subsection = ON", () => {
-		assert.equal(graphToolsEnabled({ agent: { graphTools: {} } }), true);
-		assert.equal(graphToolsEnabled({ agent: { graphTools: { enabled: true } } }), true);
-		assert.equal(graphToolsEnabled({ agent: { graphTools: { enabled: false } } }), false);
-	});
-
-	it("graphTools rides resolveSettings: absent record → the empty subsection (ON); a record's delta passes through", () => {
-		const eff = resolveSettings(null);
-		assert.deepEqual(eff.agent.graphTools, {});
-		const off = resolveSettings({ version: 1, agent: { graphTools: { enabled: false } } });
-		assert.deepEqual(off.agent.graphTools, { enabled: false });
 	});
 });

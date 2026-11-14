@@ -195,7 +195,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			systemPrompt,
 			model: engine.model,
 			thinkingLevel: engine.level,
-			// Conditional registry inclusion, like the graph-tool gates: when
+			// Conditional registry inclusion: when a tool's gate is
 			// closed, neither the tool nor its usage instructions reach the model.
 			// The shared file tools are bound to this agent (sessionTool), in
 			// every registry including explicit ones. The

@@ -2,8 +2,7 @@
  * What a lesson finishing starts. One subscriber on the event bus:
  *
  * - a turn settles on the tutor's close (`lesson_progress` with `close`):
- *   the lesson digest runs, and the graph extraction takes the lesson's
- *   tail whatever its size;
+ *   the lesson digest runs;
  * - a new lesson's first turn starts: the course's previous lesson, if it
  *   was left partway or its digest never finished, is digested;
  * - the app starts: a digest a quit cut short runs again.
@@ -19,9 +18,6 @@ import type { LessonDigest } from "../agent/subagents/lesson-digest.ts";
 export interface LessonFinishDeps {
 	chatStore: ChatStore;
 	digest: LessonDigest;
-	/** Extract the chat's uncovered teaching into the graph, whatever its
-	 *  size (the graph's own switches decide whether it runs). */
-	extractTail: (chatId: string) => void;
 }
 
 function startDigest(deps: LessonFinishDeps, chatId: string): void {
@@ -44,7 +40,6 @@ export function onLessonEvents(deps: LessonFinishDeps): () => void {
 			const record = deps.chatStore.getChat(event.chatId);
 			if (!record || !lessonFinished(record)) return;
 			startDigest(deps, record.id);
-			deps.extractTail(record.id);
 		} else if (event.type === "turn-started") {
 			const record = deps.chatStore.getChat(event.chatId);
 			if (!record?.course || record.messages.some((m) => m.role === "assistant")) return;
@@ -55,8 +50,8 @@ export function onLessonEvents(deps: LessonFinishDeps): () => void {
 }
 
 /** At app start: run again every digest a quit cut short. */
-export function resumeCutDigests(deps: Pick<LessonFinishDeps, "chatStore" | "digest">): void {
+export function resumeCutDigests(deps: LessonFinishDeps): void {
 	for (const summary of deps.chatStore.listChats()) {
-		if (deps.chatStore.getChat(summary.id)?.digest?.pending) startDigest({ ...deps, extractTail: () => {} }, summary.id);
+		if (deps.chatStore.getChat(summary.id)?.digest?.pending) startDigest(deps, summary.id);
 	}
 }

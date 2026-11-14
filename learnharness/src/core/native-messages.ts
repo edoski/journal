@@ -73,6 +73,7 @@ export interface LhMarkerMessage {
 	id: string;
 	role: "custom";
 	customType:
+		// Older sessions started from picks on the retired knowledge map.
 		| "graph-context"
 		| "course-context"
 		| "probe-handoff"
@@ -376,47 +377,6 @@ export function visibleCourseBriefKey(messages: readonly LhMessage[]): string | 
 		}
 	}
 	return null;
-}
-
-/** One picked proposition of the graph-context marker (the learner's map
- *  pick — name + statement as the learner SAW them at pick time). */
-export interface GraphContextPick {
-	id: string;
-	name: string;
-	statement: string;
-}
-
-/** The session's map context (owner, 2026-10-04): a SEPARATE custom
- *  message BEFORE the learner's first user message — the picked
- *  propositions plus the reasoning chains among them (pre-formatted
- *  lines, formatChainLine shape). The model reads `content` (flattened
- *  to a user message by toLlmMessages like every marker); `details`
- *  feeds the transcript's collapsible GraphContextCard. No more seed
- *  text glued into the first prompt. */
-export function newGraphContextMessage(picks: readonly GraphContextPick[], chains: readonly string[]): LhMarkerMessage {
-	const lines = [
-		// PREAMBLE LAW (owner, 2026-10-10): custom markers flatten to
-		// USER-role messages on the wire (toLlmMessages) — this text arrives
-		// in the learner's voice channel, so it must not read like a system
-		// broadcast. The bracket convention (NEXT_PROBLEM_TEXT's kin) marks
-		// it honestly as injected session context, not learner speech.
-		"[Session context] — picked from the learner's knowledge map when starting this session:",
-		"",
-		"Propositions (name: statement):",
-		...picks.map((p) => `- ${p.name}: ${p.statement}`),
-	];
-	if (chains.length > 0) {
-		lines.push("", "Reasoning chains among them (premises → conclusion):", ...chains.map((c) => `- ${c}`));
-	}
-	return {
-		id: newMessageId(),
-		role: "custom",
-		customType: "graph-context",
-		content: lines.join("\n"),
-		display: true,
-		details: { propositions: picks, chains },
-		timestamp: Date.now(),
-	};
 }
 
 /** How many Hint requests this problem has had so far. */

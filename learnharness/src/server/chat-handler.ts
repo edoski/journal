@@ -13,7 +13,6 @@ import { CLAUDE_MODEL_MISSING, claudeTurnError } from "../agent/claude-stream.ts
 import { SubscriptionRequestCycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
-import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
 import { createLessonDigest } from "../agent/subagents/lesson-digest.ts";
 import { onLessonEvents, resumeCutDigests } from "./lesson-finish.ts";
 import {
@@ -34,12 +33,11 @@ import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
 import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
-import { graphToolsEnabled } from "../core/settings-resolution.ts";
 import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settings.ts";
 import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
-import { persistTurn, startExtraction, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
+import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { hasProbeDone, hasUnresolvedQuestion, resumesLesson, sessionModeOf, type LhMessage } from "../core/native-messages.ts";
 import type { ChatRecord, SessionMode } from "../core/contracts/chat.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
@@ -96,19 +94,6 @@ const jobRunner = createJobRunner({
 	providerKeyMissing: (provider) =>
 		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider),
 });
-/** The app's ONE extraction pipeline instance — both front doors share it:
- *  quiz-triggered session runs (turn-service) and notes imports
- *  (/api/graph/import) hit the same single-flight registry. */
-export const extraction = createExtractionPipeline({
-	...stores,
-	// Read FRESH per stage call. Direct test values still win.
-	engineFor: agentEngine,
-	// The job runner's check: a stage engine whose account is signed out
-	// refuses BEFORE any batch runs (the typed throw), never mid-run.
-	providerKeyMissing: (provider) =>
-		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider),
-});
-
 /** The lesson digest: a finished lesson's gaps, notes and task step, saved
  *  to the course record, on the app's one model (agentEngine). */
 const lessonDigest = createLessonDigest({
@@ -127,7 +112,6 @@ const lessonDigest = createLessonDigest({
 const lessonFinishDeps = {
 	chatStore: stores.chatStore,
 	digest: lessonDigest,
-	extractTail: (chatId: string) => startExtraction(extraction, chatId),
 };
 
 interface LhLessonFinishGlobal {
@@ -136,7 +120,7 @@ interface LhLessonFinishGlobal {
 
 // One subscriber per process: Next dev compiles this module once per route
 // entry, so each load replaces the last one's subscription. Skipped under
-// tests, like the extraction trigger: scripted chats are fixtures.
+// tests: scripted chats are fixtures.
 if (process.env.NODE_ENV !== "test") {
 	const g = globalThis as typeof globalThis & LhLessonFinishGlobal;
 	g.__lhLessonFinish?.();
@@ -155,7 +139,7 @@ export function resumeLessonDigests(): void {
 setTurnRunner(async (chatId, input) => {
 	const res = await handleChatInput(chatId, input);
 	// Drive the stream to completion server-side — nobody else will read it,
-	// and onFinish (persist, extraction, endTurn) only runs when it drains.
+	// and onFinish (persist, endTurn) only runs when it drains.
 	await res.arrayBuffer().catch(() => undefined);
 	return res.status;
 });
@@ -266,7 +250,7 @@ export async function handleChatInput(
 	// running compaction): await any in-flight compaction (the settle
 	// kick usually finished inside the learner's answer pause), and if
 	// the record is STILL over threshold, compact synchronously — this
-	// request waits. Skipped under tests (the extraction precedent);
+	// request waits. Skipped under tests (scripted chats are fixtures);
 	// placement mirrors the connection gate — BEFORE appends and
 	// beginTurn, no liveness effects — and the record re-reads after
 	// because compaction appends the marker.
@@ -482,14 +466,12 @@ export async function handleChatInput(
 						chatStore: stores.chatStore,
 						// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
 						// (same runner/gating as the teacher's — research honestly
-						// absent when no engine is live) and the map readers behind
-						// the SAME settings gate as the prober's.
+						// absent when no engine is live).
 						jobs: {
 							chatId,
 							jobStore: stores.jobStore,
 							spawn: (job, input) => void jobRunner.runJob(job.id, input),
 						},
-						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
 						deliver: (steer) => void deliverJobResult(steer),
 					},
 					agentOpts,
@@ -515,10 +497,6 @@ export async function handleChatInput(
 						// needs the same job wiring as the teacher's.
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						// The map reader (wave 7): the prober reads the learner's
-						// knowledge graph through tools when the gate opens —
-						// graph master switch AND the agent.graphTools toggle.
-						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
 					},
 					agentOpts,
 				);
@@ -577,7 +555,7 @@ export async function handleChatInput(
 				unregisterLiveAgent(chatId);
 				// The canonical save may have succeeded before later bookkeeping
 				// threw. Reconcile against actual durability, never replay input
-				// merely because usage/extraction/other settlement work failed.
+				// merely because usage or other settlement work failed.
 				const persisted = stores.chatStore.getChat(chatId)?.messages ?? [];
 				reconcileUserSteers(chatId, persisted);
 				settleSteers(chatId, persisted, true, constructed);
@@ -599,12 +577,6 @@ export async function handleChatInput(
 						model: modelId,
 						steps,
 					});
-				}
-				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
-				// no extraction, no graph, no coverage (v1: the session itself
-				// is the deliverable).
-				if ((!requestCycle || requestCycle.dispatched) && agentKind !== "practice") {
-					triggerExtraction(stores, extraction, chatId);
 				}
 				// PARKED DISMISSAL (owner, 2026-10-04): a dismissal that arrived
 				// mid-turn was parked by the dismiss route (202); now that
@@ -639,8 +611,8 @@ export async function handleChatInput(
 				// between-runs window). The next turn's ensureCompacted gate
 				// awaits whatever this leaves running; a lost engine or a
 				// beneath-threshold record is a silent no-op. Skipped under
-				// tests (the extraction precedent — scripted chats are
-				// fixtures; the service itself is pinned directly).
+				// tests (scripted chats are fixtures; the service itself is
+				// pinned directly).
 				if (process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
 					kickCompaction(() => {
 						const kickAccount = effectiveSettings().claude.account;

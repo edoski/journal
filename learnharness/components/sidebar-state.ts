@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { fuzzyScore, type ChatDeleteMode, type ChatListItem } from "@/src/core";
+import { fuzzyScore, type ChatListItem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 
 /** The search over the list (owner round 8, 2026-10-05): a fuzzy
@@ -225,17 +225,14 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		}
 	}, []);
 
-	// Delete success: patch the list instantly (the poll is the backstop),
-	// navigate home if the open session died (the chat view unmounts —
-	// drafts die with it, no orphan bubbles), and announce the graph
-	// revision so the graph view refetches (deletion is the one writer
-	// the status poll can't see — no run ever transitions some→none).
+	// Delete success: patch the list instantly (the poll is the backstop)
+	// and navigate home if the open session died (the chat view unmounts —
+	// drafts die with it, no orphan bubbles).
 	const onDeleted = useCallback(
-		(id: string, _mode: ChatDeleteMode, graphRevision: number) => {
+		(id: string) => {
 			setDeleting(null);
 			setChats((prev) => (prev ? prev.filter((c) => c.id !== id) : prev));
 			if (pathname === `/chat/${id}`) router.push("/");
-			window.dispatchEvent(new CustomEvent("lh:graph-revision", { detail: { revision: graphRevision } }));
 		},
 		[pathname, router],
 	);

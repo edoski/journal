@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatListItem } from "@/src/core";
 import type { useSessionsSidebar } from "@/components/sidebar-state";
-import { CoverageMenuItem } from "@/components/unit-inbox/coverage-menu-item";
 import { SessionSlimRow } from "@/components/unit-inbox/unit-row";
 import { Input } from "@/components/ui/input";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -89,7 +88,6 @@ export function SessionItem({
 					<ContextMenuItem data-testid="ctx-delete" variant="destructive" onSelect={() => s.deleteChat(chat.id)}>
 						Delete…
 					</ContextMenuItem>
-					<CoverageMenuItem chatId={chat.id} />
 				</ContextMenuContent>
 			</ContextMenu>
 		</li>

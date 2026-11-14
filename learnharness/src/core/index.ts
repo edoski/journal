@@ -9,28 +9,17 @@
  *   components/**  →  "@/src/core"        (this barrel, ONLY)
  *   app/**         →  "@/src/core" + "@/src/server"
  *
- * Server-only core modules (core/graph.ts emission/derivation) are pure
- * but need storage ports passed in by a server caller, so they are
- * deliberately NOT re-exported here — the server imports them directly.
  * The storage PORT TYPES are types-only and browser-safe, hence re-exported.
  */
 
 export * from "./contracts.ts";
 export * from "./ports.ts";
-export * from "./chains.ts";
-export * from "./render-settings.ts";
 
 export * from "./question-core.ts";
 // The event bus (push architecture, 2026-10-02): vocabulary + emit/subscribe
 // for every layer; the browser shell consumes the types + the runtime names
 // through this barrel (shell law: pure core via @/src/core only).
 export * from "./events.ts";
-// clusters.ts (Louvain) is deliberately NOT re-exported: nothing in the
-// shell runs community detection — the snapshot carries the partition
-// from the server. Keeping it out keeps the heavy clustering deps out of the
-// client bundle (verified 2026-09-13: chunks contained it while this
-// line existed). Same logic as layout-settle.ts below.
-export * from "./layout.ts";
 export * from "./plan-tree.ts";
 export * from "./phases.ts";
 export * from "./pending.ts";
@@ -53,18 +42,11 @@ export * from "./context-usage.ts";
 export type { ChatGPTStatus, ChatGPTControlBridge } from "./contracts/chatgpt.ts";
 export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
 export type { ClaudeAccount, ClaudeAccountStatus, ClaudeConnection, ClaudeUsage } from "./contracts/claude.ts";
-export * from "./cost-summary.ts";
 export * from "./fuzzy.ts";
 // settings.ts + settings-resolution.ts (settings-storage wave, 2026-09-19):
 // the user-settings record's shape/sanitizer (pure) and its fully-resolved
 // view. Browser-safe — the Wave-4 panel imports these directly.
 export * from "./settings.ts";
-// graph-deletion.ts (wave 6): the whole module is PURE but storage-port
-// driven — the deletion RUNS server-side only. The shell needs exactly one
-// two type-only things from it: the ChatDeleteMode union (the delete
-// dialog's two-option design + the DELETE query param) and the stats
-// shape its success line describes, hence this type-only re-export.
-export type { ChatDeleteMode, ChatDeletionStats } from "./graph-deletion.ts";
 export * from "./settings-resolution.ts";
 export * from "./session-find.ts";
 export * from "./session-navigation.ts";
@@ -72,8 +54,6 @@ export * from "./session-navigation.ts";
 export * from "./keyboard.ts";
 // spatial-nav.ts: which target an arrow key moves to, from screen boxes (pure).
 export * from "./spatial-nav.ts";
-export * from "./coverage.ts";
-// session-markdown.ts (2026-09-27 engine; first consumer 2026-10-06): the
-// ONE session→markdown formatter — the extractor's view and the user-facing
-// export share it. Pure, browser-safe.
+// session-markdown.ts: the session→markdown formatter behind the export.
+// Pure, browser-safe.
 export * from "./session-markdown.ts";
