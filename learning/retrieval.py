@@ -543,26 +543,45 @@ def _graded(item: dict[str, Any]) -> dict[str, Any]:
     return {**item, "grade": progress.grade(item)}
 
 
+def _arc_topics(
+    record: dict[str, Any], arc: str, order: list[str], every: list[str]
+) -> dict[str, list[str]]:
+    """The arc's ``topics``, the live ones its standing reads, and its
+    ``excluded`` ones, each in path order (``order`` and ``every``, the path
+    without and with excluded topics)."""
+    live = set(order)
+    return {
+        "topics": arcs.live_topics(record, arc, order),
+        "excluded": [
+            key
+            for key in every
+            if key not in live and record["topics"][key].get("arc") == arc
+        ],
+    }
+
+
 def _arc_item(
     record: dict[str, Any], arc: str, standing: arcs.Standing
 ) -> dict[str, Any]:
-    """An arc with its topics in path order, its standing and the log events
-    that name it."""
+    """An arc with its topics (``_arc_topics``), its standing and the log
+    events that name it."""
     log = [
         event
         for event in record.get("arc_log", ())
         if event["kind"] == "formed"
         or arc in (event.get("arc"), event.get("from"), event.get("to"))
     ]
+    order = progress.path_order(record)
     every = progress.path_order(record, everything=True)
     return compact(
         {
             "kind": "arc",
             **record["arcs"][arc],
-            "topics": [key for key in every if record["topics"][key].get("arc") == arc],
+            **_arc_topics(record, arc, order, every),
             "standing": standing,
             "log": log,
-        }
+        },
+        keep=("topics",),
     )
 
 
@@ -793,12 +812,7 @@ def course_arcs(
             {
                 "arc": arc,
                 **record["arcs"][arc],
-                "topics": arcs.live_topics(record, arc, order),
-                "excluded": [
-                    key
-                    for key in every
-                    if key not in order and record["topics"][key].get("arc") == arc
-                ],
+                **_arc_topics(record, arc, order, every),
                 **standing,
             },
             keep=("topics", "entry"),
