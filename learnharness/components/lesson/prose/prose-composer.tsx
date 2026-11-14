@@ -11,6 +11,7 @@ import { stepConfidence } from "@/components/confidence-choice";
 import { usePhotoDraft, sentPhotos } from "@/components/photos";
 import { ComposerIcon, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
 import { carriedForm, carryWords, formToKept, keepPhotos, keepWords, keptWords, takeCarry } from "@/components/lesson/kept-drafts";
+import { holdsRescue } from "@/components/lesson/stranded-draft";
 import {
 	CONFIDENCE_CHOICES,
 	DEFAULT_CONFIDENCE,
@@ -60,6 +61,9 @@ export interface ProseComposerProps {
 	busy: boolean;
 	chatId: string;
 	carryScope?: string;
+	/** The question call the open question asks again, left open by a hint
+	 *  or a side question just before it: its carried work fills this one. */
+	reaskOf?: string | null;
 	initialDraft?: QuestionFormDraft;
 	onSaveDraft: (draft: QuestionFormDraft) => void;
 	onSubmitAnswer: (output: QuestionAnswerData, photos?: Photo[]) => void;
@@ -92,13 +96,15 @@ export function ProseComposer(props: ProseComposerProps) {
 			}
 			answer.setMode("ask");
 		} else {
-			if (!answerText.trim() && messageWords.trim()) {
+			// Words another window's answer left in the box belong to that
+			// question (stranded-draft.ts): never this one's answer.
+			if (!answerText.trim() && messageWords.trim() && !holdsRescue(chatId, messageWords)) {
 				keepWords(box, open.kind === "question" ? { form: { ...(kept?.form ?? formToKept({ selection: answer.selection, thinking: "", other: "", text: "", confidence: answer.confidence })), text: messageWords } } : { text: messageWords });
 				messageText.write("");
 			}
 			answer.setMode("answer");
 		}
-	}, [open, box, answer, messageText]);
+	}, [open, box, answer, messageText, chatId]);
 	toggleRef.current = open ? toggle : null;
 
 	if (!open || asking) {
@@ -129,6 +135,7 @@ function AnswerComposer({
 	onAsk,
 	busy,
 	carryScope,
+	reaskOf,
 	initialDraft,
 	onSaveDraft,
 	onSubmitAnswer,
@@ -157,7 +164,7 @@ function AnswerComposer({
 		if (!initialDraft) {
 			const kept = keptWords(box);
 			const keptText = kept?.form ? kept.form.text || kept.form.other || kept.form.thinking : kept?.text;
-			const carry = !keptText && spec && carryScope ? takeCarry(carryScope, spec.data.question) : undefined;
+			const carry = !keptText && spec && carryScope ? takeCarry(carryScope, spec.data.question, reaskOf) : undefined;
 			const carried = carry ? carriedForm(carry.words, true) : undefined;
 			if (keptText) setText(keptText);
 			else if (carried) setText(carried.text);
@@ -230,7 +237,7 @@ function AnswerComposer({
 	// as a new question, and his work waits in the carry to fill it.
 	const hint = () => {
 		if (!spec || spec.kind !== "explain") return;
-		if (carryScope) carryWords(carryScope, spec.data.question, { form: keptForm(text, selection) }, photos.photos.map((p) => p.photo));
+		if (carryScope) carryWords(carryScope, { question: spec.data.question, from: open.toolCallId }, { form: keptForm(text, selection) }, photos.photos.map((p) => p.photo));
 		forgetBox();
 		onSubmitAnswer(proseHintRequest(spec, text));
 	};

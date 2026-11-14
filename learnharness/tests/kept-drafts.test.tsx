@@ -86,6 +86,19 @@ describe("a box belongs to its window", () => {
 		assert.equal(keptWords("c1:composer"), undefined, "a second window does not take them too");
 	});
 
+	it("a window that wrote after this one looked is open, even if the locks missed it", () => {
+		// Round 7: window two was reloading (its lock let go) when window one
+		// looked, then carried its words; window one took them as a closed
+		// window's and filled its own box with window two's draft.
+		const looked = Date.now() - 1000;
+		setKeptWindow("w-two", { live: ["w-two"] });
+		keepWords("carry:la", { text: "window two's work", question: "why?" });
+		setKeptWindow("w-one", { live: ["w-one"], seenAt: looked });
+		assert.equal(keptWords("carry:la"), undefined, "window one does not take it");
+		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
+		assert.equal(keptWords("carry:la")?.text, "window two's work", "window two still has it");
+	});
+
 	it("closing a question forgets only this window's box for it", () => {
 		setKeptWindow("w-two", { live: ["w-one", "w-two"] });
 		keepWords("c1:q:old", { text: "window two's work" });
@@ -112,7 +125,7 @@ const check = { question: "Why?", correctAnswer: "hidden", type: "check" };
 
 /** The Prose composer answering the question `key` (the check "Why?" unless
  *  told otherwise), kept in box `c1:q:<key>`. */
-async function mount(key: string, carryScope?: string, input: unknown = check, tool = "explain") {
+async function mount(key: string, carryScope?: string, input: unknown = check, tool = "explain", reaskOf?: string) {
 	const host = document.createElement("div");
 	document.body.append(host);
 	const root = createRoot(host);
@@ -129,6 +142,7 @@ async function mount(key: string, carryScope?: string, input: unknown = check, t
 				busy={false}
 				chatId="c1"
 				carryScope={carryScope}
+				reaskOf={reaskOf}
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}
 				onSubmitThinking={async () => true}
@@ -142,7 +156,7 @@ async function mount(key: string, carryScope?: string, input: unknown = check, t
 }
 
 test("a check asked again after Hint opens with the work he had typed, and takes it once", async () => {
-	carryWords("carry:la", "Why?", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "Av = λv gives (A − λI)v = 0", confidence: "neutral" }) }, []);
+	carryWords("carry:la", { question: "Why?", from: "q1" }, { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "Av = λv gives (A − λI)v = 0", confidence: "neutral" }) }, []);
 	const { field, done } = await mount("new", "carry:la");
 	try {
 		assert.equal(field().value, "Av = λv gives (A − λI)v = 0");
@@ -167,7 +181,7 @@ test("a carried answer waits for its own question: another question opens empty 
 	// Round 6 (daily loop N5): the Done-for-today draft filled the next,
 	// unrelated Yes/No question, and Enter would have sent it as its note.
 	const typed = formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "(3,2) = 1·(2,3) + 1·(1,−1)", confidence: "neutral" });
-	carryWords("carry:la", "Why?", { form: typed }, []);
+	carryWords("carry:la", { question: "Why?", from: "q1" }, { form: typed }, []);
 	const choice = { question: "Pick up the stack question first?", options: [{ label: "Yes" }, { label: "Not now" }] };
 	const other = await mount("yes-no", "carry:la", choice, "ask_user_question");
 	try {
@@ -182,5 +196,25 @@ test("a carried answer waits for its own question: another question opens empty 
 		assert.equal(keptWords("carry:la"), undefined, "taken once");
 	} finally {
 		await same.done();
+	}
+});
+
+test("the question asked right after a hint takes his work even in other words", async () => {
+	// Round 7 (robustness): the tutor asked the check again without its
+	// "Say why.", so the carry waiting for the old words was never taken.
+	const typed = formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "(1,1) stays, stretched by 3", confidence: "neutral" });
+	carryWords("carry:la", { question: "Which directions stay on their line? Say why.", from: "q1" }, { form: typed }, []);
+	const unrelated = await mount("other", "carry:la", { ...check, question: "Which directions stay on their line?" }, "explain", "q0");
+	try {
+		assert.equal(unrelated.field().value, "", "a question after another call does not take it");
+	} finally {
+		await unrelated.done();
+	}
+	const again = await mount("again", "carry:la", { ...check, question: "Which directions stay on their line?" }, "explain", "q1");
+	try {
+		assert.equal(again.field().value, typed.text, "the re-ask opens with his work");
+		assert.equal(keptWords("carry:la"), undefined, "taken once");
+	} finally {
+		await again.done();
 	}
 });

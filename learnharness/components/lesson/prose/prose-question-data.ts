@@ -4,6 +4,7 @@
  * the inline question, the composer and the tests read one truth.
  */
 
+import type { LeftOpen } from "@/components/lesson/stranded-draft";
 import {
 	buildAnswer,
 	normalizeOptions,
@@ -111,6 +112,38 @@ interface QuestionPart {
 	output?: unknown;
 }
 
+/** Why a question's answer left it still open: he pressed Hint on it, or
+ *  set it aside to ask the tutor something. null for an answer or a skip. */
+export function leftOpen(output: unknown): LeftOpen | null {
+	const left = output as Partial<QuestionAnswerData> | undefined;
+	if (left?.hintRequested === true) return "hint";
+	if (left?.dismissed === true && left.reason === "asked") return "asked";
+	return null;
+}
+
+/** The question call `toolCallId` asks again, in whatever words: the
+ *  question just before it, when that one was left open (round 7: the
+ *  re-ask after a hint dropped "Say why." and lost his carried work). */
+export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>, toolCallId: string): string | null {
+	let previous: QuestionPart | null = null;
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (!part.type.startsWith("tool-") || !(QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) continue;
+			if (part.toolCallId === toolCallId) return previous?.toolCallId && leftOpen(previous.output) ? previous.toolCallId : null;
+			previous = part;
+		}
+	}
+	return null;
+}
+
+/** How the question call `toolCallId` left, when it is still open. */
+export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>, toolCallId: string): LeftOpen | null {
+	for (const message of messages) {
+		for (const part of message.parts) if (part.toolCallId === toolCallId) return leftOpen(part.output);
+	}
+	return null;
+}
+
 /** The question calls that ask again, word for word, the question he just
  *  pressed Hint on or set aside to ask the tutor something. The tutor asks
  *  it again after either (neither is an answer, so the question must come
@@ -128,8 +161,7 @@ export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPar
 	for (const message of messages) {
 		for (const part of message.parts) {
 			if (!part.type.startsWith("tool-") || !(QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) continue;
-			const left = previous?.output as Partial<QuestionAnswerData> | undefined;
-			const open = left?.hintRequested === true || (left?.dismissed === true && left.reason === "asked");
+			const open = leftOpen(previous?.output) !== null;
 			if (previous && open && part.toolCallId && words(part) !== null && words(part) === words(previous)) reasked.add(part.toolCallId);
 			previous = part;
 		}

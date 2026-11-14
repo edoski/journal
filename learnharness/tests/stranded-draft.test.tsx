@@ -8,8 +8,8 @@ import { parseHTML } from "linkedom";
 import type { Root } from "react-dom/client";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ProseComposer } from "../components/lesson/prose/prose-composer.tsx";
-import { dropRescue, keepRescue, strandedDraft } from "../components/lesson/stranded-draft.ts";
-import { setKeptWindow } from "../components/lesson/kept-drafts.ts";
+import { forgetRescue, holdsRescue, keepRescue, overtakenDraft } from "../components/lesson/stranded-draft.ts";
+import { keptWords, setKeptWindow } from "../components/lesson/kept-drafts.ts";
 import { emptyDockSelection } from "../src/core/index.ts";
 
 class MemoryStorage {
@@ -34,33 +34,75 @@ afterEach(async () => {
 	document.body.innerHTML = "";
 });
 
-test("words typed in a question another window answered are rescued", () => {
+test("words typed in a question another window answered go to the message box", () => {
 	// Round 2: tab 0's typed draft was wiped with no word when tab 1 answered.
-	assert.equal(strandedDraft("q:1", null, { key: "q:1", text: "(1,1) and (1,-1)" }), "(1,1) and (1,-1)");
+	assert.deepEqual(overtakenDraft("q:1", null, { key: "q:1", text: "(1,1) and (1,-1)" }, null), { to: "box", words: "(1,1) and (1,-1)" });
+	// Round 7: answered and replaced by the next question at once, the
+	// words are still kept, not dropped with the old question.
+	assert.deepEqual(overtakenDraft("q:1", "q:2", { key: "q:1", text: "trace is 7, det is" }, null), { to: "box", words: "trace is 7, det is" });
+	assert.deepEqual(overtakenDraft("q:1", "p:3", { key: "q:1", text: "trace is 7, det is" }, null), { to: "box", words: "trace is 7, det is" });
 });
 
-test("a question replaced by the next one takes its draft with it", () => {
-	// Round 6 (robustness major 2): window two's draft for a question window
-	// one answered came back under the next question.
-	assert.equal(strandedDraft("q:1", "q:2", { key: "q:1", text: "trace is 7, det is" }), null);
-	assert.equal(strandedDraft("q:1", "p:3", { key: "q:1", text: "trace is 7, det is" }), null);
+test("words typed in a question another window took a hint on wait for it to be asked again", () => {
+	// Round 7 (robustness major 1): window one's Hint wiped window two's draft.
+	assert.deepEqual(overtakenDraft("q:1", null, { key: "q:1", text: "lambda is 3 and 1" }, "hint"), { to: "carry", words: "lambda is 3 and 1", why: "hint" });
+	assert.deepEqual(overtakenDraft("q:1", "q:2", { key: "q:1", text: "lambda is 3 and 1" }, "asked"), { to: "carry", words: "lambda is 3 and 1", why: "asked" });
 });
 
-test("rescued words leave the message box when the next question opens, unless he made them his", () => {
+test("the box remembers which words were rescued until he makes them his", () => {
 	keepRescue("c1", "trace is 7, det is");
-	assert.equal(dropRescue("c1", "a note of my own\n\ntrace is 7, det is"), "a note of my own", "only the rescued words go");
-	assert.equal(dropRescue("c1", "a note of my own"), null, "the rescue is forgotten once dropped");
-	keepRescue("c1", "trace is 7, det is");
-	assert.equal(dropRescue("c1", "trace is 7, det is 10, so 5 and 2"), null, "words he typed on are his message");
-	keepRescue("c1", "trace is 7, det is");
-	assert.equal(dropRescue("c1", "trace is 7, det is"), "", "untouched, the box empties");
+	assert.equal(holdsRescue("c1", "trace is 7, det is"), true);
+	assert.equal(holdsRescue("c1", "a note of my own\n\ntrace is 7, det is"), true);
+	assert.equal(holdsRescue("c1", "trace is 7, det is 10, so 5 and 2"), false, "words he typed on are his message");
+	forgetRescue("c1");
+	assert.equal(holdsRescue("c1", "trace is 7, det is"), false);
 });
 
-test("nothing is rescued when the dock stays, nothing was typed, or the words belong to another dock", () => {
-	assert.equal(strandedDraft("q:1", "q:1", { key: "q:1", text: "x" }), null);
-	assert.equal(strandedDraft("q:1", null, { key: "q:1", text: "  " }), null);
-	assert.equal(strandedDraft("q:1", null, { key: "q:2", text: "x" }), null);
-	assert.equal(strandedDraft("q:1", null, null), null);
+test("nothing is overtaken when the dock stays, nothing was typed, or the words belong to another dock", () => {
+	assert.equal(overtakenDraft("q:1", "q:1", { key: "q:1", text: "x" }, null), null);
+	assert.equal(overtakenDraft("q:1", null, { key: "q:1", text: "  " }, null), null);
+	assert.equal(overtakenDraft("q:1", null, { key: "q:2", text: "x" }, null), null);
+	assert.equal(overtakenDraft("q:1", null, null, "hint"), null);
+});
+
+test("Esc back to the answer never moves rescued words into the next question's answer", async () => {
+	// Round 6: the rescued words, carried by Esc into the next question's
+	// answer, would have been sent by Enter. Round 7 keeps them in the box.
+	keepRescue("c2", "trace is 7, det is");
+	let box = "trace is 7, det is";
+	let mode: "answer" | "ask" = "ask";
+	const toggleRef: { current: (() => void) | null } = { current: null };
+	const noop = () => {};
+	const host = document.createElement("div") as unknown as HTMLElement;
+	document.body.append(host);
+	const { createRoot } = await import("react-dom/client");
+	const root = createRoot(host);
+	roots.push(root);
+	await act(async () => {
+		root.render(
+			<StickToBottom>
+				<ProseComposer
+					open={{ kind: "question", key: "k2", tool: "explain", toolCallId: "q2", input: { question: "What is det A?", correctAnswer: "3", type: "check" } }}
+					answer={{ openKey: "k2", selection: emptyDockSelection(), confidence: "neutral", mode, toggle: noop, setConfidence: noop, setMode: (m: "answer" | "ask") => { mode = m; } }}
+					message={{ busy: false, value: box, revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
+					messageText={{ read: () => box, write: (v: string) => { box = v; } }}
+					onAskInstead={noop}
+					toggleRef={toggleRef}
+					busy={false}
+					chatId="c2"
+					onSaveDraft={noop}
+					onSubmitAnswer={noop}
+					onSubmitThinking={async () => true}
+					onRequest={noop}
+					onDraftChange={noop}
+				/>
+			</StickToBottom>,
+		);
+	});
+	await act(async () => toggleRef.current?.());
+	assert.equal(mode, "answer");
+	assert.equal(box, "trace is 7, det is", "the rescued words stay in the message box");
+	assert.equal(keptWords("c2:q:k2"), undefined, "and never become the answer");
 });
 
 test("the composer answering a question reports what he types as he types it", async () => {

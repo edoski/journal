@@ -76,7 +76,8 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 | a reply arrived below what he can see | New reply (the cue above the dock) |
 | the tutor's turn ended with no reply | You stopped the tutor before it replied. (his stop, from any window) / The tutor stopped before replying. (the app restarted while it ran); then Try again |
 | the connection dropped mid-reply | The connection dropped before the tutor finished replying. |
-| another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. |
+| another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. (once the next question holds the box: Answered in another window. Press Esc to see what you typed here.) |
+| another window asked for a hint on it, or asked the tutor something | Another window asked for a hint. / Another window asked the tutor something. Then: What you typed here comes back when the tutor asks the question again. |
 | he stops for the day | Done for today; a question he left reads Left for next time, in full; a problem he left reads Left for next time. |
 | he skips | a question: Skipped, then the question; a problem: You skipped this problem. |
 | a course's record can't be read | Couldn't read this course's record, then why (`UNREADABLE_WORDS`): The app isn't allowed to open its files. / Its file is damaged. / Its file can't be opened. |

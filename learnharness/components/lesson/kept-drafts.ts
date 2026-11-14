@@ -33,6 +33,14 @@ export interface KeptWords {
 	/** A carry's question, its words as `sameQuestionKey` reads them: only
 	 *  that question asked again takes the carry. */
 	question?: string;
+	/** When the words were kept, so a window that wrote after another
+	 *  looked at the open windows is known to be open. */
+	at?: number;
+	/** A carry's question call: the next question after that call, when it
+	 *  was left open by a hint or a side question, asks it again in
+	 *  whatever words (round 7: a re-ask that dropped "Say why." lost his
+	 *  words). */
+	from?: string;
 }
 
 function storage(): Storage | null {
@@ -50,7 +58,11 @@ function storage(): Storage | null {
  * lives, so the others can tell a closed window from an open one. A box's
  * key is `lh.kept.<window>|<scope>`. A window opening after another has
  * gone (an app restart) takes the gone window's words for a box it has
- * none in, once; words of a window still open are never taken. */
+ * none in, once; words of a window still open are never taken. A window
+ * that wrote after this one looked at the locks is open, whatever the
+ * locks said then (round 7: a window reloading while another opened looked
+ * closed, and lost its carried words to it); the look is taken again
+ * whenever this window comes to the front. */
 
 const WINDOW_KEY = "lh.window";
 const LOCK_PREFIX = "lh.window:";
@@ -61,6 +73,8 @@ interface KeptWindow {
 	/** Ids of windows known to be open; null until the locks answer, when
 	 *  nothing is taken from another window. */
 	live: Set<string> | null;
+	/** When `live` was read: words written after it are an open window's. */
+	seenAt: number;
 }
 
 let current: KeptWindow | null = null;
@@ -81,26 +95,31 @@ function thisWindow(): KeptWindow {
 	} catch {
 		id ??= newWindowId();
 	}
-	const win: KeptWindow = { id, live: null };
+	const win: KeptWindow = { id, live: null, seenAt: 0 };
 	current = win;
 	const locks = (globalThis.navigator as Navigator | undefined)?.locks;
 	if (locks) {
 		// Held until the window closes: the promise never settles.
 		void locks.request(LOCK_PREFIX + id, () => new Promise<void>(() => {})).catch(() => {});
-		void locks.query().then((state) => {
-			const live = new Set<string>([id]);
-			for (const lock of [...(state.held ?? []), ...(state.pending ?? [])]) {
-				if (lock.name?.startsWith(LOCK_PREFIX)) live.add(lock.name.slice(LOCK_PREFIX.length));
-			}
-			if (current === win) win.live = live;
-		}).catch(() => {});
+		const look = () => {
+			const at = Date.now();
+			void locks.query().then((state) => {
+				const live = new Set<string>([id]);
+				for (const lock of [...(state.held ?? []), ...(state.pending ?? [])]) {
+					if (lock.name?.startsWith(LOCK_PREFIX)) live.add(lock.name.slice(LOCK_PREFIX.length));
+				}
+				if (current === win) Object.assign(win, { live, seenAt: at });
+			}).catch(() => {});
+		};
+		look();
+		globalThis.addEventListener?.("focus", look);
 	}
 	return win;
 }
 
 /** Tests name the window and the open ones; the app learns both itself. */
-export function setKeptWindow(id: string, others: { live: readonly string[] }): void {
-	current = { id, live: new Set([id, ...others.live]) };
+export function setKeptWindow(id: string, others: { live: readonly string[]; seenAt?: number }): void {
+	current = { id, live: new Set([id, ...others.live]), seenAt: others.seenAt ?? Date.now() };
 }
 
 function keyFor(windowId: string, scope: string): string {
@@ -117,9 +136,10 @@ function parseKey(key: string): { window: string | null; scope: string } | null 
 	return { window: null, scope: rest };
 }
 
-/** Whether a box's words were left by a window that has closed. */
-function orphaned(window: string | null, win: KeptWindow): boolean {
-	return window !== win.id && win.live !== null && (window === null || !win.live.has(window));
+/** Whether a box's words were left by a window that has closed: not open
+ *  when this window looked, and written before it looked. */
+function orphaned(window: string | null, win: KeptWindow, at: number | undefined): boolean {
+	return window !== win.id && win.live !== null && (window === null || !win.live.has(window)) && (at === undefined || at <= win.seenAt);
 }
 
 /** Whether a kept value holds anything he typed or chose. */
@@ -136,7 +156,7 @@ export function keepWords(scope: string, words: KeptWords | null): void {
 	const key = keyFor(thisWindow().id, scope);
 	try {
 		if (!words || !holdsWork(words)) store.removeItem(key);
-		else store.setItem(key, JSON.stringify(words));
+		else store.setItem(key, JSON.stringify({ ...words, at: Date.now() }));
 	} catch {
 		// Storage full or refused: the box still works, it just won't survive a reload.
 	}
@@ -164,8 +184,9 @@ export function keptWords(scope: string): KeptWords | undefined {
 		for (let i = 0; i < store.length; i++) {
 			const key = store.key(i);
 			const parsed = key ? parseKey(key) : null;
-			if (!key || !parsed || parsed.scope !== scope || !orphaned(parsed.window, win)) continue;
+			if (!key || !parsed || parsed.scope !== scope) continue;
 			const words = parseWords(store.getItem(key));
+			if (!orphaned(parsed.window, win, words?.at)) continue;
 			store.removeItem(key);
 			if (!words) continue;
 			store.setItem(keyFor(win.id, scope), JSON.stringify(words));
@@ -206,34 +227,44 @@ export function keptToForm(kept: KeptForm): QuestionFormDraft {
  * left unanswered "as it was"), in this lesson or the next. Another
  * question never takes them: the Done-for-today draft once filled the next,
  * unrelated Yes/No question, where Enter would have sent it as its note.
+ * The question asked right after one left open by a hint or a side
+ * question is that question again, whatever its words (`from`).
  * A newer carry replaces an older one. */
 
-function keepCarry(carryScope: string, question: string, words: KeptWords | undefined): void {
-	keepWords(carryScope, words && holdsWork(words) ? { ...words, question: sameQuestionKey(question) } : null);
+/** The question a carry waits for: its words and its call. */
+export interface CarryFor {
+	question: string;
+	from: string;
+}
+
+function keepCarry(carryScope: string, left: CarryFor, words: KeptWords | undefined): void {
+	keepWords(carryScope, words && holdsWork(words) ? { ...words, question: sameQuestionKey(left.question), from: left.from } : null);
 }
 
 /** Leaves his words and photos for the question asked again. */
-export function carryWords(carryScope: string, question: string, words: KeptWords | undefined, photos: readonly Photo[]): void {
-	keepCarry(carryScope, question, words);
+export function carryWords(carryScope: string, left: CarryFor, words: KeptWords | undefined, photos: readonly Photo[]): void {
+	keepCarry(carryScope, left, words);
 	void keepPhotos(carryScope, photos);
 }
 
 /** Leaves what an open question's box holds for that question asked again:
  *  its words at once, its photos read before the closed box forgets them. */
-export function carryBox(box: string, carryScope: string, question: string): void {
-	keepCarry(carryScope, question, keptWords(box));
+export function carryBox(box: string, carryScope: string, left: CarryFor): void {
+	keepCarry(carryScope, left, keptWords(box));
 	void keptPhotos(box).then((photos) => keepPhotos(carryScope, photos));
 }
 
-/** The carry, when it waits for this question. */
-export function carriedFor(carryScope: string, question: string): KeptWords | undefined {
+/** The carry, when it waits for this question: the same words, or the
+ *  question asked right after the call it was left on (`reaskOf`). */
+export function carriedFor(carryScope: string, question: string, reaskOf?: string | null): KeptWords | undefined {
 	const carry = keptWords(carryScope);
-	return carry?.question === sameQuestionKey(question) ? carry : undefined;
+	if (!carry) return undefined;
+	return carry.question === sameQuestionKey(question) || (!!reaskOf && carry.from === reaskOf) ? carry : undefined;
 }
 
 /** Takes the carry for this question: its words now, its photos after. */
-export function takeCarry(carryScope: string, question: string): { words: KeptWords; photos: Promise<Photo[]> } | undefined {
-	const words = carriedFor(carryScope, question);
+export function takeCarry(carryScope: string, question: string, reaskOf?: string | null): { words: KeptWords; photos: Promise<Photo[]> } | undefined {
+	const words = carriedFor(carryScope, question, reaskOf);
 	if (!words) return undefined;
 	keepWords(carryScope, null);
 	return { words, photos: takeKeptPhotos(carryScope) };
@@ -331,7 +362,7 @@ export async function keptPhotos(scope: string): Promise<Photo[]> {
 	for (const key of keys ?? []) {
 		if (typeof key !== "string") continue;
 		const parsed = parseKey(PREFIX + key);
-		if (!parsed || parsed.scope !== scope || !orphaned(parsed.window, win)) continue;
+		if (!parsed || parsed.scope !== scope || !orphaned(parsed.window, win, undefined)) continue;
 		const value = await run<unknown>("readonly", (store) => store.get(key));
 		await run<unknown>("readwrite", (store) => store.delete(key) as IDBRequest<unknown>);
 		if (!Array.isArray(value) || !value.length) continue;

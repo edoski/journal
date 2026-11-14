@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
 import { STREAM_DROPPED, visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -82,10 +82,10 @@ import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
-import { dropRescue, keepRescue, strandedDraft } from "@/components/lesson/stranded-draft";
+import { forgetRescue, keepRescue, overtakenDraft, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { carryBox, forgetClosedBoxes, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carryBox, carryWords, forgetClosedBoxes, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -94,7 +94,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { askedAgain } from "@/components/lesson/prose/prose-question-data";
+import { askedAgain, leftOpenOf, reaskedFrom } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 
@@ -224,7 +224,9 @@ export function Chat({
 	 * moment this window sends, so words still here when the dock's question
 	 * leaves were overtaken by another window. */
 	const liveDraftRef = useRef<{ key: string; text: string } | null>(null);
-	const [answeredElsewhere, setAnsweredElsewhere] = useState(false);
+	// What another window did to the question he was typing in, while the
+	// line about his words still applies (stranded-draft.ts).
+	const [overtaken, setOvertaken] = useState<"answered" | LeftOpen | null>(null);
 	// The dock this window last sent from: its question leaving is his doing.
 	const dockKeyRef = useRef<string | null>(null);
 	const sentFromDockRef = useRef<string | null>(null);
@@ -244,17 +246,19 @@ export function Chat({
 	const send = useCallback<typeof sendInput>((...args) => {
 		liveDraftRef.current = null;
 		sentFromDockRef.current = dockKeyRef.current;
-		setAnsweredElsewhere(false);
+		setOvertaken(null);
+		forgetRescue(chatId);
 		followAction();
 		return sendInput(...args);
-	}, [sendInput, followAction]);
+	}, [sendInput, followAction, chatId]);
 	const steer = useCallback<typeof steerInput>((...args) => {
 		// His overtaken words go out as this steer: the line that says they
 		// wait in the box goes with them (round 3: it stayed, box empty).
-		setAnsweredElsewhere(false);
+		setOvertaken(null);
+		forgetRescue(chatId);
 		followAction();
 		return steerInput(...args);
-	}, [steerInput, followAction]);
+	}, [steerInput, followAction, chatId]);
 	const submitAnswer = useCallback<typeof submitInput>((...args) => {
 		liveDraftRef.current = null;
 		sentFromDockRef.current = dockKeyRef.current;
@@ -464,6 +468,9 @@ export function Chat({
 	// listener is mount-scoped; the value it needs is render-scoped).
 	const pendingRef = useRef(pending);
 	pendingRef.current = pending;
+	// The question this one asks again after a hint or a side question:
+	// his carried work fills it, whatever its words (kept-drafts.ts).
+	const reaskOf = useMemo(() => (pending ? reaskedFrom(messages, pending.toolCallId) : null), [messages, pending?.toolCallId]);
 
 	// THE ACTIVE PRACTICE PROBLEM (practice sessions, 2026-10-04): the
 	// same dock-ownership rule as a pending question — an active problem
@@ -572,7 +579,7 @@ export function Chat({
 		textRef.current = v;
 		keepWords(composerScope, { text: v });
 		// An emptied box no longer holds the words another window overtook.
-		if (!v.trim()) setAnsweredElsewhere(false);
+		if (!v.trim()) setOvertaken((was) => (was === "answered" ? null : was));
 	}, [composerScope]);
 	// What he typed before a reload comes back after mount, so the server's
 	// page and the first client render agree.
@@ -581,33 +588,43 @@ export function Chat({
 		if (kept && !textRef.current) applyText(kept);
 	}, [composerScope, applyText]);
 
-	// ANSWERED IN ANOTHER WINDOW (stranded-draft.ts): the open question or
-	// problem left without this window sending what he typed in it, so the
-	// words go to the composer and one line says why.
+	// OVERTAKEN IN ANOTHER WINDOW (stranded-draft.ts): the open question or
+	// problem left without this window sending what he typed in it. A
+	// question still open (a hint, a side question) gets the words back when
+	// it is asked again; an answered one leaves them in the message box.
+	// Either way one line says where they are.
 	const dockKey = pending ? `q:${pending.key}` : activeProblem ? `p:${activeProblem.toolCallId}` : null;
 	dockKeyRef.current = dockKey;
+	const dock = { key: dockKey, callId: pending?.toolCallId ?? null, question: (pending?.input as { question?: string } | null)?.question ?? "" };
+	const viewRef = useRef(messages);
+	viewRef.current = messages;
 	// Boxes of questions and problems that have closed keep nothing.
 	useEffect(() => {
 		forgetClosedBoxes(chatId, dockKey ? [`${chatId}:${dockKey}`] : []);
 	}, [chatId, dockKey]);
-	const prevDockKeyRef = useRef(dockKey);
-	useEffect(() => {
-		const before = prevDockKeyRef.current;
-		prevDockKeyRef.current = dockKey;
-		if (before === dockKey) return;
+	const prevDockRef = useRef(dock);
+	// A layout effect: the carry must be written before the next question's
+	// box mounts and takes it (its effect runs before this one would).
+	useLayoutEffect(() => {
+		const before = prevDockRef.current;
+		prevDockRef.current = dock;
+		if (before.key === dockKey) return;
 		const live = liveDraftRef.current;
-		const words = before === sentFromDockRef.current ? null : strandedDraft(before, dockKey, live);
 		liveDraftRef.current = null;
-		const left = dockKey === null ? null : dropRescue(chatId, textRef.current);
-		if (left !== null) {
-			applyText(left);
-			setAnsweredElsewhere(false);
+		if (dockKey !== null) setOvertaken((was) => (was === "answered" ? was : null));
+		const why = before.callId ? leftOpenOf(viewRef.current, before.callId) : null;
+		const moved = before.key === sentFromDockRef.current ? null : overtakenDraft(before.key, dockKey, live, why);
+		if (moved === null) return;
+		if (moved.to === "carry") {
+			if (carryScope && before.callId) carryWords(carryScope, { question: before.question, from: before.callId }, { text: moved.words }, []);
+			if (dockKey === null) setOvertaken(moved.why);
+			return;
 		}
-		if (words === null) return;
-		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${words}` : words);
-		keepRescue(chatId, words);
-		setAnsweredElsewhere(true);
-	}, [chatId, dockKey, applyText]);
+		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${moved.words}` : moved.words);
+		keepRescue(chatId, moved.words);
+		setOvertaken("answered");
+		// `dock` is derived from the render that changed dockKey.
+	}, [chatId, dockKey, applyText, carryScope]);
 	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The explicitly-sent draft (composer send) until the server accepts
@@ -765,7 +782,7 @@ export function Chat({
 		if (busy || doneTonight) return;
 		// His half-typed answer waits for the same question next time
 		// (kept-drafts.ts); the answer itself stays hidden.
-		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, (pending.input as { question?: string } | null)?.question ?? "");
+		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, { question: (pending.input as { question?: string } | null)?.question ?? "", from: pending.toolCallId });
 		void send({ type: "tonight" });
 	}, [busy, doneTonight, send, pending, carryScope, chatId]);
 	const sendTonightRef = useRef(sendTonight);
@@ -1297,7 +1314,7 @@ export function Chat({
 			liveDraftRef.current = null;
 			sentFromDockRef.current = dockKeyRef.current;
 			const question = (p.input as { question?: string } | null)?.question ?? "";
-			if (carryScope) carryBox(`${chatId}:q:${p.key}`, carryScope, question);
+			if (carryScope) carryBox(`${chatId}:q:${p.key}`, carryScope, { question, from: p.toolCallId });
 			if (!(await dismissQuestion(p.toolCallId, dismissedAnswer(toolQuestionKind(p.tool), question, "asked"), p.key))) return;
 		} else if (busyRef.current) {
 			applyText("");
@@ -1665,7 +1682,7 @@ export function Chat({
 					busy={busy}
 					replyingToDock={busy && sentFromDockRef.current !== null}
 					focusEpoch={focusEpoch}
-					answeredElsewhere={answeredElsewhere && !proseOpen}
+					overtakenLine={overtakenLine(overtaken, proseOpen !== null)}
 					replyAnchorRef={replyAnchorRef}
 					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
@@ -1697,6 +1714,7 @@ export function Chat({
 							busy={busy}
 							chatId={chatId}
 							carryScope={carryScope}
+							reaskOf={reaskOf}
 							initialDraft={pending ? questionDraft(pending.key)?.form : undefined}
 							onSaveDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
 							onSubmitAnswer={submitPendingAnswer}
@@ -1793,6 +1811,15 @@ export function escAbortTarget(s: {
 	return null;
 }
 
+/** The line under the transcript about his overtaken words: where they
+ *  are, given whether a question or problem now holds the box. */
+function overtakenLine(overtaken: "answered" | LeftOpen | null, open: boolean): string | null {
+	if (overtaken === "answered") return open ? LESSON_WORDS.answeredElsewhereOpen : LESSON_WORDS.answeredElsewhere;
+	if (overtaken === "hint" && !open) return LESSON_WORDS.hintElsewhere;
+	if (overtaken === "asked" && !open) return LESSON_WORDS.askedElsewhere;
+	return null;
+}
+
 /**
  * The composer's block, OVERLAID at the bottom of the column (absolute, a
  * sibling of the scroller: the use-stick-to-bottom pattern), under a
@@ -1807,7 +1834,7 @@ function DockOverlay({
 	busy,
 	replyingToDock,
 	focusEpoch,
-	answeredElsewhere,
+	overtakenLine,
 	replyAnchorRef,
 	onJumpToLatest,
 	setupCta,
@@ -1826,8 +1853,9 @@ function DockOverlay({
 	replyingToDock: boolean;
 	/** Changes when something that held focus went away (focus-home.ts). */
 	focusEpoch: number;
-	/** Another window answered the question he was typing in. */
-	answeredElsewhere: boolean;
+	/** Where his words went when another window moved on from the
+	 *  question he was typing in. */
+	overtakenLine: string | null;
 	/** Where the reply to his latest action starts (reading-position.ts);
 	 *  the cue lets go of it once he reads to the end. */
 	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
@@ -1897,8 +1925,8 @@ function DockOverlay({
 						    one-liners above the composer. A line dies when its card
 						    lands (visibleQueuedSteers). */}
 						<QueuedSteersBody steers={queuedSteers} />
-						{answeredElsewhere && (
-							<p data-testid="answered-elsewhere" className="px-4 pb-2 text-row text-muted-foreground">{LESSON_WORDS.answeredElsewhere}</p>
+						{overtakenLine && (
+							<p data-testid="answered-elsewhere" className="px-4 pb-2 text-row text-muted-foreground">{overtakenLine}</p>
 						)}
 						{/* No clip around it: the composer draws its own 16px outline,
 						    and a wrapper's larger rounded clip cut its corners. */}
