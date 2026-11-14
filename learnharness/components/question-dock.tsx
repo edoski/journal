@@ -447,7 +447,10 @@ function QuestionDockForm({
 				e.preventDefault();
 				kbdAct(kbdIdx);
 			} else if (e.key === "Enter") {
-				if (kbdIdx === null || !canSubmit) return;
+				// A picked choice is an answer: Enter on its row sends it,
+				// whether the row was walked or clicked (round 3: Enter on a
+				// clicked option only re-pressed it, despite "↵ to submit").
+				if (!canSubmit || (kbdIdx === null && !t?.closest?.("[data-kbdrow]"))) return;
 				e.preventDefault();
 				submit();
 			}
