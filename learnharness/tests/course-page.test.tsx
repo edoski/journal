@@ -187,9 +187,9 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
 		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held } : t)) });
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
-		assert.deepEqual(row.fact, { kind: "back", words: "Due since 21 Oct" });
+		assert.deepEqual(row.fact, { kind: "review", words: "Due since 21 Oct" }, "a late review needs him, so the map's card says it too");
 		const unit = buildInbox([map], [], WS).known.find((u) => u.topic.handle === "basis")!;
-		assert.deepEqual(unitStatus(unit, "2026-11-08"), { kind: "returns", words: row.fact!.words }, "the sidebar's row says the same");
+		assert.deepEqual(unitStatus(unit, "2026-11-08"), { kind: "review", words: row.fact!.words }, "the sidebar's row says the same");
 		assert.deepEqual(
 			headMarks(unit.topic, (handle) => handle, "2026-11-08").map((m) => m.words),
 			[row.fact!.words],
