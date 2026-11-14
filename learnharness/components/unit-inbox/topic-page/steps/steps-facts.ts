@@ -102,19 +102,6 @@ export function stepsCamera(layout: TopicMapLayout, current: TopicHandle | null,
 	};
 }
 
-/**
- * How far the opening view may move up or down, in screen pixels, while
- * what it frames stays clear of the fade: the whole plan when it fits the
- * frame's height, else the step it is framed on, with its tag. Pure.
- */
-export function stepsShiftRange(layout: TopicMapLayout, current: TopicHandle | null, camera: Camera, frame: Frame, fade: Fade): [number, number] {
-	const { zoom } = camera;
-	const whole = (layout.height + TAG_ROOM) * zoom <= frame.height - fade.y * 2;
-	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
-	const [top, bottom] = whole || !at ? [-TAG_ROOM, layout.height] : [at.y - TAG_ROOM, at.y + layout.node.height];
-	return [fade.y - (camera.y + top * zoom), frame.height - fade.y - (camera.y + bottom * zoom)];
-}
-
 export interface StepMark {
 	status: PlanNodeStatus;
 	/** "Left off here" above the current step of a lesson that does not wait
@@ -135,14 +122,4 @@ export function stepMarks(plan: SessionPlan, waits: boolean): Map<string, StepMa
 			return [node.id, { status: visited.has(node.id) ? "visited" : "upcoming", tag: null }];
 		}),
 	);
-}
-
-/** The vertical shifts worth trying inside `[least, most]`: each wanted
- *  shift, pulled into the range when it falls outside, and evenly spaced
- *  ones across it, least movement first. Pure. */
-export function shiftsWithin(wanted: readonly number[], [least, most]: readonly [number, number]): number[] {
-	if (least > most) return [0];
-	const across = Array.from({ length: 9 }, (_, i) => least + ((most - least) * i) / 8);
-	const all = [0, ...wanted, ...across].map((dy) => Math.round(Math.min(most, Math.max(least, dy))));
-	return [...new Set(all)].sort((a, b) => Math.abs(a) - Math.abs(b));
 }

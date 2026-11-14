@@ -16,7 +16,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap, NODE_WIDTH, slackOf } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { aimOf, besideRow, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
+import { OPEN_AT_FIRST, aimOf, boxesOf, walkStops, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
@@ -58,7 +58,8 @@ const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 const noop = () => {};
 const LAYOUT = layoutTopicMap(MAP.topics, MAP.edges);
-const drawMap = (lit: ReadonlySet<TopicHandle> | null = null) => render(<SplitMap map={MAP} layout={LAYOUT} lit={lit} aim={null} reveal={null} onPoint={noop} onLeave={noop} />);
+const drawMap = (lit: ReadonlySet<TopicHandle> | null = null, reveal: TopicHandle | null = null) =>
+	render(<SplitMap map={MAP} layout={LAYOUT} lit={lit} aim={null} reveal={reveal} onPoint={noop} onLeave={noop} />);
 
 describe("what ties the two panes", () => {
 	it("lights a pointed row's topic with its whole prerequisite chain, as a hover on the map does", () => {
@@ -123,16 +124,32 @@ describe("the list's groups and rows", () => {
 		);
 	});
 
-	it("draws every topic as a 32px row linking to its page, none folded away, its reason's icon and words showing", () => {
-		const document = render(<SplitList groups={shownGroups(groups)} marked={null} onPoint={noop} onEnterMap={noop} />);
+	it("draws each topic of an open group as a 32px row linking to its page, its reason's icon and words showing", () => {
+		const shown = shownGroups(groups);
+		const document = render(<SplitList groups={shown} marked={null} onPoint={noop} onEnterMap={noop} />);
 		const rows = [...document.querySelectorAll('[data-slot="course-topic-row"]')];
-		assert.equal(rows.length, MAP.topics.length);
+		const openTopics = shown.filter((g) => OPEN_AT_FIRST[g.id]).flatMap((g) => g.topics);
+		assert.equal(rows.length, openTopics.length);
 		assert.ok(rows.every((r) => r.className.includes("h-8") && !r.className.includes("h-9")), "every row is 32px");
 		const fact = document.querySelector(`[href="${unitHref(WS, "independence")}"] [data-slot="course-topic-fact"]`)!;
 		assert.equal(fact.textContent, "Sure, but wrong");
 		assert.equal(fact.querySelectorAll(".sr-only").length, 0, "the words show, not only for a screen reader");
 		assert.equal(document.querySelectorAll('[data-slot="course-group-more"]').length, 0);
-		assert.equal(document.querySelectorAll('[data-slot="course-group-header"][aria-expanded="false"]').length, 0);
+	});
+
+	it("opens Needs you and Learning and folds Not started and On your own under headers he can open", () => {
+		const document = render(<SplitList groups={shownGroups(groups)} marked={null} onPoint={noop} onEnterMap={noop} />);
+		const headers = [...document.querySelectorAll('[data-slot="course-group-header"]')];
+		assert.deepEqual(
+			headers.map((h) => [h.textContent, h.tagName, h.getAttribute("aria-expanded")]),
+			[
+				["Needs you", "BUTTON", "true"],
+				["Learning", "BUTTON", "true"],
+				["Not started", "BUTTON", "false"],
+				["On your own", "BUTTON", "false"],
+			],
+		);
+		assert.equal(document.querySelector(`[href="${unitHref(WS, "vectors")}"]`), null, "a folded group's rows are not drawn");
 	});
 
 	it("marks the row of the topic he points at on the map, and only that row", () => {
@@ -158,8 +175,16 @@ describe("the map pane", () => {
 
 	it("dims every topic but the ones a row lights", () => {
 		const document = drawMap(litOf({ handle: h("span"), from: "list" }, MAP.edges));
-		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-60")).map((n) => n.getAttribute("data-testid"));
+		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-50")).map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(dimmed.sort(), ["map-node-basis", "map-node-eigen", "map-node-independence"]);
+	});
+
+	it("rings the card of the row he points at with the glow, and no other", () => {
+		const pointed = { handle: h("span"), from: "list" } as const;
+		const document = drawMap(litOf(pointed, MAP.edges), revealOf(pointed));
+		const glowing = [...document.querySelectorAll('[data-slot="course-map-node"].lh-card-mark')].map((n) => n.getAttribute("data-testid"));
+		assert.deepEqual(glowing, ["map-node-span"]);
+		assert.equal(drawMap().querySelector(".lh-card-mark"), null, "nothing glows at rest");
 	});
 });
 
@@ -181,6 +206,21 @@ describe("the keyboard walk over the rows", () => {
 		assert.equal(walkTo("Home", 3, 5), 0);
 		assert.equal(walkTo("ArrowRight", 1, 5), null);
 		assert.equal(walkTo("a", 1, 5), null);
+	});
+});
+
+describe("what the arrows walk in the list", () => {
+	const groups = shownGroups(courseGroups(COURSE));
+	it("walks each group's header and the rows of the open groups, skipping a folded group's rows", () => {
+		const keys = (open: typeof OPEN_AT_FIRST) => walkStops(groups, open).map((s) => (s.kind === "group" ? `[${s.id}]` : s.handle));
+		const atFirst = keys(OPEN_AT_FIRST);
+		for (const g of groups) {
+			assert.ok(atFirst.includes(`[${g.id}]`), `${g.title}'s header is a stop`);
+			for (const t of g.topics) assert.equal(atFirst.includes(t.topic.handle), OPEN_AT_FIRST[g.id], `${t.topic.handle} walked only while ${g.title} is open`);
+		}
+		const opened = keys({ ...OPEN_AT_FIRST, "on-your-own": true });
+		const own = groups.find((g) => g.id === "on-your-own")!;
+		assert.deepEqual(opened.slice(opened.indexOf("[on-your-own]") + 1), own.topics.map((t) => t.topic.handle), "an opened group's rows follow its header");
 	});
 });
 
@@ -210,9 +250,9 @@ describe("the map pane's surface and where it scrolls", () => {
 
 	it("draws the course at the scale it opens at: the pane's width and the course's height where it fits, with nothing to scroll", () => {
 		const layout = { ...LAYOUT, width: 744, height: 304 };
-		const surface = surfaceOf(layout, { width: 696, height: 692 }, room, 20, false, 0.8);
+		const surface = surfaceOf(layout, { width: 696, height: 692 }, room, 20, 0.8);
 		assert.deepEqual(surface, { width: 696, height: Math.floor((304 + 104) * 0.8), zoom: 0.8 });
-		const wide = surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20, false, 0.8);
+		const wide = surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20, 0.8);
 		assert.equal(wide.width, Math.ceil((2000 + 96 + slackOf(LAYOUT.node).x * 2) * 0.8), "too wide: the course and its slack at that scale, to scroll");
 	});
 
@@ -226,27 +266,6 @@ describe("the map pane's surface and where it scrolls", () => {
 		const at = layout.topics.get(h("vectors"))!;
 		assert.equal(boxes.get(h("vectors"))!.x - to.left, at.x + camera.x, "a topic sits where the camera puts it across");
 		assert.deepEqual(scrollOfCamera(layout, surface, pane, { x: 5000, y: 0 }).left, 0, "never past the surface");
-	});
-
-	it("keeps the pane's height of room above and below while the tie is drawn, so any topic can scroll beside its row", () => {
-		const layout = { ...LAYOUT, width: 744, height: 304 };
-		const plain = surfaceOf(layout, { width: 696, height: 692 }, room, 20);
-		assert.equal(surfaceOf(layout, { width: 696, height: 692 }, room, 20, true).height, plain.height + 692 * 2);
-	});
-
-	it("scrolls a pointed topic beside its row only when the line would have no clear route, by the least it can", () => {
-		// Two topics side by side on one layer; the row points at the right one from level with them, so the left one blocks the left edge.
-		const boxes = new Map<TopicHandle, Box>([
-			[h("left"), { x: 100, y: 600, width: 248, height: 56 }],
-			[h("right"), { x: 372, y: 600, width: 248, height: 56 }],
-		]);
-		const view = { left: 0, top: 400, width: 700, height: 700, maxTop: 2000 };
-		const anchor = { from: { x: -12, y: 228 }, gutter: { left: -24, right: 0 } };
-		const to = besideRow(boxes, h("right"), anchor, view, view, { x: 48, y: 32 }, null)!;
-		assert.ok(to, "it moves");
-		const top = boxes.get(h("right"))!.y - to.top;
-		assert.ok(Math.abs(top - (228 + 38)) < 1 || Math.abs(top + 56 - (228 - 18)) < 1, `the row in the channel just above or below the topic, at ${top}`);
-		assert.equal(besideRow(new Map([[h("right"), boxes.get(h("right"))!]]), h("right"), anchor, view, view, { x: 48, y: 32 }, null), null, "already clear: it stays");
 	});
 
 	it("places each topic where the map draws it: the course in the surface's middle", () => {

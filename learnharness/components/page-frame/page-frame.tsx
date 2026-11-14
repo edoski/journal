@@ -17,17 +17,25 @@ export function PageFrame({ className, children, ...rest }: ComponentProps<"div"
 	);
 }
 
+/** A hairline between the facts of the standing line, 12px tall, 12px
+ *  clear on each side. */
+const BETWEEN_FACTS = "*:not-first:before:ml-3 *:not-first:before:mr-1.5 *:not-first:before:h-3 *:not-first:before:w-px *:not-first:before:bg-border *:not-first:before:content-['']";
+
 /**
- * The page's head, every line on the column's one left edge: an optional
- * line above the title (`eyebrow`, the topic page's course), the title at
- * 20/500 with the page's actions at its right end, the standing line (a
- * 16px mark and a few words per fact, muted), then any lines under it
- * (`children`: what comes next, an error).
+ * The page's head, every line on the column's one left edge, in the order
+ * he reads it (Edo, 14 Nov 2026: minimal, with more structure): an
+ * optional line above the title (`eyebrow`, the topic page's course), the
+ * title at 20/500 with the page's actions at its right end, what to do
+ * next (`lead`, 14/500 in full ink), the standing line (a 16px mark and a
+ * few words per fact, muted, a thin divider between facts), then any
+ * lines under it (`children`: a mistake, an error). A hairline under it
+ * closes the head off from the page's body.
  */
 export function PageHead({
 	eyebrow,
 	title,
 	actions,
+	lead,
 	standing,
 	children,
 	className,
@@ -37,12 +45,14 @@ export function PageHead({
 	title: ReactNode;
 	/** The page's actions, right to left in weight: `PageAction` last. */
 	actions?: ReactNode;
+	/** What to do next: the head's primary line, under the title. */
+	lead?: ReactNode;
 	/** Where he stands: a row of facts, each a 16px mark and a few words. */
 	standing?: ReactNode;
 	children?: ReactNode;
 } & Omit<ComponentProps<"header">, "title">) {
 	return (
-		<header data-slot="page-head" className={cn("flex shrink-0 flex-col gap-1", className)} {...rest}>
+		<header data-slot="page-head" className={cn("flex shrink-0 flex-col gap-1 border-b border-border/60 pb-4", className)} {...rest}>
 			{eyebrow && (
 				<p data-slot="page-eyebrow" className="text-label text-muted-foreground">
 					{eyebrow}
@@ -58,8 +68,13 @@ export function PageHead({
 					</div>
 				)}
 			</div>
+			{lead && (
+				<div data-slot="page-lead" className="mt-1 min-w-0 text-control font-medium text-foreground">
+					{lead}
+				</div>
+			)}
 			{standing && (
-				<div data-slot="page-standing" className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-row text-muted-foreground tabular-nums">
+				<div data-slot="page-standing" className={cn("mt-1 flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-row text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
 					{standing}
 				</div>
 			)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { PageFrame } from "@/components/page-frame/page-frame";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
@@ -8,11 +8,8 @@ import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-pa
 import type { Press, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { LessonMap } from "@/components/unit-inbox/topic-page/hybrid/lesson-map";
-import { LinkedColumns, type Tie } from "@/components/linked-columns/linked-columns";
+import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
-
-/** The step the lesson on the map stopped on, which its row is tied to. */
-const TIED_STEP = '[data-slot="topic-step"][aria-current="step"]';
 
 /** What the history pane is given (`../pickup/pickup.md`). */
 export interface HybridPaneProps {
@@ -38,15 +35,12 @@ export interface HybridPaneProps {
  * on the left, which holds the page's action, and the steps of the lesson
  * picked in it as a map on the right, since a lesson's steps run down with
  * little branching, in the app's linked columns. With no lesson that
- * planned, the history takes the width. `connected` (the Link switch)
- * draws the line from the lesson's row to the step it stopped on.
+ * planned, the history takes the width.
  */
-export function HybridTopic({ facts, busy, error = null, onAct, onTask, connected = true }: TopicPageProps & { error?: string | null; connected?: boolean }) {
+export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicPageProps & { error?: string | null }) {
 	const planned = facts.sessions.filter(isPlanned);
 	const [chosen, setChosen] = useState(() => mapLessonAtFirst(facts.sessions, facts.action));
 	const shown = planned.find((entry) => entry.chat.id === chosen) ?? planned.find((entry) => entry.chat.id === mapLessonAtFirst(facts.sessions, facts.action)) ?? null;
-	const shownId = shown?.chat.id ?? null;
-	const tie = useMemo<Tie | null>(() => (shownId ? { key: shownId, row: "[data-shown]", node: TIED_STEP } : null), [shownId]);
 	const side = (className?: string) => <SectionsPane facts={facts} busy={busy} onAct={onAct} onTask={onTask} shown={shown?.chat.id ?? null} onShow={setChosen} className={className} />;
 	return (
 		<PageFrame data-testid="unit-page" data-topic-candidate="hybrid">
@@ -61,8 +55,6 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask, connecte
 			{shown ? (
 				<LinkedColumns
 					data-slot="topic-panes"
-					connected={connected}
-					tie={tie}
 					list={side("flex-1")}
 					map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />}
 				/>

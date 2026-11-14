@@ -1,6 +1,6 @@
 # Split course page
 
-The course page (course-page.md): the list and the map side by side in the app's linked columns (`../../linked-columns/linked-columns.md`), tied together. Thesis: the list says what to do, the map says where it sits, and pointing at one shows it in the other. `split-course.tsx` (the page), `split-list.tsx` (left pane), `split-map.tsx` (right pane), `split-tie.ts` (what ties them and where the map scrolls, pure; tests in `tests/course-page-split.test.tsx`). `data-slot` `course-split` (the linked columns), `course-split-list` and `course-split-list-scroller`, `course-split-map` and `course-split-map-scroller`; the rows, groups and header keep their shared slots.
+The course page (course-page.md): the list and the map side by side in the app's linked columns (`../../linked-columns/linked-columns.md`), with no line between them (Edo picked Current, 14 Nov 2026). Thesis: the list says what to do, the map says where it sits, and pointing at one shows it in the other. `split-course.tsx` (the page), `split-list.tsx` (left pane), `split-map.tsx` (right pane), `split-tie.ts` (what ties them and where the map scrolls, pure; tests in `tests/course-page-split.test.tsx`). `data-slot` `course-split` (the linked columns), `course-split-list` and `course-split-list-scroller`, `course-split-map` and `course-split-map-scroller`; the rows, groups and header keep their shared slots.
 
 ## Layout
 
@@ -9,7 +9,7 @@ The course page (course-page.md): the list and the map side by side in the app's
 | column | the shared page frame (`../../page-frame/page-frame.md`): centred, up to 72rem, 24px sides, 24px under the 52px band and below; fits the window, never scrolls as a page |
 | header | `CourseHeader` (course-header.md), the frame's head, its press at the far right |
 | panes | 20px under the head, filling the rest: the linked columns, the list up to 24rem and the map in the rest, 24px apart, nothing around them |
-| list | the groups in their order (Needs you, Learning, Not started, On your own), an empty group left out, 16px apart; each a 28px `CourseGroup` header over 32px `CourseTopicRow`s, each ending in its reason's icon and words flush right (the title truncates first). A topic a session waits on him for ("Your turn") sits at the top of Needs you, never under Learning, so Learning holds only topics he is learning. Every topic shows, none folded and no Show more, so each node on the map has its row. Linear Algebra fits whole at 1440x900; a longer list scrolls inside its pane (wheel, trackpad) with no bar showing, its bottom edge fading 40px while more is below and its top while more is above |
+| list | the groups in their order (Needs you, Learning, Not started, On your own), an empty group left out, 16px apart; each a 28px `CourseGroup` header over 32px `CourseTopicRow`s, each ending in its reason's icon and words flush right (the title truncates first). A topic a session waits on him for ("Your turn") sits at the top of Needs you, never under Learning, so Learning holds only topics he is learning. Each group is a shadcn Collapsible: Needs you and Learning open, Not started and On your own folded to their header with its chevron pointing right (Edo, 14 Nov 2026: what needs him leads); a click on a header opens or folds it, held for the visit only, never stored (`OPEN_AT_FIRST`). No Show more. Linear Algebra fits whole at 1512x982; a longer list scrolls inside its pane (wheel, trackpad) with no bar showing, its bottom edge fading 40px while more is below and its top while more is above |
 | map | the shared `TopicMap` (topic-map.md), unchanged: no outline, no header copy (Edo, 12 Nov 2026), edges faded 48px across and 32px down (`mapFade`), wider across a pane too narrow for two topics side by side (`fadeAcross`: 82px at 1100x700), so the topics beside the one in view hide in the fade instead of being cut |
 | no topics | one line in place of both panes: "Topics appear as you study this course." (Home's map words) |
 
@@ -19,16 +19,15 @@ The map sits on a surface the pane scrolls (`surfaceOf`), sized so `TopicMap` fi
 
 - It opens as every course map does (`framedCamera`, topic-map.md): the whole course when it fits at 80% or more, else framed on where he is ("You are here", the map's current topic), else the first topic the header's button takes up that is on the map, else the list's first row (`aimOf`), with the topics it leads to whole and as few topics cut as it can, at full size or down to 80% (Probability at Edo's 1512x982: 80% on Random variables, with Binomial, Expectation, Poisson and Variance whole and nothing cut; round 3 found it aimed at the header's review and "You are here" off the pane). The pane scrolls to that view (`scrollOfCamera`) and returns there when the window grows or shrinks.
 - On an axis the course fits at that scale, the surface is the pane's width (the course in its middle), or the course's height from the pane's top; on one it overflows, the course, its room and one topic and gap of empty room on each side (`slackOf`), so the pane can always scroll a topic at the course's edge wholly out of view.
-- While the Link switch is on, the surface keeps the pane's height of room above and below the course, so the pane can bring any topic beside the row pointing at it (`besideRow`).
 - A topic he points at or reaches comes into view (`scrollOn`) clear of the fade, cutting as few other topics at the pane's edges as it can (a topic cut where it shows reads as overflow), moving as little as it can.
 - Wheel and trackpad scroll the pane; a drag on the background scrolls it too; a pinch stays the map's (its zoom is fixed at the surface's scale).
 
-## The tie
+## Pointing
 
 | He does | The page answers |
 |---|---|
-| rests on or focuses a row (120ms) | the map lights that topic with its whole prerequisite chain, the other topics at 60% (the map's `highlight`), and, when the topic is not already clear of the fade, the pane glides it into view in 200ms (at once under reduced motion), beside the row when the line would otherwise have no clear route. A line in the map's edge ink runs from the row to the topic's card (the linked columns' connector) |
-| points at or focuses a node | the map lights its chain itself; the topic's row holds the hover fill (`highlighted`) and comes into view in the list if it is out of it, moving the pane as little as it can; the line ties them |
+| points at or focuses a row | its card glows at once (the map's `marked`: a ring and a soft glow in the accent that blooms in and settles, held while he points), and the map lights that topic with its whole prerequisite chain, the other topics at 50% (the map's `highlight`); once he rests on it for 120ms, when the topic is not already clear of the fade, the pane glides it into view in 200ms (at once under reduced motion) |
+| points at or focuses a node | the map lights its chain itself; the topic's row holds the hover fill (`highlighted`) and comes into view in the list if it is out of it, moving the pane as little as it can |
 | clicks either | the topic's page opens |
 | leaves a pane | only that pane's pointing clears; the map stays where it is |
 
@@ -36,9 +35,12 @@ The map sits on a surface the pane scrolls (`surfaceOf`), sized so `TopicMap` fi
 
 Tab is dead app-wide (owner, 17 Sep 2026), so the page walks with arrows, as the sidebar and the map do.
 
-- With nothing focused, Down or Home steps onto the first row, Up or End onto the last.
-- On a row: Up and Down step, Home and End jump, Enter or Space opens it, Right steps onto its topic on the map, Escape leaves the walk. Up on the first row steps onto the header's button; Down from the button steps back onto the first row, and Escape leaves it.
-- On the map: its own walk (Up to a prerequisite, Down to a topic that needs it, Left and Right along the layer), the pane bringing each topic it reaches into view; Escape hands the walk back to that topic's row.
+- The walk's stops are each group's header and the rows of the open groups; a folded group's rows are skipped (`walkStops`).
+- With nothing focused, Down or Home steps onto the first stop, Up or End onto the last.
+- Anywhere in the list: Up and Down step, Home and End jump, Escape leaves the walk. Up on the first stop steps onto the head's button; Down from the button steps back onto the first stop, and Escape leaves it.
+- On a header: Enter or Space opens or folds the group, Right opens it, Left folds it.
+- On a row: Enter or Space opens it, Right steps onto its topic on the map.
+- On the map: its own walk (Up to a prerequisite, Down to a topic that needs it, Left and Right along the layer), the pane bringing each topic it reaches into view; Escape hands the walk back to that topic's row, opening its group when it is folded.
 - Every row and the header's button have the shared 2px focus ring. A map node's ring is the map's (topic-node.tsx).
 
 ## States

@@ -14,9 +14,9 @@ The header is the sidebar's `NavSection` anatomy (nav-section.md: a 28px band, 1
 
 ## Props and states
 
-- `foldable`: the header is a button (`aria-expanded`) that folds the rows away, like the sidebar's Known shelf; hover lifts it to full ink; 2px focus ring. `defaultFolded` starts it folded.
+- `foldable`: the group is a shadcn Collapsible whose header is its trigger, a button (`aria-expanded`) that folds the rows away, like the sidebar's Known shelf; hover lifts it to full ink; 2px focus ring. `defaultFolded` starts it folded; `open` and `onOpenChange` let a page hold it (the course page does, for its arrow walk), and `headerRef` and `onHeaderKeyDown` give that page the header's button and keys.
 - `limit`: rows shown before Show more.
-- Neither is stored: each visit starts as the page draws it, so there is nothing for him to keep tidy.
+- Neither is stored: each visit starts as the page draws it, so there is nothing for him to keep tidy. A folded group's rows are not drawn.
 - An empty group still draws its header with 0; the page may leave it out.
 
 ## Sources
