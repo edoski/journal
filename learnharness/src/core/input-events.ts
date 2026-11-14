@@ -54,6 +54,8 @@ import {
 	malformedQuestionsOf,
 	questionCallsOf,
 	pendingProblemDismissalOf,
+	newUngradedAnswerMessage,
+	ungradedAnswerOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
 import { CONFIDENCE_STATES, isConfidence, type Confidence } from "./contracts/course.ts";
@@ -290,7 +292,7 @@ export function inputAppends(
 ): LhMessage[] {
 	switch (input.type) {
 		case "text":
-			return [...dismissalConclusion(record), newUserMessage(input.text, input.photos)];
+			return [...dismissalConclusion(record), ...ungradedNote(record), newUserMessage(input.text, input.photos)];
 		case "answer": {
 			const pending = danglingQuestionOf(record.messages);
 			if (!pending || pending.toolCallId !== input.toolCallId) {
@@ -353,7 +355,15 @@ export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMo
 	const dropped = active
 		? [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId)]
 		: dismissalConclusion(record);
-	return [...withheld, ...dropped, newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))];
+	return [...withheld, ...dropped, ...ungradedNote(record), newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))];
+}
+
+/** The note an answer cut off before its grade rides his next input
+ *  with (`ungradedAnswerOf`), so the record holds it however he goes on:
+ *  Try again resumes that turn by itself. */
+function ungradedNote(record: { messages: LhMessage[] }): LhMessage[] {
+	const question = ungradedAnswerOf(record.messages);
+	return question === null ? [] : [newUngradedAnswerMessage(question)];
 }
 
 /** Validate before any turn effects, then again against current saved truth.

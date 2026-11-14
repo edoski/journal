@@ -91,7 +91,8 @@ export interface LhMarkerMessage {
 		| "done-tonight"
 		| "problem-dismissed"
 		| "compaction"
-		| "session-resume";
+		| "session-resume"
+		| "ungraded-answer";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -466,6 +467,61 @@ export function newNextMessage(): LhMarkerMessage {
 		customType: "practice-next",
 		content: NEXT_PROBLEM_TEXT,
 		display: true,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** The marker for an answer whose grading turn was cut (`ungradedAnswerOf`). */
+export const UNGRADED_ANSWER = "ungraded-answer";
+
+/**
+ * A graded answer he gave whose turn stopped before the tutor graded it
+ * (round 3: a stop right after a confident wrong answer left it unrecorded
+ * unless he pressed Try again). He answered and the question showed him its
+ * answer, so by the engine's rules it is an attempt, and the record must
+ * hold it whatever he does next. The question he answered, when the newest
+ * graded answer (a check or a recall, never a prediction, which is not
+ * graded) has no save that went through after it and every reply since was
+ * cut; else null. Pure.
+ */
+export function ungradedAnswerOf(messages: readonly LhMessage[]): string | null {
+	const at = messages.findLastIndex((m) => m.role === "toolResult" && (m.toolName === "explain" || m.toolName === "recall") && !m.isError && !isDismissedResult(m));
+	if (at < 0) return null;
+	const result = messages[at] as ToolResultMessage;
+	const call = messages
+		.slice(0, at)
+		.flatMap((m) => (m.role === "assistant" ? m.content : []))
+		.find((b) => b.type === "toolCall" && b.id === result.toolCallId);
+	if (!call || call.type !== "toolCall" || !questionNeedsGrade(call.arguments)) return null;
+	const after = messages.slice(at + 1);
+	const clean = cleanToolCallIds(after);
+	for (const m of after) {
+		if (m.role !== "assistant") continue;
+		if (m.stopReason !== "aborted" && m.stopReason !== "error") return null;
+		if (m.content.some((b) => b.type === "toolCall" && b.name === "course_save" && clean.has(b.id))) return null;
+	}
+	const question = (result.details as { questionText?: unknown } | null)?.questionText;
+	return typeof question === "string" ? question : "";
+}
+
+/** A question whose answer is graded: every check and recall but a
+ *  prediction. */
+function questionNeedsGrade(input: unknown): boolean {
+	const type = (input as { type?: unknown } | null)?.type;
+	return !(typeof type === "string" && type.replace(/["']/g, "").trim() === "predict");
+}
+
+/** The note riding his next input after `ungradedAnswerOf`: grade and save
+ *  that answer first. Model-facing only. */
+export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
+	const which = question ? ` to "${question}"` : "";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: UNGRADED_ANSWER,
+		content: `[UNGRADED ANSWER] His answer${which} was submitted and its answer shown to him, but your turn stopped before you graded it. It is an attempt, not a question left open: grade it and save it with course_save in this turn, before anything else, then answer what follows.`,
+		display: false,
 		details: {},
 		timestamp: Date.now(),
 	};
@@ -1153,7 +1209,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next", "practice-request", "done-tonight"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
