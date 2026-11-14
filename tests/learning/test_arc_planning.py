@@ -176,6 +176,37 @@ def test_after_an_exam_over_named_arcs_the_rest_of_the_course_still_starts() -> 
     assert starts(plan({"c": whole}, later, 20, week(10, 1))) == []
 
 
+LEFT: dict[str, dict[str, Any]] = {
+    "a1": {"arc": "a"},
+    "a2": {"arc": "a", "needs": ["a1"]},
+    "b1": {"arc": "b", "needs": ["a2"]},
+    "b2": {"arc": "b", "needs": ["b1"]},
+    "c1": {"arc": "c", "needs": ["a1"]},
+    "c2": {"arc": "c", "needs": ["c1"]},
+}
+
+
+def test_after_an_exam_over_named_arcs_what_it_left_untaught_still_starts() -> None:
+    record = spread(LEFT, "c1", exam=scoped(["a"], 2))
+    result = plan({"c": record}, on(5), 40, week(10, 1))
+    started = starts(result)
+    assert {"a2", "b1", "b2", "c2"} <= set(started), "nothing waits on it forever"
+    assert started.index("a2") < started.index("b1") < started.index("b2")
+
+
+def test_after_an_exam_over_named_arcs_what_he_started_stands_on_comes_first() -> None:
+    topics = {
+        "a1": {"arc": "a"},
+        "a2": {"arc": "a", "needs": ["a1"]},
+        "b1": {"arc": "b", "needs": ["a1"]},
+        "c1": {"arc": "c", "needs": ["a1"]},
+        "c2": {"arc": "c", "needs": ["c1"]},
+    }
+    record = spread(topics, "c2", exam=scoped(["a"], 2))
+    result = plan({"c": record}, on(5), 3, week(10, 1))
+    assert result.days["c"][0]["new"] == ["c1"], "c2 stands on it"
+
+
 def test_the_final_review_is_as_long_as_the_topics_the_exam_examines() -> None:
     reviews = week(2, 1)
     small = course(scoped(["a"], 40))

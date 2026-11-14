@@ -93,7 +93,8 @@ An exam that names arcs examines only their topics (``progress.examining``):
 only those take its review dates, its final review and its run-up, while its
 pace, its gates and what does not fit hold them and their untaught
 prerequisites (``progress.exam_topics``). The rest of the course is planned
-as with no exam, while the exam is ahead and after it.
+as with no exam while the exam is ahead, and after it the whole course is,
+what it examined but he never started included.
 """
 
 from __future__ import annotations
@@ -181,6 +182,7 @@ class _Course:
     waits: dict[str, Why] = field(default_factory=dict)
     fresh: set[str] = field(default_factory=set)
     why: dict[str, Why] = field(default_factory=dict)
+    missed: list[str] | None = None
     began: date | None = None
 
     @classmethod
@@ -222,13 +224,17 @@ class _Course:
 
     def outside(self, day: date) -> list[str]:
         """Untaught topics no exam ahead needs: outside the next exam's scope,
-        or, once an exam over named arcs has passed, outside what it examined.
-        They are planned as in a course with no exam. After a whole-course
-        exam nothing is, until the next exam is set."""
-        bound = self.scope if self.ahead(day) else self.examined
-        if self.exam is None or bound is None:
+        or, once an exam over named arcs has passed, all of them, what it
+        examined but he never started included. They are planned as in a
+        course with no exam. After a whole-course exam nothing is, until the
+        next exam is set."""
+        if self.exam is None:
             return []
-        return [key for key in self.untaught if key not in bound]
+        if not self.ahead(day):
+            return list(self.untaught) if self.examined is not None else []
+        if self.scope is None:
+            return []
+        return [key for key in self.untaught if key not in self.scope]
 
     def arc(self, topic: str) -> str | None:
         arc: str | None = self.record["topics"][topic].get("arc")
@@ -832,9 +838,11 @@ def _new(
             paces[course.name] = math.ceil(len(course.scoped) / left)
     if begun is not None:
         room = max(room, sum(paces.values()) - begun)
-    for course in [*exams, *(course for course in courses if course.exam is None)]:
-        if room > 0 and course.gaps:
-            room -= take(course, room, course.gaps, bound=False)
+    others = [course for course in courses if course.new_end(day) is None]
+    for course in [*exams, *others]:
+        gaps = course.gaps.intersection(course.startable(day))
+        if room > 0 and gaps:
+            room -= take(course, room, gaps, bound=False)
     for course in exams:
         if room > 0 and course.name in paces:
             pace = paces[course.name]
@@ -981,6 +989,9 @@ def plan(
         if offset == 0:
             reviews_room = max(reviews_room - spent, 0)
             new_room = max(new_room - done.new, 0)
+        for course in courses:
+            if course.missed is None and course.ahead(today) and not course.ahead(day):
+                course.missed = course.scoped
         reviews = _reviews(courses, day, reviews_room, week)
         for course in courses:
             for topic in reviews[course.name]:
@@ -998,9 +1009,10 @@ def plan(
     return Plan(
         {course.name: course.days for course in courses},
         {
-            course.name: course.scoped
+            course.name: missed
             for course in courses
-            if course.ahead(today) and course.scoped
+            if course.ahead(today)
+            and (missed := course.scoped if course.missed is None else course.missed)
         },
         {course.name: dict(course.held) for course in courses if course.held},
         {
