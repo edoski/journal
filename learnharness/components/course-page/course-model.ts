@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, startsWhyWords } from "@/components/study-words";
+import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, startsWhyShort } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -171,7 +171,8 @@ export interface WhatNext {
 	 *  arc of the topic it leads with; null when Today has nothing here. */
 	pickUp: { line: NowLine; arc: CourseMapArc | null } | null;
 	/** The next new topic the plan starts (the earliest `starts`), other
-	 *  than the one he picks up, with why it starts then (`startsWhyWords`)
+	 *  than the one he picks up, with why it starts then as Today's rows
+	 *  say it (`startsWhyShort`: "After Expectation", "Back to Matrices")
 	 *  and its arc; null when the plan starts none. */
 	then: { topic: CourseMapTopic; why: string; arc: CourseMapArc | null; href: string; whyNamesArc: boolean } | null;
 }
@@ -199,10 +200,10 @@ export function whatNext(course: StudyCourse, chats: readonly ChatListItem[] = [
 		next && why
 			? {
 					topic: next,
-					why: startsWhyWords(why, map),
+					why: startsWhyShort(why, map),
 					arc: arcOf(next),
 					href: unitHref(map.workspace, next.handle),
-					// "Next in Eigenvalues", "Early, from Orthogonality" name the arc already.
+					// "Next in Eigenvalues", "Back to Matrices", "Early, from Orthogonality" name the arc already.
 					whyNamesArc: why.arc !== undefined && (why.kind !== "after" || (why.needs.length === 0 && why.partners.length === 0)),
 				}
 			: null;

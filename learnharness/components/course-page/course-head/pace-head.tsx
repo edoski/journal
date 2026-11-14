@@ -11,6 +11,7 @@ import type { CourseView } from "@/components/course-page/course-model";
 import { paceOf, type Pace } from "@/components/course-page/course-head/head-facts";
 import { ContextButton, CourseAction, ExamFact, LessonError, StudiedFact } from "@/components/course-page/course-head/head-parts";
 import { useCourseRunup } from "@/components/course-page/course-head/use-course-runup";
+import { ExamGapLine } from "@/components/course-page/course-head/exam-gaps";
 import { cn } from "@/lib/utils";
 
 const PACE_ICON: Record<Pace["kind"], typeof CircleCheckIcon> = { fits: CircleCheckIcon, started: CircleCheckIcon, unready: CircleDotDashedIcon, short: TriangleAlertIcon };
@@ -57,10 +58,15 @@ export function PaceHead({
 				</>
 			}
 			lead={
-				lead ?? <p data-slot="course-pace" data-kind={pace?.kind} className={cn("flex min-h-5 min-w-0 items-center gap-1.5", pace?.kind === "short" && "text-warning")}>
-					{Icon && <Icon aria-hidden className={cn("size-4 shrink-0", pace?.kind !== "short" && "text-muted-foreground")} />}
-					{pace ? <MathText>{pace.words}</MathText> : !course.map.exam && <span className="font-normal text-muted-foreground">{noExamWords(course.map.topics)}</span>}
-				</p>
+				<div className="flex min-w-0 flex-col gap-0.5">
+					{lead ?? (
+						<p data-slot="course-pace" data-kind={pace?.kind} className={cn("flex min-h-5 min-w-0 items-center gap-1.5", pace?.kind === "short" && "text-warning")}>
+							{Icon && <Icon aria-hidden className={cn("size-4 shrink-0", pace?.kind !== "short" && "text-muted-foreground")} />}
+							{pace ? <MathText>{pace.words}</MathText> : !course.map.exam && <span className="font-normal text-muted-foreground">{noExamWords(course.map.topics)}</span>}
+						</p>
+					)}
+					<ExamGapLine course={course} />
+				</div>
 			}
 			standing={
 				<>
