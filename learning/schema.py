@@ -1159,10 +1159,7 @@ def _log_removed(record: dict[str, Any], dropped: dict[str, str], day: str) -> N
     if dropped:
         record["arc_log"] = [
             *record.get("arc_log", ()),
-            *(
-                {"day": day, "kind": "removed", "arc": arc, "reason": reason}
-                for arc, reason in dropped.items()
-            ),
+            *arc_rules.removals(dropped, day),
         ]
 
 

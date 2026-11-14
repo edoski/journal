@@ -188,13 +188,7 @@ def settle(
     arc_rules.names(before, record)
     arc_rules.check_placed(before, record)
     day = today.isoformat()
-    log = [
-        *record.get("arc_log", ()),
-        *(
-            {"day": day, "kind": "removed", "arc": arc, "reason": reason}
-            for arc, reason in outcome.pruned.items()
-        ),
-    ]
+    log = [*record.get("arc_log", ()), *arc_rules.removals(outcome.pruned, day)]
     if change is not None:
         log += [{"day": day, **event, **change} for event in found] or [
             {"day": day, "kind": "note", **change}

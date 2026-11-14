@@ -418,6 +418,14 @@ def events(before: dict[str, Any], after: dict[str, Any]) -> list[dict[str, Any]
     return found
 
 
+def removals(dropped: dict[str, str], day: str) -> list[dict[str, Any]]:
+    """The log events of arcs the engine dropped, each with its reason."""
+    return [
+        {"day": day, "kind": "removed", "arc": arc, "reason": reason}
+        for arc, reason in dropped.items()
+    ]
+
+
 def reordered(before: dict[str, Any], after: dict[str, Any]) -> set[str]:
     """Arcs whose order relative to another arc both records hold changed."""
     old = {arc: i for i, arc in enumerate(order(before))}
