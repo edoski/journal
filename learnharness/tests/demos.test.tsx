@@ -406,7 +406,8 @@ describe("steer card rendering (the delivered artifact)", () => {
 			},
 		);
 		const { closed, open } = await openDisclosure(<SubagentSteerCard message={projectNative([steer])[0] as never} />, "research-complete-badge");
-		assert.match(closed.summary, /Research complete · 2 sources/);
+		assert.match(closed.summary, /Research complete/);
+		assert.doesNotMatch(closed.summary, /\d sources?/);
 		assert.match(closed.summary, /View brief/, "the expansion affordance is offered");
 		// collapsed by default, so the brief + sources never clutter the
 		// transcript until the learner opens them (the wave-1 "view full

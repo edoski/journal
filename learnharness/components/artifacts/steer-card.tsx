@@ -98,7 +98,7 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
  * in the record is the single source of truth. */
 function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
 	return (
-		<BriefDisclosure testid="research-complete-badge" summary={`Research complete${result.sources.length > 0 ? ` · ${result.sources.length} sources` : ""}`}>
+		<BriefDisclosure testid="research-complete-badge" summary="Research complete">
 			<ResearchBriefCard output={result} />
 		</BriefDisclosure>
 	);

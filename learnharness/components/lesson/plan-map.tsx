@@ -83,8 +83,8 @@ export function PlanPanel({ messages, onClose }: { messages: readonly PopupMessa
 }
 
 /** The plan as the transcript carried it (a frozen snapshot, never
- *  re-derived): a card with the step count and the map; it opens the
- *  live panel. */
+ *  re-derived): a card with the map and no count; it opens the live
+ *  panel. */
 export function PlanCard({ data, onOpen }: { data: PlanBlockData; onOpen: () => void }) {
 	const steps = useMemo(() => {
 		const status = new Map(data.nodes.map((n) => [n.id, n.status] as const));
@@ -98,7 +98,7 @@ export function PlanCard({ data, onOpen }: { data: PlanBlockData; onOpen: () => 
 			onClick={onOpen}
 			className="block w-full rounded-xl text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 		>
-			<LessonCard label="Plan" note={`${steps.length} step${steps.length === 1 ? "" : "s"}`}>
+			<LessonCard label="Plan">
 				<PlanMap steps={steps} />
 			</LessonCard>
 		</button>

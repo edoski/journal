@@ -64,11 +64,12 @@ describe("plan map", () => {
 		assert.deepEqual(steps.map((s) => s.next), [true, false, false]);
 	});
 
-	it("the transcript card names the step count and the steps, with no node numbers", () => {
+	it("the transcript card names the steps, with no count and no node numbers", () => {
 		const data = { kind: "full", at: "x", current: null, nodes: NODES.map((n) => ({ ...n, status: "upcoming" })), edges: EDGES } as PlanBlockData;
 		const document = documentFor(<PlanCard data={data} onOpen={() => {}} />);
 		const card = document.querySelector('[data-testid="plan-block-full"]')!;
-		assert.match(card.textContent!, /Plan·3 steps/);
+		assert.match(card.textContent!, /^Plan/);
+		assert.doesNotMatch(card.textContent!, /\d steps?/);
 		assert.match(card.textContent!, /A matrix is a linear map/);
 		assert.doesNotMatch(card.textContent!, /Node \d/);
 		assert.equal(card.getAttribute("aria-label"), "Open the plan");
