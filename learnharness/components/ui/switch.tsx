@@ -10,8 +10,13 @@ import { cn } from "@/lib/utils"
  *  2026-09-20: never a bright track); off is the input track with a muted disc. */
 function Switch({
   className,
+  thumb,
   ...props
-}: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+}: React.ComponentProps<typeof SwitchPrimitive.Root> & {
+  /** An icon that is the disc itself (the figure cards' invert switch):
+   *  no fill of its own, in full ink when on and muted when off. */
+  thumb?: React.ReactNode
+}) {
   return (
     <SwitchPrimitive.Root
       data-slot="switch"
@@ -23,8 +28,14 @@ function Switch({
     >
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
-        className="pointer-events-none block size-4 rounded-full shadow-sm transition-transform data-[state=checked]:translate-x-3.5 data-[state=checked]:bg-foreground data-[state=unchecked]:translate-x-0.5 data-[state=unchecked]:bg-muted-foreground motion-reduce:transition-none"
-      />
+        className={cn(
+          "pointer-events-none block size-4 rounded-full shadow-sm transition-transform data-[state=checked]:translate-x-3.5 data-[state=checked]:bg-foreground data-[state=unchecked]:translate-x-0.5 data-[state=unchecked]:bg-muted-foreground motion-reduce:transition-none",
+          thumb !== undefined &&
+            "flex items-center justify-center shadow-none data-[state=checked]:bg-transparent data-[state=checked]:text-foreground data-[state=unchecked]:bg-transparent data-[state=unchecked]:text-muted-foreground"
+        )}
+      >
+        {thumb}
+      </SwitchPrimitive.Thumb>
     </SwitchPrimitive.Root>
   )
 }

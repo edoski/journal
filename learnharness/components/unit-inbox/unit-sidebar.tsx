@@ -26,6 +26,8 @@ import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
 import { sessionTwins, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
+import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
 /** Every course, topic and session whose title matches the query, best
@@ -64,9 +66,6 @@ const navLinkClass = (here: boolean) =>
 		"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
 		here ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
 	);
-
-const ICON_BUTTON =
-	"lh-no-drag flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&>svg]:size-4";
 
 /**
  * The Proposed sidebar (spec: unit-inbox.md), T3 Code's sidebar for topics:
@@ -140,9 +139,9 @@ export function UnitSidebar() {
 							Home
 						</Link>
 						<Hint label="Close sidebar" action="toggle-sidebar">
-							<button type="button" aria-label="Close sidebar" onClick={toggle} className={ICON_BUTTON}>
+							<Button variant="quiet" size="icon-bar" aria-label="Close sidebar" onClick={toggle} className="lh-no-drag">
 								<PanelLeftCloseIcon />
-							</button>
+							</Button>
 						</Hint>
 					</div>
 
@@ -162,11 +161,14 @@ export function UnitSidebar() {
 					</div>
 
 					<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
-						<div className="flex h-8 min-w-0 flex-1 items-center rounded-md pr-0.5 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
+						<InputGroup
+							variant="quiet"
+							className="flex-1 pr-0.5 text-control font-medium text-muted-foreground hover:text-foreground focus-within:text-foreground"
+						>
 							<Hint label={SEARCH_LABEL} action="sessions-search" side="bottom">
 								<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
 									<SearchIcon aria-hidden className="size-4 shrink-0" />
-									<input
+									<InputGroupInput
 										ref={s.searchRef}
 										data-testid="session-search"
 										value={s.query}
@@ -182,35 +184,31 @@ export function UnitSidebar() {
 										placeholder="Search"
 										aria-label={SEARCH_LABEL}
 										spellCheck={false}
-										className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
+										className="h-auto px-0 py-0 text-control font-medium text-foreground md:text-control"
 									/>
 									{s.query && (
-										<button
-											type="button"
-											aria-label="Clear search"
-											onClick={() => s.changeQuery("")}
-											className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-										>
+										<InputGroupButton variant="quiet" size="icon-xs" aria-label="Clear search" onClick={() => s.changeQuery("")} className="size-5 hover:bg-transparent">
 											<XIcon aria-hidden className="size-3.5" />
-										</button>
+										</InputGroupButton>
 									)}
 								</label>
 							</Hint>
 							{state.status === "ready" && <CourseScope courses={state.courses} scope={scope} onScopeChange={setScope} />}
-						</div>
+						</InputGroup>
 						<Hint label="New lesson" action="new-session" side="bottom">
-							<button
-								type="button"
+							<Button
+								variant="quiet"
+								size="icon-bar"
 								data-testid="new-session"
 								aria-label="New lesson"
-								className={ICON_BUTTON}
+								className="lh-no-drag"
 								onClick={(e) => {
 									s.router.push("/chat/new");
 									blurAfterPointerClick(e);
 								}}
 							>
 								<SquarePenIcon />
-							</button>
+							</Button>
 						</Hint>
 					</div>
 
@@ -251,18 +249,18 @@ export function UnitSidebar() {
 
 					<div data-slot="sidebar-footer" className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-1">
 						<Hint label="Settings" action="open-settings" side="right">
-							<button
-								type="button"
+							<Button
+								variant="quiet"
+								size="icon-bar"
 								data-testid="settings-entry"
 								aria-label="Settings"
-								className={ICON_BUTTON}
 								onClick={(e) => {
 									openSettings();
 									blurAfterPointerClick(e);
 								}}
 							>
 								<SettingsIcon />
-							</button>
+							</Button>
 						</Hint>
 					</div>
 				</div>

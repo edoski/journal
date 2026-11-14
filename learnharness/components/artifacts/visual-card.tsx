@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { useContext, useState } from "react";
 import { ChatActionsContext } from "@/components/chat";
 import { DownloadIcon, MaximizeIcon } from "lucide-react";
@@ -135,27 +137,17 @@ export function VisualOutputCard({
 						title="Invert colors"
 						discIcon={<InvertDiscIcon className="size-3" />}
 					/>
-					<button
-						type="button"
-						aria-label="Download figure as SVG"
-						title="Download as SVG"
-						onClick={() => downloadFile("figure.svg", result.svg, "image/svg+xml")}
-						data-testid="visual-download"
-						className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-					>
-						<DownloadIcon className="size-3.5" />
-					</button>
+					<Hint label="Download as SVG">
+						<Button variant="quiet" size="icon-inline" aria-label="Download figure as SVG" onClick={() => downloadFile("figure.svg", result.svg, "image/svg+xml")} data-testid="visual-download" className="size-6.5 hover:bg-accent">
+							<DownloadIcon className="size-3.5" />
+						</Button>
+					</Hint>
 					{overlay && (
-						<button
-							type="button"
-							aria-label="Open figure fullscreen"
-							title="Open fullscreen"
-							onClick={() => overlay.openFigure(result.svg, inverted)}
-							data-testid="visual-open"
-							className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-						>
-							<MaximizeIcon className="size-3.5" />
-						</button>
+						<Hint label="Open fullscreen">
+							<Button variant="quiet" size="icon-inline" aria-label="Open figure fullscreen" onClick={() => overlay.openFigure(result.svg, inverted)} data-testid="visual-open" className="size-6.5 hover:bg-accent">
+								<MaximizeIcon className="size-3.5" />
+							</Button>
+						</Hint>
 					)}
 				</div>
 			</div>

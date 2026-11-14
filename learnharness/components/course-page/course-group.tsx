@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,16 +48,17 @@ export function CourseGroup<T>({
 		<section data-slot="course-group" aria-labelledby={headerId} className={cn("flex flex-col", className)} {...section}>
 			<h2 className="contents">
 				{foldable ? (
-					<button
-						type="button"
+					<Button
+						variant="list"
+						size="row"
 						id={headerId}
 						data-slot="course-group-header"
 						aria-expanded={!folded}
 						onClick={() => setFolded(!folded)}
-						className="-mx-3 flex h-7 w-[calc(100%+1.5rem)] items-center gap-1 rounded-md px-3 text-left text-label font-medium text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+						className="-mx-3 h-7 w-[calc(100%+1.5rem)] gap-1 px-3 text-label font-medium duration-150 hover:bg-transparent"
 					>
 						{label(<ChevronDownIcon aria-hidden className={cn("size-3.5 shrink-0 transition-transform duration-150 motion-reduce:transition-none", folded && "-rotate-90")} />)}
-					</button>
+					</Button>
 				) : (
 					<span id={headerId} data-slot="course-group-header" className="flex h-7 items-center gap-1 rounded-md text-label font-medium text-muted-foreground">
 						{label(null)}
@@ -65,15 +67,16 @@ export function CourseGroup<T>({
 			</h2>
 			{shown.length > 0 && <ul className="flex flex-col">{shown.map(renderItem)}</ul>}
 			{more > 0 && (
-				<button
-					type="button"
+				<Button
+					variant="list"
+					size="row"
 					data-slot="course-group-more"
 					onClick={() => setExpanded(true)}
-					className="-mx-3 flex h-9 w-[calc(100%+1.5rem)] items-center gap-4 rounded-md px-3 text-left text-row text-muted-foreground outline-none transition-colors duration-150 hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+					className="-mx-3 h-9 w-[calc(100%+1.5rem)] gap-4 px-3 duration-150"
 				>
 					<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
 					Show {more} more
-				</button>
+				</Button>
 			)}
 		</section>
 	);

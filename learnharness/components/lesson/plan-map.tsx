@@ -91,16 +91,16 @@ export function PlanCard({ data, onOpen }: { data: PlanBlockData; onOpen: () => 
 		return planMapSteps(data.nodes, data.edges, (id) => status.get(id) ?? "upcoming");
 	}, [data]);
 	return (
-		<button
-			type="button"
+		<Button
+			variant="quiet"
 			data-testid="plan-block-full"
 			aria-label="Open the plan"
 			onClick={onOpen}
-			className="block w-full rounded-xl text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+			className="block h-auto w-full whitespace-normal rounded-xl p-0 text-left text-[length:inherit] font-normal text-inherit hover:bg-transparent hover:text-inherit"
 		>
 			<LessonCard label="Plan" note={`${steps.length} step${steps.length === 1 ? "" : "s"}`}>
 				<PlanMap steps={steps} />
 			</LessonCard>
-		</button>
+		</Button>
 	);
 }

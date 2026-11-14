@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDownIcon, BookOpenIcon, EyeIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { ConfidenceChoice } from "@/components/confidence-choice";
 import { Hint } from "@/components/ui/hint";
@@ -96,11 +97,10 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				<Button
 					type="button"
 					variant="quiet"
-					size="sm"
+					size="pill"
 					data-testid={`practice-request-${kind}`}
 					disabled={compactionRunning}
 					onClick={() => request(kind)}
-					className="h-8 rounded-full px-3 text-row"
 				>
 					<Icon />
 					{label}
@@ -116,11 +116,12 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 
 	if (!expanded) {
 		return (
-			<button
-				type="button"
+			<Button
+				variant="list"
+				size="row"
 				data-testid="practice-dock-bar"
 				onClick={onExpand}
-				className="flex h-12 w-full items-center gap-3 px-4 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+				className="h-12 gap-3 rounded-none px-4 focus-visible:ring-inset"
 			>
 				<span className="shrink-0 text-muted-foreground">Problem</span>
 				<span className="min-w-0 flex-1 truncate text-muted-foreground">{input.statement}</span>
@@ -128,7 +129,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 					Answer
 					<ArrowDownIcon className="size-4" />
 				</span>
-			</button>
+			</Button>
 		);
 	}
 	return (
@@ -137,7 +138,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				<ToolContentResponse>{input.statement}</ToolContentResponse>
 			</div>
 			<div className="mx-4 mt-3 border-t" />
-			<textarea
+			<Textarea
 				data-testid="practice-thinking-field"
 				aria-label="Your thinking"
 				value={thinking}
@@ -158,7 +159,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				}}
 				placeholder="Work here, think out loud."
 				rows={3}
-				className="field-sizing-content block max-h-64 min-h-20 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground"
+				className="block max-h-64 min-h-20 resize-none rounded-none border-0 px-4 pb-1 pt-3 text-control focus-visible:ring-0"
 			/>
 			<div className="flex items-center gap-3 p-2 pl-3">
 				<ConfidenceChoice value={confidence} onChange={setConfidence} />
@@ -172,7 +173,8 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 					data-testid="practice-send"
 					disabled={thinking.trim().length === 0 || compactionRunning}
 					onClick={() => submit()}
-					className="ml-auto h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+					size="pill"
+						className="ml-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
 				>
 					Submit
 				</Button>

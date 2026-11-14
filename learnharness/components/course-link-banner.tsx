@@ -30,7 +30,8 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 						data-testid="course-link"
 						onClick={onLink}
 						disabled={busy}
-						className="h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+						size="pill"
+						className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
 					>
 						{busy ? "Linking…" : "Link"}
 					</Button>

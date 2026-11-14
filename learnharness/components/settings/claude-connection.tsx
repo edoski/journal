@@ -94,7 +94,7 @@ export function AccountRow({ status, current, busy, onUse }: { status: ClaudeAcc
 			<span className="min-w-0 flex-1 truncate text-row text-foreground">{claudeAccountLabel(account)}</span>
 			{inUse
 				? <span className="text-label text-muted-foreground" data-testid="claude-in-use">In use</span>
-				: connected && current !== undefined && <Button type="button" size="sm" variant="outline" className="h-7 cursor-pointer px-3 disabled:cursor-not-allowed" data-testid="claude-use-account" disabled={busy} onClick={onUse}>Use this account</Button>}
+				: connected && current !== undefined && <Button type="button" size="compact" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" data-testid="claude-use-account" disabled={busy} onClick={onUse}>Use this account</Button>}
 		</div>
 		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection, account)}</p>
 		{connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}

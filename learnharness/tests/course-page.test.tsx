@@ -234,7 +234,7 @@ function viewOf(c: StudyCourse) {
 }
 
 describe("the course header", () => {
-	it("draws the name, one button with the step's word, the facts and the next step with why", () => {
+	it("draws the name, Add material and the button with the step's word, the facts and the next step with why", () => {
 		const document = render(<CourseHeader view={viewOf(course())} busy={false} onContinue={() => {}} />);
 		assert.equal(document.querySelector('[data-slot="course-title"]')!.textContent, "Linear Algebra");
 		assert.equal(document.querySelector('[data-slot="course-action"]')!.textContent, "Review");
@@ -243,7 +243,11 @@ describe("the course header", () => {
 			["3 of 10 on your own", "Exam in 21 days", "Studied 2 days ago"],
 		);
 		assert.equal(document.querySelector('[data-slot="course-next"]')!.textContent, "Review Span1w overdue");
-		assert.equal(document.querySelectorAll("button, a").length, 1, "one control: the button");
+		assert.deepEqual(
+			[...document.querySelectorAll("button, a")].map((c) => c.getAttribute("data-slot")),
+			["course-add-material", "course-action"],
+			"two controls: Add material, then the lesson button at the far right",
+		);
 	});
 
 	it("leaves the exam out when there is none, and its skeleton keeps the header's three rows", () => {

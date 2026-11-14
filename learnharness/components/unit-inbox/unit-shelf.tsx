@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** How many rows a shelf shows before "Show more", and how many each press
@@ -48,14 +49,15 @@ export function UnitShelf<T>({
 	return (
 		<li data-slot="unit-shelf" className={cn("flex list-none flex-col", className)}>
 			<h2 className="contents">
-				<button
-					type="button"
+				<Button
+					variant="list"
+					size="row"
 					id={headerId}
 					data-slot="unit-section-header"
 					data-sidebar-row={`shelf:${id}`}
 					aria-expanded={!folded}
 					onClick={() => onFoldedChange(!folded)}
-					className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-label font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+					className="h-8 gap-2 px-2 text-label font-medium hover:bg-transparent focus-visible:ring-inset"
 				>
 					<span className="min-w-0 truncate">{label}</span>
 					<span aria-hidden className="flex-1" />
@@ -68,23 +70,24 @@ export function UnitShelf<T>({
 						aria-hidden
 						className={cn("size-3 shrink-0 transition-transform duration-150 motion-reduce:transition-none", folded && "-rotate-90")}
 					/>
-				</button>
+				</Button>
 			</h2>
 			<ul aria-labelledby={headerId} className="flex flex-col gap-px">
 				{shown.map(renderItem)}
 				{more > 0 && (
 					<li className="list-none">
-						<button
-							type="button"
+						<Button
+							variant="list"
+							size="row"
 							data-slot="unit-shelf-more"
 							data-sidebar-row={`more:${id}`}
 							data-sidebar-parent={`shelf:${id}`}
 							onClick={() => setShownCount((n) => n + SHELF_PAGE)}
-							className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-control text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+							className="h-9 gap-2 px-2.5 text-control focus-visible:ring-inset"
 						>
 							<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
 							Show {more} more
-						</button>
+						</Button>
 					</li>
 				)}
 			</ul>

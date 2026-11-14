@@ -14,6 +14,7 @@ import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
 import type { Unit } from "@/components/unit-inbox/units";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** What a line's action does, as Home's line does: Resume the session that
@@ -37,15 +38,18 @@ export function NowAction({ line, title, className }: { line: NowLine; title: st
 	} as const;
 	if ("href" in action) {
 		return (
-			<Link href={action.href} onClick={blurAfterPointerClick} {...props}>
-				<PlayIcon aria-hidden />
-				{action.label}
-			</Link>
+			<Button asChild variant="quiet" size="xs" {...props}>
+				<Link href={action.href} onClick={blurAfterPointerClick}>
+					<PlayIcon aria-hidden />
+					{action.label}
+				</Link>
+			</Button>
 		);
 	}
 	return (
-		<button
-			type="button"
+		<Button
+			variant="quiet"
+			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
 				start(action.workspace);
@@ -55,7 +59,7 @@ export function NowAction({ line, title, className }: { line: NowLine; title: st
 		>
 			<PlayIcon aria-hidden />
 			{action.label}
-		</button>
+		</Button>
 	);
 }
 
