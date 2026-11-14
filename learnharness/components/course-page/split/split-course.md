@@ -6,9 +6,9 @@ The course page (course-page.md): the list and the map side by side in the app's
 
 | Part | Notes |
 |---|---|
-| column | the page's full width less 32px sides, 20px under the 52px band, 24px below; fits the window, never scrolls as a page |
-| header | the shared `CourseHeader` (course-header.md), full width, its button at the far right |
-| panes | 24px under the header, filling the rest: the linked columns, the list up to 24rem and the map in the rest, 24px apart, nothing around them |
+| column | the shared page frame (`../../page-frame/page-frame.md`): centred, up to 72rem, 24px sides, 24px under the 52px band and below; fits the window, never scrolls as a page |
+| header | `CourseHeader` (course-header.md), the frame's head, its press at the far right |
+| panes | 20px under the head, filling the rest: the linked columns, the list up to 24rem and the map in the rest, 24px apart, nothing around them |
 | list | the groups in their order (Needs you, Learning, Not started, On your own), an empty group left out, 16px apart; each a 28px `CourseGroup` header over 32px `CourseTopicRow`s, each ending in its reason's icon and words flush right (the title truncates first). A topic a session waits on him for ("Your turn") sits at the top of Needs you, never under Learning, so Learning holds only topics he is learning. Every topic shows, none folded and no Show more, so each node on the map has its row. Linear Algebra fits whole at 1440x900; a longer list scrolls inside its pane (wheel, trackpad) with no bar showing, its bottom edge fading 40px while more is below and its top while more is above |
 | map | the shared `TopicMap` (topic-map.md), unchanged: no outline, no header copy (Edo, 12 Nov 2026), edges faded 48px across and 32px down (`mapFade`), wider across a pane too narrow for two topics side by side (`fadeAcross`: 82px at 1100x700), so the topics beside the one in view hide in the fade instead of being cut |
 | no topics | one line in place of both panes: "Topics appear as you study this course." (Home's map words) |

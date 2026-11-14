@@ -7,6 +7,7 @@ import { useLessonStart } from "@/components/start/use-lesson-start";
 import { courseMove } from "@/components/study-home/study-facts";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PageFrame } from "@/components/page-frame/page-frame";
 import { CourseChrome } from "@/components/course-page/course-chrome";
 import { CourseLessonError } from "@/components/course-page/course-header";
 import { CourseHeaderSkeleton } from "@/components/course-page/course-header-skeleton";
@@ -22,22 +23,14 @@ export interface CourseReady {
 }
 
 /**
- * What every course page candidate shares (spec: course-page.md): the
- * chrome, the read of the course with its states, and the lesson start
- * behind the header's button, whose failure the header says under its next
- * line (the window's title is the route's metadata). A candidate gives its
- * column's classes and draws the ready course; the page scrolls with no
- * bar showing, and a column of `h-full` fits the window instead.
+ * What the course page wraps itself in (spec: course-page.md): the chrome,
+ * the read of the course with its states, each in the shared page frame
+ * (`PageFrame`, page-frame.md), and the lesson start behind the head's
+ * press, whose failure the head says under its next line (the window's
+ * title is the route's metadata). The ready course draws its own frame;
+ * the page fits the window with no bar showing.
  */
-export function CourseFrame({
-	workspace,
-	className,
-	children,
-}: {
-	workspace: string;
-	className: string;
-	children: (ready: CourseReady) => React.ReactNode;
-}) {
+export function CourseFrame({ workspace, children }: { workspace: string; children: (ready: CourseReady) => React.ReactNode }) {
 	const { read, chats, retry } = useCourse(workspace);
 	const lesson = useLessonStart();
 	const router = useRouter();
@@ -49,24 +42,26 @@ export function CourseFrame({
 	return (
 		<CourseChrome>
 			<ScrollArea bar={false} data-slot="course-page" className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full">
-				<div className={className}>
-					<CourseLessonError value={lesson.error}>
-						<CourseBody read={read} onRetry={retry}>
-							{(view) => children({ view, busy: lesson.busy, onContinue: onContinue(view) })}
-						</CourseBody>
-					</CourseLessonError>
-				</div>
+				<CourseLessonError value={lesson.error}>
+					<CourseBody read={read} onRetry={retry}>
+						{(view) => children({ view, busy: lesson.busy, onContinue: onContinue(view) })}
+					</CourseBody>
+				</CourseLessonError>
 			</ScrollArea>
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</CourseChrome>
 	);
 }
 
-/** The course, or the one plain sentence that says why it cannot show. */
+/** The course, or the one plain sentence that says why it cannot show, in the page frame. */
 function CourseBody({ read, onRetry, children }: { read: CourseRead; onRetry: () => void; children: (view: CourseView) => React.ReactNode }) {
 	switch (read.status) {
 		case "loading":
-			return <CourseHeaderSkeleton />;
+			return (
+				<PageFrame className="h-full">
+					<CourseHeaderSkeleton />
+				</PageFrame>
+			);
 		case "unavailable":
 			return <Notice>The study engine is not answering, so this course can’t show right now.</Notice>;
 		case "failed":
@@ -103,8 +98,10 @@ function CourseBody({ read, onRetry, children }: { read: CourseRead; onRetry: ()
 
 function Notice({ children }: { children: React.ReactNode }) {
 	return (
-		<p data-slot="course-notice" className="flex min-h-8 flex-wrap items-center text-row text-muted-foreground">
-			{children}
-		</p>
+		<PageFrame className="h-full">
+			<p data-slot="course-notice" className="flex min-h-8 flex-wrap items-center text-row text-muted-foreground">
+				{children}
+			</p>
+		</PageFrame>
 	);
 }

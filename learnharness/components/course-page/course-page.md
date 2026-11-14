@@ -9,11 +9,11 @@ The page is the list and the map side by side in the app's linked columns (`spli
 | File | What it is |
 |---|---|
 | `course-page.tsx` | the page: `SplitCourse` |
-| `course-frame.tsx` | what the page wraps itself in, as Home wraps itself in `HomeFrame`: the chrome, the read with its states, the lesson start behind the header's button (its failure shows in the header, course-header.md). The page gives its column's classes; the page scrolls with no bar showing (`ScrollArea bar={false}`), and a column of `h-full` fits the window instead |
-| `course-chrome.tsx` | the 52px band with the sidebar toggle and the window's drag region |
+| `course-frame.tsx` | what the page wraps itself in, as Home wraps itself in `HomeFrame`: the chrome, the read with its states, each in the shared page frame (`../page-frame/page-frame.md`), the lesson start behind the head's press (its failure shows in the head, course-header.md). The page fits the window with no bar showing (`ScrollArea bar={false}`) |
+| `course-chrome.tsx` | the 52px band, the window's drag region (the folded sidebar's rail holds the open button) |
 | `use-course.ts` | the read: `useStudyHome` (Home's read of `/api/study` and `/api/chats`, once per visit) with the sessions started on a topic's page linked to it, as the sidebar does |
 | `course-model.ts` | the pure model: `courseGroups`, `courseNext`, `courseFacts`, `courseRead` and the types the page uses (`CourseView`, `CourseGroup`, `CourseTopic`, `TopicFact`) |
-| `course-header.tsx` | the header (course-header.md) |
+| `course-header.tsx` | the head, the shared `PageHead` (course-header.md) |
 | `course-topic-row.tsx` | one topic as a row (course-topic-row.md) |
 | `course-group.tsx` | a group's header over its rows, with folding and Show more (course-group.md) |
 

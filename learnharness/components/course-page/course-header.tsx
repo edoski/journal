@@ -6,7 +6,7 @@ import { AddMaterialDialog } from "@/components/course-manage-dialogs";
 import { Button } from "@/components/ui/button";
 import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import { ProgressPie } from "@/components/study-home/agenda-rows/progress-pie";
-import { LessonButton } from "@/components/study-home/lesson-button";
+import { PageAction, PageFact, PageHead } from "@/components/page-frame/page-frame";
 import type { CourseView } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
 import { MathText } from "@/components/ui/math-text";
@@ -15,52 +15,50 @@ import { MathText } from "@/components/ui/math-text";
  *  around every candidate so the alert shows under the button he pressed. */
 export const CourseLessonError = createContext<string | null>(null);
 
-/** One fact of the facts line: a 16px mark, then a few words. */
-function Fact({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-	return (
-		<span data-slot="course-fact" className="inline-flex h-5 min-w-0 items-center gap-1.5 whitespace-nowrap">
-			{icon}
-			{children}
-		</span>
-	);
-}
-
 /**
- * The course page's header (spec: course-header.md), the same on every
- * candidate: the course's name with Add material and its one primary button
- * (Home's lesson button for this course: Resume, Review, Continue or Start), the facts line (how
- * many topics he can do on his own, the exam, when he last studied), then
- * what the button takes up and why it is next, in Today's words.
+ * The course page's head (spec: course-header.md), the shared page head
+ * (`PageHead`, page-frame.md): the course's name with Add material and the
+ * page's press (what Home's line for this course does: Resume, Review,
+ * Continue or Start), the standing line (the course's progress ring and
+ * how far along it is, the exam, when he last studied), then what the
+ * press takes up and why it is next, in Today's words.
  */
 export function CourseHeader({ view, busy, onContinue, className }: { view: CourseView; busy: boolean; onContinue: (workspace: string) => void; className?: string }) {
 	const { course, facts, next } = view;
 	const error = useContext(CourseLessonError);
 	const WhyIcon = next.why ? WHY_ICON[next.why.kind] : ArrowRightIcon;
 	const [adding, setAdding] = useState(false);
+	const { open } = next.lesson;
 	return (
-		<header data-slot="course-header" className={cn("flex shrink-0 flex-col gap-2", className)}>
-			<div className="flex h-8 items-center justify-between gap-4">
-				<h1 data-slot="course-title" className="min-w-0 truncate text-xl font-semibold text-foreground">
-					{course.map.title}
-				</h1>
-				<div className="flex shrink-0 items-center gap-2">
-					<Button variant="outline" size="sm" data-slot="course-add-material" className="text-row" onClick={() => setAdding(true)}>
+		<PageHead
+			className={className}
+			title={<span data-slot="course-title">{course.map.title}</span>}
+			actions={
+				<>
+					<Button variant="quiet" size="row" data-slot="course-add-material" onClick={() => setAdding(true)}>
 						<FilePlusIcon aria-hidden />
 						Add material
 					</Button>
-					<LessonButton lesson={next.lesson} busy={busy} onContinue={onContinue} size="sm" data-slot="course-action" className="shrink-0 text-row">
+					<PageAction
+						data-slot="course-action"
+						disabled={busy}
+						{...(open.kind === "session" ? { href: open.href } : { onClick: () => onContinue(open.workspace) })}
+					>
 						{next.action}
-					</LessonButton>
-				</div>
-			</div>
-			<p data-slot="course-facts" className="flex h-5 min-w-0 items-center gap-x-4 overflow-hidden text-row text-muted-foreground tabular-nums">
-				{facts.progress && <Fact icon={<ProgressPie course={course} />}>{facts.progress}</Fact>}
-				{facts.exam && <Fact icon={<CalendarIcon aria-hidden className="size-4 shrink-0" />}>{facts.exam}</Fact>}
-				{facts.studied && <Fact icon={<ClockIcon aria-hidden className="size-4 shrink-0" />}>{facts.studied}</Fact>}
-			</p>
-			<p data-slot="course-next" className="flex h-5 min-w-0 items-center gap-1.5 text-row text-foreground">
+					</PageAction>
+				</>
+			}
+			standing={
+				<>
+					{facts.progress && <PageFact icon={<ProgressPie course={course} />}>{facts.progress}</PageFact>}
+					{facts.exam && <PageFact icon={<CalendarIcon aria-hidden className="size-4 shrink-0" />}>{facts.exam}</PageFact>}
+					{facts.studied && <PageFact icon={<ClockIcon aria-hidden className="size-4 shrink-0" />}>{facts.studied}</PageFact>}
+				</>
+			}
+		>
+			<p data-slot="course-next" className="flex min-h-5 min-w-0 items-center gap-1.5 text-row text-foreground">
 				<WhyIcon aria-hidden className={cn("size-4 shrink-0", next.why?.kind === "reply" ? "text-link" : "text-muted-foreground")} />
-				<span className="truncate">
+				<span className="min-w-0">
 					<MathText>{next.lesson.title}</MathText>
 				</span>
 				{next.why && (
@@ -75,6 +73,6 @@ export function CourseHeader({ view, busy, onContinue, className }: { view: Cour
 				</p>
 			)}
 			{adding && <AddMaterialDialog course={{ workspace: course.map.workspace, title: course.map.title }} onClose={() => setAdding(false)} />}
-		</header>
+		</PageHead>
 	);
 }
