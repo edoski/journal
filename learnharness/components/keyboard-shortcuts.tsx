@@ -42,6 +42,7 @@ import {
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { useSpatialArrows } from "@/components/spatial-arrows";
+import { useLessonVariant } from "@/components/lesson-variant";
 
 // Re-exported for the contract pin (tests/keyboard-toggle-sidebar.test.ts):
 // the dispatcher composes event names through the ONE helper — a second
@@ -175,10 +176,12 @@ const SHEET_SECTIONS: readonly { label: string; scope: KeyScope; group?: KeyGrou
 	...KEY_SCOPES.filter(({ scope }) => scope !== "global"),
 ];
 
-export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }[] {
+/** `lesson`: the lesson drawn (lesson-variant.ts); an action that names
+ *  its lessons shows only in them. */
+export function cheatSheetSections(lesson: string = "current"): { label: string; actions: KeyActionDef[] }[] {
 	return SHEET_SECTIONS.map(({ label, scope, group }) => ({
 		label,
-		actions: KEYBOARD_ACTIONS.filter((a) => a.scope === scope && a.group === group),
+		actions: KEYBOARD_ACTIONS.filter((a) => a.scope === scope && a.group === group && (!a.lessons || a.lessons.includes(lesson))),
 	})).filter((section) => section.actions.length > 0);
 }
 
@@ -188,6 +191,7 @@ export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }
  *  in the app's own words. A label too long for its column wraps under
  *  itself rather than losing its end. */
 function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+	const lesson = useLessonVariant() ?? "current";
 	if (!open) return null;
 	return (
 		<Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -199,7 +203,7 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 					<DialogClose aria-label="Close shortcuts" />
 				</Hint>
 				<div data-slot="cheat-sheet-columns" className="columns-2 gap-8">
-					{cheatSheetSections().map(({ label, actions }) => (
+					{cheatSheetSections(lesson).map(({ label, actions }) => (
 						<section key={label} aria-label={label} className="flex break-inside-avoid flex-col pb-4 last:pb-0">
 							<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
 							{actions.map((a) => (

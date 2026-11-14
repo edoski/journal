@@ -1,0 +1,164 @@
+/** The Prose lesson (components/lesson/prose/prose.md): the question in the
+ *  tutor's message, his answer as his bubble, and the composer that answers. */
+
+import React from "react";
+(globalThis as Record<string, unknown>).React = React; // tsx classic-JSX shim (see render-cards.test.tsx)
+
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { renderToStaticMarkup } from "react-dom/server";
+import { StickToBottom } from "use-stick-to-bottom";
+import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
+import { ProseConclude, ProseProblem, RequestBubble } from "../components/lesson/prose/prose-practice.tsx";
+import { ProseAnswerProvider, type ProseAnswer } from "../components/lesson/prose/prose-answer.tsx";
+import { ProseComposer, type ProseComposerProps } from "../components/lesson/prose/prose-composer.tsx";
+import { AnswerMarksProvider } from "../components/answer-mark.tsx";
+import { cheatSheetSections } from "../components/keyboard-shortcuts.tsx";
+import { buildAnswer, dismissedAnswer, emptyDockSelection, type AnswerMark } from "../src/core/index.ts";
+import { proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
+
+const noop = () => {};
+const check = { question: "Which way does $A$ stretch?", correctAnswer: "Along $(1,1)$, by 3.", type: "check" };
+const choice = { question: "What next?", options: [{ label: "Practice", description: "A short run" }, { label: "Eigenvalues" }] };
+const answerState = (over: Partial<ProseAnswer> = {}): ProseAnswer => ({
+	openKey: "q1",
+	selection: emptyDockSelection(),
+	confidence: "neutral",
+	mode: "answer",
+	toggle: noop,
+	setConfidence: noop,
+	setMode: noop,
+	...over,
+});
+const mark = { rows: [{ id: "r1", result: "correct", grade: "unaided", helped: false, sure: "confident", label: null }], disputed: false, ruling: null } as unknown as AnswerMark;
+const withMarks = (node: React.ReactNode) =>
+	renderToStaticMarkup(<AnswerMarksProvider value={{ marks: { c1: mark }, onDispute: noop, canDispute: true }}>{node}</AnswerMarksProvider>);
+
+describe("the Prose question in the tutor's message", () => {
+	it("ends the message under a quiet Your turn while it waits for him", () => {
+		const html = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} open />);
+		assert.match(html, /data-slot="prose-question" data-open=""/);
+		assert.match(html, /data-slot="your-turn"[^>]*>Your turn</);
+		assert.doesNotMatch(html, /The answer|by 3/, "the committed answer never shows before he answers");
+	});
+
+	it("draws a choice's options as plain numbered rows, the pick filled", () => {
+		const html = renderToStaticMarkup(
+			<ProseAnswerProvider value={answerState({ selection: { selected: new Set([1]), otherSelected: false } })}>
+				<ProseQuestion tool="ask_user_question" toolCallId="c2" input={choice} open />
+			</ProseAnswerProvider>,
+		);
+		assert.equal(html.match(/data-slot="prose-choice"/g)?.length, 2);
+		assert.match(html, /role="radio" aria-checked="false"[^>]*tabindex="-1"|tabindex="-1"[^>]*role="radio" aria-checked="false"/);
+		assert.match(html, /aria-checked="true"[^>]*data-picked="true"/);
+		assert.match(html, />1</);
+		assert.match(html, />2</);
+	});
+
+	it("turns his answer into his bubble with the mark under it, and keeps the committed answer behind The answer", () => {
+		const spec = proseQuestionSpec("explain", "c1", check)!;
+		const output = buildAnswer(spec.data, { text: "Along (1,1)", confidence: "confident" }, "explain");
+		const html = withMarks(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={output} open={false} />);
+		assert.doesNotMatch(html, /Your turn/);
+		assert.match(html, /data-testid="prose-answer"/);
+		assert.match(html, /ms-auto flex w-fit max-w-\[80%\]/);
+		assert.match(html, /data-testid="mark-line"/);
+		assert.match(html, /data-testid="prose-disclosure"[^>]*>.*The answer/);
+	});
+
+	it("shows a hint request as his bubble with no mark and no committed answer", () => {
+		const spec = proseQuestionSpec("explain", "c1", check)!;
+		const html = withMarks(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={buildAnswer(spec.data, { text: "it stretches", hint: true }, "explain")} open={false} />);
+		assert.match(html, /Hint/);
+		assert.doesNotMatch(html, /data-testid="mark-line"|The answer/);
+	});
+
+	it("says a question left by Done for today is left, and never shows its answer", () => {
+		const html = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={dismissedAnswer("explain", check.question, "tonight")} open={false} />);
+		assert.match(html, /Left for next time/);
+		assert.doesNotMatch(html, /by 3|The answer/);
+	});
+});
+
+describe("the Prose problem", () => {
+	it("is the tutor's words under Your turn while he works on it", () => {
+		assert.match(renderToStaticMarkup(<ProseProblem input={{ statement: "Find the rank." }} active />), /Your turn/);
+		assert.doesNotMatch(renderToStaticMarkup(<ProseProblem input={{ statement: "Find the rank." }} active={false} />), /Your turn/);
+	});
+
+	it("ends with the mark and the model solution, open when he asked to see it", () => {
+		const shown = withMarks(<ProseConclude toolCallId="c1" input={{ outcome: "surrendered" }} output={{}} reveal="The rank is 2." />);
+		assert.match(shown, /data-testid="mark-line"/);
+		assert.match(shown, /data-state="open"/);
+		const solved = withMarks(<ProseConclude toolCallId="c1" input={{ outcome: "solved" }} output={{}} reveal="The rank is 2." />);
+		assert.match(solved, /data-state="closed"/);
+		assert.match(renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), /Left for next time/);
+	});
+
+	it("shows what he asked for as his bubble", () => {
+		const html = renderToStaticMarkup(<RequestBubble data={{ problemCallId: "p", request: "show", text: "rank 2?" } as never} />);
+		assert.match(html, /Show me/);
+		assert.match(html, /rank 2\?/);
+	});
+});
+
+describe("the Prose composer", () => {
+	const props = (over: Partial<ProseComposerProps>): ProseComposerProps => ({
+		open: null,
+		answer: answerState(),
+		message: { busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true },
+		messageText: { read: () => "", write: noop },
+		onAskInstead: noop,
+		toggleRef: { current: null },
+		busy: false,
+		compacting: false,
+		chatId: "chat",
+		onSaveDraft: noop,
+		onSubmitAnswer: noop,
+		onSubmitThinking: async () => true,
+		onRequest: noop,
+		onDraftChange: noop,
+		...over,
+	});
+	const draw = (over: Partial<ProseComposerProps>) => renderToStaticMarkup(<StickToBottom><ProseComposer {...props(over)} /></StickToBottom>);
+	const question = { kind: "question" as const, key: "q1", tool: "explain", toolCallId: "c1", input: { ...check, type: "predict" } };
+
+	it("is the lesson's composer with nothing open", () => {
+		const html = draw({});
+		assert.match(html, /data-mode="message"/);
+		assert.doesNotMatch(html, /Ask instead/);
+	});
+
+	it("answers an open question: its placeholder, Hint, confidence and Ask instead", () => {
+		const html = draw({ open: question });
+		assert.match(html, /data-mode="answer"/);
+		assert.match(html, /placeholder="Your prediction, and why"/);
+		assert.match(html, /data-testid="question-hint"/);
+		assert.match(html, /data-testid="confidence-choice"[^>]*>Neutral</);
+		assert.match(html, /data-testid="prose-ask"/);
+	});
+
+	it("works a problem with Hint, Show me, Explain instead and confidence", () => {
+		const html = draw({ open: { kind: "problem", toolCallId: "p1", statement: "Find the rank." }, answer: answerState({ openKey: "p1" }) });
+		for (const id of ["practice-request-hint", "practice-request-show", "practice-request-explain", "confidence-choice", "prose-ask"]) assert.match(html, new RegExp(`data-testid="${id}"`));
+		assert.match(html, /placeholder="Work here, think out loud."/);
+	});
+
+	it("asks instead: a message to the tutor, saying what sending does, with the way back", () => {
+		const html = draw({ open: question, answer: answerState({ mode: "ask" }) });
+		assert.match(html, /data-mode="message"/);
+		assert.match(html, /placeholder="Ask anything. Sending skips this question."/);
+		assert.match(html, /data-testid="prose-back"/);
+	});
+});
+
+describe("the cheat sheet in the Prose lesson", () => {
+	it("lists the digits and Esc in Prose, and the row keys elsewhere", () => {
+		const ids = (lesson: string) => cheatSheetSections(lesson).flatMap((s) => s.actions.map((a) => a.id));
+		assert.ok(ids("prose").includes("question-pick-digit"));
+		assert.ok(ids("prose").includes("question-ask-instead"));
+		assert.ok(!ids("prose").includes("question-pick-row"));
+		assert.ok(ids("current").includes("question-pick-row"));
+		assert.ok(!ids("current").includes("question-pick-digit"));
+	});
+});
