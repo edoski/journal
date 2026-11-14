@@ -659,7 +659,7 @@ def _learner_reads(kind: str, item: dict[str, Any], path: str) -> None:
             raise ValueError(
                 f'{where} holds the date "{found[0]}", but {reads}, which dates '
                 'every entry itself: leave the date out, or say "the same day" '
-                "or \"after the hint\", and save again"
+                'or "after the hint", and save again'
             )
         if name in WRITTEN_TO_LEARNER.get(kind, ()) and (
             found := _THIRD_PERSON.search(text)

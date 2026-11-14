@@ -799,7 +799,9 @@ def test_text_the_learner_reads_is_written_to_them() -> None:
     record = course(
         {
             "topics": {"walks": {"title": "Walks", "gap": "You stop one step early"}},
-            "tasks": {"sheet-4": {"title": "Sheet 4", "step": "Find a path of length $o(n)$"}},
+            "tasks": {
+                "sheet-4": {"title": "Sheet 4", "step": "Find a path of length $o(n)$"}
+            },
         }
     )
     assert record["topics"]["walks"]["gap"] == "You stop one step early"
