@@ -61,12 +61,19 @@ export interface PracticeDockProps {
 	/** The tutor is answering him: the submit and the requests wait, so a
 	 *  second press cannot stack a second request on the first. */
 	busy?: boolean;
+	/** What he has typed so far, on every change (stranded-draft.ts). */
+	onDraftChange?: (text: string) => void;
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false, busy = false }: PracticeDockProps) {
+export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false, busy = false, onDraftChange }: PracticeDockProps) {
 	const waiting = compactionRunning || busy;
 	const [thinking, setThinking] = useState("");
 	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
+	const draftChangeRef = useRef(onDraftChange);
+	draftChangeRef.current = onDraftChange;
+	useEffect(() => {
+		draftChangeRef.current?.(thinking);
+	}, [thinking]);
 
 	const submit = () => {
 		if (waiting) return;

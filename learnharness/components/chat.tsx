@@ -88,6 +88,8 @@ import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
+import { formDraftText, strandedDraft } from "@/components/lesson/stranded-draft";
+import { LESSON_WORDS } from "@/components/study-words";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -229,6 +231,14 @@ export function Chat({
 	 * and the reply that follows holds at its own first line. Automatic
 	 * continuations go straight to the session and anchor nothing. */
 	const replyAnchorRef = useRef<ReplyAnchor>(null);
+	/* What he has typed in the open dock (stranded-draft.ts): cleared the
+	 * moment this window sends, so words still here when the dock's question
+	 * leaves were overtaken by another window. */
+	const liveDraftRef = useRef<{ key: string; form: string; reading: string } | null>(null);
+	const [answeredElsewhere, setAnsweredElsewhere] = useState(false);
+	// The dock this window last sent from: its question leaving is his doing.
+	const dockKeyRef = useRef<string | null>(null);
+	const sentFromDockRef = useRef<string | null>(null);
 	const followAction = useCallback(() => {
 		const context = scrollContextRef.current;
 		if (!context) return;
@@ -242,6 +252,9 @@ export function Chat({
 		void scrollContextRef.current?.scrollToBottom();
 	}, []);
 	const send = useCallback<typeof sendInput>((...args) => {
+		liveDraftRef.current = null;
+		sentFromDockRef.current = dockKeyRef.current;
+		setAnsweredElsewhere(false);
 		followAction();
 		return sendInput(...args);
 	}, [sendInput, followAction]);
@@ -250,6 +263,8 @@ export function Chat({
 		return steerInput(...args);
 	}, [steerInput, followAction]);
 	const submitAnswer = useCallback<typeof submitInput>((...args) => {
+		liveDraftRef.current = null;
+		sentFromDockRef.current = dockKeyRef.current;
 		followAction();
 		return submitInput(...args);
 	}, [submitInput, followAction]);
@@ -409,6 +424,8 @@ export function Chat({
 			// 2026-10-04 — the GLM loop): the question can only dangle because a
 			// turn is STILL RUNNING, so the discard ALSO kills that turn; the
 			// route parks the dismissal (202) and the settle applies it.
+			liveDraftRef.current = null;
+			sentFromDockRef.current = dockKeyRef.current;
 			const p = pendingRef.current;
 			if (p) {
 				const question = (p.input as { question?: string } | null)?.question ?? "";
@@ -546,6 +563,13 @@ export function Chat({
 	}, []);
 	const applyReadingThinking = useCallback((v: string) => {
 		readingThinkingRef.current = v;
+		const key = pendingRef.current ? `q:${pendingRef.current.key}` : null;
+		if (key) liveDraftRef.current = { key, form: liveDraftRef.current?.key === key ? liveDraftRef.current.form : "", reading: v };
+	}, []);
+	const recordDockDraft = useCallback((key: string, form: string) => {
+		const live = liveDraftRef.current;
+		if (live === null && form === "") return;
+		liveDraftRef.current = { key, form, reading: live?.key === key ? live.reading : "" };
 	}, []);
 	const clearReadingThinking = useCallback(() => {
 		readingThinkingRef.current = "";
@@ -581,6 +605,24 @@ export function Chat({
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
 	}, []);
+
+	// ANSWERED IN ANOTHER WINDOW (stranded-draft.ts): the open question or
+	// problem left without this window sending what he typed in it, so the
+	// words go to the composer and one line says why.
+	const dockKey = pending ? `q:${pending.key}` : activeProblem ? `p:${activeProblem.toolCallId}` : null;
+	dockKeyRef.current = dockKey;
+	const prevDockKeyRef = useRef(dockKey);
+	useEffect(() => {
+		const before = prevDockKeyRef.current;
+		prevDockKeyRef.current = dockKey;
+		if (before === dockKey) return;
+		const live = liveDraftRef.current;
+		const words = before === sentFromDockRef.current ? null : strandedDraft(before, dockKey, live && { key: live.key, text: formDraftText([live.form, live.reading]) });
+		liveDraftRef.current = null;
+		if (words === null) return;
+		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${words}` : words);
+		setAnsweredElsewhere(true);
+	}, [dockKey, applyText]);
 	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The last explicitly-sent draft (composer send): the
@@ -1597,6 +1639,8 @@ export function Chat({
 					onReserve={setDockReserve}
 					busy={busy}
 					focusEpoch={focusEpoch}
+					onDockDraft={recordDockDraft}
+					answeredElsewhere={answeredElsewhere}
 					replyAnchorRef={replyAnchorRef}
 					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
@@ -1801,6 +1845,8 @@ function DockOverlay({
 	onReserve,
 	busy,
 	focusEpoch,
+	onDockDraft,
+	answeredElsewhere,
 	replyAnchorRef,
 	onJumpToLatest,
 	setupCta,
@@ -1840,6 +1886,10 @@ function DockOverlay({
 	busy: boolean;
 	/** Changes when something that held focus went away (focus-home.ts). */
 	focusEpoch: number;
+	/** What he types in the open dock, keyed by its question or problem. */
+	onDockDraft: (key: string, text: string) => void;
+	/** Another window answered the question he was typing in. */
+	answeredElsewhere: boolean;
 	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
 	onJumpToLatest: () => void;
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
@@ -2222,6 +2272,9 @@ function DockOverlay({
 					    rounding starts, truncated, no background, no container. A
 					    line dies when its card lands (visibleQueuedSteers). */}
 					<QueuedSteersBody steers={queuedSteers} />
+					{answeredElsewhere && !pending && !practice && (
+						<p data-testid="answered-elsewhere" className="px-4 pb-2 text-row text-muted-foreground">{LESSON_WORDS.answeredElsewhere}</p>
+					)}
 					{/* The reading-thinking field (owner 2026-10-03): mounted while a
 					    teach-phase check waits — the same cue that collapses it.
 					    Rides the check answer on submit. */}
@@ -2257,6 +2310,7 @@ function DockOverlay({
 									onSubmit={onSubmitAnswer}
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
+									onDraftChange={(text) => onDockDraft(`q:${pending.key}`, text)}
 									compactionRunning={compactionRunning}
 								/>
 							) : practice ? (
@@ -2270,6 +2324,7 @@ function DockOverlay({
 									}}
 									onSubmit={onSubmitThinking}
 									onRequest={onPracticeRequest}
+									onDraftChange={(text) => onDockDraft(`p:${practice.toolCallId}`, text)}
 									compactionRunning={compactionRunning}
 									busy={busy}
 								/>
