@@ -8,7 +8,7 @@ The lesson screen, picked by Edo over Current and Slot on 14 Nov 2026. **Thesis:
 |---|---|
 | `prose-question.tsx` | `ProseQuestion`: a question in the tutor's message, open or answered; `ChoiceRows`, `QuestionWords`, `YourTurn`, `Disclosure` |
 | `prose-practice.tsx` | `ProseProblem`, `ProseConclude`, his work, requests and disputes as bubbles |
-| `learner-bubble.tsx` | `LearnerBubble`: his words on the right, at most 80% wide, the mark under it; `BubbleMark` |
+| `learner-bubble.tsx` | `LearnerBubble`: his words on the right, at most 80% wide, the mark under it; `BubbleMark`; `LearnerWords`: his words exactly as typed, plain text with its line breaks, never Markdown (round 5: `2*30` lost its star, `[2, ∞)` became a blocked link, "$5 and $10" became maths); only maths he wrapped in a delimiter is typeset, by `MathText`'s rule, which keeps money as money |
 | `prose-composer.tsx` | `ProseComposer`: the lesson's composer, the answer field while something is open, Ask instead, the quote |
 | `prose-answer.tsx` | the open item's picks, confidence and mode, shared by the option rows and the composer |
 | `prose-question-data.ts` | pure: what a question asks, the placeholder, readiness, the answer his field and picks make, digit keys |

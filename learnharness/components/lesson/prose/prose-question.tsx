@@ -9,7 +9,7 @@ import { LESSON_WORDS } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 import { proseQuestionSpec, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
 import { useProseAnswerContext } from "@/components/lesson/prose/prose-answer";
-import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
+import { LearnerBubble, LearnerWords } from "@/components/lesson/prose/learner-bubble";
 
 /** Small prose: a choice's description, his note on an answer. */
 const SMALL_SIZE = "[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]";
@@ -171,7 +171,7 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor 
 			) : (
 				<>
 					<LearnerBubble testId="prose-answer" text={words} photos={photos} markId={toolCallId}>
-						{added && <ToolContentResponse className={cn(words && "mt-1", SMALL)}>{added}</ToolContentResponse>}
+						{added && <LearnerWords className={cn(words && "mt-1", SMALL)}>{added}</LearnerWords>}
 					</LearnerBubble>
 					{answer.kind === "explain" && answer.committed && <Disclosure label="The answer">{answer.committed}</Disclosure>}
 				</>

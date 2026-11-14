@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { MessageResponse } from "@/components/ai-elements/message";
+import { MathText } from "@/components/ui/math-text";
 import { SentPhotos } from "@/components/photos";
 import { MarkLine } from "@/components/lesson/mark-line";
 import type { Photo } from "@/src/core";
@@ -43,7 +43,7 @@ export function LearnerBubble({
 					{label}
 				</div>
 			)}
-			{words && <MessageResponse className="text-foreground">{words}</MessageResponse>}
+			{words && <LearnerWords className="text-foreground">{words}</LearnerWords>}
 			{children}
 			{photos && photos.length > 0 && <SentPhotos photos={photos} className={words || label ? "mt-2" : undefined} />}
 		</div>
@@ -53,6 +53,19 @@ export function LearnerBubble({
 			{bubble}
 			{markId && <MarkLine answerId={markId} className={MARK_UNDER_BUBBLE} />}
 		</div>
+	);
+}
+
+/** His own words exactly as he typed them (prose.md, "His words"): plain
+ *  text with its line breaks, never Markdown, so `2*30`, `[2, ∞)` and
+ *  "$5 and $10" read as written. Only maths he wrapped in a delimiter on
+ *  purpose is typeset (`MathText`'s rule: `\(…\)`, `$$…$$`, or a `$…$`
+ *  hugging its formula, so money stays money). */
+export function LearnerWords({ children, className }: { children: string; className?: string }) {
+	return (
+		<p data-slot="learner-words" className={cn("lh-prose whitespace-pre-wrap break-words", className)}>
+			<MathText>{children}</MathText>
+		</p>
 	);
 }
 
