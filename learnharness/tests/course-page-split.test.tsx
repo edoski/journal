@@ -172,10 +172,10 @@ describe("the map pane", () => {
 		assert.equal(document.querySelectorAll('[data-slot="course-map-node"]').length, MAP.topics.length);
 	});
 
-	it("dims every topic but the ones a row lights", () => {
+	it("dims every topic but the ones a row lights, You are here and the topics it leads to", () => {
 		const document = drawMap(litOf({ handle: h("span"), from: "list" }, MAP.edges));
-		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => n.parentElement!.className.includes("opacity-50")).map((n) => n.getAttribute("data-testid"));
-		assert.deepEqual(dimmed.sort(), ["map-node-basis", "map-node-eigen", "map-node-independence"]);
+		const dimmed = [...document.querySelectorAll('[data-slot="course-map-node"]')].filter((n) => /opacity:\s*0?\.\d/.test(n.parentElement!.getAttribute("style") ?? "")).map((n) => n.getAttribute("data-testid"));
+		assert.deepEqual(dimmed.sort(), ["map-node-eigen"]);
 	});
 
 	it("rings the card of the row he points at with the glow, and no other", () => {

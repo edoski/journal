@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
+import { readFileSync } from "node:fs";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { CourseMap, CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
@@ -94,6 +95,21 @@ const MAP: CourseMap = {
 	edges: [...edgesOf(NEEDS), { kind: "contrasts", pair: [h("cramer"), h("elimination")] }],
 };
 const byHandle = (handle: string) => TOPICS.find((t) => t.handle === handle)!;
+
+/** The muted line's contrast on its card, the whole card drawn at `opacity` over the page (the app's dark tokens). */
+function contrastAt(opacity: number): number {
+	const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+	const token = (name: string) => /#([0-9a-f]{6})/i.exec(new RegExp(`--${name}:\\s*([^;]+);`).exec(css)![1]!)![1]!;
+	const rgb = (hex: string) => [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+	const over = (fg: number[], bg: number[]) => fg.map((c, i) => c * opacity + bg[i]! * (1 - opacity));
+	const luminance = (c: number[]) => {
+		const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+		return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+	};
+	const page = rgb(token("background"));
+	const [text, card] = [luminance(over(rgb(token("muted-foreground")), page)), luminance(over(rgb(token("card")), page))];
+	return (Math.max(text, card) + 0.05) / (Math.min(text, card) + 0.05);
+}
 const titleOf = (handle: TopicHandle) => byHandle(handle).title;
 
 describe("where he stands on a topic", () => {
@@ -296,9 +312,12 @@ describe("where a course map opens framed", () => {
 			const fit = cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * camera.zoom, bottom: top + TOPIC_NODE_SIZE.height * camera.zoom }, frame, FADE);
 			if (fit === "cut") out.cut.push(handle);
 			else if (fit === "clear") out.clear.push(handle);
+			if (fit === "clear" || fit === "faded") out.whole.push(handle);
 		}
 		return out;
 	};
+	/** The topics that need one: where he goes next from it. */
+	const nextOf = (handle: string) => MAP.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === handle ? [e.topic as string] : []));
 
 	it("calls a card that shows only in the fade but runs past the frame's edge cut, and one wholly past it out of view", () => {
 		const frame = { width: 896, height: 413 };
@@ -312,12 +331,9 @@ describe("where a course map opens framed", () => {
 	it("shows the whole course when it fits at a readable scale", () => {
 		const camera = framedCamera(layout, MAP.current, { width: 1600, height: 900 }, FADE, TAG);
 		assert.ok(camera.zoom >= READABLE_ZOOM);
-			if (fit === "clear" || fit === "faded") out.whole.push(handle);
 		assert.equal(sort(camera, { width: 1600, height: 900 }).clear.length, layout.topics.size);
 	});
 
-	/** The topics that need one: where he goes next from it. */
-	const nextOf = (handle: string) => MAP.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === handle ? [e.topic as string] : []));
 	it("frames the current topic clear of the fade, with its tag, and the topics it leads to whole", () => {
 		const frame = { width: 896, height: 413 };
 		const camera = framedCamera(layout, MAP.current, frame, FADE, TAG);
@@ -430,6 +446,20 @@ describe("topic map drawing", () => {
 		);
 		assert.equal(document.querySelectorAll('[data-slot="topic-detail"], [data-testid="study-topic"]').length, 0);
 		assert.match(document.querySelector("figcaption")!.textContent!, /16 topics.*You are at Rank\./);
+	});
+
+	it("keeps You are here and the topics it leads to at full strength while a page lights others, and dims the rest only as far as their words still read (round 5: Diagonalization at 2.8:1)", () => {
+		const lit = render(<TopicMap map={MAP} said={said} highlight={new Set([h("basis")])} />);
+		const strength = (handle: string) => {
+			const card = lit.querySelector(`[data-testid="map-node-${handle}"]`)!.parentElement!;
+			const styled = /opacity:\s*([\d.]+)/.exec(card.getAttribute("style") ?? "")?.[1];
+			const classed = /(?:^|\s)opacity-(\d+)(?:\s|$)/.exec(card.getAttribute("class") ?? "")?.[1];
+			return styled ? Number(styled) : classed ? Number(classed) / 100 : 1;
+		};
+		for (const handle of ["basis", "rank", "kernel", "invertibility", "eigen"]) assert.equal(strength(handle), 1, handle);
+		const dimmed = strength("diagonalization");
+		assert.ok(dimmed < 1, "a topic two steps on dims");
+		assert.ok(contrastAt(dimmed) >= 4.5, `its muted line at ${contrastAt(dimmed).toFixed(2)}:1`);
 	});
 
 	it("draws one line per need, hidden from a screen reader", () => {

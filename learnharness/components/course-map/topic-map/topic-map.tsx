@@ -187,8 +187,15 @@ function Flow({
 	const [active, setActive] = useState<TopicHandle | null>(null);
 	const [tabStop, setTabStop] = useState<TopicHandle | null>(map.current ?? map.topics[0]?.handle ?? null);
 	const links = useRef(new Map<TopicHandle, HTMLAnchorElement>());
-	// A hovered or focused topic's chain, else the page's highlight.
-	const lit = useMemo(() => (active ? chainOf(active, map.edges) : highlight), [active, map.edges, highlight]);
+	// A hovered or focused topic's chain; else the page's highlight, with "You are here" and the topics it leads to
+	// (Edo, 14 Nov 2026: they stay whole and readable; only topics further away recede).
+	const lit = useMemo(() => {
+		if (active) return chainOf(active, map.edges);
+		if (!highlight) return null;
+		const here = map.current;
+		const next = here ? map.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === here ? [e.topic] : [])) : [];
+		return new Set([...highlight, ...(here ? [here] : []), ...next]);
+	}, [active, map.edges, map.current, highlight]);
 
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
 	// Zoomed out as far as the whole course, however small: the enlarged map's overview.
