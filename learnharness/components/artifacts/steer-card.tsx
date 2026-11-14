@@ -71,7 +71,7 @@ function AbortedBadge({ kind }: { kind: string }) {
 		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-row text-muted-foreground">
 			<CircleX className="size-4" />
 			<span className="first-letter:uppercase">{kind}</span>
-			<span>aborted by the learner</span>
+			<span>stopped by you</span>
 		</div>
 	);
 }

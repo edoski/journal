@@ -385,7 +385,8 @@ describe("steer card rendering (the delivered artifact)", () => {
 		const html = renderToStaticMarkup(<SubagentSteerCard message={view as never} />);
 		assert.match(html, /job-aborted-badge/);
 		assert.match(html, /research/, "the job's kind, lower-cased like the complete-badge idiom");
-		assert.match(html, /aborted by the learner/);
+		assert.match(html, /stopped by you/);
+		assert.doesNotMatch(html, /learner/);
 		// the teacher-facing protocol text never renders for the learner
 		assert.ok(!html.includes("no brief is coming"), "no protocol glue in the chip");
 		// the badge renders off the PART, not metadata (the custom-message scheme)
