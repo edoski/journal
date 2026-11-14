@@ -1,0 +1,188 @@
+"use client";
+
+import { createContext, useContext, useRef, useState, type KeyboardEvent } from "react";
+import { CircleCheckIcon, CircleMinusIcon, CircleXIcon, FlagIcon, GaugeIcon, HandHelpingIcon, ScaleIcon, UserIcon, type LucideIcon } from "lucide-react";
+import type { AnswerMark, DisputeDetails, MarkResult, MarkRow } from "@/src/core";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Hint } from "@/components/ui/hint";
+import { MathText } from "@/components/ui/math-text";
+import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { countedWords, MARK_WORDS } from "@/components/study-words";
+import { cn } from "@/lib/utils";
+
+/**
+ * An answer's mark on its card, and the dispute (spec: answer-mark.md).
+ * Everything shown is the engine's record of the attempt that stands; the
+ * session fetches it (`/api/chats/:id/marks`) and hands it down here.
+ */
+
+export interface AnswerMarks {
+	marks: Readonly<Record<string, AnswerMark>>;
+	/** Opens the dispute dialog on this answer. */
+	onDispute: (answerId: string) => void;
+	/** False while a turn runs: a dispute is a message to the tutor. */
+	canDispute: boolean;
+}
+
+const AnswerMarksContext = createContext<AnswerMarks>({ marks: {}, onDispute: () => {}, canDispute: false });
+export const AnswerMarksProvider = AnswerMarksContext.Provider;
+
+/** This answer's mark, when the engine holds one. */
+export function useAnswerMark(answerId: string | undefined): AnswerMark | undefined {
+	const { marks } = useContext(AnswerMarksContext);
+	return answerId ? marks[answerId] : undefined;
+}
+
+const RESULT_ICON: Record<MarkResult, LucideIcon> = {
+	correct: CircleCheckIcon,
+	partial: CircleMinusIcon,
+	incorrect: CircleXIcon,
+};
+
+function Fact({ icon: Icon, children, className }: { icon: LucideIcon; children: React.ReactNode; className?: string }) {
+	return (
+		<span className={cn("inline-flex items-center gap-1.5", className)}>
+			<Icon aria-hidden className="size-3.5 shrink-0" />
+			{children}
+		</span>
+	);
+}
+
+function RowFacts({ row }: { row: MarkRow }) {
+	return (
+		<span data-testid="mark-row" data-result={row.result} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+			{row.label && <span className="text-muted-foreground">{row.label}</span>}
+			<Fact icon={RESULT_ICON[row.result]} className="text-foreground">{MARK_WORDS.result[row.result]}</Fact>
+			<Fact icon={row.helped || row.grade === "helped" ? HandHelpingIcon : UserIcon}>{countedWords(row)}</Fact>
+			{row.sure && <Fact icon={GaugeIcon}>{MARK_WORDS.sure[row.sure]}</Fact>}
+		</span>
+	);
+}
+
+/** The card's foot: the mark, whether it was disputed, and Dispute. Null
+ *  until the engine holds an attempt for the answer. */
+export function AnswerMarkLine({ answerId }: { answerId: string }) {
+	const { marks, onDispute, canDispute } = useContext(AnswerMarksContext);
+	const mark = marks[answerId];
+	if (!mark) return null;
+	return (
+		<div data-testid="answer-mark" className="mt-3 flex items-start gap-3 border-t pt-3 text-row text-muted-foreground">
+			<div className="flex min-w-0 flex-1 flex-col gap-1">
+				{mark.rows.map((row) => (
+					<RowFacts key={row.id} row={row} />
+				))}
+				{mark.disputed && (
+					<span data-testid="mark-disputed" className="flex min-w-0 items-start gap-1.5">
+						<ScaleIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+						<span className="min-w-0">
+							{MARK_WORDS.disputed}
+							{mark.ruling && <span className="text-muted-foreground/80">: <MathText>{mark.ruling}</MathText></span>}
+						</span>
+					</span>
+				)}
+			</div>
+			<Hint label={MARK_WORDS.disputeTitle} action="dispute-mark">
+				<Button variant="quiet" size="row" data-testid="dispute-mark" disabled={!canDispute} onClick={() => onDispute(answerId)} className="-my-1.5 -mr-2 shrink-0">
+					<FlagIcon aria-hidden className="size-3.5" />
+					{MARK_WORDS.dispute}
+				</Button>
+			</Hint>
+		</div>
+	);
+}
+
+/** What the dialog sends: his words, the mark he picked, or both. */
+export type DisputeDraft = Pick<DisputeDetails, "said" | "proposed">;
+
+const PICKS: readonly MarkResult[] = ["correct", "partial", "incorrect"];
+
+/** The dispute: a sentence on what's wrong, or the mark he thinks is
+ *  right. ↑ from the start of the field reaches the marks, ↓ comes back,
+ *  ← → move between marks, ⌘↵ sends. */
+export function DisputeDialog({ mark, onClose, onSend }: { mark: AnswerMark; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
+	const [said, setSaid] = useState("");
+	const [proposed, setProposed] = useState<MarkResult | "">("");
+	const fieldRef = useRef<HTMLTextAreaElement>(null);
+	const groupRef = useRef<HTMLDivElement>(null);
+	const ready = said.trim().length > 0 || proposed !== "";
+	const send = () => {
+		if (!ready) return;
+		onSend({ ...(said.trim() ? { said: said.trim() } : {}), ...(proposed ? { proposed } : {}) });
+	};
+	const marked = mark.rows.map((row) => MARK_WORDS.result[row.result]).join(", ");
+	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+			e.preventDefault();
+			send();
+		} else if (e.key === "ArrowUp" && e.target === fieldRef.current && fieldRef.current.selectionStart === 0 && fieldRef.current.selectionEnd === 0) {
+			e.preventDefault();
+			const items = groupRef.current?.querySelectorAll<HTMLButtonElement>("[data-pick]");
+			(groupRef.current?.querySelector<HTMLButtonElement>('[data-state="on"]') ?? items?.[0])?.focus();
+		} else if (e.key === "ArrowDown" && groupRef.current?.contains(e.target as Node)) {
+			e.preventDefault();
+			fieldRef.current?.focus();
+		}
+	};
+	return (
+		<Dialog open onOpenChange={(open) => !open && onClose()}>
+			<DialogContent data-testid="dispute-dialog" className="max-w-md" onKeyDown={onKeyDown} onOpenAutoFocus={(e) => { e.preventDefault(); fieldRef.current?.focus(); }}>
+				<DialogHeader>
+					<DialogTitle>{MARK_WORDS.disputeTitle}</DialogTitle>
+					<DialogDescription>
+						Marked {marked}. {MARK_WORDS.disputeLine}
+					</DialogDescription>
+				</DialogHeader>
+				<ToggleGroup
+					ref={groupRef}
+					type="single"
+					variant="segmented"
+					size="segment"
+					aria-label="The mark you think is right"
+					data-testid="dispute-pick"
+					value={proposed}
+					onValueChange={(next) => setProposed(next as MarkResult | "")}
+					className="self-start"
+				>
+					{PICKS.map((pick) => (
+						<ToggleGroupItem key={pick} value={pick} data-pick={pick}>
+							{MARK_WORDS.result[pick]}
+						</ToggleGroupItem>
+					))}
+				</ToggleGroup>
+				<Textarea ref={fieldRef} data-testid="dispute-said" value={said} onChange={(e) => setSaid(e.target.value)} placeholder={MARK_WORDS.disputePlaceholder} rows={3} className="min-h-20" />
+				<DialogFooter>
+					<Button variant="quiet" size="row" onClick={onClose}>
+						Cancel
+					</Button>
+					<Hint label={MARK_WORDS.disputeSend} binding="mod+enter">
+						<Button size="row" data-testid="dispute-send" disabled={!ready} onClick={send}>
+							{MARK_WORDS.disputeSend}
+						</Button>
+					</Hint>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+/** His dispute in the transcript: what he said is wrong and the mark he
+ *  picked. A learner row, never an answer card. */
+export function DisputeRow({ data }: { data: DisputeDetails }) {
+	return (
+		<div data-testid="dispute-row" className="my-1 w-full rounded-xl bg-card px-4 py-3">
+			<div className="flex items-center gap-2 text-row text-muted-foreground">
+				<FlagIcon aria-hidden className="size-4 shrink-0" />
+				{MARK_WORDS.youDisputed}
+				{data.proposed && (
+					<>
+						<span aria-hidden>·</span>
+						{MARK_WORDS.youThink}: {MARK_WORDS.result[data.proposed]}
+					</>
+				)}
+			</div>
+			{data.said ? <p className="lh-prose mt-1 whitespace-pre-wrap italic text-muted-foreground"><MathText>{data.said}</MathText></p> : null}
+		</div>
+	);
+}

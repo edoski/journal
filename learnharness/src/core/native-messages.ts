@@ -47,9 +47,11 @@ import {
 	THINKING_LABEL,
 	type PracticeRequest,
 	type SessionMode,
+	disputeText,
 } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
 import type { Confidence } from "./contracts/course.ts";
+import type { MarkResult } from "./contracts/marks.ts";
 import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import { PHOTO_ONLY_TEXT, WORKING_PHOTO_NOTE, type Photo } from "./photos.ts";
@@ -88,6 +90,7 @@ export interface LhMarkerMessage {
 		| "practice-next"
 		| "practice-request"
 		| "done-tonight"
+		| "dispute"
 		| "problem-dismissed"
 		| "compaction"
 		| "session-resume";
@@ -481,6 +484,32 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): Lh
 		content: DONE_TONIGHT_TEXT[agent],
 		display: true,
 		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** His dispute of an answer's mark (Edo, 14 Nov 2026), the transcript's
+ *  record of it: which answer, the attempts that stood for it, and what he
+ *  said or the mark he picked. */
+export interface DisputeDetails {
+	/** The answer's tool call: a question's, or a problem's conclude. */
+	answerId: string;
+	observations: string[];
+	said?: string;
+	proposed?: MarkResult;
+}
+
+/** His dispute, as its own message to the tutor: the content names the
+ *  answer and its attempts, so the agent re-judges them as the course
+ *  record says (prompts/course/10-record.md). */
+export function newDisputeMessage(details: DisputeDetails, question: string): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "dispute",
+		content: disputeText(details, question),
+		display: true,
+		details,
 		timestamp: Date.now(),
 	};
 }
@@ -1113,7 +1142,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next", "practice-request", "done-tonight"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", "dispute"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {

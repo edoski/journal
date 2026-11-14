@@ -39,6 +39,17 @@ Home's line names the lapsed topic when the line is about another one ("Missed C
 | he stops for the day | Done for today; a question he left reads Left for next time |
 | a course's record can't be read | Couldn't read this course's record, then why (`UNREADABLE_WORDS`): The app isn't allowed to open its files. / Its file is damaged. / Its file can't be opened. |
 
+## An answer's mark
+
+`MARK_WORDS` and `countedWords`: the record's mark on an answered card (answer-mark.md).
+
+| Fact | Words |
+|---|---|
+| result | Right, Partly right, Not right |
+| counted | On your own; With help; Counted as helped (a right guess, an unsure or a partly right answer with no help) |
+| confidence recorded | Guessing, Neutral, Confident |
+| a dispute | Dispute; Disputed: and the tutor's ruling; in the transcript, You disputed the mark, You think: Partly right |
+
 ## Counts
 
 | Where | Words |

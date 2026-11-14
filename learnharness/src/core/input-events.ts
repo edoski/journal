@@ -44,6 +44,7 @@ import {
 	newAnswerResult,
 	newNextMessage,
 	newDoneTonightMessage,
+	newDisputeMessage,
 	respondingAgentOf,
 	newProblemDismissedMarker,
 	newThinkingMessage,
@@ -56,6 +57,8 @@ import {
 	pendingProblemDismissalOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
+import { markLinks } from "./answer-marks.ts";
+import { isMarkResult, MARK_RESULTS, type MarkResult } from "./contracts/marks.ts";
 import { CONFIDENCE_STATES, isConfidence, type Confidence } from "./contracts/course.ts";
 import { isPracticeRequest, PRACTICE_REQUESTS, type PracticeRequest } from "./contracts/chat.ts";
 
@@ -85,7 +88,11 @@ export type ChatInput =
 	 *  only with nothing active (mid-problem input rides the dock). */
 	| { type: "next" }
 	/** Done for tonight: he stops now, whatever is open. */
-	| { type: "tonight" };
+	| { type: "tonight" }
+	/** His dispute of an answer's mark (Edo, 14 Nov 2026): the answer's
+	 *  call, the attempts that stood for it when he pressed Dispute, and
+	 *  what he said is wrong or the mark he thinks is right (at least one). */
+	| { type: "dispute"; answerId: string; observations: string[]; said?: string; proposed?: MarkResult };
 
 /** A wake-pipeline steer delivery — same turn composition, server-origin.
  *  Wave C (2026-09-26): the idle wake carries EVERY queued marker as its
@@ -270,6 +277,24 @@ export function parseChatInput(input: unknown): ChatInput {
 			return { type: "next" };
 		case "tonight":
 			return { type: "tonight" };
+		case "dispute": {
+			if (typeof i.answerId !== "string" || i.answerId.length === 0) throw new ChatInputError("dispute input requires answerId");
+			const observations = Array.isArray(i.observations) ? i.observations : [];
+			if (observations.length === 0 || !observations.every((id) => typeof id === "string" && /^o\d+$/.test(id))) {
+				throw new ChatInputError("dispute input requires the observation ids (o12) that stand for the answer");
+			}
+			if (i.said !== undefined && typeof i.said !== "string") throw new ChatInputError("dispute input said must be a string");
+			if (i.proposed !== undefined && !isMarkResult(i.proposed)) throw new ChatInputError(`dispute input proposed must be one of ${MARK_RESULTS.join(", ")}`);
+			const said = typeof i.said === "string" ? i.said.trim() : "";
+			if (!said && i.proposed === undefined) throw new ChatInputError("dispute input requires what he says is wrong or the mark he thinks is right");
+			return {
+				type: "dispute",
+				answerId: i.answerId,
+				observations: observations as string[],
+				...(said ? { said } : {}),
+				...(i.proposed !== undefined ? { proposed: i.proposed } : {}),
+			};
+		}
 		default:
 			throw new ChatInputError(`unknown input type: ${String(i.type)}`);
 	}
@@ -335,7 +360,45 @@ export function inputAppends(
 		}
 		case "tonight":
 			return tonightAppends(record);
+		case "dispute":
+			return disputeAppends(record, input);
 	}
+}
+
+/** The question an answer answered: a graded question's text, or the
+ *  statement of the problem a conclude ended. Null when the record holds
+ *  no such answer. Pure. */
+export function answeredQuestionText(messages: readonly LhMessage[], answerId: string): string | null {
+	const at = messages.findIndex((m) => m.role === "toolResult" && m.toolCallId === answerId && !m.isError);
+	if (at < 0) return null;
+	const result = messages[at] as LhMessage & { role: "toolResult" };
+	if (result.toolName !== "conclude") {
+		const text = (result.details as { questionText?: unknown } | null)?.questionText;
+		return typeof text === "string" ? text : null;
+	}
+	for (let i = at - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const pose = m.content.findLast((b) => b.type === "toolCall" && b.name === "problem");
+		if (pose?.type !== "toolCall") continue;
+		const args = typeof pose.arguments === "string" ? (JSON.parse(pose.arguments) as unknown) : pose.arguments;
+		const statement = (args as { statement?: unknown } | null)?.statement;
+		return typeof statement === "string" ? statement : "";
+	}
+	return "";
+}
+
+/** A dispute's appends (pure): a pending problem dismissal's conclude
+ *  pair, then the dispute itself. Refused when the answer carries no mark
+ *  the record links to it (answer-marks.ts). An open question is left as
+ *  it is: the agent reads it as set aside and asks it again. */
+export function disputeAppends(record: { messages: LhMessage[] }, input: Extract<ChatInput, { type: "dispute" }>): LhMessage[] {
+	const question = answeredQuestionText(record.messages, input.answerId);
+	if (question === null || !markLinks(record.messages)[input.answerId]) {
+		throw new ChatInputError("dispute input targets no marked answer");
+	}
+	const { answerId, observations, said, proposed } = input;
+	return [...dismissalConclusion(record), newDisputeMessage({ answerId, observations, ...(said ? { said } : {}), ...(proposed ? { proposed } : {}) }, question)];
 }
 
 /** Done for tonight's appends (pure). Every answerable question in the

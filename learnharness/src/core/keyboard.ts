@@ -50,6 +50,7 @@ export type KeyAction =
 	| "practice-explain"
 	| "jump-latest"
 	| "done-tonight"
+	| "dispute-mark"
 	| "dialog-confirm"
 	| "attach-photo";
 
@@ -106,6 +107,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "practice-explain", label: "Problem · explain instead", scope: "lesson", binding: "mod+shift+e" },
 	{ id: "jump-latest", label: "Go to the newest reply", scope: "lesson", binding: "mod+arrowdown" },
 	{ id: "done-tonight", label: "Done for tonight", scope: "lesson", binding: "mod+shift+d" },
+	// The newest answer's mark: the dialog opens on it (answer-mark.tsx).
+	{ id: "dispute-mark", label: "Dispute the newest answer's mark", scope: "lesson", binding: "mod+shift+m" },
 	// The answer field on show (composer, check or problem) opens its picker.
 	{ id: "attach-photo", label: "Attach a photo of your working", scope: "lesson", binding: "mod+shift+p" },
 	{ id: "dialog-confirm", label: "Confirm a stop or skip (← → pick a button)", scope: "lesson", binding: "mod+enter", displayOnly: true },

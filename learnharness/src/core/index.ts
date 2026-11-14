@@ -39,6 +39,7 @@ export * from "./photos.ts";
 export * from "./view.ts";
 export * from "./tool-parts.ts";
 export * from "./answer-presentation.ts";
+export * from "./answer-marks.ts";
 export { doneTonightAtEnd } from "./session-end.ts";
 export { replyNeverCame } from "./turn-cut.ts";
 export * from "./prices.ts";

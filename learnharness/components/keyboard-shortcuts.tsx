@@ -133,6 +133,7 @@ export function KeyboardShortcuts() {
 				case "practice-show":
 				case "practice-explain":
 				case "done-tonight":
+				case "dispute-mark":
 					// The problem box owns these; claim the chord from the browser.
 					e.preventDefault();
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
