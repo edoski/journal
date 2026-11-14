@@ -8,12 +8,23 @@
  * (the owner's decisions), and the stylesheet owns those, so mode,
  * background, reading font, serif session names and heading weight have no
  * row (their schema fields stay); reading size and the emphasis inks do.
- * Inputs commit on blur/Enter. The emphasis inks default to the regular
- * text color (globals.css); the empty-state placeholders say "same as text".
+ * Every row is a control, never free text: Text size is a menu of the
+ * sizes the record takes, its factory size marked as the default (picking
+ * it unsets the field); each ink is a swatch with the system colour picker
+ * and Default, which stores null. The inks default to the regular text
+ * colour (globals.css), which an unset swatch shows.
  */
 
-import type { AppearanceSettings } from "@/src/core";
-import { CommitInput, SettingsGroup, SettingsRow } from "./controls.tsx";
+import { FACTORY_SETTINGS, PROSE_FONT_MAX, PROSE_FONT_MIN, type AppearanceSettings } from "@/src/core";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ColorField, SettingsGroup, SettingsRow } from "./controls.tsx";
+
+/** The reading sizes the menu offers: every size the record takes. */
+const SIZES = Array.from({ length: PROSE_FONT_MAX - PROSE_FONT_MIN + 1 }, (_, i) => PROSE_FONT_MIN + i);
+const FACTORY_SIZE = FACTORY_SETTINGS.appearance.proseFontSize;
+
+/** The regular text ink, which an unset emphasis ink resolves to. */
+const TEXT_INK = "var(--foreground)";
 
 export function AppearanceSection({
 	appearance,
@@ -25,48 +36,49 @@ export function AppearanceSection({
 	onSectionChange: (next: AppearanceSettings) => void;
 }) {
 	const md = appearance?.mdRendering;
-
-	const commitProseSize = (v: string) => {
-		// Empty = factory default (owner, fix wave): omit the key so the record
-		// UNSETS and the field stays empty (absence, not null, is the
-		// unset for numbers). Number("") is 0, so the old clamp wrote 12.
-		if (v === "") {
-			onSectionChange({ ...appearance, proseFontSize: undefined });
-			return;
-		}
-		const n = Number(v);
-		if (!Number.isFinite(n)) return; // bad input: no write, factory stays
-		onSectionChange({ ...appearance, proseFontSize: Math.min(24, Math.max(12, Math.round(n))) });
-	};
+	const size = appearance?.proseFontSize ?? FACTORY_SIZE;
+	const bold = md?.boldColor ?? null;
+	const italic = md?.italicColor ?? null;
 
 	return (
 		<SettingsGroup label="Reading" testid="group-reading">
 			<SettingsRow label="Text size" testid="row-prose-size">
-				<CommitInput
-					type="number"
-					value={String(appearance?.proseFontSize ?? "")}
-					placeholder="16"
-					ariaLabel="prose font size"
-					testid="input-prose-size"
-					onCommit={commitProseSize}
-				/>
+				<Select
+					value={String(size)}
+					onValueChange={(v) => {
+						const n = Number(v);
+						// The factory size is the default: picking it unsets the field.
+						onSectionChange({ ...appearance, proseFontSize: n === FACTORY_SIZE ? undefined : n });
+					}}
+				>
+					<SelectTrigger size="sm" aria-label="Text size" data-testid="input-prose-size" className="w-32 font-normal">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent data-testid="prose-size-menu">
+						{SIZES.map((n) => (
+							<SelectItem key={n} value={String(n)}>
+								{n === FACTORY_SIZE ? `${n} px, default` : `${n} px`}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</SettingsRow>
-			<SettingsRow label="Bold color" testid="row-bold-color">
-				<CommitInput
-					value={md?.boldColor ?? ""}
-					placeholder="same as text"
-					ariaLabel="bold color"
+			<SettingsRow label="Bold color" hint={bold === null ? "Same as the text" : undefined} testid="row-bold-color">
+				<ColorField
+					value={bold}
+					fallback={TEXT_INK}
+					label="Bold color"
 					testid="input-bold-color"
-					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v === "" ? null : v } })}
+					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v } })}
 				/>
 			</SettingsRow>
-			<SettingsRow label="Italic color" testid="row-italic-color">
-				<CommitInput
-					value={md?.italicColor ?? ""}
-					placeholder="same as text"
-					ariaLabel="italic color"
+			<SettingsRow label="Italic color" hint={italic === null ? "Same as the text" : undefined} testid="row-italic-color">
+				<ColorField
+					value={italic}
+					fallback={TEXT_INK}
+					label="Italic color"
 					testid="input-italic-color"
-					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, italicColor: v === "" ? null : v } })}
+					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, italicColor: v } })}
 				/>
 			</SettingsRow>
 		</SettingsGroup>

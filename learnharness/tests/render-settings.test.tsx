@@ -5,12 +5,14 @@
  * fire), so the SSR state IS the loading state — asserted as such.
  * Same tsx classic-JSX shim as render-sidebar.test.tsx.
  */
-import React from "react";
+import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createRoot } from "react-dom/client";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
@@ -57,18 +59,55 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 });
 
 describe("AppearanceSection (thin SSR)", () => {
-	it("the inputs carry the factory placeholders: 16 for the text size, same as text for the inks", () => {
+	it("every row is a control: a size menu and two colour pickers, each with Default", () => {
 		const html = renderToStaticMarkup(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />);
-		assert.ok(tagOf(html, "input-prose-size").includes('placeholder="16"'));
-		assert.ok(tagOf(html, "input-bold-color").includes('placeholder="same as text"'));
-		assert.ok(tagOf(html, "input-italic-color").includes('placeholder="same as text"'));
+		const size = tagOf(html, "input-prose-size");
+		assert.match(size, /^<button/, "Text size is a menu, not a field");
+		for (const ink of ["input-bold-color", "input-italic-color"]) {
+			assert.match(tagOf(html, ink), /type="color"/, `${ink} opens the system colour picker`);
+			assert.match(tagOf(html, `${ink}-default`), /disabled=""/, `${ink}'s Default is off while the default is in use`);
+		}
+		assert.equal(html.match(/Same as the text/g)?.length, 2, "an unset ink says it follows the text");
+		assert.doesNotMatch(html, /type="(text|number)"/, "nothing is typed");
 	});
 
-	it("a set ink shows in the input, not the placeholder", () => {
+	it("a set ink shows in the picker and its Default clears it to null", () => {
+		const changes: unknown[] = [];
 		const html = renderToStaticMarkup(
-			<AppearanceSection appearance={{ mdRendering: { boldColor: "#1a1a2e" } }} onSectionChange={() => {}} />,
+			<AppearanceSection appearance={{ mdRendering: { boldColor: "#abc" }, proseFontSize: 18 }} onSectionChange={(next) => changes.push(next)} />,
 		);
-		assert.ok(tagOf(html, "input-bold-color").includes(`value="#1a1a2e"`));
+		assert.ok(tagOf(html, "input-bold-color").includes(`value="#aabbcc"`), "a short hex grows to the picker's form");
+		assert.doesNotMatch(tagOf(html, "input-bold-color-default"), /disabled=""/);
+		assert.equal(html.match(/Same as the text/g)?.length, 1, "only the unset ink follows the text");
+	});
+
+	it("the size menu names the size in use, the factory one as the default", async () => {
+		for (const [appearance, words] of [[undefined, "16 px, default"], [{ proseFontSize: 18 }, "18 px"]] as const) {
+			const host = dom.document.createElement("div");
+			dom.document.body.appendChild(host);
+			const root = createRoot(host);
+			await act(async () => {
+				root.render(<AppearanceSection appearance={appearance} onSectionChange={() => {}} />);
+			});
+			assert.equal(host.querySelector('[data-testid="input-prose-size"]')?.textContent?.trim(), words);
+			await act(async () => root.unmount());
+			host.remove();
+		}
+	});
+
+	it("Default stores null, the record's unset ink", async () => {
+		const changes: { mdRendering?: { boldColor?: string | null } }[] = [];
+		const host = dom.document.createElement("div");
+		dom.document.body.appendChild(host);
+		const root = createRoot(host);
+		await act(async () => {
+			root.render(<AppearanceSection appearance={{ mdRendering: { boldColor: "#1a1a2e" } }} onSectionChange={(next) => changes.push(next)} />);
+		});
+		const reset = host.querySelector<HTMLButtonElement>('[data-testid="input-bold-color-default"]');
+		await act(async () => reset?.click());
+		assert.equal(changes.at(-1)?.mdRendering?.boldColor, null);
+		await act(async () => root.unmount());
+		host.remove();
 	});
 });
 

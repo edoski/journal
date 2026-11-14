@@ -146,8 +146,10 @@ export const FACTORY_SETTINGS: FactorySettings = {
 
 // ─── Sanitizer ─────────────────────────────────────────────────────────────
 
-const PROSE_FONT_MIN = 12;
-const PROSE_FONT_MAX = 24;
+/** The reading size's bounds in px, which the record clamps to and
+ *  Settings' Text size menu offers. */
+export const PROSE_FONT_MIN = 12;
+export const PROSE_FONT_MAX = 24;
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
