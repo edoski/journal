@@ -38,7 +38,7 @@ A typical turn after a hinted attempt on an exercise:
 }
 ```
 
-The receipt returns new observation ids, the reviews it set, level changes, the current `focus` and `path_current`, the number of due reviews, `placed` (where each new topic outside `path.order` went), and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
+The receipt returns new observation ids, the reviews it set (each with `due`, the day memory asks for it, and `planned`, the day the daily plan puts it, which every screen shows: when you tell the learner when a topic comes back, say the `planned` day, never one you count from `due`), level changes, the current `focus` and `path_current`, the number of reviews the plan puts today (`due_count`), `placed` (where each new topic outside `path.order` went), and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
 
 ## Topics and the knowledge path
 
@@ -60,7 +60,7 @@ After the learning day the next expected review is the next day; after any other
 
 The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days (`solid` verdicts), the last attempt, `lapsed` (the latest verdict is not `solid` after an earlier `solid` one), `choice_errors` (wrongly chosen methods since the last `solid` verdict, with counts), `confident_errors` (confident errors since the last `solid` verdict) and `stale` (the gap or note was judged on an earlier day than the latest evidence). Levels: `attempted` (only `missed` verdicts), `assisted` (no `solid` verdict), `independent` (one), `retained` (two or more), `transferred` (a `solid` `transfer` attempt on a day not `missed`).
 
-`resume.due` is today's review: at most five topics whose review date has come (`due_more` counts the rest, which carry over, and `due_oldest` names the most overdue when it is among them). Lapsed topics come first, then, in the 21 days before an exam, topics without a `solid` verdict in the last two weeks, then the most overdue, then path order. Prerequisites are listed before the topics that need them, and a competing method follows its partner. A topic leaves the list when a save gives it a verdict.
+`resume.due` is today's review: at most five of the topics the daily plan, made with every course, puts today (`due_more` counts the rest, which carry over, and `due_oldest` names the most overdue when it is among them). `due_later` lists topics whose review date has come but that the plan puts on a later day, each with that `planned` day (`due_later_more` counts the rest): they are not overdue but wait behind other work, so offer them only when the learner wants more than the plan. Lapsed topics come first, then, in the 21 days before an exam, topics without a `solid` verdict in the last two weeks, then the most overdue, then path order. Prerequisites are listed before the topics that need them, and a competing method follows its partner. A topic leaves the list when a save gives it a verdict.
 
 ## Path and tasks
 

@@ -82,7 +82,8 @@ def plan(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def save(args: argparse.Namespace) -> dict[str, Any]:
-    return records.save(_workspace(args), _stdin_json())
+    workspace = _workspace(args)
+    return retrieval.dated(workspace, records.save(workspace, _stdin_json()))
 
 
 def _taken(record: dict[str, Any]) -> set[str]:

@@ -6,7 +6,8 @@
  * with the course tools.
  *
  * The brief's key is the part that changes the lesson's opening move: the
- * study day, the due topics and backlog, the open tasks (with their steps
+ * study day, the due topics and backlog, the reviews the daily plan puts
+ * on later days, the open tasks (with their steps
  * when none is in focus) and the current path topic. A new brief enters the transcript only when the key changes, so
  * the cached prompt prefix holds between saves; level changes in between
  * reach the agent through the save receipts.
@@ -181,6 +182,13 @@ export function projectCourseBrief(
 	} else {
 		lines.push("Due today: nothing.");
 	}
+	const later = list(r.due_later).map(obj);
+	if (later.length > 0) {
+		const more = typeof r.due_later_more === "number" && r.due_later_more > 0 ? `, and ${r.due_later_more} more` : "";
+		lines.push(
+			`Planned for later days, not overdue: ${later.map((d) => `${str(d.topic) ?? "?"} (${dayWithWeekday(str(d.planned))})`).join(", ")}${more}`,
+		);
+	}
 	const weak = list(r.weak);
 	if (weak.length > 0) lines.push("Weak:", ...weak.map((w) => weakLine(withDetail(w, detail), role)));
 	lines.push(...taskLines(r));
@@ -196,6 +204,7 @@ export function projectCourseBrief(
 		task ? [task.key ?? null, task.step ?? null] : null,
 		r.due_more ?? null,
 		obj(r.due_oldest).topic ?? null,
+		list(r.due_later).map((d) => [obj(d).topic ?? null, obj(d).planned ?? null]),
 		list(r.tasks)
 			.map((t) => [str(obj(t).key) ?? "", task ? null : (obj(t).step ?? null)])
 			.sort(([a], [b]) => String(a).localeCompare(String(b))),
