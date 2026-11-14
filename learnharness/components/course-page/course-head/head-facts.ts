@@ -1,4 +1,4 @@
-import type { CalendarCourse, ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
+import type { CalendarCourse, ChatListItem, CourseMap, CourseMapTopic, ExamGapReason, StudyCourse, TopicHandle } from "@/src/core";
 import { misfitWords } from "@/components/calendar/calendar-facts";
 import { finalReviewMissWords } from "@/components/study-words";
 
@@ -34,12 +34,14 @@ export function paceOf(course: StudyCourse, planned: Pick<CalendarCourse, "doesN
 }
 
 /** What the exam's plan leaves out, as the engine's `map` says it: the
- *  topics it has no room to start before the exam (`doesNotFit`), and the
- *  taught ones its final review has no room for (`unreviewed`). Null with
- *  no exam ahead or nothing left out. Pure. */
+ *  topics it has no room to start before the exam (`doesNotFit`), the
+ *  taught ones its final review has no room for (`unreviewed`), and the
+ *  engine's reasons for each list, each once, in topic order (`why`). Null
+ *  with no exam ahead or nothing left out. Pure. */
 export interface ExamGaps {
 	start: readonly CourseMapTopic[];
 	review: readonly CourseMapTopic[];
+	why: { start: readonly ExamGapReason[]; review: readonly ExamGapReason[] };
 }
 
 export function examGaps(map: Pick<CourseMap, "exam" | "topics">): ExamGaps | null {
@@ -52,7 +54,8 @@ export function examGaps(map: Pick<CourseMap, "exam" | "topics">): ExamGaps | nu
 		});
 	const start = topicsOf(exam.doesNotFit);
 	const review = topicsOf(exam.unreviewed);
-	return start.length > 0 || review.length > 0 ? { start, review } : null;
+	const why = (topics: readonly CourseMapTopic[]) => [...new Set(topics.flatMap((t) => exam.reasons?.[t.handle] ?? []))];
+	return start.length > 0 || review.length > 0 ? { start, review, why: { start: why(start), review: why(review) } } : null;
 }
 
 /** Whether a topic the course keeps is still untaught. */

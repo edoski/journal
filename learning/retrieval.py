@@ -656,8 +656,9 @@ def _runup(
     record: dict[str, Any], countdown: dict[str, Any], planned: agenda.When
 ) -> dict[str, Any]:
     """The exam and its run-up: when the final review starts, the path topics
-    the plan cannot start before it (``does_not_fit``), and the taught ones
-    its final review has no room for (``unreviewed``); with a scope, its
+    the plan cannot start before it (``does_not_fit``), the taught ones its
+    final review has no room for (``unreviewed``), and why the plan leaves
+    each of those out (``reasons``, ``agenda.Reason``); with a scope, its
     ``arcs``, the topics it ``leaves_out``, and the untaught
     earlier topics it ``needed`` started first (``progress.exam_topics``),
     in path order."""
@@ -677,6 +678,7 @@ def _runup(
             "final_review": plan.final.isoformat() if plan else None,
             "does_not_fit": planned.does_not_fit,
             "unreviewed": planned.unreviewed,
+            "reasons": dict(planned.reasons),
         },
         keep=("date", "days_left"),
     )

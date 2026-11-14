@@ -24,7 +24,7 @@ import {
 	type UnreadableCourse,
 	type UnreadableProblem,
 } from "../core/contracts/course.ts";
-import { isTopicLevel, type CourseExam, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
+import { EXAM_GAP_REASONS, isTopicLevel, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
 import { arcBlockOf, startsWhyOf, type ArcBlock } from "./course-arcs.ts";
 
@@ -204,11 +204,15 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 	const unreviewed = handles(e.unreviewed);
 	const arcs = block.arcs && Array.isArray(e.arcs) ? strings(e.arcs).flatMap((a) => block.arcOf(a) ?? []) : null;
 	const leavesOut = handles(e.leaves_out);
+	const reasons = Object.fromEntries(
+		Object.entries(record(e.reasons) ?? {}).filter(([h, r]) => listed.has(h) && EXAM_GAP_REASONS.includes(r as ExamGapReason)),
+	) as Partial<Record<TopicHandle, ExamGapReason>>;
 	return {
 		...exam,
 		...(finalReview ? { finalReview } : {}),
 		...(doesNotFit.length > 0 ? { doesNotFit } : {}),
 		...(unreviewed.length > 0 ? { unreviewed } : {}),
+		...(Object.keys(reasons).length > 0 ? { reasons } : {}),
 		...(arcs ? { arcs } : {}),
 		...(leavesOut.length > 0 ? { leavesOut } : {}),
 	};

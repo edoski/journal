@@ -380,7 +380,7 @@ def test_an_exams_pace_passes_the_window_only_when_holding_would_raise_it() -> N
         "arc_change": REASON,
     }
     record = evidence(save(schema.empty(), patch, MONDAY), ["a1"], "a3")
-    near = save(record, {"exam": scoped(["a", "b", "c"], 4)}, MONDAY)
+    near = save(record, {"exam": scoped(["a", "b", "c"], 5)}, MONDAY)
     first = plan({"c": near}, MONDAY, 2, week(10, 3))
     assert first.days["c"][1]["new"] == ["c1"], "three topics in three days"
     assert first.when("c", MONDAY, True).why["c1"] == {
