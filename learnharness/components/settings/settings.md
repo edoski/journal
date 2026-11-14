@@ -7,7 +7,7 @@ The settings sheet and its control kit: `settings-dialog.tsx` draws the frame, `
 | Slot | Notes |
 |---|---|
 | sheet | 880 × 792 (max 90vw × 90vh): the tallest section, Keyboard, fits whole in the owner's 1512 × 982 window, so no section scrolls there; one `popover` surface, 1px `border`, radius 12, `shadow-2xl`; overlay black 50% (dialog.md) |
-| section list | 208px, hairline at its right, padding 8; vertical `Tabs` (components/ui/tabs.md): a `NavSection` titled "Settings" over a `line` `TabsList` whose triggers render one `NavRow` per section (nav-row.md: 32px, 13px, active on `fill-selected`); ↑/↓ move between sections |
+| section list | 208px, hairline at its right, padding 8; vertical `Tabs` (components/ui/tabs.md): the dialog's `DialogTitle` "Settings" in every dialog's title style (18/600, round 6: a 13px muted section header named it) over a `line` `TabsList` whose triggers render one `NavRow` per section (nav-row.md: 32px, 13px, active on `fill-selected`); ↑/↓ move between sections |
 | pane | scrolls only in a window shorter than the sheet, with no visible scrollbar (the app shows none); padding 24 (32 at the foot); groups 24 apart. No title: the list names the section (a heading that repeats the selected item is noise) |
 | close | quiet 32px ✕ at top 12, right 12; Esc closes too |
 

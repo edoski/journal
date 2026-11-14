@@ -16,6 +16,7 @@ import { createRoot } from "react-dom/client";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { INK_SWATCHES } from "../components/settings/controls.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
+import { Dialog } from "../components/ui/dialog.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
 import { KEYBOARD_ACTIONS } from "../src/core/index.ts";
 
@@ -41,7 +42,7 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 	});
 
 	it("the dialog frame: the ✕ + the section nav, Providers first and General last", () => {
-		const html = renderToStaticMarkup(<SettingsDialogBody onClose={() => {}} />);
+		const html = renderToStaticMarkup(<Dialog open><SettingsDialogBody onClose={() => {}} /></Dialog>);
 		assert.ok(html.includes('aria-label="Close settings"'));
 		for (const id of ["general", "keys", "appearance", "keyboard"]) {
 			assert.ok(html.includes(`data-testid="settings-nav-${id}"`), id);
