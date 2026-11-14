@@ -36,7 +36,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
-import { hasUnresolvedQuestion, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
+import { hasUnresolvedQuestion, respondingAgentOf, shownTopicsOf, type LhMessage } from "../core/native-messages.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
@@ -419,8 +419,10 @@ export async function handleChatInput(
 		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
 		chatId,
 		// A course-linked session reads and writes the learner's course
-		// record through the engine, whatever the agent kind.
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords } } : {}),
+		// record through the engine, whatever the agent kind, with the
+		// topics whose solution the session has shown him (shown-help.ts),
+		// read from the whole record, a cut turn's saves included.
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, shown: { topics: shownTopicsOf(merged) } } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the

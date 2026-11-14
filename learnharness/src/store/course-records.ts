@@ -240,6 +240,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 			choiceErrors,
 			confidentErrors: count(e.confident_errors),
 			repaired: e.repaired === true,
+			...(e.repaired_with_help === true ? { repairedWithHelp: true } : {}),
 		},
 		tasks: strings(e.tasks),
 		...(str(e.excluded) ? { excluded: str(e.excluded)! } : {}),

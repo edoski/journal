@@ -14,11 +14,66 @@ import { serverExecute } from "../tool-execute.ts";
 import { healToolRecord } from "./heal.ts";
 import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/course.ts";
 import type { CourseRecords } from "../../core/ports.ts";
+import { shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
+import { studyDay, withDayWords } from "../../core/day-words.ts";
 
 /** What the course tools close over. */
 export interface CourseToolContext {
 	course: CourseLink;
 	records: CourseRecords;
+	/** The topics whose solution this session has shown him since his last
+	 *  answer on each (shown-help.ts), read from the session's record when
+	 *  the turn starts and kept by every save in it. The course tools and
+	 *  `conclude` of one turn share it. Absent: nothing shown yet. */
+	shown?: { topics: Set<string> };
+}
+
+/** The turn's shown topics, kept on the context so every tool of the turn
+ *  reads and moves the same set. */
+function shownOf(ctx: CourseToolContext): { topics: Set<string> } {
+	ctx.shown ??= { topics: new Set() };
+	return ctx.shown;
+}
+
+/** A patch as the engine reads it: the object, or its JSON text, which the
+ *  tutor often sends; null when it is neither. */
+function patchOf(changes: unknown): Record<string, unknown> | null {
+	let value = changes;
+	if (typeof value === "string") {
+		try {
+			value = JSON.parse(value);
+		} catch {
+			return null;
+		}
+	}
+	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+/** Mark topics whose solution was just shown with no answer saved, as when
+ *  a problem ends on Explain instead before any work. */
+export function markShown(ctx: CourseToolContext, topics: readonly string[]): void {
+	for (const topic of topics) shownOf(ctx).topics.add(topic);
+}
+
+/**
+ * Save one patch with the shown-solution rule applied (shown-help.ts): an
+ * attempt saved as unaided on a topic whose solution was just shown is saved
+ * helped, and the receipt says so. The turn's shown topics move only when the
+ * save went through. Every save of a session's answers comes through here.
+ */
+export async function saveCourse(ctx: CourseToolContext, changes: unknown): Promise<CourseResult> {
+	const ledger = shownOf(ctx);
+	const patch = patchOf(changes);
+	const listed = patch && Array.isArray(patch.observations) ? patch.observations : null;
+	const ruled = listed ? withShownHelp(listed, ledger.topics) : null;
+	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: ruled ? { ...patch, observations: ruled.observations } : changes });
+	if (!result.ok || !ruled) return result;
+	ledger.topics = ruled.shown;
+	const note = shownHelpNote(ruled.helped);
+	if (!note || typeof result.json !== "object" || result.json === null) return result;
+	const receipt = result.json as Record<string, unknown>;
+	const notes = Array.isArray(receipt.notes) ? receipt.notes : [];
+	return { ...result, json: { ...receipt, notes: [...notes, note] } };
 }
 
 /** The registered tool names (the transcript card registry and the prompt
@@ -53,8 +108,8 @@ const saveInput = Type.Object({
 });
 
 async function call(ctx: CourseToolContext, verb: CourseVerb): Promise<string> {
-	const result: CourseResult = await ctx.records.run(ctx.course.workspace, verb);
-	if (result.ok) return JSON.stringify(result.json);
+	const result: CourseResult = verb.verb === "save" ? await saveCourse(ctx, verb.changes) : await ctx.records.run(ctx.course.workspace, verb);
+	if (result.ok) return JSON.stringify(withDayWords(result.json, studyDay()));
 	if (result.kind === "validation") throw new Error(`Nothing was saved or read. ${result.message}`);
 	throw new Error(result.message);
 }

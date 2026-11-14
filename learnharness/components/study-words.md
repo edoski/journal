@@ -20,7 +20,7 @@ One form each, wherever it shows.
 
 | Reason | Words |
 |---|---|
-| a slip, the first signal that holds | Fixed, check again later (`repaired`); Missed last time (`lapsed`); Mistake to fix (`gap`); Mixed up with Cramer's rule (`choiceErrors`, the method's title); Sure, but wrong (`confidentErrors`); else Look again |
+| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); Missed last time (`lapsed`, a crossed circle); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Look again (a magnifier). A repair made only with help (`repairedWithHelp`) is not "Fixed": the next signal shows. |
 | a review come due | Due today, 3d overdue (under a week), 1w overdue, 2w overdue |
 | a review dated ahead | Back in 5d, Back in 3w, Back in 2mo |
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 2w ago; Unfinished when no day is known. Never the tutor's step text. |

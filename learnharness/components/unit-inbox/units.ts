@@ -1,5 +1,5 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { LESSON_WORDS, leftOffWords, overdueWords, returnWords, slipWords } from "@/components/study-words";
+import { LESSON_WORDS, leftOffWords, overdueWords, returnWords, slipMark, slipWords, type SlipKey } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
@@ -167,7 +167,8 @@ export function daysBetween(from: string, to: string): number {
 export type UnitStatus =
 	| { kind: "your-turn" }
 	| { kind: "working" }
-	| { kind: "slip" | "review" | "task" | "returns" | "studied"; words: string }
+	| { kind: "slip"; words: string; slip: SlipKey }
+	| { kind: "review" | "task" | "returns" | "studied"; words: string }
 	| { kind: "none" };
 
 /** When an open task was left, in the app's words ("Left off 3d ago"):
@@ -195,7 +196,7 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.now === "left") return { kind: "task", words: LESSON_WORDS.leftForTonight };
 	if (unit.now) return { kind: unit.now };
 	const { topic } = unit;
-	if (unit.slip) return { kind: "slip", words: unit.slip };
+	if (unit.slip) return { kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key };
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
 	if (topic.review?.kind === "scheduled") return { kind: "returns", words: returnWords(Math.max(1, daysBetween(today, topic.review.date))) };

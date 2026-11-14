@@ -381,6 +381,60 @@ def _new(
     return chosen
 
 
+def _morning(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record as today began: without today's answers, and each review
+    the engine moved for one of them back on the day it had then."""
+    day = today.isoformat()
+    observations = {
+        key: item for key, item in record["observations"].items() if item["date"] < day
+    }
+    touched = {
+        topic
+        for item in record["observations"].values()
+        if item["date"] >= day
+        for topic in item["topics"]
+    }
+    before = {**record, "observations": observations}
+    replayed = progress.replays(before)
+    topics = dict(record["topics"])
+    for key in touched & topics.keys():
+        review = topics[key].get("review", {})
+        if review.get("by") != "engine":
+            continue
+        rest = {name: value for name, value in review.items() if name != "due"}
+        due = replayed[key].due
+        topics[key] = {
+            **topics[key],
+            "review": {**rest, "due": due.isoformat()} if due else rest,
+        }
+    return {**before, "topics": topics}
+
+
+def _spent_today(
+    records: Mapping[str, dict[str, Any]],
+    courses: list[_Course],
+    today: date,
+    week: Capacity,
+) -> int:
+    """Today's reviews already answered that today's plan held as the day
+    began. A review he chose beyond them, one the plan had put on a later
+    day, is study past the plan: it takes no place from a review still
+    planned today, so nothing shown due today drops off it unstudied."""
+    morning = plan(
+        {name: _morning(record, today) for name, record in records.items()},
+        today,
+        1,
+        week,
+    )
+    day = today.isoformat()
+    return sum(
+        1
+        for course in courses
+        for topic in morning.days[course.name][0]["reviews"]
+        if course.replayed[topic].days.get(day) == progress.PROBE
+    )
+
+
 def plan(
     records: Mapping[str, dict[str, Any]],
     today: date,
@@ -390,12 +444,14 @@ def plan(
     """Every course's plan for ``days`` days from today, together.
 
     ``week`` defaults to the capacity learned from these records. Today's
-    allowance is what is left after what the record shows done today.
+    allowance is what is left after the reviews done today that today's plan
+    held as the day began (``_spent_today``).
     """
     history = capacity.activity(records.values(), today)
     week = week or capacity.estimate(history, today)
     courses = [_Course.of(name, record) for name, record in records.items()]
     done = history.get(today, capacity.Done())
+    spent = _spent_today(records, courses, today, week) if done.reviews else 0
     allowance = _Allowance()
     for offset in range(days):
         day = today + timedelta(days=offset)
@@ -413,7 +469,7 @@ def plan(
             if not rates.new.shown:
                 begun = done.new if offset == 0 else 0
         if offset == 0:
-            reviews_room = max(reviews_room - done.reviews, 0)
+            reviews_room = max(reviews_room - spent, 0)
             new_room = max(new_room - done.new, 0)
         reviews = _reviews(courses, day, reviews_room, week)
         for course in courses:

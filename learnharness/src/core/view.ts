@@ -435,6 +435,8 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 	switch (marker.customType) {
 		case "course-context":
 			return; // model-facing course brief: nothing to render
+		case "ungraded-answer":
+			return; // model-facing: grade the answer a stop cut off
 		case "session-mode":
 			return; // the creation's starting mode: nothing to render
 		case "graph-context": {

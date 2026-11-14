@@ -204,7 +204,7 @@ describe("where he stands, in the app's one wording", () => {
 
 	it("gives why it needs him and its review as marks of their own kind", () => {
 		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [
-			{ kind: "slip", words: "Missed last time" },
+			{ kind: "slip", words: "Missed last time", slip: "lapsed" },
 			{ kind: "review", words: "2d overdue" },
 		]);
 		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);

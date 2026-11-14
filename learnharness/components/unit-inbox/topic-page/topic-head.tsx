@@ -5,8 +5,10 @@ import { MathText } from "@/components/ui/math-text";
 import { PageFact, PageHead } from "@/components/page-frame/page-frame";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import type { HeadMark, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { SLIP_ICON } from "@/components/slip-icons";
 
-/** One icon per kind of mark, the ones the map's nodes and Today's rows use. */
+/** One icon per kind of mark, the ones the map's nodes and Today's rows
+ *  use; a slip wears its own (`SLIP_ICON`). */
 const MARK_ICON: Record<HeadMark["kind"], LucideIcon> = { slip: CircleXIcon, review: HistoryIcon };
 
 /** A pause for a screen reader between the line's facts, which the eye
@@ -43,7 +45,7 @@ export function TopicHead({ facts, children }: { facts: TopicFacts; children?: R
 							{standing.words}
 						</PageFact>
 						{marks.map((mark) => {
-							const Icon = MARK_ICON[mark.kind];
+							const Icon = mark.slip ? SLIP_ICON[mark.slip] : MARK_ICON[mark.kind];
 							return (
 								<PageFact key={mark.kind} icon={<Icon aria-hidden className="size-4 shrink-0" />} data-kind={mark.kind}>
 									{PAUSE}

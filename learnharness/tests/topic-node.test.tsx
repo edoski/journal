@@ -29,9 +29,9 @@ function topic(over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 describe("a card's status", () => {
 	it("says a slip first, in the app's one wording", () => {
 		const status = (signals: Partial<TopicSignals>) => statusOf(topic({ level: "attempted", weak: true, signals: { ...QUIET, ...signals } }), TASKS, titleOf, TODAY);
-		assert.deepEqual(status({ lapsed: true }), { kind: "slip", words: "Missed last time" });
+		assert.deepEqual(status({ lapsed: true }), { kind: "slip", words: "Missed last time", slip: "lapsed" });
 		assert.equal(status({ gap: "sign error" })!.words, "Mistake to fix");
-		assert.deepEqual(status({ choiceErrors: { cramer: 2 } }), { kind: "slip", words: "Mixed up with Cramer's rule" });
+		assert.deepEqual(status({ choiceErrors: { cramer: 2 } }), { kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" });
 		assert.equal(status({ confidentErrors: 1 })!.words, "Sure, but wrong");
 		assert.equal(status({})!.words, "Look again");
 	});

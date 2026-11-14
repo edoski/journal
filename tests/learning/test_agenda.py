@@ -208,6 +208,33 @@ def test_today_holds_only_what_is_left_after_what_he_already_did() -> None:
     assert days[1]["new"] == ["t01"]
 
 
+def learned(record: dict[str, Any], day: date) -> dict[str, Any]:
+    """Every topic taught on ``day``, its first retrieval the engine's date."""
+    return save(
+        record, {"topics": {key: {"introduced": True} for key in record["topics"]}}, day
+    )
+
+
+def test_a_review_beyond_todays_plan_takes_no_place_from_one_still_planned() -> None:
+    records = {"a": learned(course(3), on(-2)), "b": learned(course(1), on(-2))}
+    morning = plan(records, 2, week(2, 0)).days
+    assert morning["a"][0]["reviews"] == ["t00"] and morning["b"][0]["reviews"] == [
+        "t00"
+    ]
+    later = morning["a"][1]["reviews"][0]
+    records["a"] = save(records["a"], {"observations": [answer(later)]}, MONDAY)
+    after = plan(records, 2, week(2, 0)).days
+    assert after["a"][0]["reviews"] == ["t00"] and after["b"][0]["reviews"] == ["t00"]
+
+
+def test_a_review_on_todays_plan_answered_leaves_room_for_the_rest_only() -> None:
+    record = taught(course(4), on(-1))
+    morning = plan({"c": record}, 1, week(2, 0)).days["c"][0]["reviews"]
+    first, second = morning
+    record = save(record, {"observations": [answer(first)]}, MONDAY)
+    assert plan({"c": record}, 1, week(2, 0)).days["c"][0]["reviews"] == [second]
+
+
 def test_courses_without_an_exam_share_his_new_topic_room() -> None:
     together = plan(
         {"a": course(10), "b": course(10)}, 2, week(10, 3, frozenset(range(7)))

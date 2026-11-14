@@ -34,6 +34,7 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { afterAnswer } from "./shown-help.ts";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
@@ -90,7 +91,8 @@ export interface LhMarkerMessage {
 		| "done-tonight"
 		| "problem-dismissed"
 		| "compaction"
-		| "session-resume";
+		| "session-resume"
+		| "ungraded-answer";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -470,6 +472,61 @@ export function newNextMessage(): LhMarkerMessage {
 	};
 }
 
+/** The marker for an answer whose grading turn was cut (`ungradedAnswerOf`). */
+export const UNGRADED_ANSWER = "ungraded-answer";
+
+/**
+ * A graded answer he gave whose turn stopped before the tutor graded it
+ * (round 3: a stop right after a confident wrong answer left it unrecorded
+ * unless he pressed Try again). He answered and the question showed him its
+ * answer, so by the engine's rules it is an attempt, and the record must
+ * hold it whatever he does next. The question he answered, when the newest
+ * graded answer (a check or a recall, never a prediction, which is not
+ * graded) has no save that went through after it and every reply since was
+ * cut; else null. Pure.
+ */
+export function ungradedAnswerOf(messages: readonly LhMessage[]): string | null {
+	const at = messages.findLastIndex((m) => m.role === "toolResult" && (m.toolName === "explain" || m.toolName === "recall") && !m.isError && !isDismissedResult(m));
+	if (at < 0) return null;
+	const result = messages[at] as ToolResultMessage;
+	const call = messages
+		.slice(0, at)
+		.flatMap((m) => (m.role === "assistant" ? m.content : []))
+		.find((b) => b.type === "toolCall" && b.id === result.toolCallId);
+	if (!call || call.type !== "toolCall" || !questionNeedsGrade(call.arguments)) return null;
+	const after = messages.slice(at + 1);
+	const clean = cleanToolCallIds(after);
+	for (const m of after) {
+		if (m.role !== "assistant") continue;
+		if (m.stopReason !== "aborted" && m.stopReason !== "error") return null;
+		if (m.content.some((b) => b.type === "toolCall" && b.name === "course_save" && clean.has(b.id))) return null;
+	}
+	const question = (result.details as { questionText?: unknown } | null)?.questionText;
+	return typeof question === "string" ? question : "";
+}
+
+/** A question whose answer is graded: every check and recall but a
+ *  prediction. */
+function questionNeedsGrade(input: unknown): boolean {
+	const type = (input as { type?: unknown } | null)?.type;
+	return !(typeof type === "string" && type.replace(/["']/g, "").trim() === "predict");
+}
+
+/** The note riding his next input after `ungradedAnswerOf`: grade and save
+ *  that answer first. Model-facing only. */
+export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
+	const which = question ? ` to "${question}"` : "";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: UNGRADED_ANSWER,
+		content: `[UNGRADED ANSWER] His answer${which} was submitted and its answer shown to him, but your turn stopped before you graded it. It is an attempt, not a question left open: grade it and save it with course_save in this turn, before anything else, then answer what follows.`,
+		display: false,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
 /** His Done for tonight: he stops now. The content tells the agent that
  *  answers it to close without grading what he left open; the
  *  transcript draws its own quiet line off the marker. */
@@ -634,6 +691,45 @@ export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
 		}
 	}
 	return [...topics];
+}
+
+/** A JSON array the tutor may send as its text, as a list of strings. */
+function stringList(value: unknown): string[] {
+	if (typeof value !== "string") return strings(value);
+	try {
+		return strings(JSON.parse(value));
+	} catch {
+		return [];
+	}
+}
+
+/** The topics whose solution the session has shown him since his last
+ *  answer on each (shown-help.ts): a concluded problem on a topic he did
+ *  not answer right, or a saved answer that was not right, whose answer
+ *  the question revealed. Only calls that went through count; a problem
+ *  dismissed for today revealed nothing. Pure. */
+export function shownTopicsOf(messages: readonly LhMessage[]): Set<string> {
+	const clean = cleanToolCallIds(messages);
+	let shown = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
+			const args = (block.arguments ?? {}) as Record<string, unknown>;
+			if (block.name === PRACTICE_CONCLUDE_TOOL && args.outcome !== "dismissed") {
+				const byTopic = (typeof args.byTopic === "object" && args.byTopic !== null ? args.byTopic : {}) as Record<string, unknown>;
+				for (const topic of stringList(problemInputForConclude(messages, block.id)?.topics)) {
+					const result = byTopic[topic] ?? args.result;
+					shown = afterAnswer(shown, { topics: [topic], result: typeof result === "string" ? result : null });
+				}
+			}
+			const changes = block.name === "course_save" ? saveChanges(args) : null;
+			for (const o of Array.isArray(changes?.observations) ? changes.observations : []) {
+				if (typeof o === "object" && o !== null) shown = afterAnswer(shown, o as Record<string, unknown>);
+			}
+		}
+	}
+	return shown;
 }
 
 /** The course saves a session made that went through, each as the changes
@@ -1113,7 +1209,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next", "practice-request", "done-tonight"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {

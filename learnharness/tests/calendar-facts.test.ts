@@ -176,6 +176,35 @@ describe("calendar entries", () => {
 		assert.deepEqual(entries.map((e) => e.title), ["Linear Algebra exam", "Waiting", "Span", "Done earlier"]);
 	});
 
+	it("shows one review once: today's task and session on only its topics fold into its entry", () => {
+		const PROB_TODAY = course(
+			"/study/prob",
+			"Probability",
+			{
+				tasks: [
+					{ key: "review-total", title: "Review: law of total probability", step: "Ask the open question first", updated: TODAY },
+					{ key: "sheet-2", title: "Problem sheet 2", step: null, updated: TODAY },
+				],
+				topics: [
+					topic("total", { title: "Law of total probability", review: { kind: "due", date: "2026-11-07", overdue: 1 }, tasks: ["review-total", "sheet-2"] }),
+					topic("bayes", { title: "Bayes' rule", review: { kind: "scheduled", date: "2026-11-12" }, tasks: ["sheet-2"] }),
+				],
+			},
+			{ due: ["total" as TopicHandle] },
+		);
+		const prob = { workspace: "/study/prob", title: "Probability" };
+		const review = chat({ title: "Review Law of total probability", phase: "probe", course: prob, topics: ["total"], updatedAt: "2026-11-08T11:00:00" });
+		const wider = chat({ title: "Total probability and Bayes", course: prob, topics: ["total", "bayes"], updatedAt: "2026-11-08T12:00:00" });
+		const earlier = chat({ title: "Total probability, last week", course: prob, topics: ["total"], updatedAt: "2026-11-02T12:00:00" });
+		const entries = calendarEntries({ courses: [PROB_TODAY], chats: [review, wider, earlier], scope: null });
+		assert.deepEqual(summary(entries), [
+			"2026-11-02 lesson Total probability, last week",
+			"2026-11-08 overdue Law of total probability",
+			"2026-11-08 task Problem sheet 2",
+			"2026-11-08 lesson Total probability and Bayes",
+		]);
+	});
+
 	it("keeps one course when scoped, and with it no session outside a course", () => {
 		const general = chat({ course: undefined });
 		const entries = calendarEntries({ courses: [LINALG, PROB], chats: [general, chat()], scope: "/study/prob" });

@@ -402,8 +402,11 @@ def _standing(
     judged = topic.get("judged")
     if judged is not None and history.latest > judged:
         result["stale"] = True
-    if _repaired(topic, attempts, result):
+    fixes = _repaired(topic, attempts, result)
+    if fixes:
         result["repaired"] = True
+        if not any(unaided(item) for item in fixes):
+            result["repaired_with_help"] = True
     return result
 
 
@@ -412,12 +415,14 @@ _MISTAKES = ("lapsed", "choice_errors", "confident_errors")
 
 def _repaired(
     topic: dict[str, Any], attempts: list[Attempt], standing: dict[str, Any]
-) -> bool:
-    """A mistake answered right since: a correct answer after the newest
+) -> list[dict[str, Any]]:
+    """A mistake answered right since: the correct answers after the newest
     incorrect one, else after the newest partial one, with the gap, if any,
-    not diagnosed on a later day than that answer. A partial answer after the
-    repair leaves it standing: its gap is what is left to check. It stays
-    weak until a later day's unaided answer settles it."""
+    not diagnosed on a later day than the first of them; none when it is not
+    repaired. A partial answer after the repair leaves it standing: its gap is
+    what is left to check. It stays weak until a later day's unaided answer
+    settles it. A repair whose answers all had help is ``repaired_with_help``:
+    help may have carried it, so the mistake is not shown fixed on his own."""
     results = [item["result"] for _, item in attempts]
     wrong = next(
         (
@@ -430,10 +435,10 @@ def _repaired(
     )
     fixes = [item for _, item in attempts[wrong + 1 :] if item["result"] == "correct"]
     if not fixes:
-        return False
+        return []
     if "gap" in topic:
-        return str(topic.get("judged", "")) <= str(fixes[0]["date"])
-    return any(flag in standing for flag in _MISTAKES)
+        return fixes if str(topic.get("judged", "")) <= str(fixes[0]["date"]) else []
+    return fixes if any(flag in standing for flag in _MISTAKES) else []
 
 
 def replays(record: dict[str, Any]) -> dict[str, Replay]:
