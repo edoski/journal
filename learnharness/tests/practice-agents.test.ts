@@ -272,7 +272,7 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		// The base's voice section and the doctrine's spine are present…
 		assert.match(prompt, /Everything in this section deletes a default/);
 		assert.match(prompt, /You run practice sessions\./);
-		assert.match(prompt, /## IX\. The arc/);
+		assert.match(prompt, /## IX\. The session's shape/);
 		// …and nothing from the teaching system prompt or shared fragments.
 		assert.doesNotMatch(prompt, /install understanding/);
 		// The shared 20-question-tools doctrine (predict/check) must not

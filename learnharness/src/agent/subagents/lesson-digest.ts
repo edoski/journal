@@ -30,6 +30,7 @@ import {
 	type DigestWindow,
 } from "../../core/lesson-digest.ts";
 import type { PiEngine } from "../models.ts";
+import { DIGEST_DOCTRINE, composeDoctrine } from "../prompt-segments.ts";
 import { withBgLlmSlot } from "./bg-llm-semaphore.ts";
 import { finishRun, setRunPhase } from "./background-runs.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
@@ -88,6 +89,12 @@ Rules:
 - Leave out what the saves made during the lesson already hold, and anything the lesson did not show.
 - Write to the learner, in plain words they understand days later: "you", never "he" or "the learner"; no dates or ids; math in $…$.
 - When nothing is worth recording, submit empty lists.`;
+
+/** The digest's system prompt: its instructions, then how a new topic joins
+ *  the arcs, read from the tutor's references at each run. */
+export function digestSystemPrompt(dir?: string): string {
+	return `${DIGEST_INSTRUCTIONS}\n\n${composeDoctrine(DIGEST_DOCTRINE, dir)}`;
+}
 
 /** The run's inputs, as the agent reads them. */
 function digestPrompt(record: ChatRecord, window: DigestWindow, map: CourseMap, view: DigestCourseView): string {
@@ -235,7 +242,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 				parameters: digestSchema,
 				fill: (input: Static<typeof digestSchema>) => ({ ...input, topics: input.topics ?? [], knowledge: input.knowledge ?? [] }),
 				validate: save,
-				systemPrompt: DIGEST_INSTRUCTIONS,
+				systemPrompt: digestSystemPrompt(),
 				prompt: digestPrompt(record, window, map, view),
 				engine,
 				signal,

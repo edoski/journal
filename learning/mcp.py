@@ -30,6 +30,7 @@ GUIDES = (
     "teaching",
     "reviews",
     "course",
+    "arcs",
     "lifecycle",
     "research",
 )

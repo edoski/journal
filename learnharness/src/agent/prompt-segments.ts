@@ -77,10 +77,11 @@ export function sourcePromptTexts(agent: PromptAgent): string[] {
 /** One file of the engine's doctrine: whole, or its opening (the title and
  *  the text before its first `## ` heading) followed by the listed `## `
  *  sections. `intro: false` keeps only the title of the opening, for an agent
- *  whose job the opening's general rules do not fit. */
+ *  whose job the opening's general rules do not fit. `step` keeps only that
+ *  numbered step of the one listed section, under the section's heading. */
 export type DoctrinePart =
 	| { readonly file: string }
-	| { readonly file: string; readonly sections: readonly string[]; readonly intro?: false };
+	| { readonly file: string; readonly sections: readonly string[]; readonly intro?: false; readonly step?: number };
 
 /** What each agent composes from the tutor skill's host-neutral references,
  *  so the tutor and the app teach from one text and each agent reads only
@@ -98,24 +99,35 @@ const ACROSS_SESSIONS: readonly DoctrinePart[] = [
 	{ file: "course.md", sections: ["Exam facts"], intro: false },
 ];
 
+/** What every agent that creates or places topics reads of arcs.md, the one
+ *  text on arcs: forming them is the grouping pass's alone. */
+const ARC_RECORD = ["What an arc is", "Placing a new topic", "Changing arcs"] as const;
+const ARCS_ACROSS_SESSIONS: DoctrinePart = { file: "arcs.md", sections: ARC_RECORD, intro: false };
+/** The prober brackets an arc's entry; the teacher and practice teach from its map. */
+const ARCS_PROBING: DoctrinePart = { file: "arcs.md", sections: [...ARC_RECORD, "Probing an arc's start"], intro: false };
+const ARCS_TEACHING: DoctrinePart = { file: "arcs.md", sections: [...ARC_RECORD, "Teaching with arcs"], intro: false };
+
 export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart[]>> = {
 	prober: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["Finding the edge"], intro: false },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses"] },
 		...ACROSS_SESSIONS,
+		ARCS_PROBING,
 	],
 	teacher: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["The chain", "Hints", "Corrections and diagrams"] },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
 		...ACROSS_SESSIONS,
+		ARCS_TEACHING,
 	],
 	practice: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Mixing methods", "Transfer", "Corrections and diagrams"] },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close", "Exam run-up"] },
 		...ACROSS_SESSIONS,
+		ARCS_TEACHING,
 	],
 };
 
@@ -126,7 +138,10 @@ function doctrineText(dir: string, part: DoctrinePart): string {
 	const picked = part.sections.map((title) => {
 		const section = rest.find((chunk) => chunk.split(/\r?\n/, 1)[0]?.trim() === `## ${title}`);
 		if (!section) throw new Error(`engine doctrine: no "## ${title}" in ${part.file}`);
-		return section.trim();
+		if (part.step === undefined) return section.trim();
+		const step = section.split(/\r?\n/).find((line) => line.startsWith(`${part.step}. `));
+		if (!step) throw new Error(`engine doctrine: no step ${part.step} in "## ${title}" of ${part.file}`);
+		return `## ${title}\n\n${step.trim()}`;
 	});
 	const head = part.intro === false ? (opening.trim().split(/\r?\n/, 1)[0] ?? "") : opening.trim();
 	return [head, ...picked].filter(Boolean).join("\n\n");
@@ -142,11 +157,30 @@ export function courseRecordPrompt(agent: PromptAgent, dir: string = PATHS.tutor
 }
 
 /** What the course map builder composes: the one path-building recipe
- *  every host follows. */
-export const COURSE_MAP_DOCTRINE: readonly DoctrinePart[] = [{ file: "course.md", sections: ["Building the path"], intro: false }];
+ *  every host follows, and how a new topic joins the arcs. The builder
+ *  extends arcs and never forms them. */
+export const COURSE_MAP_DOCTRINE: readonly DoctrinePart[] = [
+	{ file: "course.md", sections: ["Building the path"], intro: false },
+	ARCS_ACROSS_SESSIONS,
+];
 
-/** The path-building recipe, read from `dir`. Throws like courseRecordPrompt
- *  when the section is renamed. */
+/** The lesson digest's part of arcs.md: its code places the topics it adds. */
+export const DIGEST_DOCTRINE: readonly DoctrinePart[] = [{ file: "arcs.md", sections: ["Placing a new topic"], intro: false }];
+
+/** The grouping pass's edge step reads the prerequisite test alone, so it
+ *  never settles an edge to make room for a cut. */
+export const ARC_EDGES_DOCTRINE: readonly DoctrinePart[] = [{ file: "course.md", sections: ["Building the path"], intro: false, step: 3 }];
+
+/** The grouping pass's cut step: what an arc is and how arcs are formed. */
+export const ARC_CUT_DOCTRINE: readonly DoctrinePart[] = [{ file: "arcs.md", sections: ["What an arc is", "Forming arcs"], intro: false }];
+
+/** A producer's doctrine, read from `dir`. Throws like courseRecordPrompt
+ *  when a section is renamed. */
+export function composeDoctrine(parts: readonly DoctrinePart[], dir: string = PATHS.tutorReferences): string {
+	return parts.map((part) => doctrineText(dir, part)).join("\n\n");
+}
+
+/** The course map builder's recipe, read from `dir`. */
 export function courseMapDoctrine(dir: string = PATHS.tutorReferences): string {
-	return COURSE_MAP_DOCTRINE.map((part) => doctrineText(dir, part)).join("\n\n");
+	return composeDoctrine(COURSE_MAP_DOCTRINE, dir);
 }

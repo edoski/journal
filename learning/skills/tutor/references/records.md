@@ -21,6 +21,7 @@ The rest is for you and the next session: a task's `help` and `note`, knowledge,
 | `preferences`, `global_preferences` | merge by dimension; `null` deletes; `global_preferences` applies to every course |
 | lists (`needs`, `topics`, `refs`, `aliases`, `order`, …) | replace |
 | `observations` | a list of new entries, appended |
+| `arcs`, `arc_change` (they arrive with the arc record) | `arcs` merges by handle; `arc_change` says why the save changes arcs; both as [arcs.md](arcs.md) says |
 
 Handles are 1–64 lowercase letters, digits, `-` or `_`, starting with a letter or digit. Topics, knowledge entries, tasks and sources share one set of handles; `o` followed by digits is reserved for observations. Anything you reference (a topic in an observation, a source in a ref) must exist or be created in the same patch.
 
@@ -51,7 +52,7 @@ A topic is one idea or method you would check separately: `title`, `needs` (prer
 - `introduced: true` when you first teach it; the helper stamps the day and, if nothing is scheduled, a first retrieval for the next day.
 - `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved, as [evidence.md](evidence.md) defines.
 - `note`: any other judgement worth carrying (fluent but slow, relies on a picture, avoids proofs).
-- `excluded`: why the course leaves the topic out ("Chapter 4 is off the exam"). It leaves due reviews, the plan and the run-up, no studied topic waits on it, and its evidence stays; `null` brings it back.
+- `excluded`: why no exam session of the course examines the topic ("Chapter 4 is never examined"); a topic outside only the next exam's scope is not excluded ([arcs.md](arcs.md)). It leaves due reviews, the plan and the run-up, no studied topic waits on it, and its evidence stays; `null` brings it back.
 - `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then and `{"points": ["...", "..."]}` lists the one to five key points an answer is marked against. The fields merge; pin only for a reason, otherwise the helper schedules.
 
 How the helper judges and schedules. Each attempt gets a grade: `solid` (correct, unaided, no `uncertain`, not a guess), `helped` (correct with help, partial, or correct but `uncertain` or a guess) or `missed` (incorrect). Each day of attempts on a topic counts at most once, as one verdict:

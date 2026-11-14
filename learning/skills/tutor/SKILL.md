@@ -47,6 +47,8 @@ Levels are computed from attempts: `new`, `introduced` (taught), `attempted` (no
 
 Read [reviews.md](references/reviews.md) before running today's review, writing review prompts, looking at the week or preparing an exam; `plan` gives each course's daily plan (which reviews and which new topics each day across every course: everything owed, paced to the exam, until the learner has shown how much he gets through on that weekday) and, in the run-up, the untaught and unready topics and the pace. Read [teaching.md](references/teaching.md) before teaching a new topic and [evidence.md](references/evidence.md) before recording a first attempt.
 
+Read [arcs.md](references/arcs.md) before any save that adds a topic, changes arcs or sets an exam in a course with arcs, and before teaching the first lesson of an arc.
+
 ## Judgement
 
 What counts as evidence, how it is graded and how confidence and self-reports are recorded: [evidence.md](references/evidence.md).
