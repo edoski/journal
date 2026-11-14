@@ -258,6 +258,37 @@ export const ARC_EXAM_WORDS = {
 	none: "Not on the exam",
 } as const;
 
+/** The course head's line under its first, when the exam's plan leaves
+ *  topics out (`examGaps`: the engine's `does_not_fit` and `unreviewed`):
+ *  why, then a way in. "Today", since a press starts it now. */
+export const EXAM_GAP_WORDS = {
+	full: "Every day before the exam is full at your pace",
+	start: "Start it today",
+	review: "Review it today",
+	startOne: "Start one today",
+	ask: "Ask the tutor",
+	/** Each topic in Start one today's menu: "Start Variance", "Review Rank". */
+	startTopic: "Start",
+	reviewTopic: "Review",
+} as const;
+
+/** The taught topics the final review has no room for, standing alone
+ *  (the calendar's "No room in it for" reads under its final review). */
+export function finalReviewMissWords(titles: readonly string[]): string {
+	return `No room in the final review for ${listWords(titles)}`;
+}
+
+/** The same, when the head's first line already names a topic with no
+ *  room to start. */
+export function examGapEitherWords(titles: readonly string[]): string {
+	return `${finalReviewMissWords(titles)} either`;
+}
+
+/** His opening words in a lesson Ask the tutor starts, naming the topics. */
+export function examGapAsk(titles: readonly string[]): string {
+	return `My exam plan has no room for ${listWords(titles)}. How can I still fit ${titles.length === 1 ? "it" : "them"} in before the exam?`;
+}
+
 /** Why a topic the exam ahead leaves out (`exam.leavesOut`) starts when
  *  it does: "Not on the exam; after it" when the plan starts it after the
  *  exam, "Not on the exam" when it starts before, since nothing the exam
