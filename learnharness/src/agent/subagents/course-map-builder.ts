@@ -48,7 +48,7 @@ const mapSchema = Type.Object({
 	topics: Type.Array(
 		Type.Object({
 			handle: Type.String({ description: "A short lowercase handle; an existing topic's handle when it is the same idea." }),
-			title: Type.String({ description: "The topic's name as a heading reads, in words; $…$ only when the name is a symbol." }),
+			title: Type.String({ description: "The topic's name as a heading reads, every piece of math in it as $…$ LaTeX." }),
 			needs: Type.Optional(Type.Array(Type.String(), { description: "Handles of its true, direct prerequisites." })),
 			contrasts: Type.Optional(Type.Array(Type.String(), { description: "Handles of methods it competes with." })),
 			refs: Type.Optional(Type.Array(refSchema, { description: "Every place the material teaches it." })),
@@ -75,7 +75,7 @@ How this differs from the recipe's tools:
 - Read every source before you answer. A long PDF is read in parts: follow each read's note on where to continue. A book longer than the course needs: read its table of contents, then the chapters the other material or the syllabus points to, and find the rest with search_material. A page with no text layer is a scan: render it to read it.
 - The course may already have a map, listed with its handles. Update by handle: when the material teaches an idea the map already has, under any wording, send that topic's existing handle with only what is new (references, prerequisites, competing methods). Never repeat, reword or rename a topic; a new handle is only for an idea the map lacks. The app refuses a new topic whose name matches an existing one.
 - A source you cannot read, or a scan you cannot make out, goes under unread with the reason; never guess its content.
-- A title is the topic's name as a heading reads, in words ("Kronecker product", "Singular value decomposition"). Put formulas and symbols in aliases, not in the title; use $…$ in a title only when the name is itself a symbol, as in "$k$-means".
+- A title is the topic's name as a heading reads ("Singular value decomposition", "$k$-means"). Every piece of math in a title is LaTeX in $…$, as in every text the record keeps, never bare: "$\\det(AB) = \\det A \\det B$", not "det(AB) = det A · det B". The app typesets it on the map, the course page and the topic's header. Other names the material uses go in aliases.
 
 `;
 
