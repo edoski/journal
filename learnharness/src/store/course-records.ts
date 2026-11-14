@@ -26,6 +26,7 @@ import {
 } from "../core/contracts/course.ts";
 import { isTopicLevel, type CourseExam, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
+import { arcBlockOf, startsWhyOf, type ArcBlock } from "./course-arcs.ts";
 
 export interface EngineCommand {
 	/** The interpreter that has the engine's dependencies. */
@@ -187,9 +188,10 @@ function examOf(value: unknown): CourseSummary["exam"] {
 	return typeof date === "string" && typeof daysLeft === "number" ? { date, daysLeft } : null;
 }
 
-/** The map's exam with its run-up; topic handles the map does not list
- *  are dropped. */
-function mapExamOf(value: unknown, listed: ReadonlySet<string>): CourseExam | null {
+/** The map's exam with its run-up and its scope of arcs; topic and arc
+ *  handles the map does not list are dropped. A scope stays a list when
+ *  none of its arcs is shown: the exam then examines none of them. */
+function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock): CourseExam | null {
 	const exam = examOf(value);
 	const e = record(value);
 	if (!exam || !e) return null;
@@ -197,11 +199,15 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>): CourseExam | nu
 	const finalReview = str(e.final_review);
 	const doesNotFit = handles(e.does_not_fit);
 	const unreviewed = handles(e.unreviewed);
+	const arcs = block.arcs && Array.isArray(e.arcs) ? strings(e.arcs).flatMap((a) => block.arcOf(a) ?? []) : null;
+	const leavesOut = arcs ? handles(e.leaves_out) : [];
 	return {
 		...exam,
 		...(finalReview ? { finalReview } : {}),
 		...(doesNotFit.length > 0 ? { doesNotFit } : {}),
 		...(unreviewed.length > 0 ? { unreviewed } : {}),
+		...(arcs ? { arcs } : {}),
+		...(leavesOut.length > 0 ? { leavesOut } : {}),
 	};
 }
 
@@ -235,8 +241,9 @@ function count(value: unknown): number {
 const RIGHT_ANSWERS: readonly RightAnswer[] = ["unaided", "helped", "guess", "uncertain", "partial"];
 const isRightAnswer = (value: unknown): value is RightAnswer => RIGHT_ANSWERS.includes(value as RightAnswer);
 
-/** One `map` topic; null when it lacks a handle or an engine level. */
-function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contrasts: string[] }) | null {
+/** One `map` topic with its raw edges, arc and start reason; null when it
+ *  lacks a handle or an engine level. */
+function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contrasts: string[]; rawArc: string | null; rawWhy: unknown }) | null {
 	const e = record(entry);
 	const handle = str(e?.topic);
 	if (!e || !handle || !isTopicLevel(e.level)) return null;
@@ -270,13 +277,16 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 		...(str(e.starts) && strings(e.starts_after).length > 0 ? { startsAfter: strings(e.starts_after) } : {}),
 		needs: strings(e.needs),
 		contrasts: strings(e.contrasts),
+		rawArc: str(e.arc),
+		rawWhy: str(e.starts) ? e.starts_why : null,
 	};
 }
 
-/** The engine's `map` output as a CourseMap: field renaming, and the
+/** The engine's `map` output as a CourseMap: field renaming, the
  *  per-topic `needs` and symmetric `contrasts` lists flattened into edges
- *  (one per unordered contrast pair). Edges to topics the map does not list
- *  are dropped; null when the output is not a map at all. */
+ *  (one per unordered contrast pair), and the arc block whole or not at
+ *  all (`arcBlockOf`). Edges to topics the map does not list are dropped;
+ *  null when the output is not a map at all. */
 export function courseMapOf(workspace: string, json: unknown): CourseMap | null {
 	const m = record(json);
 	if (!m || !Array.isArray(m.topics) || typeof m.today !== "string") return null;
@@ -295,7 +305,16 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 			edges.push({ kind: "contrasts", pair: [topic.handle, other as TopicHandle] });
 		}
 	}
-	const topics = parsed.map(({ needs: _needs, contrasts: _contrasts, ...topic }) => topic);
+	const block = arcBlockOf(
+		workspace,
+		m,
+		parsed.map((t) => ({ handle: t.handle, excluded: t.excluded !== undefined, arc: t.rawArc })),
+	);
+	const topics = parsed.map(({ needs: _needs, contrasts: _contrasts, rawArc, rawWhy, ...topic }): CourseMapTopic => {
+		const arc = block.arcOf(rawArc);
+		const startsWhy = startsWhyOf(rawWhy, listed, block.arcOf);
+		return { ...topic, ...(arc ? { arc } : {}), ...(startsWhy ? { startsWhy } : {}) };
+	});
 	const current = str(m.current);
 	const tasks = (Array.isArray(m.tasks) ? m.tasks : []).flatMap((entry) => {
 		const t = record(entry);
@@ -307,12 +326,14 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 		title: str(m.title) ?? courseLabel({ workspace, title: null }),
 		today: m.today,
 		revision: count(m.revision),
-		exam: mapExamOf(m.exam, listed),
+		exam: mapExamOf(m.exam, listed, block),
 		current: current && listed.has(current) ? (current as TopicHandle) : null,
 		focus: str(m.focus),
 		tasks,
 		topics,
 		edges,
+		...(block.arcs ? { arcs: block.arcs } : {}),
+		...(block.currentArc ? { currentArc: block.currentArc } : {}),
 	};
 }
 

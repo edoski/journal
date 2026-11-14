@@ -5,6 +5,8 @@
  * app computes no standing from them.
  */
 
+import type { ArcHandle, CourseMapArc } from "./course-arcs.ts";
+
 /** An engine topic key, verbatim. */
 export type TopicHandle = string & { readonly __topic: unique symbol };
 
@@ -53,11 +55,25 @@ export interface TopicSignals {
  *  help, as a guess, on doubtful evidence, or partly. */
 export type RightAnswer = "unaided" | "helped" | "guess" | "uncertain" | "partial";
 
+/** Why the plan starts an untaught topic when it does, in the material's
+ *  terms (the engine's `starts_why`): `next`, the next one he can start in
+ *  its arc or the course; `after`, it waited for its prerequisites
+ *  (`needs`) or the methods it competes with (`partners`) to be solid;
+ *  `early`, ahead of its place, from a later arc while the current one has
+ *  topics left (`waitingOn`: what those wait on to be solid; `exam`: the
+ *  exam's pace took it). `arc` is its arc, absent without arcs. */
+export type StartsWhy =
+	| { kind: "next"; arc?: ArcHandle }
+	| { kind: "after"; arc?: ArcHandle; needs: readonly TopicHandle[]; partners: readonly TopicHandle[] }
+	| { kind: "early"; arc?: ArcHandle; waitingOn: readonly TopicHandle[]; exam: boolean };
+
 export interface CourseMapTopic {
 	handle: TopicHandle;
 	/** The engine title; the handle when the record has none. */
 	title: string;
 	level: TopicLevel;
+	/** Its arc, one of the map's `arcs`; absent in a course without arcs. */
+	arc?: ArcHandle;
 	/** The study day it was first taught, when it was. */
 	introduced: string | null;
 	review: TopicReview | null;
@@ -79,6 +95,8 @@ export interface CourseMapTopic {
 	/** The courses whose new topics take the days before that start, when
 	 *  it waits behind them (the engine's `starts_after`). */
 	startsAfter?: readonly string[];
+	/** Why it starts then in its own course, present with `starts`. */
+	startsWhy?: StartsWhy;
 }
 
 /** `needs`: the prerequisite comes before the topic that needs it.
@@ -104,6 +122,11 @@ export interface CourseExam {
 	finalReview?: string;
 	doesNotFit?: readonly TopicHandle[];
 	unreviewed?: readonly TopicHandle[];
+	/** The arcs it examines, in arc order; absent when it covers the whole
+	 *  course. Read it through `examCovers`. */
+	arcs?: readonly ArcHandle[];
+	/** Topics of those arcs it leaves out; absent when it leaves none. */
+	leavesOut?: readonly TopicHandle[];
 }
 
 export interface CourseMap {
@@ -120,6 +143,14 @@ export interface CourseMap {
 	/** Engine path order: prerequisites first. */
 	topics: readonly CourseMapTopic[];
 	edges: readonly CourseMapEdge[];
+	/** The arcs he sees, in study order, never empty; absent in a course
+	 *  without arcs, or when the engine's arc block could not be read, so
+	 *  every surface shows the course as it did before arcs. */
+	arcs?: readonly CourseMapArc[];
+	/** The engine's arc of "You are here" (its `current_arc`, told the
+	 *  lesson in progress). Read `currentArc(map)`, which also follows a
+	 *  `current` Home moved to the lesson since. */
+	currentArc?: ArcHandle;
 }
 
 /** Of a session's candidate topics, the ones the course map lists as never
