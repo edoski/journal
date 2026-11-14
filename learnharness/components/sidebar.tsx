@@ -161,13 +161,6 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 	);
 }
 
-/** The page band's sidebar toggle, now held by the folded sidebar's rail
- *  (`SidebarRail`), so it draws nothing. The calendar and the topic page,
- *  which other work owns, still place it; delete it once they drop it. */
-export function SidebarToggle() {
-	return null;
-}
-
 /** The app frame: sidebar inline + content. Rendered once in the root layout. */
 export function AppShell({ children }: { children: React.ReactNode }) {
 	return (
