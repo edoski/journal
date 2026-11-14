@@ -58,7 +58,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 
 ## Why a topic starts then
 
-`startsWhyWords`: the engine's `starts_why`, in the course's names. "After Probability's new topics" (`startsAfterWords`) stays beside it for another course's starts.
+`startsWhyWords`: the engine's `starts_why`, in the course's names. `startsWhyShort` cuts it to fit a row's reason beside its icon ("After Expectation", "Early, from Orthogonality"), for Home's rows and the sidebar's cards; the topic page keeps the whole sentence. "After Probability's new topics" (`startsAfterWords`) stays beside it for another course's starts.
 
 | Reason | Words |
 |---|---|

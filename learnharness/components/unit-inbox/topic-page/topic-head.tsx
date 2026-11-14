@@ -3,7 +3,8 @@ import { CircleXIcon, ClockIcon, HistoryIcon, type LucideIcon } from "lucide-rea
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { MathText } from "@/components/ui/math-text";
 import { PageFact, PageHead } from "@/components/page-frame/page-frame";
-import { courseHref } from "@/components/unit-inbox/unit-href";
+import { arcHref, courseHref } from "@/components/unit-inbox/unit-href";
+import { ArcPill } from "@/components/course-map/arc-pill";
 import type { HeadMark, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { SLIP_ICON } from "@/components/slip-icons";
 
@@ -20,7 +21,9 @@ const PAUSE = <span className="sr-only">. </span>;
  * (`PageHead`, page-frame.md) the course page wears: the course, which
  * opens the course's page; the topic; the standing line, the pie Home's
  * rows and the map draw leading where he stands in words, then why it
- * needs him and when he last studied it, each an icon and a few words;
+ * needs him and when he last studied it, each an icon and a few words,
+ * then in a course with arcs the topic's arc as a bubble that opens the
+ * course page on that arc (never "Course · Arc" text, Edo, 14 Nov 2026);
  * and what went wrong when the engine can say. The page's action is in
  * the history's Now, so the head has no button.
  */
@@ -39,11 +42,13 @@ export function TopicHead({ facts, children }: { facts: TopicFacts; children?: R
 			}
 			title={<MathText>{facts.topic.title}</MathText>}
 			standing={
-				standing && (
+				(standing || facts.arc) && (
 					<>
-						<PageFact icon={<TopicGlyph standing={standing} />} data-kind="standing">
-							{standing.words}
-						</PageFact>
+						{standing && (
+							<PageFact icon={<TopicGlyph standing={standing} />} data-kind="standing">
+								{standing.words}
+							</PageFact>
+						)}
 						{marks.map((mark) => {
 							const Icon = mark.slip ? SLIP_ICON[mark.slip] : MARK_ICON[mark.kind];
 							return (
@@ -58,6 +63,13 @@ export function TopicHead({ facts, children }: { facts: TopicFacts; children?: R
 								{PAUSE}
 								{studied}
 							</PageFact>
+						)}
+						{facts.arc && (
+							// The row's divider is this span's own; the pill sits 2px into the gaps above and below, so the row keeps its 20px.
+							<span data-kind="arc" className="inline-flex h-5 min-w-0 max-w-full items-center">
+								{standing && PAUSE}
+								<ArcPill arc={facts.arc} share={facts.arc.share} href={arcHref(facts.course.workspace, facts.arc.handle)} className="-my-0.5" />
+							</span>
 						)}
 					</>
 				)

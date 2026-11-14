@@ -4,7 +4,7 @@ The hybrid topic page's history pane (`SectionsPane`, which `HybridTopic` always
 
 Edo's ask (13 Nov 2026): resuming is resuming his study, tracked across lessons, within a lesson and across its steps, so it belongs in the page, inside the list of sessions, not on the composer. The sessions sorted by relevance, with quiet dividers saying what to pick up now, what is scheduled, what comes next and what is past.
 
-Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and `nowline` (a calendar's now-line), which are deleted with the Resume switch's composer options. Thesis: the history sorted by relevance, as an inbox: Now, Next, Scheduled, Earlier. Now is the first row, larger words, an accent rule down its left edge, the press word in the accent (`sections.tsx`).
+Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and `nowline` (a calendar's now-line), which are deleted with the Resume switch's composer options. Thesis: the history sorted by relevance, as an inbox: Now, Next, Scheduled, Earlier. Now is the first row, larger words, an accent rule on the Now label's left edge, the press word in the accent (`sections.tsx`).
 
 ## Sections (`pickup-facts.ts`, pure)
 
@@ -25,7 +25,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 | Open | the same | Tutor writing |
 | Review | "2d overdue", the head's mark | |
 | Continue a task | the task's title | its step, "Part (c)" |
-| Start | First lesson (the head already says Not started) | the day the plan starts it (`plannedWords`): Planned today, Planned Wed 11 Nov, then the courses whose new topics come first ("Planned Wed 11 Nov, after Probability's new topics"); nothing when the plan has no day for it |
+| Start | First lesson (the head already says Not started) | the day the plan starts it (`plannedWords`): Planned today, Planned Wed 11 Nov, then the courses whose new topics come first ("Planned Wed 11 Nov, after Probability's new topics"); nothing when the plan has no day for it. In a course with arcs, a line under it says why it comes then, whole (`facts.startsWhy`, `startsWhyWords`, `data-slot="topic-starts-why"`): its `STARTS_ICON` and "After Expectation and linearity, which it needs"; Scheduled's first lesson carries the same line |
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |
 | Study | Nothing due (Scheduled holds the date); "Nothing planned today" when the plan holds a review memory asked for already, which Scheduled says ("Due since 6 Nov") | |
 
@@ -39,10 +39,11 @@ Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (ke
 
 - `Divider`, `Section`: a 32px label in `text-label` with a hairline to the column's end.
 - `NowPress`: the press stretched over its container (`after:absolute inset-0`), so the whole row is the press; a link to the session it opens, else a button that starts one. The press word in the accent with a 16px arrow that moves 2px on hover. Its focus ring is inset, inside the pane's clip.
-- `NowRow`: 1rem icon column, the words in `text-control` medium wrapping to two lines at most, the press flush right, then the note in `text-label` muted. Bleeds 12px as Home's row; `marked` draws a 2px accent rule down its left edge. A plain row like the list's other rows, no fill or ring at rest even when its lesson is on the map (Edo, 13 Nov 2026): its weight is its type and the accent rule.
+- `NowRow`: 1rem icon column, the words in `text-control` medium wrapping to two lines at most, the press flush right, then the note in `text-label` muted. Bleeds 12px as Home's row; `marked` draws a 2px accent rule (`NOW_RULE`) in the rows' gutter, on the x where the section labels' text starts. A plain row like the list's other rows, no fill or ring at rest even when its lesson is on the map (Edo, 13 Nov 2026): its weight is its type and the accent rule.
 - `NextList`: a session is the history's own row (`SessionItem`) with its map button; a review is Home's one-line row (`../row-classes.ts`), a button that starts the session; an unfinished task is the two-line row, its title over the step it stopped on, so the step (often a formula) gets the row's width.
 - `ScheduledEntry`, `EarlierDays` (the history's `SessionItem` and `AttemptEntry` with their `date` column, 4.5rem, the day on each day's first row), `MapToggle` (the history's map button over a stretched press). A session row says "Tutor writing" while the tutor writes.
 - Every pane is the history's `HistoryPane`: `-mx-3` with `px-3` inside, so a row's bleed keeps its room inside the clip.
+- The gutter (`../row-classes.ts`, Edo, 14 Nov 2026: the rule should sit on the Now text, without misaligning the icons): every row of the pane, Now, Next, Scheduled, Builds on, In your material, sessions and attempts, starts with one 18px leading inset (`GUTTER`), the rule's 2px and the 16px the rows put between their columns, ruled or not. So the rule starts on the labels' x, every icon sits 18px past it on one shared x, and no row moves when it gains or loses the rule. A bleeding row (`BLEED`) keeps its 12px fill past the column on both sides; the spine runs down the icons' middle past the gutter. Home's rows draw no accent rule, so nothing there changes. Measured in Chromium at 1512×982 (rule = Now text x, icons on one x, fills 12px each side) and held by `tests/topic-page-pickup.test.tsx`.
 
 ## Moved here
 

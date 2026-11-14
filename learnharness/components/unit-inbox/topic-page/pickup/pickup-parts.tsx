@@ -10,10 +10,11 @@ import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/to
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { HAIRLINE, ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
+import { BLEED, GUTTER, HAIRLINE, NOW_RULE, ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
-import type { BuildsOn, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import type { BuildsOn, StartsReason, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { STARTS_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import type { TopicRef } from "@/src/core";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
@@ -181,7 +182,7 @@ export function MaterialList({ refs }: { refs: readonly TopicRef[] }) {
 	return (
 		<ul className="flex flex-col">
 			{refs.map((ref, i) => (
-				<li key={`${ref.source}#${ref.locator ?? i}`} data-slot="pickup-material" className={cn(ref.locator ? TWO_LINE_ROW : ONE_LINE_ROW, "mx-0 w-full px-0")}>
+				<li key={`${ref.source}#${ref.locator ?? i}`} data-slot="pickup-material" className={cn(ref.locator ? TWO_LINE_ROW : ONE_LINE_ROW, "mx-0 w-full pr-0 has-[>svg]:pr-0", GUTTER)}>
 					<BookOpenIcon aria-hidden className={ICON} />
 					<span className="col-span-2 truncate text-row text-foreground">{ref.locator ?? ref.source}</span>
 					{ref.locator && <span className="col-span-2 col-start-2 truncate text-label text-muted-foreground">{ref.source}</span>}
@@ -191,18 +192,32 @@ export function MaterialList({ refs }: { refs: readonly TopicRef[] }) {
 	);
 }
 
+/** Why the plan starts a topic not started when it does, as Home's rows
+ *  say it: its icon and the whole sentence, 12 muted, wrapping rather than
+ *  cut. */
+export function StartsWhyLine({ why, className }: { why: StartsReason; className?: string }) {
+	const Icon = STARTS_ICON[why.kind];
+	return (
+		<span data-slot="topic-starts-why" data-kind={why.kind} className={cn("flex items-start gap-1.5 text-label text-muted-foreground", className)}>
+			<Icon aria-hidden className="mt-0.5 size-3 shrink-0" />
+			<MathText>{why.words}</MathText>
+		</span>
+	);
+}
+
 /** Scheduled: the engine's next review or a topic's first lesson, why it
- *  waits when something comes first, and its day in the date column. A
- *  date, not a control. */
-export function ScheduledEntry({ kind, day, waits }: { kind: "review" | "start"; day: string; waits: string | null }) {
+ *  waits when something comes first, and its day in the date column; a
+ *  first lesson also says why it comes then. A date, not a control. */
+export function ScheduledEntry({ kind, day, waits, why }: { kind: "review" | "start"; day: string; waits: string | null; why?: StartsReason | null }) {
 	const Icon = kind === "review" ? HistoryIcon : BookOpenIcon;
 	return (
-		<p data-slot="pickup-scheduled" data-kind={kind} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", waits && "py-2")}>
+		<p data-slot="pickup-scheduled" data-kind={kind} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", GUTTER, (waits || why) && "py-2")}>
 			<Icon aria-hidden className={ICON} />
 			<span className="truncate text-row text-muted-foreground">{kind === "review" ? "Review" : FIRST_LESSON}</span>
 			<span data-slot="topic-history-date" className="text-label text-muted-foreground tabular-nums">
 				{day}
 			</span>
+			{why && <StartsWhyLine why={why} className="col-span-2 col-start-2" />}
 			{waits && (
 				<span data-slot="pickup-scheduled-waits" className="col-span-2 col-start-2 text-label text-muted-foreground">
 					{waits}
@@ -239,8 +254,9 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
  * Now as a row: its icon, what to pick up and the press on top, where it
  * stands in a few words under them, the whole row the press. Bleeds 12px
  * as Home's row. A plain row like the rest of the list, no fill or box at
- * rest: its weight is its type and, when `marked`, the accent rule down
- * its left edge, so the eye lands there first.
+ * rest: its weight is its type and, when `marked`, the accent rule in
+ * the rows' shared gutter, on the section label's x, so the eye lands
+ * there first.
  */
 export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now: NowItem; marked: boolean } & Pick<HybridPaneProps, "facts" | "busy" | "onAct" | "shown" | "onShow">) {
 	const onMap = now.chat !== null && now.chat === shown;
@@ -250,8 +266,9 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 			data-action={now.kind}
 			data-shown={onMap || undefined}
 			className={cn(
-				"group/now relative -mx-3 grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg px-3 py-3 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
-				marked && "before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-full before:bg-link",
+				"group/now relative grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg py-3 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
+				BLEED,
+				marked && NOW_RULE,
 			)}
 		>
 			<NowIcon now={now} facts={facts} />
@@ -264,6 +281,7 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 					<MathText>{now.note}</MathText>
 				</span>
 			)}
+			{now.why && <StartsWhyLine why={now.why} className="col-start-2" />}
 			{now.chat && facts.sessions.some((entry) => entry.chat.id === now.chat && entry.plan?.tree.nodes.length) && (
 				<MapToggle chat={now.chat} shown={onMap} onShow={onShow} className="col-start-3 self-end justify-self-end" />
 			)}

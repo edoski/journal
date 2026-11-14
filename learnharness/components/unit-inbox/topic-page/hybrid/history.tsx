@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon, WaypointsIcon } from "lucide-react";
 import type { TopicAttempt } from "@/src/core";
 import { cn } from "@/lib/utils";
+import { GUTTER } from "@/components/unit-inbox/topic-page/row-classes";
 import { ATTEMPT_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -28,11 +29,12 @@ function edgeFade(top: boolean, bottom: boolean): React.CSSProperties | undefine
 }
 
 /* The spine: a 1px line in the map's edge ink down the middle of the 16px
- * icon column, broken 4px above and below each icon on it. Every entry
+ * icon column, past the rows' gutter (`GUTTER`), broken 4px above and
+ * below each icon on it. Every entry
  * draws its own piece, so a row's fill never hides the line. */
 const SPINE = "before:absolute before:w-px before:bg-white/33 after:absolute after:w-px after:bg-white/33";
-const ABOVE = "before:left-[7.5px] before:top-0 before:h-2";
-const BELOW = "after:left-[7.5px] after:top-8 after:bottom-0";
+const ABOVE = "before:left-[25.5px] before:top-0 before:h-2";
+const BELOW = "after:left-[25.5px] after:top-8 after:bottom-0";
 
 /** Where an entry sits on the line: the first has no line above its icon, the last none below. */
 export interface Ends {
@@ -68,7 +70,7 @@ export function AttemptEntry({ attempt, titleOf, ends, date }: { attempt: TopicA
 	const { result, words: how } = attemptMark(attempt, titleOf);
 	const { Icon, words } = RESULT[result];
 	return (
-		<li data-slot="topic-attempt" data-result={result} className={cn("grid min-h-10 items-baseline gap-x-4 gap-y-0.5 py-2.75", date === undefined ? "grid-cols-[1rem_minmax(0,1fr)]" : DATED, spine(ends))}>
+		<li data-slot="topic-attempt" data-result={result} className={cn("grid min-h-10 items-baseline gap-x-4 gap-y-0.5 py-2.75", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)]" : DATED, spine(ends))}>
 			<Icon role="img" aria-label={how ? `${words}, ${how}` : words} className={cn(ICON, "mt-px self-start")} />
 			<p className={cn("line-clamp-2 text-row text-muted-foreground", date !== undefined && "col-span-2")}>
 				<LineText>{attempt.text}</LineText>
@@ -107,13 +109,14 @@ export function SessionItem({
 	const planned = isPlanned(entry);
 	const why = state === "your-turn" ? <WhyMark kind="reply" words="Your turn" /> : state === "working" ? <WhyMark kind="writing" words={writing} /> : null;
 	return (
-		<li data-slot="topic-history-session" data-shown={shown || undefined} className={cn("grid gap-x-4", date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
+		<li data-slot="topic-history-session" data-shown={shown || undefined} className={cn("grid gap-x-4", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
 			<Button
 				variant="quiet"
 				asChild
 				data-testid="unit-page-session"
 				className={cn(
-					"col-span-full row-start-1 -mx-3 grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg px-3 text-left font-normal whitespace-normal",
+					// Its fill reaches back over the row's gutter and 12px past the column, as every row's does (`BLEED`).
+					"col-span-full row-start-1 -mr-3 -ml-[1.875rem] grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg pr-3 pl-[1.875rem] text-left font-normal whitespace-normal has-[>svg]:pr-3 has-[>svg]:pl-[1.875rem]",
 					shown && "bg-fill-selected hover:bg-fill-selected",
 				)}
 			>

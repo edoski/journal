@@ -233,6 +233,19 @@ export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "t
 	return `Next in ${arc ?? map.title}`;
 }
 
+/** `startsWhyWords` cut to fit a row's reason beside its icon, where the
+ *  topic page keeps the whole sentence: "Next in Matrices"; "After
+ *  Expectation"; "After Separable equations"; "Early, from Orthogonality"
+ *  ("Early, ahead of its place" without arcs). Pure. */
+export function startsWhyShort(why: StartsWhy, map: Pick<CourseMap, "title" | "topics" | "arcs">): string {
+	if (why.kind === "early") return startsWhyWords({ ...why, waitingOn: [], exam: false }, map);
+	if (why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0)) {
+		const handles = why.needs.length > 0 ? why.needs : why.partners;
+		return `After ${listWords(handles.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h))}`;
+	}
+	return startsWhyWords(why, map);
+}
+
 /** How far a day is from the engine's, one form wherever a distance shows
  *  (an exam, a planned review): "Today", "Tomorrow", "In 18 days",
  *  "Yesterday", "3 days ago". Always days, never rounded to weeks, so the

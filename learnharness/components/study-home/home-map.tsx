@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRightIcon, Maximize2Icon, Minimize2Icon } from "lucide-react";
-import type { ChatListItem, StudyCourse, TopicHandle } from "@/src/core";
+import type { ArcHandle, ChatListItem, StudyCourse, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,10 @@ export function HomeMap({
 	onSelect: (workspace: string) => void;
 	/** Topics to light on the chosen course's map; null lights none. */
 	highlight?: ReadonlySet<TopicHandle> | null;
+	/** The arc of the chosen course Home's follow shows (the Today row he
+	 *  points at, `litArc`); null shows where he is. Unset, the map follows
+	 *  `highlight` itself. */
+	arc?: ArcHandle | null;
 	enlarged: boolean;
 	onEnlarge: (enlarged: boolean) => void;
 }) {
