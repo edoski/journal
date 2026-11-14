@@ -28,7 +28,8 @@ export interface Unit {
 	course: UnitCourse;
 	topic: CourseMapTopic;
 	shelf: Shelf;
-	/** Newest first. A session that worked on two units is in both. */
+	/** Newest first. A session that worked on two units is in both; `now`
+	 *  reads only those the unit's topic is their own. */
 	sessions: readonly ChatListItem[];
 	now: UnitNow;
 	/** The open task that holds the topic, the course's focused one first
@@ -55,7 +56,8 @@ export interface UnitInbox {
 	working: readonly Unit[];
 	/** The soonest back first. */
 	known: readonly Unit[];
-	/** Sessions tied to no listed unit: a general question, or a session
+	/** Sessions that belong to no listed unit (no own topic on one): a
+	 *  general question, a lesson its plan has not named yet, or a session
 	 *  older than the course rule. Newest first. */
 	other: readonly ChatListItem[];
 }
@@ -90,9 +92,11 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
 	return slipWords(topic.signals, (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle);
 }
 
-/** What a topic's sessions are doing now. Pure. */
-export function nowOf(sessions: readonly ChatListItem[]): UnitNow {
-	const states = sessions.map(sessionState);
+/** What a topic's own sessions are doing now: those that belong to it
+ *  (`ownTopics`), never one that only touched it on the way, so a lesson
+ *  is "Your turn" on its own topic alone. Pure. */
+export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNow {
+	const states = sessions.filter((c) => (c.ownTopics ?? []).includes(handle)).map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	return states.includes("working") ? "working" : null;
 }
@@ -120,12 +124,13 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 		const course = { workspace: map.workspace, title: map.title };
 		for (const topic of map.topics) {
 			const sessions = topicSessions(chats, map.workspace, topic.handle);
-			const now = nowOf(sessions);
+			const now = nowOf(sessions, topic.handle);
 			const shelf = shelfOf(topic, now);
 			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic), slip: slipOf(map, topic) });
 		}
 	}
-	const listed = new Set(units.flatMap((u) => u.sessions.map((s) => s.id)));
+	const handles = new Set<string>(units.map((u) => u.topic.handle));
+	const listed = new Set(units.flatMap((u) => u.sessions.filter((c) => (c.ownTopics ?? []).some((h) => handles.has(h))).map((c) => c.id)));
 	const inScope = (chat: ChatListItem) => (scope === null ? true : chat.course?.workspace === scope);
 	const resting = units.filter((u) => u.now !== "working");
 	return {

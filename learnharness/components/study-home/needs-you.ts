@@ -59,11 +59,17 @@ export function slotWords(why: Why | null, lead: CourseMapTopic | null): string 
 
 /**
  * The topic a line's reason is about, so a card titled by it and its
- * reason name the same topic: a lapse's lapsed topic, an open task's
- * current topic when the task holds it, else the line's first topic.
+ * reason name the same topic: a session's own topic, the one it belongs
+ * to, fixed for its life (none when it has none on the map), never the
+ * topic its lesson is on now; a lapse's lapsed topic; an open task's
+ * current topic when the task holds it; else the line's first topic.
  * `whyOf` picks the lapsed topic the same way. Pure.
  */
 export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Why | null): CourseMapTopic | null {
+	if (row.kind === "session") {
+		const [own] = row.chat.ownTopics ?? [];
+		return topics.find((t) => t.handle === own) ?? null;
+	}
 	if (why?.kind === "missed") {
 		const held = new Set(topics.map((t) => t.handle));
 		const lapsed = row.course?.map.topics.find((t) => held.has(t.handle) && t.signals.lapsed);

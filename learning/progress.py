@@ -344,6 +344,29 @@ def _since_solid(attempts: list[Attempt], replayed: Replay) -> list[dict[str, An
     return [item for _, item in attempts if item["date"] > since]
 
 
+RIGHT = ("unaided", "helped", "guess", "uncertain", "partial")
+
+
+def _answered(item: dict[str, Any]) -> str | None:
+    if item["result"] == "partial":
+        return "partial"
+    if item["result"] != "correct":
+        return None
+    if not unaided(item):
+        return "helped"
+    if item.get("sure") == "guess":
+        return "guess"
+    return "uncertain" if "uncertain" in item else "unaided"
+
+
+def _right(attempts: list[Attempt]) -> str | None:
+    """How the learner has best answered a topic not yet solid, the first of
+    ``RIGHT`` any attempt shows: right with no help (on the day it was
+    learned), with help, as a guess, on doubtful evidence, or partly."""
+    found = {_answered(item) for _, item in attempts}
+    return next((kind for kind in RIGHT if kind in found), None)
+
+
 def _standing(
     key: str, topic: dict[str, Any], history: _History, exam: Exam | None
 ) -> dict[str, Any]:
@@ -354,6 +377,8 @@ def _standing(
         "attempts": len(attempts),
         "unaided_days": sum(verdict == "solid" for _, verdict in replayed.verdicts),
     }
+    if result["level"] == "assisted":
+        result["right"] = _right(attempts)
     if attempts:
         key, item = attempts[-1]
         last = {"id": key, "date": item["date"], "result": item["result"]}
@@ -383,13 +408,26 @@ _MISTAKES = ("lapsed", "choice_errors", "confident_errors")
 def _repaired(
     topic: dict[str, Any], attempts: list[Attempt], standing: dict[str, Any]
 ) -> bool:
-    """A mistake answered right since: the newest attempt is correct and the
-    gap, if any, was not diagnosed after it. It stays weak until a later
-    day's unaided answer settles it."""
-    if not attempts or attempts[-1][1]["result"] != "correct":
+    """A mistake answered right since: a correct answer after the newest
+    incorrect one, else after the newest partial one, with the gap, if any,
+    not diagnosed on a later day than that answer. A partial answer after the
+    repair leaves it standing: its gap is what is left to check. It stays
+    weak until a later day's unaided answer settles it."""
+    results = [item["result"] for _, item in attempts]
+    wrong = next(
+        (
+            at
+            for result in ("incorrect", "partial")
+            for at in reversed(range(len(results)))
+            if results[at] == result
+        ),
+        -1,
+    )
+    fixes = [item for _, item in attempts[wrong + 1 :] if item["result"] == "correct"]
+    if not fixes:
         return False
     if "gap" in topic:
-        return str(topic.get("judged", "")) <= str(attempts[-1][1]["date"])
+        return str(topic.get("judged", "")) <= str(fixes[0]["date"])
     return any(flag in standing for flag in _MISTAKES)
 
 

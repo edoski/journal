@@ -87,6 +87,7 @@ const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({
 	busy: false,
 	compacting: false,
 	course: { workspace: WS, title: "Linear Algebra" },
+	ownTopics: over.topics ?? [],
 	...over,
 });
 

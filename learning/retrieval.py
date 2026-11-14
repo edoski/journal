@@ -63,6 +63,22 @@ def last_activity(record: dict[str, Any], today: date) -> dict[str, Any] | None:
     return {"date": day.isoformat(), "days_ago": (today - day).days}
 
 
+def last_studied(record: dict[str, Any], today: date) -> dict[str, Any] | None:
+    """The latest day the record shows study on, an observation's or a topic's
+    introduction, and how long ago it was; a save that records neither (a new
+    course, a renamed topic) does not move it."""
+    days = [item["date"] for item in record["observations"].values()]
+    days += [
+        str(topic["introduced"])
+        for topic in record["topics"].values()
+        if "introduced" in topic
+    ]
+    if not days:
+        return None
+    day = date.fromisoformat(max(days))
+    return {"date": day.isoformat(), "days_ago": (today - day).days}
+
+
 def new_week(record: dict[str, Any], today: date) -> bool:
     """Whether the last save fell in an earlier ISO week than ``today``."""
     if "updated_at" not in record:
@@ -484,6 +500,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "review": topic.get("review", {}).get("due"),
             "overdue": overdue.get(key),
             "weak": _is_weak(topic, standing),
+            "right": standing.get("right"),
             "gap": topic.get("gap"),
             "excluded": topic.get("excluded"),
             **{

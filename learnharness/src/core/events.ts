@@ -36,8 +36,10 @@ export interface ServerEvents {
 	"jobs-changed": { chatId?: string };
 	/** A background run started, changed phase or ended (activity dock). */
 	"activity-changed": Record<string, never>;
-	/** The session list changed (create, delete, title). */
-	"chats-changed": Record<string, never>;
+	/** The session list changed (create, delete, title). `named` carries a
+	 *  session's new title when its first plan named it, so its open header
+	 *  shows the one name the list does. */
+	"chats-changed": { named?: { id: string; title: string } };
 	/** The course list changed: a course was created, renamed or deleted. */
 	"courses-changed": Record<string, never>;
 	/** A course's engine record changed: a save through the app, or another

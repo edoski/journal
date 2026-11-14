@@ -37,7 +37,9 @@ export interface CourseSummary {
 	/** The exam, when the record has a date for it: `daysLeft` is the
 	 *  engine's own count from the study day. */
 	exam: { date: string; daysLeft: number } | null;
-	/** Days since the record was last saved; null when it never was. */
+	/** Days since the record last shows study (the engine's `last_studied`:
+	 *  an observation or a topic taught); null when it shows none, even
+	 *  when the course was saved. */
 	lastActiveDaysAgo: number | null;
 }
 

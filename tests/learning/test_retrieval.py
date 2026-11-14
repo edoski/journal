@@ -609,6 +609,30 @@ def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
     assert "Private working" not in json.dumps(result)
 
 
+def test_map_says_how_a_topic_not_yet_solid_was_best_answered(
+    workspace: Workspace,
+) -> None:
+    records.save(
+        workspace,
+        {
+            "topics": {
+                "handshake": {"introduced": TODAY.isoformat()},
+                "connectivity": {"introduced": TODAY.isoformat()},
+            },
+            "observations": [
+                attempt("handshake", sure="confident"),
+                attempt("connectivity", result="partial"),
+            ],
+        },
+    )
+    topics = {item["topic"]: item for item in retrieval.course_map(workspace)["topics"]}
+    assert (topics["handshake"]["level"], topics["handshake"]["right"]) == (
+        "assisted",
+        "unaided",
+    )
+    assert topics["connectivity"]["right"] == "partial"
+
+
 def test_map_of_a_new_course_has_no_topics(workspace: Workspace) -> None:
     assert retrieval.course_map(workspace) == {
         "today": TODAY.isoformat(),

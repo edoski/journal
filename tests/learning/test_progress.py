@@ -195,6 +195,47 @@ def test_a_mistake_answered_right_since_is_repaired_until_a_later_check() -> Non
 
 
 @pytest.mark.parametrize(
+    ("observations", "right"),
+    [
+        ([attempt("rank")], "unaided"),
+        ([attempt("rank", "partial"), attempt("rank", help="A hint")], "helped"),
+        ([attempt("rank", sure="guess")], "guess"),
+        ([attempt("rank", uncertain="Maybe read from notes")], "uncertain"),
+        ([attempt("rank", "partial"), attempt("rank", "incorrect")], "partial"),
+    ],
+)
+def test_a_topic_not_yet_solid_says_how_it_was_best_answered(
+    observations: list[dict[str, Any]], right: str
+) -> None:
+    standing = progress.standing(course(observations, introduced=day(0)), "rank")
+    assert (standing["level"], standing["right"]) == ("assisted", right)
+
+
+def test_only_a_topic_not_yet_solid_says_how_it_was_answered() -> None:
+    solid = course([attempt("rank", offset=-1)], introduced=day(-3))
+    assert progress.standing(solid, "rank")["level"] == "independent"
+    assert "right" not in progress.standing(solid, "rank")
+
+
+def test_a_partial_answer_after_the_repair_leaves_it_repaired() -> None:
+    gap = {"gap": "Takes lambda off one diagonal entry only"}
+    slip = attempt("rank", "incorrect", sure="confident")
+    fixed = attempt("rank", help="Showed the setup again", sure="confident")
+    recall = attempt("rank", "partial", help="none")
+    standing = progress.standing(course([slip, fixed, recall], **gap), "rank")
+    assert standing["repaired"] is True
+    assert "repaired" not in progress.standing(
+        course([fixed, attempt("rank", "partial")], **gap), "rank"
+    )
+    assert "repaired" not in progress.standing(
+        course([slip, fixed, attempt("rank", "incorrect")], **gap), "rank"
+    )
+    assert progress.standing(
+        course([attempt("rank", "partial"), fixed], **gap), "rank"
+    )["repaired"]
+
+
+@pytest.mark.parametrize(
     ("verdict", "streak", "expected"),
     [
         ("missed", 0, 1),

@@ -27,10 +27,16 @@ export interface TopicSignals {
 	/** Wrongly chosen method -> times, since the last solid verdict. */
 	choiceErrors: Readonly<Record<string, number>>;
 	confidentErrors: number;
-	/** His newest answer was right since the mistake: the topic stays weak
-	 *  until a later day's unaided answer settles it. */
+	/** He answered right after the mistake, a partial answer since or
+	 *  not: the topic stays weak until a later day's unaided answer
+	 *  settles it. */
 	repaired: boolean;
 }
+
+/** How he has best answered a topic he cannot yet do on his own (the
+ *  engine's `right`): right with no help (on the day it was learned), with
+ *  help, as a guess, on doubtful evidence, or partly. */
+export type RightAnswer = "unaided" | "helped" | "guess" | "uncertain" | "partial";
 
 export interface CourseMapTopic {
 	handle: TopicHandle;
@@ -42,6 +48,9 @@ export interface CourseMapTopic {
 	review: TopicReview | null;
 	/** The engine's weak verdict. */
 	weak: boolean;
+	/** At the `assisted` level, how he has best answered it; absent at
+	 *  every other level. */
+	right?: RightAnswer;
 	signals: TopicSignals;
 	/** Keys of open tasks that hold this topic. */
 	tasks: readonly string[];

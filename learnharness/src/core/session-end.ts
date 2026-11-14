@@ -12,9 +12,11 @@ import { phaseAt3Lh } from "./phases.ts";
  * partway through a lesson when the plan waits for his go-ahead, when he
  * dismissed its question, when a lesson it picked up has reached no step
  * yet, or when its turn ended in words that ask him something while the
- * step it stopped on leads to another: "mid-lesson". Words that end
- * without a question ("Good place to stop") end the session there, like
- * anything else: "closed". Pure.
+ * step it stopped on leads to another: "mid-lesson". A lesson the tutor
+ * moved to practice waits on him too while its plan has steps left: a
+ * concluded problem waits on Next problem. Words that end without a
+ * question ("Good place to stop") end the session there, like anything
+ * else, as does a practice round with no plan or none left: "closed". Pure.
  */
 export function sessionEndOf(messages: readonly LhMessage[], tree: PlanTree | undefined, initial: SessionMode = "teach"): SessionEnd {
 	const last = [...messages].reverse().find((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
@@ -25,13 +27,20 @@ export function sessionEndOf(messages: readonly LhMessage[], tree: PlanTree | un
 	}
 	if (last.role !== "assistant" || last.stopReason !== "stop") return "cut";
 	if (closedTonight(messages)) return "closed";
-	if (sessionModeOf(messages, initial) === "practice") return "closed";
+	if (sessionModeOf(messages, initial) === "practice") return tree && stepsLeft(tree, messages) ? "mid-lesson" : "closed";
 	const phase = phaseAt3Lh(messages);
 	if (phase === "plan") return "mid-lesson";
 	if (phase !== "teach" || !tree) return "closed";
 	const { current } = derivePlanStatusesLh(tree, messages);
 	if (current === null) return "mid-lesson";
 	return asks(last) && tree.edges.some((edge) => edge.from === current) ? "mid-lesson" : "closed";
+}
+
+/** Whether the lesson's plan has a step not yet taught: one no tagged
+ *  question has moved past and no progress call marked done. Pure. */
+function stepsLeft(tree: PlanTree, messages: readonly LhMessage[]): boolean {
+	const { visited } = derivePlanStatusesLh(tree, messages);
+	return tree.nodes.some((node) => !visited.has(node.id));
 }
 
 /** Whether a reply's last words are a question to him: its text ends in a

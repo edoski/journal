@@ -24,7 +24,7 @@ import {
 	type UnreadableCourse,
 	type UnreadableProblem,
 } from "../core/contracts/course.ts";
-import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type TopicHandle } from "../core/contracts/course-map.ts";
+import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
 
 export interface EngineCommand {
@@ -172,7 +172,7 @@ function summaryOf(workspace: string, e: Record<string, unknown>): CourseSummary
 		task: str(task.title),
 		step: str(task.step),
 		exam: examOf(e.exam),
-		lastActiveDaysAgo: daysAgoOf(e.last_activity),
+		lastActiveDaysAgo: daysAgoOf(e.last_studied),
 	};
 }
 
@@ -210,6 +210,9 @@ function count(value: unknown): number {
 	return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0;
 }
 
+const RIGHT_ANSWERS: readonly RightAnswer[] = ["unaided", "helped", "guess", "uncertain", "partial"];
+const isRightAnswer = (value: unknown): value is RightAnswer => RIGHT_ANSWERS.includes(value as RightAnswer);
+
 /** One `map` topic; null when it lacks a handle or an engine level. */
 function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contrasts: string[] }) | null {
 	const e = record(entry);
@@ -229,6 +232,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 				: { kind: "scheduled", date: reviewDate }
 			: null,
 		weak: e.weak === true,
+		...(isRightAnswer(e.right) ? { right: e.right } : {}),
 		signals: {
 			gap: str(e.gap),
 			lapsed: e.lapsed === true,

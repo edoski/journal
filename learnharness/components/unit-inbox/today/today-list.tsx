@@ -6,7 +6,7 @@ import { restShelves } from "@/components/unit-inbox/now-inbox";
 import type { NowListProps } from "@/components/unit-inbox/now-list-props";
 import { NowShelves } from "@/components/unit-inbox/now-shelves";
 import { SidebarNote } from "@/components/unit-inbox/sidebar-note";
-import { steadyTop, itemKey, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
+import { claimedKeys, steadyTop, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { isUnitOpen } from "@/components/unit-inbox/unit-row";
 import { UnreadableCard } from "@/components/unit-inbox/unreadable-card";
@@ -40,7 +40,7 @@ export function TodayList(props: NowListProps) {
 		top = steadyTop(drawn.top, fresh, inbox, chats);
 		setDrawn({ fresh, top });
 	}
-	const shelves = useMemo(() => restShelves(inbox, new Set(top.map(itemKey))), [inbox, top]);
+	const shelves = useMemo(() => restShelves(inbox, new Set(top.flatMap(claimedKeys))), [inbox, top]);
 	const isOpen = (item: NowItem) => (item.kind === "topic" ? isUnitOpen(item.unit, pathname) : pathname === `/chat/${item.chat.id}`);
 	const note = noteOf(props, top.length + unreadable.length);
 	return (

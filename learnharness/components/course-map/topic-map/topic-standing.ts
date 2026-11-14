@@ -1,6 +1,6 @@
 import type { CourseMapTask, CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
 import { mathPlain } from "@/components/ui/math-text";
-import { overdueWords, slipWords, STANDING_WORDS, type Fill } from "@/components/study-words";
+import { overdueWords, slipWords, standingWords, type Fill } from "@/components/study-words";
 import { taskWords } from "@/components/unit-inbox/units";
 
 /** Where the learner stands on a topic, as the map draws and says it. */
@@ -10,7 +10,7 @@ export interface Standing {
 	fill: Fill;
 	/** The engine calls the topic weak: the pie wears the warning ink. */
 	slipping: boolean;
-	/** The same in the pie's words (`STANDING_WORDS`). */
+	/** Where he stands in words true to the record (`standingWords`). */
 	words: string;
 }
 
@@ -28,7 +28,7 @@ const FILL: Record<TopicLevel, Fill> = { new: 0, introduced: 0.25, attempted: 0.
 export function standingOf(topic: CourseMapTopic): Standing {
 	const full = ON_HIS_OWN.has(topic.level);
 	const fill = full && topic.weak ? 0.75 : FILL[topic.level];
-	return { fill, slipping: topic.weak, words: STANDING_WORDS[fill] };
+	return { fill, slipping: topic.weak, words: standingWords(fill, topic) };
 }
 
 /** Why a topic needs the learner now. */
