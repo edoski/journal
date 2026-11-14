@@ -53,6 +53,18 @@ export function overdueWords(overdue: number): string {
 	return `${Math.floor(overdue / 7)}w overdue`;
 }
 
+/** Where unfinished work holding a topic was left, by when, never by the
+ *  tutor's step: "Left off today", "Left off yesterday", "Left off 3d
+ *  ago", "Left off 2w ago"; "Unfinished" when no day is known. */
+export function leftOffWords(days: number | null): string {
+	if (days === null) return "Unfinished";
+	if (days <= 0) return "Left off today";
+	if (days === 1) return "Left off yesterday";
+	if (days < 14) return `Left off ${days}d ago`;
+	if (days < 60) return `Left off ${Math.floor(days / 7)}w ago`;
+	return `Left off ${Math.floor(days / 30)}mo ago`;
+}
+
 /** A review the engine has dated ahead, some days away: "Back in 5d",
  *  "Back in 3w", "Back in 2mo". */
 export function returnWords(days: number): string {

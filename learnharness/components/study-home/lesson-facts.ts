@@ -69,7 +69,7 @@ export function lessonOf(row: TodayRow): Lesson {
 		courseTitle: course.map.title,
 		exam: runupExam(course),
 		title: stepWords(step),
-		detail: step.kind === "review" ? (then ? `Then ${then}` : null) : step.kind === "task" ? step.step : null,
+		detail: step.kind === "review" && then ? `Then ${then}` : null,
 		action: ACTION[step.kind],
 		topics,
 		place: topicSpan(course, topics),

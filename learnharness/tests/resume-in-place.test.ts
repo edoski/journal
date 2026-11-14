@@ -68,7 +68,7 @@ const topic = (handle: string, title: string, over: Partial<CourseMapTopic> = {}
 });
 const RANK = topic("rank", "Rank and the column space");
 const KERNEL = topic("kernel", "Kernel and rank-nullity", { review: { kind: "scheduled", date: "2026-11-12" } });
-const SHEET = { key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A" };
+const SHEET = { key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A", updated: null };
 const MAP: CourseMap = { workspace: WS, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: RANK.handle, focus: SHEET.key, tasks: [SHEET], topics: [RANK, KERNEL], edges: [] };
 const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 

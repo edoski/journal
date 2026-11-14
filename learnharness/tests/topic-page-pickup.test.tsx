@@ -51,8 +51,8 @@ const MAP: CourseMap = {
 	current: "rank" as TopicHandle,
 	focus: "sheet-4",
 	tasks: [
-		{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" },
-		{ key: "sheet-5", title: "Problem sheet 5", step: null },
+		{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: null },
+		{ key: "sheet-5", title: "Problem sheet 5", step: null, updated: null },
 	],
 	topics: [EIGEN, SPAN, RANK, INVERTIBILITY, DET, VECTORS],
 	edges: [],

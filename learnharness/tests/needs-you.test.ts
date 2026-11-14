@@ -57,11 +57,11 @@ describe("needsYouNow", () => {
 		const task: StudyCourse = {
 			...LINALG,
 			due: [],
-			map: { ...LINALG.map, focus: "sheet", tasks: [{ key: "sheet", title: "Problem sheet 4", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A" }] },
+			map: { ...LINALG.map, focus: "sheet", tasks: [{ key: "sheet", title: "Problem sheet 4", step: "At first, the owed rank retest: he needs the matrix", updated: "2026-11-07" }] },
 		};
 		const [taskLine] = needsYouNow([task], [], TODAY).lines;
-		assert.equal(taskLine!.why?.short, "At part (c): show dim ker A = 2 for the 3x5 matrix A");
-		assert.equal(taskLine!.slot, "At part (c)");
+		assert.equal(taskLine!.why?.short, "Left off yesterday");
+		assert.equal(taskLine!.slot, "Left off yesterday");
 		const today: StudyCourse = { ...ANALYSIS, map: { ...ANALYSIS.map, topics: [topic("conv", "Convergent sequences", "independent", { review: due(0) })] }, due: ["conv"] as TopicHandle[] };
 		assert.equal(needsYouNow([today], [], TODAY).lines[0]!.slot, "Due today");
 		assert.equal(slotWords(null, null), null);
@@ -78,11 +78,11 @@ describe("needsYouNow", () => {
 	});
 
 	it("leads an open task with the course's current topic when the task holds it, else its first held topic", () => {
-		const sheet = { key: "sheet", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2" };
+		const sheet = { key: "sheet", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2", updated: null };
 		const holds = (handles: string[]) => LINALG.map.topics.map((t) => (handles.includes(t.handle) ? { ...t, tasks: ["sheet"] } : t));
 		const task = (handles: string[]): StudyCourse => ({ ...LINALG, due: [], map: { ...LINALG.map, focus: "sheet", tasks: [sheet], topics: holds(handles) } });
 		const [atRank] = needsYouNow([task(["independence", "rank"])], [], TODAY).lines;
-		assert.deepEqual([atRank!.lead?.title, atRank!.slot, atRank!.topics.map((t) => t.handle)], ["Rank and the column space", "At part (c)", ["rank", "independence"]]);
+		assert.deepEqual([atRank!.lead?.title, atRank!.slot, atRank!.topics.map((t) => t.handle)], ["Rank and the column space", "Unfinished", ["rank", "independence"]]);
 		const [atFirst] = needsYouNow([task(["independence", "det"])], [], TODAY).lines;
 		assert.equal(atFirst!.lead?.title, "Linear independence");
 	});
@@ -124,7 +124,7 @@ describe("lineTopics", () => {
 			map: {
 				...LINALG.map,
 				focus: "sheet",
-				tasks: [{ key: "sheet", title: "Sheet", step: null }],
+				tasks: [{ key: "sheet", title: "Sheet", step: null, updated: null }],
 				topics: LINALG.map.topics.map((t) => (t.handle === "det" || t.handle === "independence" ? { ...t, tasks: ["sheet"] } : t)),
 			},
 		};

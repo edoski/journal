@@ -37,7 +37,7 @@ const LINALG = course(
 	"Linear Algebra",
 	{
 		exam: { date: "2026-11-29", daysLeft: 21 },
-		tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }],
+		tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: null }],
 		topics: [
 			topic("span", { title: "Span", review: { kind: "due", date: "2026-10-29", overdue: 10 } }),
 			topic("basis", { title: "Basis", review: { kind: "due", date: TODAY, overdue: 0 } }),

@@ -5,7 +5,7 @@ import { examWords, todayRows, type TodayRow } from "@/components/study-home/stu
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { buildInbox, daysBetween, type Unit, type UnitNow } from "@/components/unit-inbox/units";
+import { buildInbox, daysBetween, taskWords as leftOff, type Unit, type UnitNow } from "@/components/unit-inbox/units";
 import { returnWords } from "@/components/study-words";
 
 /**
@@ -71,16 +71,14 @@ export interface CourseGroup {
 	topics: readonly CourseTopic[];
 }
 
-const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 const overdue = (t: CourseMapTopic) => (t.review?.kind === "due" ? t.review.overdue : -1);
 
-/** Where an open task holding the topic was left: the course's focused task
- *  first, "At part (c): …", else "In Problem sheet 4". Pure. */
+/** When an open task holding the topic was left, the course's focused
+ *  task first: "Left off 3d ago". Pure. */
 function taskWords(course: StudyCourse, topic: CourseMapTopic): string | null {
 	const held = course.map.tasks.filter((task) => topic.tasks.includes(task.key));
 	const task = held.find((t) => t.key === course.map.focus) ?? held[0];
-	if (!task) return null;
-	return task.step ? `At ${lowerFirst(task.step)}` : `In ${task.title}`;
+	return task ? leftOff(task, course.map.today) : null;
 }
 
 /** The row's one fact, by priority: a session that waits or runs, then

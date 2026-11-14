@@ -146,7 +146,7 @@ describe("unitStatus", () => {
 		fixed,
 	]);
 	const inbox = buildInbox(
-		[{ ...la, map: { ...la.map, tasks: [{ key: "sheet4", title: "Problem sheet 4", step: "Part (c): show dim ker A = 2" }] } }],
+		[{ ...la, map: { ...la.map, tasks: [{ key: "sheet4", title: "Problem sheet 4", step: "Part (c): show dim ker A = 2", updated: "2026-11-06" }] } }],
 		[chat("r", { topics: ["rank"], busy: true }), chat("c", { topics: ["cramer"] }), chat("e", { topics: ["eigen"], pendingQuestion: true } as Partial<ChatListItem>), chat("t", { topics: ["trace"], updatedAt: "2026-11-05T12:00:00.000Z" })],
 		null,
 	);
@@ -161,7 +161,7 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Fixed, check again later" });
 		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "2d overdue" });
 		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "1w overdue" });
-		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "At part (c)" });
+		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 2d ago" });
 		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back in 1d" });
 		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back in 3w" });
 		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "3d ago" });

@@ -123,7 +123,7 @@ const MAP: CourseMap = {
 	exam: null,
 	current: "rank" as never,
 	focus: null,
-	tasks: [{ key: "sheet-2", title: "Sheet 2", step: "Exercise 1" }],
+	tasks: [{ key: "sheet-2", title: "Sheet 2", step: "Exercise 1", updated: null }],
 	topics: [
 		{ handle: "rank", title: "Rank", level: "assisted", introduced: "2026-11-13", review: null, weak: false, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false }, tasks: ["sheet-2"] },
 		{ handle: "nullity", title: "Nullity", level: "none", introduced: null, review: null, weak: false, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false }, tasks: [] },
@@ -335,7 +335,7 @@ describe("a digest run", () => {
 		const digest = createLessonDigest({
 			chatStore,
 			courseRecords: course.records,
-			engine: submitEngine((prompt) => (prompt.includes("speaks of the learner") ? SUBMIT : thirdPerson)),
+			engine: submitEngine((prompt: string) => (prompt.includes("speaks of the learner") ? SUBMIT : thirdPerson)),
 		});
 		assert.equal((await digest.digestLesson(chatId)).status, "saved");
 		assert.equal(course.saves.length, 1);

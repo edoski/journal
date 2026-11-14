@@ -83,7 +83,7 @@ const MAP: CourseMap = {
 	exam: null,
 	current: h("rank"),
 	focus: "sheet-4",
-	tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }],
+	tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: null }],
 	topics: TOPICS,
 	edges: [...edgesOf(NEEDS), { kind: "contrasts", pair: [h("cramer"), h("elimination")] }],
 };

@@ -254,7 +254,7 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 	const tasks = (Array.isArray(m.tasks) ? m.tasks : []).flatMap((entry) => {
 		const t = record(entry);
 		const key = str(t?.key);
-		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step) }] : [];
+		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step), updated: str(t.updated) }] : [];
 	});
 	return {
 		workspace,

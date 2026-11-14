@@ -23,5 +23,6 @@ One form each, wherever it shows.
 | a slip, the first signal that holds | Fixed, check again later (`repaired`); Missed last time (`lapsed`); Mistake to fix (`gap`); Mixed up with Cramer's rule (`choiceErrors`, the method's title); Sure, but wrong (`confidentErrors`); else Look again |
 | a review come due | Due today, 3d overdue (under a week), 1w overdue, 2w overdue |
 | a review dated ahead | Back in 5d, Back in 3w, Back in 2mo |
+| unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 2w ago; Unfinished when no day is known. Never the tutor's step text. |
 
 Home's line names the lapsed topic when the line is about another one ("Missed Chain rule", `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Missed) is not a reason and keeps its own words.

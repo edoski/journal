@@ -1,5 +1,5 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { overdueWords, returnWords, slipWords } from "@/components/study-words";
+import { leftOffWords, overdueWords, returnWords, slipWords } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
@@ -151,7 +151,7 @@ export function daysBetween(from: string, to: string): number {
  *   - the engine calls the topic weak ("Missed last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
  *   - a solid topic's review is due ("Due today", "3d overdue");
- *   - an open task holds it, and where he left off ("At part (c)");
+ *   - an open task holds it, and when he left off ("Left off 3d ago");
  *   - when its next review comes ("Back in 5d");
  *   - else when he last studied it ("Today", "3d ago").
  * A topic still being learned never says its review is due: almost all
@@ -163,12 +163,11 @@ export type UnitStatus =
 	| { kind: "slip" | "review" | "task" | "returns" | "studied"; words: string }
 	| { kind: "none" };
 
-/** Where an open task was left, in Home's slot words: its step up to the
- *  first colon ("At part (c)"), else "Unfinished". Pure. */
-export function taskWords(task: CourseMapTask): string {
-	if (!task.step) return "Unfinished";
-	const step = task.step.split(":")[0]!.trimEnd();
-	return `At ${step.charAt(0).toLowerCase()}${step.slice(1)}`;
+/** When an open task was left, in the app's words ("Left off 3d ago"):
+ *  the engine's day it last changed, never its step, which the tutor
+ *  writes. Pure. */
+export function taskWords(task: Pick<CourseMapTask, "updated">, today: string): string {
+	return leftOffWords(task.updated ? Math.max(0, daysBetween(task.updated, today)) : null);
 }
 
 /** The learner's own calendar day of a session's time, or a study day as
@@ -190,7 +189,7 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	const { topic } = unit;
 	if (unit.slip) return { kind: "slip", words: unit.slip };
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
-	if (unit.task) return { kind: "task", words: taskWords(unit.task) };
+	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
 	if (topic.review?.kind === "scheduled") return { kind: "returns", words: returnWords(Math.max(1, daysBetween(today, topic.review.date))) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
 	return at ? { kind: "studied", words: studiedWords(at, today) } : { kind: "none" };
