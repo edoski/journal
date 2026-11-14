@@ -110,7 +110,7 @@ export function LessonRoadmap({
 				align="end"
 				aria-label="Where this lesson is"
 				data-testid="roadmap-panel"
-				className="w-80 p-1"
+				className="p-1"
 				onKeyDown={walkStops}
 				// Closed by Esc, a jump or a link: his next key goes to the
 				// box he answers in, not back to the strip.

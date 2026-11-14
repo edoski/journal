@@ -54,7 +54,7 @@ function PopoverContent({
         className={cn(
           OVERLAY_LAYER,
           OVERLAY_MOTION,
-          "w-72 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-row text-popover-foreground shadow-lg outline-none",
+          "w-80 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-row text-popover-foreground shadow-lg outline-none",
           className
         )}
         {...props}

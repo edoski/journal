@@ -20,7 +20,7 @@ export function MistakesPress({ rows }: { rows: readonly MistakeRow[] }) {
 					{MISTAKE_WORDS.press}
 				</Button>
 			</PopoverTrigger>
-			<PopoverContent align="end" className="w-[26rem] p-3">
+			<PopoverContent align="end" className="p-3">
 				<PopoverHeader className="px-1 pb-1">
 					<PopoverTitle>{MISTAKE_WORDS.title}</PopoverTitle>
 				</PopoverHeader>
