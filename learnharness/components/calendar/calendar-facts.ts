@@ -53,7 +53,21 @@ export type CalendarEntry =
 	  }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; waits: string | null; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
-	| { kind: "session"; id: string; day: string; title: string; course: CourseRef | null; chat: ChatListItem; type: SessionType; waits: boolean; topic: CourseMapTopic | null };
+	| {
+			kind: "session";
+			id: string;
+			day: string;
+			title: string;
+			course: CourseRef | null;
+			chat: ChatListItem;
+			type: SessionType;
+			waits: boolean;
+			topic: CourseMapTopic | null;
+			/** The open task this session of today left (`holdsTask`): one
+			 *  piece of work, so one entry, Unfinished, under the session's
+			 *  name. */
+			task: CourseMapTask | null;
+	  };
 
 /** The next step toward an exam: the course's step as Home's line takes it
  *  up (`nextStepOf`, `courseMove`), in Home's words. */
@@ -156,7 +170,7 @@ export function lookOf(entry: CalendarEntry): EntryLook {
 		case "task":
 			return "task";
 		case "session":
-			return entry.type;
+			return entry.task ? "task" : entry.type;
 	}
 }
 
@@ -195,6 +209,18 @@ function sessionTopic(chat: ChatListItem, courses: readonly CalendarCourse[]): C
 	return null;
 }
 
+/** Whether a session holds an open task: it saved the task as open, or
+ *  it is itself unfinished (left for next time, waiting on him, stopped)
+ *  and worked on every topic the task holds, since a lesson's digest
+ *  writes its unfinished step as a task on the lesson's topics. A finished
+ *  session that only touched those topics holds none of it. Pure. */
+export function holdsTask(chat: ChatListItem, task: CourseMapTask, holders: readonly string[]): boolean {
+	if (chat.tasks?.includes(task.key)) return true;
+	if (sessionState(chat) === "finished") return false;
+	const topics = new Set(chat.topics ?? []);
+	return holders.length > 0 && holders.every((handle) => topics.has(handle));
+}
+
 /**
  * Every entry on the calendar, by day and then by look:
  *   - each exam on its date, with the course's next step toward it while
@@ -206,7 +232,12 @@ function sessionTopic(chat: ChatListItem, courses: readonly CalendarCourse[]): C
  *   - each session on the day of its last message (a day after the
  *     engine's counts as today);
  * one review once: a task or a session of today that holds only topics
- * in today's review folds into that review's entry, which opens it.
+ * in today's review folds into that review's entry, which opens it; and
+ * one lesson once: an open task a session of today holds (`holdsTask`)
+ * folds into that session's entry, which keeps the session's name, the
+ * one the sidebar and Home give it, and reads Unfinished (round 4: one
+ * lesson showed as "Eigenvalues lesson: eigenspaces and diagonalisation"
+ * and "Eigenvalues and eigenvectors").
  * `chats` are every session, each with its topics; `scope` keeps one
  * course, and with it no session outside a course.
  */
@@ -226,6 +257,11 @@ export function calendarEntries({
 	 *  today that holds only those is that review, so it is not its own
 	 *  entry (round 3 saw one review as Overdue, Unfinished and Quiz). */
 	const reviewedToday = new Map<string, ReadonlySet<string>>();
+	/** Each session placed on today, by its course: the lessons an open
+	 *  task may belong to. */
+	const ofToday = (workspace: string) => chats.filter((chat) => chat.course?.workspace === workspace && sessionDay(chat, today) === today);
+	/** Each open task a session of today holds, by session id. */
+	const heldBy = new Map<string, CourseMapTask>();
 	for (const studied of shown) {
 		const { map, due, planned, doesNotFit, finalReview } = studied;
 		const course = { workspace: map.workspace, title: map.title };
@@ -267,14 +303,18 @@ export function calendarEntries({
 		for (const task of map.tasks) {
 			const holders = map.topics.filter((t) => t.tasks.includes(task.key));
 			if (inReview(holders.map((t) => t.handle), reviewing)) continue;
+			const lesson = ofToday(map.workspace).find((chat) => !heldBy.has(chat.id) && !inReview(sessionTopics(chat, courses), reviewing) && holdsTask(chat, task, holders.map((t) => t.handle)));
+			if (lesson) {
+				heldBy.set(lesson.id, task);
+				continue;
+			}
 			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
 		}
 	}
 	for (const chat of chats) {
 		const workspace = chat.course?.workspace;
 		if (scope !== null && workspace !== scope) continue;
-		const local = localDay(chat.updatedAt);
-		const day = today && local > today ? today : local;
+		const day = sessionDay(chat, today);
 		if (day === today && workspace && inReview(sessionTopics(chat, courses), reviewedToday.get(workspace))) continue;
 		const listed = courses.find((c) => c.map.workspace === workspace);
 		const course = workspace ? { workspace, title: listed?.map.title ?? chat.course!.title } : null;
@@ -288,9 +328,17 @@ export function calendarEntries({
 			type: sessionType(chat),
 			waits: sessionState(chat) === "your-turn",
 			topic: sessionTopic(chat, courses),
+			task: heldBy.get(chat.id) ?? null,
 		});
 	}
 	return entries.sort((a, b) => a.day.localeCompare(b.day) || rankOf(a) - rankOf(b));
+}
+
+/** The day a session sits on: its last message's, a day after the
+ *  engine's counting as today. Pure. */
+function sessionDay(chat: ChatListItem, today: string): string {
+	const local = localDay(chat.updatedAt);
+	return today && local > today ? today : local;
 }
 
 /** "9:00 to 12:30", a window in the Journal's own times, the hour's

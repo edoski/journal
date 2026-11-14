@@ -205,6 +205,21 @@ describe("calendar entries", () => {
 		]);
 	});
 
+	it("shows one lesson once: the open task an unfinished session of today left folds into that session's entry, under its name", () => {
+		const LA_TODAY = course("/study/linalg", "Linear Algebra", {
+			tasks: [{ key: "eigen-lesson", title: "Eigenvalues lesson: eigenspaces and diagonalisation", step: "Find the eigenspace", updated: TODAY }],
+			topics: [topic("eigen", { title: "Eigenvalues", level: "assisted", tasks: ["eigen-lesson"] })],
+		});
+		const la = { workspace: "/study/linalg", title: "Linear Algebra" };
+		const lesson = chat({ id: "eigen", title: "Eigenvalues and eigenvectors", course: la, topics: ["eigen"], ended: "left", updatedAt: "2026-11-08T09:00:00" });
+		const entries = calendarEntries({ courses: [LA_TODAY], chats: [lesson], scope: null });
+		assert.deepEqual(summary(entries), ["2026-11-08 task Eigenvalues and eigenvectors"]);
+		const done = calendarEntries({ courses: [LA_TODAY], chats: [{ ...lesson, ended: "closed" }], scope: null });
+		assert.deepEqual(summary(done), ["2026-11-08 task Eigenvalues lesson: eigenspaces and diagonalisation", "2026-11-08 lesson Eigenvalues and eigenvectors"], "a finished lesson that only touched the topic leaves the task its own entry");
+		const yesterday = calendarEntries({ courses: [LA_TODAY], chats: [{ ...lesson, updatedAt: "2026-11-07T09:00:00" }], scope: null });
+		assert.equal(yesterday.filter((e) => e.day === TODAY).length, 1, "an older session stays on its own day; today keeps the task");
+	});
+
 	it("keeps one course when scoped, and with it no session outside a course", () => {
 		const general = chat({ course: undefined });
 		const entries = calendarEntries({ courses: [LINALG, PROB], chats: [general, chat()], scope: "/study/prob" });
