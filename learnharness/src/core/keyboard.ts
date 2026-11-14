@@ -233,6 +233,17 @@ export function isTypingSurface(e: KeyboardEvent): boolean {
 	return target.isContentEditable;
 }
 
+/** Whether a field keeps this key from the shortcut registry: inside a
+ *  typing surface only keys that never type a character fire, which are
+ *  ⌘, Ctrl and ⌥ combos and the function keys. F2 (rename) was dead in a
+ *  lesson once focus always sat in the answer box, and the title he typed
+ *  went to the tutor (round 3, 14 Nov 2026). */
+export function fieldKeepsKey(e: KeyboardEvent): boolean {
+	if (!isTypingSurface(e)) return false;
+	if (e.metaKey || e.ctrlKey || e.altKey) return false;
+	return !/^F\d{1,2}$/.test(e.key);
+}
+
 /** macOS styling for binding display ("⌘D", "⇧⇥", "⌥↑"). */
 export const IS_MAC =
 	typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent);
