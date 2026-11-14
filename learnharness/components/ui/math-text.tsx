@@ -65,26 +65,75 @@ function formula(tex: string): string {
 	return katex.renderToString(tex, { throwOnError: false, strict: "ignore", trust: false, output: "htmlAndMathml" });
 }
 
+/** A label's words, cut at its spaces: each word is the run of plain
+ *  text and formulas between two spaces, so a formula keeps the letters
+ *  that touch it ("$\varepsilon$-moves" is one word), and the spaces
+ *  between are their own pieces. Pure. */
+export function mathWords(pieces: readonly MathPiece[]): (MathPiece | MathPiece[])[] {
+	const out: (MathPiece | MathPiece[])[] = [];
+	let word: MathPiece[] = [];
+	const flush = () => {
+		if (word.length) out.push(word);
+		word = [];
+	};
+	for (const piece of pieces) {
+		if (piece.kind === "math") {
+			word.push(piece);
+			continue;
+		}
+		for (const part of piece.text.split(/(\s+)/)) {
+			if (!part) continue;
+			if (/^\s+$/.test(part)) {
+				flush();
+				out.push({ kind: "text", text: part });
+			} else word.push({ kind: "text", text: part });
+		}
+	}
+	flush();
+	return out;
+}
+
+/** A word the line must not break inside: one holding a formula, whose
+ *  inline box would otherwise let the line break between it and the
+ *  letters it touches ("ε" | "-moves"), or one whose hyphen follows a
+ *  lone symbol ("ε-closure", "k-means", "p-value"). Pure. */
+export function keepWhole(word: readonly MathPiece[]): boolean {
+	if (word.some((piece) => piece.kind === "math")) return true;
+	const text = word.map((piece) => (piece.kind === "text" ? piece.text : "")).join("");
+	return /^[([{"'“‘]?[^\s\p{N}]-/u.test(text);
+}
+
 /**
  * A one-line label that may hold TeX (spec: math-text.md): the words as
  * they are and each formula typeset by KaTeX inline, at the label's own
  * size, so a title like "$\sigma$-algebras" reads as it would in the
- * lesson. A label with no formula renders as plain text. The caller's
- * element keeps its own truncation: a formula is inline, so an ellipsis
- * still cuts the line.
+ * lesson. A formula and the letters touching it, or a lone symbol and its
+ * hyphenated word, wrap as one word (`keepWhole`). A label with neither
+ * renders as plain text. The caller's element keeps its own truncation: a
+ * formula is inline, so an ellipsis still cuts the line.
  */
 export function MathText({ children }: { children: string }) {
-	const pieces = useMemo(() => mathPieces(children), [children]);
-	if (pieces.every((piece) => piece.kind === "text")) return <>{children}</>;
+	const words = useMemo(() => mathWords(mathPieces(children)), [children]);
+	if (!words.some((word) => Array.isArray(word) && keepWhole(word))) return <>{children}</>;
 	return (
 		<>
-			{pieces.map((piece, index) =>
-				piece.kind === "text" ? (
-					<Fragment key={index}>{piece.text}</Fragment>
+			{words.map((word, index) => {
+				if (!Array.isArray(word)) return <Fragment key={index}>{word.kind === "text" ? word.text : null}</Fragment>;
+				const parts = word.map((piece, at) =>
+					piece.kind === "text" ? (
+						<Fragment key={at}>{piece.text}</Fragment>
+					) : (
+						<span key={at} data-slot="math-text" className="[&_.katex]:text-[1.05em]" dangerouslySetInnerHTML={{ __html: formula(piece.tex) }} />
+					),
+				);
+				return keepWhole(word) ? (
+					<span key={index} data-slot="math-word" className="whitespace-nowrap">
+						{parts}
+					</span>
 				) : (
-					<span key={index} data-slot="math-text" className="[&_.katex]:text-[1.05em]" dangerouslySetInnerHTML={{ __html: formula(piece.tex) }} />
-				),
-			)}
+					<Fragment key={index}>{parts}</Fragment>
+				);
+			})}
 		</>
 	);
 }
