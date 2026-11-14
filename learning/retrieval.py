@@ -111,6 +111,8 @@ def exam(record: dict[str, Any], today: date) -> dict[str, Any] | None:
     if "exam" not in record:
         return None
     result = dict(record["exam"])
+    if "arcs" in result:
+        result["arc_titles"] = [record["arcs"][arc]["title"] for arc in result["arcs"]]
     if "date" in result:
         result["days_left"] = (date.fromisoformat(result["date"]) - today).days
     return result

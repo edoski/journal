@@ -18,7 +18,16 @@ _SCHEMA = 1
 # to the course, never to the global preferences.
 FINAL_REVIEW_DAYS = "final_review_days"
 COUNTS = {FINAL_REVIEW_DAYS: (1, 14)}
-COURSE_ONLY = frozenset({FINAL_REVIEW_DAYS})
+# Whether a course takes questions at all: "none" is a course studied without
+# being asked (a project course), so it has no arc check. How to ask is the
+# free-text ``question_style``; this is the one fact the engine reads.
+QUESTIONS = "questions"
+CHOICES = {QUESTIONS: ("asked", "none")}
+# Course-only dimensions: why each belongs to one course, and an example value.
+COURSE_ONLY = {
+    FINAL_REVIEW_DAYS: ("it moves that course's review dates", "4"),
+    QUESTIONS: ("it says whether that course takes questions", "none"),
+}
 # How much a day holds, and which days, come from what the learner completes.
 LEARNED = frozenset({"daily_topics", "new_topics_on_weekends"})
 _LEADING_NUMBER = re.compile(r"\s*(\d+)\b")
@@ -83,9 +92,9 @@ def check_engine(changes: dict[str, str | None], field: str) -> None:
     for dimension, instruction in changes.items():
         if field != "preferences" and dimension in COURSE_ONLY:
             raise ValueError(
-                f"{field}.{dimension} belongs to one course, since it moves that "
-                f'course\'s review dates; save it as {{"preferences": {{"{dimension}": '
-                '"4"}}'
+                f"{field}.{dimension} belongs to one course, since "
+                f"{COURSE_ONLY[dimension][0]}; save it as "
+                f'{{"preferences": {{"{dimension}": "{COURSE_ONLY[dimension][1]}"}}}}'
             )
         if instruction is None:
             continue
@@ -94,6 +103,11 @@ def check_engine(changes: dict[str, str | None], field: str) -> None:
                 f"{field}.{dimension} is not a setting: the daily plan holds what "
                 "the learner actually completes on each weekday, learned from the "
                 "record; send null to delete it"
+            )
+        if dimension in CHOICES and instruction not in CHOICES[dimension]:
+            choices = " or ".join(f'"{choice}"' for choice in CHOICES[dimension])
+            raise ValueError(
+                f"{field}.{dimension} must be {choices}, not {instruction!r}"
             )
         if dimension in COUNTS and _count(instruction, *COUNTS[dimension]) is None:
             low, high = COUNTS[dimension]

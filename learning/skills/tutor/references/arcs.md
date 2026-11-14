@@ -106,6 +106,7 @@ An arc is held when it holds a studied topic (taught, named by any attempt, or `
 
 - moving a studied topic: "a studied topic changes arc only when he asks for a re-plan";
 - moving any topic into or out of a held arc: "only he can ask to re-cut it, so place new topics instead";
+- removing a held arc, dissolving every arc included: "only he can ask to remove it";
 - renaming a held arc, or changing the order of two arcs when either is held;
 - forming arcs in a course that already has studied topics.
 

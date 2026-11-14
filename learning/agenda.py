@@ -78,7 +78,6 @@ from learning.capacity import Capacity
 # The longest plan the engine makes: a year from today, so every review on
 # the spacing ladder and every exam of the year falls inside it.
 MAX_DAYS = 366
-SECURE = frozenset({"independent", "retained", "transferred"})
 NOT_YET_SOLID = frozenset({"introduced", "attempted", "assisted"})
 RELEARNING, EXAM_AHEAD, NO_EXAM, EXAM_PASSED = range(4)
 
@@ -93,7 +92,7 @@ def waiting(
 
 def solid(standing: dict[str, Any]) -> bool:
     return (
-        standing["level"] in SECURE
+        standing["level"] in progress.SECURE
         and not standing.get("lapsed")
         and not standing.get("relearn")
     )
@@ -249,7 +248,7 @@ class _Course:
             for name, value in self.levels[topic].items()
             if name not in ("lapsed", "relearn")
         }
-        if standing["level"] not in SECURE:
+        if standing["level"] not in progress.SECURE:
             standing["level"] = "independent"
         standing["last"] = {"date": day.isoformat()}
         self.levels[topic] = standing

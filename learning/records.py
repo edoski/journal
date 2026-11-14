@@ -2,10 +2,12 @@
 
 Writes run under the record lock on the latest content; two sessions editing the
 same field resolve as last writer wins. A save validates the patch before taking
-the lock, applies it, lets the progress engine schedule reviews, validates the
-whole record and publishes it only when something changed. Pinned knowledge loads
-in every session, so a save may not grow it past ``PINNED_BYTES``; the tutor
-consolidates in the same save instead of ``resume`` dropping entries later.
+the lock, applies it, settles its arcs (placing new topics and guarding re-cuts),
+lets the progress engine schedule reviews, validates the whole record and
+publishes it only when something changed; ``check`` runs the same steps and
+writes nothing. Pinned knowledge loads in every session, so a save may not
+grow it past ``PINNED_BYTES``; the tutor consolidates in the same save instead
+of ``resume`` dropping entries later.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from learning import clock, packing, preferences, progress, schema, storage
+from learning import arcs, clock, packing, preferences, progress, schema, storage
 from learning.workspace import Workspace
 
 # Half of resume's knowledge budget: every pinned entry loads, with room left for
@@ -22,9 +24,26 @@ PINNED_BYTES = 1536
 
 
 def _readable(workspace: Workspace, stored: dict[str, Any] | None) -> dict[str, Any]:
-    """The validated stored course; a broken file is an I/O failure, not a bad request."""
+    """The validated stored course; a broken file is an I/O failure, not a bad request.
+
+    A record of another schema is refused before any rule runs, naming the
+    command that brings record and engine together.
+    """
     if not stored:
         return schema.empty()
+    version = stored.get("schema")
+    if type(version) is int and version == schema.SCHEMA - 1:
+        raise storage.Unreadable(
+            f"{workspace.record} has schema {version}; run python -m learning "
+            "migrate --all (it keeps a backup) and retry. Nothing was changed"
+        )
+    if type(version) is int and version > schema.SCHEMA:
+        raise storage.Unreadable(
+            f"{workspace.record} has schema {version}, and this learning engine "
+            f"reads schema {schema.SCHEMA}: update the engine's checkout and restart "
+            "the app and every MCP host, or have the newer engine run python -m "
+            f"learning migrate --all --to {schema.SCHEMA}. Nothing was changed"
+        )
     try:
         return schema.validate_record(stored)
     except ValueError as error:
@@ -109,10 +128,19 @@ def _placed(record: dict[str, Any], created: set[str]) -> dict[str, Any] | None:
     return placed or None
 
 
-def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
-    """Apply one patch and return the receipt (see the v6 spec, section 3)."""
+def save(workspace: Workspace, patch: Any, *, check: bool = False) -> dict[str, Any]:
+    """Apply one patch and return the receipt (see the v6 spec, section 3).
+
+    With ``check`` the patch runs through every step of a save, and nothing
+    is written: the result says it would pass, or the save's refusal raises.
+    """
     changes = schema.check_patch(patch)
     global_changes = changes.pop("global_preferences", None)
+    if check and global_changes is not None:
+        raise ValueError(
+            "save --check writes nothing, and global_preferences are written "
+            "outside the course; check the course's part without them"
+        )
     today = clock.today()
     now = clock.now().isoformat(timespec="microseconds")
     outcome = schema.PatchResult()
@@ -120,12 +148,14 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
     final: dict[str, Any] = {}
     levels: dict[str, Any] = {}
     known: set[str] = set()
+    arcs_placed: dict[str, str] = {}
 
     def transform(stored: dict[str, Any]) -> dict[str, Any]:
-        nonlocal outcome, scheduled, final, levels, known
+        nonlocal outcome, scheduled, final, levels, known, arcs_placed
         before = _readable(workspace, stored)
         known = set(before["topics"])
         patched, outcome = schema.apply_patch(before, changes, today=today, now=now)
+        arcs_placed = arcs.settle(before, patched, changes, outcome, today)
         planned, scheduled = progress.schedule(patched, outcome, today)
         final = schema.validate_record(planned)
         _check_pinned(before, final)
@@ -134,6 +164,15 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
         levels = _levels(before, final)
         return final
 
+    if check:
+        stored = storage.load(workspace.record) or {}
+        transform({k: v for k, v in stored.items() if k not in storage.METADATA})
+        created = set(changes.get("topics") or ()) - known
+        return {
+            "ok": True,
+            "arcs_placed": arcs_placed,
+            "placed": _placed(final, created) or {},
+        }
     previous = global_preferences() if global_changes is not None else None
     if changes:
         record, changed = storage.update(workspace.record, transform)
@@ -157,6 +196,8 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
     }
     if placed := _placed(final, set(changes.get("topics") or ()) - known):
         receipt["placed"] = placed
+    if arcs_placed:
+        receipt["arcs_placed"] = arcs_placed
     if "knowledge" in changes:
         receipt["pinned"] = {
             "bytes": packing.size(_pinned(final)),
@@ -181,8 +222,14 @@ def forget(
     if not handles:
         raise ValueError("forget needs handles, --lesson UUID or --course")
 
+    dropped: list[str] = []
+
     def transform(stored: dict[str, Any]) -> dict[str, Any]:
-        return schema.remove(_readable(workspace, stored), handles)
+        before = _readable(workspace, stored)
+        after = schema.remove(before, handles)
+        dropped.extend(arc for arc in before["arcs"] if arc not in after["arcs"])
+        return after
 
     record, _ = storage.update(workspace.record, transform)
-    return {"removed": list(dict.fromkeys(handles)), "revision": record["revision"]}
+    removed = list(dict.fromkeys([*handles, *dropped]))
+    return {"removed": removed, "revision": record["revision"]}

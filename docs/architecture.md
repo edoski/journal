@@ -34,7 +34,7 @@ background worker.
 
 ## Learning
 
-One workspace studies one course; its record is `.study/course.json` (schema 6).
+One workspace studies one course; its record is `.study/course.json` (schema 7).
 `learning/schema.py` declares the record shapes, the handle namespace shared by
 topics, knowledge, tasks and sources, whole-record validation and the single patch
 rule (maps merge by handle, entries by field, `null` removes, lists replace,

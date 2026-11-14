@@ -100,7 +100,9 @@ const ACROSS_SESSIONS: readonly DoctrinePart[] = [
 ];
 
 /** What every agent that creates or places topics reads of arcs.md, the one
- *  text on arcs: forming them is the grouping pass's alone. */
+ *  text on arcs: forming them is the grouping pass's alone. Each part joins
+ *  a prompt only in a course with arcs, so a course without them gets no
+ *  arc field to write. */
 const ARC_RECORD = ["What an arc is", "Placing a new topic", "Changing arcs"] as const;
 const ARCS_ACROSS_SESSIONS: DoctrinePart = { file: "arcs.md", sections: ARC_RECORD, intro: false };
 /** The prober brackets an arc's entry; the teacher and practice teach from its map. */
@@ -113,23 +115,33 @@ export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart
 		{ file: "teaching.md", sections: ["Finding the edge"], intro: false },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses"] },
 		...ACROSS_SESSIONS,
-		ARCS_PROBING,
 	],
 	teacher: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["The chain", "Hints", "Corrections and diagrams"] },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
 		...ACROSS_SESSIONS,
-		ARCS_TEACHING,
 	],
 	practice: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Mixing methods", "Transfer", "Corrections and diagrams"] },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close", "Exam run-up"] },
 		...ACROSS_SESSIONS,
-		ARCS_TEACHING,
 	],
 };
+
+/** What each agent adds of arcs.md in a course with arcs. */
+export const ARCS_DOCTRINE: Readonly<Record<PromptAgent, DoctrinePart>> = {
+	prober: ARCS_PROBING,
+	teacher: ARCS_TEACHING,
+	practice: ARCS_TEACHING,
+};
+
+/** What a prompt's composition knows of the course. */
+export interface CourseShape {
+	/** Whether the record groups its topics into arcs (`recordHasArcs`). */
+	arcs: boolean;
+}
 
 function doctrineText(dir: string, part: DoctrinePart): string {
 	const text = fs.readFileSync(path.join(dir, part.file), "utf-8").trim();
@@ -149,22 +161,20 @@ function doctrineText(dir: string, part: DoctrinePart): string {
 
 /** The course-record doctrine, appended to every agent's prompt in a
  *  course session: the app's adapter, then the agent's engine doctrine read
- *  from `dir`. Throws when a listed file or section is missing, so a rename
- *  in the engine fails the doctrine test instead of a lesson. */
-export function courseRecordPrompt(agent: PromptAgent, dir: string = PATHS.tutorReferences): string {
+ *  from `dir`, with its part of arcs.md in a course with arcs. Throws when a
+ *  listed file or section is missing, so a rename in the engine fails the
+ *  doctrine test instead of a lesson. */
+export function courseRecordPrompt(agent: PromptAgent, course: CourseShape, dir: string = PATHS.tutorReferences): string {
 	const adapter = fs.readFileSync(path.join(PROMPTS_DIR, "course", "10-record.md"), "utf-8").trim();
-	return [adapter, ...ENGINE_DOCTRINE[agent].map((part) => doctrineText(dir, part))].join("\n\n");
+	const parts = course.arcs ? [...ENGINE_DOCTRINE[agent], ARCS_DOCTRINE[agent]] : ENGINE_DOCTRINE[agent];
+	return [adapter, ...parts.map((part) => doctrineText(dir, part))].join("\n\n");
 }
 
-/** What the course map builder composes: the one path-building recipe
- *  every host follows, and how a new topic joins the arcs. The builder
- *  extends arcs and never forms them. */
-export const COURSE_MAP_DOCTRINE: readonly DoctrinePart[] = [
-	{ file: "course.md", sections: ["Building the path"], intro: false },
-	ARCS_ACROSS_SESSIONS,
-];
+/** The one path-building recipe every host follows. */
+const BUILDING_THE_PATH: DoctrinePart = { file: "course.md", sections: ["Building the path"], intro: false };
 
-/** The lesson digest's part of arcs.md: its code places the topics it adds. */
+/** The lesson digest's part of arcs.md, in a course with arcs: its code
+ *  places the topics it adds. */
 export const DIGEST_DOCTRINE: readonly DoctrinePart[] = [{ file: "arcs.md", sections: ["Placing a new topic"], intro: false }];
 
 /** The grouping pass's edge step reads the prerequisite test alone, so it
@@ -180,7 +190,9 @@ export function composeDoctrine(parts: readonly DoctrinePart[], dir: string = PA
 	return parts.map((part) => doctrineText(dir, part)).join("\n\n");
 }
 
-/** The course map builder's recipe, read from `dir`. */
-export function courseMapDoctrine(dir: string = PATHS.tutorReferences): string {
-	return composeDoctrine(COURSE_MAP_DOCTRINE, dir);
+/** The course map builder's recipe, read from `dir`: building the path, and
+ *  in a course with arcs how a new topic joins them. The builder extends
+ *  arcs and never forms them. */
+export function courseMapDoctrine(course: CourseShape, dir: string = PATHS.tutorReferences): string {
+	return composeDoctrine(course.arcs ? [BUILDING_THE_PATH, ARCS_ACROSS_SESSIONS] : [BUILDING_THE_PATH], dir);
 }
