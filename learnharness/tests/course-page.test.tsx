@@ -185,12 +185,12 @@ describe("every topic once, in the group he would act on it from", () => {
 
 describe("the header's facts and next lesson", () => {
 	it("counts what Home's pie counts, names the exam once and when he last studied", () => {
-		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago" });
+		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago", lastSession: null });
 	});
 
 	it("leaves out an exam that is not set and a count for a course with no topics", () => {
 		const facts = courseFacts(course({ exam: null, topics: [] }, { lastActiveDaysAgo: null }));
-		assert.deepEqual(facts, { progress: null, exam: null, studied: "Not studied yet" });
+		assert.deepEqual(facts, { progress: null, exam: null, studied: "Not studied yet", lastSession: null });
 	});
 
 	it("takes up Home's next step for the course: today's reviews first, in Today's words", () => {

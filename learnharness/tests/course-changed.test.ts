@@ -36,7 +36,7 @@ function announced(): { workspaces: string[]; stop: () => void } {
 }
 
 describe("the app's own writes", () => {
-	it("a write verb announces the course; a read does not", async () => {
+	it("a write verb announces the course; a read, a material scan included, does not", async () => {
 		const records = createCourseRecords(fakeEngine());
 		const { workspaces, stop } = announced();
 		const verbs: CourseVerb[] = [
@@ -44,6 +44,7 @@ describe("the app's own writes", () => {
 			{ verb: "show", handles: ["rank"] },
 			{ verb: "save", changes: { topics: { rank: { gap: "x" } } } },
 			{ verb: "sources", add: ["notes.pdf"] },
+			{ verb: "sources", scan: true },
 		];
 		for (const verb of verbs) await records.run("/courses/linalg", verb);
 		await records.map("/courses/linalg");

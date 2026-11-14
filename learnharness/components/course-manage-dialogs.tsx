@@ -134,6 +134,21 @@ export function DeleteCourseDialog({ course, onClose, onDeleted, fetchLike = fet
 	);
 }
 
+/** Send picked files to a course (POST /api/courses/material): the server
+ *  copies them into its material folder, registers them and extends its
+ *  map. Null when they landed, else the plain sentence to show. Add
+ *  material and the course page's Context both add files through it. */
+export async function sendMaterial(fetchLike: typeof fetch, workspace: string, picks: readonly MaterialPick[]): Promise<string | null> {
+	try {
+		const res = await fetchLike("/api/courses/material", { method: "POST", body: addMaterialForm({ workspace, picks }) });
+		if (res.ok) return null;
+		const answer = (await res.json().catch(() => ({}))) as { error?: string };
+		return answer.error ?? "The material could not be added. Try again.";
+	} catch {
+		return UNREACHABLE;
+	}
+}
+
 /** Add material: New course's material field for a course that exists. The
  *  server copies the files into the course and extends its topic map from
  *  them in the background, which the dialog then follows until Done. */
@@ -147,14 +162,9 @@ export function AddMaterialDialog({ course, onClose, fetchLike = fetch }: { cour
 		if (picks.length === 0 || busy) return;
 		setBusy(true);
 		setError(null);
-		try {
-			const res = await fetchLike("/api/courses/material", { method: "POST", body: addMaterialForm({ workspace: course.workspace, picks }) });
-			if (res.ok) return setAdded(true);
-			const answer = (await res.json().catch(() => ({}))) as { error?: string };
-			setError(answer.error ?? "The material could not be added. Try again.");
-		} catch {
-			setError(UNREACHABLE);
-		}
+		const failure = await sendMaterial(fetchLike, course.workspace, picks);
+		if (failure === null) return setAdded(true);
+		setError(failure);
 		setBusy(false);
 	};
 	return (

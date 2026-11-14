@@ -20,7 +20,7 @@
  *     through their own `claude` CLI.
  */
 
-const { app, BrowserWindow, Menu, ipcMain, powerMonitor, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, powerMonitor, session, shell } = require("electron");
 const { waitForServer } = require("./server-ready.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
 const { randomBytes } = require("node:crypto");
@@ -469,6 +469,13 @@ async function main() {
 	// The renderer's first paint can race did-finish-load — it asks for
 	// the current factor itself (mirrors "lh:zoom" pushes).
 	ipcMain.handle("lh:zoom:get", (event) => BrowserWindow.fromWebContents(event.sender)?.webContents.getZoomFactor() ?? 1);
+	// Context's Link a folder: the system folder picker; null when cancelled.
+	ipcMain.handle("lh:pick-folder", async (event) => {
+		const win = BrowserWindow.fromWebContents(event.sender);
+		const options = { properties: ["openDirectory"], buttonLabel: "Link" };
+		const picked = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+		return picked.canceled ? null : (picked.filePaths[0] ?? null);
+	});
 	ipcMain.on("lh:expand-window", (event) => {
 		const win = BrowserWindow.fromWebContents(event.sender);
 		if (!win) return;

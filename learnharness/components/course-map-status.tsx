@@ -29,19 +29,12 @@ export function mapStatusWords(status: MapStatus | null): { text: string; retry:
 	}
 }
 
-/** The New course dialog after Create when material came with the course,
- *  and Add material after Add: the map building in the background, live,
- *  until Done. */
-export function CourseMapStatus({ course, title, onClose, fetchLike = fetch }: {
-	course: Pick<CourseSummary, "workspace" | "title">;
-	/** The heading; "<course> is ready" after New course. */
-	title?: string;
-	onClose: () => void;
-	fetchLike?: typeof fetch;
-}) {
+/** Where a course's map stands, live (null until first read), and Try
+ *  again, which builds it from the material no build read. */
+export function useMapStatus(workspace: string, fetchLike: typeof fetch = fetch): { status: MapStatus | null; retry: () => void } {
 	const [status, setStatus] = useState<MapStatus | null>(null);
 	const hub = useNotifyHub();
-	const url = `/api/courses/map?workspace=${encodeURIComponent(course.workspace)}`;
+	const url = `/api/courses/map?workspace=${encodeURIComponent(workspace)}`;
 	const refresh = useCallback(() => {
 		void fetchLike(url)
 			.then((r) => (r.ok ? (r.json() as Promise<MapStatus>) : null))
@@ -56,10 +49,24 @@ export function CourseMapStatus({ course, title, onClose, fetchLike = fetch }: {
 	}, [hub, refresh]);
 	const retry = () => {
 		setStatus({ state: "building" });
-		void fetchLike("/api/courses/map", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ workspace: course.workspace }) })
+		void fetchLike("/api/courses/map", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ workspace }) })
 			.then(refresh)
 			.catch(() => {});
 	};
+	return { status, retry };
+}
+
+/** The New course dialog after Create when material came with the course,
+ *  and Add material after Add: the map building in the background, live,
+ *  until Done. */
+export function CourseMapStatus({ course, title, onClose, fetchLike = fetch }: {
+	course: Pick<CourseSummary, "workspace" | "title">;
+	/** The heading; "<course> is ready" after New course. */
+	title?: string;
+	onClose: () => void;
+	fetchLike?: typeof fetch;
+}) {
+	const { status, retry } = useMapStatus(course.workspace, fetchLike);
 	const words = mapStatusWords(status);
 	return (
 		<div className="flex flex-col gap-4" data-testid="course-map-status" data-state={status?.state ?? "building"}>

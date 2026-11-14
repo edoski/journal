@@ -17,6 +17,9 @@
  *   publishes it as --lh-zoom so physical-constant lengths (the traffic-
  *   light gutter) can divide by it.
  *
+ *   window.lh.pickFolder() — the system folder picker for Context's Link a
+ *   folder; resolves to the folder's path, or null when cancelled.
+ *
  * Channel names are mirrored in electron/main.cjs — keep them in sync.
  */
 const { contextBridge, ipcRenderer } = require("electron");
@@ -30,6 +33,7 @@ contextBridge.exposeInMainWorld("lh", {
 		return () => ipcRenderer.removeListener("lh:zoom", listener);
 	},
 	getZoom: () => ipcRenderer.invoke("lh:zoom:get"),
+	pickFolder: () => ipcRenderer.invoke("lh:pick-folder"),
 	/** The machine woke from sleep; returns unsubscribe. */
 	onResume: (cb) => {
 		const listener = () => cb();

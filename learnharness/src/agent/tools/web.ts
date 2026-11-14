@@ -64,7 +64,9 @@ function htmlToMarkdown(html: string): { title: string; content: string } | null
 	return { title: article.title ?? "", content: markdown };
 }
 
-async function fetchAndExtract(url: string): Promise<string> {
+/** A page's readable text as markdown, headed by its source line; throws
+ *  with the reason when it cannot be read. */
+export async function fetchAndExtract(url: string): Promise<string> {
 	const resp = await fetch(url, {
 		headers: {
 			"User-Agent": USER_AGENT,
