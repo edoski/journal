@@ -239,6 +239,28 @@ export function againstCut(diffs: readonly EdgeDiff[], topicArc: Readonly<Record
 	});
 }
 
+/**
+ * The view the cut reads when the edge step only proposes: every stored need
+ * plus each edge it proposes to add, listed apart in `proposed`. A cut that
+ * holds them holds whichever proposals the learner accepts, since dropping an
+ * edge never breaks a cut and adding one can. An add that would close a loop
+ * with the stored edges is left out: it can only be accepted with a drop.
+ * Pure.
+ */
+export function withProposed<V extends Pick<MapCourseView, "topics">>(view: V, diffs: readonly EdgeDiff[]): V & { proposed: Record<string, string[]> } {
+	const needs = new Map(Object.entries(view.topics).map(([k, t]) => [k, [...t.needs]]));
+	const proposed: Record<string, string[]> = {};
+	for (const d of diffs) {
+		const list = needs.get(d.topic);
+		if (d.change !== "add" || !list || !needs.has(d.need) || list.includes(d.need)) continue;
+		if (cyclic(new Map(needs).set(d.topic, [...list, d.need]))) continue;
+		list.push(d.need);
+		(proposed[d.topic] ??= []).push(d.need);
+	}
+	const topics = Object.fromEntries(Object.entries(view.topics).map(([k, t]) => [k, k in proposed ? { ...t, needs: needs.get(k)! } : t]));
+	return { ...view, topics, proposed };
+}
+
 /** The index in the record's arc log of its latest `edges` event: the one
  *  a formation refers to as `edges_entry`. Pure. */
 export function lastEdgesEntry(record: unknown): number | undefined {
@@ -285,6 +307,9 @@ export interface ArcSubmit {
 export interface ArcPassView extends MapCourseView {
 	/** The exam's day, when it has one. */
 	examDate: string | null;
+	/** Needs the edge step proposes and the record does not hold yet, by
+	 *  topic: also in the topic's `needs`, so the cut holds them. */
+	proposed?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** The view, from the record and the topics he has studied. */
@@ -351,7 +376,19 @@ export function arcPassProblems(submit: ArcSubmit, view: ArcPassView): string | 
 		if (!(t.topic in view.topics)) problems.push(`titles names "${t.topic}", which is no topic of the course.`);
 		else if (view.topics[t.topic]!.title) problems.push(`titles renames "${t.topic}", which has a title: give titles only to topics with none.`);
 	}
-	const stored = new Set(storedEdges(view).map(([t, n]) => edgeKey(t, n)));
+	const order = new Map(submit.arcs.map((a, i) => [a.handle, i]));
+	for (const [t, needs] of Object.entries(view.proposed ?? {})) {
+		const [at, from] = [home.get(t), order.get(home.get(t) ?? "")];
+		if (at === undefined || from === undefined) continue;
+		for (const n of needs) {
+			const later = home.get(n);
+			if (later !== undefined && (order.get(later) ?? -1) > from) {
+				problems.push(`"${t}" (in "${at}") needs "${n}", a prerequisite the edge step proposes, which sits in the later arc "${later}": the cut must hold if the learner accepts it. Move "${n}" into "${at}" or an earlier arc, or "${t}" into "${later}" or a later one.`);
+			}
+		}
+	}
+	const proposed = new Set(Object.entries(view.proposed ?? {}).flatMap(([t, needs]) => needs.map((n) => edgeKey(t, n))));
+	const stored = new Set(storedEdges(view).map(([t, n]) => edgeKey(t, n)).filter((k) => !proposed.has(k)));
 	for (const d of submit.doubts ?? []) if (!stored.has(edgeKey(d.topic, d.need))) problems.push(`doubts names "${d.topic}" needs "${d.need}", which is no stored edge.`);
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }

@@ -37,6 +37,7 @@ import {
 	type EdgeDiff,
 	type EdgeSubmit,
 	type Formation,
+	withProposed,
 } from "../../core/arc-pass.ts";
 import { courseView, NO_STANDING, openLessonsOf, sourcesOf, type MapCourseView } from "../../core/course-map-build.ts";
 import type { ChatSummary } from "../../core/contracts/chat.ts";
@@ -122,6 +123,7 @@ export const ARC_CUT_INSTRUCTIONS = `You group a course's topics into arcs, foll
 
 How this differs from the text below:
 - The prerequisites are settled and you cannot change them: your answer has no field for needs. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
+- A topic's proposed needs are prerequisites the edge step found, waiting for the learner's yes. Cut as if they were stored: no topic sits in an arc before the arc holding one of its needs, stored or proposed, so the arcs hold whichever proposals the learner accepts.
 - Read the material's units before you cut: the sources' tables of contents with read_material, headings with search_material, and the unit each topic's reference locator names. A source the course cannot open is listed as such; then the locators are the material you have.
 - List the arcs in study order, and each arc's topics in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
 - A topic keeps its title; give a title only to a topic listed with none, under titles. A leading label two or more of an arc's topics share ("GTM: Pricing") is dropped by the app, since the arc now names it: name such an arc for the label's group.
@@ -156,12 +158,15 @@ function courseHead(title: string, record: unknown, files: readonly MaterialFile
 }
 
 /** The topics in path order, each with what the step reads of it. */
-function topicLines(view: MapCourseView, withNeeds: boolean): string[] {
+function topicLines(view: MapCourseView & Pick<ArcPassView, "proposed">, withNeeds: boolean): string[] {
 	const listed = [...view.order.filter((k) => k in view.topics), ...Object.keys(view.topics).filter((k) => !view.order.includes(k))];
 	return listed.map((handle) => {
 		const t = view.topics[handle]!;
+		const proposed = view.proposed?.[handle] ?? [];
+		const stored = t.needs.filter((n) => !proposed.includes(n));
 		const facts = [
-			withNeeds && t.needs.length > 0 ? `needs ${t.needs.join(", ")}` : "",
+			withNeeds && stored.length > 0 ? `needs ${stored.join(", ")}` : "",
+			withNeeds && proposed.length > 0 ? `proposed needs ${proposed.join(", ")}` : "",
 			t.contrasts.length > 0 ? `contrasts ${t.contrasts.join(", ")}` : "",
 			t.refs.length > 0 ? `refs ${refWords(t.refs)}` : "",
 			t.aliases.length > 0 ? `also called ${t.aliases.join(", ")}` : "",
@@ -357,7 +362,11 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 			} else edges.skipped = diffs;
 		}
 
-		const cut = await viewNow(workspace);
+		const settled = async () => {
+			const read = await viewNow(workspace);
+			return options.edges === "propose" ? { ...read, view: withProposed(read.view, diffs) } : read;
+		};
+		const cut = await settled();
 		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;
 		const answer = await agent<ArcSubmit>("cut", ARCS_TOOL, arcSchema, composeDoctrine(ARC_CUT_DOCTRINE), ARC_CUT_INSTRUCTIONS, cutPrompt(title, cut.view, cut.record, files), async (a) => {
 			const problems = arcPassProblems(a, cut.view);
@@ -371,7 +380,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		if (signal?.aborted) throw aborted();
 		if (answer.none?.trim()) return { status: "none", reason: answer.none.trim(), edges, answer };
 
-		const now = await viewNow(workspace);
+		const now = await settled();
 		if (recordHasArcs(now.record)) return { status: "failed", reason: "the course got arcs while the pass read it", edges, answer };
 		const formation = arcPassChanges(answer, now.view, { edgesEntry, asked: options.asked, reason: options.reason });
 		if (!formation) return { status: "none", reason: "the answer formed no arcs", edges, answer };

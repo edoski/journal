@@ -29,6 +29,7 @@ import {
 	type ArcPassView,
 	type ArcSubmit,
 	type EdgeSubmit,
+	withProposed,
 } from "../src/core/arc-pass.ts";
 import { duplicateOf, type ViewTopic } from "../src/core/course-map-build.ts";
 import { createArcPass, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
@@ -190,6 +191,22 @@ describe("the cut's shape rules", () => {
 			againstCut(diffs, arcs, ["a", "b", "c"]).map((d) => [d.topic, d.need, d.backward]),
 			[["derivative", "riemann", true], ["riemann", "chain", false], ["chain", "limits", false]],
 		);
+	});
+
+	it("in propose mode the cut holds every proposed add, so any he accepts keeps it valid; one that would close a loop is left out", () => {
+		const proposed = withProposed(view(CALC), [
+			{ topic: "continuity", need: "chain", change: "add", reason: "x" },
+			{ topic: "riemann", need: "chain", change: "drop", reason: "y" },
+			{ topic: "limits", need: "riemann", change: "add", reason: "z" },
+		]);
+		assert.deepEqual(proposed.proposed, { continuity: ["chain"] });
+		assert.deepEqual(proposed.topics.continuity!.needs, ["limits", "chain"]);
+		assert.deepEqual(proposed.topics.riemann!.needs, ["limits", "chain"], "a proposed drop changes nothing the cut reads");
+		assert.match(arcPassProblems(good, proposed)!, /"continuity" \(in "limits-continuity"\) needs "chain", a prerequisite the edge step proposes, which sits in the later arc "derivatives"/);
+		const holds = { ...good, arcs: [arc("limits-derivatives", "Limits and derivatives", ["limits", "derivative", "chain"]), arc("continuity-sums", "Continuity and sums", ["continuity", "riemann"])] };
+		assert.equal(arcPassProblems(holds, proposed), null);
+		assert.match(arcPassProblems({ ...holds, doubts: [{ topic: "continuity", need: "chain", reason: "x" }] }, proposed)!, /no stored edge/, "a proposal is not a stored edge to doubt");
+		assert.deepEqual((arcPassChanges(holds, proposed)!.changes.path as { order: string[] }).order, ["limits", "derivative", "chain", "continuity", "riemann"]);
 	});
 
 	it("an arc handle no topic, source, task or knowledge entry has", () => {
