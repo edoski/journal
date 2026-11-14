@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
+import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap, NODE_WIDTH, slackOf } from "../components/course-map/topic-map/topic-map-layout.ts";
 import { OPEN_AT_FIRST, aimOf, boxesOf, walkStops, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, wholeSurfaceOf, type Box } from "../components/course-page/split/split-tie.ts";
@@ -92,8 +92,26 @@ describe("what ties the two panes", () => {
 	});
 });
 
+/** A session on Span that waits on him, so Today takes Span up. */
+const WAITING: ChatListItem = {
+	id: "c1",
+	title: "Span",
+	kind: "teach",
+	createdAt: "2026-11-08T08:00:00.000Z",
+	updatedAt: "2026-11-08T08:30:00.000Z",
+	messageCount: 4,
+	phase: "teach",
+	pendingQuestion: true,
+	pendingProblem: false,
+	busy: false,
+	compacting: false,
+	course: { workspace: WS, title: "Linear Algebra" },
+	topics: [h("span")],
+	ownTopics: [h("span")],
+};
+
 describe("the list's groups and rows", () => {
-	const groups = courseGroups(COURSE);
+	const groups = courseGroups(COURSE, [WAITING]);
 
 	it("shows the four groups in their order, leaving an empty one out", () => {
 		assert.deepEqual(
@@ -102,27 +120,6 @@ describe("the list's groups and rows", () => {
 		);
 		assert.deepEqual(shownGroups(courseGroups({ ...COURSE, map: { ...MAP, topics: [MAP.topics[4]!], edges: [] } })).map((g) => g.title), ["Not started"]);
 		assert.deepEqual(shownGroups(courseGroups({ ...COURSE, map: { ...MAP, topics: [], edges: [] } })), []);
-	});
-
-	it("puts every topic a session waits on him for at the top of Needs you, out of Learning", () => {
-		const waiting = (group: (typeof groups)[number], index: number) => ({ ...group.topics[index]!, fact: { kind: "your-turn" as const, words: "Your turn" } });
-		const [needs, learning, notStarted, own] = groups;
-		const marked = [
-			needs!,
-			{ ...learning!, topics: [waiting(learning!, 0)] },
-			{ ...notStarted!, topics: [waiting(notStarted!, 0), ...notStarted!.topics.slice(1)] },
-			own!,
-		];
-		const shown = shownGroups(marked);
-		assert.deepEqual(
-			shown.map((g) => [g.title, g.topics.map((t) => t.topic.handle)]),
-			[
-				["Needs you", ["span", "basis", "independence"]],
-				["Not started", ["eigen"]],
-				["On your own", ["vectors"]],
-			],
-			"Learning, left empty, is left out",
-		);
 	});
 
 	it("draws each topic of an open group as a 32px row linking to its page, its reason's icon and words showing", () => {
@@ -212,7 +209,7 @@ describe("the keyboard walk over the rows", () => {
 });
 
 describe("what the arrows walk in the list", () => {
-	const groups = shownGroups(courseGroups(COURSE));
+	const groups = shownGroups(courseGroups(COURSE, [WAITING]));
 	it("walks each group's header and the rows of the open groups, skipping a folded group's rows", () => {
 		const keys = (open: typeof OPEN_AT_FIRST) => walkStops(groups, open).map((s) => (s.kind === "group" ? `[${s.id}]` : s.handle));
 		const atFirst = keys(OPEN_AT_FIRST);
@@ -329,7 +326,7 @@ describe("the map pane's surface and where it scrolls", () => {
 	});
 
 	it("opens where he is, else on what the header's button takes up when it is on the map, else the list's first row", () => {
-		const shown = shownGroups(courseGroups(COURSE));
+		const shown = shownGroups(courseGroups(COURSE, [WAITING]));
 		assert.equal(aimOf(h("eigen"), [h("basis")], shown, LAYOUT), "eigen");
 		assert.equal(aimOf(null, [h("basis")], shown, LAYOUT), "basis");
 		assert.equal(aimOf(h("elsewhere"), [h("basis")], shown, LAYOUT), "basis");

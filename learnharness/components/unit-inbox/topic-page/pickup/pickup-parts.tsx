@@ -10,10 +10,11 @@ import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/to
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
+import { HAIRLINE, ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
-import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import type { BuildsOn, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import type { TopicRef } from "@/src/core";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 
@@ -137,6 +138,55 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 					</li>
 				);
 			})}
+		</ul>
+	);
+}
+
+/** Builds on: each topic this one builds on as a row, its pie, its title
+ *  and where he stands on it in the pie's words, opening its page; a
+ *  pointer or focus on a row tells the page (`onPoint`), so the map beside
+ *  can light it. */
+export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[]; onPoint?: (handle: string | null) => void }) {
+	return (
+		<ul className="flex flex-col">
+			{builds.map(({ topic, standing, href }) => (
+				<li key={topic.handle} className={HAIRLINE}>
+					<Link
+						href={href}
+						data-slot="pickup-builds-on"
+						data-topic={topic.handle}
+						onMouseEnter={() => onPoint?.(topic.handle)}
+						onMouseLeave={() => onPoint?.(null)}
+						onFocus={() => onPoint?.(topic.handle)}
+						onBlur={() => onPoint?.(null)}
+						className={cn(ONE_LINE_ROW, "outline-none transition-colors duration-150 hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none")}
+					>
+						<TopicGlyph standing={standing} />
+						<span className="truncate text-row text-foreground">
+							<LineText>{topic.title}</LineText>
+						</span>
+						<span data-slot="pickup-builds-on-standing" className="text-label text-muted-foreground">
+							{standing.words}
+						</span>
+					</Link>
+				</li>
+			))}
+		</ul>
+	);
+}
+
+/** In your material: each place his material covers the topic, the place
+ *  in it ("Section 4.7") over the source's title. Words, not a control. */
+export function MaterialList({ refs }: { refs: readonly TopicRef[] }) {
+	return (
+		<ul className="flex flex-col">
+			{refs.map((ref, i) => (
+				<li key={`${ref.source}#${ref.locator ?? i}`} data-slot="pickup-material" className={cn(ref.locator ? TWO_LINE_ROW : ONE_LINE_ROW, "mx-0 w-full px-0")}>
+					<BookOpenIcon aria-hidden className={ICON} />
+					<span className="col-span-2 truncate text-row text-foreground">{ref.locator ?? ref.source}</span>
+					{ref.locator && <span className="col-span-2 col-start-2 truncate text-label text-muted-foreground">{ref.source}</span>}
+				</li>
+			))}
 		</ul>
 	);
 }

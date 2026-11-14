@@ -8,7 +8,7 @@ One topic on a course page (course-page.md), drawn by the split page's list. `co
 |---|---|
 | pie | the topic map's 16px `TopicGlyph` (topic-map.md): dashed and empty for a topic not started, a quarter more for each step towards doing it on his own, full once he can, the warning ink on a slip; 16 before the title |
 | title | 13/18 at 500, one line, truncates; muted ink for a topic not started. His standing in the map's words follows for a screen reader only ("Kernel, Learning") |
-| fact | flush right on one edge for every row, at most 224px, 12/16 at 400 muted with a 14px icon 6 before the words; "Your turn" in the accent at 500. Icons: the sidebar's for a turn that waits (message-circle-question), a topic coming back (calendar-clock; the calendar's alarm clock means overdue) and the tutor writing (the braille spinner); the map's for a slip (circle-x) and a review (history); map-pin for "You are here"; Today's bookmark for an open task. No fact, no slot |
+| fact | flush right on one edge for every row, at most 224px, 12/16 at 400 muted with a 14px icon 6 before the words; "Your turn" in the accent at 500. Icons: the sidebar's and Today's for the same fact (`WHY_ICON`): a turn that waits (message-circle-question), the tutor stopped (pause), a slip (circle-x), a review (history), an open task (bookmark), today's new topic (arrow-right); a topic coming back (calendar-clock; the calendar's alarm clock means overdue); the tutor writing (the braille spinner); map-pin for "You are here". How long since he studied it has no icon, as on the sidebar, and keeps its words on a compact row. No fact, no slot |
 
 ## Sizes and states
 

@@ -75,6 +75,18 @@ describe("the engine's show as the topic's record", () => {
 		assert.deepEqual(topicRecordOf(SHOW_RANK, "rank", [])!.tasks, []);
 	});
 
+	it("names where the topic is in his material: each source's title and the place in it, in the record's order", () => {
+		const show = {
+			items: { poisson: { kind: "topic", title: "Poisson distribution", observations: [], refs: [{ source: "bh", locator: "Section 4.7" }, { source: "notes" }, { source: "gone", locator: "p. 3" }] } },
+			sources: { bh: { path: "material/bh.md", title: "Blitzstein and Hwang" }, notes: { path: "notes.md" } },
+		};
+		assert.deepEqual(topicRecordOf(show, "poisson", [])!.refs, [
+			{ source: "Blitzstein and Hwang", locator: "Section 4.7" },
+			{ source: "notes", locator: null },
+		]);
+		assert.deepEqual(topicRecordOf(SHOW_MANY, "matmul", [])!.refs, [], "a topic its record points nowhere for");
+	});
+
 	it("names the method he reached for in the topic's place", () => {
 		const [last] = topicRecordOf(SHOW_MANY, "elimination", [])!.attempts;
 		assert.equal(last!.chose, "cramer");

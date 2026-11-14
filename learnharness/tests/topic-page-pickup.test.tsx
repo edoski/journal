@@ -147,11 +147,15 @@ describe("the sections' order", () => {
 		assert.deepEqual(next.map((item) => item.kind === "task" && item.key), ["sheet-5"]);
 	});
 
-	it("dates a topic not started on its planned first lesson, with the courses that come first", () => {
+	it("dates a topic not started on its planned first lesson once, under Now, with the courses that come first", () => {
 		const later = factsOf(topic("poisson", { title: "Poisson", level: "new", starts: "2026-11-19", startsAfter: ["Linear Algebra"] }));
-		assert.deepEqual(pickupSections(later).scheduled, { kind: "start", day: "Thu 19 Nov", waits: "After Linear Algebra's new topics" });
-		const line = page(later).querySelector('[data-slot="pickup-scheduled"]')!;
-		assert.match(line.textContent ?? "", /First lesson/);
+		const { now, scheduled } = pickupSections(later);
+		assert.deepEqual([now.words, now.note], ["First lesson", "Planned Thu 19 Nov, after Linear Algebra's new topics"]);
+		assert.equal(scheduled, null, "Scheduled does not say it again");
+		assert.equal(page(later).querySelectorAll('[data-slot="pickup-scheduled"]').length, 0);
+		assert.equal((page(later).body.textContent ?? "").split("First lesson").length - 1, 1, "First lesson once on the page");
+		assert.equal(pickupSections(factsOf(topic("poisson", { level: "new", starts: TODAY }))).now.note, "Planned today");
+		assert.equal(pickupSections(factsOf(topic("poisson", { level: "new" }))).now.note, null, "no day when the plan has none");
 	});
 
 	it("dates only a review the engine set ahead, as Scheduled", () => {
@@ -159,6 +163,64 @@ describe("the sections' order", () => {
 			ROWS.map(([, facts]) => pickupSections(facts).scheduled),
 			[null, null, null, null, null, null, { kind: "review", day: "Fri 13 Nov", waits: null }],
 		);
+	});
+});
+
+describe("a topic not started", () => {
+	const KERNEL = topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-11-01", weak: true, signals: { ...QUIET, confidentErrors: 1 } });
+	const POISSON = topic("poisson", { title: "Poisson distribution", level: "new", starts: "2026-11-11" });
+	const map: CourseMap = {
+		...MAP,
+		current: "rank" as TopicHandle,
+		topics: [VECTORS, SPAN, RANK, KERNEL, POISSON, EIGEN],
+		edges: [
+			{ kind: "needs", prerequisite: "vectors" as TopicHandle, topic: "span" as TopicHandle },
+			{ kind: "needs", prerequisite: "span" as TopicHandle, topic: "rank" as TopicHandle },
+			{ kind: "needs", prerequisite: "rank" as TopicHandle, topic: "poisson" as TopicHandle },
+			{ kind: "needs", prerequisite: "kernel" as TopicHandle, topic: "poisson" as TopicHandle },
+			{ kind: "needs", prerequisite: "poisson" as TopicHandle, topic: "eigen" as TopicHandle },
+		],
+	};
+	const record: TopicRecord = { attempts: [], tasks: [], refs: [{ source: "Blitzstein and Hwang", locator: "Section 4.7" }] };
+	const facts = topicFacts({ course: { ...COURSE, map }, topic: POISSON, chats: [], read: { record, plans: [] } });
+
+	it("says why it comes now: what it builds on with where he stands on each, then where it is in his material", () => {
+		const { why } = pickupSections(facts);
+		assert.deepEqual(
+			why?.builds.map((b) => [b.topic.handle, b.standing.words]),
+			[
+				["rank", "Right with help"],
+				["kernel", "Tried, not right yet"],
+			],
+		);
+		assert.deepEqual(why?.refs, [{ source: "Blitzstein and Hwang", locator: "Section 4.7" }]);
+		const document = page(facts);
+		assert.deepEqual(order(document), ["now", "builds on", "in your material"]);
+		const rows = [...document.querySelectorAll('[data-slot="pickup-builds-on"]')];
+		assert.deepEqual(
+			rows.map((r) => [r.getAttribute("href"), r.querySelector('[data-slot="pickup-builds-on-standing"]')!.textContent]),
+			[
+				["/unit/L3N0dWR5L2xpbmFsZw/rank", "Right with help"],
+				["/unit/L3N0dWR5L2xpbmFsZw/kernel", "Tried, not right yet"],
+			],
+		);
+		assert.equal(document.querySelector('[data-slot="pickup-material"]')!.textContent, "Section 4.7Blitzstein and Hwang");
+	});
+
+	it("draws beside it the course map cut to the topic and everything it builds on, near or far", () => {
+		assert.deepEqual(facts.buildsMap?.topics.map((t) => t.handle), ["vectors", "span", "rank", "kernel", "poisson"]);
+		assert.equal(facts.buildsMap?.current, "rank", "where he is, when it is among them");
+		const document = page(facts);
+		assert.ok(document.querySelector('[data-slot="topic-panes"] [data-slot="topic-builds-map"]'), "the map column");
+		const alone = topicFacts({ course: { ...COURSE, map }, topic: topic("vectors-2", { level: "new" }), chats: [], read: null });
+		assert.equal(alone.buildsMap, null);
+		assert.equal(page(alone).querySelector('[data-slot="topic-builds-map"]'), null, "a topic that builds on nothing takes the width");
+	});
+
+	it("says none of it once a session or the engine has started it", () => {
+		const taught = topicFacts({ course: { ...COURSE, map }, topic: { ...POISSON, level: "introduced", introduced: TODAY }, chats: [], read: { record, plans: [] } });
+		assert.equal(pickupSections(taught).why, null);
+		assert.equal(page(taught).querySelector('[data-slot="topic-builds-map"]'), null);
 	});
 });
 

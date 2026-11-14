@@ -1,26 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarClockIcon, BookmarkIcon, CircleXIcon, HistoryIcon, MapPinIcon, MessageCircleQuestionIcon, type LucideIcon } from "lucide-react";
+import { CalendarClockIcon, MapPinIcon, type LucideIcon } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { Hint } from "@/components/ui/hint";
+import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import type { CourseTopic, TopicFact } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
 import { MathText } from "@/components/ui/math-text";
 import { MathLine } from "@/components/ui/math-line";
 
-/** The icon each kind of fact leads with: the sidebar's for a turn that
- *  waits and a topic coming back, the map's for a slip and a review,
- *  Today's for an open task. */
-const FACT_ICON: Record<Exclude<TopicFact["kind"], "working">, LucideIcon> = {
-	"your-turn": MessageCircleQuestionIcon,
-	slip: CircleXIcon,
-	review: HistoryIcon,
-	here: MapPinIcon,
-	task: BookmarkIcon,
+/** The icon each kind of fact leads with: the one the sidebar's row and
+ *  Today's card use for the same fact (`WHY_ICON`), a calendar for when a
+ *  topic comes back, the map's pin for where he is. When he last studied
+ *  it has no icon, as on the sidebar. */
+const FACT_ICON: Record<Exclude<TopicFact["kind"], "working" | "studied">, LucideIcon> = {
+	"your-turn": WHY_ICON.reply,
+	stopped: WHY_ICON.stopped,
+	slip: WHY_ICON.missed,
+	review: WHY_ICON.review,
+	task: WHY_ICON.task,
+	next: WHY_ICON.next,
 	back: CalendarClockIcon,
+	here: MapPinIcon,
 };
 
 /** A hairline above every row but the first, across the column. */
@@ -29,8 +33,10 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
 /** The row's fact: its icon, then its words; a turn that waits wears the
  *  accent, as in the sidebar and on Today. `iconOnly` keeps the words for
  *  the hint and a screen reader. */
-function Fact({ fact, iconOnly }: { fact: TopicFact; iconOnly: boolean }) {
-	const Icon = fact.kind === "working" ? null : FACT_ICON[fact.kind];
+function Fact({ fact, iconOnly: compact }: { fact: TopicFact; iconOnly: boolean }) {
+	const Icon = fact.kind === "working" || fact.kind === "studied" ? null : FACT_ICON[fact.kind];
+	// A fact with no mark (how long ago) keeps its words even on a compact row.
+	const iconOnly = compact && fact.kind !== "studied";
 	const mark = (
 		<span
 			data-slot="course-topic-fact"
@@ -40,7 +46,7 @@ function Fact({ fact, iconOnly }: { fact: TopicFact; iconOnly: boolean }) {
 				fact.kind === "your-turn" ? "font-medium text-link" : "text-muted-foreground",
 			)}
 		>
-			{Icon ? <Icon aria-hidden className="size-3.5 shrink-0" /> : <BrailleSpinner />}
+			{Icon ? <Icon aria-hidden className="size-3.5 shrink-0" /> : fact.kind === "working" && <BrailleSpinner />}
 			<span className={iconOnly ? "sr-only" : "truncate"}>{fact.words}</span>
 		</span>
 	);
