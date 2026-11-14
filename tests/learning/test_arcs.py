@@ -354,6 +354,23 @@ def test_leaves_out_holds_topics_of_the_named_arcs_without_emptying_one(
     assert "leaves_out" not in records.load(workspace)["exam"]
 
 
+def test_an_exam_over_the_whole_course_may_leave_topics_out(
+    workspace: Workspace,
+) -> None:
+    formed(workspace)
+    records.save(
+        workspace, {"exam": {"date": "2026-12-20", "arcs": None, "leaves_out": ["ftc"]}}
+    )
+    record = records.load(workspace)
+    assert arc_rules.examined(record) == {
+        "limit",
+        "continuity",
+        "derivative",
+        "chain-rule",
+        "riemann",
+    }
+
+
 def test_a_save_to_a_course_without_arcs_is_told_to_drop_its_arc_fields(
     workspace: Workspace,
 ) -> None:

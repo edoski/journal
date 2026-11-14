@@ -657,8 +657,8 @@ def _runup(
 ) -> dict[str, Any]:
     """The exam and its run-up: when the final review starts, the path topics
     the plan cannot start before it (``does_not_fit``), and the taught ones
-    its final review has no room for (``unreviewed``); with a scope of arcs,
-    its ``arcs``, the topics of theirs it ``leaves_out``, and the untaught
+    its final review has no room for (``unreviewed``); with a scope, its
+    ``arcs``, the topics it ``leaves_out``, and the untaught
     earlier topics it ``needed`` started first (``progress.exam_topics``),
     in path order."""
     plan = progress.exam_plan(record)

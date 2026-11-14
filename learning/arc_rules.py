@@ -90,17 +90,20 @@ def title(record: dict[str, Any], arc: str) -> str:
 
 
 def examined(record: dict[str, Any]) -> frozenset[str] | None:
-    """The topics the next exam examines when it names arcs, else None (the
-    whole course): live topics of ``exam.arcs`` not in ``exam.leaves_out``.
+    """The topics the next exam examines when it has a scope, else None (the
+    whole course): live topics of ``exam.arcs`` (of the whole course when it
+    names none) not in ``exam.leaves_out``, in a course with or without arcs.
     It reads no evidence, so it stays the same while the learner is taught."""
     exam = record.get("exam", {})
-    if "date" not in exam or "arcs" not in exam:
+    if "date" not in exam or ("arcs" not in exam and "leaves_out" not in exam):
         return None
-    named, left = set(exam["arcs"]), set(exam.get("leaves_out", ()))
+    named, left = exam.get("arcs"), set(exam.get("leaves_out", ()))
     return frozenset(
         key
         for key, topic in record["topics"].items()
-        if topic.get("arc") in named and "excluded" not in topic and key not in left
+        if "excluded" not in topic
+        and key not in left
+        and (named is None or topic.get("arc") in named)
     )
 
 
@@ -127,6 +130,7 @@ def check(record: dict[str, Any], *, placing: bool = False) -> None:
     _check_topics(record, placing)
     _check_order(record)
     if not record["arcs"]:
+        _check_left(record)
         return
     for arc, item in record["arcs"].items():
         for name, why in TEXTS.items():
@@ -164,9 +168,8 @@ def _check_order(record: dict[str, Any]) -> None:
     if not arcs:
         if listed:
             raise ValueError('path.arcs: the course has no arcs; remove "arcs"')
-        for name in ("arcs", "leaves_out"):
-            if name in record.get("exam", {}):
-                raise ValueError(f"exam.{name}: the course has no arcs; remove it")
+        if "arcs" in record.get("exam", {}):
+            raise ValueError("exam.arcs: the course has no arcs; remove it")
         return
     missing = [arc for arc in arcs if arc not in listed]
     unknown = [arc for arc in listed if arc not in arcs]
@@ -258,7 +261,7 @@ def _check_sizes(record: dict[str, Any]) -> None:
 
 def _check_exam(record: dict[str, Any]) -> None:
     """H6 and H8: the exam's arcs are a run of live arcs, and what it leaves
-    out lies inside them without emptying one."""
+    out lies inside them without emptying one (``_check_left``)."""
     exam = record.get("exam", {})
     named: list[str] = exam.get("arcs", [])
     running = live(record)
@@ -283,18 +286,9 @@ def _check_exam(record: dict[str, Any]) -> None:
                 "exam.arcs must be a run of consecutive live arcs in path.arcs, "
                 f'e.g. ["{run[0]}", …, "{run[-1]}"]{where}'
             )
+    _check_left(record)
     left: list[str] = exam.get("leaves_out", [])
-    if left and not named:
-        raise ValueError(
-            "exam.leaves_out lists topics of the exam's arcs, so it needs exam.arcs"
-        )
     topics = record["topics"]
-    for key in left:
-        topic = topics.get(key, {})
-        if topic.get("arc") not in named or "excluded" in topic:
-            raise ValueError(
-                f'exam.leaves_out: "{key}" is not in the exam\'s arcs {_listed(named)}'
-            )
     for arc in named:
         if all(
             "excluded" in topics[key] or key in left for key in members(record, arc)
@@ -303,6 +297,34 @@ def _check_exam(record: dict[str, Any]) -> None:
                 f'exam.leaves_out holds every topic of "{arc}"; drop "{arc}" from '
                 "exam.arcs instead"
             )
+
+
+def _check_left(record: dict[str, Any]) -> None:
+    """H8 in every course: ``exam.leaves_out`` names topics the course studies
+    (of the exam's arcs, when it names some), and never all of them."""
+    exam = record.get("exam", {})
+    left: list[str] = exam.get("leaves_out", [])
+    named: list[str] | None = exam.get("arcs")
+    topics = record["topics"]
+    for key in left:
+        if named is not None and topics.get(key, {}).get("arc") not in named:
+            raise ValueError(
+                f'exam.leaves_out: "{key}" is not in the exam\'s arcs {_listed(named)}'
+            )
+        if key not in topics:
+            raise ValueError(f'exam.leaves_out: no topic "{key}"{_close(key, topics)}')
+        if "excluded" in topics[key]:
+            raise ValueError(
+                f'exam.leaves_out: "{key}" is excluded, and no exam examines an '
+                "excluded topic; drop it from exam.leaves_out"
+            )
+    if left and all(
+        "excluded" in topic or key in left for key, topic in topics.items()
+    ):
+        raise ValueError(
+            "exam.leaves_out holds every topic the course studies, so the exam "
+            "would examine none; leave out only what it does not examine"
+        )
 
 
 def check_arcless_patch(record: dict[str, Any], changes: dict[str, Any]) -> None:
@@ -314,9 +336,7 @@ def check_arcless_patch(record: dict[str, Any], changes: dict[str, Any]) -> None
     ):
         return
     exam, path = changes.get("exam") or {}, changes.get("path") or {}
-    stray = [
-        f"exam.{name}" for name in ("arcs", "leaves_out") if exam.get(name) is not None
-    ]
+    stray = ["exam.arcs"] if exam.get("arcs") is not None else []
     stray += ["path.arcs"] if path.get("arcs") is not None else []
     stray += [
         f"topics.{key}.arc"
@@ -342,17 +362,25 @@ def check_arcless_patch(record: dict[str, Any], changes: dict[str, Any]) -> None
 def check_exam_patch(
     before: dict[str, Any], after: dict[str, Any], change: dict[str, Any] | None
 ) -> None:
-    """H7: in a course with arcs, a changed or removed exam date states the
-    new exam's scope."""
-    if not after["arcs"] or not change or "date" not in change or "arcs" in change:
+    """H7: a changed or removed exam date states the new exam's scope: in a
+    course with arcs, ``exam.arcs``; in one without, ``exam.leaves_out`` when
+    the old exam left topics out."""
+    if not change or "date" not in change:
         return
-    if change["date"] == before.get("exam", {}).get("date"):
+    old = before.get("exam", {})
+    if change["date"] == old.get("date"):
         return
-    raise ValueError(
-        "exam.date changes and exam.arcs does not; say the new exam's scope in "
-        "exam.arcs (null for the whole course), and exam.leaves_out if it leaves "
-        "topics of those arcs out"
-    )
+    if after["arcs"] and "arcs" not in change:
+        raise ValueError(
+            "exam.date changes and exam.arcs does not; say the new exam's scope in "
+            "exam.arcs (null for the whole course), and exam.leaves_out if it "
+            "leaves topics of those arcs out"
+        )
+    if not after["arcs"] and "leaves_out" in old and "leaves_out" not in change:
+        raise ValueError(
+            "exam.date changes and exam.leaves_out does not; say what the new exam "
+            "leaves out in exam.leaves_out (null when it examines the whole course)"
+        )
 
 
 # --- names ------------------------------------------------------------------
@@ -545,13 +573,10 @@ def drop(record: dict[str, Any], removed: Collection[str]) -> None:
     exam = dict(record.get("exam", {}))
     arcs = [arc for arc in path.pop("arcs", []) if arc not in removed]
     named = [arc for arc in exam.pop("arcs", []) if arc not in removed]
-    left = exam.pop("leaves_out", [])
     if record["arcs"]:
         path["arcs"] = arcs
         if named:
             exam["arcs"] = named
-            if left:
-                exam["leaves_out"] = left
     else:
         record["topics"] = {
             key: {name: value for name, value in topic.items() if name != "arc"}

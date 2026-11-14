@@ -127,7 +127,7 @@ def exam_plan(record: dict[str, Any]) -> Exam | None:
 
 def examining(record: dict[str, Any]) -> Callable[[str], Exam | None]:
     """Each topic's exam: the course's, for a topic the next exam examines;
-    None for one outside the arcs it names (``arc_rules.examined``), which is
+    None for one outside its scope (``arc_rules.examined``), which is
     scheduled as in a course with no exam. The set reads no evidence, so a
     topic keeps its exam, or its lack of one, as he is taught."""
     exam = exam_plan(record)
@@ -147,7 +147,7 @@ def exam_topics(
 ) -> frozenset[str] | None:
     """What the next exam needs started: the topics it examines and every
     ``untaught`` topic they need, directly or through others. None when the
-    exam names no arcs (the whole course). An untaught prerequisite of an
+    exam examines the whole course. An untaught prerequisite of an
     examined topic is not examined itself, but the exam's topics cannot start
     without it, so its start keeps the exam's pace; once taught it leaves
     this set, and its reviews never had the exam's."""
