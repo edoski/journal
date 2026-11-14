@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCalendarController, type CalendarController, type DayHeaderInfo, type EventInput } from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/react/daygrid";
 import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, MoonIcon } from "lucide-react";
@@ -12,7 +12,7 @@ import { EventCalendarViews } from "@/components/ui/event-calendar-views";
 import { EventCalendarCloseIcon } from "@/components/event-calendar-icons";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
 import { CalendarEntryView, type StartSession } from "@/components/calendar/calendar-entry";
-import { quietBetween, studyTimeWords, type CalendarEntry } from "@/components/calendar/calendar-facts";
+import { moreWords, quietBetween, studyTimeWords, type CalendarEntry } from "@/components/calendar/calendar-facts";
 import { overlayOpen } from "@/components/spatial-arrows";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +72,24 @@ function rangeTitle(view: string, start: Date, end: Date): string {
 	return start.getUTCMonth() === last.getUTCMonth()
 		? `${start.getUTCDate()} to ${DAY_MONTH.format(last)} ${year}`
 		: `${DAY_MONTH.format(start)} to ${DAY_MONTH.format(last)} ${year}`;
+}
+
+/** A day's More, in words of what it folds away (`moreWords`): the day
+ *  grid gives only how many it hides, so the day is read from the cell it
+ *  sits in, and the hidden entries are that day's last, in the grid's
+ *  order. */
+function MoreLabel({ hidden, entries }: { hidden: number; entries: readonly CalendarEntry[] }) {
+	const ref = useRef<HTMLSpanElement>(null);
+	const [day, setDay] = useState<string | null>(null);
+	useLayoutEffect(() => setDay(ref.current?.closest("[data-date]")?.getAttribute("data-date") ?? null), []);
+	const words = day ? moreWords(entries.filter((entry) => entry.day === day).slice(-hidden)) : "More";
+	return (
+		<Hint label="Show everything on this day">
+			<span ref={ref} data-slot="calendar-more" className="block truncate">
+				{words}
+			</span>
+		</Hint>
+	);
 }
 
 /** A week's day head: the weekday, the date (today's filled), and the
@@ -219,11 +237,7 @@ export function CalendarView({
 						<CalendarEntryView entry={info.event.extendedProps.entry as CalendarEntry} today={today} compact={compact} busy={busy} onStart={onStart} />
 					)}
 					moreLinkHint={() => ""}
-					moreLinkContent={() => (
-						<Hint label="Show everything on this day">
-							<span>More</span>
-						</Hint>
-					)}
+					moreLinkContent={(info) => <MoreLabel hidden={info.num} entries={entries} />}
 					views={{ dayGrid: DAY_GRID }}
 					dayHeaderAlign="start"
 					dayHeaderClass="border-border/60"

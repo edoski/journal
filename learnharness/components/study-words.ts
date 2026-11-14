@@ -102,20 +102,62 @@ export function returnWords(days: number): string {
 	return `Back in ${Math.round(days / 30)}mo`;
 }
 
-/** Why a review waits past the day memory asks for it, when the engine's
- *  plan says a nearer exam's reviews filled the evenings before it
- *  (`held`): a course with no exam ahead of the review waits for the exam
- *  courses, one whose own exam is still ahead waits for a nearer one. */
+const SHORT_DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+/** "1 Oct". */
+const shortDay = (day: string) => SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
+
+/** Why a review waits past the day memory asks for it (the engine's
+ *  `held`): another course's final review came first, or the days before
+ *  its planned day are full. Never "your exams" when its own exam is the
+ *  one it misses. */
 export const HELD_WORDS = {
-	exams: "Waits for your exams",
-	nearer: "Waits for a nearer exam",
+	exam: (course: string) => `Waits for your ${course} exam`,
+	full: "Earlier days are full",
 } as const;
 
 /** The words for a review the plan holds back (`HELD_WORDS`); null for one
- *  it does not. `exam` is the course's exam day, null with none. */
-export function heldWords(review: CourseMapTopic["review"], exam: string | null): string | null {
+ *  it does not. */
+export function heldWords(review: CourseMapTopic["review"]): string | null {
 	if (review?.kind !== "scheduled" || !review.held) return null;
-	return exam !== null && exam > review.date ? HELD_WORDS.nearer : HELD_WORDS.exams;
+	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
+}
+
+/** A review that is due: "Due today", "3d overdue"; one the plan holds
+ *  past a day memory asked for already says since when, "Due since 1 Oct",
+ *  so a review weeks late never reads as spacing; any other dated review
+ *  "Back in 5d". `today` is the engine's day. */
+export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
+	if (review.kind === "due") return overdueWords(review.overdue);
+	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}`;
+	return returnWords(Math.max(1, daysBetween(today, review.date)));
+}
+
+/** Why a topic's first lesson waits (the engine's `starts_after`): the
+ *  courses whose new topics take the days before it. "After Probability's
+ *  new topics", "After Probability's and Linear Algebra's new topics";
+ *  null when it waits for none. */
+export function startsAfterWords(courses: readonly string[] | undefined): string | null {
+	if (!courses || courses.length === 0) return null;
+	const names = courses.map((course) => `${course}'s`);
+	const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+	return `After ${list} new topics`;
+}
+
+/** How far a day is from the engine's, one form wherever a distance shows
+ *  (an exam, a planned review): "Today", "Tomorrow", "In 18 days",
+ *  "Yesterday", "3 days ago". Always days, never rounded to weeks, so the
+ *  same exam reads the same on the course page and in the calendar. */
+export function distanceWords(day: string, today: string): string {
+	const days = daysBetween(today, day);
+	if (days === 0) return "Today";
+	if (days === 1) return "Tomorrow";
+	if (days === -1) return "Yesterday";
+	return days > 0 ? `In ${days} days` : `${-days} days ago`;
+}
+
+/** Whole days from `from` to `to`, both "YYYY-MM-DD". */
+function daysBetween(from: string, to: string): number {
+	return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 /** The lesson's words for what just happened to his work (round 2, 14 Nov

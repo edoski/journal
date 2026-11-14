@@ -184,16 +184,17 @@ describe("course records adapter (fake engine)", () => {
 			today: "2026-11-08",
 			revision: 12,
 			title: "Linear Algebra",
-			exam: { date: "2026-11-29", days_left: 21 },
+			exam: { date: "2026-11-29", days_left: 21, final_review: "2026-11-23", unreviewed: ["basis", "gone"], does_not_fit: ["cramer"] },
 			current: "rank",
 			focus: "sheet-4",
 			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }],
 			topics: [
 				{ topic: "vectors", title: "Vectors", needs: [], contrasts: [], level: "transferred", introduced: "2026-10-16", review: "2026-11-23", weak: false, tasks: [] },
-				{ topic: "basis", title: "Basis", needs: [], contrasts: [], level: "retained", introduced: "2026-10-16", review: "2026-12-04", held: true, weak: false, tasks: [] },
+				{ topic: "basis", title: "Basis", needs: [], contrasts: [], level: "retained", introduced: "2026-10-16", review: "2026-12-04", held: true, held_for: "Probability", due: "2026-11-02", weak: false, tasks: [] },
 				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", right: "partial", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
 				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", right: "sideways", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
 				{ topic: "cramer", needs: ["vectors"], contrasts: ["elimination"], level: "introduced", weak: false, tasks: [] },
+				{ topic: "det", title: "Determinants", needs: [], contrasts: [], level: "new", starts: "2026-11-19", starts_after: ["Probability"], weak: false, tasks: [] },
 				{ topic: "odd", level: "mastered", needs: [], contrasts: [], weak: false, tasks: [] },
 			],
 		};
@@ -203,17 +204,18 @@ describe("course records adapter (fake engine)", () => {
 		assert.ok(result.ok);
 		const { map } = result;
 		assert.equal(map.workspace, "/s/linalg");
-		assert.deepEqual(map.exam, { date: "2026-11-29", daysLeft: 21 });
+		assert.deepEqual(map.exam, { date: "2026-11-29", daysLeft: 21, finalReview: "2026-11-23", doesNotFit: ["cramer"], unreviewed: ["basis"] }, "the run-up, with topics the map lists");
 		assert.equal(map.current, "rank");
 		assert.deepEqual(map.tasks, [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }]);
 		assert.deepEqual(
 			map.topics.map((t) => t.handle),
-			["vectors", "basis", "elimination", "rank", "cramer"],
+			["vectors", "basis", "elimination", "rank", "cramer", "det"],
 			"a topic with a level the engine does not have is not drawn",
 		);
 		const [vectors, basis, elimination, rank, cramer] = map.topics;
 		assert.deepEqual(vectors!.review, { kind: "scheduled", date: "2026-11-23" });
-		assert.deepEqual(basis!.review, { kind: "scheduled", date: "2026-12-04", held: true }, "a review a nearer exam holds back says so");
+		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.startsAfter, ["Probability"], "a start says which courses' new topics come first");
+		assert.deepEqual(basis!.review, { kind: "scheduled", date: "2026-12-04", held: { exam: "Probability", since: "2026-11-02" } }, "a review a final review holds back says which, and since when");
 		assert.deepEqual(rank!.review, { kind: "due", date: "2026-11-05", overdue: 3 });
 		assert.deepEqual(rank!.signals, { gap: "Counts nonzero entries", lapsed: false, stale: true, choiceErrors: {}, confidentErrors: 0, repaired: true });
 		assert.equal(elimination!.signals.repaired, false);

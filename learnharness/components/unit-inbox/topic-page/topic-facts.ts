@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { heldWords, LESSON_WORDS, overdueWords, returnWords, type SlipKey } from "@/components/study-words";
+import { heldWords, LESSON_WORDS, reviewWords, startsAfterWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -85,6 +85,10 @@ export interface TopicFacts {
 	/** Why its next review waits past the day memory asks for it
 	 *  (`heldWords`); null when nothing holds it back. */
 	waits: string | null;
+	/** A topic not started that the engine's plan starts later: the day of
+	 *  its first lesson and, when it waits behind other courses' new
+	 *  topics, which (`startsAfterWords`); null otherwise. */
+	starts: { day: string; waits: string | null } | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
 	/** Every session of the topic, newest first. */
@@ -94,6 +98,14 @@ export interface TopicFacts {
 	/** Newest first; empty without the topic read. */
 	attempts: readonly TopicAttempt[];
 	titleOf: (handle: string) => string;
+}
+
+/** Why the review waits, after since when it was due when memory asked
+ *  for it already: "Due since 1 Oct, earlier days are full". */
+function waitsWords(review: CourseMapTopic["review"], today: string): string | null {
+	const why = heldWords(review);
+	if (!why || review?.kind !== "scheduled" || !review.held || review.held.since >= today) return why;
+	return `${reviewWords(review, today)}, ${why.charAt(0).toLowerCase()}${why.slice(1)}`;
 }
 
 /** The open tasks that hold the topic: the focused one first, then the
@@ -162,17 +174,13 @@ export function studiedWords(days: number): string {
 /**
  * What the head says beside the pie, in the app's words (study-words.ts),
  * each drawn as an icon and a few words: why the engine calls the topic
- * weak, then its review, due ("3d overdue") or dated ("Back in 5d"), as
- * the map, Home and the sidebar say it. `today` is the engine's study day.
+ * weak, then its review, due ("3d overdue"), held past memory's day ("Due
+ * since 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
+ * say it (`reviewWords`). `today` is the engine's study day.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {
 	const need = topic.weak ? needOf(topic, titleOf) : null;
-	const review =
-		topic.review?.kind === "due"
-			? overdueWords(topic.review.overdue)
-			: topic.review?.kind === "scheduled"
-				? returnWords(Math.max(1, daysBetween(today, topic.review.date)))
-				: null;
+	const review = topic.review ? reviewWords(topic.review, today) : null;
 	return [...(need ? [{ kind: "slip" as const, words: need.words, ...(need.slip ? { slip: need.slip } : {}) }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }
 
@@ -280,7 +288,8 @@ export function topicFacts({ course, topic, chats, read }: { course: StudyCourse
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
-		waits: heldWords(topic.review, map.exam?.date ?? null),
+		waits: waitsWords(topic.review, map.today),
+		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,
 		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,

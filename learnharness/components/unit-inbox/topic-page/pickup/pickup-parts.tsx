@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightIcon, BookmarkIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon, WaypointsIcon } from "lucide-react";
+import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon, WaypointsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -139,14 +139,16 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 	);
 }
 
-/** Scheduled: the engine's next review, why it waits when a nearer exam
- *  holds it, and its day in the date column. A date, not a control. */
-export function ScheduledEntry({ day, waits }: { day: string; waits: string | null }) {
+/** Scheduled: the engine's next review or a topic's first lesson, why it
+ *  waits when something comes first, and its day in the date column. A
+ *  date, not a control. */
+export function ScheduledEntry({ kind, day, waits }: { kind: "review" | "start"; day: string; waits: string | null }) {
+	const Icon = kind === "review" ? HistoryIcon : BookOpenIcon;
 	return (
-		<p data-slot="pickup-scheduled" className="grid h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4">
-			<HistoryIcon aria-hidden className={ICON} />
+		<p data-slot="pickup-scheduled" data-kind={kind} className="grid h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4">
+			<Icon aria-hidden className={ICON} />
 			<span className="truncate text-row text-muted-foreground">
-				Review
+				{kind === "review" ? "Review" : "First lesson"}
 				{waits && (
 					<span data-slot="pickup-scheduled-waits" className="ml-2 text-label">
 						{waits}

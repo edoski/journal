@@ -1,7 +1,7 @@
 import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { heldWords } from "@/components/study-words";
+import { distanceWords, heldWords, reviewWords, startsAfterWords } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, stepWords, type CourseMove } from "@/components/study-home/study-facts";
 
@@ -24,9 +24,21 @@ export interface CourseRef {
 export type SessionType = "check-in" | "plan" | "lesson" | "practice";
 
 export type CalendarEntry =
-	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; road: readonly RoadWeek[]; finalReview: string | null; doesNotFit: readonly string[]; allStarted: boolean; next: NextMove | null }
-	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; waits: string | null; action: TopicAction }
-	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; action: TopicAction }
+	| {
+			kind: "exam";
+			id: string;
+			day: string;
+			title: string;
+			course: CourseRef;
+			road: readonly RoadWeek[];
+			finalReview: string | null;
+			doesNotFit: readonly string[];
+			unreviewed: readonly string[];
+			allStarted: boolean;
+			next: NextMove | null;
+	  }
+	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; since: string | null; waits: string | null; action: TopicAction }
+	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; waits: string | null; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
 	| { kind: "session"; id: string; day: string; title: string; course: CourseRef | null; chat: ChatListItem; type: SessionType; waits: boolean; topic: CourseMapTopic | null };
 
@@ -85,6 +97,32 @@ export const LOOKS: Record<EntryLook, { words: string; rank: number }> = {
 	plan: { words: "Plan", rank: 4 },
 	"check-in": { words: "Quiz", rank: 4 },
 };
+
+/** Each look as the thing it is, singular and plural, for More's words. */
+const THINGS: Record<EntryLook, [string, string]> = {
+	exam: ["an exam", "exams"],
+	overdue: ["an overdue review", "overdue reviews"],
+	new: ["a new topic", "new topics"],
+	review: ["a review", "reviews"],
+	task: ["unfinished work", "unfinished work"],
+	lesson: ["a lesson", "lessons"],
+	practice: ["practice", "practice"],
+	plan: ["a lesson", "lessons"],
+	"check-in": ["a lesson", "lessons"],
+};
+
+/** What a day's More hides, by kind and never by number: "Also reviews
+ *  and a new topic". `hidden` are the entries the day grid folds away. */
+export function moreWords(hidden: readonly CalendarEntry[]): string {
+	const counts = new Map<string, [string, string, number]>();
+	for (const entry of hidden) {
+		const [one, many] = THINGS[lookOf(entry)];
+		const seen = counts.get(one);
+		counts.set(one, [one, many, (seen?.[2] ?? 0) + 1]);
+	}
+	const things = [...counts.values()].map(([one, many, n]) => (n > 1 ? many : one));
+	return things.length > 0 ? `Also ${listWords(things)}` : "More";
+}
 
 export function lookOf(entry: CalendarEntry): EntryLook {
 	switch (entry.kind) {
@@ -174,14 +212,17 @@ export function calendarEntries({
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
 			const step = nextStepOf(studied);
 			const next = map.exam.date > today && step.kind !== "none" ? { words: stepWords(step), move: courseMove(studied, chats) } : null;
-			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), allStarted, next });
+			const unreviewed = (map.exam.unreviewed ?? []).map(titleOf);
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
-			const waits = topic.review?.date === day ? heldWords(topic.review, map.exam?.date ?? null) : null;
-			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, waits, ...facts(topic) });
+			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
+			const since = held?.held && held.held.since < today ? reviewWords(held, today) : null;
+			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, since, waits: held ? heldWords(held) : null, ...facts(topic) });
 		};
-		const fresh = (topic: CourseMapTopic, day: string) => entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, ...facts(topic) });
+		const fresh = (topic: CourseMapTopic, day: string) =>
+			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? startsAfterWords(topic.startsAfter) : null, ...facts(topic) });
 		const topicOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle);
 		for (const handle of due ?? []) {
 			const topic = topicOf(handle);
@@ -254,17 +295,9 @@ export function longDayWords(day: string): string {
 	return LONG_DAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
 }
 
-/** How far a day is from the engine's: "Today", "Tomorrow", "In 3 days",
- *  "In 2 weeks", "Yesterday", "3 days ago". */
-export function distanceWords(day: string, today: string): string {
-	const days = daysBetween(today, day);
-	if (days === 0) return "Today";
-	if (days === 1) return "Tomorrow";
-	if (days === -1) return "Yesterday";
-	const span = Math.abs(days);
-	const words = span < 14 ? `${span} days` : `${Math.round(span / 7)} weeks`;
-	return days > 0 ? `In ${words}` : `${words} ago`;
-}
+/** How far a day is from the engine's, in the app's one form
+ *  (`study-words.ts`). */
+export { distanceWords };
 
 const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const short = (day: string) => SHORT.format(new Date(`${day}T00:00:00Z`));
@@ -286,6 +319,11 @@ export function finalReviewWords(day: string | null, today: string): string | nu
 /** "A, B and C". */
 function listWords(items: readonly string[]): string {
 	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** The taught topics the final review has no room for, named. */
+export function unreviewedWords(titles: readonly string[]): string | null {
+	return titles.length > 0 ? `No room in it for ${listWords(titles)}` : null;
 }
 
 /** The topics the plan has no room to start before the exam, named. */

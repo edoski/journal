@@ -972,9 +972,11 @@ def _interleaved(
     return placed
 
 
-def _late_share(item: dict[str, Any], standing: dict[str, Any]) -> float:
+def late_share(item: dict[str, Any], standing: dict[str, Any]) -> float:
     """Days overdue as a share of the interval that set the date: two days late
-    on a one-day interval matters more than ten on a 160-day one."""
+    on a one-day interval matters more than ten on a 160-day one. Each step of
+    the ladder is set for the same recall, and forgetting runs in proportion to
+    the interval, so an equal share is an equal loss of recall."""
     last = standing.get("last", {}).get("date")
     gap = (
         (date.fromisoformat(item["due"]) - date.fromisoformat(last)).days if last else 0
@@ -1008,7 +1010,7 @@ def due(
             not current[item["topic"]].get("relearn"),
             not current[item["topic"]].get("lapsed"),
             item["topic"] not in behind,
-            -_late_share(item, current[item["topic"]]),
+            -late_share(item, current[item["topic"]]),
             rank[item["topic"]],
         )
     )

@@ -173,7 +173,7 @@ describe("study facts", () => {
 				...PROB.map,
 				current: "series" as TopicHandle,
 				topics: [
-					topic("cauchy", "Cauchy sequences", "assisted", { review: { kind: "scheduled", date: "2026-11-15", held: true } }),
+					topic("cauchy", "Cauchy sequences", "assisted", { review: { kind: "scheduled", date: "2026-11-15", held: { exam: null, since: "2026-11-07" } } }),
 					topic("series", "Series", "retained", { review: { kind: "scheduled", date: "2026-12-04" } }),
 					topic("continuity", "Continuity", "new", { starts: "2026-11-22" }),
 				],
@@ -362,7 +362,7 @@ describe("what a line of Today reads", () => {
 				current: "fundamental" as TopicHandle,
 				topics: [
 					topic("fundamental", "Fundamental theorem", "retained", { review: { kind: "scheduled", date: "2026-12-09" } }),
-					topic("improper", "Improper integrals", "retained", { review: { kind: "scheduled", date: "2026-11-29", held: true } }),
+					topic("improper", "Improper integrals", "retained", { review: { kind: "scheduled", date: "2026-11-29", held: { exam: null, since: "2026-11-07" } } }),
 				],
 			},
 		};

@@ -16,12 +16,20 @@ export function isTopicLevel(value: unknown): value is TopicLevel {
 	return (TOPIC_LEVELS as readonly unknown[]).includes(value);
 }
 
+/** Why the plan put a review past the day memory asks for it (the
+ *  engine's `held`): full days left it out; `exam` names the course whose
+ *  final review came first, null when the days before were simply full;
+ *  `since` is the day memory asked for it. */
+export interface ReviewHeld {
+	exam: string | null;
+	since: string;
+}
+
 /** The topic's review on the day the engine's daily plan puts it: `due`
  *  exactly when that day is today, with the days since memory asked for
  *  it; a review the plan moves to a later day is `scheduled` for that day,
- *  not overdue, and `held` when it moved because a nearer exam's reviews
- *  filled the evenings before it (the engine's `held`). */
-export type TopicReview = { kind: "due"; date: string; overdue: number } | { kind: "scheduled"; date: string; held?: true };
+ *  not overdue, and `held` when full days put it past memory's day. */
+export type TopicReview = { kind: "due"; date: string; overdue: number } | { kind: "scheduled"; date: string; held?: ReviewHeld };
 
 /** Why the engine calls a topic weak: each its own engine field, shown as is. */
 export interface TopicSignals {
@@ -68,6 +76,9 @@ export interface CourseMapTopic {
 	 *  this untaught topic; absent once taught or when the plan has no
 	 *  room for it. */
 	starts?: string;
+	/** The courses whose new topics take the days before that start, when
+	 *  it waits behind them (the engine's `starts_after`). */
+	startsAfter?: readonly string[];
 }
 
 /** `needs`: the prerequisite comes before the topic that needs it.
@@ -84,13 +95,24 @@ export interface CourseMapTask {
 	updated: string | null;
 }
 
+/** The exam and its run-up, as the engine's `map` gives it: the final
+ *  review's first day, the path topics the plan cannot start before the
+ *  exam and the taught ones its final review has no room for. */
+export interface CourseExam {
+	date: string;
+	daysLeft: number;
+	finalReview?: string;
+	doesNotFit?: readonly TopicHandle[];
+	unreviewed?: readonly TopicHandle[];
+}
+
 export interface CourseMap {
 	workspace: string;
 	title: string;
 	/** The engine's study day, never the app's clock. */
 	today: string;
 	revision: number;
-	exam: { date: string; daysLeft: number } | null;
+	exam: CourseExam | null;
 	current: TopicHandle | null;
 	/** The focused open task's key. */
 	focus: string | null;

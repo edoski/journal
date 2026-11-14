@@ -1,5 +1,5 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { LESSON_WORDS, leftOffWords, overdueWords, returnWords, slipMark, slipWords, type SlipKey } from "@/components/study-words";
+import { LESSON_WORDS, leftOffWords, overdueWords, reviewWords, slipMark, slipWords, type SlipKey } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
@@ -199,7 +199,7 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.slip) return { kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key };
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
-	if (topic.review?.kind === "scheduled") return { kind: "returns", words: returnWords(Math.max(1, daysBetween(today, topic.review.date))) };
+	if (topic.review?.kind === "scheduled") return { kind: "returns", words: reviewWords(topic.review, today) };
 	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
 	return at ? { kind: "studied", words: studiedWords(at, today) } : { kind: "none" };
 }

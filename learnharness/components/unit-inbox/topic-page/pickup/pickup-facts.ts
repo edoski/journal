@@ -44,9 +44,10 @@ export interface PickupSections {
 	now: NowItem;
 	/** Empty when nothing else waits. */
 	next: NextItem[];
-	/** The engine's next review: its day, "Fri 13 Nov", and why it waits
-	 *  that long when a nearer exam holds it; null when it dated none ahead. */
-	scheduled: { day: string; waits: string | null } | null;
+	/** What the engine's plan dates ahead: the next review, or a topic's
+	 *  first lesson; its day, "Fri 13 Nov", and why it waits that long when
+	 *  something comes first; null when it dated none ahead. */
+	scheduled: { kind: "review" | "start"; day: string; waits: string | null } | null;
 	/** The sessions neither Now nor Next hold, and every scored attempt, by day. */
 	earlier: TrailDay[];
 }
@@ -126,7 +127,12 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 	return {
 		now,
 		next,
-		scheduled: review?.kind === "scheduled" ? { day: dayOf(review.date), waits: facts.waits } : null,
+		scheduled:
+			review?.kind === "scheduled"
+				? { kind: "review", day: dayOf(review.date), waits: facts.waits }
+				: facts.starts
+					? { kind: "start", day: dayOf(facts.starts.day), waits: facts.starts.waits }
+					: null,
 		earlier: trailDays(
 			facts.sessions.filter((entry) => !held.has(entry.chat.id)),
 			facts.attempts,
