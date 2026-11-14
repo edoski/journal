@@ -8,7 +8,7 @@ import { MIN_ZOOM, type Camera, cameraAt, centreOf, chainOf, isWalkKey, neighbou
 import { TopicMapContext, type TopicMapState } from "@/components/course-map/topic-map/topic-node";
 import { mapFade } from "@/components/study-home/map-frame";
 import { StepNode, type StepFlowNode } from "@/components/unit-inbox/topic-page/steps/step-node";
-import { STEP_SIZE, TAG_ROOM, stepsCamera, stepsLayout, stepsShiftRange, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
+import { STEP_SIZE, TAG_ROOM, shiftsWithin, stepsCamera, stepsLayout, stepsShiftRange, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
 import { useTieAnchor } from "@/components/linked-columns/linked-columns";
@@ -167,8 +167,8 @@ function Flow({
 				const box = node.id === current ? [] : [onScreen(node.position.x, node.position.y, NODE_WIDTH, NODE_HEIGHT)];
 				return node.data.tag || node.data.status === "current" ? [...box, onScreen(node.position.x, node.position.y - TAG_ROOM, NODE_WIDTH / 2, 14)] : box;
 			});
-			const [least, most] = stepsShiftRange(layout, current, camera, frame, FADE);
-			const dy = clearShift({ ...anchor, to, obstacles }, tieShifts(anchor.from, to).filter((dy) => dy >= least && dy <= most));
+			const range = stepsShiftRange(layout, current, camera, frame, FADE);
+			const dy = clearShift({ ...anchor, to, obstacles }, shiftsWithin(tieShifts(anchor.from, to), range));
 			if (dy) camera.y += dy;
 		}
 		setOpening(camera);

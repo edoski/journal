@@ -133,3 +133,13 @@ export function stepMarks(plan: SessionPlan, waits: boolean): Map<string, StepMa
 		}),
 	);
 }
+
+/** The vertical shifts worth trying inside `[least, most]`: each wanted
+ *  shift, pulled into the range when it falls outside, and evenly spaced
+ *  ones across it, least movement first. Pure. */
+export function shiftsWithin(wanted: readonly number[], [least, most]: readonly [number, number]): number[] {
+	if (least > most) return [0];
+	const across = Array.from({ length: 9 }, (_, i) => least + ((most - least) * i) / 8);
+	const all = [0, ...wanted, ...across].map((dy) => Math.round(Math.min(most, Math.max(least, dy))));
+	return [...new Set(all)].sort((a, b) => Math.abs(a) - Math.abs(b));
+}

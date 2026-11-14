@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import type { ChatRecord } from "../src/core/contracts/chat.ts";
 import { derivePlanStatusesLh } from "../src/core/contracts/plan.ts";
 import type { SessionPlan } from "../src/core/contracts/topic.ts";
-import { lessonWords, stepMarks, stepsCamera, stepsLayout, stepsShiftRange, STEP_SIZE, TAG_ROOM } from "../components/unit-inbox/topic-page/steps/steps-facts.ts";
+import { lessonWords, shiftsWithin, stepMarks, stepsCamera, stepsLayout, stepsShiftRange, STEP_SIZE, TAG_ROOM } from "../components/unit-inbox/topic-page/steps/steps-facts.ts";
 import { WHOLE_COURSE_ZOOM, type Camera, type TopicMapLayout } from "../components/course-map/topic-map/topic-map-layout.ts";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
@@ -167,5 +167,15 @@ describe("where a lesson's step map opens", () => {
 		assert.ok(least < 0 && most > 0);
 		assert.deepEqual([...clearOfFade(layout, camera, least, tall), ...clearOfFade(layout, camera, most, tall)], []);
 		assert.ok(clearOfFade(layout, camera, most + 1, tall).length > 0, "a step further down meets the fade");
+	});
+});
+
+describe("the shifts a step map tries for its line", () => {
+	it("pulls a wanted shift into the range and tries the range across, least movement first", () => {
+		assert.deepEqual(shiftsWithin([0, 300, -40], [-80, 80]), [0, -20, 20, -40, 40, -60, 60, 80, -80]);
+	});
+
+	it("stays put when the range is empty", () => {
+		assert.deepEqual(shiftsWithin([120], [10, -10]), [0]);
 	});
 });
