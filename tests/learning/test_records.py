@@ -437,6 +437,31 @@ def test_a_prediction_alone_never_teaches_marks_dates_or_moves_to_its_topic(
     assert records.load(workspace)["topics"]["diag"]["introduced"] == TODAY
 
 
+def test_a_save_whose_only_answer_on_a_taught_topic_is_a_prediction_sets_no_gap(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {**COURSE, "observations": [attempt()]})
+    prediction = attempt(text="Guess the next step", result="partial", predicted=True)
+    with pytest.raises(
+        ValueError, match=r"only answers on rank in this save are predictions"
+    ):
+        records.save(
+            workspace,
+            {"observations": [prediction], "topics": {"rank": {"gap": "Misreads it"}}},
+        )
+    records.save(
+        workspace,
+        {
+            "observations": [
+                prediction,
+                attempt(text="Checked the step", result="partial"),
+            ],
+            "topics": {"rank": {"gap": "Misreads it"}},
+        },
+    )
+    assert records.load(workspace)["topics"]["rank"]["gap"] == "Misreads it"
+
+
 def test_a_topic_taught_without_any_question_is_still_introduced(
     workspace: Workspace,
 ) -> None:
