@@ -1,6 +1,6 @@
 # Lesson composer
 
-`<LessonComposer />` (`lesson-composer.tsx`): the reading lessons' box at the bottom, lifted from T3 Code's composer (`ChatComposer.tsx`, `ComposerSurface.tsx`; MIT, notice in `T3CODE_LICENSE.txt`). `LessonSessionComposer` wraps it with its own keystroke state, as `ChatSessionComposer` wraps today's. Testids are today's (`composer`, `composer-send`, `photo-attach`, `next-problem-button`), so focus-home, the photo shortcut and the tests find it.
+`<LessonComposer />` (`lesson-composer.tsx`): the lesson's box at the bottom, lifted from T3 Code's composer (`ChatComposer.tsx`, `ComposerSurface.tsx`; MIT, notice in `T3CODE_LICENSE.txt`). `LessonSessionComposer` wraps it with its own keystroke state. Its testids (`composer`, `composer-send`, `photo-attach`, `next-problem-button`), so focus-home, the photo shortcut and the tests find it.
 
 ## Anatomy
 
@@ -13,7 +13,7 @@
 | chips `composer-chips` | `ComposerChip` | 32px pills, 13px muted, the hover fill; `pressed` reads selected |
 | send `composer-send` | `button` | 32px circle, `primary`; 40% while there is nothing to send; a square on `fill-selected` while a turn runs and the field is empty (Stop) |
 
-## Props the candidates use
+## Props
 
 | Prop | What it does |
 |---|---|

@@ -17,8 +17,8 @@ import type { DemoResult, VisualResult } from "@/src/core";
 /**
  * A tutor's figure or demo in the flow of his reply (spec: inline-figure.md):
  * at column width, no border, no caption, the app's dark colours, its height
- * its content's, and its few controls only while pointed at. The reading
- * candidates draw these in place of the visual and demo cards.
+ * its content's, and its few controls only while pointed at. The lesson
+ * draws these in place of the visual and demo cards.
  */
 
 /** The app's tokens a demo may use, handed to it as `:root` variables. */

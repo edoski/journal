@@ -10,6 +10,6 @@
 | shadow | `shadow-xs` |
 | field focused | 1px `ring` outline at 50% over the edge (`has-[textarea:focus]`) |
 
-Inside: content padding 16 (question, problem), the answer field borderless on the same surface, a toolbar row with padding 8 (controls left, the primary action right). The occupants: the composer (`composer.tsx`, variant proposed), the question dock (`question-dock.tsx`), the practice dock (`practice-dock.tsx`), the course-link banner (`course-link-banner.tsx`), the reading-thinking field.
+Inside: content padding 16 (question, problem), the answer field borderless on the same surface, a toolbar row with padding 8 (controls left, the primary action right). The occupants: the New lesson composer (`composer.tsx`) and the course-link banner (`course-link-banner.tsx`). The lesson's own composer is `lesson/lesson-composer.tsx`.
 
 Sources: T3 Code and Claude desktop composers (radius 20, muted controls inside, one primary action), research/agent-apps.md; findings 17 ("one rounded surface, 12 to 20").

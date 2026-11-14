@@ -6,8 +6,10 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { parseHTML } from "linkedom";
 import type { Root } from "react-dom/client";
-import { QuestionDock } from "../components/question-dock.tsx";
-import { formDraftText, strandedDraft } from "../components/lesson/stranded-draft.ts";
+import { StickToBottom } from "use-stick-to-bottom";
+import { ProseComposer } from "../components/lesson/prose/prose-composer.tsx";
+import { strandedDraft } from "../components/lesson/stranded-draft.ts";
+import { emptyDockSelection } from "../src/core/index.ts";
 
 const { window, document } = parseHTML("<html><body></body></html>");
 Object.assign(document, { oninput: null });
@@ -31,12 +33,9 @@ test("nothing is rescued when the dock stays, nothing was typed, or the words be
 	assert.equal(strandedDraft("q:1", null, null), null);
 });
 
-test("a form's answer, own answer and thinking join into one draft", () => {
-	assert.equal(formDraftText(["(1,1)", undefined, " because rows sum to 3 "]), "(1,1)\n\nbecause rows sum to 3");
-});
-
-test("the question dock reports what he types as he types it", async () => {
-	const seen: string[] = [];
+test("the composer answering a question reports what he types as he types it", async () => {
+	const seen: [string, string][] = [];
+	const noop = () => {};
 	const host = document.createElement("div") as unknown as HTMLElement;
 	document.body.append(host);
 	const { createRoot } = await import("react-dom/client");
@@ -44,14 +43,30 @@ test("the question dock reports what he types as he types it", async () => {
 	roots.push(root);
 	await act(async () => {
 		root.render(
-			<QuestionDock toolName="explain" toolCallId="q1" input={{ question: "Which directions stay on their line?", correctAnswer: "(1,1) and (1,-1)" } as never}
-				expanded onExpand={() => {}} onSubmit={() => {}} onDraftChange={(text: string) => seen.push(text)} />,
+			<StickToBottom>
+				<ProseComposer
+					open={{ kind: "question", key: "k1", tool: "explain", toolCallId: "q1", input: { question: "Which directions stay on their line?", correctAnswer: "(1,1) and (1,-1)", type: "check" } }}
+					answer={{ openKey: "k1", selection: emptyDockSelection(), confidence: "neutral", mode: "answer", toggle: noop, setConfidence: noop, setMode: noop }}
+					message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
+					messageText={{ read: () => "", write: noop }}
+					onAskInstead={noop}
+					toggleRef={{ current: null }}
+					busy={false}
+					compacting={false}
+					chatId="c1"
+					onSaveDraft={noop}
+					onSubmitAnswer={noop}
+					onSubmitThinking={async () => true}
+					onRequest={noop}
+					onDraftChange={(key: string, text: string) => seen.push([key, text])}
+				/>
+			</StickToBottom>,
 		);
 	});
-	const field = host.querySelector<HTMLTextAreaElement>('[data-testid="answer-field"]')!;
+	const field = host.querySelector<HTMLTextAreaElement>("textarea")!;
 	await act(async () => {
 		Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")!.set!.call(field, "(1,1) by 3");
 		field.dispatchEvent(new window.Event("input", { bubbles: true }));
 	});
-	assert.equal(seen.at(-1), "(1,1) by 3");
+	assert.deepEqual(seen.at(-1), ["q:k1", "(1,1) by 3"]);
 });

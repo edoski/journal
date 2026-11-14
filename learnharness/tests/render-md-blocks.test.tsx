@@ -15,7 +15,6 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MessageResponse } from "../components/ai-elements/message.tsx";
-import { ThinkingBlock, setAllUserThinkingOpen } from "@/components/thinking-block";
 import { MermaidOverlay, SessionMermaidContext, chartSize } from "../components/session-overlay.tsx";
 import { MarkdownCode, codeSource } from "../components/md-blocks.tsx";
 import { plainNumber } from "../components/plain-numbers.ts";
@@ -238,35 +237,6 @@ describe("md-blocks — the restored plain blockquote (owner round, 2026-10-07)"
 		assert.ok(html.includes("border-l-4"), "the left border is back");
 		assert.ok(html.includes("text-muted-foreground italic"), "muted italic — the quote register");
 		assert.ok(!html.includes("md-callout"), "a plain quote is not a callout box");
-	});
-});
-
-describe("ThinkingBlock — the learner's surface + ⌘T sync", () => {
-	it("the row is the learner's quiet surface, full width, open on arrival", () => {
-		const html = renderToStaticMarkup(<ThinkingBlock text="banded" defaultOpen />);
-		assert.ok(html.includes('data-slot="learner-note"'));
-		assert.ok(html.includes("rounded-xl bg-card"), "the card-fill surface");
-		assert.ok(html.includes("w-full"), "full width — no chat side");
-		assert.ok(!html.includes("border-l-"), "no rail");
-		assert.match(html, /aria-expanded="true"/);
-		assert.ok(html.includes("banded"), "text visible on arrival");
-	});
-
-	it("in-card rows take no surface of their own", () => {
-		const html = renderToStaticMarkup(<ThinkingBlock text="in card" inCard />);
-		assert.ok(!html.includes("bg-accent") && !html.includes("bg-card"), "transparent on the card");
-	});
-
-	it("⌘T sets every row — explicit sets stomp individual state, late mounts honor the last set", () => {
-		setAllUserThinkingOpen(false);
-		const collapsed = renderToStaticMarkup(<ThinkingBlock text="synced" defaultOpen />);
-		assert.match(collapsed, /aria-expanded="false"/);
-		assert.ok(!collapsed.includes(">synced<"), "the open default was stomped");
-		setAllUserThinkingOpen(true);
-		const reopened = renderToStaticMarkup(<ThinkingBlock text="synced" />);
-		assert.match(reopened, /aria-expanded="true"/);
-		// restore the null default for other tests in this file
-		setAllUserThinkingOpen(true);
 	});
 });
 

@@ -17,19 +17,16 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { MessageResponse } from "../components/ai-elements/message.tsx";
-import { QuestionDock } from "../components/question-dock.tsx";
 import { DispatchCard } from "../components/artifacts/dispatch-card.tsx";
 import { JobsContext } from "../components/jobs-context.ts";
 import { ChatActionsContext } from "../components/chat.tsx";
+import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
+import { LESSON_WORDS } from "../components/study-words.ts";
 import type { JobRecord } from "../src/core/contracts.ts";
 import { providerKeyMissing } from "../src/core/settings.ts";
-import { AnsweredCard } from "../components/answered-card.tsx";
 import {
 	buildAnswer,
-	dismissedAnswer,
 	normalizeOptions,
-	questionNeedsReveal,
-	type QuestionAnswerData,
 	type QuestionData,
 } from "../src/core/question-core.ts";
 
@@ -63,45 +60,6 @@ function askQD(): QuestionData {
 		createdAt: new Date().toISOString(),
 	};
 }
-
-function renderDock(props: {
-	toolName: "ask_user_question" | "explain" | "recall";
-	toolCallId: string;
-	input: never;
-	onSubmit?: () => void;
-}) {
-	// expanded=true renders the full form (the collapsed bar is covered by the
-	// QuestionDockBar test below). No scroll context needed — the DockOverlay
-	// in the chat view owns that.
-	return renderToStaticMarkup(
-		<QuestionDock {...props} expanded={true} onExpand={() => {}} onSubmit={props.onSubmit ?? (() => {})} />,
-	);
-}
-
-describe("question submission draft restoration", () => {
-	const draft = {
-		selection: { selected: new Set([0]), otherSelected: true },
-		thinking: "preserved reasoning",
-		other: "preserved custom answer",
-		text: "preserved free-text answer",
-		confidence: "confident" as const,
-	};
-
-	it("restores a free-response answer and its confidence state when its form remounts", () => {
-		const html = renderToStaticMarkup(<QuestionDock toolName="explain" toolCallId="e1" input={explainInput} expanded onExpand={() => {}} onSubmit={() => {}} initialDraft={draft} />);
-		assert.ok(html.includes("preserved free-text answer"));
-		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
-		assert.equal(doc.querySelector('[data-testid="confidence-choice"] [data-confidence="confident"]')?.getAttribute("aria-checked"), "true");
-	});
-
-	it("restores an ask's custom answer and a free-text answer", () => {
-		const custom = renderToStaticMarkup(<QuestionDock toolName="ask_user_question" toolCallId="ask1" input={{ question: "Fixture?", options: [{ label: "Listed answer" }, { label: "Another answer" }], multiSelect: true }} expanded onExpand={() => {}} onSubmit={() => {}} initialDraft={draft} />);
-		assert.ok(custom.includes('value="preserved custom answer"'));
-		assert.match(custom, /aria-checked="true" data-testid="other-option"/);
-		const text = renderToStaticMarkup(<QuestionDock toolName="ask_user_question" toolCallId="ask2" input={{ question: "Fixture?" }} expanded onExpand={() => {}} onSubmit={() => {}} initialDraft={draft} />);
-		assert.ok(text.includes("preserved free-text answer"));
-	});
-});
 
 describe("DispatchCard — the refusal tone", () => {
 	const job = (over: Partial<JobRecord>): JobRecord => ({
@@ -173,232 +131,6 @@ describe("DispatchCard — the refusal tone", () => {
 	});
 });
 
-describe("render smoke tests", () => {
-	it("explain dock renders the question, the answer field, and the three confidence states, neutral preselected", () => {
-		const html = renderDock({ toolName: "explain", toolCallId: "e1", input: explainInput as never });
-		assert.match(html, /Which planet is closest to the sun/);
-		assert.ok(html.includes('data-testid="answer-field"'), "free response is the answer field");
-		assert.match(html, /Your answer/);
-		assert.match(html, />Submit</, "send becomes Submit");
-		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
-		const group = doc.querySelector('[data-testid="confidence-choice"]');
-		assert.ok(group, "the confidence control renders under the answer box");
-		assert.equal(group.getAttribute("role"), "radiogroup");
-		assert.ok(group.closest("form")?.querySelector('[data-testid="answer-field"]'), "it lives in the answer box's submit row");
-		const choices = [...group.querySelectorAll('[role="radio"]')];
-		assert.deepEqual(choices.map((c) => c.textContent), ["Guessing", "Neutral", "Confident"]);
-		assert.deepEqual(choices.map((c) => c.getAttribute("aria-checked")), ["false", "true", "false"], "neutral is preselected");
-		assert.ok(!html.includes('type="range"'), "no slider");
-		assert.ok(!/\d+%/.test(html), "no percentage");
-		assert.ok(!html.includes("I don&#x27;t know"), "no multiple-choice 'I don't know' row");
-	});
-
-	it("the recall dock carries the same control; ask questions never do", () => {
-		const recall = renderDock({ toolName: "recall", toolCallId: "r1", input: { question: "Explain the chain rule.", correctAnswer: "Outer derivative times inner derivative." } as never });
-		assert.ok(recall.includes('data-testid="confidence-choice"'));
-		const ask = renderDock({ toolName: "ask_user_question", toolCallId: "a1", input: { question: "Where next?" } as never });
-		assert.ok(!ask.includes('data-testid="confidence-choice"'), "ask is ungraded: no confidence");
-	});
-
-	it("the explain dock never leaks the committed answer before submit", () => {
-		const html = renderDock({ toolName: "explain", toolCallId: "e1", input: explainInput as never });
-		assert.ok(!html.includes("innermost orbit"), "the commitment must not render pre-answer");
-	});
-
-	it("ask dock renders the editable Other row + thinking field, no grading affordance", () => {
-		const html = renderDock({
-			toolName: "ask_user_question",
-			toolCallId: "a1",
-			input: { question: "How confident are you?", options: [{ label: "Very" }, { label: "Somewhat" }] } as never,
-		});
-		// Other is an editable OPTION ROW — a sibling of the options, with the
-		// radio circle + an inline input; picking it never displaces thinking.
-		assert.ok(html.includes('data-testid="other-option"'), "Other is an option row");
-		assert.match(html, /Type your own answer/, "type directly into the option");
-		assert.ok(html.includes('role="radio"'), "Other row keeps the option role");
-		assert.match(html, /aria-checked="false"/, "circle starts unfilled");
-		assert.ok(html.includes('data-testid="thinking-field"'), "thinking field coexists with Other");
-		assert.match(html, /aria-label="Your thinking"/, "ask select-mode also gets the learner's voice");
-	});
-
-	it("multi-select ask renders checkbox rows and the select-all hint", () => {
-		const html = renderDock({
-			toolName: "ask_user_question",
-			toolCallId: "m1",
-			input: {
-				question: "Which topics interest you?",
-				multiSelect: true,
-				options: [{ label: "Physics" }, { label: "Philosophy" }],
-			} as never,
-		});
-		assert.match(html, /Select all that apply/);
-		assert.ok(html.includes('role="group"'), "checkbox group");
-		assert.ok((html.match(/role="checkbox"/g) ?? []).length >= 3, "options AND the Other row are checkboxes");
-		assert.ok(html.includes('data-testid="other-option"'), "Other is still an option row in multi-select");
-		// The bigger \u2713 glyph (text-base, 2026-09-24 owner round) only
-		// mounts on a CHECKED row — unreachable from the unselected static
-		// render, so it's live-verified (Playwright: 14px computed in the
-		// 16px box) instead of pinned here.
-	});
-
-	it("a malformed question input renders the quiet fallback, never a crash", () => {
-		// The seam rule (tool-parts.ts): the dock PARSES the model-authored
-		// input instead of casting it. Options the boundary healed from a
-		// JSON string render; options no heal can read render the fallback.
-		const healed = renderDock({
-			toolName: "ask_user_question",
-			toolCallId: "stringified",
-			input: { question: "q?", options: JSON.stringify([{ label: "a" }, { label: "b" }]) } as never,
-		});
-		assert.ok(!healed.includes('data-testid="malformed-question"'), "stringified options heal like the boundary");
-		const html = renderDock({
-			toolName: "ask_user_question",
-			toolCallId: "bad",
-			input: { question: "q?", options: "[{label: a" } as never,
-		});
-		assert.ok(html.includes('data-testid="malformed-question"'));
-		assert.match(html, /malformed/);
-	});
-
-	it("phase scales the thinking field: teaching invites depth, probing stays quick", () => {
-		const selectAsk = { question: "Which first?", options: [{ label: "Limits" }, { label: "Series" }] };
-		const teach = renderToStaticMarkup(
-			<QuestionDock
-				toolName="ask_user_question"
-				toolCallId="t1"
-				input={selectAsk as never}
-				expanded={true}
-				phase="teach"
-				onExpand={() => {}}
-				onSubmit={() => {}}
-			/>,
-		);
-		const field = (html: string) => parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-testid="thinking-field"]')!.classList;
-		assert.ok(field(teach).contains("min-h-20"), "teach: a generous dump area");
-		const probe = renderDock({ toolName: "ask_user_question", toolCallId: "q1", input: selectAsk as never });
-		assert.ok(!field(probe).contains("min-h-20"), "probe (default): stays compact");
-		assert.ok(field(probe).contains("min-h-12"), "probe: one quiet row");
-	});
-
-	it("text-mode asks keep Enter-to-submit and the answer label", () => {
-		const html = renderDock({
-			toolName: "ask_user_question",
-			toolCallId: "a2",
-			input: { question: "Explain the chain rule in your own words." } as never,
-		});
-		assert.ok(html.includes('data-testid="answer-field"'), "text mode is the answer field");
-		assert.match(html, /Your answer/, "labeled as the answer");
-		assert.ok(!html.includes('data-testid="thinking-field"'), "no thinking field in text mode (v1)");
-		assert.ok(!html.includes("⌘/Ctrl"), "no dump shortcut hint — Enter already submits");
-	});
-
-	it("AnsweredCard shows the explain answer's confidence as a word, never a rail or percentage", () => {
-		const answer = buildAnswer(explainQD(), { text: "Mercury, closest orbit.", confidence: "guessing" });
-		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
-		assert.equal(doc.querySelector('[data-testid="answered-confidence"]')?.textContent, "Guessing");
-		assert.ok(!html.includes("confidence-rail") && !/\d+%/.test(html));
-	});
-
-	it("AnsweredCard shows no confidence where none exists (ask, older explain records)", () => {
-		const ask = buildAnswer(askQD(), { other: "Shaky" });
-		assert.ok(!renderToStaticMarkup(<AnsweredCard answer={ask} />).includes("answered-confidence"), "ask never had one");
-		const { confidence: _none, ...older } = buildAnswer(explainQD(), { text: "x" });
-		assert.ok(!renderToStaticMarkup(<AnsweredCard answer={older} />).includes("answered-confidence"), "pre-7-Nov explain answers");
-	});
-
-	it("an old transcript's multiple-choice answer renders as a plain read-only card", () => {
-		// A persisted `quiz` answer from before multiple choice was removed:
-		// the grading, the explanation and the 0–100 confidence are ignored.
-		const legacy = {
-			kind: "quiz",
-			tool: "probe",
-			questionText: "Which planet is closest to the sun?",
-			options: [{ index: 1, label: "Venus" }, { index: 2, label: "Mercury" }],
-			answers: [{ index: 1, label: "Venus", value: "Venus" }],
-			correct: false,
-			correctIndices: [2],
-			dontKnow: false,
-			explanation: "Mercury is the innermost planet.",
-			confidence: 70,
-			answeredAt: "2026-10-01T00:00:00.000Z",
-		} as unknown as QuestionAnswerData;
-		const input = { question: "Which planet is closest to the sun?", options: [{ label: "Venus" }, { label: "Mercury" }], correctAnswer: "Mercury", explanation: "Mercury is the innermost planet." };
-		const html = renderToStaticMarkup(<AnsweredCard answer={legacy} input={input} />);
-		assert.match(html, /Which planet is closest to the sun\?/);
-		assert.match(html, /Venus/);
-		assert.match(html, /Mercury/);
-		assert.match(html, />Question</, "the plain label");
-		assert.ok(!/incorrect|70%|innermost|answered-confidence/.test(html), "no grading, explanation or percentage");
-	});
-
-	it("AnsweredCard renders the learner's own Other answer AS an option row", () => {
-		const answer = buildAnswer(askQD(), { other: "Fairly confident — but shaky on applications" });
-		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		assert.ok(html.includes('data-testid="answered-other"'), "the Other answer is an option row");
-		assert.match(html, /shaky on applications/, "the typed words render");
-		// Inside the options list — same list, not a loose quote outside it.
-		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
-		const list = doc.querySelector('[data-testid="answered-other"]')!.parentElement!;
-		assert.match(list.textContent!, /Very/, "the Other row sits with the listed options");
-		assert.ok(
-			html.indexOf("Very") < html.indexOf("answered-other"),
-			"after them",
-		);
-	});
-
-	it("AnsweredCard promotes the learner's thinking to a first-class block", () => {
-		const answer = buildAnswer(askQD(), {
-			values: ["Somewhat"],
-			thinking: "I picked Venus because it looks brightest — but now I realize brightness isn't distance.",
-		});
-		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		assert.ok(html.includes('data-testid="your-thinking"'), "the thinking row exists");
-		assert.match(html, />Your thinking</, "labeled as the learner's voice");
-		assert.ok(html.includes('data-slot="learner-note"'), "the learner's own surface");
-		// COLLAPSED ARRIVAL (owner round 2, 2026-10-05): the SSR output is the
-		// trigger row only — the thinking text is one click away, never loud.
-		assert.ok(html.includes('data-testid="your-thinking-trigger"'), "the trigger row");
-		assert.ok(html.includes('aria-expanded="false"'), "arrives collapsed");
-		assert.ok(!html.includes("brightness isn&#x27;t distance"), "the text is hidden until expanded");
-		assert.ok(!html.includes("Note:"), "no longer a muted 'Note:' footnote");
-	});
-
-	it("AnsweredCard does NOT grade ask answers", () => {
-		const qd: QuestionData = {
-			id: "a1",
-			kind: "ask",
-			question: "How confident are you?",
-			mode: "single-select",
-			options: normalizeOptions([{ label: "Very" }, { label: "Somewhat" }]),
-			createdAt: new Date().toISOString(),
-		};
-		const answer = buildAnswer(qd, { values: ["Somewhat"] });
-		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		assert.ok(!html.includes("incorrect"), "ask answers are never graded");
-		assert.match(html, /Somewhat/);
-	});
-
-	it("AnsweredCard renders dismissal as skipped, the question typeset", () => {
-		const answer = { ...buildAnswer(askQD(), {}), dismissed: true };
-		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		const card = parseHTML(`<html><body>${html}</body></html>`).document;
-		assert.equal(card.querySelector('[data-slot="lesson-card-label"]')?.textContent, "Skipped");
-		assert.match(card.body.textContent ?? "", /How confident are you\?/);
-	});
-
-	it("AnsweredCard renders a check left for tonight with its question and never its answer", () => {
-		const answer = dismissedAnswer("explain", "What is $\\lambda$ for $A = 2I$?", "tonight");
-		const input = { ...explainInput, question: "What is $\\lambda$ for $A = 2I$?", correctAnswer: "Two, the only eigenvalue." };
-		const html = renderToStaticMarkup(<AnsweredCard answer={{ ...answer, tool: "explain" }} input={input} />);
-		assert.match(html, /Left for next time/);
-		assert.ok(html.includes("katex"), "the question's math typesets");
-		assert.ok(!html.includes("\\cdots"), "the whole question, never a cut");
-		assert.ok(!html.includes("The answer"), "no answer section");
-		assert.ok(!html.includes("only eigenvalue"), "the committed answer never shows");
-	});
-});
-
 describe("math rendering (streamdown + KaTeX)", () => {
 	// Standard authoring: $...$ inline and $$ on separate lines for display.
 	// The legacy backslash reader remains for existing content.
@@ -430,211 +162,52 @@ describe("math rendering (streamdown + KaTeX)", () => {
 		assert.match(html, /\$5/);
 	});
 
-	it("explain cards render math in the question and the committed answer", () => {
+	it("a check renders math in its question, open and answered", () => {
 		const mathExplain = {
 			question: "What is $\\frac{dy}{dx}$ of $y = x^2$?",
 			correctAnswer: "The power rule gives $\\frac{dy}{dx} = 2x$.",
 		};
-		const pendingHtml = renderDock({ toolName: "recall", toolCallId: "m1", input: mathExplain as never });
-		assert.ok(pendingHtml.includes("katex"), "pending dock: question math renders");
+		const pendingHtml = renderToStaticMarkup(<ProseQuestion tool="recall" toolCallId="m1" input={mathExplain} open />);
+		assert.ok(pendingHtml.includes("katex"), "the open question: its math renders");
 		const qd: QuestionData = { ...explainQD(), question: mathExplain.question, committedAnswer: mathExplain.correctAnswer };
-		const answeredHtml = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(qd, { text: "2x" })} />);
-		assert.ok((answeredHtml.match(/class="katex"/g) ?? []).length >= 2, "answered card: question and commitment math render");
+		const answeredHtml = renderToStaticMarkup(<ProseQuestion tool="recall" toolCallId="m1" input={mathExplain} output={buildAnswer(qd, { text: "2x" })} open={false} />);
+		assert.ok(answeredHtml.includes("katex"), "the answered question: its math renders");
 	});
 });
 
-describe("teach-check reveal (W5 phase separation)", () => {
-	// The collapsed dock renders the bar AND the hidden form (it stays mounted
-	// so a half-made selection survives) — assertions target the bar species.
-	it("teach-phase check collapses into the invitation bar, not the scroll bar", () => {
-		const html = renderToStaticMarkup(
-				<QuestionDock
-					toolName="explain"
-					toolCallId="t1"
-					input={explainInput as never}
-					expanded={false}
-					reveal
-					onExpand={() => {}}
-					onSubmit={() => {}}
-				/>,
-		);
-		assert.ok(html.includes('data-testid="teach-check-reveal"'), "invitation affordance present");
-		assert.match(html, /Check your understanding/);
-		assert.match(html, /Which planet is closest/, "question teaser invites, not minimizes");
-		assert.match(html, /Open/, "a clear reveal action");
+describe("a settled question", () => {
+	it("a skipped one says so, the question typeset", () => {
+		const input = { question: "How confident are you?", options: [{ label: "Very" }, { label: "Somewhat" }] };
+		const answer = { ...buildAnswer(askQD(), {}), dismissed: true };
+		const card = parseHTML(`<html><body>${renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="a1" input={input} output={answer} open={false} />)}</body></html>`).document;
+		assert.equal(card.querySelector('[data-testid="prose-question-left"]')?.textContent, LESSON_WORDS.skippedQuestion);
+		assert.match(card.body.textContent ?? "", /How confident are you\?/);
 	});
 
-	it("probe questions keep the plain collapsed bar (no invitation copy)", () => {
-		const html = renderToStaticMarkup(
-				<QuestionDock
-					toolName="recall"
-					toolCallId="q1"
-					input={explainInput as never}
-					expanded={false}
-					onExpand={() => {}}
-					onSubmit={() => {}}
-				/>,
-		);
-		assert.ok(html.includes('data-testid="question-dock-bar"'), "the scroll-collapse strip");
-		assert.ok(!html.includes("Check your understanding"), "no invitation copy outside teach phase");
-		assert.match(html, /Answer/, "the strip keeps its Answer affordance");
-	});
-
-	it("after the reveal, the teach check renders the full form (probe default, unchanged)", () => {
-		// Post-click: expanded=true — exactly today's dock. The probe auto-open
-		// path renders the identical form; this is also the regression pin for it.
-		const html = renderDock({ toolName: "explain", toolCallId: "t1", input: explainInput as never });
-		assert.ok(html.includes('data-testid="question-dock"'), "the form is the dock's content once expanded");
-		assert.match(html, />Submit</);
+	it("his reading thoughts come before his answer, as his own bubble", () => {
+		const withReading = buildAnswer(explainQD(), { text: "Mercury", readingThinking: "was unsure mid-paragraph" });
+		const html = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="e1" input={explainInput} output={withReading} open={false} />);
+		const blockAt = html.indexOf("reading-thinking-bubble");
+		assert.ok(blockAt !== -1, "the reading thoughts render");
+		assert.ok(blockAt < html.indexOf('data-testid="prose-answer"'), "above his answer");
+		assert.ok(html.includes("was unsure mid-paragraph"));
 	});
 });
-
-// ─── probe-done card (the malformed-assessment crash) ─────────────────────
-// ─── the explain reveal (free-recall, owner 2026-09-27) ────────────────────
-
-describe("AnsweredCard: the explain variant", () => {
-	const explainQD = (): QuestionData => ({
-		id: "e1",
-		kind: "explain",
-		question: "Explain why the null result matters.",
-		mode: "text",
-		options: [],
-		committedAnswer: "It ruled out the luminiferous aether — a stationary aether predicts a fringe shift, and none was seen.",
-		createdAt: new Date().toISOString(),
-	});
-
-	it("reveals the single committed answer (reasoning inside it) with NO verdict chips", () => {
-		const html = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(explainQD(), { text: "Something about relativity?" })} />);
-		assert.match(html, /Explain/, "labeled as the explain kind");
-		assert.match(html, />The answer</);
-		assert.match(html, /luminiferous aether/);
-		assert.match(html, /fringe shift/);
-		assert.ok(!html.includes("Why:"), "no separate explanation field — one committed answer (owner 2026-09-27)");
-		assert.ok(!html.includes("incorrect") && !html.includes("correct</"), "no client grading");
-	});
-
-	it("renders his free text as the answer", () => {
-		const html = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(explainQD(), { text: "Something about relativity?" })} />);
-		assert.match(html, /Something about relativity\?/);
-	});
-
-});
-
-// ─── probe-phase naming (owner, 2026-10-09): the probe/recall rename —
-//     both surfaces carry the tool's OWN name ────────────────────────────
-
-describe("probe-phase naming: Recall labels", () => {
-
-	it("the collapsed dock labels a recall question as Recall", () => {
-		const html = renderToStaticMarkup(
-			<QuestionDock toolName="recall" toolCallId="r1" input={{ question: "Explain the chain rule.", correctAnswer: "Outer function times the derivative of the inner." } as never}
-				expanded={false} onExpand={() => {}} onSubmit={() => {}} />,
-		);
-		const bar = parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-testid="question-dock-bar"]')!;
-		assert.equal(bar.firstElementChild!.textContent, "Recall");
-		assert.ok(!html.includes(">Explain<"), "not the teach label");
-	});
-
-	it("an answered recall labels Recall", () => {
-		const recallQD: QuestionData = {
-			id: "r2",
-			kind: "explain",
-			question: "Explain why the null result matters.",
-			mode: "text",
-			options: [],
-			committedAnswer: "It ruled out the luminiferous aether.",
-			createdAt: new Date().toISOString(),
-		};
-		const html = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(recallQD, { text: "A hand-wave." }, "recall")} />);
-		assert.match(html, /Recall/);
-		assert.ok(!html.includes(">Explain<"), "not the teach label");
-	});
-
-	it("old records (no tool) keep the kind labels", () => {
-		const oldQD: QuestionData = {
-			id: "o2",
-			kind: "explain",
-			question: "Explain why the null result matters.",
-			mode: "text",
-			options: [],
-			committedAnswer: "It ruled out the luminiferous aether.",
-			createdAt: new Date().toISOString(),
-		};
-		const html = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(oldQD, { text: "A hand-wave." })} />);
-		assert.match(html, /Explain/, "no tool field → the standing kind label");
-	});
-});
-
-// ─── the two roles in the UI (predict vs check, owner 2026-10-03) ─────────
-// Predictions arrive OPEN before the teaching; checks arrive collapsed after
-// it.
-describe("predict vs check rendering", () => {
-	it("a collapsed predict explain renders the 'Prediction' chip", () => {
-		const html = renderToStaticMarkup(
-			<QuestionDock
-				toolName="explain"
-				toolCallId="call-p1"
-				input={{ ...explainInput, type: "predict" } as never}
-				expanded={false}
-				onExpand={() => {}}
-				onSubmit={() => {}}
-			/>,
-		);
-		assert.ok(html.includes("Prediction"), `chip missing: ${html.slice(0, 200)}`);
-	});
-
-	it("a collapsed check reads 'Check'", () => {
-		const html = renderToStaticMarkup(
-			<QuestionDock toolName="explain" toolCallId="call-c1" input={explainInput as never}
-				expanded={false} onExpand={() => {}} onSubmit={() => {}} />,
-		);
-		const bar = parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-testid="question-dock-bar"]')!;
-		assert.equal(bar.firstElementChild!.textContent, "Check");
-	});
-
-	it("the reading-thinking channel is LIFTED above the card as its own user-side block", () => {
-		const withReading = buildAnswer(explainQD(), {
-			text: "Mercury",
-			thinking: "answering thought",
-			readingThinking: "was unsure mid-paragraph",
-		});
-		const html = renderToStaticMarkup(<AnsweredCard answer={withReading} />);
-		// The unified ThinkingBlock (owner round, 2026-10-05; round two
-		// 2026-10-07): the reading thoughts render BEFORE the card as the
-		// learner's own row, arriving EXPANDED (clearly sent).
-		const blockAt = html.indexOf("reading-thinking-block");
-		const cardAt = html.indexOf("answered-card");
-		assert.ok(blockAt !== -1, "the lifted block renders");
-		assert.ok(blockAt < cardAt, "it sits ABOVE the answered card");
-		assert.ok(html.includes(">Your thinking<"), "the plain label");
-		assert.ok(!html.includes("Your thinking while reading"), "the old verbose label is gone");
-		assert.ok(!html.includes("your-reading-thinking"), "the in-card inset is gone");
-		// EXPANDED ARRIVAL (owner round two, 2026-10-07): transcript rows
-		// render their text; the in-card answer thinking stays collapsed.
-		assert.ok(html.includes('data-testid="your-thinking-trigger"'), "the answer thinking stays inside the card");
-		assert.ok(html.includes("was unsure mid-paragraph"), "the lifted row arrives expanded");
-		assert.ok(!html.includes("answering thought"), "the in-card row stays collapsed");
-		const legacy = { ...buildAnswer(explainQD(), { text: "Mercury" }), note: "a 2026-09 answer" };
-		const legacyHtml = renderToStaticMarkup(<AnsweredCard answer={legacy} />);
-		assert.ok(legacyHtml.includes("a 2026-09 answer") || legacyHtml.includes('data-testid="your-thinking-trigger"'), "records from before the rename still render");
-	});
-});
-
-// ─── details + option descriptions render as markdown (owner, 2026-10-12) ──
 
 describe("question context renders as markdown everywhere (owner, 2026-10-12)", () => {
-	it("pending dock: ask option descriptions render LaTeX, not plain text", () => {
-		const html = renderDock({
-			toolName: "ask_user_question",
-			toolCallId: "d1",
-			input: {
+	it("an open question: ask option descriptions render LaTeX, not plain text", () => {
+		const html = renderToStaticMarkup(<ProseQuestion
+			tool="ask_user_question"
+			toolCallId="d1"
+			open
+			input={{
 				question: "Which tool?",
 				options: [
 					{ label: "Pencil", description: "Wood around $\\text{Pb}_x\\text{C}$ graphite — the classic $x^2$ choice." },
 					{ label: "Pen" },
 				],
-			} as never,
-		});
+			}}
+		/>);
 		// The description rides the same MessageResponse path as the label:
 		// KaTeX spans render inside the option subtext.
 		const katexCount = (html.match(/class="katex"/g) ?? []).length;
@@ -642,7 +215,7 @@ describe("question context renders as markdown everywhere (owner, 2026-10-12)", 
 		assert.ok(!html.includes("$\\text"), "raw dollar delimiters do not leak as visible text");
 	});
 
-	it("settled ask card keeps the details line and option descriptions — retroactively from the persisted call", () => {
+	it("a settled ask keeps the details line and option descriptions — retroactively from the persisted call", () => {
 		const input = {
 			question: "Which destination?",
 			details: "Inline $a^2+b^2=c^2$ and display:\n$$\nE = mc^2\n$$",
@@ -660,18 +233,11 @@ describe("question context renders as markdown everywhere (owner, 2026-10-12)", 
 			createdAt: new Date().toISOString(),
 		};
 		const answer = buildAnswer(qd, { values: ["Classical"] });
-		const html = renderToStaticMarkup(<AnsweredCard answer={answer} input={input} />);
+		const html = renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="d2" input={input} output={answer} open={false} />);
 		const katexCount = (html.match(/class="katex"/g) ?? []).length;
 		assert.ok(katexCount >= 3, `details (inline+display) + description math render (got ${katexCount})`);
 		assert.match(html, /Entropy/, "the option description text is present");
 		assert.ok(html.includes("katex-display"), "display math in the details line renders");
 	});
 
-	it("legacy settled records (no input prop) render exactly as before", () => {
-		const answer = buildAnswer(askQD(), { values: ["Very"] });
-		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		assert.match(html, /Very/, "the card renders");
-		assert.equal((html.match(/class="katex"/g) ?? []).length, 0, "no context slot appears from nothing");
-		assert.ok(!html.includes("lh-prose block text-xs"), "no description slot without an ask input");
-	});
 });

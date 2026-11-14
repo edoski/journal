@@ -4,10 +4,21 @@ import { BookOpenIcon, EyeIcon, FlagIcon, LightbulbIcon, MapIcon, type LucideIco
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
 import { MARK_WORDS, LESSON_WORDS } from "@/components/study-words";
-import type { DisputeDetails, PracticeRequest, PracticeRequestDetails } from "@/src/core";
-import type { PracticeThinkingData } from "@/components/practice-cards";
+import type { Confidence, DisputeDetails, Photo, PracticeRequest, PracticeRequestDetails } from "@/src/core";
 import { BubbleMark, LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 import { Disclosure, YourTurn } from "@/components/lesson/prose/prose-question";
+
+/** The practice-thinking marker's details (native-messages.ts). */
+export interface PracticeThinkingData {
+	problemCallId: string;
+	/** Legacy records (pre 2026-10-05) carry the old two-lane flag; ignored. */
+	commit?: boolean;
+	text: string;
+	/** Absent on submissions recorded before 7 Nov 2026. */
+	confidence?: Confidence;
+	/** Photos of his working (the marker's images, joined by the view). */
+	photos?: Photo[];
+}
 
 /** A posed problem in the tutor's message (spec: prose.md): its statement
  *  as prose, under "Your turn" while it is the one he works on. The

@@ -1,6 +1,6 @@
 # Mark line
 
-`<MarkLine answerId />` (`mark-line.tsx`): how the record marked an answer, as one 13px line under his answer, for the reading candidates. `data-slot="mark-line"`, 32px tall.
+`<MarkLine answerId />` (`mark-line.tsx`): how the record marked an answer, as one 13px line under his answer. `data-slot="mark-line"`, 32px tall.
 
 | Part | Treatment |
 |---|---|

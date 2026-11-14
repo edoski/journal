@@ -25,7 +25,9 @@ const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
 const { carriedForm, forgetClosedBoxes, formToKept, keepWords, keptWords } = await import("../components/lesson/kept-drafts.ts");
-const { QuestionDock } = await import("../components/question-dock.tsx");
+const { ProseComposer } = await import("../components/lesson/prose/prose-composer.tsx");
+const { StickToBottom } = await import("use-stick-to-bottom");
+const { emptyDockSelection } = await import("../src/core/index.ts");
 
 beforeEach(() => storage.clear());
 
@@ -64,21 +66,45 @@ describe("carriedForm", () => {
 	});
 });
 
-const check = (question: string) => ({ question, correctAnswer: "hidden", type: "check" }) as never;
+const noop = () => {};
+const check = { question: "Why?", correctAnswer: "hidden", type: "check" };
 
-async function mount(props: Record<string, unknown>) {
+/** The Prose composer answering the check `key`, kept in box `c1:q:<key>`. */
+async function mount(key: string, carryScope?: string) {
 	const host = document.createElement("div");
 	document.body.append(host);
 	const root = createRoot(host);
-	await act(async () => root.render(<QuestionDock toolName="explain" toolCallId="q2" input={check("Why?")} expanded onExpand={() => {}} onSubmit={() => {}} {...props} />));
-	return { host, done: async () => { await act(async () => root.unmount()); host.remove(); } };
+	const answer = { openKey: key, selection: emptyDockSelection(), confidence: "neutral" as const, mode: "answer" as const, toggle: noop, setConfidence: noop, setMode: noop };
+	await act(async () => root.render(
+		<StickToBottom>
+			<ProseComposer
+				open={{ kind: "question", key, tool: "explain", toolCallId: "q2", input: check }}
+				answer={answer}
+				message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
+				messageText={{ read: () => "", write: noop }}
+				onAskInstead={noop}
+				toggleRef={{ current: null }}
+				busy={false}
+				compacting={false}
+				chatId="c1"
+				carryScope={carryScope}
+				onSaveDraft={noop}
+				onSubmitAnswer={noop}
+				onSubmitThinking={async () => true}
+				onRequest={noop}
+				onDraftChange={noop}
+			/>
+		</StickToBottom>,
+	));
+	const field = () => host.querySelector<HTMLTextAreaElement>("textarea")!;
+	return { field, done: async () => { await act(async () => root.unmount()); host.remove(); } };
 }
 
 test("a check asked again after Hint opens with the work he had typed, and takes it once", async () => {
 	keepWords("carry:la", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "Av = λv gives (A − λI)v = 0", confidence: "neutral" }) });
-	const { host, done } = await mount({ keepAs: "c1:q:new", carryAs: "carry:la" });
+	const { field, done } = await mount("new", "carry:la");
 	try {
-		assert.equal(host.querySelector<HTMLTextAreaElement>('[data-testid="answer-field"]')!.value, "Av = λv gives (A − λI)v = 0");
+		assert.equal(field().value, "Av = λv gives (A − λI)v = 0");
 		assert.equal(keptWords("carry:la"), undefined, "the carry is taken once");
 		assert.equal(keptWords("c1:q:new")?.form?.text, "Av = λv gives (A − λI)v = 0", "and now kept in its own box");
 	} finally {
@@ -88,9 +114,9 @@ test("a check asked again after Hint opens with the work he had typed, and takes
 
 test("after a reload a check opens with what he typed in it", async () => {
 	keepWords("c1:q:k", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "the trace check", confidence: "guessing" }) });
-	const { host, done } = await mount({ keepAs: "c1:q:k" });
+	const { field, done } = await mount("k");
 	try {
-		assert.equal(host.querySelector<HTMLTextAreaElement>('[data-testid="answer-field"]')!.value, "the trace check");
+		assert.equal(field().value, "the trace check");
 	} finally {
 		await done();
 	}

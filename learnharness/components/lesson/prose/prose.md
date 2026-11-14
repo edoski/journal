@@ -1,6 +1,6 @@
 # Prose lesson
 
-The `lesson=prose` candidate (`lesson-variant.ts`). **Thesis:** the tutor asks in its own words, and the one composer becomes the answer field until he answers. No dock, no record cards: the lesson is prose, his bubbles and one mark line. Source: `research-ui.md` direction A and its inventory (14 Nov 2026).
+The lesson screen, picked by Edo over Current and Slot on 14 Nov 2026. **Thesis:** the tutor asks in its own words, and the one composer becomes the answer field until he answers. No dock, no record cards: the lesson is prose, his bubbles and one mark line. Source: `research-ui.md` direction A and its inventory (14 Nov 2026).
 
 ## Files
 
@@ -13,7 +13,7 @@ The `lesson=prose` candidate (`lesson-variant.ts`). **Thesis:** the tutor asks i
 | `prose-answer.tsx` | the open item's picks, confidence and mode, shared by the option rows and the composer |
 | `prose-question-data.ts` | pure: what a question asks, the placeholder, readiness, the answer his field and picks make, digit keys |
 
-`chat.tsx` branches on `prose` where a part is drawn and passes the composer to the dock shell with no question or problem, so no dock ever opens.
+`chat.tsx` draws each part through these and puts the composer at the foot of the column (`DockOverlay`).
 
 ## Moments
 
@@ -30,7 +30,7 @@ The `lesson=prose` candidate (`lesson-variant.ts`). **Thesis:** the tutor asks i
 
 ## Keys
 
-Enter or Send answers; ⇧Enter is a newline. 1 to 9 pick a choice from anywhere but a field holding words. Esc turns the composer between answering and asking. ⌘⇧H, ⌘⇧S, ⌘⇧E are Hint, Show me, Explain instead; ⌥↑ ⌥↓ move confidence, as does a press on its chip; ⌘⇧P attaches a photo; ⌘⇧D is Done for today; ⌘⇧M disputes the newest mark. The cheat sheet lists the digits and Esc only in this lesson (`lessons` on the key action).
+Enter or Send answers; ⇧Enter is a newline. 1 to 9 pick a choice from anywhere but a field holding words. Esc turns the composer between answering and asking. ⌘⇧H, ⌘⇧S, ⌘⇧E are Hint, Show me, Explain instead; ⌥↑ ⌥↓ move confidence, as does a press on its chip; ⌘⇧P attaches a photo; ⌘⇧D is Done for today; ⌘⇧M disputes the newest mark. The cheat sheet lists the digits and Esc under Question.
 
 ## Kept
 
