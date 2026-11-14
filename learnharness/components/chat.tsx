@@ -1517,7 +1517,11 @@ export function Chat({
 										<LearnerBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} photos={m.parts.filter((p) => p.type === "photos").flatMap((p) => p.data as Photo[])} />
 									) : (
 									<Message from="assistant" className="max-w-full">
-									<MessageContent className="w-full">
+									{/* Visible overflow: a quiet row's hover fill reaches past the
+									    text's edge (choice rows, disclosures), and the clip cut its
+									    rounded corners square. Wide math and tables scroll in their
+									    own boxes. */}
+									<MessageContent className="w-full overflow-visible">
 											{m.parts.map((part, pi) => {
 												// Where a plan step was first taught (roadmap-facts.ts):
 												// the roadmap's step opens the transcript here.
