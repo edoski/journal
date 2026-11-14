@@ -1013,4 +1013,14 @@ export class SessionModel {
 	clearError(): void {
 		this.setError(null);
 	}
+
+	/** The app came back after a restart cut the turn this view was reading.
+	 *  A dropped connection is no failure of the tutor's, so the record alone
+	 *  decides what is owed next, as when the lesson opens. */
+	recoverDroppedStream(): void {
+		if (this.statusValue !== "error" || this.errorValue?.message !== STREAM_DROPPED) return;
+		this.automaticContinuationBlocked = false;
+		this.setError(null);
+		this.setStatus("ready");
+	}
 }

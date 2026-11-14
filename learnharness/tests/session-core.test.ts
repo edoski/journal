@@ -919,6 +919,39 @@ describe("automatic continuation after recovery failure", () => {
 		await m.continueIfOwed(answered);
 		assert.equal(posts, 1);
 	});
+
+	/** Round 6, report 6 major 1: the app restarts while the tutor reads his
+	 *  answer, and the open window's stream drops twice. */
+	function droppedByRestart(bodies: string[]): SessionModel {
+		const partialReply = () => sseResponse({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "partial" }] } });
+		return model({ initialMessages: [question], fetch: async (url, init) => {
+			if (String(url) === "/api/chat") { bodies.push(String(init?.body)); return Response.json({ ok: true }); }
+			if (String(url).endsWith("/stream")) return bodies.length > 1 ? sseResponse("[DONE]") : partialReply();
+			return Response.json({ messages: answered });
+		} });
+	}
+
+	it("a window whose stream the app's restart dropped gets the reply its answer is owed once the app is back", async () => {
+		const bodies: string[] = [];
+		const m = droppedByRestart(bodies);
+		await m.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
+		m.recoverDroppedStream();
+		m.setMessages(answered);
+		await m.continueIfOwed(answered);
+		assert.equal(bodies.length, 2, "the answer, then one continue");
+		assert.equal(JSON.parse(bodies[1]!).input.type, "continue");
+		assert.equal(m.getState().error, null);
+	});
+
+	it("only a dropped stream recovers so: a failed reply still waits for him", async () => {
+		const bodies: string[] = [];
+		const m = model({ initialMessages: answered, initialError: "The reply could not be saved.", fetch: dietFetch({ onPost: (body) => bodies.push(body), stream: () => sseResponse("[DONE]") }) });
+		m.recoverDroppedStream();
+		await m.continueIfOwed(answered);
+		assert.equal(bodies.length, 0);
+		assert.equal(m.getState().error?.message, "The reply could not be saved.");
+	});
 });
 
 // ─── failed answer submissions (no replay without canonical reconciliation) ──
