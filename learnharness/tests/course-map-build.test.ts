@@ -180,7 +180,7 @@ after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 function memoryLedgers(): CourseMapLedgers & { all: Map<string, CourseMapLedger> } {
 	const all = new Map<string, CourseMapLedger>();
-	return { all, get: (w) => all.get(w), save: (w, l) => void all.set(w, structuredClone(l)), workspaces: () => [...all.keys()] };
+	return { all, get: (w) => all.get(w), save: (w, l) => void all.set(w, structuredClone(l)), workspaces: () => [...all.keys()], forget: (w) => void all.delete(w) };
 }
 
 /** Resolves once `done` holds after a build ends: the builder's own signal, not a clock. */

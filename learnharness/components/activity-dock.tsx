@@ -353,7 +353,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
  *  background run is a finished lesson's digest or a course's map being
  *  built from its material. */
 function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "extraction") return blob.phase === "mapping" ? "Building the course map" : "Digesting lesson";
+	if (blob.process === "extraction") return blob.phase === "mapping" ? "Mapping course" : "Digesting lesson";
 	switch (blob.jobKind) {
 		case "research":
 			return "Researcher";

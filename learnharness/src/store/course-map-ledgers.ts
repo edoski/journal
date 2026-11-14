@@ -37,4 +37,10 @@ export const courseMapLedgers: CourseMapLedgers = {
 		fs.mkdirSync(path.dirname(FILE()), { recursive: true });
 		writeFileAtomicSync(FILE(), JSON.stringify(all, null, "\t"), { allowInPlaceFallback: true });
 	},
+	forget(workspace) {
+		const all = readAll();
+		if (!(workspace in all)) return;
+		delete all[workspace];
+		writeFileAtomicSync(FILE(), JSON.stringify(all, null, "\t"), { allowInPlaceFallback: true });
+	},
 };

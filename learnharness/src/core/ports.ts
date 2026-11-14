@@ -121,6 +121,9 @@ export interface CourseMapLedgers {
 	save(workspace: string, ledger: CourseMapLedger): void;
 	/** Every course that has a ledger. */
 	workspaces(): string[];
+	/** Drop a deleted course's ledger, so a course made again in its folder
+	 *  has its material read afresh. */
+	forget(workspace: string): void;
 }
 
 // ─── CourseRecords — the learning engine's course records ───────────────────

@@ -257,11 +257,14 @@ describe("rename and delete a course", () => {
 	});
 
 	it("DELETE has the engine forget the course record; it leaves the list and its folder stays", async () => {
+		const { stores } = await import("../src/server/stores.ts");
+		stores.courseMapLedgers.save(RUST, { done: [{ fingerprint: "f", files: ["notes.md"], at: "2026-11-08T10:00:00Z" }] } as never);
 		const res = await deleteCourseRoute(send("DELETE", { workspace: RUST }));
 		assert.equal(res.status, 200, await res.clone().text());
 		assert.deepEqual(engineCalls().filter((c) => c.args[1] === RUST).at(-1)!.args.slice(2), ["forget", "--course"]);
 		assert.ok(!(await listed()).some((c) => c.workspace === RUST));
 		assert.ok(fs.existsSync(RUST));
+		assert.equal(stores.courseMapLedgers.get(RUST), undefined, "a course made again in this folder reads its material afresh");
 		const again = await deleteCourseRoute(send("DELETE", { workspace: RUST }));
 		assert.equal(again.status, 404);
 	});

@@ -231,7 +231,7 @@ describe("activity section render", () => {
 		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g)?.length, 2, "elapsed on every row");
 		assert.equal(html.match(/data-testid="activity-abort"/g)?.length, 2, "END on every row's face, detail-independent");
 		assert.match(html, /aria-label="End Demo builder in Chain-rule demo"/, "the stop button names what it stops");
-		assert.match(html, /aria-label="End Building the course map in Mapping Algebra"/);
+		assert.match(html, /aria-label="End Mapping course in Mapping Algebra"/);
 		assert.match(html, /Background agents/);
 		assert.doesNotMatch(html, /building sandbox…/, "what it is doing waits in the detail");
 

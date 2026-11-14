@@ -212,6 +212,7 @@ export async function deleteCourse(workspace: string): Promise<CourseChange> {
 	if (!found.ok) return found;
 	const forgotten = await stores.courseRecords.run(workspace, { verb: "forget-course" });
 	if (!forgotten.ok) return engineFailure("delete", forgotten.message);
+	stores.courseMapLedgers.forget(workspace);
 	emit("courses-changed", {});
 	return { ok: true };
 }
