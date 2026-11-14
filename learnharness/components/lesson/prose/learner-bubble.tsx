@@ -28,8 +28,8 @@ export function LearnerBubble({
 	icon?: LucideIcon;
 	label?: string;
 	testId?: string;
-	/** The answer whose mark goes on one line under the bubble, its words
-	 *  starting where his do. */
+	/** The answer whose mark goes on one line under the bubble, its facts
+	 *  ending where his words do. */
 	markId?: string;
 	children?: ReactNode;
 	className?: string;
@@ -51,21 +51,17 @@ export function LearnerBubble({
 	return (
 		<div className="my-1 ms-auto flex w-fit max-w-[80%] min-w-0 flex-col">
 			{bubble}
-			{markId && <MarkLine answerId={markId} className={MARK_UNDER_BUBBLE} />}
+			{markId && <MarkLine answerId={markId} />}
 		</div>
 	);
 }
-
-/** The mark reads as his bubble's footnote: its facts end where his words
- *  do, and Dispute shows before them while the line is pointed at. */
-const MARK_UNDER_BUBBLE = "flex-row-reverse pe-4";
 
 /** The record's mark for a problem, where the problem ended: under the
  *  bubble that ended it, on the right. */
 export function BubbleMark({ answerId }: { answerId: string }) {
 	return (
 		<div className="ms-auto w-fit max-w-[80%]">
-			<MarkLine answerId={answerId} className={MARK_UNDER_BUBBLE} />
+			<MarkLine answerId={answerId} />
 		</div>
 	);
 }
