@@ -24,6 +24,11 @@ import { NowCard } from "../components/unit-inbox/now-card.tsx";
 import { topicUnit, unitFor } from "../components/unit-inbox/now-inbox.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
 import { TopicCard } from "../components/unit-inbox/unit-row.tsx";
+import { arcHref, courseHref } from "../components/unit-inbox/unit-href.ts";
+import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
+import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
+import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
+import { SectionsPane } from "../components/unit-inbox/topic-page/pickup/sections.tsx";
 import { chat, LINALG, LINALG_ARCS, TODAY } from "./fixtures/now-demo.ts";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
@@ -103,5 +108,47 @@ describe("the sidebar's cards", () => {
 		assert.equal(unitFor(LINALG, rank, []).arc, null);
 		const doc = render(<TopicCard unit={unit} today={TODAY} active={false} />);
 		assert.equal(doc.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra · Linear systems");
+	});
+});
+
+describe("the topic page", () => {
+	const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
+
+	it("links the course and the arc in its head, the arc to its place on the course page", () => {
+		const facts = topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null });
+		assert.deepEqual(facts.arc, { handle: "systems", title: "Linear systems" });
+		const doc = render(<TopicHead facts={facts} />);
+		assert.equal(doc.querySelector('[data-slot="topic-course-link"]')?.getAttribute("href"), courseHref("/s/linalg"));
+		const link = doc.querySelector('[data-slot="topic-arc-link"]')!;
+		assert.equal(link.textContent, "Linear systems");
+		assert.equal(link.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
+		assert.equal(arcHref("/s/linalg", "systems"), link.getAttribute("href"));
+	});
+
+	it("has only the course link without arcs", () => {
+		const facts = topicFacts({ course: LINALG, topic: rank, chats: [], read: null });
+		assert.equal(facts.arc, null);
+		const doc = render(<TopicHead facts={facts} />);
+		assert.equal(doc.querySelector('[data-slot="topic-arc-link"]'), null);
+		assert.equal(doc.querySelector('[data-slot="page-eyebrow"]')?.textContent, "Linear Algebra");
+	});
+
+	it("says why a topic not started comes when it does, under its planned first lesson", () => {
+		const startsWhy: StartsWhy = { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] };
+		const diag = { ...LINALG_ARCS.map.topics.find((t) => t.handle === "diag")!, starts: "2026-11-11", startsWhy };
+		const course = { ...LINALG_ARCS, map: { ...LINALG_ARCS.map, topics: LINALG_ARCS.map.topics.map((t) => (t.handle === "diag" ? diag : t)) } };
+		const facts = topicFacts({ course, topic: diag, chats: [], read: null });
+		assert.deepEqual(facts.startsWhy, { kind: "after", words: "After Eigenvalues and eigenvectors, which it needs" });
+		const { now } = pickupSections(facts);
+		assert.deepEqual([now.kind, now.note, now.why], ["start", "Planned Wed 11 Nov", facts.startsWhy]);
+		const doc = render(<SectionsPane facts={facts} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
+		const line = doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]')!;
+		assert.equal(line.textContent, "After Eigenvalues and eigenvectors, which it needs");
+		assert.equal(line.getAttribute("data-kind"), "after");
+		const withSession = topicFacts({ course, topic: diag, chats: [chat("d", { topics: ["diag"], pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })], read: null });
+		assert.deepEqual(pickupSections(withSession).scheduled?.why, facts.startsWhy, "Scheduled's first lesson says it too, when Now does not start it");
+		const plain = topicFacts({ course: { ...LINALG, map: { ...LINALG.map, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? diag : t)) } }, topic: diag, chats: [], read: null });
+		assert.equal(plain.startsWhy, null, "a course without arcs says what it said before");
+		assert.equal(pickupSections(plain).now.why, null);
 	});
 });

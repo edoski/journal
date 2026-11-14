@@ -25,3 +25,9 @@ export function unitHref(workspace: string, handle: string): string {
 export function courseHref(workspace: string): string {
 	return `/unit/${courseSegment(workspace)}`;
 }
+
+/** An arc's place on its course page: `/unit/<course>?arc=<handle>`,
+ *  which opens the page with that arc unfolded. */
+export function arcHref(workspace: string, arc: string): string {
+	return `${courseHref(workspace)}?arc=${encodeURIComponent(arc)}`;
+}

@@ -13,7 +13,8 @@ import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { HAIRLINE, ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
-import type { BuildsOn, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import type { BuildsOn, StartsReason, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { STARTS_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import type { TopicRef } from "@/src/core";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
@@ -191,18 +192,32 @@ export function MaterialList({ refs }: { refs: readonly TopicRef[] }) {
 	);
 }
 
+/** Why the plan starts a topic not started when it does, as Home's rows
+ *  say it: its icon and the whole sentence, 12 muted, wrapping rather than
+ *  cut. */
+export function StartsWhyLine({ why, className }: { why: StartsReason; className?: string }) {
+	const Icon = STARTS_ICON[why.kind];
+	return (
+		<span data-slot="topic-starts-why" data-kind={why.kind} className={cn("flex items-start gap-1.5 text-label text-muted-foreground", className)}>
+			<Icon aria-hidden className="mt-0.5 size-3 shrink-0" />
+			<MathText>{why.words}</MathText>
+		</span>
+	);
+}
+
 /** Scheduled: the engine's next review or a topic's first lesson, why it
- *  waits when something comes first, and its day in the date column. A
- *  date, not a control. */
-export function ScheduledEntry({ kind, day, waits }: { kind: "review" | "start"; day: string; waits: string | null }) {
+ *  waits when something comes first, and its day in the date column; a
+ *  first lesson also says why it comes then. A date, not a control. */
+export function ScheduledEntry({ kind, day, waits, why }: { kind: "review" | "start"; day: string; waits: string | null; why?: StartsReason | null }) {
 	const Icon = kind === "review" ? HistoryIcon : BookOpenIcon;
 	return (
-		<p data-slot="pickup-scheduled" data-kind={kind} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", waits && "py-2")}>
+		<p data-slot="pickup-scheduled" data-kind={kind} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", (waits || why) && "py-2")}>
 			<Icon aria-hidden className={ICON} />
 			<span className="truncate text-row text-muted-foreground">{kind === "review" ? "Review" : FIRST_LESSON}</span>
 			<span data-slot="topic-history-date" className="text-label text-muted-foreground tabular-nums">
 				{day}
 			</span>
+			{why && <StartsWhyLine why={why} className="col-span-2 col-start-2" />}
 			{waits && (
 				<span data-slot="pickup-scheduled-waits" className="col-span-2 col-start-2 text-label text-muted-foreground">
 					{waits}
@@ -264,6 +279,7 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 					<MathText>{now.note}</MathText>
 				</span>
 			)}
+			{now.why && <StartsWhyLine why={now.why} className="col-start-2" />}
 			{now.chat && facts.sessions.some((entry) => entry.chat.id === now.chat && entry.plan?.tree.nodes.length) && (
 				<MapToggle chat={now.chat} shown={onMap} onShow={onShow} className="col-start-3 self-end justify-self-end" />
 			)}
