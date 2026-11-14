@@ -158,6 +158,23 @@ export function planMapTooBig(tree: Pick<PlanTree, "nodes" | "edges">): string |
 	);
 }
 
+/** A relation between two things, in plain text or TeX: a title holding
+ *  one states a result rather than naming an idea. */
+const RELATION = /[=≠≈≡∼≃≅∝→↦⇒⟹⇔⟺≤≥<>∈⊂⊆~]|->|\\(?:to|rightarrow|Rightarrow|longrightarrow|Longrightarrow|implies|iff|Leftrightarrow|mapsto|leq?|geq?|neq?|approx|sim|simeq|cong|equiv|propto|in|subset|subseteq|lt|gt)(?![A-Za-z])/;
+
+/** The roadmap shows every title before its step is taught, so a title that
+ *  states its step's result shows him the answer to the question on screen.
+ *  Returns words the tutor can act on, or null when every title names an idea. */
+export function planTitlesGiveAway(tree: Pick<PlanTree, "nodes">): string | null {
+	const spoilers = tree.nodes.filter((n) => RELATION.test(n.title)).map((n) => JSON.stringify(n.title));
+	if (spoilers.length === 0) return null;
+	return (
+		`These titles state their step's result: ${spoilers.join(", ")}. ` +
+		"He sees every title before the step is taught, so a title names what the step teaches, never its result or formula: " +
+		"\"The no-event case\", not \"P(no event) = e^{-λ}\"."
+	);
+}
+
 // The per-node mutation ops (addNode/updateNode/removeNode/addEdge/removeEdge/
 // setCurrent/markDone) were deleted with the author-once protocol
 // (2026-09-03) and their dead exports removed with the 2026-09-11 pivot: the
