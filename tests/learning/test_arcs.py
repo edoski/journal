@@ -1200,6 +1200,93 @@ def test_migrating_down_strips_every_arc_field_and_keeps_every_other_save(
     assert json.loads(backup.read_text()) == up
 
 
+# Schema 6's fields, frozen from the engine at 43d4b64c: what --to 6 may write.
+V6_FIELDS = {
+    "record": (
+        *("schema", "title", "goal", "exam", "journal", "sources", "topics"),
+        *("observations", "knowledge", "tasks", "focus", "path", "preferences"),
+        *("next_observation", "revision", "updated_at"),
+    ),
+    "exam": (
+        *("date", "format", "coverage", "criteria", "constraints", "unknowns"),
+        "refs",
+    ),
+    "source": ("path", "title"),
+    "topic": (
+        *("title", "needs", "contrasts", "refs", "aliases", "introduced", "gap"),
+        *("note", "review", "excluded"),
+    ),
+    "review": ("due", "prompt", "points"),
+    "observation": (
+        *("kind", "topics", "text", "response", "help", "result", "sure", "chose"),
+        *("transfer", "shown", "gave_up", "date", "task", "refs", "corrects"),
+        *("disputed", "ruling", "uncertain"),
+    ),
+    "knowledge": ("text", "topics", "refs", "uncertain", "pinned", "aliases"),
+    "task": ("title", "topics", "refs", "goal", "step", "help", "note"),
+    "path": ("current", "order", "basis"),
+    "ref": ("source", "locator"),
+}
+V6_HELPERS = frozenset(
+    "schema revision updated_at next_observation recorded due_topics judged "
+    "updated created by standing level".split()
+)
+
+
+def v6_strays(record: dict[str, Any]) -> list[str]:
+    """Every field of a stored record that schema 6 has no slot for."""
+    strays: list[str] = []
+
+    def walk(item: dict[str, Any], shape: str, where: str) -> None:
+        allowed = {*V6_FIELDS[shape], *V6_HELPERS}
+        strays.extend(f"{where}.{name}" for name in item if name not in allowed)
+        for ref in item.get("refs", ()):
+            walk(ref, "ref", f"{where}.refs")
+        if "review" in item:
+            walk(item["review"], "review", f"{where}.review")
+
+    walk(record, "record", "record")
+    for name in ("exam", "path"):
+        if name in record:
+            walk(record[name], name, name)
+    for name, shape in (
+        ("sources", "source"),
+        ("topics", "topic"),
+        ("knowledge", "knowledge"),
+        ("tasks", "task"),
+        ("observations", "observation"),
+    ):
+        for key, item in record.get(name, {}).items():
+            walk(item, shape, f"{name}.{key}")
+    return strays
+
+
+def test_a_record_migrated_down_has_only_schema_6_fields(tmp_path: Path) -> None:
+    workspace = course(tmp_path, "calculus")
+    migrate.migrate(workspace)
+    records.save(
+        workspace,
+        {
+            **deepcopy(FORMED),
+            "exam": {"date": "2026-12-20", "arcs": ORDER[:2], "leaves_out": ["limit"]},
+            "path": {"arcs": ORDER, "current": "derivative"},
+            "preferences": {"questions": "asked"},
+        },
+    )
+    records.save(
+        workspace,
+        {
+            "observations": [attempt("riemann", checkpoint="integrals")],
+            "arcs": {"integrals": {"question": "How much accumulates?"}},
+            "arc_change": {"reason": "A sharper focus question"},
+        },
+    )
+    up = json.loads(workspace.record.read_text())
+    assert v6_strays(up), "the record holds schema 7 fields to strip"
+    migrate.migrate(workspace, to=6)
+    assert v6_strays(json.loads(workspace.record.read_text())) == []
+
+
 def test_migrating_down_keeps_a_questions_preference_schema_6_held(
     tmp_path: Path,
 ) -> None:
