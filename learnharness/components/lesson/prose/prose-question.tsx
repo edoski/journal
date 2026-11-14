@@ -11,7 +11,7 @@ import { proseQuestionSpec, type ProseQuestionSpec } from "@/components/lesson/p
 import { useProseAnswerContext } from "@/components/lesson/prose/prose-answer";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 
-/** Small prose: a choice's description, a question's details. */
+/** Small prose: a choice's description, his note on an answer. */
 const SMALL_SIZE = "[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]";
 const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
 
@@ -46,13 +46,13 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open }:
 	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} />;
 }
 
-/** The question's words: the question, its details, and "Select all that
- *  apply" for a choice of many. Shared with the composer's quote. */
+/** The question's words: the question, and "Select all that apply" for a
+ *  choice of many; nothing under them (Edo, 14 Nov 2026: a helper line
+ *  under a question is visual bloat). Shared with the composer's quote. */
 export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSpec; compact?: boolean }) {
 	return (
 		<>
 			<ToolContentResponse className={compact ? SMALL_SIZE : undefined}>{spec.data.question}</ToolContentResponse>
-			{spec.data.context && <ToolContentResponse className={cn("mt-1", SMALL)}>{spec.data.context}</ToolContentResponse>}
 			{spec.mode === "multi-select" && !compact && <p className="mt-1 text-row text-muted-foreground">Select all that apply.</p>}
 		</>
 	);

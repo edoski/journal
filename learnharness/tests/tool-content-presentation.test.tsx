@@ -87,12 +87,12 @@ test("shape parsers retain source text and identities; recovery is presentation 
 	assert.deepEqual({ ask, explain }, before);
 });
 
-test("the open question recovers only its rendering, including question, context and option labels", () => {
+test("the open question recovers only its rendering, question and option labels, and draws no details line", () => {
 	const source = { question: doubled, details: doubled, options: [{ label: doubled }, { label: "no" }] };
 	const before = structuredClone(source);
 	const answer = { openKey: "source_q", selection: emptyDockSelection(), confidence: "neutral" as const, mode: "answer" as const, toggle: () => {}, setConfidence: () => {}, setMode: () => {} };
 	const html = renderToStaticMarkup(<ProseAnswerProvider value={answer}><ProseQuestion tool="ask_user_question" toolCallId="source_q" input={source} open /></ProseAnswerProvider>);
-	assert.deepEqual(tex(html), Array(3).fill(String.raw`\nabla f`));
+	assert.deepEqual(tex(html), Array(2).fill(String.raw`\nabla f`));
 	assert.deepEqual(source, before);
 });
 

@@ -259,11 +259,11 @@ describe("parseExplainInput: the dock's display seam for explain calls", () => {
 		details: "Think about where it appears at dusk.",
 	};
 
-	it("parses a valid call and strips the teacher-only nodeId", () => {
+	it("parses a valid call and strips the teacher-only nodeId and an old record's details line", () => {
 		const parsed = parseExplainInput(good)!;
 		assert.equal(parsed.question, "Explain why Mercury is hard to observe.");
 		assert.equal(parsed.correctAnswer, "Its small angular separation from the Sun — it never strays far from the Sun in our sky.");
-		assert.equal(parsed.details, "Think about where it appears at dusk.");
+		assert.ok(!("details" in parsed), "the removed details line is cleaned away");
 		assert.ok(!("nodeId" in parsed), "the teacher-only key is cleaned away");
 	});
 

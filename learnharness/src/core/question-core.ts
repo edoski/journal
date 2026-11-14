@@ -142,9 +142,6 @@ export const explainInputBase = Type.Object({
 			"text — never revise the commitment after seeing his words, and never mark a wrong answer right to be kind. " +
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
-	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
-	),
 });
 
 /** The TEACH-side explain object: base + the teaching-cycle role field
@@ -200,9 +197,6 @@ export const askInputSchema = Type.Object({
 		description:
 			"The single question to ask the learner. ONE question per turn: ask, then end your turn — the answer determines the next question.",
 	}),
-	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
-	),
 	options: Type.Optional(
 		Type.Array(Type.Object(askOptionProps), {
 			minItems: 2,
@@ -238,7 +232,6 @@ export interface QuestionData {
 	id: string;
 	kind: QuestionKind;
 	question: string;
-	context?: string;
 	mode: QuestionMode;
 	options: QuestionOption[];
 	// explain only. NEVER send to the client before answering:

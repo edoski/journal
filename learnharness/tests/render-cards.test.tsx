@@ -215,10 +215,10 @@ describe("question context renders as markdown everywhere (owner, 2026-10-12)", 
 		assert.ok(!html.includes("$\\text"), "raw dollar delimiters do not leak as visible text");
 	});
 
-	it("a settled ask keeps the details line and option descriptions — retroactively from the persisted call", () => {
+	it("a settled ask keeps its option descriptions, and a recorded details line stays off the screen", () => {
 		const input = {
 			question: "Which destination?",
-			details: "Inline $a^2+b^2=c^2$ and display:\n$$\nE = mc^2\n$$",
+			details: "A guess with a reason is worth more than a computed answer here.",
 			options: [
 				{ label: "Classical", description: "Entropy $H(X)$ first." },
 				{ label: "ML toolkit" },
@@ -234,10 +234,11 @@ describe("question context renders as markdown everywhere (owner, 2026-10-12)", 
 		};
 		const answer = buildAnswer(qd, { values: ["Classical"] });
 		const html = renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="d2" input={input} output={answer} open={false} />);
-		const katexCount = (html.match(/class="katex"/g) ?? []).length;
-		assert.ok(katexCount >= 3, `details (inline+display) + description math render (got ${katexCount})`);
 		assert.match(html, /Entropy/, "the option description text is present");
-		assert.ok(html.includes("katex-display"), "display math in the details line renders");
+		assert.ok((html.match(/class="katex"/g) ?? []).length >= 1, "description math renders");
+		assert.doesNotMatch(html, /A guess with a reason/, "an old record's helper line never renders");
+		const open = renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="d2" input={input} open />);
+		assert.doesNotMatch(open, /A guess with a reason/, "nor under an open question");
 	});
 
 });

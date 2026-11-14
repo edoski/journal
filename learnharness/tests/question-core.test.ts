@@ -259,9 +259,9 @@ describe("dock selection (toggleOption / toggleOther)", () => {
 // ─── the explain tool: the commitment contract ─────────────────────────────
 
 describe("explainInputBase / explainInputProblems (the commitment contract)", () => {
-	it("has ONE authoring field — no explanation remnant (owner ruling 2026-09-27)", () => {
+	it("has ONE authoring field — no explanation remnant (owner ruling 2026-09-27), and no details line under the question (Edo, 14 Nov 2026)", () => {
 		const keys = Object.keys(explainInputBase.properties);
-		assert.deepEqual(keys, ["question", "correctAnswer", "details"]);
+		assert.deepEqual(keys, ["question", "correctAnswer"]);
 	});
 
 	it("the teach object LEADS with the required pair (type, nodeId) — base fields follow", () => {
