@@ -213,7 +213,7 @@ function deleteChat(id: string): boolean {
 	try {
 		fs.unlinkSync(chatFile(id));
 		removeLeftoverTemps(chatFile(id));
-		emit("chats-changed", {}); // only a real removal — the present-entry law
+		emit("chats-changed", { deleted: id }); // only a real removal — the present-entry law
 		return true;
 	} catch {
 		return false; // never existed, already deleted, or unreadable — same answer

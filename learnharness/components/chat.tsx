@@ -97,6 +97,10 @@ import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
 
+/** The chat routes' answer for a deleted lesson: TurnError reads it as
+ *  "This lesson was deleted." with Go to Home. */
+const LESSON_GONE = JSON.stringify({ error: "Unknown chat" });
+
 /** The transcript's own column inside the scroller (the docks have their own find roots). */
 const TRANSCRIPT_COLUMN = "[data-transcript-column]";
 
@@ -382,6 +386,8 @@ export function Chat({
 	// the plan popup, or the setup dialog over a pending question must not
 	// dismiss the question underneath.
 	const [abortAsk, setAbortAsk] = useState<AbortMode | null>(null);
+	// The lesson was deleted elsewhere (chats-changed `deleted`).
+	const [gone, setGone] = useState(false);
 	// Bumped when something that held focus goes away (a rename ends, a
 	// confirm closes): the dock puts focus back where he types (focus-home.ts).
 	const [focusEpoch, setFocusEpoch] = useState(0);
@@ -1232,6 +1238,12 @@ export function Chat({
 		// The first plan named this session (ChatStore.nameSession): the
 		// header takes the name the list now shows.
 		if (p.named?.id === chatId) setTitleText(p.named.title);
+		// Deleted in another window: say so now, not at his next send.
+		if (p.deleted === chatId) {
+			setGone(true);
+			keepWords(composerScope, null);
+			forgetClosedBoxes(chatId, []);
+		}
 	});
 	useServerEvent("record-changed", (p) => {
 		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
@@ -1412,7 +1424,7 @@ export function Chat({
 						courseHref={course ? courseHref(course.workspace) : undefined}
 						phase={mode === "practice" ? "Practice" : chipLabel(messages, phases)}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
-						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
+						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone} />}
 						details={
 							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
 						}
@@ -1647,6 +1659,7 @@ export function Chat({
 							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
 							{replyCut && <ReplyCut onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
+							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
@@ -1667,7 +1680,7 @@ export function Chat({
 				    anchored to the dock block's top edge, so it rides every
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
-				{!course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
+				{gone ? null : !course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
 					pending={pending}
 					initialQuestionDraft={pending ? questionDraft(pending.key)?.form : undefined}
 					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
