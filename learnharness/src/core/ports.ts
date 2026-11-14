@@ -9,6 +9,7 @@
  * adapters may import core; core NEVER imports an adapter.
  */
 
+import type { ArcPassLedger } from "./arc-pass.ts";
 import type { CourseMapLedger } from "./course-map-build.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type {
@@ -130,6 +131,18 @@ export interface CourseMapLedgers {
 	workspaces(): string[];
 	/** Drop a deleted course's ledger, so a course made again in its folder
 	 *  has its material read afresh. */
+	forget(workspace: string): void;
+}
+
+// ─── ArcPassLedgers — where each course stands with the grouping pass ───────
+
+/** The grouping pass's ledger, one per course workspace: whether a live run
+ *  may form its arcs, and what the last run found. A course without one
+ *  never gets a live run. */
+export interface ArcPassLedgers {
+	get(workspace: string): ArcPassLedger | undefined;
+	save(workspace: string, ledger: ArcPassLedger): void;
+	workspaces(): string[];
 	forget(workspace: string): void;
 }
 

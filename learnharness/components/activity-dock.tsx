@@ -174,7 +174,7 @@ export interface ActivityBlob {
 	process: "job" | "run";
 	/** Sub-agent kind for jobs (background runs have none). */
 	jobKind?: JobKind;
-	/** A background run's phase (digesting, mapping); jobs carry none. */
+	/** A background run's phase (digesting, mapping, grouping); jobs carry none. */
 	phase?: string;
 	title: string;
 	chatId: string;
@@ -183,6 +183,13 @@ export interface ActivityBlob {
 	/** Latest human-readable activity line (""). */
 	activity: string;
 }
+
+/** What a background run is doing, in its detail line. */
+const RUN_ACTIVITY: Record<string, string> = {
+	digesting: "Writing down what you learned in this lesson",
+	mapping: "Reading the course's material to build its topic map",
+	grouping: "Settling what each topic builds on, then grouping the topics into arcs from the material's chapters",
+};
 
 /** Merge the feed into one oldest-first blob list (the stable blob order). */
 export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
@@ -206,7 +213,7 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 			title: run.title,
 			chatId: run.chatId,
 			startedAt: run.startedAt,
-			activity: run.phase === "mapping" ? "Reading the course's material to build its topic map" : "Writing down what you learned in this lesson",
+			activity: RUN_ACTIVITY[run.phase] ?? RUN_ACTIVITY.digesting!,
 		});
 	}
 	blobs.sort((a, b) => a.startedAt - b.startedAt);
@@ -292,14 +299,14 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
  *  (`backgroundWorkWords`): "Drawing a figure for Eigenvalues", "Building
  *  the topic map of Graph Theory". */
 function blobWords(blob: ActivityBlob): string {
-	if (blob.process === "run") return backgroundWorkWords(blob.phase === "mapping" ? "mapping" : "digest", blob.title);
+	if (blob.process === "run") return backgroundWorkWords(blob.phase === "mapping" || blob.phase === "grouping" ? blob.phase : "digest", blob.title);
 	return backgroundWorkWords(blob.jobKind ?? "unknown", blob.title);
 }
 
 /** Where a process's detail links: a course-map build to its course's
  *  page (its key is the course), anything else to its lesson. */
 function openTarget(blob: ActivityBlob): { href: string; words: string } {
-	if (blob.process === "run" && blob.phase === "mapping") return { href: courseHref(blob.chatId), words: "Open the course" };
+	if (blob.process === "run" && (blob.phase === "mapping" || blob.phase === "grouping")) return { href: courseHref(blob.chatId), words: "Open the course" };
 	return { href: `/chat/${blob.chatId}`, words: "Open the lesson" };
 }
 
