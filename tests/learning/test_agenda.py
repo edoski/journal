@@ -620,6 +620,18 @@ def test_the_final_review_is_as_long_as_his_pace_needs_for_every_topic() -> None
     assert capacity.final_review_days(course(16), [], week(2, 0, every), MONDAY) is None
 
 
+def test_a_review_he_did_with_nothing_else_owed_does_not_start_a_final_review() -> None:
+    record = course(30, exam=25)
+    record = save(record, {"topics": {"t00": {"introduced": True}}}, on(-2))
+    record = save(record, {"observations": [answer("t00")]}, on(-1))
+    assert not capacity.of([record], MONDAY).on(MONDAY).reviews.shown
+    stored = progress.with_final_review(record, None)
+    read = capacity.final_reviews({"c": stored}, MONDAY)["c"]
+    shortest = on(25 - progress.SHORTEST_FINAL_REVIEW).isoformat()
+    assert read["exam"]["final_review"] == shortest, "one review is no pace"
+    assert progress.begun(read, MONDAY)["exam"] == {"date": on(25).isoformat()}
+
+
 def test_a_nearer_exams_final_review_lengthens_a_later_one_it_overlaps() -> None:
     every = frozenset(range(7))
     near = save(course(8, exam=27), {"exam": {"date": on(27).isoformat()}}, MONDAY)

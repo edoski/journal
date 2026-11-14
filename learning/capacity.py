@@ -570,9 +570,16 @@ def final_review_days(
     shortest one with room for every topic; a longer one would ask him to
     review topics further from the exam than his pace needs, and a shorter one
     leaves some with no review before it. It starts no earlier than today:
-    days gone hold nothing. With no review on record yet he has shown no
-    limit, and the plan proposes every review owed, so the shortest stands
-    until his record shows his pace. None without an exam date.
+    days gone hold nothing. With no review on record yet the shortest stands.
+
+    Until he has stopped short of the reviews owed, the reviews he does are
+    the least he can do (the module's rule): a final review that holds every
+    topic at that rate holds them at his, so it stands. One that cannot start
+    late enough shows only that the least he can do is too little, never
+    that he is behind, so the shortest stands: early in a course, when one
+    review fell due a day, the least read as a review a day would start a far
+    exam's final review today, and a save that day keeps a start once it has
+    come (``progress.begun``). None without an exam date.
     """
     when = record.get("exam", {}).get("date")
     if not when:
@@ -581,6 +588,7 @@ def final_review_days(
     shortest = progress.SHORTEST_FINAL_REVIEW
     if not any(weekday.reviews.value for weekday in week.weekdays):
         return shortest
+    limited = any(weekday.reviews.shown for weekday in week.weekdays)
     nearer = []
     for other in others:
         plan = progress.exam_plan(other)
@@ -598,7 +606,7 @@ def final_review_days(
         lead += 1
         day = exam - timedelta(days=lead)
         if day < today:
-            return max(lead - 1, shortest)
+            return max(lead - 1, shortest) if limited else shortest
         if not week.studies(day):
             continue
         rate = week.on(day).reviews.value
