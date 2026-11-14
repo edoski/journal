@@ -48,9 +48,8 @@ import { SessionMessageNavigation } from "@/components/session-navigation";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
-import type { ArtifactPartProps, Confidence, Photo, JobRecord, PracticeRequest, PracticeRequestDetails, QuestionAnswerData, TurnUsage, SessionPricing } from "@/src/core";
+import type { ArtifactPartProps, Confidence, Photo, JobRecord, LessonPlace, PracticeRequest, PracticeRequestDetails, QuestionAnswerData } from "@/src/core";
 import type { AnswerMark, CourseLink, DisputeDetails, LhViewMessage, SessionMode } from "@/src/core";
-import { chipLabel, ModeDivider, PhaseDivider } from "@/components/phase-divider";
 import { CompactionCutDivider } from "@/components/compaction-divider";
 import {
 	activeProblemOf,
@@ -61,8 +60,7 @@ import {
 	failedResponseAtEnd,
 	findPendingToolCall,
 	isClaudeLimitFailure,
-	phaseTimeline,
-	teachStepIndex,
+	derivePlanStatuses,
 	toolQuestionKind,
 	closedTonight,
 	doneTonightAtEnd,
@@ -71,9 +69,11 @@ import {
 } from "@/src/core";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { ActiveProblemContext } from "@/components/lesson/active-problem";
-import { LessonDetails, LessonTopBar } from "@/components/lesson/lesson-top-bar";
-import { courseHref } from "@/components/unit-inbox/unit-href";
-import { PlanPanel } from "@/components/lesson/plan-map";
+import { LessonTopBar, topicCrumbShown } from "@/components/lesson/lesson-top-bar";
+import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
+import { LessonRoadmap } from "@/components/lesson/lesson-roadmap";
+import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-facts";
+import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
@@ -83,7 +83,7 @@ import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { strandedDraft } from "@/components/lesson/stranded-draft";
-import { LESSON_WORDS, PHASE_WORDS } from "@/components/study-words";
+import { LESSON_WORDS } from "@/components/study-words";
 import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
@@ -93,7 +93,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { DisputeBubble, PlanLine, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
+import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 
 /** The chat routes' answer for a deleted lesson: TurnError reads it as
@@ -156,12 +156,6 @@ function isSubagentSteer(m: LhViewMessage): boolean {
 	return (m.metadata as { subagentResult?: unknown } | undefined)?.subagentResult != null;
 }
 
-/** The mode a handoff marker's view part moves the session to. */
-function modeHandoffTarget(m: LhViewMessage): SessionMode {
-	const part = m.parts.find((p) => p.type === "data-mode-handoff") as { data?: { mode?: unknown } } | undefined;
-	return part?.data?.mode === "practice" ? "practice" : "teach";
-}
-
 /**
  * The teaching session. All chat state lives in useChat; the server persists
  * the canonical transcript after every turn.
@@ -181,6 +175,7 @@ export function Chat({
 	initiallyCompacting = false,
 	startedIn,
 	course,
+	place,
 	initiallyCourseDeleted = false,
 }: {
 	chatId: string;
@@ -188,6 +183,9 @@ export function Chat({
 	/** The session's course. Absent on sessions older than the rule that
 	 *  every session has one: the link banner replaces the dock. */
 	course?: CourseLink;
+	/** Where the lesson sits in its course (its topic and arc), read once
+	 *  when the page opened; absent when the course map could not say. */
+	place?: LessonPlace;
 	/** The course was deleted: the lesson is history, with no box to write in. */
 	initiallyCourseDeleted?: boolean;
 	initialMessages: LhMessage[];
@@ -564,11 +562,6 @@ export function Chat({
 		liveDraftRef.current = { key, text };
 	}, []);
 
-	// The phase at every message (one linear fold): the transcript draws a
-	// color-coded dotted divider at each boundary; the header chip reads the
-	// session's current phase.
-	const phases = useMemo(() => phaseTimeline(messages), [messages]);
-
 	const [composerDraftRevision, setComposerDraftRevision] = useState(0);
 	/* The composer draft ref is synchronous, so sends read the latest text
 	 * without a parent render per input event. Explicit resets still bump a
@@ -850,9 +843,7 @@ export function Chat({
 	const syncFromServer = useCallback(async () => {
 		const res = await fetch(`/api/chats/${chatId}`);
 		if (!res.ok) return;
-		const record = (await res.json()) as { messages?: LhMessage[]; turns?: TurnUsage[]; pricing?: SessionPricing; turnError?: string };
-		if (Array.isArray(record.turns)) setTurns(record.turns);
-		setPricing(record.pricing);
+		const record = (await res.json()) as { messages?: LhMessage[]; turnError?: string };
 		if (!Array.isArray(record.messages)) return;
 		setMessages(record.messages, record.turnError);
 		// The continuation seam (contracts.ts protocol §4): a job result
@@ -900,7 +891,6 @@ export function Chat({
 	// The live plan panel (wave 4): opened by any transcript plan card or
 	// the top-bar plan chip.
 	const [planOpen, setPlanOpen] = useState(false);
-	const closePlan = useCallback(() => setPlanOpen(false), []);
 	// The mermaid focus (chrome-melt wave, 2026-09-19): md-blocks' expand
 	// button registers the chart source here; the overlay (and the plan
 	// popup) mount INSIDE the session-area div — both are session-scoped, so
@@ -927,17 +917,26 @@ export function Chat({
 	planOpenRef.current = planOpen;
 	const setupOpenRef = useRef(setupOpen);
 	setupOpenRef.current = setupOpen;
-	// The session's live plan (drives the top-bar chip).
+	// The session's live plan: its steps, where he is on them and where each
+	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
+	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
+	const steps = useMemo(() => {
+		if (!planTree) return [];
+		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()));
+	}, [planTree, messages, anchors]);
+	// A step's place in the transcript: scroll to where it was first taught
+	// and mark it as a passage link lands (session-navigation.tsx).
+	const jumpToStep = useCallback((stepId: string) => {
+		const scope = sessionFindScopeRef.current;
+		const target = scope?.querySelector<HTMLElement>(`[data-step-anchor="${CSS.escape(stepId)}"]`);
+		if (!scope || !target) return;
+		replyAnchorRef.current = null;
+		scrollSessionTarget(target, scope, scrollContextRef.current);
+		target.classList.add("lh-source-highlight");
+		window.setTimeout(() => target.classList.remove("lh-source-highlight"), 2_000);
+	}, []);
 
-	// ── Session usage (the lesson's details menu) ──
-	// The money channel: the record's turns log and read-time server Pi
-	// pricing projection. Seeded once on mount (the page doesn't carry turns),
-	// refreshed when the local stream settles (each turn appends to the log
-	// server-side), and kept fresh by syncFromServer whenever it already
-	// fetches the record. No turns yet → the labels read "—".
-	const [turns, setTurns] = useState<TurnUsage[]>([]);
-	const [pricing, setPricing] = useState<SessionPricing | undefined>();
 	// The dock's reserved tail height (DockOverlay reports it; the spacer at
 	// the end of the transcript renders it). Lives here because the spacer is
 	// inside the scroller while the dock overlays OUTSIDE it — two parents.
@@ -945,25 +944,8 @@ export function Chat({
 	// guess so the static paint has a sane tail. The first layout effect
 	// replaces it with the measured truth before paint.
 	const [dockReserve, setDockReserve] = useState(208);
-	const syncTurns = useCallback(async () => {
-		try {
-			const res = await fetch(`/api/chats/${chatId}`);
-			if (!res.ok) return;
-			const record = (await res.json()) as { turns?: TurnUsage[]; pricing?: SessionPricing };
-			if (Array.isArray(record.turns)) setTurns(record.turns);
-			setPricing(record.pricing);
-		} catch {
-			// transient blip: stats stay on the last known figures
-		}
-	}, [chatId]);
-	useEffect(() => {
-		void syncTurns();
-	}, [syncTurns]);
-	// After the learner's own turn ends the log has a fresh entry — and the
 	// Post-turn settle (the SLIMMED watch — push-architecture S3,
-	// 2026-10-02): our own stream just ended. One instant LOCAL action
-	// only — the turns-only refetch lands the log entry while the server's
-	// persist/endTurn lags by milliseconds. The ADOPTION
+	// 2026-10-02): our own stream just ended. The ADOPTION
 	// LOOP and the HANDOFF WATCH that lived here are RETIRED: a
 	// server-initiated turn (the probe→teach handoff, a job wake, another
 	// tab) is now ANNOUNCED on the events channel — the turn-started
@@ -976,9 +958,6 @@ export function Chat({
 		// branch — the re-fire-on-dep-churn wart, fixed S3).
 		prevStatusRef.current = status;
 		if (!transitioned) return;
-		// immediate: turns-only refetch — the details update even while
-		// the server's persist/endTurn lags the client by milliseconds
-		void syncTurns();
 		// CANONIZATION (fix B, the duplicate-previous-message bug, 2026-10-02):
 		// turn-settled for OUR OWN turn arrives while the stream is still open
 		// (endTurn emits from onFinish before the response terminates, so the
@@ -996,7 +975,7 @@ export function Chat({
 			settleAnnouncedRef.current = false;
 			void syncFromServer();
 		}
-	}, [status, syncTurns, syncFromServer]);
+	}, [status, syncFromServer]);
 
 	// A stream that died MID-FLIGHT (network): the runner decoupled the turn
 	// from its view, so the server turn runs ON behind the error banner —
@@ -1456,12 +1435,18 @@ export function Chat({
 						}
 						course={course?.title}
 						courseHref={course ? courseHref(course.workspace) : undefined}
-						phase={closedForToday ? PHASE_WORDS.done : mode === "practice" ? PHASE_WORDS.practice : chipLabel(messages, phases)}
-						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
-						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone || courseGone} />}
-						details={
-							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
+						topic={course && place?.topic && topicCrumbShown(place.topic.title, titleText) ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined}
+						roadmap={
+							<LessonRoadmap
+								steps={steps}
+								place={place}
+								course={course ? { title: course.title, workspace: course.workspace } : undefined}
+								open={planOpen}
+								onOpenChange={setPlanOpen}
+								onJump={jumpToStep}
+							/>
 						}
+						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone || courseGone} />}
 					/>
 				</TopBar>
 
@@ -1486,24 +1471,12 @@ export function Chat({
 									// PROTOCOL" §4). Key fallback: legacy transcripts (pre id-hygiene)
 									// can still hold empty ids — the index keeps keys unique for them.
 									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} figures="inline" />
-								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume") ? (
-								// A session that picks up an earlier lesson opens teaching:
-								// the plan carried over, so no probe or planning came first.
-								<PhaseDivider key={m.id || `m-${mi}`} phase="teach" />
-								) : m.role === "user" && m.parts.some((p) => p.type === "data-probe-handoff") ? (
-								// The probe→teach handoff wake (custom-message scheme): the
-								// PLANNING DIVIDER IS the seam (owner ruling 2026-09-26 — it
-								// replaced the "Preparing your plan…" system line; the marker
-								// renders in the right spot by record construction, so the old
-								// fold-based divider — which floated to the transcript top once
-								// Wave D grouping merged the whole probe into one giant
-								// assistant group — is gone). Never a user bubble: the wake is
-								// scaffolding; the model-facing instruction lives in the adapter.
-								<PhaseDivider key={m.id || `m-${mi}`} phase="plan" />
-							) : m.role === "user" && m.parts.some((p) => p.type === "data-mode-handoff") ? (
-								// A handoff between teaching and practice: the rule where
-								// the next agent takes over, never a user bubble.
-								<ModeDivider key={m.id || `m-${mi}`} mode={modeHandoffTarget(m)} />
+								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
+								// The seams between the opening questions, planning, teaching
+								// and practice draw nothing: the lesson names no phase (Edo,
+								// 14 Nov 2026), and where he is in the plan is the top bar's
+								// roadmap. Never a user bubble: the markers are scaffolding.
+								null
 							) : m.role === "user" && m.parts.length > 0 && m.parts.every((p) => p.type.startsWith("data-")) ? (
 								// Marker cards (custom messages, 2026-10-04): user-side
 								// scaffolding — the graph-context pick, the practice
@@ -1539,31 +1512,6 @@ export function Chat({
 								</Fragment>
 							) : (
 									<Fragment key={m.id || `m-${mi}`}>
-									{/* THE INFERRED TEACH SEAM (owner ruling 2026-09-26, the verdict
-									death): teaching begins where the FIRST nodeId-tagged quiz is
-									posed — the fold (phaseTimeline, the same derivation the phase chip
-									reads) flips to teach exactly AT this assistant group. STEP-LEVEL
-									since owner round 8 (2026-10-05 — the stacked-dividers bug): the
-									plan presentation often lives in the SAME message, an earlier
-									provider step than the quiz call, and the old message-level seam
-									drew this divider before the plan too (Planning and Teaching
-									stacked back-to-back, nothing between). teachStepIndex finds the
-									step boundary governing the flip call: -1 = the message's first
-									step → prepend before the whole block (this branch); a later
-									index → the divider renders AT that part boundary in the loop
-									below (replacing the plain step hairline — a labeled phase rule
-									supersedes it). The boundary check (this index flips, the
-									previous didn't) still guarantees exactly ONE divider per session.
-									PREPENDED, never a replacement branch: the teach group is a real
-									message with content — a replacement ternary swallowed the entire
-									first lesson block (the Lacan session, 2026-09-27). */}
-									{m.role === "assistant" &&
-									mi > 0 &&
-									phases[mi] === "teach" &&
-									phases[mi - 1] !== "teach" &&
-									teachStepIndex(m.parts) === -1 ? (
-										<PhaseDivider key={`teach-${m.id || `m-${mi}`}`} phase="teach" />
-									) : null}
 									{m.role === "user" ? (
 										// His words: a bubble on the right.
 										<LearnerBubble text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} photos={m.parts.filter((p) => p.type === "photos").flatMap((p) => p.data as Photo[])} />
@@ -1571,15 +1519,9 @@ export function Chat({
 									<Message from="assistant" className="max-w-full">
 									<MessageContent className="w-full">
 											{m.parts.map((part, pi) => {
-												// The step boundary where teaching begins (round 8): when
-												// the teach flip happens in a LATER step, its PhaseDivider
-												// replaces this boundary's plain hairline.
-												const teachBoundary =
-													m.role === "assistant" &&
-													mi > 0 &&
-													phases[mi] === "teach" &&
-													phases[mi - 1] !== "teach" &&
-													teachStepIndex(m.parts) === pi;
+												// Where a plan step was first taught (roadmap-facts.ts):
+												// the roadmap's step opens the transcript here.
+												const stepAnchor = anchors.get(partKey(mi, pi));
 												// A tool call that errored BACK TO THE AGENT (validation
 												// failure, malformed args) is invisible work — the agent
 												// reads the error and retries. Owner ruling 2026-09-26:
@@ -1601,7 +1543,7 @@ export function Chat({
 														const sourceId = textPartMessageId(part.id);
 														const anchor = sourceId && sourceTextParts.get(sourceId) === part.id ? messageAnchorId(sourceId) : undefined;
 														return (
-															<div key={part.id || pi} id={anchor} data-source-message-id={sourceId ?? undefined} className="lh-source-passage">
+															<div key={part.id || pi} id={anchor} data-source-message-id={sourceId ?? undefined} data-step-anchor={stepAnchor} className="lh-source-passage">
 																<MessageResponse>{part.text}</MessageResponse>
 															</div>
 														);
@@ -1611,11 +1553,11 @@ export function Chat({
 														// shows in the lesson.
 														return null;
 													case "step-start":
-														return teachBoundary ? <PhaseDivider key={`teach-step-${pi}`} phase="teach" /> : null;
+														return null;
 													case "data-plan-block":
-														// The plan in the chat (wave 4): a frozen snapshot
-														// card — rendered as carried, never re-derived.
-														return <PlanLine key={pi} onOpen={() => setPlanOpen(true)} />;
+														// The plan lives in the top bar's roadmap; the
+														// tutor's own words introduce it here.
+														return null;
 													// quiz/probe: the removed multiple-choice tools, drawn as
 													// an answered question when an old transcript holds one.
 													case "tool-quiz":
@@ -1641,6 +1583,7 @@ export function Chat({
 																output={part.state === "output-available" ? (part.output as QuestionAnswerData) : undefined}
 																photos={part.photos as Photo[] | undefined}
 																open={pending?.toolCallId === part.toolCallId && part.state !== "output-available"}
+																stepAnchor={stepAnchor}
 															/>
 														);
 													}

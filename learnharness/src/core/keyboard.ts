@@ -97,7 +97,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// surface listens.
 	{ id: "find", label: "Find in this lesson", scope: "lesson", binding: "mod+f" },
 	{ id: "rename-session", label: "Rename this lesson", scope: "lesson", binding: "f2" },
-	{ id: "open-model-picker", label: "Lesson details", scope: "lesson", binding: "mod+k" },
+	// The id predates the roadmap and stays, since saved rebinds key on it.
+	{ id: "open-model-picker", label: "Where this lesson is: its steps, topic and course map", scope: "lesson", binding: "mod+k" },
 	// The practice problem's requests: the mounted problem box answers them.
 	{ id: "practice-hint", label: "Problem or check · hint", scope: "lesson", binding: "mod+shift+h" },
 	{ id: "practice-show", label: "Problem · show me", scope: "lesson", binding: "mod+shift+s" },

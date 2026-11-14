@@ -1,8 +1,7 @@
 "use client";
 
-import { BookOpenIcon, EyeIcon, FlagIcon, LightbulbIcon, MapIcon, type LucideIcon } from "lucide-react";
+import { BookOpenIcon, EyeIcon, FlagIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
-import { Button } from "@/components/ui/button";
 import { MARK_WORDS, LESSON_WORDS } from "@/components/study-words";
 import type { Confidence, DisputeDetails, Photo, PracticeRequest, PracticeRequestDetails } from "@/src/core";
 import { BubbleMark, LearnerBubble } from "@/components/lesson/prose/learner-bubble";
@@ -96,14 +95,4 @@ export function RequestBubble({ data }: { data: PracticeRequestDetails }) {
 export function DisputeBubble({ data }: { data: DisputeDetails }) {
 	const label = data.proposed ? `${MARK_WORDS.youDisputed} · ${MARK_WORDS.youThink}: ${MARK_WORDS.result[data.proposed]}` : MARK_WORDS.youDisputed;
 	return <LearnerBubble testId="dispute-row" icon={FlagIcon} label={label} text={data.said} />;
-}
-
-/** The plan as proposed, as one line that opens the plan beside the top bar. */
-export function PlanLine({ onOpen }: { onOpen: () => void }) {
-	return (
-		<Button variant="quiet" size="row" data-testid="plan-line" onClick={onOpen} className="-ms-2 my-1 gap-1.5 self-start px-2 font-normal">
-			<MapIcon aria-hidden className="size-3.5" />
-			Open the plan
-		</Button>
-	);
 }

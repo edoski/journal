@@ -1,23 +1,20 @@
-# LessonTopBar and LessonDetails
+# LessonTopBar
 
-The session's top bar, rendered in the shared `TopBar` at `size="slim"` (52px, padding 0 16).
+The session's top bar, rendered in the shared `TopBar` at `size="slim"` (52px, padding 0 16). It names no phase and holds no details menu: Edo, 14 Nov 2026, called the "Teaching" label pointless and the session-details popover (tutor, room left, cost) totally pointless.
 
 ## Anatomy, left to right
 
 | Slot | Notes |
 |---|---|
 | sidebar toggle | `TopBar`'s own, only while the sidebar is closed |
-| course | 14 `muted-foreground`, first, at most 160px, truncates before the title does (`shrink-[2]`), then a 14px chevron at 60%. It is a link to the course's page (`courseHref`, components/course-page/course-page.md), lifting to full ink on hover as shadcn's breadcrumb link does, with a 2px focus ring; with no course page to open it stays plain text |
-| title | 14 at 500 (`text-control font-medium`), after the course as T3 Code's breadcrumb does (project › thread); truncates; a click (or F2) renames it in place, the input in the same style |
-| phase | 13/18 `muted-foreground`, sentence case (`PHASE_WORDS`: "Recall" while the tutor asks its opening questions, "Planning", "Teaching", "Practice"), and "Done for today" once the session stopped for the day, by his press or the tutor's close, until he writes again; not interactive |
-| done for today | quiet button, 32px, "Done for today" at 13/400 (`LESSON_WORDS.doneTonight`); stops the session whatever is open: a waiting check is left unanswered with its answer hidden, an open problem is dropped, and the tutor closes (done-tonight.tsx). ⌘⇧D presses it. Waits while a turn runs; gone once the session stopped for the day |
-| plan toggle | quiet button, 32px, 16px waypoints icon and "Plan" at 13/400; `data-slot="plan-toggle"`; the trigger of the plan popover (plan-map.md, popover.md), right-aligned under it |
-| details | quiet 32px icon button (ellipsis), the trigger of the details popover |
+| course | 14 `muted-foreground`, first, at most 160px, truncates before the title does (`shrink-[2]`), then a 14px chevron at 60%. A link to the course's page, where its map is (`courseHref`, components/course-page/course-page.md), lifting to full ink on hover as shadcn's breadcrumb link does, with a 2px focus ring; with no course page to open it stays plain text |
+| topic | the same crumb, a link to the topic's page (`unitHref`), shown only when the topic's words are not the title's (`topicCrumbShown`): a lesson named after its topic would say the same thing twice. The topic comes from the course map when the page opens (`lessonPlace`, src/server/lesson-place.ts) |
+| title | 14 at 500 (`text-control font-medium`), after the crumbs as T3 Code's breadcrumb does (project › thread); truncates; a click (or F2) renames it in place, the input in the same style |
+| roadmap | where the lesson is in its plan (`LessonRoadmap`, lesson-roadmap.md), right-aligned |
+| done for today | outlined 32px pill with a circle-check icon and "Done for today" at 13/400 (`LESSON_WORDS.doneTonight`), its tooltip "Stop here for today" with ⌘⇧D; stops the session whatever is open: a waiting check is left unanswered with its answer hidden, an open problem is dropped, and the tutor closes (done-tonight.tsx). Waits while a turn runs; gone once the session stopped for the day |
 
-## Details panel
-
-A `Popover` (components/ui/popover.md), 352px, padding 12, right-aligned under its button. A two-column list at 13/18 in his words (`DETAIL_WORDS`): Tutor (plain text, "Claude Opus 5.5": every agent runs it at high effort and nothing chooses it, owner 2026-11-14); Room left ("Plenty" until half the room before compaction is used, then "Over half used. When it fills, the tutor sums up the lesson so far"; the room is the compaction trigger, `compactionTriggerTokens` of the model's window from GET /api/models; no token count); Cost so far (the priced cost, or "Included in your Claude plan" on his subscription). The content is force-mounted and hidden while closed; a closed panel never takes Esc. ⌘K opens the panel. Esc or a click outside closes the topmost layer only (components/ui/overlay.md).
+The agent's machinery (tutor, room left before the tutor sums up, cost) is not in the lesson. Compaction still announces itself where it happens: the composer says "Compacting the conversation…" while it runs, and the cut leaves a hairline in the transcript.
 
 ## Sources
 
-T3 Code's 52px top bar and 13px secondary text; the owner's decision to take tokens, cost, model and thinking level out of the lesson into "one small details disclosure" (findings, binding decisions; findings 16).
+T3 Code's 52px top bar and 13px secondary text; shadcn's breadcrumb; Edo's rulings of 14 Nov 2026.

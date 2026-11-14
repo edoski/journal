@@ -7,7 +7,7 @@ The lesson screen, picked by Edo over Current and Slot on 14 Nov 2026. **Thesis:
 | File | What |
 |---|---|
 | `prose-question.tsx` | `ProseQuestion`: a question in the tutor's message, open or answered; `ChoiceRows`, `QuestionWords`, `YourTurn`, `Disclosure` |
-| `prose-practice.tsx` | `ProseProblem`, `ProseConclude`, his work, requests and disputes as bubbles, `PlanLine` |
+| `prose-practice.tsx` | `ProseProblem`, `ProseConclude`, his work, requests and disputes as bubbles |
 | `learner-bubble.tsx` | `LearnerBubble`: his words on the right, at most 80% wide, the mark under it; `BubbleMark` |
 | `prose-composer.tsx` | `ProseComposer`: the lesson's composer, the answer field while something is open, Ask instead, the quote |
 | `prose-answer.tsx` | the open item's picks, confidence and mode, shared by the option rows and the composer |
@@ -26,7 +26,7 @@ The lesson screen, picked by Edo over Current and Slot on 14 Nov 2026. **Thesis:
 | Ask instead (Esc) | the composer is a message to the tutor ("Ask anything. Sending skips this question." / "Ask anything. The problem stays open."), chip "Back to answering" (Esc). A question is set aside through the silent dismissal before the message goes; a problem stays open. Esc carries his words to the other side when that side holds none |
 | A problem ends | the mark under the bubble that ended it; "Model solution" behind a disclosure, open after Show me; a skip or Done for today is one muted line |
 | Long statement | when the open question's first line has scrolled above the view, the composer quotes it in its head (14px, muted, at most min(40dvh, 20rem), scrolls with no bar); it goes once the line is 40px back in view. Measured on the 3×5 matrix problem at 1512×982: quote 187px, composer 296px |
-| The plan | one quiet line, "Open the plan", that opens the top bar's plan |
+| The plan | nothing in the transcript beyond the tutor's own words: the top bar's roadmap holds it (../lesson-roadmap.md). Phase seams (opening questions, planning, teaching, practice) draw nothing either |
 
 ## Keys
 

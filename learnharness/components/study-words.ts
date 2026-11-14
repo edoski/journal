@@ -280,27 +280,6 @@ export const LESSON_WORDS = {
 	startLesson: "Start a new lesson",
 } as const;
 
-/** What a lesson's top bar says it is doing: asking its opening questions
- *  (the same word as their label), planning, teaching, practice, or
- *  stopped for the day. A lesson is never called a quiz (round 3). */
-export const PHASE_WORDS = {
-	probe: "Recall",
-	plan: "Planning",
-	teach: "Teaching",
-	practice: "Practice",
-	done: LESSON_WORDS.doneTonight,
-} as const;
-
-/** A question's label on its card and folded bar, by what it asks: a
- *  check of what was just taught, a prediction before it, a recall of
- *  what he knows, else a plain question. */
-export const QUESTION_WORDS = {
-	check: "Check",
-	predict: "Prediction",
-	recall: "Recall",
-	question: "Question",
-} as const;
-
 /** An answer's mark as the record keeps it (Edo, 14 Nov 2026): the
  *  result, whether it counted as his own or as helped, the confidence
  *  recorded, and a dispute. */
@@ -408,25 +387,4 @@ export const CHOICE_NOTE = "Anything to add?";
  *  nothing (Edo, 13 Nov 2026). */
 export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
-}
-
-/** The lesson's details panel, in his words: which tutor, how much room
- *  the lesson has before the tutor sums it up, and what it has cost. */
-export const DETAIL_WORDS = {
-	tutor: "Tutor",
-	room: "Room left",
-	cost: "Cost so far",
-	unmeasured: "Not measured yet",
-	plenty: "Plenty",
-	filling: "Over half used. When it fills, the tutor sums up the lesson so far",
-	plan: "Included in your Claude plan",
-} as const;
-
-/** How much room the lesson has before the tutor sums it up (`used` of
- *  `room`, both in the model's own units, never shown): plenty until half
- *  is used, since half is the one split that needs no tuning, then a
- *  warning of what happens when it fills. */
-export function roomWords(used: number | null, room: number): string {
-	if (used === null) return DETAIL_WORDS.unmeasured;
-	return used * 2 < room ? DETAIL_WORDS.plenty : DETAIL_WORDS.filling;
 }

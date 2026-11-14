@@ -29,7 +29,7 @@ export function YourTurn() {
  *  digit while the composer takes his words. Answered, the question stays
  *  as the tutor asked it, his answer becomes his bubble with the record's
  *  mark under it, and the committed answer waits behind "The answer". */
-export function ProseQuestion({ tool, toolCallId, input, output, photos, open }: {
+export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor }: {
 	tool: string;
 	toolCallId: string;
 	input: unknown;
@@ -38,12 +38,15 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open }:
 	photos?: readonly Photo[];
 	/** This is the question waiting for him. */
 	open: boolean;
+	/** The plan step this question first taught, when the roadmap opens
+	 *  the transcript here (roadmap-facts.ts). */
+	stepAnchor?: string;
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
 	if (!spec) return null;
-	if (open) return <OpenQuestion spec={spec} />;
+	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} />;
 	if (!output) return null;
-	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} />;
+	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} />;
 }
 
 /** The question's words: the question, and "Select all that apply" for a
@@ -58,11 +61,11 @@ export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSp
 	);
 }
 
-function OpenQuestion({ spec }: { spec: ProseQuestionSpec }) {
+function OpenQuestion({ spec, stepAnchor }: { spec: ProseQuestionSpec; stepAnchor?: string }) {
 	const answer = useProseAnswerContext();
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
-		<div data-testid="prose-question" data-slot="prose-question" data-open="" className="mt-2">
+		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-step-anchor={stepAnchor} className="mt-2">
 			<YourTurn />
 			<QuestionWords spec={spec} />
 			{spec.mode !== "text" && (
@@ -130,16 +133,17 @@ export function ChoiceRows({ options, multi, selected, onPick, compact = false }
 	);
 }
 
-function AnsweredQuestion({ spec, toolCallId, input, output, photos }: {
+function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor }: {
 	spec: ProseQuestionSpec;
 	toolCallId: string;
 	input: unknown;
 	output: QuestionAnswerData;
 	photos?: readonly Photo[];
+	stepAnchor?: string;
 }) {
 	const answer = answerForPresentation(output, input);
 	const question = (
-		<div data-testid="prose-question" data-slot="prose-question" className="mt-2">
+		<div data-testid="prose-question" data-slot="prose-question" data-step-anchor={stepAnchor} className="mt-2">
 			<QuestionWords spec={spec} />
 			{spec.mode !== "text" && <ChoiceRows options={spec.data.options} multi={spec.mode === "multi-select"} selected={new Set()} />}
 		</div>

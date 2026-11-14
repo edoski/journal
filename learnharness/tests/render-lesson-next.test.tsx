@@ -10,17 +10,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { PlanCard, PlanPanel, planMapSteps } from "../components/lesson/plan-map.tsx";
+import { partKey, roadmapLabel, roadmapSteps, stepAnchors } from "../components/lesson/roadmap-facts.ts";
+import { derivePlanStatuses } from "../src/core/index.ts";
 import { LiveToolCard } from "../components/artifacts/live-tool-card.tsx";
 import { artifactRenderers } from "../components/artifacts/index.ts";
-import { PhaseDivider } from "../components/phase-divider.tsx";
 import { CompactionCutDivider } from "../components/compaction-divider.tsx";
 import { ProseConclude, ProseProblem, ThinkingBubble } from "../components/lesson/prose/prose-practice.tsx";
 import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
 import { CourseLinkBody } from "../components/course-link-banner.tsx";
-import { sessionStatLabels } from "../components/usage-format.ts";
 import type { CourseChoice } from "../components/course-picker.tsx";
-import type { ArtifactPartProps, PlanBlockData, QuestionAnswerData } from "../src/core/index.ts";
+import type { ArtifactPartProps, QuestionAnswerData } from "../src/core/index.ts";
 
 function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
@@ -38,54 +37,43 @@ const EDGES = [
 	{ from: "equation", to: "compute" },
 ];
 
-describe("plan map", () => {
-	it("lists the steps in teaching order and marks where the learner is and what comes next", () => {
-		const status: Record<string, "visited" | "current" | "upcoming"> = { maps: "visited", equation: "current", compute: "upcoming" };
-		const steps = planMapSteps(NODES, EDGES, (id) => status[id]!);
-		assert.deepEqual(steps.map((s) => [s.title, s.status, s.next]), [
-			["A matrix is a linear map", "visited", false],
-			["The eigen-equation", "current", false],
-			["Computing a 2×2 spectrum", "upcoming", true],
+describe("the lesson's roadmap", () => {
+	const tree = { nodes: NODES, edges: EDGES, version: 1 };
+	const messages = [
+		{ parts: [{ type: "tool-plan_init", state: "output-available", output: { ok: true, tree } }] },
+		{ parts: [{ type: "step-start" }, { type: "text" }, { type: "tool-explain", state: "output-available", input: { nodeId: "maps" } }] },
+		{ parts: [{ type: "step-start" }, { type: "tool-lesson_progress", state: "output-available", input: { done: ["maps"] } }, { type: "step-start" }, { type: "text" }, { type: "text" }, { type: "tool-explain", state: "input-available", input: { nodeId: "equation" } }] },
+	];
+	const statuses = () => derivePlanStatuses(tree, messages);
+
+	it("lists the steps in teaching order, marks where he is, what comes next and what the tutor marked done", () => {
+		const steps = roadmapSteps(tree, statuses(), new Set(["maps", "equation"]));
+		assert.deepEqual(steps.map((s) => [s.title, s.status, s.next, s.done, s.taught]), [
+			["A matrix is a linear map", "visited", false, true, true],
+			["The eigen-equation", "current", false, false, true],
+			["Computing a 2×2 spectrum", "upcoming", true, false, false],
 		]);
+		assert.equal(roadmapLabel(steps), "The eigen-equation");
 	});
 
-	it("before any step is current, the first step is next", () => {
-		const steps = planMapSteps(NODES, EDGES, () => "upcoming");
-		assert.deepEqual(steps.map((s) => s.next), [true, false, false]);
+	it("names the next step between steps, and says when every step was taught", () => {
+		const between = roadmapSteps(tree, { current: null, visited: new Set(["maps"]), done: new Set(["maps"]) }, new Set());
+		assert.equal(roadmapLabel(between), "Next: The eigen-equation");
+		const all = roadmapSteps(tree, { current: null, visited: new Set(NODES.map((n) => n.id)), done: new Set() }, new Set());
+		assert.equal(roadmapLabel(all), "Every step taught");
+		assert.equal(roadmapLabel([]), null);
 	});
 
-	it("the transcript card names the steps, with no count and no node numbers", () => {
-		const data = { kind: "full", at: "x", current: null, nodes: NODES.map((n) => ({ ...n, status: "upcoming" })), edges: EDGES } as PlanBlockData;
-		const document = documentFor(<PlanCard data={data} onOpen={() => {}} />);
-		const card = document.querySelector('[data-testid="plan-block-full"]')!;
-		assert.match(card.textContent!, /^Plan/);
-		assert.doesNotMatch(card.textContent!, /\d steps?/);
-		assert.match(card.textContent!, /A matrix is a linear map/);
-		assert.doesNotMatch(card.textContent!, /Node \d/);
-		assert.equal(card.getAttribute("aria-label"), "Open the plan");
+	it("a step was taught at the first text of the provider step that asks its first question", () => {
+		const anchors = stepAnchors(messages, new Set(NODES.map((n) => n.id)));
+		assert.equal(anchors.get(partKey(1, 1)), "maps");
+		assert.equal(anchors.get(partKey(2, 3)), "equation", "the step's own text, past the progress call's step");
+		assert.equal(anchors.size, 2, "an untaught step has no place");
 	});
 
-	it("a step that names a formula shows it typeset", () => {
-		const nodes = [{ id: "eq", title: "The eigen-equation $Av = \\lambda v$", status: "upcoming" }];
-		const data = { kind: "full", at: "x", current: null, nodes, edges: [] } as unknown as PlanBlockData;
-		const card = documentFor(<PlanCard data={data} onOpen={() => {}} />).querySelector('[data-testid="plan-block-full"]')!;
-		assert.equal(card.querySelectorAll(".katex").length, 1);
-		assert.doesNotMatch(card.textContent!, /\$/);
-	});
-
-	it("the plan panel derives statuses live: the latest tagged check is current, earlier ones visited", () => {
-		const tree = { nodes: NODES, edges: EDGES, version: 1 };
-		const messages = [
-			{ parts: [{ type: "tool-plan_init", state: "output-available", output: { ok: true, tree } }] },
-			{ parts: [{ type: "tool-quiz", state: "output-available", input: { nodeId: "maps" }, output: { correct: true } }] },
-			{ parts: [{ type: "tool-quiz", state: "input-available", input: { nodeId: "equation" } }] },
-		];
-		const document = documentFor(<PlanPanel messages={messages} onClose={() => {}} />);
-		const status = (id: string) => document.querySelector(`[data-testid="plan-step-${id}"]`)!.getAttribute("data-status");
-		assert.equal(status("maps"), "visited");
-		assert.equal(status("equation"), "current");
-		assert.equal(status("compute"), "upcoming");
-		assert.equal(documentFor(<PlanPanel messages={[]} onClose={() => {}} />).querySelectorAll('[data-testid^="plan-step-"]').length, 0, "no plan, no steps");
+	it("a question with no text before it in its step is its own place", () => {
+		const bare = [{ parts: [{ type: "step-start" }, { type: "tool-explain", input: { nodeId: "maps" } }] }];
+		assert.equal(stepAnchors(bare, new Set(["maps"])).get(partKey(0, 1)), "maps");
 	});
 });
 
@@ -107,10 +95,7 @@ describe("agent chrome out of the lesson", () => {
 		assert.doesNotMatch(document.body.textContent!, /secret\/notes\.md/);
 	});
 
-	it("phase changes are quiet section breaks; compaction leaves only a hairline, no token count", () => {
-		const teach = documentFor(<PhaseDivider phase="teach" />).querySelector('[data-slot="section-break"]')!;
-		assert.equal(teach.getAttribute("aria-label"), "Teaching");
-		assert.equal(teach.textContent, "Teaching");
+	it("compaction leaves only a hairline, no token count", () => {
 		const cut = documentFor(<CompactionCutDivider />);
 		assert.equal(cut.body.textContent, "");
 		assert.ok(cut.querySelector('[data-slot="section-break"]'));
@@ -155,14 +140,5 @@ describe("lesson cards", () => {
 			"besides the course chip, Link is the one action",
 		);
 		assert.equal(banner.querySelector('[data-testid="course-link"]')!.textContent, "Link");
-	});
-});
-
-describe("session details", () => {
-	it("context reads used over the catalog limit, and cost stays — until a turn is priced", () => {
-		assert.deepEqual(
-			[sessionStatLabels({ turns: [], contextTokens: 19400, pricing: undefined, limit: 1_000_000 }).contextLabel, sessionStatLabels({ turns: [], contextTokens: 19400, pricing: undefined, limit: 1_000_000 }).costLabel],
-			["19.4k / 1M", "—"],
-		);
 	});
 });

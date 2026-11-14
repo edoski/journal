@@ -85,6 +85,9 @@ export interface DerivedPlanStatuses {
 	current: string | null;
 	/** Nodes referenced by earlier tagged calls — been there, monotonic. */
 	visited: ReadonlySet<string>;
+	/** Nodes a lesson_progress call named done: taught, and he showed he
+	 *  has it (each is also visited). */
+	done: ReadonlySet<string>;
 }
 
 /** Statuses of a node: the derived view the plan panel should render. */
@@ -132,6 +135,7 @@ function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanSt
 	const ids = new Set(tree.nodes.map((n) => n.id));
 	let current: string | null = null;
 	const visited = new Set<string>();
+	const done = new Set<string>();
 	for (const call of calls) {
 		if (POSITION_QUESTION_TOOLS.includes(call.name)) {
 			const nodeId = (call.input as { nodeId?: unknown } | undefined)?.nodeId;
@@ -142,11 +146,12 @@ function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanSt
 			for (const id of lessonProgressOf(call.input)?.done ?? []) {
 				if (!ids.has(id)) continue;
 				visited.add(id);
+				done.add(id);
 				if (current === id) current = null;
 			}
 		}
 	}
-	return { current, visited };
+	return { current, visited, done };
 }
 
 export function derivePlanStatuses(tree: PlanTree, messages: readonly PartsCarrier[]): DerivedPlanStatuses {

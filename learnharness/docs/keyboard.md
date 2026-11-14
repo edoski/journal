@@ -40,7 +40,7 @@ second pillar of input).
 
 | Action | Binding | Seam |
 |---|---|---|
-| Lesson details | ⌘K | `lh:kbd-open-model-picker` (lesson-top-bar.tsx; the id predates the details panel and stays, since saved rebinds key on it) |
+| Where this lesson is | ⌘K | `lh:kbd-open-model-picker` (lesson-roadmap.tsx; the id predates the roadmap and stays, since saved rebinds key on it) |
 | Toggle sidebar | ⌘B | `lh:toggle-sidebar` (sidebar.tsx) |
 | Sessions search | ⌘⇧F | `lh:kbd-sessions-search` (sidebar.tsx) |
 | Walk search results | ↑ / ↓ *in the search field* | sidebar-state.ts: focus goes to the first (↓) or last (↑) result row, course, topic or lesson, and the list's own arrows walk on (sidebar-tree.ts) |
