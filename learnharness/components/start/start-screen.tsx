@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Composer } from "@/components/composer";
 import { CourseControl, CoursesUnavailable, useCourseChoice } from "@/components/course-picker";
@@ -10,6 +10,8 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { useModelSetup } from "@/components/setup-cta";
 import { SessionStarter } from "@/components/start-session";
 import { Button } from "@/components/ui/button";
+import { usePhotoDraft } from "@/components/photos";
+import { keepPhotos, keepWords, keptWords } from "@/components/lesson/kept-drafts";
 
 /** The heading over the composer. It names no mode: the tutor routes the
  *  request to teaching or practice itself. */
@@ -24,9 +26,24 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
  * nothing else. It is the draft at /chat/new; a session is created only
  * when something is sent.
  */
+/** The New lesson box's scope in kept-drafts.ts. */
+const START_SCOPE = "new";
+
 export function StartScreen() {
 	const router = useRouter();
 	const [text, setText] = useState("");
+	// His words and photos survive a reload (kept-drafts.ts); the photos go
+	// with the lesson's first message.
+	const photos = usePhotoDraft(undefined, START_SCOPE);
+	const restoredRef = useRef(false);
+	useEffect(() => {
+		const kept = keptWords(START_SCOPE)?.text;
+		if (kept) setText(kept);
+		restoredRef.current = true;
+	}, []);
+	useEffect(() => {
+		if (restoredRef.current) keepWords(START_SCOPE, { text });
+	}, [text]);
 	const [busy, setBusy] = useState(false);
 	const startingRef = useRef(false);
 	const starterRef = useRef(new SessionStarter());
@@ -57,7 +74,13 @@ export function StartScreen() {
 		setStartError(null);
 		void starterRef.current
 			.start({ title: opening, course: { workspace: course } }, fetch)
-			.then((target) => router.push(target))
+			.then(async (target) => {
+				const waiting = photos.photos.map((p) => p.photo);
+				if (waiting.length) await keepPhotos(`${target.slice(target.lastIndexOf("/") + 1)}:opening`, waiting);
+				keepWords(START_SCOPE, null);
+				photos.take();
+				router.push(target);
+			})
 			.catch(() => {
 				startingRef.current = false;
 				setBusy(false);
@@ -96,6 +119,7 @@ export function StartScreen() {
 						autoFocus
 						placeholder={START_PLACEHOLDER}
 						toolbar={<CourseControl choice={courseChoice} />}
+						photos={photos}
 					/>
 				</div>
 				<div className="mx-auto flex min-h-0 w-full max-w-[46rem] flex-1 flex-col gap-6 overflow-y-auto pt-4 pb-6">

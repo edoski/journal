@@ -39,6 +39,7 @@ import {
 import { ConfidenceChoice } from "@/components/confidence-choice";
 import { PendingPhotos, PhotoAttachButton, sentPhotos, usePhotoDraft } from "@/components/photos";
 import type { Photo } from "@/src/core";
+import { carriedForm, formToKept, keepPhotos, keepWords, keptToForm, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 
 /**
  * The question dock — a pending question REPLACES the chat composer: the
@@ -81,6 +82,11 @@ export interface QuestionDockProps {
 	onSaveDraft?: (draft: QuestionFormDraft) => void;
 	/** What he has typed so far, on every change (stranded-draft.ts). */
 	onDraftChange?: (text: string) => void;
+	/** This box's scope in kept-drafts.ts: his answer survives a reload. */
+	keepAs?: string;
+	/** The course's carry scope (kept-drafts.ts): Hint leaves his work
+	 *  there, and a question with nothing of its own opens with it. */
+	carryAs?: string;
 	/** The keyboard machine (wave B) is armed only while the dock is
 	 *  expanded — the collapsed bar keeps its native Enter-to-expand. */
 	active?: boolean;
@@ -105,6 +111,8 @@ export function QuestionDock({
 	initialDraft,
 	onSaveDraft,
 	onDraftChange,
+	keepAs,
+	carryAs,
 	phase = "probe",
 	compactionRunning = false,
 }: QuestionDockProps) {
@@ -151,6 +159,8 @@ export function QuestionDock({
 					initialDraft={initialDraft}
 					onSaveDraft={onSaveDraft}
 					onDraftChange={onDraftChange}
+					keepAs={keepAs}
+					carryAs={carryAs}
 					compactionRunning={compactionRunning}
 				/>
 			</div>
@@ -237,6 +247,8 @@ function QuestionDockForm({
 	initialDraft,
 	onSaveDraft,
 	onDraftChange,
+	keepAs,
+	carryAs,
 	compactionRunning = false,
 }: Omit<QuestionDockProps, "expanded" | "onExpand" | "reveal">) {
 	const kind = toolQuestionKind(toolName);
@@ -275,7 +287,49 @@ function QuestionDockForm({
 	// between questions, so each question starts fresh at neutral.
 	const [confidence, setConfidence] = useState<Confidence>(initialDraft?.confidence ?? DEFAULT_CONFIDENCE);
 	// Photos of his working: a text answer's only (a choice is a choice).
-	const photos = usePhotoDraft(initialDraft?.photos);
+	const photos = usePhotoDraft(initialDraft?.photos, qd.mode === "text" ? keepAs : undefined);
+	const restorePhotos = photos.restore;
+	// Where the form starts (kept-drafts.ts), after mount so the server's
+	// page and the first client render agree: this call's unconfirmed
+	// submission, else what he typed here before a reload, else the work
+	// Hint or Done for today carried from the question before, taken once.
+	const restoredRef = useRef(false);
+	useEffect(() => {
+		if (initialDraft) {
+			restoredRef.current = true;
+			return;
+		}
+		const kept = keepAs ? keptWords(keepAs)?.form : undefined;
+		const carry = !kept && carryAs ? keptWords(carryAs) : undefined;
+		const draft = kept ? keptToForm(kept) : carry ? carriedForm(carry, qd.mode === "text") : undefined;
+		if (draft) {
+			setSel(draft.selection);
+			setThinking(draft.thinking);
+			setOther(draft.other);
+			setText(draft.text);
+			setConfidence(draft.confidence);
+		}
+		if (carry && carryAs) {
+			keepWords(carryAs, null);
+			void takeKeptPhotos(carryAs).then((carried) => {
+				if (qd.mode === "text") restorePhotos(carried.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
+			});
+		}
+		restoredRef.current = true;
+		// Once, when the question's form mounts.
+	}, []);
+	// Every change is kept for a reload; a sent answer forgets its box.
+	const sentRef = useRef(false);
+	useEffect(() => {
+		if (!keepAs || sentRef.current || !restoredRef.current) return;
+		keepWords(keepAs, { form: formToKept({ selection: sel, thinking, other, text, confidence }) });
+	}, [keepAs, sel, thinking, other, text, confidence]);
+	const forgetBox = () => {
+		sentRef.current = true;
+		if (!keepAs) return;
+		keepWords(keepAs, null);
+		void keepPhotos(keepAs, []);
+	};
 	const selectMode: SelectMode = qd.mode === "multi-select" ? "multi-select" : "single-select";
 	const draftChangeRef = useRef(onDraftChange);
 	draftChangeRef.current = onDraftChange;
@@ -309,6 +363,7 @@ function QuestionDockForm({
 			confidence,
 			...(photos.photos.length ? { photos: photos.photos } : {}),
 		});
+		forgetBox();
 		onSubmit(buildAnswer(qd, req, toolName), qd.mode === "text" ? sentPhotos(photos.photos) : undefined);
 	};
 
@@ -320,6 +375,13 @@ function QuestionDockForm({
 	// answer stays hidden and the tutor gives the next rung.
 	const askHint = () => {
 		if (kind !== "explain" || compactionRunning) return;
+		// The check comes back after the hint as a new question: his work
+		// waits in the carry and fills it (round 3: the field came back empty).
+		if (carryAs) {
+			keepWords(carryAs, { form: formToKept({ selection: sel, thinking, other, text, confidence }) });
+			void keepPhotos(carryAs, photos.photos.map((p) => p.photo));
+		}
+		forgetBox();
 		onSubmit(buildAnswer(qd, { text: qd.mode === "text" ? text : undefined, thinking: qd.mode !== "text" ? thinking.trim() || undefined : undefined, hint: true }, toolName));
 	};
 	const askHintRef = useRef(askHint);

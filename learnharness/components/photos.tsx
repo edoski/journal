@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { useSessionMermaid } from "@/components/session-overlay";
 import { kbdEventForAction, MAX_PHOTOS_PER_ANSWER, PHOTO_MAX_EDGE, photoSrc, type Photo } from "@/src/core";
+import { keepPhotos, keptPhotos } from "@/components/lesson/kept-drafts";
 
 /**
  * Photos of his handwritten working (spec: photos.md): the attach control,
@@ -65,8 +66,10 @@ function imageFiles(list: FileList | null | undefined): File[] {
 }
 
 /** One answer field's photos: add (resized), remove, restore after a
- *  refused send, and the paste and drop handlers for its surface. */
-export function usePhotoDraft(initial?: readonly PendingPhoto[]) {
+ *  refused send, and the paste and drop handlers for its surface. With
+ *  `keepAs` (kept-drafts.ts) the waiting photos survive a reload: they
+ *  are kept under that box's scope and come back when it mounts. */
+export function usePhotoDraft(initial?: readonly PendingPhoto[], keepAs?: string) {
 	const [photos, setPhotos] = useState<PendingPhoto[]>(() => [...(initial ?? [])]);
 	const [error, setError] = useState<string | null>(null);
 	const [dragging, setDragging] = useState(false);
@@ -74,6 +77,26 @@ export function usePhotoDraft(initial?: readonly PendingPhoto[]) {
 	photosRef.current = photos;
 	const countRef = useRef(photos.length);
 	countRef.current = photos.length;
+	// Kept photos join once read; nothing is written over them before then.
+	const loadedRef = useRef(!keepAs || (initial?.length ?? 0) > 0);
+	useEffect(() => {
+		if (!keepAs || loadedRef.current) return;
+		let live = true;
+		void keptPhotos(keepAs).then((kept) => {
+			if (!live) return;
+			loadedRef.current = true;
+			const back = kept.map((photo) => ({ id: `photo_${++nextId}`, photo }));
+			if (back.length) setPhotos((prev) => [...back, ...prev].slice(0, MAX_PHOTOS_PER_ANSWER));
+			else if (photosRef.current.length) void keepPhotos(keepAs, photosRef.current.map((p) => p.photo));
+		});
+		return () => {
+			live = false;
+		};
+	}, [keepAs]);
+	useEffect(() => {
+		if (!keepAs || !loadedRef.current) return;
+		void keepPhotos(keepAs, photos.map((p) => p.photo));
+	}, [keepAs, photos]);
 
 	const add = useCallback(async (files: readonly Blob[]) => {
 		if (files.length === 0) return;

@@ -9,6 +9,7 @@ import { useEnterSubmits } from "@/components/enter-submits";
 import { ConfidenceChoice } from "@/components/confidence-choice";
 import { Hint } from "@/components/ui/hint";
 import { PendingPhotos, PhotoAttachButton, sentPhotos, usePhotoDraft } from "@/components/photos";
+import { keepWords, keptWords } from "@/components/lesson/kept-drafts";
 import { cn } from "@/lib/utils";
 import { DEFAULT_CONFIDENCE, kbdEventForAction, type Confidence, type KeyAction, type Photo, type PracticeRequest } from "@/src/core";
 
@@ -68,18 +69,28 @@ export interface PracticeDockProps {
 	busy?: boolean;
 	/** What he has typed so far, on every change (stranded-draft.ts). */
 	onDraftChange?: (text: string) => void;
+	/** This box's scope in kept-drafts.ts: his work survives a reload. */
+	keepAs?: string;
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false, busy = false, onDraftChange }: PracticeDockProps) {
+export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false, busy = false, onDraftChange, keepAs }: PracticeDockProps) {
 	const waiting = compactionRunning || busy;
 	const [thinking, setThinking] = useState("");
 	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
-	const photos = usePhotoDraft();
+	const photos = usePhotoDraft(undefined, keepAs);
 	const draftChangeRef = useRef(onDraftChange);
 	draftChangeRef.current = onDraftChange;
+	// What he typed before a reload comes back after mount (kept-drafts.ts).
+	const restoredRef = useRef(false);
+	useEffect(() => {
+		const kept = keepAs ? keptWords(keepAs)?.text : undefined;
+		if (kept) setThinking(kept);
+		restoredRef.current = true;
+	}, [keepAs]);
 	useEffect(() => {
 		draftChangeRef.current?.(thinking);
-	}, [thinking]);
+		if (keepAs && restoredRef.current) keepWords(keepAs, { text: thinking });
+	}, [thinking, keepAs]);
 
 	const submit = () => {
 		if (waiting) return;

@@ -92,6 +92,7 @@ import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { formDraftText, strandedDraft } from "@/components/lesson/stranded-draft";
 import { LESSON_WORDS } from "@/components/study-words";
+import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -599,23 +600,40 @@ export function Chat({
 	/* The composer draft ref is synchronous, so sends read the latest text
 	 * without a parent render per input event. Explicit resets still bump a
 	 * revision so the local field can sync. */
+	// What he types here is kept per box on this Mac (kept-drafts.ts), so
+	// a reload or a restart never empties it.
+	const composerScope = `${chatId}:composer`;
+	const carryScope = course ? `carry:${course.workspace}` : undefined;
 	const textRef = useRef("");
 	// His photos waiting in the composer (photos.tsx): they stay while a
 	// question or problem holds the dock, and go with the next message.
-	const composerPhotos = usePhotoDraft();
+	const composerPhotos = usePhotoDraft(undefined, composerScope);
+	const restoreComposerPhotos = composerPhotos.restore;
 	const applyText = useCallback((v: string) => {
 		textRef.current = v;
+		keepWords(composerScope, { text: v });
 		setComposerDraftRevision((revision) => revision + 1);
-	}, []);
+	}, [composerScope]);
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
-	}, []);
+		keepWords(composerScope, { text: v });
+	}, [composerScope]);
+	// What he typed before a reload comes back after mount, so the server's
+	// page and the first client render agree.
+	useEffect(() => {
+		const kept = keptWords(composerScope)?.text;
+		if (kept && !textRef.current) applyText(kept);
+	}, [composerScope, applyText]);
 
 	// ANSWERED IN ANOTHER WINDOW (stranded-draft.ts): the open question or
 	// problem left without this window sending what he typed in it, so the
 	// words go to the composer and one line says why.
 	const dockKey = pending ? `q:${pending.key}` : activeProblem ? `p:${activeProblem.toolCallId}` : null;
 	dockKeyRef.current = dockKey;
+	// Boxes of questions and problems that have closed keep nothing.
+	useEffect(() => {
+		forgetClosedBoxes(chatId, dockKey ? [`${chatId}:${dockKey}`] : []);
+	}, [chatId, dockKey]);
 	const prevDockKeyRef = useRef(dockKey);
 	useEffect(() => {
 		const before = prevDockKeyRef.current;
@@ -656,16 +674,18 @@ export function Chat({
 		setOpeningError(false);
 		draftRef.current = prompt; // The existing 503 flow must restore it too.
 		applyText("");
-		void send({ type: "text", text: prompt }, () => {
+		// Photos from the New lesson box go with the first message.
+		void takeKeptPhotos(`${chatId}:opening`).then((photos) => send({ type: "text", text: prompt, ...(photos.length ? { photos } : {}) }, () => {
 			clearOpeningPrompt(chatId);
 			openingDraftRef.current = null;
 			if (draftRef.current === prompt) draftRef.current = null;
 		}).then(accepted => {
+			if (!accepted && photos.length) restoreComposerPhotos(photos.map((photo, i) => ({ id: `opening_${i}`, photo })));
 			if (!accepted && openingMountedRef.current && openingDraftRef.current === prompt && !textRef.current) {
 				applyText(prompt);
 			}
-		});
-	}, [chatId, send, applyText]);
+		}));
+	}, [chatId, send, applyText, restoreComposerPhotos]);
 
 	const sentInitial = useRef(false);
 	useEffect(() => {
@@ -791,8 +811,16 @@ export function Chat({
 	const doneTonight = doneTonightAtEnd(nativeMessages);
 	const sendTonight = useCallback(() => {
 		if (busy || compacting || doneTonight) return;
+		// His half-typed answer waits for the same question next time
+		// (kept-drafts.ts); the answer itself stays hidden.
+		if (pending && carryScope) {
+			const box = `${chatId}:q:${pending.key}`;
+			const kept = keptWords(box);
+			if (kept) keepWords(carryScope, kept);
+			void keptPhotos(box).then((photos) => { if (photos.length) void keepPhotos(carryScope, photos); });
+		}
 		void send({ type: "tonight" });
-	}, [busy, compacting, doneTonight, send]);
+	}, [busy, compacting, doneTonight, send, pending, carryScope, chatId]);
 	const sendTonightRef = useRef(sendTonight);
 	sendTonightRef.current = sendTonight;
 	useEffect(() => {
@@ -1656,6 +1684,8 @@ export function Chat({
 					busy={busy}
 					focusEpoch={focusEpoch}
 					onDockDraft={recordDockDraft}
+					keepScope={chatId}
+					carryScope={carryScope}
 					answeredElsewhere={answeredElsewhere}
 					replyAnchorRef={replyAnchorRef}
 					onJumpToLatest={jumpToLatest}
@@ -1870,6 +1900,8 @@ function DockOverlay({
 	busy,
 	focusEpoch,
 	onDockDraft,
+	keepScope,
+	carryScope,
 	answeredElsewhere,
 	replyAnchorRef,
 	onJumpToLatest,
@@ -1913,6 +1945,10 @@ function DockOverlay({
 	focusEpoch: number;
 	/** What he types in the open dock, keyed by its question or problem. */
 	onDockDraft: (key: string, text: string) => void;
+	/** The lesson's prefix for kept boxes (kept-drafts.ts). */
+	keepScope: string;
+	/** The course's carry: work Hint or Done for today leaves for the next question. */
+	carryScope?: string;
 	/** Another window answered the question he was typing in. */
 	answeredElsewhere: boolean;
 	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
@@ -2343,6 +2379,8 @@ function DockOverlay({
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
 									onDraftChange={(text) => onDockDraft(`q:${pending.key}`, text)}
+									keepAs={`${keepScope}:q:${pending.key}`}
+									carryAs={carryScope}
 									compactionRunning={compactionRunning}
 								/>
 							) : practice ? (
@@ -2357,6 +2395,7 @@ function DockOverlay({
 									onSubmit={onSubmitThinking}
 									onRequest={onPracticeRequest}
 									onDraftChange={(text) => onDockDraft(`p:${practice.toolCallId}`, text)}
+									keepAs={`${keepScope}:p:${practice.toolCallId}`}
 									compactionRunning={compactionRunning}
 									busy={busy}
 								/>
