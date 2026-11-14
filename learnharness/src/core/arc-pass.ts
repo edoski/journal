@@ -263,7 +263,7 @@ export interface ArcSubmit {
 	doubts?: { topic: string; need: string; reason: string }[];
 	/** Why the course gets no arcs (R6), instead of arcs. */
 	none?: string;
-	/** Where the cut comes from, in one line: the formation's reason. */
+	/** Where the cut comes from, and why it departs from the material where it does: the formation's reason. */
 	basis: string;
 }
 
@@ -291,7 +291,7 @@ export function arcPassProblems(submit: ArcSubmit, view: ArcPassView): string | 
 		if (submit.arcs.length > 0) problems.push("none says the course gets no arcs, yet arcs lists some: send one or the other.");
 		return problems.length > 0 ? problems.join("\n") : null;
 	}
-	if (!submit.basis?.trim()) problems.push("basis is empty: say in one line which units of the material the cut follows.");
+	if (!submit.basis?.trim()) problems.push("basis is empty: say which units of the material the cut follows, and why it departs from them where it does.");
 	if (submit.arcs.length < MIN_ARCS) problems.push(`arcs lists ${submit.arcs.length === 0 ? "none" : "one"}: form at least two, or send none with the reason the course gets no arcs.`);
 	const taken = new Set([...topics, ...view.taken, ...view.sources]);
 	const handles = new Set<string>();

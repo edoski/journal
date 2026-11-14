@@ -103,7 +103,7 @@ const arcSchema = Type.Object({
 		Type.Array(Type.Object({ topic: Type.String(), need: Type.String(), reason: Type.String() }), { description: "Stored prerequisites you think false: kept, and recorded with your reason." }),
 	),
 	none: Type.Optional(Type.String({ description: "Only when the course should get no arcs: why, by the size rules." })),
-	basis: Type.String({ description: "In one line, the material's units the cut follows." }),
+	basis: Type.String({ description: "The material's units the cut follows, then each place the cut departs from them, with its reason: a topic homed outside its unit, a unit merged or re-cut, an order other than the material's, a count outside four to eight arcs." }),
 });
 
 export const ARC_EDGES_INSTRUCTIONS = `You settle a course's prerequisites before anything is built on them, following the test below. You answer with one ${EDGES_TOOL} call; the app saves it.
