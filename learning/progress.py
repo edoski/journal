@@ -303,11 +303,16 @@ def replay(
 
 
 def _transferred(attempts: list[Attempt], replayed: Replay) -> bool:
-    """A ``solid`` transfer on a day neither missed nor a learning day."""
+    """A ``solid`` transfer on a day neither missed nor a learning day, after
+    an earlier ``solid`` day: applying an idea in a new setting is evidence
+    beyond holding it only once it is held, so one answer flagged as transfer
+    never lifts a topic on its own."""
+    solid = [day for day, verdict in replayed.verdicts if verdict == "solid"]
     missed = {day for day, verdict in replayed.verdicts if verdict == "missed"}
-    return any(
+    return bool(solid) and any(
         item.get("transfer")
         and grade(item) == "solid"
+        and item["date"] > solid[0]
         and item["date"] not in missed
         and replayed.days.get(item["date"]) != LEARNING
         for _, item in attempts

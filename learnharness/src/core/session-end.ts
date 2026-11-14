@@ -10,7 +10,7 @@ import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
  * question or problem it posed is read separately). The tutor owes the
  * next word when its turn failed, was stopped, never answered his message
  * or a wake, or ran tools it never answered: "cut". It waits on him
- * partway through a lesson when the plan waits for his go-ahead, when he
+ * partway through a lesson when it wrote the plan but taught no step, when he
  * dismissed its question, when a lesson it picked up has reached no step
  * yet, or when its turn ended in words that ask him something while the
  * step it stopped on leads to another: "mid-lesson". Practice waits on
