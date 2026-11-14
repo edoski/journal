@@ -189,7 +189,7 @@ describe("practice display surfaces", () => {
 		assert.ok(preview.includes(doubled));
 		assert.deepEqual(math(preview).annotations, []);
 		const dismissed = renderToStaticMarkup(<ConcludeCard part={part({ outcome: "dismissed", verdict: doubled }, { reveal: doubled })} />);
-		assert.ok(dismissed.includes("Problem dismissed."));
+		assert.ok(dismissed.includes("You skipped this problem."));
 		assert.deepEqual(math(dismissed).annotations, []);
 		const plain = math(renderToStaticMarkup(<MessageResponse>{doubled}</MessageResponse>));
 		assert.deepEqual(plain.annotations, [doubled.slice(1, -1)]);

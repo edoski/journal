@@ -512,6 +512,9 @@ export function newProblemDismissedMarker(problemCallId: string): LhMarkerMessag
  *  pair appends at most once per marker). */
 export function concludedByDismissalPair(
 	problemCallId: string,
+	/** "tonight" when Done for today dropped it (the card says it was left
+	 *  for next time); the model's face is the same either way. */
+	reason?: "tonight",
 ): [LhMessage & AssistantMessage, LhMessage & ToolResultMessage] {
 	const callId = `call_conc_${problemCallId}`;
 	const now = Date.now();
@@ -547,7 +550,7 @@ export function concludedByDismissalPair(
 			toolCallId: callId,
 			toolName: PRACTICE_CONCLUDE_TOOL,
 			content: [{ type: "text", text: CONCLUDE_ACK_TEXT }],
-			details: { outcome: "dismissed", problemCallId },
+			details: { outcome: "dismissed", problemCallId, ...(reason ? { reason } : {}) },
 			isError: false,
 			timestamp: now,
 		},

@@ -109,17 +109,22 @@ export function heldWords(review: CourseMapTopic["review"], exam: string | null)
 }
 
 /** The lesson's words for what just happened to his work (round 2, 14 Nov
- *  2026): a reply below the fold, a reply that never came, a draft another
- *  window overtook, stopping for the night, and a course whose record
- *  can't be read. One form each, wherever it shows. */
+ *  2026): a reply below the fold, a reply that never came (he stopped it,
+ *  or the app lost it), a connection that dropped mid-reply, a draft
+ *  another window overtook, stopping for the day, a problem he skipped,
+ *  and a course whose record can't be read. One form each, wherever it
+ *  shows. */
 export const LESSON_WORDS = {
 	newReply: "New reply",
 	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
+	youStoppedReply: "You stopped the tutor before it replied.",
 	tryAgain: "Try again",
+	connectionDropped: "The connection dropped before the tutor finished replying.",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
+	skippedProblem: "You skipped this problem.",
 	unreadableCourse: "Couldn't read this course's record",
 } as const;
 
@@ -153,6 +158,16 @@ export const STOPPED_WORDS: Record<JobKind | "unknown", string> = {
 	pdf: "PDF reading stopped by you",
 	unknown: "Stopped by you",
 };
+
+/** Esc's confirm, in his words: skip the question or problem waiting on
+ *  him, or stop the tutor's reply. `alsoStops` follows a skip made while
+ *  the tutor is still writing. */
+export const STOP_WORDS = {
+	turn: { title: "Stop the tutor's reply?", line: "What it has written so far stays.", action: "Stop" },
+	question: { title: "Skip this question?", line: "The tutor goes on without your answer.", action: "Skip" },
+	problem: { title: "Skip this problem?", line: "The tutor moves on, and the solution stays hidden.", action: "Skip" },
+	alsoStops: "The tutor's reply stops too.",
+} as const;
 
 /** What stops a course's record being read, after
  *  `LESSON_WORDS.unreadableCourse`, in a student's words. */

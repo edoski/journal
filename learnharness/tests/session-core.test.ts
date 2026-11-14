@@ -740,7 +740,7 @@ describe("truncated stream recovery", () => {
 		assert.equal(posts, 1);
 		assert.equal(streams, 2);
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("reports the approved connection error when the recovery record read fails", async () => {
@@ -753,7 +753,7 @@ describe("truncated stream recovery", () => {
 		} });
 		await m.send({ type: "text", text: "go" });
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("accepts turn-settled when the original turn finished during the disconnection", async () => {
@@ -802,7 +802,7 @@ describe("truncated stream recovery", () => {
 		} });
 		await m.send({ type: "text", text: "go" });
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("preserves malformed-event diagnostics rather than calling them network drops", async () => {
@@ -811,7 +811,7 @@ describe("truncated stream recovery", () => {
 		await m.send({ type: "text", text: "go" });
 		assert.equal(streams, 1);
 		assert.equal(m.status, "error");
-		assert.notEqual(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.notEqual(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 		assert.match(m.getState().error!.message, /JSON|property name/);
 	});
 
@@ -821,7 +821,7 @@ describe("truncated stream recovery", () => {
 		await m.send({ type: "text", text: "go" });
 		assert.equal(streams, 2);
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("a superseded consume cannot recover or overwrite its replacement's state", async () => {

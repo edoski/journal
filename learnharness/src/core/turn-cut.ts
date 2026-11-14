@@ -9,13 +9,23 @@ import { nativeInputCause, NEUTRAL_MARKERS, type LhMessage } from "./native-mess
  * continuation law (`needsContinuation`) resumes that turn by itself. Pure.
  */
 export function replyNeverCame(messages: readonly LhMessage[]): boolean {
+	return replyCutOf(messages) !== null;
+}
+
+/** Why the reply never came (`replyNeverCame`): "stopped" when the record
+ *  ends at an empty reply someone stopped (only a stop press, his, from
+ *  any window, aborts a turn), "lost" when it ends at his input with no
+ *  reply at all (the app restarted while it ran); null when a reply came.
+ *  Pure. */
+export function replyCutOf(messages: readonly LhMessage[]): "stopped" | "lost" | null {
 	let i = messages.length - 1;
 	while (i >= 0 && messages[i]!.role === "custom" && NEUTRAL_MARKERS.includes((messages[i] as { customType: string }).customType)) i--;
 	const last = messages[i];
-	if (!last) return false;
+	if (!last) return null;
 	if (last.role === "assistant") {
-		return last.stopReason === "aborted" && !last.content.some((b) => (b.type === "text" && b.text.trim() !== "") || b.type === "toolCall");
+		const empty = last.stopReason === "aborted" && !last.content.some((b) => (b.type === "text" && b.text.trim() !== "") || b.type === "toolCall");
+		return empty ? "stopped" : null;
 	}
-	if (last.role === "toolResult") return false;
-	return nativeInputCause(last as never, messages.slice(0, i) as never) === "learner";
+	if (last.role === "toolResult") return null;
+	return nativeInputCause(last as never, messages.slice(0, i) as never) === "learner" ? "lost" : null;
 }

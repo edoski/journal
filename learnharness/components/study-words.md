@@ -34,11 +34,18 @@ Home's line names the lapsed topic when the line is about another one ("Missed C
 | Moment | Words |
 |---|---|
 | a reply arrived below what he can see | New reply (the cue above the dock) |
-| the tutor's turn ended with no reply (a restart, a stop before any words) | The tutor stopped before replying. Try again |
+| the tutor's turn ended with no reply | You stopped the tutor before it replied. (his stop, from any window) / The tutor stopped before replying. (the app restarted while it ran); then Try again |
+| the connection dropped mid-reply | The connection dropped before the tutor finished replying. |
 | another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. |
-| he stops for the day | Done for today; a question he left reads Left for next time, in full |
-| he skips a question | Skipped, then the question |
+| he stops for the day | Done for today; a question he left reads Left for next time, in full; a problem he left reads Left for next time. |
+| he skips | a question: Skipped, then the question; a problem: You skipped this problem. |
 | a course's record can't be read | Couldn't read this course's record, then why (`UNREADABLE_WORDS`): The app isn't allowed to open its files. / Its file is damaged. / Its file can't be opened. |
+
+## Labels in a lesson
+
+| What | Words |
+|---|---|
+| Esc's confirm (`STOP_WORDS`) | Stop the tutor's reply? What it has written so far stays. Stop / Skip this question? The tutor goes on without your answer. Skip / Skip this problem? The tutor moves on, and the solution stays hidden. Skip; while the tutor writes, The tutor's reply stops too. |
 
 ## Counts
 

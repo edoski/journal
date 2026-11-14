@@ -72,7 +72,7 @@ import {
 	toolQuestionKind,
 	questionNeedsReveal,
 	doneTonightAtEnd,
-	replyNeverCame,
+	replyCutOf,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
@@ -775,7 +775,7 @@ export function Chat({
 	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
 	// A turn that ended with no word after his input (a restart, a stop
 	// before the reply began) says so, with Try again (turn-cut.ts).
-	const replyCut = status === "ready" && !busy && !compacting && !error && replyNeverCame(nativeMessages);
+	const replyCut = status === "ready" && !busy && !compacting && !error ? replyCutOf(nativeMessages) : null;
 	const sendAllowed = !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
@@ -1612,7 +1612,7 @@ export function Chat({
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
 							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
-							{replyCut && <ReplyCut onRetry={() => void send({ type: "continue" })} />}
+							{replyCut && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>

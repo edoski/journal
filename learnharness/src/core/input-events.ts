@@ -351,7 +351,7 @@ export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMo
 			dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight")));
 	const active = activeProblemOf(record.messages);
 	const dropped = active
-		? [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId)]
+		? [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId, "tonight")]
 		: dismissalConclusion(record);
 	return [...withheld, ...dropped, newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))];
 }
