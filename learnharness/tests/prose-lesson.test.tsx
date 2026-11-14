@@ -126,16 +126,18 @@ describe("the Prose composer", () => {
 	it("is the lesson's composer with nothing open", () => {
 		const html = draw({});
 		assert.match(html, /data-mode="message"/);
-		assert.doesNotMatch(html, /Ask instead/);
+		assert.doesNotMatch(html, /data-testid="prose-mode"/);
 	});
 
-	it("answers an open question: its placeholder, Hint, confidence and Ask instead", () => {
+	it("answers an open question: its placeholder, Hint as an icon beside attach, confidence and the Answer or Ask toggle as icons", () => {
 		const html = draw({ open: question });
 		assert.match(html, /data-mode="answer"/);
 		assert.match(html, /placeholder="Your prediction, and why"/);
-		assert.match(html, /data-testid="question-hint"/);
-		assert.match(html, /data-testid="confidence-choice"[^>]*>Neutral</);
-		assert.match(html, /data-testid="prose-ask"/);
+		assert.match(html, /data-slot="composer-leading"[^>]*>.*data-testid="question-hint"[^>]*aria-label="Hint"/);
+		assert.match(html, /data-testid="confidence-choice"[^>]*aria-label="How sure you are: Neutral"/);
+		assert.match(html, /data-testid="prose-mode"[^>]*data-mode="answer"/);
+		assert.match(html, /data-testid="prose-answer-mode"[^>]*aria-checked="true"|aria-checked="true"[^>]*data-testid="prose-answer-mode"/);
+		assert.doesNotMatch(html, />(Hint|Neutral|Ask instead)</, "no text chips");
 	});
 
 	it("works a problem with Hint, Show me, Explain instead and confidence", () => {
@@ -148,7 +150,7 @@ describe("the Prose composer", () => {
 		const html = draw({ open: question, answer: answerState({ mode: "ask" }) });
 		assert.match(html, /data-mode="message"/);
 		assert.match(html, /placeholder="Ask anything. Sending skips this question."/);
-		assert.match(html, /data-testid="prose-back"/);
+		assert.match(html, /data-testid="prose-mode"[^>]*data-mode="ask"/, "the same toggle, now on asking, is the way back");
 	});
 });
 

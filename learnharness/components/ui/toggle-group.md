@@ -17,3 +17,5 @@ shadcn's toggle group (`components/ui/toggle-group.tsx`, `toggle.tsx`, Radix Tog
 One item is a tab stop (Radix roving focus); arrows move between items. Use `type="single"` and ignore the empty value, so one item is always on.
 
 Sources: Apple segmented control (sentence case, the selected segment on a raised fill), T3 Code's muted 12–13px toolbar controls (research/agent-apps.md).
+
+The chosen item reads from `aria-checked` and `aria-pressed` as well as `data-state`: a tooltip trigger wrapping an item (the composer's Answer or Ask toggle) writes its own `data-state` over the item's.

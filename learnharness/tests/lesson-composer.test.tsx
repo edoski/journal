@@ -6,7 +6,7 @@ import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ComposerChip, LessonComposer } from "../components/lesson/lesson-composer.tsx";
+import { ComposerIcon, LessonComposer } from "../components/lesson/lesson-composer.tsx";
 
 const noop = () => {};
 const composer = (props: Partial<React.ComponentProps<typeof LessonComposer>> = {}) =>
@@ -24,11 +24,17 @@ describe("the lesson composer", () => {
 		assert.match(html, /size-8/);
 	});
 
-	it("takes a host's placeholder and its quiet chips before the send", () => {
-		const html = composer({ placeholder: "Your prediction, and why", toolbar: <ComposerChip pressed>Confident</ComposerChip> });
+	it("takes a host's placeholder, its icons beside attach and its controls before the send", () => {
+		const html = composer({
+			placeholder: "Your prediction, and why",
+			leading: <ComposerIcon aria-label="Hint" data-testid="hint">H</ComposerIcon>,
+			toolbar: <ComposerIcon pressed aria-label="How sure you are: Confident">C</ComposerIcon>,
+		});
 		assert.match(html, /placeholder="Your prediction, and why"/);
-		assert.match(html, /data-slot="composer-chip"[^>]*aria-pressed="true"/);
-		assert.ok(html.indexOf("composer-chip") < html.indexOf("composer-send"), "chips sit before the send");
+		assert.match(html, /data-slot="composer-leading"[^>]*>.*data-testid="hint"/);
+		assert.match(html, /data-slot="composer-control"[^>]*aria-pressed="true"/);
+		assert.ok(html.indexOf("composer-controls") < html.indexOf("composer-send"), "controls sit before the send");
+		assert.ok(html.indexOf("composer-leading") < html.indexOf("composer-controls"), "the icons lead, on the left");
 	});
 
 	it("submits an answer in answer mode, ready or not, whatever the field holds", () => {

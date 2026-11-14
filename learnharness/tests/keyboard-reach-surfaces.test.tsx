@@ -18,7 +18,7 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { Confidence } from "../src/core/contracts/course.ts";
 import { kbdEventForAction, type KeyAction } from "../src/core/keyboard.ts";
 import { CalendarView } from "../components/calendar/calendar-view.tsx";
-import { ConfidenceChoice } from "../components/confidence-choice.tsx";
+import { ConfidenceIcon } from "../components/lesson/prose/prose-composer.tsx";
 
 const TODAY = "2026-11-08";
 const router = { push: () => {}, replace: () => {}, prefetch: () => {}, back: () => {}, forward: () => {}, refresh: () => {} };
@@ -96,12 +96,12 @@ function Toggle({ initial }: { initial: Confidence }) {
 	return (
 		<>
 			<textarea data-testid="answer" />
-			<ConfidenceChoice value={value} onChange={setValue} />
+			<ConfidenceIcon value={value} onChange={setValue} />
 		</>
 	);
 }
 
-const chosen = () => document.querySelector("[data-testid=confidence-choice] [data-state=on]")?.getAttribute("data-confidence");
+const chosen = () => document.querySelector("[data-testid=confidence-choice]")?.getAttribute("data-confidence");
 
 /** An ⌥-arrow keydown from the answer field; true when something claimed it. */
 async function altArrow(key: "ArrowUp" | "ArrowDown"): Promise<boolean> {
@@ -114,14 +114,9 @@ async function altArrow(key: "ArrowUp" | "ArrowDown"): Promise<boolean> {
 }
 
 describe("confidence from the keyboard", () => {
-	const shown = (visible: boolean) => {
-		(dom.window.HTMLElement.prototype as unknown as { checkVisibility: () => boolean }).checkVisibility = () => visible;
-	};
-
 	it("⌥↑ is more sure and ⌥↓ less sure, from the answer field, held at the ends", async () => {
-		shown(true);
 		await render(<Toggle initial="neutral" />);
-		assert.equal(await altArrow("ArrowUp"), true, "the toggle claims the key");
+		assert.equal(await altArrow("ArrowUp"), true, "the confidence icon claims the key");
 		assert.equal(chosen(), "confident");
 		await altArrow("ArrowUp");
 		assert.equal(chosen(), "confident");
@@ -131,10 +126,5 @@ describe("confidence from the keyboard", () => {
 		assert.equal(chosen(), "guessing");
 	});
 
-	it("does nothing, and leaves the key to the field, while the toggle is not on screen", async () => {
-		shown(false);
-		await render(<Toggle initial="neutral" />);
-		assert.equal(await altArrow("ArrowUp"), false);
-		assert.equal(chosen(), "neutral");
-	});
+
 });

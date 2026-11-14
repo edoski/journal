@@ -1912,7 +1912,9 @@ function DockOverlay({
 						{answeredElsewhere && (
 							<p data-testid="answered-elsewhere" className="px-4 pb-2 text-row text-muted-foreground">{LESSON_WORDS.answeredElsewhere}</p>
 						)}
-						<div className="pointer-events-auto overflow-hidden rounded-[20px]">{composer}</div>
+						{/* No clip around it: the composer draws its own 16px outline,
+						    and a wrapper's larger rounded clip cut its corners. */}
+						{composer}
 					</div>
 					<ScrollCueButton anchorRef={replyAnchorRef} onJump={onJumpToLatest} className="bottom-full mb-2" />
 				</div>

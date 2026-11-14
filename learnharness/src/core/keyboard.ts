@@ -126,7 +126,7 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "calendar-month", label: "Show the month", scope: "global", binding: "m", group: "calendar" },
 	{ id: "calendar-previous", label: "Previous week or month", scope: "global", binding: "p", group: "calendar" },
 	{ id: "calendar-next", label: "Next week or month", scope: "global", binding: "n", group: "calendar" },
-	// The confidence toggle owns these while it is mounted (confidence-choice.tsx).
+	// The composer's confidence icon owns these while it is mounted (prose-composer.tsx).
 	{ id: "confidence-up", label: "More sure", scope: "lesson", binding: "alt+arrowup", displayOnly: true },
 	{ id: "confidence-down", label: "Less sure", scope: "lesson", binding: "alt+arrowdown", displayOnly: true },
 	{ id: "pick-course", label: "Pick a course", scope: "lesson", binding: "mod+o" },
