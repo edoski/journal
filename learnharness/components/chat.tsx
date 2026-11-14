@@ -78,7 +78,7 @@ import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
-import { READING_COLUMN } from "@/components/lesson/lesson-column";
+import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
@@ -226,7 +226,7 @@ export function Chat({
 	// (components/lesson/prose/prose.md). Esc while something is open turns
 	// the composer between answering and asking (prose-composer.tsx binds it).
 	const proseToggleRef = useRef<(() => void) | null>(null);
-	const column = READING_COLUMN;
+	const column = LESSON_COLUMN;
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
 

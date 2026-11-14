@@ -6,7 +6,7 @@
 
 | Slot | Element | Measured at 1512×982 |
 |---|---|---|
-| root `data-slot="composer"` | `form` | 16px radius, `card` fill, a 1px hairline at white 5% with a 3% inset highlight on `::after`; 520px wide in the reading column; 110px empty (109.5) |
+| root `data-slot="composer"` | `form` | 16px radius, `card` fill, a 1px hairline at white 5% with a 3% inset highlight on `::after`; 736px wide in the lesson column (lesson-column.ts); 110px empty (109.5) |
 | body `composer-body` | `div` | padding 16 top and sides, 8 bottom |
 | field `composer-field` | `textarea` | 14/22.75 (`text-control`, 1.625), two lines tall (53.5px) growing to 208px, then it scrolls with no bar |
 | toolbar `composer-toolbar` | `div` | padding 0 8 8: attach on the left, the host's chips right-aligned 2px apart, then the send |
