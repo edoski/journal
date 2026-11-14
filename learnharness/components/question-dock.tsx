@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownIcon, CheckIcon, ChevronRightIcon, LightbulbIcon } from "lucide-react";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
@@ -196,11 +197,12 @@ export function QuestionDockBar({
 }) {
 	const reveal = variant === "reveal";
 	return (
-		<button
-			type="button"
+		<Button
+			variant="list"
+			size="row"
 			data-testid={reveal ? "teach-check-reveal" : "question-dock-bar"}
 			onClick={onExpand}
-			className="dock-variant flex h-12 w-full items-center gap-3 px-4 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+			className="dock-variant h-12 gap-3 rounded-none px-4 focus-visible:ring-inset"
 		>
 			<span className={cn("shrink-0", reveal ? "font-medium text-foreground" : "text-muted-foreground")}>
 				{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
@@ -212,7 +214,7 @@ export function QuestionDockBar({
 				{reveal ? "Open" : "Answer"}
 				{reveal ? <ChevronRightIcon className="size-4" /> : <ArrowDownIcon className="size-4" />}
 			</span>
-		</button>
+		</Button>
 	);
 }
 
@@ -557,7 +559,7 @@ function QuestionDockForm({
 			>
 				<div className="mx-4 mt-3 border-t" />
 				{qd.mode === "text" ? (
-					<textarea
+					<Textarea
 						data-testid="answer-field"
 						aria-label="Your answer"
 						value={text}
@@ -566,12 +568,12 @@ function QuestionDockForm({
 						placeholder="Your answer"
 						rows={1}
 						className={cn(
-							"field-sizing-content block max-h-48 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground",
+							"block max-h-48 resize-none rounded-none border-0 px-4 pb-1 pt-3 text-control focus-visible:ring-0",
 							phase === "teach" ? "min-h-20" : "min-h-12",
 						)}
 					/>
 				) : (
-					<textarea
+					<Textarea
 						ref={thinkingRef}
 						data-testid="thinking-field"
 						aria-label="Your thinking"
@@ -581,7 +583,7 @@ function QuestionDockForm({
 						placeholder="Why this answer? Whatever comes to mind."
 						rows={1}
 						className={cn(
-							"field-sizing-content block max-h-48 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground",
+							"block max-h-48 resize-none rounded-none border-0 px-4 pb-1 pt-3 text-control focus-visible:ring-0",
 							phase === "teach" ? "min-h-20" : "min-h-12",
 						)}
 					/>
