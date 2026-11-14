@@ -18,6 +18,7 @@ import { MessageResponse } from "../components/ai-elements/message.tsx";
 import { ThinkingBlock, setAllUserThinkingOpen } from "@/components/thinking-block";
 import { MermaidOverlay, SessionMermaidContext, chartSize } from "../components/session-overlay.tsx";
 import { MarkdownCode, codeSource } from "../components/md-blocks.tsx";
+import { plainNumber } from "../components/plain-numbers.ts";
 
 function render(md: string): string {
 	return renderToStaticMarkup(<MessageResponse mode="static">{md}</MessageResponse>);
@@ -266,5 +267,29 @@ describe("ThinkingBlock — the learner's surface + ⌘T sync", () => {
 		assert.match(reopened, /aria-expanded="true"/);
 		// restore the null default for other tests in this file
 		setAllUserThinkingOpen(true);
+	});
+});
+
+describe("a tutor's table and its numbers", () => {
+	it("wraps to the lesson column instead of running past it, header cells included", () => {
+		const css = readFileSync("app/globals.css", "utf8");
+		const table = css.slice(css.indexOf('[data-streamdown="table"] {'), css.indexOf("}", css.indexOf('[data-streamdown="table"] {')));
+		assert.match(table, /width: fit-content;/);
+		assert.match(table, /max-width: 100%;/);
+		assert.doesNotMatch(table, /max-content/);
+		const cells = css.slice(css.indexOf('[data-streamdown="table"] :where(th, td) {'));
+		assert.match(cells.slice(0, cells.indexOf("}")), /white-space: normal;/);
+	});
+
+	it("sets a bare number written as math in the prose's type, and keeps KaTeX for anything else", () => {
+		assert.equal(plainNumber("0.5"), "0.5");
+		assert.equal(plainNumber("-3"), "−3");
+		assert.equal(plainNumber("12\\%"), "12%");
+		assert.equal(plainNumber("0{,}5"), "0,5");
+		assert.equal(plainNumber("x = 2"), null);
+		assert.equal(plainNumber("2 \\times 3"), null);
+		const html = renderToStaticMarkup(<MessageResponse mode="static">{"| Check | Time |\n|---|---|\n| Trace | $0.5$ min |\n| Eigenpair | $A v = 2 v$ |"}</MessageResponse>);
+		assert.match(html, />0\.5 min</, "the number reads as the words beside it");
+		assert.equal((html.match(/class="katex"/g) ?? []).length, 1, "only the real formula is typeset");
 	});
 });

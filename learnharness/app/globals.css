@@ -386,11 +386,13 @@ body {
 [data-streamdown="table"] {
 	border: 1px solid var(--border);
 	/* Tables HUG their contents (owner, callout round 2026-10-07): no more
-	   full-width stretch with dead space. max-content sizes to the cells
-	   (width:auto would still stretch — the classic table trap). No
-	   max-width cap: a max-width would squish-wrap wide tables instead of
-	   letting the md-blocks overflow-x scroller carry them. */
-	width: max-content;
+	   full-width stretch with dead space. fit-content sizes to the cells
+	   while they fit the column, and past that wraps them to the column's
+	   width (round 3: a three-column table ran 894px into a 720px column
+	   behind a hidden scrollbar). Only a table whose narrowest layout is
+	   still wider scrolls, in the md-blocks scroller. */
+	width: fit-content;
+	max-width: 100%;
 	/* Tables run at the SESSION prose size (owner note, 2026-09-19: they
 	   visibly lagged the 16px chat text at streamdown's 12.5px text-sm).
 	   Unlayered CSS beats the cells' own utility-layer text-sm, and the
@@ -399,6 +401,9 @@ body {
 }
 [data-streamdown="table"] :where(th, td) {
 	font-size: inherit;
+	/* Streamdown pins header cells to one line; a wide header wraps like
+	   the rest, so the table can fit its column. */
+	white-space: normal;
 }
 /* Column separators: a hairline left rule on every cell but the first in
    its row (owner ask, 2026-09-19) — border-collapse merges it with the row
