@@ -162,6 +162,7 @@ class Run:
     ) -> None:
         self.schema, self.progress = engine["schema"], engine["progress"]
         self.agenda = engine.get("agenda")
+        self.capacity = engine.get("capacity")
         self.scenario = scenario
         self.rng = random.Random(f"{scenario.learner}/{scenario.late}/{scenario.seed}")
         # Days off from their own stream, so every engine meets the same days.
@@ -186,7 +187,8 @@ class Run:
         patched, outcome = self.schema.apply_patch(
             self.record, patch, today=day(n), now=NOW
         )
-        planned, _ = self.progress.schedule(patched, outcome, day(n))
+        lead = final_review_days(self.capacity, patched, [], n)
+        planned, _ = self.progress.schedule(patched, outcome, day(n), *lead)
         self.record = self.schema.validate_record(planned)
 
     def untaught(self) -> list[str]:
@@ -277,15 +279,32 @@ class Run:
         self.outcome.overdue = sum(due < exam for due in dates)
 
 
+def final_review_days(
+    capacity: ModuleType | None,
+    record: dict[str, Any],
+    others: list[dict[str, Any]],
+    n: int,
+) -> list[int]:
+    """The final review's length a save passes, as the app's saves do: from
+    his pace (``capacity.final_review_days``), on an engine that derives it;
+    none on one that does not."""
+    if capacity is None or not hasattr(capacity, "final_review_days"):
+        return []
+    week = capacity.of([*others, record], day(n))
+    lead = capacity.final_review_days(record, others, week, day(n))
+    return [] if lead is None else [lead]
+
+
 def load_engine(root: str | None) -> dict[str, ModuleType]:
     if root is not None:
         sys.path.insert(0, str(Path(root).resolve()))
     names = ("schema", "progress")
     modules = {name: importlib.import_module(f"learning.{name}") for name in names}
-    try:
-        modules["agenda"] = importlib.import_module("learning.agenda")
-    except ModuleNotFoundError:
-        pass
+    for name in ("agenda", "capacity"):
+        try:
+            modules[name] = importlib.import_module(f"learning.{name}")
+        except ModuleNotFoundError:
+            pass
     return modules
 
 

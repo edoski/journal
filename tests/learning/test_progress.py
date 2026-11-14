@@ -5,6 +5,10 @@ import pytest
 
 from learning import progress, schema
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
 TODAY = date(2026, 10, 10)
 NOW = "2026-10-10T09:00:00+00:00"
 
@@ -44,7 +48,7 @@ def save(
 ) -> tuple[dict[str, Any], progress.Scheduled]:
     now = f"{today.isoformat()}T09:00:00+00:00"
     patched, outcome = schema.apply_patch(record, patch, today=today, now=now)
-    return progress.schedule(patched, outcome, today)
+    return progress.schedule(patched, outcome, today, LEAD)
 
 
 def level(observations: list[dict[str, Any]], **topic: Any) -> str:
@@ -289,7 +293,7 @@ def test_grades(observation: dict[str, Any], expected: str) -> None:
     assert progress.grade(observation) == expected
 
 
-def exam(day_: date, lead: int = progress.FINAL_REVIEW_DAYS) -> progress.Exam:
+def exam(day_: date, lead: int = 6) -> progress.Exam:
     return progress.Exam(day_, day_ - timedelta(days=lead))
 
 

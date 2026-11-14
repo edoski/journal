@@ -203,6 +203,7 @@ FIELDS: dict[str, dict[str, str]] = {
     "arc_change": {"reason": _TEXT, "asked": _TEXT},
 }
 HELPERS: dict[str, dict[str, str]] = {
+    "exam": {"final_review_days": "in_days"},
     "topic": {"judged": _DAY},
     "review": {"by": _BY},
     "observation": {"recorded": _STAMP, "due_topics": _HANDLES},
@@ -340,6 +341,7 @@ class Task(TypedDict, total=False):
 
 class Exam(TypedDict, total=False):
     date: str
+    final_review_days: int
     format: str
     coverage: str
     criteria: list[str]

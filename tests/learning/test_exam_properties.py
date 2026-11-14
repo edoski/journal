@@ -11,6 +11,10 @@ from hypothesis import strategies as st
 from learning import agenda, capacity, progress, schema
 from learning.capacity import Capacity, Limit, Weekday
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
 START = date(2026, 1, 5)
 ACTIONS = ("introduce", "correct", "incorrect", "partial", "hint", "pin")
 TOPICS = ("a", "b", "c", "d", "e")
@@ -23,7 +27,7 @@ def on(offset: int) -> date:
 def save(record: dict[str, Any], patch: dict[str, Any], day: date) -> dict[str, Any]:
     now = f"{day.isoformat()}T09:00:00+00:00"
     patched, outcome = schema.apply_patch(record, patch, today=day, now=now)
-    planned, _ = progress.schedule(patched, outcome, day)
+    planned, _ = progress.schedule(patched, outcome, day, LEAD)
     return schema.validate_record(planned)
 
 

@@ -13,9 +13,12 @@ of ``resume`` dropping entries later.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
-from learning import arcs, clock, packing, preferences, progress, schema, storage
+from learning import arcs, capacity, clock, packing, preferences, progress
+from learning import schema, storage
+from learning import workspace as workspaces
 from learning.workspace import Workspace
 
 # Half of resume's knowledge budget: every pinned entry loads, with room left for
@@ -128,6 +131,30 @@ def _placed(record: dict[str, Any], created: set[str]) -> dict[str, Any] | None:
     return placed or None
 
 
+def _others(workspace: Workspace) -> list[dict[str, Any]]:
+    """Every other registered course's record that can be read: his pace is
+    learned from all of them."""
+    others = []
+    for other in workspaces.registered():
+        if other.directory == workspace.directory or not other.record.is_file():
+            continue
+        try:
+            others.append(load(other))
+        except (ValueError, OSError):
+            continue
+    return others
+
+
+def _lead(
+    record: dict[str, Any], others: list[dict[str, Any]], today: date
+) -> int | None:
+    """The final review's length his pace asks for, with an exam date."""
+    if not record.get("exam", {}).get("date"):
+        return None
+    week = capacity.of([*others, record], today)
+    return capacity.final_review_days(record, others, week, today)
+
+
 def _reviewed(record: dict[str, Any], keys: list[str]) -> list[str]:
     """The topics whose due review the new answers counted as: the ones the
     engine had due when each was saved (``due_topics``). An answer on a topic
@@ -162,6 +189,7 @@ def save(workspace: Workspace, patch: Any, *, check: bool = False) -> dict[str, 
     levels: dict[str, Any] = {}
     known: set[str] = set()
     arcs_placed: dict[str, str] = {}
+    others = _others(workspace) if changes else []
 
     def transform(stored: dict[str, Any]) -> dict[str, Any]:
         nonlocal outcome, scheduled, final, levels, known, arcs_placed
@@ -169,7 +197,8 @@ def save(workspace: Workspace, patch: Any, *, check: bool = False) -> dict[str, 
         known = set(before["topics"])
         patched, outcome = schema.apply_patch(before, changes, today=today, now=now)
         arcs_placed = arcs.settle(before, patched, changes, outcome, today)
-        planned, scheduled = progress.schedule(patched, outcome, today)
+        lead = _lead(patched, others, today)
+        planned, scheduled = progress.schedule(patched, outcome, today, lead)
         final = schema.validate_record(planned)
         _check_pinned(before, final)
         if final == before:

@@ -29,8 +29,12 @@ from learning.workspace import Workspace
 # step; it never re-labels this one.
 PREVIOUS, CURRENT = 6, 7
 # The fields schema 7 added, all optional: dropping them is a schema 6 record.
+# The exam's ``final_review_days`` is the engine's, derived again on a save.
 _RECORD_ARC_FIELDS = ("arcs", "arc_log")
-_NESTED_ARC_FIELDS = {"path": ("arcs",), "exam": ("arcs", "leaves_out")}
+_NESTED_ARC_FIELDS = {
+    "path": ("arcs",),
+    "exam": ("arcs", "leaves_out", "final_review_days"),
+}
 _ITEM_ARC_FIELDS = {"topics": "arc", "observations": "checkpoint"}
 
 
