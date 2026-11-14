@@ -70,6 +70,24 @@ for (const [name, surface] of Object.entries(surfaces)) describe(`streaming math
 		assert.equal(complete.body.textContent, "before bold TAIL");
 	});
 
+	it("reads a half-open interval as maths, never as an unfinished link", () => {
+		// Round 4: `$[2,\infty)$` left `](streamdown:incomplete-link)` in a finished reply.
+		for (const [source, tex] of [
+			[String.raw`positive and decreasing on $[2,\infty)$, so the test applies.`, [String.raw`[2,\infty)`]],
+			[String.raw`$x \in [0,1)$ and $(a,b]$ and $\sqrt[3]{x}$ TAIL`, [String.raw`x \in [0,1)`, "(a,b]", String.raw`\sqrt[3]{x}`]],
+			["$$\n[0,1)\n$$\n\nTAIL", ["[0,1)"]],
+		] as const) {
+			const document = documentFor(surface(source));
+			assert.deepEqual(annotations(document), tex, source);
+			assert.ok(!document.body.textContent.includes("streamdown:incomplete-link"), source);
+			assert.ok(!document.body.textContent.includes("[blocked]"), source);
+			assert.ok(!document.body.textContent.includes("\uE000"), source);
+		}
+		const after = documentFor(surface(String.raw`On $[2,\infty)$ see [the notes TAIL`));
+		assert.deepEqual(annotations(after), [String.raw`[2,\infty)`]);
+		assert.ok(after.body.textContent.includes("[blocked]"), "a real unfinished link after the maths is still completed");
+	});
+
 	it("keeps the other incomplete-Markdown repairs", () => {
 		const bold = documentFor(surface("**bold TAIL"));
 		assert.equal(bold.querySelector("strong")?.textContent, "bold TAIL");

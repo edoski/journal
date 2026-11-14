@@ -1763,6 +1763,7 @@ export function Chat({
 					phase={phases.at(-1) ?? "probe"}
 					onReserve={setDockReserve}
 					busy={busy}
+					replyingToDock={busy && sentFromDockRef.current !== null}
 					focusEpoch={focusEpoch}
 					onDockDraft={recordDockDraft}
 					keepScope={chatId}
@@ -2000,6 +2001,7 @@ function DockOverlay({
 	onSubmitAnswer,
 	onReserve,
 	busy,
+	replyingToDock,
 	focusEpoch,
 	onDockDraft,
 	keepScope,
@@ -2045,6 +2047,9 @@ function DockOverlay({
 	 *  the cue lets go of it once he reads to the end. */
 	/** A turn is running for this lesson (the practice dock waits). */
 	busy: boolean;
+	/** The tutor is replying to what he sent from a question or problem:
+	 *  focus waits for the reply instead of landing in the composer. */
+	replyingToDock: boolean;
 	/** Changes when something that held focus went away (focus-home.ts). */
 	focusEpoch: number;
 	/** What he types in the open dock, keyed by its question or problem. */
@@ -2257,8 +2262,8 @@ function DockOverlay({
 	// he types next, if nothing holds it.
 	useEffect(() => {
 		const block = blockRef.current;
-		if (block) landFocus(document, block);
-	}, [mode, expanded, busy, focusEpoch]);
+		if (block) landFocus(document, block, replyingToDock);
+	}, [mode, expanded, busy, focusEpoch, replyingToDock]);
 
 	// An empty field's arrows and page keys read the lesson (focus-home.ts):
 	// the field he was put in must not swallow the keys he reads with.

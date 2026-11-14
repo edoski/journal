@@ -9,7 +9,7 @@
 
 import { subscribe } from "../core/events.ts";
 import type { ChatStore, CourseRecords } from "../core/ports.ts";
-import { firstTurnTopics } from "../core/session-naming.ts";
+import { firstTurnTopics, onFirstTurn } from "../core/session-naming.ts";
 
 export interface SessionNamingDeps {
 	chatStore: ChatStore;
@@ -21,7 +21,8 @@ export interface SessionNamingDeps {
 export async function nameFromFirstTurn(deps: SessionNamingDeps, chatId: string): Promise<boolean> {
 	const record = deps.chatStore.getChat(chatId);
 	if (!record?.course || record.named || record.renamed || (record.topics ?? []).length > 0) return false;
-	if (!record.messages.some((m) => m.role === "assistant" && m.stopReason === "stop")) return false;
+	// Its first reply came, a question included, and nothing he did followed.
+	if (!record.messages.some((m) => m.role === "assistant" && m.stopReason !== "aborted" && m.stopReason !== "error") || !onFirstTurn(record.messages)) return false;
 	const candidates = firstTurnTopics(record.messages);
 	if (candidates.length === 0) return false;
 	const mapped = await deps.courseRecords.map(record.course.workspace);

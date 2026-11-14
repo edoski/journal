@@ -362,6 +362,9 @@ export class SessionModel {
 			signal,
 		};
 		let response = await this.fetch("/api/chat", init);
+		// A continue that finds a turn running asks for nothing of its own:
+		// that turn is the reply it wanted, so the caller attaches to it.
+		if (input.type === "continue") return response;
 		const deadline = Date.now() + this.waitMaxMs;
 		while (response.status === 409) {
 			await response.body?.cancel().catch(() => {});
@@ -763,6 +766,12 @@ export class SessionModel {
 			// STREAM consume stays on the controller — releasing that held
 			// connection is Diet A's whole job.
 			const res = await this.postInputEvent(input);
+			if (res.status === 409 && input.type === "continue") {
+				await res.body?.cancel().catch(() => {});
+				if (this.consumeAbort !== controller) return false;
+				await this.resumeStream(true);
+				return false;
+			}
 			if (res.status === 409) {
 				throw new Error("A turn is already running — try again in a moment.");
 			}

@@ -11,6 +11,7 @@ import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { titleFromPrompt } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
+import { onFirstTurn } from "../../core/session-naming.ts";
 import { serverExecute } from "../tool-execute.ts";
 
 export const NAME_SESSION_TOOL = "name_session";
@@ -36,12 +37,12 @@ export function nameSessionTool(ctx: NameSessionContext): Record<string, AgentTo
 			label: NAME_SESSION_TOOL,
 			description:
 				"Name this session: its title in the learner's session list, Home and the header, and the course topic it is about. " +
-				"Takes effect once; a session started on a topic, renamed by the learner or already named keeps its name, and the result says so.",
+				"Takes effect once, on the session's first turn; a session started on a topic, renamed by the learner, already named or past its first turn keeps its name, and the result says so.",
 			parameters: nameSessionInput,
 			execute: serverExecute(NAME_SESSION_TOOL, nameSessionInput, async ({ title, topic }) => {
 				const record = ctx.chatStore.getChat(ctx.chatId);
 				if (!record) return { ok: false, error: `Chat not found: ${ctx.chatId}` };
-				if ((record.topics ?? []).length > 0 || record.named) return `The session keeps its name: ${record.title}`;
+				if ((record.topics ?? []).length > 0 || record.named || !onFirstTurn(record.messages)) return `The session keeps its name: ${record.title}`;
 				ctx.chatStore.nameSession(ctx.chatId, { title: titleFromPrompt(title), ...(topic ? { topic } : {}) });
 				return record.renamed ? `The session keeps the name he gave it: ${record.title}` : "Named.";
 			}),

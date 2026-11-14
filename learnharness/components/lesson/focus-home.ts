@@ -9,7 +9,11 @@
  * - an open question with choices: nowhere, because the page's arrows walk
  *   its rows and Enter sends;
  * - a question or problem folded to its bar: nowhere, because Enter opens it;
- * - otherwise the composer.
+ * - otherwise the composer, except while the tutor replies to what he just
+ *   sent from a question or problem (round 4, 14 Nov 2026): keys typed on
+ *   after Enter landed in the message box and waited there unseen behind
+ *   the next question, to surface later as a stray draft. The reply ending
+ *   puts focus home.
  *
  * It moves focus only when nothing has it: a field or menu he is in keeps it.
  */
@@ -23,12 +27,12 @@ const FIELD = {
 } as const;
 
 /** The field his next key belongs to, or null where the page's own keys act. */
-export function focusHomeIn(root: ParentNode): HTMLElement | null {
+export function focusHomeIn(root: ParentNode, replyingToDock = false): HTMLElement | null {
 	const practice = root.querySelector<HTMLElement>(FIELD.practice);
 	if (practice) return practice;
 	if (root.querySelector(FIELD.choices)) return root.querySelector<HTMLElement>(FIELD.answer);
 	if (root.querySelector(FIELD.folded)) return null;
-	return root.querySelector<HTMLElement>(FIELD.composer);
+	return replyingToDock ? null : root.querySelector<HTMLElement>(FIELD.composer);
 }
 
 /** Whether focus is nowhere a key would do anything: the page itself, or an
@@ -39,9 +43,9 @@ export function focusIsLost(doc: Document): boolean {
 }
 
 /** Puts focus home if nothing holds it. */
-export function landFocus(doc: Document, root: ParentNode): void {
+export function landFocus(doc: Document, root: ParentNode, replyingToDock = false): void {
 	if (!focusIsLost(doc)) return;
-	focusHomeIn(root)?.focus({ preventScroll: true });
+	focusHomeIn(root, replyingToDock)?.focus({ preventScroll: true });
 }
 
 /** Arrows and page keys in an EMPTY lesson field read the lesson instead:

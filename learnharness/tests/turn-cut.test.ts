@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { needsContinuation, type LhMessage } from "../src/core/native-messages.ts";
-import { replyCutOf, replyNeverCame } from "../src/core/turn-cut.ts";
+import { replyCutOf, replyNeverCame, stoppedReplyIds } from "../src/core/turn-cut.ts";
 
 const ask = { id: "a1", role: "assistant", content: [{ type: "toolCall", id: "q1", name: "explain", arguments: { question: "Which directions stay on their line?", correctAnswer: "(1,1) and (1,-1)" } }], stopReason: "toolUse", timestamp: 1 } as unknown as LhMessage;
 const answer = { id: "r1", role: "toolResult", toolCallId: "q1", toolName: "explain", isError: false, timestamp: 2,
@@ -40,4 +40,14 @@ test("a reply he stopped reads as his stop, a reply the app lost as the tutor's"
 	assert.equal(replyCutOf([reply, message, stoppedEmpty]), "stopped");
 	assert.equal(replyCutOf([reply, courseNote, message]), "lost");
 	assert.equal(replyCutOf([message, reply]), null);
+});
+
+test("a reply stopped while its first tool call was still empty is a stop before its first word", () => {
+	// Round 4: the stop landed as send_to_user began, with no arguments yet;
+	// the sidebar said Stopped mid-reply and the lesson offered no Try again.
+	const cutCall = { id: "a4", role: "assistant", content: [{ type: "toolCall", id: "c1", name: "send_to_user", arguments: {} }], stopReason: "aborted", timestamp: 6 } as unknown as LhMessage;
+	assert.equal(replyCutOf([ask, answer, cutCall]), "stopped");
+	assert.deepEqual([...stoppedReplyIds([ask, answer, cutCall])], ["a4"]);
+	const shownCall = { ...cutCall, content: [{ type: "toolCall", id: "c1", name: "send_to_user", arguments: { text: "Half a sen" } }] } as unknown as LhMessage;
+	assert.equal(replyCutOf([ask, answer, shownCall]), null, "a call that had begun to show something is a reply");
 });
