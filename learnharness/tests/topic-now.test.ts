@@ -22,3 +22,12 @@ describe("a topic in search", () => {
 		assert.deepEqual(unitStatus(eigen, TODAY), { kind: "your-turn" });
 	});
 });
+
+describe("search's sessions", () => {
+	it("come newest first, however closely each title matches", () => {
+		const older = chat("chat_a", { title: "Total probability practice", updatedAt: "2026-10-10T09:00:00.000Z" });
+		const newer = chat("chat_b", { title: "Probability review, total", updatedAt: "2026-10-25T09:00:00.000Z" });
+		const found = searchInbox(buildInbox([], [older, newer], null), [older, newer], "total prob", []);
+		assert.deepEqual(found.sessions.map((c) => c.id), ["chat_b", "chat_a"]);
+	});
+});
