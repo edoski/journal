@@ -6,7 +6,7 @@
  * and Calculus I with a lapse on Chain rule. Built by hand, engine fields
  * only.
  */
-import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel, TopicReview } from "../../src/core/index.ts";
+import type { ArcHandle, ArcState, ChatListItem, CourseMap, CourseMapArc, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel, TopicReview } from "../../src/core/index.ts";
 
 export const TODAY = "2026-11-08";
 
@@ -53,6 +53,25 @@ export const LINALG: StudyCourse = {
 	due: h("independence"),
 	lastActiveDaysAgo: 2,
 	newToday: [],
+};
+
+export function arc(handle: string, title: string, state: ArcState, entry: readonly string[] = []): CourseMapArc {
+	return { handle: handle as ArcHandle, title, state, entry: entry as TopicHandle[] };
+}
+
+/** Linear Algebra cut into three arcs, "You are here" on Rank in the
+ *  second while the first is ready for its check. */
+export const LINALG_ARCS: StudyCourse = {
+	...LINALG,
+	map: {
+		...LINALG.map,
+		arcs: [arc("spaces", "Vector spaces", "ready"), arc("systems", "Linear systems", "learning", ["independence"]), arc("eigenvalues", "Eigenvalues", "learning", ["rank"])],
+		currentArc: "systems" as ArcHandle,
+		topics: LINALG.map.topics.map((t) => ({
+			...t,
+			arc: (["vectors", "independence"].includes(t.handle) ? "spaces" : ["rank", "det"].includes(t.handle) ? "systems" : "eigenvalues") as ArcHandle,
+		})),
+	},
 };
 
 export const PROB: StudyCourse = {

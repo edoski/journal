@@ -16,6 +16,7 @@ import { LEARNING_ENGINE } from "../config.ts";
 import { courseMapOf, createCourseRecords } from "../src/store/course-records.ts";
 import { currentArc, examCovers, type CourseMapArc } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap, TopicHandle } from "../src/core/contracts/course-map.ts";
+import { LINALG_ARCS } from "./fixtures/now-demo.ts";
 import { subscribe } from "../src/core/events.ts";
 import { courseTools } from "../src/agent/tools/course.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
@@ -358,6 +359,9 @@ describe("the current arc (design 1.4, T-current)", () => {
 	it("is the arc of the topic \"You are here\" names, even with an earlier arc unfinished", () => {
 		assert.equal(map.current, "eigen");
 		assert.equal(currentArc(map), "eigenvalues");
+	});
+	it("reads the same in the demo fixture the surfaces build on", () => {
+		assert.equal(currentArc(LINALG_ARCS.map), "systems");
 	});
 	it("follows the lesson in progress once Home moves \"You are here\" to it", () => {
 		assert.equal(currentArc({ ...map, current: "projection" as TopicHandle }), "orthogonality");
