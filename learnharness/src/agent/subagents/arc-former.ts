@@ -103,7 +103,7 @@ const arcSchema = Type.Object({
 		Type.Array(Type.Object({ topic: Type.String(), need: Type.String(), reason: Type.String() }), { description: "Stored prerequisites you think false: kept, and recorded with your reason." }),
 	),
 	none: Type.Optional(Type.String({ description: "Only when the course should get no arcs: why, by the size rules." })),
-	basis: Type.String({ description: "In one line, the material's units the cut follows." }),
+	basis: Type.String({ description: "The material's units the cut follows, then each place the cut departs from them, with its reason: a topic homed outside its unit, a unit merged or re-cut, an order other than the material's, a count outside four to eight arcs." }),
 });
 
 export const ARC_EDGES_INSTRUCTIONS = `You settle a course's prerequisites before anything is built on them, following the test below. You answer with one ${EDGES_TOOL} call; the app saves it.
@@ -112,7 +112,7 @@ export const ARC_EDGES_INSTRUCTIONS = `You settle a course's prerequisites befor
 - Judge each edge from the topics' meaning and the material, never from the order the material teaches them in. A topic taught earlier is not a prerequisite for that alone.
 - Keep every direct prerequisite. An edge is only implied, and dropped, when B uses A solely through another of B's prerequisites. When an exercise on B itself works with A (continuity is defined by a limit; an improper integral is a limit of integrals), the edge is direct: keep it, even when another path also leads to A.
 - When the test leaves you unsure, keep the edge. A false drop hides what the learner must recall before B; a kept edge only orders the path.
-- Under add, list true, direct prerequisites the graph misses, each with its reason; send an empty list when there are none.
+- Look for missing prerequisites as hard as for false ones. For each topic, read what its material works with that another topic of the course teaches (a definition, a result, a method, a tool or service it runs on: a deploy runbook that ships through a hosting platform needs the topic that teaches that platform), and test each. Under add, list every such prerequisite the graph misses, direct and passing the same test as a kept edge, each with its reason; send an empty list when there are none.
 - The material is registered: read it with read_material, search_material and render_pages where a test needs it. You need not read every source whole.
 - Each handle is its own topic. Two topics whose names share words are still two topics: never treat one as the other.
 
@@ -123,13 +123,12 @@ export const ARC_CUT_INSTRUCTIONS = `You group a course's topics into arcs, foll
 How this differs from the text below:
 - The prerequisites are settled and you cannot change them: your answer has no field for needs. A stored edge you think false goes under doubts with its reason; it is recorded and kept.
 - Read the material's units before you cut: the sources' tables of contents with read_material, headings with search_material, and the unit each topic's reference locator names. A source the course cannot open is listed as such; then the locators are the material you have.
-- List the arcs in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
+- List the arcs in study order, and each arc's topics in study order. Every topic listed below, left-out ones too, goes in exactly one arc's topics.
 - A topic keeps its title; give a title only to a topic listed with none, under titles. A leading label two or more of an arc's topics share ("GTM: Pricing") is dropped by the app, since the arc now names it: name such an arc for the label's group.
 - Each handle is its own topic. Two topics whose names share words are still two topics, and both keep their handles.
 - An arc of one topic carries single, saying why it stands alone. Two arcs citing the same unit of the material each carry shares, saying why.
 - Every arc cites in refs the unit of the material it follows, when the course has registered material.
-- Before you submit, test your names as the learner will read them: sort the topic titles, shuffled, into your arc names alone. A title that fits another arc's name better means that arc's name is wrong, or the topic's place is (move it if rule 2 allows). Use the material's chapter title only when the sort holds; otherwise name the idea that tells the neighbours apart.
-- Each arc's focus question is one question. If it only reads as two questions joined by "and" for unrelated ideas, the arc holds two ideas: cut it, or find the one question both serve.
+- Before you submit, run the name sort that rule 8 describes, and check each focus question is one question, not two joined by "and".
 - examArcs and leavesOut only when the material states the next exam's scope.
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 

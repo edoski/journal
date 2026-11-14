@@ -145,6 +145,14 @@ describe("the cut's shape rules", () => {
 		assert.match(arcPassProblems(twice, view(CALC))!, /"limits" is in both/);
 	});
 
+	it("R1: a topic no exam examines joins an arc whose question it extends, never one of its own", () => {
+		const left = { ...CALC, extra: topic("Extra", ["chain"], { excluded: "not examined" }) };
+		const alone = { ...good, arcs: [...good.arcs, arc("extra-arc", "Extras", ["extra"], { single: "outside the exam" })] };
+		assert.match(arcPassProblems(alone, view(left))!, /holds only topics no exam examines/);
+		const joined = { ...good, arcs: [good.arcs[0]!, { ...good.arcs[1]!, topics: [...good.arcs[1]!.topics, "extra"] }] };
+		assert.equal(arcPassProblems(joined, view(left)), null);
+	});
+
 	it("R6: two arcs or none, and a one-topic arc only with its reason", () => {
 		assert.match(arcPassProblems({ ...good, arcs: [arc("all", "Calculus", Object.keys(CALC))] }, view(CALC))!, /form at least two/);
 		const lone = { ...good, arcs: [arc("a", "Limits", ["limits"]), arc("b", "The rest", ["continuity", "derivative", "chain", "riemann"])] };
@@ -195,6 +203,14 @@ describe("the cut's shape rules", () => {
 		assert.deepEqual(doubtNote({ ...good, doubts: [{ topic: "riemann", need: "chain", reason: "no derivative in a sum" }] }), {
 			arc_change: { reason: 'prerequisites the grouping pass doubts, kept as they are: "riemann" needs "chain" (no derivative in a sum)' },
 		});
+	});
+
+	it("the path takes each arc's topics in the answer's order, a prerequisite in the same arc first", () => {
+		const listed = { ...good, arcs: [arc("limits-continuity", "Limits and continuity", ["continuity", "limits"]), arc("derivatives", "Derivatives", ["riemann", "derivative", "chain"])] };
+		const formation = arcPassChanges(listed, view(CALC, { order: ["limits", "continuity", "chain", "derivative", "riemann"] }))!;
+		assert.deepEqual((formation.changes.path as { order: string[] }).order, ["limits", "continuity", "derivative", "chain", "riemann"]);
+		const free = { ...CALC, riemann: topic("Riemann sums", ["limits"]) };
+		assert.deepEqual((arcPassChanges(listed, view(free))!.changes.path as { order: string[] }).order, ["limits", "continuity", "riemann", "derivative", "chain"]);
 	});
 
 	it("re-derives on the record read at save time: a topic added since gets no arc, one gone is left out, and the path reads arc by arc", () => {
