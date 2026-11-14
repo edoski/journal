@@ -10,7 +10,9 @@ import { topoFor, type PopupMessage } from "@/components/lesson/plan-facts";
 export interface RoadmapStep {
 	id: string;
 	title: string;
-	status: PlanNodeStatus;
+	/** `passed`: a step before the one he is on that he never reached,
+	 *  behind him all the same (round 6: drawn hollow like the next one). */
+	status: PlanNodeStatus | "passed";
 	/** The tutor's lesson_progress named it done. */
 	done: boolean;
 	/** The first step after the current one (or the first, before any). */
@@ -30,6 +32,9 @@ export function roadmapSteps(tree: Pick<PlanTree, "nodes" | "edges">, statuses: 
 		taught: taught.has(n.id),
 	}));
 	const current = steps.findIndex((s) => s.status === "current");
+	steps.forEach((s, i) => {
+		if (i < current && s.status === "upcoming") s.status = "passed";
+	});
 	const next = steps.findIndex((s, i) => i > current && s.status === "upcoming");
 	if (next >= 0) steps[next]!.next = true;
 	return steps;

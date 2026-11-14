@@ -13,24 +13,27 @@ import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { kbdEventForAction, type LessonPlace } from "@/src/core";
 import { roadmapLabel, type RoadmapStep } from "@/components/lesson/roadmap-facts";
 
+/** A step behind him: one he reached, or one before Now he never did. */
+const behind = (step: RoadmapStep) => step.status === "visited" || step.status === "passed";
+
 /** A step's dot in the strip: where he is is a short primary bar, steps
  *  behind him a filled dot, steps ahead a faint one. */
-function stripDot(step: RoadmapStep): string {
+export function stripDot(step: RoadmapStep): string {
 	if (step.status === "current") return "h-1.5 w-3 bg-primary";
-	return step.status === "visited" ? "size-1.5 bg-muted-foreground" : "size-1.5 bg-muted-foreground/35";
+	return behind(step) ? "size-1.5 bg-muted-foreground" : "size-1.5 bg-muted-foreground/35";
 }
 
 /** The panel's marker: the plan list's 8px circle (the topic page's
  *  step map wears the same), centred in the 16px slot the links' icons
  *  take, so steps and links share one column. */
-function rowDot(step: RoadmapStep): string {
+export function rowDot(step: RoadmapStep): string {
 	if (step.status === "current") return "bg-primary";
-	return step.status === "visited" ? "bg-muted-foreground" : "ring-1 ring-inset ring-muted-foreground";
+	return behind(step) ? "bg-muted-foreground" : "ring-1 ring-inset ring-muted-foreground";
 }
 
 /** The trailing word on a step's row, literal: where he is, what comes
  *  next, what the tutor marked done. */
-function rowWord(step: RoadmapStep): string | null {
+export function rowWord(step: RoadmapStep): string | null {
 	if (step.status === "current") return "Now";
 	if (step.next) return "Next";
 	return step.done ? "Done" : null;
