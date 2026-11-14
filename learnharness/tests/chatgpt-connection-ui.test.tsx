@@ -79,7 +79,7 @@ afterEach(async () => { await act(async () => root?.unmount()); host?.remove(); 
 test("Providers is the first/default page; General is last and other pages keep relative order", () => {
  const html = renderToStaticMarkup(<SettingsDialogBody onClose={() => {}} />);
  const ids = [...html.matchAll(/data-testid="settings-nav-([^"]+)"/g)].map((m) => m[1]);
- assert.deepEqual(ids, ["keys", "agent", "appearance", "keyboard", "general"]);
+ assert.deepEqual(ids, ["keys", "appearance", "keyboard", "general"]);
  assert.match(html, /settings-nav-keys[^>]*aria-selected="true"/); assert.match(html, /settings-nav-keys[^>]*><span[^>]*>Accounts<\/span><\/button>/);
  assert.doesNotMatch(html, />Model providers</);
 });

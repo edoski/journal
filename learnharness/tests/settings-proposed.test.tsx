@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { Toggle } from "../components/settings/controls.tsx";
-import { AgentSection } from "../components/settings/agent-section.tsx";
 
 // The settings kit on the real Radix layers. Fetch is stubbed read-only.
 const originalFetch = globalThis.fetch;
@@ -59,14 +58,5 @@ describe("settings switch", () => {
 		assert.equal(control.getAttribute("aria-checked"), "false");
 		await press(control, "click");
 		assert.deepEqual(flips, [true]);
-	});
-});
-
-describe("Settings › Tutor", () => {
-	it("has no model or thinking choice, only the tool switches", async () => {
-		await mount(<AgentSection agent={undefined} onSectionChange={() => {}} />);
-		assert.equal(document.querySelector('[data-testid="group-models"]'), null);
-		assert.equal(document.querySelector('[data-testid^="slot-"]'), null);
-		assert.ok(element('[data-testid="group-tools"]'));
 	});
 });

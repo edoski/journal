@@ -46,7 +46,7 @@ describe("settings-signal — the seam's contract", () => {
 		const off = onSettingsSaved((s) => {
 			if (s === "claude") got.push(s);
 		});
-		notifySettingsSaved("agent");
+		notifySettingsSaved("keys");
 		notifySettingsSaved("appearance");
 		assert.deepEqual(got, []);
 		notifySettingsSaved("claude");

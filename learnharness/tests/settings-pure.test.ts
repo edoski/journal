@@ -1,16 +1,13 @@
 /**
  * The settings wave's pure layers (thin settings wave): the appearance →
- * CSS-variable mapping (the section must actually DO something), the
- * agent section's compose helpers
- * (the replace-whole PUT discipline), and the keyboard overrides map.
+ * CSS-variable mapping (the section must actually DO something) and the
+ * keyboard overrides map.
  */
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { appearanceVars, resolveAppearance, staleVarNames } from "../components/settings/appearance.tsx";
-import { composeTool } from "../components/settings/agent-section.tsx";
 import { nextOverrides } from "../components/settings/keyboard-section.tsx";
-import type { AgentSettings } from "../src/core";
 
 describe("resolveAppearance — delta over factory", () => {
 	it("absent everything = the factory view", () => {
@@ -61,15 +58,6 @@ describe("staleVarNames — the removal half of application (owner repro: resets
 
 	it("no previous applications → nothing stale", () => {
 		assert.deepEqual(staleVarNames([], appearanceVars(resolveAppearance(undefined))), []);
-	});
-});
-
-describe("agent section compose helpers — the replace-whole PUT body", () => {
-	it("composeTool carries the rest of the section verbatim", () => {
-		const before = { tools: { demo: false } };
-		const after = composeTool(before, "visual", false);
-		assert.deepEqual(after.tools, { demo: false, visual: false });
-		assert.deepEqual(before.tools, { demo: false }, "the input untouched");
 	});
 });
 

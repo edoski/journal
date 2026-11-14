@@ -23,9 +23,9 @@ The settings sheet and its control kit: `settings-dialog.tsx` draws the frame, `
 | disclosure | a prompt part's Show text / Hide text is a `Collapsible`; the original and your version are `Textarea`s |
 | buttons | `Button` at 28px: quiet for secondary actions (Show text, Change, Refresh), outline for Connect and Use this account, default (the accent) for Save |
 
-## What Tutor and Accounts leave out
+## What Settings and Accounts leave out
 
-Every agent runs Claude Opus 5.5 at high effort (owner, 2026-11-14), so Tutor has no model or thinking rows, only Tools. The only choice left is the Claude account they run on: in Accounts each signed-in Claude account offers Use this account, and the one in use reads "In use" (12/16 muted) instead. An account whose plan or Claude Code version lacks the model shows one danger line saying so (`claude-model-missing`); nothing falls back to another model. The sign-in dialog (`setup-dialog.tsx`) shows the same Claude rows and closes once the account in use is signed in.
+There is no Tutor section: research, interactive demos, figures and reading PDFs are always on (owner, 2026-11-14), so nothing switches a tool off. Every agent runs Claude Opus 5.5 at high effort (owner, 2026-11-14), so there are no model or thinking rows either. The only choice left is the Claude account they run on: in Accounts each signed-in Claude account offers Use this account, and the one in use reads "In use" (12/16 muted) instead. An account whose plan or Claude Code version lacks the model shows one danger line saying so (`claude-model-missing`); nothing falls back to another model. The sign-in dialog (`setup-dialog.tsx`) shows the same Claude rows and closes once the account in use is signed in.
 
 ## What Appearance leaves out
 
