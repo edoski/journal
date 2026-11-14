@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ListFilterIcon } from "lucide-react";
+import { ArrowRightIcon, ListFilterIcon } from "lucide-react";
 import type { StudyCourse } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
@@ -10,23 +10,22 @@ import { Hint } from "@/components/ui/hint";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
-	DropdownMenuGroup,
 	DropdownMenuItem,
-	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
-	DropdownMenuSeparator,
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MathText } from "@/components/ui/math-text";
+import { MathText, mathPlain } from "@/components/ui/math-text";
 
 const ALL = "";
 
 /** Which courses the sidebar lists, T3 Code's project filter: a 28px icon
  *  button beside the search (the filter glyph, or the chosen course's mark)
- *  opening every course with its exam countdown, then each course again as
- *  a link to its page. */
+ *  opening every course once (round 4: a second list of the same courses
+ *  under "Open a course page" read as a duplicate). A row filters by its
+ *  course and shows its exam countdown; the arrow at its end opens the
+ *  course's page, as Home's "Course page →" does. */
 export function CourseScope({
 	courses,
 	scope,
@@ -50,35 +49,33 @@ export function CourseScope({
 					{chosen ? <CourseMark title={chosen.map.title} /> : <ListFilterIcon aria-hidden className="size-4" />}
 				</DropdownMenuTrigger>
 			</Hint>
-			<DropdownMenuContent align="end" className="w-60">
+			<DropdownMenuContent align="end" className="w-72">
 				<DropdownMenuRadioGroup value={scope ?? ALL} onValueChange={(v) => onScopeChange(v === ALL ? null : v)}>
 					<DropdownMenuRadioItem value={ALL} indicator={false}>
 						All courses
 					</DropdownMenuRadioItem>
-					{courses.map((c) => (
-						<DropdownMenuRadioItem key={c.map.workspace} value={c.map.workspace} indicator={false}>
-							<CourseMark title={c.map.title} />
-							<span className="min-w-0 flex-1 truncate">
-								<MathText>{c.map.title}</MathText>
-							</span>
-							{examText(c.map.exam) && <DropdownMenuShortcut>{examText(c.map.exam)}</DropdownMenuShortcut>}
-						</DropdownMenuRadioItem>
-					))}
+					{courses.map((c) => {
+						const page = `Open the ${mathPlain(c.map.title)} course page`;
+						return (
+							<div key={c.map.workspace} data-slot="course-scope-row" className="flex items-center gap-0.5">
+								<DropdownMenuRadioItem value={c.map.workspace} indicator={false} className="min-w-0 flex-1">
+									<CourseMark title={c.map.title} />
+									<span className="min-w-0 flex-1 truncate">
+										<MathText>{c.map.title}</MathText>
+									</span>
+									{examText(c.map.exam) && <DropdownMenuShortcut>{examText(c.map.exam)}</DropdownMenuShortcut>}
+								</DropdownMenuRadioItem>
+								<Hint label={page} side="right">
+									<DropdownMenuItem asChild className="size-8 shrink-0 justify-center px-0 data-[highlighted]:[&_svg]:text-foreground">
+										<Link href={courseHref(c.map.workspace)} aria-label={page} data-testid="course-scope-page">
+											<ArrowRightIcon aria-hidden />
+										</Link>
+									</DropdownMenuItem>
+								</Hint>
+							</div>
+						);
+					})}
 				</DropdownMenuRadioGroup>
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<DropdownMenuLabel>Open a course page</DropdownMenuLabel>
-					{courses.map((c) => (
-						<DropdownMenuItem key={c.map.workspace} asChild>
-							<Link href={courseHref(c.map.workspace)} data-testid="course-scope-page">
-								<CourseMark title={c.map.title} />
-								<span className="min-w-0 flex-1 truncate">
-									<MathText>{c.map.title}</MathText>
-								</span>
-							</Link>
-						</DropdownMenuItem>
-					))}
-				</DropdownMenuGroup>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
