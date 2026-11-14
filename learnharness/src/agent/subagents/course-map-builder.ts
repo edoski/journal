@@ -279,6 +279,9 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 			return { status: "busy" };
 		}
 		R.inFlight.add(workspace);
+		// Claimed before the first await: material added while this build
+		// reads the record is then the course's own, never adopted as unread.
+		if (!ledgers.get(workspace)) ledgers.save(workspace, { done: [] });
 		deps.onStatus?.(workspace);
 		const jobKey = jobKeyOf(workspace);
 		let signal: AbortSignal | undefined;
@@ -322,6 +325,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		if (ledgers.get(workspace)) return;
 		const left = new Set(except);
 		const before = sourcesOf(await readRecord(workspace)).filter((s) => !left.has(s.handle) && !left.has(s.path));
+		if (ledgers.get(workspace)) return;
 		ledgers.save(workspace, { done: before.length > 0 ? [{ sources: ledgerSources(before), fingerprint: "adopted", at: new Date().toISOString(), outcome: ADOPTED }] : [] });
 	}
 

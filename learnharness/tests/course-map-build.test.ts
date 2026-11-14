@@ -331,6 +331,25 @@ describe("course map builder (real engine, scripted model)", { skip: !realEngine
 		assert.equal(ledgers.all.get(dir)!.pending, undefined);
 	});
 
+	it("material added right after a course is created is read with the rest, never adopted as unread", async () => {
+		const dir = course("fresh-add");
+		const ledgers = memoryLedgers();
+		let release!: () => void;
+		const gate = new Promise<void>((r) => (release = r));
+		const model = scriptedModel([FIRST, { topics: [{ handle: "cv", title: "Cross-validation", refs: [{ source: "sheet" }] }], order: ["cv"] }], gate);
+		const builder = createCourseMapBuilder({ courseRecords: records, ledgers, engine: model });
+		const first = builder.buildMap(dir);
+		await builder.adopt(dir, ["material/sheet.md"]);
+		fs.writeFileSync(path.join(dir, "material", "sheet.md"), "Ex. 1\n");
+		engine(["--workspace", dir, "sources", "--add", "material/sheet.md"]);
+		void builder.buildMap(dir);
+		release();
+		await first;
+		for (let waited = 0; ledgers.all.get(dir)!.done.length < 2 && waited < 250; waited++) await new Promise((r) => setTimeout(r, 20));
+		assert.deepEqual(ledgers.all.get(dir)!.done.map((d) => d.outcome.startsWith("material the course had") ? "adopted" : "built"), ["built", "built"]);
+		assert.deepEqual(model.reads, ["notes", "sheet"]);
+	});
+
 	it("material added to a course from before the builder: only the new material is read", async () => {
 		const dir = course("adopted");
 		const ledgers = memoryLedgers();
