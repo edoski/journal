@@ -29,7 +29,7 @@ The map sits on a surface the pane scrolls (`surfaceOf`), sized so `TopicMap` fi
 | points at or focuses a row | its card glows at once (the map's `marked`: a ring and a soft glow in the accent that blooms in and settles, held while he points), and the map lights that topic with its whole prerequisite chain, the other topics at 50% (the map's `highlight`); once he rests on it for 120ms, when the topic is not already clear of the fade, the pane glides it into view in 200ms (at once under reduced motion) |
 | points at or focuses a node | the map lights its chain itself; the topic's row holds the hover fill (`highlighted`) and comes into view in the list if it is out of it, moving the pane as little as it can |
 | clicks either | the topic's page opens |
-| leaves a pane | only that pane's pointing clears; the map stays where it is |
+| leaves a pane | only that pane's pointing clears. Once he points at nothing in either pane for 400ms, a map pane a row moved glides back to its opening view in 200ms (at once under reduced motion), so "You are here" is never left cut; 400ms outlasts the pointer crossing from one row to the next, so a sweep down the list never sends it home and back. A pane he scrolled or dragged himself, or walked with the keys, stays where he left it |
 
 ## Keyboard
 

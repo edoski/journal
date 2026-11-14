@@ -23,6 +23,10 @@ const TAG_ROOM = 20;
  *  how long he rests on a row before it moves. */
 const GLIDE_MS = 200;
 const REVEAL_DWELL_MS = 120;
+/** How long nothing is pointed at before the pane glides back to its
+ *  opening view: longer than the pointer takes to cross from one row to the
+ *  next, so moving down the list never sends it home and back. */
+const RETURN_DWELL_MS = 400;
 /** No visible scrollbar on either axis (T3 Code shows none). */
 const NO_BAR = "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
@@ -73,7 +77,12 @@ export function SplitMap({
 	const root = useRef<HTMLElement>(null);
 	const scroller = useRef<HTMLDivElement>(null);
 	const pointed = useRef<TopicHandle | null>(null);
+	const revealed = useRef<TopicHandle | null>(reveal);
+	revealed.current = reveal;
+	/** The pane moved off its opening view to show a row he pointed at, and has not been scrolled by him since. */
+	const strayed = useRef(false);
 	const glide = useRef(0);
+	const homing = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const [pane, setPane] = useState<Size>({ width: 0, height: 0 });
 
 	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, layout.node), y: FADE.y }), [pane.width, layout.node]);
@@ -82,34 +91,57 @@ export function SplitMap({
 	const surface = useMemo(() => surfaceOf(layout, pane, FADE, TAG_ROOM, opening?.zoom), [layout, pane, opening?.zoom]);
 	const boxes = useMemo(() => boxesOf(layout, { width: surface.width, height: surface.height, zoom: surface.zoom }), [layout, surface.width, surface.height, surface.zoom]);
 
+	/** Where the pane rests: the opening view. */
+	const home = useMemo(() => (opening ? scrollOfCamera(layout, surface, pane, opening) : null), [layout, surface, pane, opening]);
+
+	/** Glides the pane over 200ms to `to`, at once under reduced motion. */
+	const glideTo = useCallback((to: Scroll) => {
+		const el = scroller.current;
+		if (!el) return;
+		cancelAnimationFrame(glide.current);
+		if (reducedMotion()) return el.scrollTo(to);
+		const from: Scroll = { left: el.scrollLeft, top: el.scrollTop };
+		const start = performance.now();
+		const step = (now: number) => {
+			const t = Math.min(1, (now - start) / GLIDE_MS);
+			const eased = 1 - (1 - t) ** 3;
+			el.scrollTo(from.left + (to.left - from.left) * eased, from.top + (to.top - from.top) * eased);
+			if (t < 1) glide.current = requestAnimationFrame(step);
+		};
+		glide.current = requestAnimationFrame(step);
+	}, []);
+
+	/** Brings a topic he points at or reaches into view, when it is not already clear of the fade. */
+	const show = useCallback(
+		(handle: TopicHandle) => {
+			const el = scroller.current;
+			if (!el || el.clientWidth === 0) return false;
+			const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
+			const to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade);
+			cancelAnimationFrame(glide.current);
+			if (!to) return false;
+			glideTo(to);
+			return true;
+		},
+		[boxes, fade, glideTo],
+	);
+
+	/** Once nothing is pointed at in either pane for a moment, a pane a row moved glides back to its opening view. */
+	const settle = useCallback(() => {
+		clearTimeout(homing.current);
+		homing.current = setTimeout(() => {
+			if (!strayed.current || revealed.current || pointed.current || !home) return;
+			strayed.current = false;
+			glideTo(home);
+		}, RETURN_DWELL_MS);
+	}, [home, glideTo]);
+
 	const point = (handle: TopicHandle | null) => {
 		if (handle === pointed.current) return;
 		pointed.current = handle;
 		onPoint(handle);
+		if (!handle) settle();
 	};
-
-	/** Glides the pane over 200ms (at once under reduced motion) to show a topic he points at or reaches. */
-	const show = useCallback(
-		(handle: TopicHandle) => {
-			const el = scroller.current;
-			if (!el || el.clientWidth === 0) return;
-			const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
-			const to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade);
-			cancelAnimationFrame(glide.current);
-			if (!to) return;
-			if (reducedMotion()) return el.scrollTo(to);
-			const from: Scroll = { left: el.scrollLeft, top: el.scrollTop };
-			const start = performance.now();
-			const step = (now: number) => {
-				const t = Math.min(1, (now - start) / GLIDE_MS);
-				const eased = 1 - (1 - t) ** 3;
-				el.scrollTo(from.left + (to.left - from.left) * eased, from.top + (to.top - from.top) * eased);
-				if (t < 1) glide.current = requestAnimationFrame(step);
-			};
-			glide.current = requestAnimationFrame(step);
-		},
-		[boxes, fade],
-	);
 
 	// The pane's size sets the surface's width and where it opens.
 	useEffect(() => {
@@ -122,23 +154,28 @@ export function SplitMap({
 		return () => {
 			observer.disconnect();
 			cancelAnimationFrame(glide.current);
+			clearTimeout(homing.current);
 		};
 	}, []);
 
 	// The pane opens framed on its aim, and returns there whenever it grows or shrinks.
 	useEffect(() => {
 		const el = scroller.current;
-		if (!el || !opening) return;
+		if (!el || !home) return;
 		cancelAnimationFrame(glide.current);
-		el.scrollTo(scrollOfCamera(layout, surface, pane, opening));
-	}, [layout, opening, surface, pane]);
+		strayed.current = false;
+		el.scrollTo(home);
+	}, [home]);
 
-	// A row he rests on for a moment, not one the pointer crosses on its way.
+	// A row he rests on for a moment, not one the pointer crosses on its way; once he points at none, the pane goes home.
 	useEffect(() => {
-		if (!reveal) return;
-		const wait = setTimeout(() => show(reveal), REVEAL_DWELL_MS);
+		if (!reveal) return settle();
+		clearTimeout(homing.current);
+		const wait = setTimeout(() => {
+			if (show(reveal)) strayed.current = true;
+		}, REVEAL_DWELL_MS);
 		return () => clearTimeout(wait);
-	}, [reveal, show]);
+	}, [reveal, show, settle]);
 
 	// The wheel and trackpad scroll the pane, not the map (which has nowhere to pan); a pinch stays the map's.
 	// A drag on the background scrolls it too; a drag that starts on a topic stays a click.
@@ -149,12 +186,14 @@ export function SplitMap({
 			if (e.ctrlKey) return;
 			e.stopPropagation();
 			cancelAnimationFrame(glide.current);
+			strayed.current = false;
 		};
 		let drag: { x: number; y: number; left: number; top: number; id: number } | null = null;
 		const onPointerDown = (e: PointerEvent) => {
 			if (e.button !== 0 || e.pointerType === "touch" || (e.target as Element).closest("[data-slot=course-map-node]")) return;
 			e.stopPropagation();
 			cancelAnimationFrame(glide.current);
+			strayed.current = false;
 			drag = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, id: e.pointerId };
 			el.setPointerCapture(e.pointerId);
 		};
@@ -202,7 +241,10 @@ export function SplitMap({
 				const handle = topicAt(e.target);
 				point(handle);
 				// The map's own follow has nothing to do on a surface it fits; the pane brings the topic in instead.
-				if (handle && (e.target as Element).matches(":focus-visible")) show(handle);
+				if (handle && (e.target as Element).matches(":focus-visible")) {
+					show(handle);
+					strayed.current = false;
+				}
 			}}
 			onBlur={(e) => {
 				if (!e.currentTarget.contains(e.relatedTarget as Node | null)) point(null);
