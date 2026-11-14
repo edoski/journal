@@ -8,5 +8,7 @@ import { useLessonVariant } from "@/components/lesson-variant";
  *  Current draws today's lesson; each candidate draws the reading base. */
 export function LessonView(props: Omit<ComponentProps<typeof Chat>, "lesson">) {
 	const lesson = useLessonVariant();
+	// Development only: the frame before the switch can be read draws nothing.
+	if (lesson === null) return <div className="h-dvh" />;
 	return lesson === "current" ? <Chat {...props} /> : <Chat {...props} lesson={lesson} />;
 }

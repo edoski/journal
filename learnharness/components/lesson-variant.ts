@@ -30,12 +30,18 @@ function subscribeSwitch(onChange: () => void): () => void {
 	};
 }
 const readCurrent = (): LessonVariant => "current";
-function readLesson(): LessonVariant {
+const readUnknown = (): LessonVariant | null => null;
+function readLesson(): LessonVariant | null {
+	// Until the guide registers the groups the switch can't be read, and a
+	// lesson drawn as Current for that frame runs Current's effects (its
+	// question box once cleared a Prose draft kept for a reload).
+	if (!(window as { polishHost?: unknown }).polishHost) return null;
 	const value = polishVariant("lesson");
 	return LESSON_OPTIONS.find((option) => option === value) ?? "current";
 }
 
-/** Which lesson to draw. Production builds draw Current until one ships. */
-export function useLessonVariant(): LessonVariant {
-	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readLesson : readCurrent, readCurrent);
+/** Which lesson to draw; null in development until the switch can be read.
+ *  Production builds draw Current until one ships. */
+export function useLessonVariant(): LessonVariant | null {
+	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readLesson : readCurrent, DEV ? readUnknown : readCurrent);
 }
