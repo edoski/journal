@@ -50,7 +50,9 @@ function Fact({ icon: Icon, children, className }: { icon: LucideIcon; children:
 	);
 }
 
-function RowFacts({ row }: { row: MarkRow }) {
+/** One mark row's facts: its label, the result, how it counted, the
+ *  confidence recorded. The card's foot and the lesson's mark line share it. */
+export function RowFacts({ row }: { row: MarkRow }) {
 	return (
 		<span data-testid="mark-row" data-result={row.result} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
 			{row.label && <span className="text-muted-foreground">{row.label}</span>}
@@ -59,6 +61,13 @@ function RowFacts({ row }: { row: MarkRow }) {
 			{row.sure && <Fact icon={GaugeIcon}>{MARK_WORDS.sure[row.sure]}</Fact>}
 		</span>
 	);
+}
+
+/** Dispute's press for an answer: whether a dispute can go now, and the
+ *  opener of the dialog. */
+export function useAnswerMarkActions(): Pick<AnswerMarks, "onDispute" | "canDispute"> {
+	const { onDispute, canDispute } = useContext(AnswerMarksContext);
+	return { onDispute, canDispute };
 }
 
 /** The card's foot: the mark, whether it was disputed, and Dispute. Null
