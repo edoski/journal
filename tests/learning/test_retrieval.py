@@ -538,6 +538,7 @@ def test_show_returns_whole_items_with_context(workspace: Workspace) -> None:
     assert rank["standing"]["level"] == "assisted"
     assert result["items"]["o2"]["kind"] == "attempt"
     assert result["items"]["o2"]["corrected_by"] == ["o5"]
+    assert result["items"]["o2"]["grade"] == "missed"
     assert result["items"]["pivots"]["kind"] == "knowledge"
     assert result["items"]["notes"] == {"kind": "source", "path": "notes.md"}
     assert result["items"]["ex5"]["kind"] == "task"

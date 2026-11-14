@@ -66,7 +66,7 @@ SAVE_RULES = "\n".join(
         "- Lists replace whole; refs are [{source, locator}].",
         "- observations: new entries, appended: {topics, text, kind, help, shown, "
         "result, gave_up, sure, response, chose, transfer, date, task, refs, "
-        "corrects, uncertain}. "
+        "corrects, disputed, ruling, uncertain}. "
         'kind attempt (default) needs help ("none" if unaided) and result correct|'
         "partial|incorrect; exam needs result; self_report (the learner's own "
         "statement) takes neither. sure: guess|neutral|confident, only when the "
@@ -78,8 +78,12 @@ SAVE_RULES = "\n".join(
         "wrongly chosen method, on an attempt that was not correct, recorded on "
         'the topic that should have been chosen. corrects: ["oN"] supersedes '
         "earlier ones and, without a date, takes the earliest one's day; an attempt "
-        "may correct only observations recorded today, a self_report any. Work you "
-        "did not see produced is uncertain.",
+        "may correct only observations recorded today, a self_report any. When "
+        "the learner disputes a mark, re-judge the attempt against its question "
+        "and response and record the re-marked attempt, agreeing or not, with "
+        "corrects, disputed (his words) and ruling (why, one or two lines); it "
+        "may re-mark an attempt from any day. Work you did not see produced is "
+        "uncertain.",
         "- preferences (this course), global_preferences (every course): "
         "{dimension: instruction}; null deletes.",
         "Attempts schedule reviews; only the first try on a due day counts, retries "

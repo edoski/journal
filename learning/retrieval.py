@@ -498,8 +498,14 @@ def show(
             shown.update(dict.fromkeys(ids[:limit]))
             related.update(ids)
         elif where == "observations":
+            item = observations[handle]
+            scored = item["kind"] in progress.SCHEDULING_KINDS
             items[handle] = compact(
-                {**observations[handle], "corrected_by": corrected_by.get(handle)}
+                {
+                    **item,
+                    "grade": progress.grade(item) if scored else None,
+                    "corrected_by": corrected_by.get(handle),
+                }
             )
         else:
             items[handle] = {"kind": ITEM_KINDS[where], **record[where][handle]}

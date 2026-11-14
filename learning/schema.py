@@ -155,6 +155,8 @@ FIELDS: dict[str, dict[str, str]] = {
         "task": _HANDLE,
         "refs": _REFS,
         "corrects": _IDS,
+        "disputed": _TEXT,
+        "ruling": _TEXT,
         "uncertain": _TEXT,
     },
     "knowledge": {
@@ -254,6 +256,8 @@ class Observation(TypedDict, total=False):
     task: str
     refs: list[Reference]
     corrects: list[str]
+    disputed: str
+    ruling: str
     uncertain: str
     recorded: str
     due_topics: list[str]
@@ -742,6 +746,18 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
         )
     if observation.get("gave_up") and observation.get("result") != "incorrect":
         raise ValueError(f'{path}.gave_up is allowed only with result "incorrect"')
+    if "disputed" in observation or "ruling" in observation:
+        if kind != "attempt":
+            raise ValueError(
+                f"{path}.disputed marks an attempt re-marked after the learner "
+                "disputed its mark; it rides only an attempt"
+            )
+        if "disputed" not in observation or "ruling" not in observation:
+            raise ValueError(
+                f"{path}: a re-marked attempt needs both disputed (what the "
+                "learner said was wrong with the mark) and ruling (why the mark "
+                "now stands as it does, in one or two lines)"
+            )
     if "chose" in observation:
         if observation.get("result") == "correct":
             raise ValueError(
@@ -775,6 +791,11 @@ def _new_observation(value: Any, path: str) -> dict[str, Any]:
     for name in ("topics", "text"):
         if name not in result:
             raise ValueError(f'{path} needs "{name}"')
+    if "disputed" in result and not result.get("corrects"):
+        raise ValueError(
+            f"{path}.disputed needs corrects naming the attempt whose mark was "
+            'disputed, e.g. "corrects": ["o12"]'
+        )
     _observation_rules(result, path)
     return result
 
@@ -1325,21 +1346,47 @@ def _check_new(
         raise _missing_topic(item["chose"], f"{path}.chose", record["topics"])
     if "task" in item and item["task"] not in tasks:
         raise _missing_task(item["task"], f"{path}.task", tasks)
+    superseded = {
+        target
+        for stored in record["observations"].values()
+        for target in stored.get("corrects", ())
+    }
     for target in item.get("corrects", []):
         if target not in record["observations"]:
             raise ValueError(
                 f"{path}.corrects: {target!r} is not a recorded observation; "
                 f"{_span(record)}"
             )
+        if "disputed" in item:
+            _check_disputed(record["observations"][target], target, path, superseded)
+            continue
         recorded = clock.local_day(record["observations"][target]["recorded"])
         if item["kind"] != "self_report" and recorded < today:
             raise ValueError(
                 f"{path}.corrects: {target} was recorded on {recorded.isoformat()}, "
                 "and an attempt from an earlier day stands as it was recorded: never "
                 "regrade it from a transcript. When the learner says it was wrong, "
-                "record their words as a self_report that corrects it"
+                "record their words as a self_report that corrects it; when they "
+                "dispute its mark, re-judge it and record the re-marked attempt "
+                "with disputed and ruling"
             )
     _check_refs(item, path, record["sources"])
+
+
+def _check_disputed(
+    target: dict[str, Any], key: str, path: str, superseded: Collection[str]
+) -> None:
+    """A disputed mark is re-judged on the attempt that stands, from any day:
+    the question and the learner's response are in the record."""
+    if target["kind"] == "self_report":
+        raise ValueError(
+            f"{path}.corrects: {key} is a self_report, which has no mark to dispute"
+        )
+    if key in superseded:
+        raise ValueError(
+            f"{path}.corrects: {key} was already superseded; re-mark the "
+            "observation that corrects it, the mark that stands"
+        )
 
 
 def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> str:

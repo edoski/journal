@@ -296,6 +296,43 @@ def test_a_self_report_that_supersedes_a_miss_reschedules_its_topic() -> None:
     assert course.due == on(4).isoformat()
 
 
+def dispute(result: str, *targets: str, **extra: Any) -> dict[str, Any]:
+    return att(
+        result,
+        corrects=list(targets),
+        disputed=extra.pop("disputed", "My answer was right"),
+        ruling=extra.pop("ruling", "He is right: the answer holds"),
+        **extra,
+    )
+
+
+def test_an_accepted_dispute_days_later_moves_the_level_and_the_review() -> None:
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", text="the review"))
+    assert course.verdicts[-1] == (on(5).isoformat(), "missed")
+    assert course.due == on(6).isoformat()
+    course.attempts(9, dispute("correct", "o2", text="the review"))
+    remark = course.record["observations"]["o3"]
+    assert remark["date"] == on(5).isoformat()
+    assert course.verdicts == [
+        (on(1).isoformat(), "solid"),
+        (on(5).isoformat(), "solid"),
+    ]
+    assert course.standing["level"] == "retained"
+    assert course.due == on(13).isoformat()
+
+
+def test_a_rejected_dispute_keeps_the_verdicts_and_the_review() -> None:
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", text="the review"))
+    before = (course.verdicts, course.due, course.standing["level"])
+    course.attempts(
+        7, dispute("incorrect", "o2", text="the review", ruling="The sign is wrong")
+    )
+    assert (course.verdicts, course.due, course.standing["level"]) == before
+    assert course.record["observations"]["o3"]["ruling"] == "The sign is wrong"
+
+
 def test_the_final_review_caps_every_replayed_interval() -> None:
     course = Course({**TOPICS, "exam": {"date": on(14).isoformat()}})
     course.attempts(1, att("correct"))
