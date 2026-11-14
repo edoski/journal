@@ -8,7 +8,6 @@ import { useFieldCycle } from "@/components/field-cycle";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useModelSetup } from "@/components/setup-cta";
-import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
 import { Button } from "@/components/ui/button";
 
@@ -125,11 +124,6 @@ export function StartScreen() {
 					)}
 				</div>
 			</main>
-			<header className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 px-3 py-2">
-				<div className="pointer-events-auto">
-					<SidebarToggle />
-				</div>
-			</header>
 			<SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} />
 		</div>
 	);

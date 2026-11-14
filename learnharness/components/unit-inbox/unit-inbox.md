@@ -49,6 +49,10 @@ The right edge resizes the sidebar, as T3 Code's rail does (`sidebar-width.ts`, 
 
 The open and close slide, the window's drag band and the Home row with its close button are as before; the handle exists only while the sidebar is open.
 
+## Folded
+
+Closing the sidebar (its button, ⌘B) leaves a rail (`sidebar-rail.tsx`, `data-slot="sidebar-rail"`), as T3 Code's and shadcn's collapsible icon sidebars do: 48px wide (in the Mac app as wide as the traffic lights, under their 52px band, `.lh-rail`), with Open sidebar on top, a hairline, then Home, Calendar, Search (opens the sidebar on its field) and New lesson as 28px icon buttons, and Settings at the foot. Each is named in a tooltip on its right with its shortcut; Home and Calendar hold the selected fill on their page. The pages' own open button is gone: the rail holds it. shadcn's `Sidebar` itself is not used: its fixed width and provider would replace the resizable sidebar and its Today list rather than fold them.
+
 ## Keyboard
 
 Every row is a Tab stop; `sidebar-tree.ts` moves focus without opening: ↑/↓ step through the rows, Home and End jump to the ends, → opens a folded shelf (or steps into an open one), and on a row with an action (Resume, Study, Review) moves to the action, which shows with its ring; ← folds a shelf, goes back from an action to its row, or from a shelf row to its header. Enter opens; Space opens a topic. ↓ from an empty search goes to the first row; with a query, ↑/↓ walk the matching sessions and Enter opens one.
