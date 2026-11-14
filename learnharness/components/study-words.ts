@@ -1,4 +1,4 @@
-import type { CourseMapTopic, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import type { CourseMapTopic, JobKind, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -121,6 +121,16 @@ export const LESSON_WORDS = {
 	leftForTonight: "Left for next time",
 	unreadableCourse: "Couldn't read this course's record",
 } as const;
+
+/** The lesson's mark for a helper he stopped, one sentence per kind;
+ *  `stopped` when the kind is unknown. */
+export const STOPPED_WORDS: Record<JobKind | "unknown", string> = {
+	research: "Research stopped by you",
+	demo: "Demo stopped by you",
+	visual: "Figure stopped by you",
+	pdf: "PDF reading stopped by you",
+	unknown: "Stopped by you",
+};
 
 /** What stops a course's record being read, after
  *  `LESSON_WORDS.unreadableCourse`, in a student's words. */
