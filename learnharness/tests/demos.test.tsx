@@ -488,7 +488,7 @@ describe("artifact chrome — scrollbar, invert toggles, downloads (release poli
 		assert.match(html, /toggle-invert-figure-brightness/, "the invert switch (house Toggle)");
 		assert.match(html, /data-testid="visual-download"/);
 		assert.ok(!html.includes('data-testid="visual-open"'), "fullscreen needs the session overlay context");
-		assert.ok(!html.includes("hue-rotate"), "inversion OFF by default");
+		assert.match(html, /hue-rotate/, "drawn for the dark page by default: no white panel in a dark-only app");
 	});
 
 	it("figure card: NO card chrome, image first, caption row BELOW (owner round, 2026-10-07)", () => {

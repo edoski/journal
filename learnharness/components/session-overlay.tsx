@@ -9,6 +9,7 @@ import { MermaidError } from "@/components/mermaid-error";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { SvgImage } from "@/components/artifacts/svg-image";
+import { FIGURE_ON_DARK } from "@/components/artifacts/figure-on-dark";
 
 /**
  * SESSION-SCOPED OVERLAYS (owner wave, 2026-09-19): the "fullscreen"
@@ -312,7 +313,7 @@ export function MermaidOverlay({
 								<div
 									data-lh-overlay-chart
 									className="bg-white"
-									style={inverted ? { filter: "invert(1) hue-rotate(180deg)" } : undefined}
+									style={inverted ? { filter: FIGURE_ON_DARK } : undefined}
 								>
 									<SvgImage svg={svg ?? ""} className="block h-auto w-full" />
 								</div>

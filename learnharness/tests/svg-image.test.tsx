@@ -94,7 +94,7 @@ describe("generated SVG image boundary", () => {
 				: <MermaidOverlay svg={FIGURE} inverted onClose={() => {}} />);
 			const { document } = parseHTML(html);
 			const holder = document.querySelector(mode === "inline" ? '[data-testid="visual-svg"]' : "[data-lh-overlay-chart]")!;
-			assert.match(holder.getAttribute("style")!, /invert\(1\) hue-rotate\(180deg\)/);
+			assert.match(holder.getAttribute("style")!, /invert\(0\.929\d*\) hue-rotate\(180deg\)/);
 			assert.ok(holder.classList.contains("bg-white"));
 			assertImageBoundary(holder, FIGURE);
 		});
@@ -176,7 +176,7 @@ it("the fullscreen button opens the same SVG image and inversion; download keeps
 		const overlayHolder = host.querySelector("[data-lh-overlay-chart]")!;
 		const fullscreen = assertImageBoundary(overlayHolder, displaySvg);
 		assert.equal(fullscreen.getAttribute("src"), inline.getAttribute("src"));
-		assert.match(overlayHolder.getAttribute("style")!, /invert\(1\) hue-rotate\(180deg\)/);
+		assert.match(overlayHolder.getAttribute("style")!, /invert\(0\.929\d*\) hue-rotate\(180deg\)/);
 
 		// Intercept only the download anchor; never navigate or write a real file.
 		dom.document.createElement = ((...args: Parameters<typeof originalCreateElement>) => {
