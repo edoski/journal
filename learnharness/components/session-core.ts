@@ -36,6 +36,8 @@ import {
 	type LiveExecution,
 	type QuestionAnswerData,
 	type QuestionDraft,
+	type Photo,
+	PHOTO_STEER_LINE,
 } from "../src/core";
 
 export type SessionStatus = "ready" | "submitted" | "streaming" | "error";
@@ -709,12 +711,12 @@ export class SessionModel {
 		// write-ahead will persist (inputAppends), with LOCAL ids so
 		// adoption can tell them from the record's absorbed copies.
 		const optimistic: LhMessage[] = [];
-		if (input.type === "text") optimistic.push({ ...newUserMessage(input.text), id: localId() });
+		if (input.type === "text") optimistic.push({ ...newUserMessage(input.text, input.photos), id: localId() });
 		else if (input.type === "thinking") {
 			// The practice submissions (2026-10-04): the marker lands
 			// optimistically — the card renders from its details the
 			// moment the button fires.
-			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text, input.confidence), id: localId() });
+			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text, input.confidence, input.photos), id: localId() });
 		} else if (input.type === "request") {
 			optimistic.push({ ...newPracticeRequestMessage(input.problemCallId, input.request, input.text), id: localId() });
 		} else if (input.type === "next") {
@@ -730,7 +732,7 @@ export class SessionModel {
 			}
 		} else if (input.type === "answer") {
 			const tool = pendingCallTool([...this.base, ...this.tail], input.toolCallId) ?? "explain";
-			const result = { ...newAnswerResult(input.toolCallId, tool, input.answer), id: localId() };
+			const result = { ...newAnswerResult(input.toolCallId, tool, input.answer, input.photos), id: localId() };
 			optimistic.push(result);
 			this.unconfirmedAnswers.set(result.id, expectedKey ?? input.toolCallId);
 		}
@@ -828,11 +830,11 @@ export class SessionModel {
 	 *  settled mid-send (the race): fall back to the plain text send —
 	 *  the entry is dropped and send() pushes its own optimistic card.
 	 */
-	async steer(text: string): Promise<void> {
+	async steer(text: string, photos?: Photo[]): Promise<boolean> {
 		const t = text.trim();
-		if (!t) return;
+		if (!t && !photos?.length) return false;
 		const id = `steer_${localId()}`;
-		this.steerQueueValue = [...this.steerQueueValue, { id, text: t }];
+		this.steerQueueValue = [...this.steerQueueValue, { id, text: t || PHOTO_STEER_LINE }];
 		this.onChange?.();
 		const dropSteer = () => {
 			this.steerQueueValue = this.steerQueueValue.filter((s) => s.id !== id);
@@ -842,27 +844,28 @@ export class SessionModel {
 			const res = await this.fetch(`/api/chats/${this.chatId}/steer`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ input: { type: "steer", id, text: t } }),
+				body: JSON.stringify({ input: { type: "steer", id, text: t, ...(photos?.length ? { photos } : {}) } }),
 			});
-			if (res.ok) return; // parked or delivered — the stream lands the card
+			if (res.ok) return true; // parked or delivered — the stream lands the card
 			if (res.status === 409) {
 				dropSteer();
-				await this.send({ type: "text", text: t }); // the settle race: plain send
-				return;
+				return await this.send({ type: "text", text: t, ...(photos?.length ? { photos } : {}) }); // the settle race: plain send
 			}
 			dropSteer();
 			this.setError((await res.text()) || `The steer failed (${res.status}).`);
+			return false;
 		} catch (err) {
 			dropSteer();
 			this.setError((err as Error).message);
+			return false;
 		}
 	}
 
 	/** The answer path (the dock): the answer IS the question call's tool
 	 *  result (fork 1), riding as its input event. */
-	submitAnswer(tool: string, toolCallId: string, output: QuestionAnswerData, questionKey?: string): Promise<void> {
+	submitAnswer(tool: string, toolCallId: string, output: QuestionAnswerData, questionKey?: string, photos?: Photo[]): Promise<void> {
 		void tool;
-		return this.send({ type: "answer", toolCallId, answer: output }, undefined, questionKey).then(() => undefined);
+		return this.send({ type: "answer", toolCallId, answer: output, ...(photos?.length ? { photos } : {}) }, undefined, questionKey).then(() => undefined);
 	}
 
 	/** The dismissal path (owner design 2026-10-03, "A2"): the skipped

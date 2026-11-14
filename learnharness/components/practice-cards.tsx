@@ -1,7 +1,8 @@
 "use client";
 
 import { ToolContentResponse } from "@/components/ai-elements/message";
-import type { ArtifactPartProps, Confidence, PracticeRequest, PracticeRequestDetails } from "@/src/core";
+import type { ArtifactPartProps, Confidence, Photo, PracticeRequest, PracticeRequestDetails } from "@/src/core";
+import { SentPhotos } from "@/components/photos";
 import { BookOpenIcon, EyeIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
 
 /**
@@ -32,6 +33,8 @@ export interface PracticeThinkingData {
 	text: string;
 	/** Absent on submissions recorded before 7 Nov 2026. */
 	confidence?: Confidence;
+	/** Photos of his working (the marker's images, joined by the view). */
+	photos?: Photo[];
 }
 
 export function ProblemCard({ part }: ArtifactPartProps) {
@@ -98,7 +101,13 @@ export function ThinkingCard({ data }: { data: PracticeThinkingData }) {
 	// 50%-italic quote block on expand. Legacy records' commit flag is
 	// deliberately unread (one lane now). A TRANSCRIPT row (owner round,
 	// 2026-10-07): full-width band + rail, arriving expanded.
-	return <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen />;
+	if (!data.photos?.length) return <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen />;
+	return (
+		<>
+			{data.text.trim() && <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen />}
+			<SentPhotos photos={data.photos} className="my-1" />
+		</>
+	);
 }
 
 const REQUEST_LINE: Record<PracticeRequest, { label: string; icon: LucideIcon }> = {

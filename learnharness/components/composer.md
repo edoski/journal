@@ -12,6 +12,7 @@
 | send | `button` | 32px circle, `primary` fill, 16px arrow; disabled at 40% while empty; a 16px square on `fill-selected` while a turn runs and the field is empty (Stop) |
 | next problem | `button` | replaces send in the practice pause: 32px pill, `primary`, "Next problem" 13/500 and a 16px arrow |
 | head | the host's (`head`) | a row docked inside the surface above the field (the hybrid topic page's resume line) |
+| photos | `photos.md` | the lesson composer's: the attach button leads the toolbar's left, thumbnails wait above the field, paste and drop add photos; a photo alone can be sent |
 | empty action | `button` (`data-testid="composer-action"`) | the host's `emptyAction`: as next problem, labelled with its `label`, while the field is empty; Enter on the empty field runs it |
 
 ## States

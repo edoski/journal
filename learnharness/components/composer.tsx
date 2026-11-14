@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
+import { PendingPhotos, PhotoAttachButton, type PhotoDraft } from "@/components/photos";
 
 /** What one Enter press does, in precedence order: stop a busy stream,
  *  otherwise send the message, otherwise — practice sessions only — fire
@@ -47,10 +48,13 @@ export function ChatSessionComposer({
 	placeholder,
 	nextProblem,
 	onNext,
+	photos,
 }: {
 	busy: boolean;
 	value: string;
 	revision: number;
+	/** His photos waiting to go with the message (photos.tsx). */
+	photos?: PhotoDraft;
 	onChange: (value: string) => void;
 	onSend: () => void;
 	onStop: () => void;
@@ -61,7 +65,8 @@ export function ChatSessionComposer({
 }) {
 	const [draft, setDraft] = useState(value);
 	useLayoutEffect(() => { setDraft(value); }, [revision, value]);
-	const canSend = sendAllowed && draft.trim().length > 0;
+	// A photo alone is a message.
+	const canSend = sendAllowed && (draft.trim().length > 0 || (photos?.photos.length ?? 0) > 0);
 	const applyDraft = useCallback((next: string) => {
 		setDraft(next);
 		onChange(next);
@@ -78,6 +83,7 @@ export function ChatSessionComposer({
 			placeholder={placeholder}
 			nextProblem={nextProblem}
 			onNext={onNext}
+			photos={photos}
 		/>
 	);
 }
@@ -99,6 +105,7 @@ export function Composer({
 	toolbar,
 	head,
 	emptyAction,
+	photos,
 }: {
 	busy: boolean;
 	value: string;
@@ -127,6 +134,9 @@ export function Composer({
 	/** The signal's dispatcher (send({type:"next"})) — the button and the
 	 *  empty-Enter share it. */
 	onNext?: () => void;
+	/** Photos of his working (photos.tsx): the attach button leads the
+	 *  toolbar, thumbnails wait above the text, paste and drop add more. */
+	photos?: PhotoDraft;
 }) {
 	// The label the empty composer's button wears instead of the send.
 	const next = nextProblem
@@ -148,13 +158,15 @@ export function Composer({
 		<form
 			data-testid="composer"
 			data-slot="composer"
-			className={`flex flex-col ${DOCK_SURFACE}`}
+			className={cn("flex flex-col", DOCK_SURFACE, photos?.dragging && "outline-1 outline-ring")}
 			onSubmit={(e) => {
 				e.preventDefault();
 				act();
 			}}
+			{...photos?.surface}
 		>
 			{head}
+			{photos && <PendingPhotos draft={photos} />}
 			<Textarea
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
@@ -172,7 +184,10 @@ export function Composer({
 				className="max-h-48 min-h-12 resize-none rounded-none border-0 px-4 pb-2 pt-3.5 text-control focus-visible:ring-0"
 			/>
 			<div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-1 p-2">
-				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">{toolbar}</div>
+				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+					{photos && <PhotoAttachButton draft={photos} />}
+					{toolbar}
+				</div>
 				{next && !busy && !canSend ? (
 					<Button
 						type="submit"

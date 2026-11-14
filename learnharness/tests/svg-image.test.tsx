@@ -163,7 +163,7 @@ it("the fullscreen button opens the same SVG image and inversion; download keeps
 	function Harness() {
 		const [focus, setFocus] = useState<{ svg: string; inverted: boolean } | null>(null);
 		return (
-			<SessionMermaidContext.Provider value={{ openMermaid: () => {}, openFigure: (svg, inverted) => setFocus({ svg, inverted }) }}>
+			<SessionMermaidContext.Provider value={{ openMermaid: () => {}, openFigure: (svg, inverted) => setFocus({ svg, inverted }), openPhoto: () => {} }}>
 				<VisualOutputCard output={{ svg: originalSvg }} initialInverted />
 				{focus && <MermaidOverlay svg={focus.svg} inverted={focus.inverted} onClose={() => setFocus(null)} />}
 			</SessionMermaidContext.Provider>

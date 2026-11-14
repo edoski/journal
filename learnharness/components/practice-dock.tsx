@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { ConfidenceChoice } from "@/components/confidence-choice";
 import { Hint } from "@/components/ui/hint";
-import { DEFAULT_CONFIDENCE, kbdEventForAction, type Confidence, type KeyAction, type PracticeRequest } from "@/src/core";
+import { PendingPhotos, PhotoAttachButton, sentPhotos, usePhotoDraft } from "@/components/photos";
+import { cn } from "@/lib/utils";
+import { DEFAULT_CONFIDENCE, kbdEventForAction, type Confidence, type KeyAction, type Photo, type PracticeRequest } from "@/src/core";
 
 /** The three requests, in the order the row shows them. */
 const REQUESTS: readonly { request: PracticeRequest; label: string; hint: string; icon: LucideIcon; action: KeyAction }[] = [
@@ -49,8 +51,10 @@ export interface PracticeDockProps {
 	/** Collapse state, owned by the DockOverlay. */
 	expanded: boolean;
 	onExpand: () => void;
-	/** text + confidence — POST {type:"thinking"} (one lane; the register is read from the text). */
-	onSubmit: (text: string, confidence: Confidence) => void;
+	/** text + confidence (+ photos of his working) — POST {type:"thinking"}
+	 *  (one lane; the register is read from the text). A photo alone is a
+	 *  submission. Resolves false when the server refused it. */
+	onSubmit: (text: string, confidence: Confidence, photos?: Photo[]) => Promise<boolean> | void;
 	/** A request button (Hint, Show me, Explain instead), with the work in
 	 *  the field so far: POST {type:"request"}, never an answer. */
 	onRequest: (request: PracticeRequest, text: string) => void;
@@ -70,6 +74,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 	const waiting = compactionRunning || busy;
 	const [thinking, setThinking] = useState("");
 	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
+	const photos = usePhotoDraft();
 	const draftChangeRef = useRef(onDraftChange);
 	draftChangeRef.current = onDraftChange;
 	useEffect(() => {
@@ -79,10 +84,13 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 	const submit = () => {
 		if (waiting) return;
 		const text = thinking.trim();
-		if (text.length === 0) return;
+		if (text.length === 0 && photos.photos.length === 0) return;
 		setThinking("");
 		setConfidence(DEFAULT_CONFIDENCE);
-		onSubmit(text, confidence);
+		const taken = photos.take();
+		void Promise.resolve(onSubmit(text, confidence, sentPhotos(taken))).then((accepted) => {
+			if (accepted === false) photos.restore(taken);
+		});
 	};
 
 	// A request carries the work so far and leaves it in the field: after
@@ -144,11 +152,12 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 		);
 	}
 	return (
-		<div data-testid="practice-dock" data-problem={problemCallId}>
+		<div data-testid="practice-dock" data-problem={problemCallId} {...photos.surface} className={cn(photos.dragging && "bg-fill-hover")}>
 			<div data-dock-scroll-area="" className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-4">
 				<ToolContentResponse>{input.statement}</ToolContentResponse>
 			</div>
 			<div className="mx-4 mt-3 border-t" />
+			<PendingPhotos draft={photos} />
 			<Textarea
 				data-testid="practice-thinking-field"
 				aria-label="Your thinking"
@@ -173,6 +182,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				className="block max-h-64 min-h-20 resize-none rounded-none border-0 px-4 pb-1 pt-3 text-control focus-visible:ring-0"
 			/>
 			<div className="flex items-center gap-3 p-2 pl-3">
+				<PhotoAttachButton draft={photos} active={expanded} disabled={waiting} />
 				<ConfidenceChoice value={confidence} onChange={setConfidence} />
 				{compactionRunning ? (
 					<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">Compacting the conversation…</span>
@@ -182,7 +192,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				<Button
 					type="button"
 					data-testid="practice-send"
-					disabled={thinking.trim().length === 0 || waiting}
+					disabled={(thinking.trim().length === 0 && photos.photos.length === 0) || waiting}
 					onClick={() => submit()}
 					size="pill"
 						className="ml-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
