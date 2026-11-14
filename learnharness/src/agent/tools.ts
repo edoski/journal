@@ -3,6 +3,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult, serverExecute } from "./tool-execute.ts";
 import {
 	askInputSchema,
+	askLabelProblems,
 	askOptionProblems,
 	explainInputBase,
 	explainInputObject,
@@ -82,7 +83,7 @@ export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 	prepareArguments: prepareQuestionArguments,
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {
-		const problems = askOptionProblems(input.options ?? []);
+		const problems = [...askOptionProblems(input.options ?? []), ...askLabelProblems(input.options ?? [])];
 		if (problems.length > 0) return invalidInputResult("ask_user_question", problems);
 		return questionResult();
 	},

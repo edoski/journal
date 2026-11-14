@@ -8,6 +8,7 @@ import { Value } from "typebox/value";
 import type { TSchema } from "typebox";
 import {
 	askInputSchema,
+	askLabelProblems,
 	askOptionProblems,
 	buildAnswer,
 	compactAnswerForModel,
@@ -46,6 +47,12 @@ describe("askInputSchema / askOptionProblems", () => {
 		const emptyLabel = { question: "?", options: [{ label: "" }, { label: "B" }] };
 		assert.equal(boundaryOk(askInputSchema, emptyLabel, askOptionProblems(emptyLabel.options ?? [])), false);
 		assert.match(askOptionProblems(emptyLabel.options).join(" "), /label is empty/);
+	});
+
+	it("refuses a label tagged \"(Recommended)\": the label becomes his answer's words", () => {
+		const tagged = [{ label: "The whole picture (Recommended)" }, { label: "Just the method" }];
+		assert.match(askLabelProblems(tagged).join(" "), /"The whole picture \(Recommended\)" carries a tag/);
+		assert.deepEqual(askLabelProblems([{ label: "The whole picture" }, { label: "Defaults of a loan" }]), []);
 	});
 });
 
