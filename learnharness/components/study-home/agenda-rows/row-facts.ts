@@ -1,8 +1,8 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { overdueWords } from "@/components/study-words";
+import { overdueWords, returnWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
-import { taskWords } from "@/components/unit-inbox/units";
+import { daysBetween, taskWords } from "@/components/unit-inbox/units";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
@@ -94,8 +94,8 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  * Why a line is on Today, in words that need no memory of the system: a
  * session waiting on the learner, the tutor writing in it or stopped
  * mid-reply in it, why a review is due (a lapse, or how
- * long it is overdue), when an open task was left, or that the topic is
- * next on the course's map. Engine fields only, never the tutor's prose.
+ * long it is overdue) or when one dated ahead comes back, when an open task
+ * was left, or that the topic is next on the course's map. Engine fields only, never the tutor's prose.
  * Pure.
  */
 export function whyOf(row: TodayRow): Why | null {
@@ -103,6 +103,8 @@ export function whyOf(row: TodayRow): Why | null {
 	const { course, step } = row;
 	switch (step.kind) {
 		case "review": {
+			// A review dated ahead, the course's next with nothing due: when it comes back.
+			if (step.back !== undefined) return { kind: "review", short: returnWords(daysBetween(course.map.today, step.back)) };
 			const handles = new Set<string>(step.topics);
 			return reviewReason(course.map.topics.filter((t) => handles.has(t.handle)));
 		}

@@ -27,7 +27,7 @@ import {
 import { lessonOf, topicSpan } from "../components/study-home/lesson-facts.ts";
 import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { Today } from "../components/study-home/today.tsx";
-import { courseProgress, foldLines, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
+import { courseProgress, foldLines, lessonTitle, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { UnreadableLines } from "../components/study-home/unreadable-course.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
@@ -176,7 +176,7 @@ describe("study facts", () => {
 		assert.equal(stepWords(step), "Start Poisson distribution");
 		assert.equal(whyOf({ kind: "course", course: reviewed, step })?.short, "Next up");
 		const done: StudyCourse = { ...reviewed, map: { ...reviewed.map, topics: reviewed.map.topics.slice(0, 1) } };
-		assert.equal(nextStepOf(done).kind, "none", "nothing left to start: no Continue on a topic he has on his own");
+		assert.deepEqual(nextStepOf(done), { kind: "review", titles: ["Bayes' rule"], topics: ["bayes"], then: null, back: "2026-11-11" }, "nothing left to start: no Continue on a topic he has on his own, but the review the plan dates next");
 	});
 
 	it("a course never studied comes after every course with reviews tonight, even with the nearer exam", () => {
@@ -337,6 +337,26 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Missed Sequences"]);
 		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 3d ago"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
+	});
+
+	it("names the next dated review, and when it comes back, on a course with every topic his own and nothing due (round 3: \"Calculus I · Start a lesson\")", () => {
+		const done: StudyCourse = {
+			...ANALYSIS,
+			due: [],
+			map: {
+				...ANALYSIS.map,
+				current: "fundamental" as TopicHandle,
+				topics: [
+					topic("fundamental", "Fundamental theorem", "retained", { review: { kind: "scheduled", date: "2026-12-09" } }),
+					topic("improper", "Improper integrals", "retained", { review: { kind: "scheduled", date: "2026-11-29", held: true } }),
+				],
+			},
+		};
+		const row = rowOf(done);
+		assert.equal(lessonTitle(row), "Review Improper integrals");
+		assert.deepEqual(whyOf(row), { kind: "review", short: "Back in 3w" });
+		const empty = rowOf({ ...done, map: { ...done.map, topics: done.map.topics.map((t) => ({ ...t, review: null })) } });
+		assert.equal(lessonTitle(empty), "Start a lesson", "with no review dated at all, the tutor proposes");
 	});
 
 	it("says how long ago a course was studied in a few characters", () => {

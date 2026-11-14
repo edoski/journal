@@ -8,8 +8,8 @@ The home's list of what to study today: each session to pick up, then each cours
 |---|---|
 | heading | `DayHeading`, the page's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). It stays above the rows it names, under the map (Edo, 12 Nov 2026: "where it's at, but bigger"); above the map it would sit beside the course tabs and away from its list |
 | line | a hybrid row (hybrid.md); the whole line opens the lesson |
-| lesson | "Review A, B, C" (today's review, every topic), "Continue <task or topic>", the waiting session's title, or "Start a lesson" |
-| also | past five courses the fifth line reads "Also today:" and each further course as a quiet button that opens its lesson |
+| lesson | "Review A, B, C" (today's review, every topic), "Continue <task or topic>", the waiting session's title; on a course with every topic his own and nothing due, the review the plan dates next, "Review Improper integrals", its reason when it comes back ("Back in 3w"); "Start a lesson" only for a course with no topic to name (round 3: "Calculus I · Start a lesson" named no topic and no reason) |
+| also | past five courses the fifth line reads "Also today:" and each further course as a quiet button that opens its lesson, its tooltip naming the lesson and why ("Review Improper integrals. Back in 3w"); the label sits as far from the first course as the courses from each other |
 
 No line has a button: the first row's blue Open looked ugly and every line already opens its lesson (Edo, 13 Nov 2026). Not on a line (Edo, 12 Nov 2026): the exam run-up ("Exam in 11 days"), what follows a review ("Then Bayes' rule"), the open task's step, and the place on the map ("Steps 2–3 of 5" with its marks). Each was a second line or a column that told him nothing when he came back after days away. What a line says instead is the hybrid row's pie, recency and reason (`agenda-rows/agenda-rows.md`).
 
