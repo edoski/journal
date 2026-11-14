@@ -642,6 +642,49 @@ export function sortProblems(misses: readonly SortMiss[], submit: ArcSubmit): st
 	].join("\n");
 }
 
+// ─── the purpose check ───────────────────────────────────────────────────────
+
+/** Rule 8's purpose test, read by a fresh reader: each arc's purpose line
+ *  beside its topics' titles, as the learner will see them. */
+export interface PurposeQuiz {
+	arcs: { title: string; purpose: string; topics: { id: string; handle: string; title: string }[] }[];
+}
+
+/** The topics a reader found a purpose line false of. */
+export interface PurposeAnswer {
+	false: { topic: string; why: string }[];
+}
+
+/** The quiz for a formation. Pure. */
+export function purposeQuiz(submit: ArcSubmit, view: ArcPassView, formation: Formation): PurposeQuiz {
+	const sorted = sortQuiz(submit, view, formation);
+	const id = new Map(sorted.topics.map((t) => [t.handle, t]));
+	return { arcs: submit.arcs.map((a) => ({ title: a.title.trim(), purpose: a.purpose.trim(), topics: a.topics.flatMap((t) => (id.has(t) ? [id.get(t)!] : [])) })) };
+}
+
+/** What is wrong with the reader's answer, for it to fix. Pure. */
+export function purposeAnswerProblems(answer: PurposeAnswer, quiz: PurposeQuiz): string | null {
+	const ids = new Set(quiz.arcs.flatMap((a) => a.topics.map((t) => t.id)));
+	const problems = answer.false.flatMap((f) => [...(ids.has(f.topic) ? [] : [`"${f.topic}" is no topic id.`]), ...(f.why?.trim() ? [] : [`say why the purpose line is false of "${f.topic}".`])]);
+	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
+}
+
+/** The refusal a purpose line false of some topic gives the cut, or null.
+ *  Pure. */
+export function purposeProblems(answer: PurposeAnswer, quiz: PurposeQuiz): string | null {
+	const lines = answer.false.flatMap((f) => {
+		const arc = quiz.arcs.find((a) => a.topics.some((t) => t.id === f.topic));
+		const topic = arc?.topics.find((t) => t.id === f.topic);
+		return arc && topic ? [`- "${arc.title}": its purpose line is not true of "${topic.title}" (${topic.handle}): ${f.why.trim()}`] : [];
+	});
+	if (lines.length === 0) return null;
+	return [
+		"A fresh reader read each purpose line against its arc's topics (rule 8) and found these false:",
+		...lines,
+		"Write each such line again at the level of the arc's question, so it is true of every topic in the arc, in words its topic titles use.",
+	].join("\n");
+}
+
 /** The note a cut's doubts leave in the arc log, saved after the arcs:
  *  each edge it thinks false, kept as it is. Null with none. Pure. */
 export function doubtNote(submit: ArcSubmit): Json | null {

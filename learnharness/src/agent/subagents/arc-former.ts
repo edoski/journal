@@ -33,6 +33,9 @@ import {
 	liveTopics,
 	mergeMisses,
 	passDue,
+	purposeAnswerProblems,
+	purposeProblems,
+	purposeQuiz,
 	sortAnswerProblems,
 	sortMisses,
 	sortProblems,
@@ -46,6 +49,8 @@ import {
 	type SortAnswer,
 	type SortMiss,
 	type SortQuiz,
+	type PurposeAnswer,
+	type PurposeQuiz,
 	type EdgeAdd,
 	withMissing,
 	withProposed,
@@ -66,6 +71,7 @@ const EDGES_TOOL = "submit_edges";
 const MISSING_TOOL = "submit_missing";
 const ARCS_TOOL = "submit_arcs";
 const SORT_TOOL = "submit_sort";
+const PURPOSE_TOOL = "submit_purpose";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
 /** Blind readers per cut: the rubric scores with two fresh scorers and
  *  takes the lower, so a name passes only when both place every topic. */
@@ -116,6 +122,13 @@ const sortSchema = Type.Object({
 			arcs: Type.Array(Type.String(), { description: "The arc names it reads as part of, exactly as listed, best first; a second only when it fits exactly as well." }),
 		}),
 		{ description: "Every topic, once." },
+	),
+});
+
+const purposeSchema = Type.Object({
+	false: Type.Array(
+		Type.Object({ topic: Type.String({ description: "The topic's id: t1, t2, …" }), why: Type.String({ description: "What the purpose line claims that this topic does not give." }) }),
+		{ description: "Each topic its arc's purpose line is false of; an empty list when every line is true of every topic." },
 	),
 });
 
@@ -185,6 +198,12 @@ How this differs from the text below:
 `;
 
 export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the names of its arcs, in no particular order, and its topic titles, shuffled. For each topic, say which arc's name it reads as part of, from the names alone: nothing else about the course is given, and nothing else counts. List a second name only when it fits the topic exactly as well as the first. Answer with one ${SORT_TOOL} call.`;
+
+export const PURPOSE_INSTRUCTIONS = `You read a course's arcs the way a student does. Each arc below has a purpose line, one sentence on what the arc lets the student do, and its topics. For each arc, read the purpose line against each of its topics in turn: is it true of that topic, so that studying the topic is part of what the line promises? List each topic a line is false of, with what the line claims that the topic does not give. A line that is broad but true is fine. Answer with one ${PURPOSE_TOOL} call.`;
+
+function purposePrompt(quiz: PurposeQuiz): string {
+	return quiz.arcs.flatMap((a) => [`## ${a.title}`, `Purpose: ${a.purpose}`, ...a.topics.map((t) => `- ${t.id}: ${t.title}`), ""]).join("\n");
+}
 
 function sortPrompt(quiz: SortQuiz): string {
 	return ["## Arc names", ...[...quiz.arcs].sort().map((a) => `- ${a}`), "", "## Topics", ...quiz.topics.map((t) => `- ${t.id}: ${t.title}`)].join("\n");
@@ -293,7 +312,7 @@ export type ArcPassResult =
 /** One entry of a run's transcript: a model message, an answer the app or
  *  the engine refused, or a save. */
 export type TranscriptEntry =
-	| { at: string; step: "edges" | "missing" | "cut" | "sort"; kind: "message"; message: AssistantMessage }
+	| { at: string; step: "edges" | "missing" | "cut" | "sort" | "purpose"; kind: "message"; message: AssistantMessage }
 	| { at: string; step: "sort"; kind: "sorted"; misses: SortMiss[] }
 	| { at: string; step: "edges" | "missing" | "cut"; kind: "refused"; problems: string }
 	| { at: string; step: "edges" | "cut" | "note"; kind: "saved" | "save refused"; changes: unknown; message?: string };
@@ -470,10 +489,33 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 				return null;
 			});
 			const reads = (await Promise.all(Array.from({ length: SORT_READERS }, reader))).filter((r): r is SortAnswer => r !== null);
-			if (reads.length === 0) return null;
-			sorted = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
-			log({ step: "sort", kind: "sorted", misses: sorted });
-			return sortProblems(sorted, a);
+			if (reads.length > 0) {
+				sorted = mergeMisses(...reads.map((read) => sortMisses(quiz, read, a)));
+				log({ step: "sort", kind: "sorted", misses: sorted });
+				const misses = sortProblems(sorted, a);
+				if (misses) return misses;
+			}
+			const purposes = purposeQuiz(a, cut.view, formation);
+			const purposeRead = await runSubmitAgent<PurposeAnswer>({
+				role: "teacher",
+				toolName: PURPOSE_TOOL,
+				toolDescription: "Submit the topics a purpose line is false of.",
+				parameters: purposeSchema,
+				fill: (input: Json) => ({ false: (input.false as PurposeAnswer["false"] | undefined) ?? [] }),
+				validate: (answer) => purposeAnswerProblems(answer, purposes),
+				systemPrompt: PURPOSE_INSTRUCTIONS,
+				prompt: purposePrompt(purposes),
+				engine,
+				signal,
+				onMessage: (message) => log({ step: "purpose", kind: "message", message }),
+				onStep: (usage, model, n, finish, tools) => console.info(`[arc-pass ${workspace}] purpose step ${n} ${model}: ${usage.input} in, ${usage.output} out, ${finish}, ${tools}`),
+				neverSubmitted: "The purpose check never submitted.",
+			}).catch((err: unknown) => {
+				if (signal?.aborted) throw aborted();
+				console.info(`[arc-pass ${workspace}] the purpose check skipped: ${err instanceof Error ? err.message : String(err)}`);
+				return null;
+			});
+			return purposeRead ? purposeProblems(purposeRead, purposes) : null;
 		};
 		const answer = await agent<ArcSubmit>("cut", ARCS_TOOL, arcSchema, composeDoctrine(ARC_CUT_DOCTRINE), ARC_CUT_INSTRUCTIONS, cutPrompt(title, cut.view, cut.record, files), async (a) => {
 			const problems = arcPassProblems(a, cut.view);

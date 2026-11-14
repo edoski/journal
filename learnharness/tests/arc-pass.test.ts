@@ -379,9 +379,10 @@ function scriptedModel(
 	hook?: () => void,
 	readsAs: Record<string, string> = {},
 	missing: EdgeSubmit["add"] = [],
-): PiEngine & { calls: number; sorts: number; checks: number; refusals: string[] } {
+	purposeFalseOf: string[] = [],
+): PiEngine & { calls: number; sorts: number; checks: number; purposes: number; refusals: string[] } {
 	const faux = createFauxCore({});
-	const state = { calls: 0, sorts: 0, checks: 0, refusals: [] as string[] };
+	const state = { calls: 0, sorts: 0, checks: 0, purposes: 0, refusals: [] as string[] };
 	let cut = 0;
 	const step: FauxResponseStep = async (context) => {
 		const last = context.messages.at(-1) as { role: string; isError?: boolean; content?: Array<{ text?: string }> };
@@ -391,6 +392,11 @@ function scriptedModel(
 			state.checks++;
 			if (last.role === "toolResult" && last.isError) state.refusals.push(last.content?.map((c) => c.text ?? "").join("") ?? "");
 			return fauxAssistantMessage([fauxToolCall("submit_missing", { add: missing } as unknown as ToolCall["arguments"], { id: `missing-${state.checks}` })], { stopReason: "toolUse" });
+		}
+		if (/^## .+\nPurpose: /.test(body)) {
+			state.purposes++;
+			const falseOf = [...body.matchAll(/^- (t\d+): (.+)$/gm)].flatMap((m) => (purposeFalseOf.includes(m[2]!) ? [{ topic: m[1]!, why: "the line promises nothing of it" }] : []));
+			return fauxAssistantMessage([fauxToolCall("submit_purpose", { false: falseOf } as unknown as ToolCall["arguments"], { id: `purpose-${state.purposes}` })], { stopReason: "toolUse" });
 		}
 		if (body.startsWith("## Arc names")) {
 			state.sorts++;
@@ -502,6 +508,16 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		assert.deepEqual(record(dir2).topics.chain.needs, ["derivative", "continuity"]);
 		assert.deepEqual(result.status === "formed" && result.edges.diffs.map((d) => `${d.change} ${d.topic}<-${d.need}`), ["drop riemann<-chain", "add chain<-continuity"]);
 		assert.equal(good.checks, 1);
+	});
+
+	it("a purpose line a fresh reader finds false of one of its topics sends the cut back, naming the topic", async () => {
+		const dir = course("purpose");
+		const model = scriptedModel(EDGES, [CUT], undefined, {}, [], ["Chain rule"]);
+		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" }), /never submitted/);
+		assert.match(model.refusals[0]!, /"Derivatives": its purpose line is not true of "Chain rule" \(chain\): the line promises nothing of it/);
+		const fine = scriptedModel(EDGES, [CUT]);
+		assert.equal((await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: fine }).run(course("purpose-fine"), { edges: "apply" })).status, "formed");
+		assert.equal(fine.purposes, 1);
 	});
 
 	it("a blind reader sorts the titles into the arc names alone; two topics that read as another arc send the cut back, naming them", async () => {
