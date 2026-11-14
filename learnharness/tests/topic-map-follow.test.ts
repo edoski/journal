@@ -14,8 +14,8 @@ const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const topic = (handle: string): CourseMapTopic => ({ handle: h(handle), title: handle, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [] });
 
-/** Linear Algebra on the true-prerequisite seed, as topic-map-framing.test.ts has it. */
-const NEEDS: Record<string, readonly string[]> = { vectors: [], span: ["vectors"], independence: ["span"], basis: ["independence"], matmul: ["vectors"], elimination: [], rank: ["basis", "elimination"], kernel: ["rank"], determinant: ["matmul"], cramer: ["determinant"], invertibility: ["rank", "determinant"], "change-basis": ["basis", "matmul", "invertibility"], eigen: ["determinant", "rank"], diagonalization: ["eigen", "basis", "change-basis"], "inner-product": ["vectors"], projection: ["inner-product", "basis"] };
+/** Linear Algebra on the demo seed, as topic-map-framing.test.ts has it. */
+const NEEDS: Record<string, readonly string[]> = { vectors: [], span: ["vectors"], independence: ["span"], basis: ["independence"], matmul: ["vectors"], elimination: [], rank: ["basis", "elimination"], kernel: ["rank"], determinant: ["matmul"], cramer: ["determinant"], invertibility: ["rank", "determinant"], "change-basis": ["basis", "matmul", "invertibility"], eigen: ["determinant", "rank", "invertibility", "kernel"], diagonalization: ["eigen", "basis", "change-basis"], "inner-product": ["vectors"], projection: ["inner-product", "basis"] };
 const EDGES: CourseMapEdge[] = Object.entries(NEEDS).flatMap(([t, prereqs]) => prereqs.map((p) => ({ kind: "needs" as const, prerequisite: h(p), topic: h(t) })));
 const LAYOUT = layoutTopicMap(Object.keys(NEEDS).map(topic), EDGES, TOPIC_NODE_SIZE);
 const HERE = h("eigen");
@@ -36,27 +36,24 @@ function fitOf(handle: string, camera: Camera): CardFit {
 	const top = at.y * camera.zoom + camera.y;
 	return cardFit({ left, top, right: left + LAYOUT.node.width * camera.zoom, bottom: top + LAYOUT.node.height * camera.zoom }, FRAME, FADE);
 }
-const cutBy = (camera: Camera) => [...LAYOUT.topics.keys()].filter((t) => fitOf(t, camera) === "cut");
 const follow = (lit: string[], from = OPENING) => litCamera(LAYOUT, from, lit.map(h), FRAME, FADE, REACH, MIN_ZOOM, HERE, TAG);
 
 describe("where the map's camera goes for the row he points at", () => {
-	it("brings a lit topic that opens out of view into view, clear of the fade, with You are here and its tag still clear and no card cut", () => {
-		assert.equal(fitOf("basis", OPENING), "out", "Basis opens out of view");
-		const to = follow(["basis"])!;
+	it("brings a lit topic that opens cut at the frame's edge into view, clear of the fade, with You are here and its tag still clear", () => {
+		assert.equal(fitOf("projection", OPENING), "cut", "Orthogonal projection opens cut");
+		const to = follow(["projection"])!;
 		assert.ok(to, "the camera moves");
 		assert.equal(to.zoom, OPENING.zoom, "at the scale it opened at");
-		assert.equal(fitOf("basis", to), "clear");
+		assert.equal(fitOf("projection", to), "clear");
 		assert.equal(fitOf("eigen", to), "clear", "You are here");
 		const here = LAYOUT.topics.get(HERE)!;
 		assert.ok(here.y * to.zoom + to.y - TAG >= FADE.y - 1, "its tag");
-		assert.deepEqual(cutBy(to), []);
 	});
 
 	it("frames every topic a row lights at once, a problem sheet's three", () => {
-		assert.notEqual(fitOf("kernel", OPENING), "clear", "Kernel opens under the fade");
+		assert.equal(fitOf("basis", OPENING), "out", "Basis opens out of view");
 		const to = follow(["basis", "rank", "kernel"])!;
 		for (const t of ["basis", "rank", "kernel"]) assert.equal(fitOf(t, to), "clear", t);
-		assert.deepEqual(cutBy(to), []);
 	});
 
 	it("moves nothing when the row's topics are already clear of the fade", () => {

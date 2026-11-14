@@ -36,8 +36,8 @@ function reducedMotion(): boolean {
  * over the layout's own geometry. Each node says where he stands and,
  * from `said` (`sidebarSays`), what the sidebar says for it when that
  * needs him, and opens the topic's page. The map opens on the
- * whole course when that fits, else framed on the current topic with its
- * neighbours whole (`framedCamera`), or at `zoom` with the whole course in
+ * whole course when that fits, else framed on the current topic with the
+ * topics it leads to whole (`framedCamera`), or at `zoom` with the whole course in
  * its middle, for a page that frames the map itself; `whole` shows the
  * whole course however small (the enlarged map's zoom out). It pans by
  * drag or scroll and zooms by pinch. Hover or focus lights a topic's
@@ -194,8 +194,8 @@ function Flow({
 	// Zoomed out as far as the whole course, however small: the enlarged map's overview.
 	const fitted = frame ? Math.min(1, wholeZoom(layout, frame, margin)) : 1;
 	const minZoom = fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
-	// As far as an opening may look (`framedCamera`): the room (in the frame's pixels) at the smallest scale the map
-	// shows, and one topic past it.
+	// As far as the camera may look: the room (in the frame's pixels) at the smallest scale the map shows, and one
+	// topic past it for a pan or a follow (`slackOf`).
 	const reach = useMemo(() => {
 		const slack = slackOf(layout.node);
 		const smallest = Math.min(READABLE_ZOOM, minZoom);

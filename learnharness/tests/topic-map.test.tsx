@@ -289,7 +289,7 @@ describe("where a course map opens framed", () => {
 	/** Every topic's box on screen under a camera, sorted into wholly clear of the fade and cut by the frame's edge
 	 *  (part of it shows, in the fade or not, and the edge cuts the rest). */
 	const sort = (camera: Camera, frame: { width: number; height: number }) => {
-		const out = { clear: [] as string[], cut: [] as string[] };
+		const out = { clear: [] as string[], cut: [] as string[], whole: [] as string[] };
 		for (const [handle, at] of layout.topics) {
 			const left = at.x * camera.zoom + camera.x;
 			const top = at.y * camera.zoom + camera.y;
@@ -312,32 +312,51 @@ describe("where a course map opens framed", () => {
 	it("shows the whole course when it fits at a readable scale", () => {
 		const camera = framedCamera(layout, MAP.current, { width: 1600, height: 900 }, FADE, TAG);
 		assert.ok(camera.zoom >= READABLE_ZOOM);
+			if (fit === "clear" || fit === "faded") out.whole.push(handle);
 		assert.equal(sort(camera, { width: 1600, height: 900 }).clear.length, layout.topics.size);
 	});
 
-	it("frames the current topic clear of the fade, with its tag, and cuts none of the others at the frame's edge", () => {
+	/** The topics that need one: where he goes next from it. */
+	const nextOf = (handle: string) => MAP.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === handle ? [e.topic as string] : []));
+	it("frames the current topic clear of the fade, with its tag, and the topics it leads to whole", () => {
 		const frame = { width: 896, height: 413 };
 		const camera = framedCamera(layout, MAP.current, frame, FADE, TAG);
-		const { clear, cut } = sort(camera, frame);
+		const { clear, whole } = sort(camera, frame);
 		assert.ok(clear.includes("rank"), "the current topic is clear");
 		assert.ok(layout.topics.get(h("rank"))!.y * camera.zoom + camera.y - TAG >= FADE.y - 1, "its tag too");
-		assert.deepEqual(cut, []);
+		for (const next of nextOf("rank")) assert.ok(whole.includes(next), `${next}, where he goes next`);
 		assert.ok(camera.zoom >= READABLE_ZOOM && camera.zoom <= 1);
 	});
 
-	it("opens Linear Algebra on Eigenvalues on Home's map with no card cut, and its course page's with one at most (the round-3 evaluation)", () => {
+	it("opens Linear Algebra on Eigenvalues with the topics it leads to whole, on Home's map and on its course page", () => {
 		const home = { width: 896, height: 413 };
 		const onHome = sort(framedCamera(layout, h("eigen"), home, FADE, TAG), home);
 		assert.ok(onHome.clear.includes("eigen"));
-		assert.deepEqual(onHome.cut, []);
+		for (const next of nextOf("eigen")) assert.ok(onHome.whole.includes(next), `${next} on Home`);
 		const page = { width: 696, height: 782 };
-		const onPage = framedCamera(layout, h("eigen"), page, { x: 48, y: 32 }, TAG, "top");
-		const cut = [...layout.topics.values()].filter((at) => {
+		const pageFade = { x: 48, y: 32 };
+		const onPage = framedCamera(layout, h("eigen"), page, pageFade, TAG, "top");
+		const fits = new Map([...layout.topics].map(([handle, at]) => {
 			const left = at.x * onPage.zoom + onPage.x;
 			const top = at.y * onPage.zoom + onPage.y;
-			return cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * onPage.zoom, bottom: top + TOPIC_NODE_SIZE.height * onPage.zoom }, page, { x: 48, y: 32 }) === "cut";
-		});
-		assert.ok(cut.length <= 1, `${cut.length} cut`);
+			return [handle as string, cardFit({ left, top, right: left + TOPIC_NODE_SIZE.width * onPage.zoom, bottom: top + TOPIC_NODE_SIZE.height * onPage.zoom }, page, pageFade)];
+		}));
+		assert.equal(fits.get("eigen"), "clear");
+		for (const next of nextOf("eigen")) assert.ok(["clear", "faded"].includes(fits.get(next)!), `${next} on its page`);
+	});
+
+	it("never moves the camera past the drawing's room to avoid a card cut at the frame's edge (round 5: an empty band under Home's map)", () => {
+		const frame = { width: 896, height: 413 };
+		const room = { x: FADE.x, y: FADE.y + TAG };
+		for (const handle of layout.topics.keys()) {
+			const camera = framedCamera(layout, handle, frame, FADE, TAG);
+			if (layout.height * camera.zoom + room.y * 2 > frame.height) {
+				assert.ok(camera.y <= room.y && camera.y + layout.height * camera.zoom >= frame.height - room.y, `down, opening on ${handle}`);
+			}
+			if (layout.width * camera.zoom + room.x * 2 > frame.width) {
+				assert.ok(camera.x <= room.x && camera.x + layout.width * camera.zoom >= frame.width - room.x, `across, opening on ${handle}`);
+			}
+		}
 	});
 
 	it("opens Probability's course page on where he is, its tag and the topics it leads to clear (the round-3 evaluation)", () => {
@@ -354,8 +373,7 @@ describe("where a course map opens framed", () => {
 		}));
 		assert.equal(fits.get(h("random-variables")), "clear");
 		assert.ok(probability.topics.get(h("random-variables"))!.y * camera.zoom + camera.y - TAG >= fade.y - 1, "its tag is clear");
-		assert.ok(["expectation", "poisson"].every((next) => fits.get(h(next)) === "clear"), "the topics it leads to");
-		assert.ok(![...fits.values()].includes("cut"));
+		assert.ok(["expectation", "poisson"].every((next) => ["clear", "faded"].includes(fits.get(h(next))!)), "the topics it leads to");
 	});
 
 	it("never opens below the scale where a card's 13px title draws at about 11px", () => {
