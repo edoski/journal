@@ -471,11 +471,33 @@ function QuestionDockForm({
 				}
 				return;
 			}
+			// ↑ at the very start of his thinking goes back to the last
+			// choice, since Tab is dead (Edo, 17 Sep 2026).
+			const thinking = thinkingRef.current;
+			if (e.key === "ArrowUp" && !modded && thinking && t === thinking && thinking.selectionStart === 0 && thinking.selectionEnd === 0) {
+				e.preventDefault();
+				const idx = rowCount - 1;
+				setKbdIdx(idx);
+				focusRow(idx);
+				return;
+			}
+			// ↓ at the end of the last row's own field (Other) reaches it too.
+			const lastRow = t?.closest?.(`[data-kbdrow="${rowCount - 1}"]`);
+			if (e.key === "ArrowDown" && !modded && thinking && lastRow && t instanceof HTMLInputElement && t.selectionStart === t.value.length) {
+				e.preventDefault();
+				thinking.focus();
+				return;
+			}
 			// Keys from a typing surface keep their meaning (arrows move
 			// the caret, space types).
 			if (typing || modded) return;
 			if (e.key === "ArrowDown") {
 				e.preventDefault();
+				// ↓ past the last choice reaches his thinking.
+				if (kbdIdx === rowCount - 1 && thinking) {
+					thinking.focus();
+					return;
+				}
 				const next = Math.min((kbdIdx ?? -1) + 1, rowCount - 1);
 				setKbdIdx(next);
 				// Focus follows the walk while the user is IN the rows (Tab

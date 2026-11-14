@@ -7,7 +7,7 @@ The topic page (`/unit/<course>/<topic>`): `UnitPage` in `../unit-page.tsx` draw
 | His question | Where it is answered |
 |---|---|
 | What is the one thing to do now? | Now in the history pane (`pickup/pickup.md`): Resume, Open, Review, Continue, Start, or Study |
-| Is there anything to review, and when? | The head line, in the app's one wording (`components/study-words.ts`): "Due today", "1w overdue" (at any level, as the action), or "Back in 5d" |
+| Is there anything to review, and when? | The head line, in the app's one wording (`components/study-words.ts`): "Due today", "10d overdue" (at any level, as the action), or "Back in 5d" |
 | Where do I pick this up? | Now and Next in the history pane: the session that waits or is being written, at the step it is on, and each open task that holds the topic, at its step. Else Earlier dates the last study |
 
 ## The one action, first match wins (`topicAction`)

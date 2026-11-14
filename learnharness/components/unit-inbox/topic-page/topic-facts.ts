@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { heldWords, LESSON_WORDS, reviewWords, startsAfterWords, type SlipKey } from "@/components/study-words";
+import { agoWords, heldWords, LESSON_WORDS, reviewWords, startsAfterWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -151,25 +151,9 @@ export function dayWords(day: string, today: string): string {
 	return days === 1 ? "Yesterday" : dayOf(day);
 }
 
-/** How long ago in a trailing column, in Home's words (`studiedAgo`):
- *  "Today", "Yesterday", "3d ago", "2w ago", "3mo ago". */
-export function agoWords(days: number): string {
-	if (days <= 0) return "Today";
-	if (days === 1) return "Yesterday";
-	if (days < 14) return `${days}d ago`;
-	if (days < 60) return `${Math.floor(days / 7)}w ago`;
-	return `${Math.floor(days / 30)}mo ago`;
-}
-
-/** When he last studied the topic: "Studied today", "Studied 3 days
- *  ago", "Studied 2 weeks ago". */
-export function studiedWords(days: number): string {
-	if (days <= 0) return "Studied today";
-	if (days === 1) return "Studied yesterday";
-	if (days < 14) return `Studied ${days} days ago`;
-	if (days < 60) return `Studied ${Math.floor(days / 7)} weeks ago`;
-	return `Studied ${Math.floor(days / 30)} months ago`;
-}
+/** How long ago in a trailing column, and when he last studied the
+ *  topic: the app's one form, in days (`study-words.ts`). */
+export { agoWords, studiedDaysWords as studiedWords };
 
 /**
  * What the head says beside the pie, in the app's words (study-words.ts),
@@ -286,7 +270,7 @@ export function topicFacts({ course, topic, chats, read }: { course: StudyCourse
 		today: map.today,
 		standing: silent ? null : standingOf(topic),
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
-		studied: !silent && studied ? studiedWords(daysBetween(studied, map.today)) : null,
+		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
 		waits: waitsWords(topic.review, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,

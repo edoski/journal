@@ -236,6 +236,12 @@ export function courseDeleted(chatId: string): boolean {
 	return !!workspace && courseRecordForgotten(workspace);
 }
 
+/** The same fact for a listed session, from its course link: true when
+ *  its course was deleted. */
+export function courseGone(course: { workspace: string } | undefined): boolean {
+	return !!course && courseRecordForgotten(course.workspace);
+}
+
 /** True when the session exists and has no course: its learner turns are
  *  refused until the learner links one. */
 export function courseRequired(chatId: unknown): boolean {

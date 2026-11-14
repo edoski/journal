@@ -11,7 +11,7 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
-import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, unreviewedWords, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, unreviewedWords, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -39,10 +39,10 @@ const LINALG = course(
 		exam: { date: "2026-11-29", daysLeft: 21 },
 		tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: null }],
 		topics: [
-			topic("span", { title: "Span", review: { kind: "due", date: "2026-10-29", overdue: 10 } }),
+			topic("span", { title: "Span", review: { kind: "due", date: TODAY, overdue: 10 } }),
 			topic("basis", { title: "Basis", review: { kind: "due", date: TODAY, overdue: 0 } }),
 			topic("vectors", { title: "Vectors", review: { kind: "scheduled", date: "2026-11-13" } }),
-			topic("rank", { title: "Rank", level: "assisted", review: { kind: "due", date: "2026-11-05", overdue: 3 }, tasks: ["sheet-4"] }),
+			topic("rank", { title: "Rank", level: "assisted", review: { kind: "due", date: TODAY, overdue: 3 }, tasks: ["sheet-4"] }),
 			topic("eigen", { title: "Eigenvalues", level: "new" }),
 		],
 	},
@@ -203,6 +203,21 @@ describe("calendar entries", () => {
 			"2026-11-08 task Problem sheet 2",
 			"2026-11-08 lesson Total probability and Bayes",
 		]);
+	});
+
+	it("shows one lesson once: the open task an unfinished session of today left folds into that session's entry, under its name", () => {
+		const LA_TODAY = course("/study/linalg", "Linear Algebra", {
+			tasks: [{ key: "eigen-lesson", title: "Eigenvalues lesson: eigenspaces and diagonalisation", step: "Find the eigenspace", updated: TODAY }],
+			topics: [topic("eigen", { title: "Eigenvalues", level: "assisted", tasks: ["eigen-lesson"] })],
+		});
+		const la = { workspace: "/study/linalg", title: "Linear Algebra" };
+		const lesson = chat({ id: "eigen", title: "Eigenvalues and eigenvectors", course: la, topics: ["eigen"], ended: "left", updatedAt: "2026-11-08T09:00:00" });
+		const entries = calendarEntries({ courses: [LA_TODAY], chats: [lesson], scope: null });
+		assert.deepEqual(summary(entries), ["2026-11-08 task Eigenvalues and eigenvectors"]);
+		const done = calendarEntries({ courses: [LA_TODAY], chats: [{ ...lesson, ended: "closed" }], scope: null });
+		assert.deepEqual(summary(done), ["2026-11-08 task Eigenvalues lesson: eigenspaces and diagonalisation", "2026-11-08 lesson Eigenvalues and eigenvectors"], "a finished lesson that only touched the topic leaves the task its own entry");
+		const yesterday = calendarEntries({ courses: [LA_TODAY], chats: [{ ...lesson, updatedAt: "2026-11-07T09:00:00" }], scope: null });
+		assert.equal(yesterday.filter((e) => e.day === TODAY).length, 1, "an older session stays on its own day; today keeps the task");
 	});
 
 	it("keeps one course when scoped, and with it no session outside a course", () => {
@@ -394,5 +409,21 @@ describe("the plan's reasons and gaps in the calendar", () => {
 		assert.equal(unreviewedWords(["Kernel", "Rank"]), "No room in it for Kernel and Rank");
 		const fresh = entries.find((e) => e.kind === "new");
 		assert.equal(fresh?.kind === "new" && fresh.waits, "After Probability's new topics");
+	});
+});
+
+describe("an overdue review's due day", () => {
+	it("is its days overdue before the day the engine dates it, never that day itself", () => {
+		assert.equal(dueDay({ kind: "due", date: "2026-11-08", overdue: 2 }), "2026-11-06");
+		assert.equal(dueDay({ kind: "due", date: "2026-11-01", overdue: 7 }), "2026-10-25");
+		assert.equal(dueDay({ kind: "due", date: "2026-11-08", overdue: 0 }), "2026-11-08");
+		assert.equal(dueDay({ kind: "scheduled", date: "2026-11-12" }), null);
+		assert.equal(dueDay(null), null);
+	});
+
+	it("rides on the calendar's overdue entry", () => {
+		const entries = calendarEntries({ courses: [LINALG], chats: [], scope: null });
+		const span = entries.find((e) => e.kind === "review" && e.topic.handle === "span");
+		assert.equal(span?.kind === "review" ? span.dueOn : undefined, "2026-10-29");
 	});
 });

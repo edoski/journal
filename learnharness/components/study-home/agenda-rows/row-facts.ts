@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { LESSON_WORDS, lapsedOnWords, overdueWords } from "@/components/study-words";
+import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedOnWords, overdueWords, studiedDaysWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -85,7 +85,7 @@ function reviewReason(due: readonly CourseMapTopic[]): Why | null {
 /** A session's line by where it stands; a finished session has no line. */
 const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
 	"your-turn": { kind: "reply", short: "Your turn" },
-	working: { kind: "working", short: "Tutor writing" },
+	working: { kind: "working", short: TUTOR_WRITING },
 	paused: { kind: "stopped", short: "Stopped mid-reply" },
 	left: { kind: "task", short: LESSON_WORDS.leftForTonight },
 	finished: null,
@@ -119,7 +119,7 @@ export function whyOf(row: TodayRow): Why | null {
 }
 
 /** The line's one clock, short enough for a trailing column: "Today",
- *  "Yesterday", "3d ago", "2w ago", "3mo ago". A session's line says when
+ *  "Yesterday", "3d ago", "40d ago". A session's line says when
  *  he last wrote in that session, so one started minutes ago reads Today;
  *  a course's line says when he last studied the course; an open task's
  *  line says nothing there, since its reason already dates it ("Left off
@@ -138,28 +138,17 @@ export function studiedAgo(row: TodayRow): string | null {
 	return days === null ? null : agoWords(days);
 }
 
-/** Some days ago in Home's words: "Today", "Yesterday", "3d ago", "2w
- *  ago", "3mo ago". Pure. */
-export function agoWords(days: number): string {
-	if (days <= 0) return "Today";
-	if (days === 1) return "Yesterday";
-	if (days < 14) return `${days}d ago`;
-	if (days < 60) return `${Math.floor(days / 7)}w ago`;
-	return `${Math.floor(days / 30)}mo ago`;
-}
+/** Some days ago in Home's words, the app's one form (`study-words.ts`). */
+export { agoWords };
 
 /** When the learner last studied a line's course, in words: "Studied
- *  today", "Studied 3 days ago", "Studied 2 weeks ago", or "Not studied
+ *  today", "Studied 3 days ago", "Studied 20 days ago", or "Not studied
  *  yet"; null for a line with no course. Pure. */
 export function lastStudied(row: TodayRow): string | null {
 	const days = row.course?.lastActiveDaysAgo;
 	if (row.course === null || days === undefined) return null;
 	if (days === null) return "Not studied yet";
-	if (days === 0) return "Studied today";
-	if (days === 1) return "Studied yesterday";
-	if (days < 14) return `Studied ${days} days ago`;
-	if (days < 60) return `Studied ${Math.floor(days / 7)} weeks ago`;
-	return `Studied ${Math.floor(days / 30)} months ago`;
+	return studiedDaysWords(days);
 }
 
 /** The levels at which the learner can do a topic on their own: the
