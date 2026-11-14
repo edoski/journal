@@ -1,6 +1,6 @@
 import type { ArcHandle, ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StartsWhy, StudyCourse, TopicAttempt, TopicHandle, TopicRecord, TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -167,12 +167,13 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 	return map.topics.filter((t) => needs.has(t.handle)).map((t) => ({ topic: t, standing: standingOf(t), href: unitHref(map.workspace, t.handle) }));
 }
 
-/** Why the review waits, after since when it was due when memory asked
- *  for it already: "Due since 1 Oct, earlier days are full". */
+/** Why the review waits past the day memory asked for it, after from
+ *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
+ *  from 9 Nov, earlier days are full". */
 function waitsWords(review: CourseMapTopic["review"], today: string): string | null {
 	const why = heldWords(review);
-	if (!why || review?.kind !== "scheduled" || !review.held || review.held.since >= today) return why;
-	return `${reviewWords(review, today)}, ${why.charAt(0).toLowerCase()}${why.slice(1)}`;
+	const moved = movedWords(review, today);
+	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : why;
 }
 
 /** The open tasks that hold the topic: the focused one first, then the

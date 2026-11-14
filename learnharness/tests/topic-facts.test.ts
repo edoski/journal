@@ -297,6 +297,17 @@ describe("what went wrong", () => {
 	});
 });
 
+describe("when a topic comes up", () => {
+	const factsOf = (t: CourseMapTopic) => topicFacts({ course: { ...COURSE, map: { ...COURSE.map, topics: [...COURSE.map.topics, t] } }, topic: t, chats: [], read: null });
+
+	it("says from when a review moved past the day memory asked for it, and why", () => {
+		const moved = topic("series", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-22", held: { exam: null, since: "2026-11-09" } } });
+		assert.equal(factsOf(moved).waits, "Moved from 9 Nov, earlier days are full");
+		const late = topic("series", { level: "independent", introduced: "2026-09-01", review: { kind: "scheduled", date: "2026-11-13", held: { exam: "Probability", since: "2026-10-02" } } });
+		assert.equal(factsOf(late).waits, "Due since 2 Oct, waits for your Probability exam");
+	});
+});
+
 describe("where to pick the topic back up", () => {
 	const record: TopicRecord = { attempts: [], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] };
 	const pickups = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[] = []) => pickupsOf(t, MAP, sessionEntries(sessions, plans, TODAY), sessions, record, TODAY);

@@ -173,6 +173,15 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
 }
 
+/** A review the plan moved past the day memory asked for it, from when:
+ *  "Due since 1 Oct" once that day has passed, else "Moved from 9 Nov", so
+ *  a day the tutor named that a later review took never changes in
+ *  silence (round 5); null for a review the plan does not hold. */
+export function movedWords(review: CourseMapTopic["review"], today: string): string | null {
+	if (review?.kind !== "scheduled" || !review.held) return null;
+	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : `Moved from ${shortDay(review.held.since)}`;
+}
+
 /** A review that is due: "Due today", "3d overdue"; one the plan holds
  *  past a day memory asked for already says since when, "Due since 1 Oct",
  *  so a review weeks late never reads as spacing; any other dated review
