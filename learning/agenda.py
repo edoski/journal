@@ -206,7 +206,9 @@ class _Allowance:
         self.carry = {"reviews": 0.5, "new": 0.5}
 
     def take(self, kind: str, rate: float) -> int:
-        whole = math.floor(self.carry[kind] + rate)
+        """A day's whole items: never more than its own rate rounded up, so a
+        remainder carried from lighter days never doubles a day's load."""
+        whole = min(math.floor(self.carry[kind] + rate), math.ceil(rate))
         self.carry[kind] += rate - whole
         return whole
 
