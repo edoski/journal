@@ -1042,6 +1042,22 @@ def test_with_every_live_topic_taught_the_current_arc_is_the_last_drawn_one(
     assert [arc["arc"] for arc in mapped["arcs"] if arc["current"]] == ["derivatives"]
 
 
+def test_a_scoped_exam_names_the_untaught_earlier_topics_it_needs(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace, exam={"date": day(30), "arcs": ["integrals"]})
+    block = retrieval.course_map(workspace)["exam"]
+    assert block["arcs"] == ["integrals"]
+    assert block["needed"] == ["limit", "derivative", "chain-rule"]
+    taught(workspace, -1, "limit")
+    assert retrieval.course_map(workspace)["exam"]["needed"] == [
+        "derivative",
+        "chain-rule",
+    ], "a taught topic is needed no more"
+    records.save(workspace, {"exam": {"date": day(30), "arcs": None}})
+    assert "needed" not in retrieval.course_map(workspace)["exam"], "the whole course"
+
+
 def test_the_current_arc_follows_the_lesson_in_progress(
     workspace: Workspace,
 ) -> None:

@@ -639,14 +639,22 @@ def _runup(
     """The exam and its run-up: when the final review starts, the path topics
     the plan cannot start before it (``does_not_fit``), and the taught ones
     its final review has no room for (``unreviewed``); with a scope of arcs,
-    its ``arcs`` and the topics of theirs it ``leaves_out``."""
+    its ``arcs``, the topics of theirs it ``leaves_out``, and the untaught
+    earlier topics it ``needed`` started first (``progress.exam_topics``),
+    in path order."""
     plan = progress.exam_plan(record)
+    examined = arc_rules.examined(record)
+    needed: list[str] = []
+    if examined is not None:
+        scope = progress.exam_topics(record, arcs.untaught(record)) or frozenset()
+        needed = [key for key in progress.path_order(record) if key in scope - examined]
     return compact(
         {
             "date": countdown["date"],
             "days_left": countdown["days_left"],
             "arcs": countdown.get("arcs"),
             "leaves_out": countdown.get("leaves_out"),
+            "needed": needed or None,
             "final_review": plan.final.isoformat() if plan else None,
             "does_not_fit": planned.does_not_fit,
             "unreviewed": planned.unreviewed,
