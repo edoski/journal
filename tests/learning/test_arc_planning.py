@@ -358,3 +358,54 @@ def test_reviews_ignore_arcs() -> None:
     assert [set(day["reviews"]) for day in one] == [
         set(day["reviews"]) for day in other
     ]
+
+
+SPREAD: dict[str, dict[str, Any]] = {
+    "a1": {"arc": "a"},
+    "a2": {"arc": "a", "needs": ["a1"], "contrasts": ["a3"]},
+    "a3": {"arc": "a"},
+    "b1": {"arc": "b", "needs": ["a1"]},
+    "c1": {"arc": "c", "needs": ["a1"]},
+    "d1": {"arc": "d", "needs": ["a1"]},
+}
+
+
+def spread(topics: dict[str, Any], learning: str, **exam: Any) -> dict[str, Any]:
+    names = sorted({topic["arc"] for topic in topics.values()})
+    patch: dict[str, Any] = {
+        "arcs": {name: arc(name.upper()) for name in names},
+        "topics": topics,
+        "path": {"order": list(topics), "arcs": names},
+        "arc_change": REASON,
+        **exam,
+    }
+    return evidence(save(schema.empty(), patch, MONDAY), ["a1"], learning)
+
+
+def test_topics_outside_the_exam_read_the_window_from_where_he_is() -> None:
+    def planned(record: dict[str, Any]) -> tuple[list[list[str]], dict[str, Any]]:
+        result = plan({"c": record}, MONDAY, 6, week(10, 1))
+        why = dict(result.when("c", MONDAY, True).why)
+        return [day["new"] for day in result.days["c"]], why
+
+    scoped_ = planned(spread(SPREAD, "a3", exam=scoped(["a"], 40)))
+    assert scoped_ == planned(spread(SPREAD, "a3")), "as in a course with no exam"
+    days, why = scoped_
+    assert days[0] == ["b1"] and why["b1"]["kind"] == "early"
+    started = [topic for day in days for topic in day]
+    assert started.index("a2") < started.index("c1"), "C waits while A has topics"
+
+
+def test_a_second_topic_on_one_day_keeps_the_window() -> None:
+    topics = {
+        "a1": {"arc": "a"},
+        "z": {"arc": "a"},
+        "a2": {"arc": "a", "needs": ["a1"]},
+        "a3": {"arc": "a", "needs": ["z"]},
+        "b1": {"arc": "b", "needs": ["a3"]},
+        "c1": {"arc": "c", "needs": ["a1"]},
+    }
+    result = plan({"c": spread(topics, "z")}, MONDAY, 6, week(10, 1.5))
+    started = starts(result)
+    assert result.days["c"][0]["new"] == ["a2"], "C is two arcs on: it waits"
+    assert started.index("a3") < started.index("c1")

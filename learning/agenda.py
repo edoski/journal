@@ -778,16 +778,19 @@ def _new(
         count: float,
         among: set[str] | None = None,
         *,
+        pool: Collection[str] | None = None,
         bound: bool = True,
         pace: bool = False,
     ) -> int:
-        """Up to ``count`` ready topics in path order from the window
-        (``_Course.opens``; all of them when not ``bound``), those related to
-        one it starts today first: a second topic on one day builds on what
-        the first does."""
+        """Up to ``count`` ready topics of ``among`` in path order from the
+        window (``_Course.opens``; all of them when not ``bound``), those
+        related to one it starts today first: a second topic on one day builds
+        on what the first does. The window is read from the earliest untaught
+        topic of ``pool`` (of ``among`` when None), so narrowing the
+        candidates never moves where he is in the material."""
         taken = 0
         while taken < count:
-            front = course.front(among)
+            front = course.front(among if pool is None else pool)
             ready = [
                 topic
                 for topic in course.untaught
@@ -804,15 +807,17 @@ def _new(
             taken += 1
         return taken
 
-    def spare(course: _Course, among: list[str]) -> int:
-        """One topic of ``among`` beyond what the paces and the gaps need. Two
-        unrelated topics on one day split his attention, so it starts one only
-        on a day that starts none yet, or one related to a topic this course
-        starts today, unless his own rate that weekday holds two."""
+    def spare(course: _Course, among: list[str], pool: list[str]) -> int:
+        """One topic of ``among`` beyond what the paces and the gaps need, from
+        the window read from ``pool``. Two unrelated topics on one day split
+        his attention, so it starts one only on a day that starts none yet, or
+        one related to a topic this course starts today, unless his own rate
+        that weekday holds two."""
         if not any(chosen.values()) or week.on(day).new.value >= 2:
-            return take(course, 1, set(among))
+            return take(course, 1, set(among), pool=pool)
         started = chosen[course.name]
-        return take(course, 1, {t for t in among if course.related(t, started)})
+        related = {t for t in among if course.related(t, started)}
+        return take(course, 1, related, pool=pool)
 
     exams = sorted(
         (course for course in courses if course.new_end(day) is not None),
@@ -847,7 +852,7 @@ def _new(
                 more = min(room, pace - taken)
                 room -= take(course, more, scoped, bound=False, pace=True)
     for course in exams:
-        while room > 0 and spare(course, course.scoped):
+        while room > 0 and spare(course, course.scoped, course.scoped):
             room -= 1
     open_ = sorted(
         (course for course in courses if course.exam is None or course.outside(day)),
@@ -857,7 +862,7 @@ def _new(
         started = []
         for course in open_:
             among = course.untaught if course.exam is None else course.outside(day)
-            if room > 0 and spare(course, among):
+            if room > 0 and spare(course, among, course.startable(day)):
                 started.append(course)
                 room -= 1
         open_ = started
