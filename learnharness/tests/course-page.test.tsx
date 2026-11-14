@@ -367,4 +367,11 @@ describe("the sidebar's search", () => {
 		const scoped = buildInbox([course()], [], "/elsewhere");
 		assert.deepEqual(searchInbox(scoped, [], "eigen", [course()]).units, [], "under the course filter, only that course's topics");
 	});
+
+	it("says a topic it finds that he has not started is Not started, instead of a blank status (round 4)", () => {
+		const inbox = buildInbox([course()], [], null);
+		const [eigen] = searchInbox(inbox, [], "eigen", [course()]).units;
+		assert.equal(eigen!.topic.level, "new");
+		assert.deepEqual(unitStatus(eigen!, "2026-11-08"), { kind: "none", words: "Not started" });
+	});
 });
