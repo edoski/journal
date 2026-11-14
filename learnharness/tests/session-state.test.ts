@@ -33,7 +33,7 @@ describe("sessionState", () => {
 	it("a running turn outranks the learner's turn; a compaction in his pause does not (round 6, report 6 minor 4)", () => {
 		assert.equal(sessionState(item({ busy: true, pendingQuestion: true })), "working");
 		assert.equal(sessionState(item({ compacting: true, pendingQuestion: true })), "your-turn", "he can answer while it compacts, so it is not the tutor writing");
-		assert.equal(sessionState(item({ compacting: true })), "working");
+		assert.equal(sessionState(item({ compacting: true, ended: "left" })), "left", "a lesson closed for today stays closed while it compacts");
 	});
 
 	it("a lesson waiting on his words mid-lesson is his turn; a cut turn is paused; else finished", () => {

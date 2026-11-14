@@ -3,8 +3,8 @@ import type { ChatListItem } from "@/src/core";
 /**
  * Where a session stands, the one model Home, the topic page, the calendar
  * and the sidebar read (spec: session-state.md). Pure.
- *   - working: the tutor is writing (a turn runs, or a compaction runs
- *     while nothing waits on him: he can answer during one);
+ *   - working: the tutor is writing (a turn runs; a compaction is not
+ *     writing: he can answer during one, and a closed lesson stays closed);
  *   - your-turn: the tutor waits on the learner: a question or a practice
  *     problem it posed, a plan it wrote but taught no step of, or its last
  *     words asking him something partway through a lesson;
@@ -21,7 +21,6 @@ export type SessionState = "working" | "your-turn" | "paused" | "left" | "finish
 export function sessionState(chat: ChatListItem): SessionState {
 	if (chat.busy) return "working";
 	if (chat.pendingQuestion || chat.pendingProblem || chat.ended === "mid-lesson") return "your-turn";
-	if (chat.compacting) return "working";
 	if (chat.ended === "left") return "left";
 	return chat.ended === "cut" ? "paused" : "finished";
 }
