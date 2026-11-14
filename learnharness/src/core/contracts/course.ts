@@ -99,6 +99,9 @@ export type CourseVerb =
 	 *  computable checks. */
 	| { verb: "arcs"; here?: string | null; open?: readonly string[]; report?: boolean }
 	| { verb: "plan"; days?: number }
+	/** Where he stands for the exam, part by part, and each topic's open
+	 *  mistakes (core/contracts/course-standing.ts). */
+	| { verb: "standing" }
 	/** Register files as the course's material; paths are relative to the
 	 *  course folder. */
 	| { verb: "sources"; add: readonly string[] }
