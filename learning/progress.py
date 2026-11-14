@@ -913,11 +913,15 @@ def _placed(
 
 
 def path_order(record: dict[str, Any], *, everything: bool = False) -> list[str]:
-    """Topics in prerequisite order, ties broken by their place then handle.
+    """Topics in prerequisite order, arc by arc, ties broken by their place
+    then handle.
 
-    The place is the topic's index in ``path.order``, and a topic outside it is
-    placed where its prerequisites put it (``_placed``), so a topic added later
-    never drops to the end. Excluded topics are left out unless ``everything``.
+    In a course with arcs, every topic of one arc comes before the next arc's:
+    no topic needs a later arc (``arc_rules``, H2), so while an earlier arc
+    has a topic left, one of them is always ready. The place is the topic's
+    index in ``path.order``, and a topic outside it is placed where its
+    prerequisites put it (``_placed``), so a topic added later never drops to
+    the end. Excluded topics are left out unless ``everything``.
     """
     topics = {
         key
@@ -928,7 +932,12 @@ def path_order(record: dict[str, Any], *, everything: bool = False) -> list[str]
         key: [need for need in record["topics"][key].get("needs", ()) if need in topics]
         for key in topics
     }
-    place = _placed(topics, links, record.get("path", {}).get("order", []))
+    stored = _placed(topics, links, record.get("path", {}).get("order", []))
+    chapter = {arc: index for index, arc in enumerate(arc_rules.order(record))}
+    place = {
+        key: (chapter.get(record["topics"][key].get("arc"), 0), stored[key])
+        for key in topics
+    }
     waiting: dict[str, int] = {}
     dependents: dict[str, list[str]] = defaultdict(list)
     for key in topics:
