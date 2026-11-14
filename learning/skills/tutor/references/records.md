@@ -38,7 +38,7 @@ A typical turn after a hinted attempt on an exercise:
 }
 ```
 
-The receipt returns new observation ids, the reviews it set (each with `due`, the day memory asks for it, and `planned`, the day the daily plan puts it, which every screen shows: when you tell the learner when a topic comes back, say the `planned` day, never one you count from `due`), level changes, the current `focus` and `path_current`, the number of reviews the plan puts today (`due_count`), `placed` (where each new topic outside `path.order` went), and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
+The receipt returns new observation ids, the reviews it set (each with `due`, the day memory asks for it, and `planned`, the day the daily plan puts it, which every screen shows: when you tell the learner when a topic comes back, say the `planned` day alone, never `due` or one you count from it), level changes, the current `focus` and `path_current`, the number of reviews the plan puts today (`due_count`), `placed` (where each new topic outside `path.order` went), and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
 
 ## Topics and the knowledge path
 
