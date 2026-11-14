@@ -14,10 +14,17 @@ export function replyNeverCame(messages: readonly LhMessage[]): boolean {
 
 const isNeutral = (m: LhMessage): boolean => m.role === "custom" && NEUTRAL_MARKERS.includes((m as { customType: string }).customType);
 
-/** A reply someone stopped before its first word: thinking at most. */
+/** A reply someone stopped before its first word: thinking at most, or a
+ *  tool call cut off before any of its arguments came, which shows him
+ *  nothing and never ran. */
 function isEmptyStop(m: LhMessage): boolean {
 	return m.role === "assistant" && m.stopReason === "aborted" &&
-		!m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || b.type === "toolCall");
+		!m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && hasArguments(b.arguments)));
+}
+
+function hasArguments(args: unknown): boolean {
+	if (typeof args === "string") return args.trim() !== "" && args.trim() !== "{}";
+	return args != null && typeof args === "object" && Object.keys(args).length > 0;
 }
 
 /** Why the reply never came (`replyNeverCame`): "stopped" when the record
