@@ -14,8 +14,8 @@ type Frame = { width: number; height: number };
 type Room = { x: number; y: number };
 
 /** How long a page rests on what it points at before the camera moves, and
- *  how long it points at nothing before the camera goes home: the course
- *  page's (split-map.tsx), so a sweep across rows never sends it there and
+ *  how long it points at nothing before the camera goes home, for Home's
+ *  map and the course page alike, so a sweep across rows never sends it there and
  *  back. */
 export const REVEAL_DWELL_MS = 120;
 export const RETURN_DWELL_MS = 400;
