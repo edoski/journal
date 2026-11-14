@@ -23,6 +23,7 @@ import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { ChatSessionComposer } from "@/components/composer";
+import type { LessonVariant } from "@/components/lesson-variant";
 import { SentPhotos, sentPhotos, usePhotoDraft, type PendingPhoto } from "@/components/photos";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { dockStateKey } from "@/components/dock-state-key";
@@ -89,7 +90,7 @@ import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
-import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
+import { LESSON_COLUMN, READING_COLUMN } from "@/components/lesson/lesson-column";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
@@ -198,7 +199,12 @@ export function Chat({
 	startedIn,
 	course,
 	initiallyCourseDeleted = false,
+	lesson = "current",
 }: {
+	/** How the lesson reads (lesson-variant.ts): Current, or one of the
+	 *  reading candidates, which share the T3-style composer, the reading
+	 *  column and figures in the flow. */
+	lesson?: LessonVariant;
 	chatId: string;
 	title: string;
 	/** The session's course. Absent on sessions older than the rule that
@@ -238,6 +244,9 @@ export function Chat({
 	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
+	// The reading candidates share one base (lesson-variant.ts).
+	const reading = lesson !== "current";
+	const column = reading ? READING_COLUMN : LESSON_COLUMN;
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
 
@@ -1489,7 +1498,7 @@ export function Chat({
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef} targetScrollTop={followTargetScrollTop}>
 					<SessionMessageNavigation />
 					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-						<div data-session-find-root="" data-transcript-column="" className={`${LESSON_COLUMN} flex flex-1 flex-col gap-4 pt-6`}>
+						<div data-session-find-root="" data-transcript-column="" className={`${column} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="New session"
@@ -1762,6 +1771,7 @@ export function Chat({
 					setupCta={
 						unconnected && <SignInPill onOpen={() => setSetupOpen(true)} />
 					}
+					column={column}
 					composer={
 						<ChatSessionComposer
 							// Stop aborts ANY in-flight turn (stream-reattach wave): the
@@ -1955,6 +1965,7 @@ export function shouldStampGeometryMute(nextH: number, prevH: number, pending: b
 }
 
 function DockOverlay({
+	column,
 	pending,
 	initialQuestionDraft,
 	onSaveQuestionDraft,
@@ -1981,6 +1992,8 @@ function DockOverlay({
 	setupCta,
 	queuedSteers,
 }: {
+	/** The reading column the dock sits in (lesson-column.ts). */
+	column: string;
 	pending: ReturnType<typeof pendingQuestionOf>;
 	initialQuestionDraft?: QuestionFormDraft;
 	onSaveQuestionDraft: (draft: QuestionFormDraft) => void;
@@ -2404,7 +2417,7 @@ function DockOverlay({
 		<div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ right: sbInset }}>
 			<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 			<div ref={blockRef} className="relative bg-background pb-5">
-				<div className={LESSON_COLUMN}>
+				<div className={column}>
 					<div ref={viewportRef} data-dock-viewport="" className="pointer-events-auto">
 					<div ref={bodyRef}>
 					{setupCta}

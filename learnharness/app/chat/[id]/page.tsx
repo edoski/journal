@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Chat } from "@/components/chat";
+import { LessonView } from "@/components/lesson/lesson-view";
 import { compactionInFlight, courseDeleted, getChat, isTurnRunning, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export default async function ChatPage({
 	const chat = getChat(id);
 	if (!chat) notFound();
 	return (
-		<Chat
+		<LessonView
 			key={chat.id}
 			chatId={chat.id}
 			title={chat.title}
