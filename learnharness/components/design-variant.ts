@@ -6,8 +6,8 @@ import { onPolishChange, polishVariant, type PolishGroup } from "@/components/de
 /** The course page's head candidates (spec:
  *  components/course-page/course-head/course-head.md): Pace leads with
  *  whether every topic fits before the exam, Brief with the course's own
- *  description and linked material. */
-export const COURSE_HEAD_OPTIONS = ["pace", "brief"] as const;
+ *  description and linked material, Road with what the plan starts next. */
+export const COURSE_HEAD_OPTIONS = ["pace", "brief", "road"] as const;
 export type CourseHeadVariant = "current" | (typeof COURSE_HEAD_OPTIONS)[number];
 /** What production builds draw until Edo picks a candidate. */
 const COURSE_HEAD_SHIPPED: CourseHeadVariant = "current";
