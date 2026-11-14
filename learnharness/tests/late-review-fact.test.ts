@@ -8,10 +8,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
 import { cardLine } from "../components/course-map/topic-map/topic-standing.ts";
-import type { StudyCourse, TopicHandle } from "../src/core/index.ts";
+import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { LINALG, map, topic, TODAY } from "./fixtures/now-demo.ts";
 
-const course = (review: Parameters<typeof topic>[3]["review"]): StudyCourse => ({
+const course = (review: CourseMapTopic["review"]): StudyCourse => ({
 	...LINALG,
 	map: map({ ...LINALG.map, today: TODAY, topics: [topic("cramer", "Cramer's rule", "introduced", { review })] }),
 	unready: [],

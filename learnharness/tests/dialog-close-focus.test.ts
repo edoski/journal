@@ -53,7 +53,7 @@ test("a dialog gives focus back to what held it when it opened, though no trigge
 	const opener = { isConnected: true, focus: () => focused.push("opener") };
 	const doc = { body, activeElement: opener } as unknown as Document;
 	const returner = openerReturn(() => doc);
-	returner.onOpenAutoFocus(new Event("focusin", { cancelable: true }));
+	returner.onOpenAutoFocus();
 	(doc as { activeElement: unknown }).activeElement = body;
 	const close = new Event("focusout", { cancelable: true });
 	returner.onCloseAutoFocus(close);
@@ -68,7 +68,7 @@ test("a dialog opened with focus on the page lands where he types on close", asy
 	const field = { focus: () => focused.push("composer") };
 	const doc = { body, activeElement: body, querySelector: () => field } as unknown as Document;
 	const returner = openerReturn(() => doc);
-	returner.onOpenAutoFocus(new Event("focusin", { cancelable: true }));
+	returner.onOpenAutoFocus();
 	returner.onCloseAutoFocus(new Event("focusout", { cancelable: true }));
 	await settle();
 	assert.deepEqual(focused, ["composer"]);
