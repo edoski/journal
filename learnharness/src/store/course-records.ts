@@ -190,9 +190,10 @@ function examOf(value: unknown): CourseSummary["exam"] {
 	return typeof date === "string" && typeof daysLeft === "number" ? { date, daysLeft } : null;
 }
 
-/** The map's exam with its run-up and its scope of arcs; topic and arc
- *  handles the map does not list are dropped. A scope stays a list when
- *  none of its arcs is shown: the exam then examines none of them. */
+/** The map's exam with its run-up and its scope: its arcs and the topics
+ *  it leaves out, in a course with or without arcs; topic and arc handles
+ *  the map does not list are dropped. A scope stays a list when none of
+ *  its arcs is shown: the exam then examines none of them. */
 function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock): CourseExam | null {
 	const exam = examOf(value);
 	const e = record(value);
@@ -202,7 +203,7 @@ function mapExamOf(value: unknown, listed: ReadonlySet<string>, block: ArcBlock)
 	const doesNotFit = handles(e.does_not_fit);
 	const unreviewed = handles(e.unreviewed);
 	const arcs = block.arcs && Array.isArray(e.arcs) ? strings(e.arcs).flatMap((a) => block.arcOf(a) ?? []) : null;
-	const leavesOut = arcs ? handles(e.leaves_out) : [];
+	const leavesOut = handles(e.leaves_out);
 	return {
 		...exam,
 		...(finalReview ? { finalReview } : {}),

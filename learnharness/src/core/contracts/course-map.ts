@@ -125,7 +125,8 @@ export interface CourseExam {
 	/** The arcs it examines, in arc order; absent when it covers the whole
 	 *  course. Read it through `examCovers`. */
 	arcs?: readonly ArcHandle[];
-	/** Topics of those arcs it leaves out; absent when it leaves none. */
+	/** The topics it does not examine (of those arcs, when it names some),
+	 *  in a course with or without arcs; absent when it leaves none out. */
 	leavesOut?: readonly TopicHandle[];
 }
 

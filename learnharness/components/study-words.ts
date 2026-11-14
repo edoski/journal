@@ -1,4 +1,4 @@
-import type { ArcState, CourseMap, CourseMapTopic, JobKind, MarkHow, MarkResult, MarkRow, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import type { ArcState, CourseExam, CourseMap, CourseMapTopic, JobKind, MarkHow, MarkResult, MarkRow, RightAnswer, StartsWhy, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -215,6 +215,16 @@ export const ARC_EXAM_WORDS = {
 	part: "Partly on the exam",
 	none: "Not on the exam",
 } as const;
+
+/** Why a topic the exam ahead leaves out (`exam.leavesOut`) starts when
+ *  it does: "Not on the exam; after it" when the plan starts it after the
+ *  exam, "Not on the exam" when it starts before, since nothing the exam
+ *  examines waits. Null for a topic the exam examines, or with no exam
+ *  ahead. Pure. */
+export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, exam: Pick<CourseExam, "date" | "daysLeft" | "leavesOut"> | null): string | null {
+	if (!exam || exam.daysLeft < 0 || !exam.leavesOut?.includes(topic.handle)) return null;
+	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
+}
 
 /** Why an untaught topic starts when the plan starts it, in his course's
  *  names: "Next in Matrices"; "After Expectation, which it needs"; "After
