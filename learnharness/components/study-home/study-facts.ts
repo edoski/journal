@@ -193,14 +193,6 @@ export function addDays(date: string, days: number): string {
 	return d.toISOString().slice(0, 10);
 }
 
-/** The study home's question for the hour of the learner's day: "What
- *  are we studying this morning?", "…this afternoon?", "…this evening?",
- *  "…tonight?". Pure. */
-export function studyQuestion(hour: number): string {
-	const when = hour >= 5 && hour < 12 ? "this morning" : hour >= 12 && hour < 18 ? "this afternoon" : hour >= 18 && hour < 22 ? "this evening" : "tonight";
-	return `What are we studying ${when}?`;
-}
-
 /** What a press on a course's line does: open a session, or start one
  *  with an opening on some topics, `from` a finished lesson it picks up. */
 export type CourseMove = { kind: "open"; chat: ChatListItem } | { kind: "start"; opening: string; topics: readonly TopicHandle[]; from?: string };

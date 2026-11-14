@@ -21,7 +21,6 @@ import {
 	openSessions,
 	todayCourses,
 	courseMove,
-	studyQuestion,
 	type TodayRow,
 } from "../components/study-home/study-facts.ts";
 import { lessonOf, topicSpan } from "../components/study-home/lesson-facts.ts";
@@ -121,22 +120,6 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 }
 
 describe("study facts", () => {
-	it("asks the home's question for the hour, never naming the date", () => {
-		assert.deepEqual(
-			[4, 5, 11, 12, 17, 18, 21, 22].map(studyQuestion),
-			[
-				"What are we studying tonight?",
-				"What are we studying this morning?",
-				"What are we studying this morning?",
-				"What are we studying this afternoon?",
-				"What are we studying this afternoon?",
-				"What are we studying this evening?",
-				"What are we studying this evening?",
-				"What are we studying tonight?",
-			],
-		);
-	});
-
 	it("words the next step in the order Continue takes it, naming every review with commas and never counting them", () => {
 		assert.equal(stepWords(nextStepOf(LINALG)), "Review Linear independence, Rank, Span");
 		assert.equal(stepWords(nextStepOf(PROB)), "Continue Bayes' rule");
@@ -295,7 +278,7 @@ describe("Today", () => {
 	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
 	it("gives each line its pie, its course ending in how long ago it was studied, and its lesson ending in an icon and a few words for why it is on Today, with no button and no review counted", () => {
-		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} busy={false} onContinue={() => {}} />);
+		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} done={[]} busy={false} onContinue={() => {}} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
@@ -306,12 +289,19 @@ describe("Today", () => {
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["review", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
-		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|tonight)\?$/);
+		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|today)\?$/);
+		assert.equal(doc.querySelector('[data-slot="today-done"]'), null, "nothing says done before he finishes anything");
+	});
+
+	it("once he finished something today, asks what else and names what he did, never a count", () => {
+		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], [], TODAY)} done={["Eigenvalues and eigenvectors", "Rank practice"]} busy={false} onContinue={() => {}} />);
+		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What else are we studying (this morning|this afternoon|this evening|today)\?$/);
+		assert.equal(doc.querySelector('[data-slot="today-done"]')?.textContent, "Done today: Eigenvalues and eigenvectors, Rank practice");
 	});
 
 	it("past five lines, names the other courses on the last", () => {
 		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
-		const doc = render(<Today rows={todayRows(many, [], TODAY)} busy={false} onContinue={() => {}} />);
+		const doc = render(<Today rows={todayRows(many, [], TODAY)} done={[]} busy={false} onContinue={() => {}} />);
 		assert.equal(doc.querySelectorAll('[data-slot="today-line"]').length, 4);
 		assert.match(doc.querySelector('[data-slot="today-also"]')?.textContent ?? "", /Also today:Course 4Course 5/);
 	});

@@ -41,7 +41,7 @@ export function StudyHome() {
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 
 function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { rows, courses, busy, onContinue } = ready;
+	const { rows, courses, done, busy, onContinue } = ready;
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	// The line under the pointer or holding focus, if any: only then does the line the map follows wear its fill, so
 	// no row has a card behind it at rest.
@@ -79,6 +79,7 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 			{!enlarged && (
 				<Today
 					rows={rows}
+					done={done}
 					busy={busy}
 					onContinue={onContinue}
 					pointed={followed && pointingAt === lineKey(followed) ? pointingAt : null}
