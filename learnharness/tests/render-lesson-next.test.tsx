@@ -214,7 +214,7 @@ describe("lesson cards", () => {
 			confidence: "confident", committed: "A nonzero kernel means not invertible.",
 		} as unknown as QuestionAnswerData;
 		const card = documentFor(<AnsweredCard answer={answer} />).querySelector('[data-testid="answered-card"]')!;
-		assert.match(card.textContent!, /^Explain·Confident/);
+		assert.match(card.textContent!, /^Check·Confident/);
 		assert.match(card.textContent!, /“The kernel is nonzero\.”/);
 		assert.match(card.textContent!, /The answerA nonzero kernel means not invertible\./);
 		assert.doesNotMatch(card.textContent!, /EXPLAIN|Correct|Incorrect/);

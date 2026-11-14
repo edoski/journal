@@ -112,9 +112,6 @@ export function QuestionDock({
 	// The probe-phase name (owner, 2026-10-09) canonicalizes onto its teach
 	// twin for every dock concern — parse dispatch, labels, kinds.
 	const canonical = toolName === "recall" ? "explain" : toolName;
-	// The chip's display name carries the tool's OWN name (owner
-	// 2026-10-09): probe-phase questions label Recall in the composer.
-	const toolLabel = toolName === "recall" ? "Recall" : undefined;
 	// Parse, don't cast (src/core/tool-parts.ts): the model authored this
 	// input, and only the schema the tool declared vouches for its shape.
 	// The dock mounts on input-available parts (already validated at the
@@ -133,12 +130,7 @@ export function QuestionDock({
 					question={parsed.question}
 					onExpand={onExpand}
 					variant={reveal ? "reveal" : "collapsed"}
-					toolLabel={toolLabel}
-					label={
-						canonical === "explain" && normalizeQuestionType((parsed as { type?: unknown }).type) === "predict"
-							? "Prediction"
-							: undefined
-					}
+					label={questionLabel(toolName, (parsed as { type?: unknown }).type)}
 				/>
 			)}
 			<div className={expanded ? "dock-variant" : "invisible h-0 overflow-hidden"}>
@@ -202,7 +194,7 @@ export function QuestionDockBar({
 			className="dock-variant h-12 gap-3 rounded-none px-4 focus-visible:ring-inset"
 		>
 			<span className={cn("shrink-0", reveal ? "font-medium text-foreground" : "text-muted-foreground")}>
-				{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
+				{reveal ? "Check your understanding" : (label ?? toolLabel ?? questionLabel(toolName, undefined))}
 			</span>
 			<span className="min-w-0 flex-1 truncate text-muted-foreground">
 				<LineText>{repairMathForDisplay(question)}</LineText>

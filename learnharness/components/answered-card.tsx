@@ -6,6 +6,7 @@ import { ToolContentResponse } from "@/components/ai-elements/message";
 import { TypedText } from "@/components/typed-text";
 import type { Photo, QuestionAnswerData } from "@/src/core";
 import { SentPhotos } from "@/components/photos";
+import { questionLabel } from "@/components/question-dock";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { LESSON_WORDS } from "@/components/study-words";
@@ -59,7 +60,7 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 			)}
 			<LessonCard
 				data-testid="answered-card"
-				label={answer.tool === "recall" ? "Recall" : isExplain ? "Explain" : "Question"}
+				label={questionLabel(answer.tool ?? (isExplain ? "explain" : "ask_user_question"), (input as { type?: unknown } | undefined)?.type)}
 				note={answer.hintRequested ? <span data-testid="answered-hint">You asked for a hint</span> : confidenceLabel && <span data-testid="answered-confidence">{confidenceLabel}</span>}
 			>
 				<ToolContentResponse>{answer.questionText}</ToolContentResponse>

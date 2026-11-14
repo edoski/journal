@@ -9,10 +9,8 @@ import {
 	DumbbellIcon,
 	GraduationCapIcon,
 	HistoryIcon,
-	ListChecksIcon,
 	MessageCircleQuestionIcon,
 	MessageSquareIcon,
-	RouteIcon,
 	type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,8 +33,6 @@ const ICONS: Record<EntryLook, LucideIcon> = {
 	task: ClipboardListIcon,
 	lesson: MessageSquareIcon,
 	practice: DumbbellIcon,
-	plan: RouteIcon,
-	"check-in": ListChecksIcon,
 };
 
 /** What a press on an entry can start: a session whose first message is

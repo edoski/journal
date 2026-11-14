@@ -21,7 +21,7 @@ export interface CourseRef {
 
 /** What a session is, from its transcript: practice, or a teaching
  *  session at its phase (the prober's questions, the plan, the lesson). */
-export type SessionType = "check-in" | "plan" | "lesson" | "practice";
+export type SessionType = "lesson" | "practice";
 
 export type CalendarEntry =
 	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; road: readonly RoadWeek[]; finalReview: string | null; doesNotFit: readonly string[]; allStarted: boolean; next: NextMove | null }
@@ -82,8 +82,6 @@ export const LOOKS: Record<EntryLook, { words: string; rank: number }> = {
 	task: { words: "Unfinished", rank: 3 },
 	lesson: { words: "Lesson", rank: 4 },
 	practice: { words: "Practice", rank: 4 },
-	plan: { words: "Plan", rank: 4 },
-	"check-in": { words: "Quiz", rank: 4 },
 };
 
 export function lookOf(entry: CalendarEntry): EntryLook {
@@ -106,9 +104,11 @@ export function rankOf(entry: CalendarEntry): number {
 	return entry.kind === "session" && entry.waits ? 0.5 : LOOKS[lookOf(entry)].rank;
 }
 
+/** A session as the calendar names it: practice, else a lesson, whatever
+ *  step it reached (a lesson still asking its opening questions is not a
+ *  quiz, round 3). */
 export function sessionType(chat: ChatListItem): SessionType {
-	if (chat.kind === "practice") return "practice";
-	return chat.phase === "probe" ? "check-in" : chat.phase === "plan" ? "plan" : "lesson";
+	return chat.kind === "practice" ? "practice" : "lesson";
 }
 
 /** The first topic the session worked on that its course's map lists. */

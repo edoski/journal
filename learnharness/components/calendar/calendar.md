@@ -12,7 +12,7 @@ The engine owns every date; the page invents none (`calendar-facts.ts`, pure, te
 | Overdue, Review | today for the reviews `plan` makes today (Overdue when past their date); a later day's reviews as the engine's daily plan proposes them | `plan`'s `due`; `plan.plan.days`' `reviews` |
 | New topic | the day the daily plan proposes to start it, today included | `plan.plan.days`' `new` |
 | Unfinished | today, since the engine dates no task (an open task) | `map`'s `tasks` |
-| Lesson, Practice, Plan, Quiz | the day of the session's last message (a day after the engine's counts as today) | the session store: practice, else the teaching session's phase (the prober's questions, the plan, the lesson) |
+| Lesson, Practice | the day of the session's last message (a day after the engine's counts as today) | the session store: practice, else a lesson, whatever step it reached (a lesson still asking its opening questions is not a quiz, round 3) |
 
 A week's day head says Day off on a weekday the engine has learned he does not study (`plan`'s `capacity.study_days`), else the Journal's study windows for that day (`journal.upcoming_schedule`, read by `src/server/calendar.ts`). The one clock is the engine's study day.
 

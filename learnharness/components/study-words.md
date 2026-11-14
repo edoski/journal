@@ -45,6 +45,8 @@ Home's line names the lapsed topic when the line is about another one ("Missed C
 
 | What | Words |
 |---|---|
+| the top bar (`PHASE_WORDS`) | Recall while the tutor asks its opening questions (the label they carry), Planning, Teaching, Practice; Done for today once he or the tutor stopped for the day. Never Quiz: a lesson is a lesson |
+| a question's card and folded bar (`QUESTION_WORDS`) | Check (a check after teaching), Prediction, Recall, else Question; never Explain, the tool's name |
 | Esc's confirm (`STOP_WORDS`) | Stop the tutor's reply? What it has written so far stays. Stop / Skip this question? The tutor goes on without your answer. Skip / Skip this problem? The tutor moves on, and the solution stays hidden. Skip; while the tutor writes, The tutor's reply stops too. |
 
 ## Counts

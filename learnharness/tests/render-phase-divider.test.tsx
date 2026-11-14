@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PhaseDivider } from "../components/phase-divider.tsx";
+import { PHASE_WORDS, QUESTION_WORDS } from "../components/study-words.ts";
 import { teachStepIndex } from "../src/core/phases.ts";
 
 describe("PhaseDivider (transcript boundary)", () => {
@@ -75,5 +76,12 @@ describe("teachStepIndex (WHERE teaching begins inside the flipping message — 
 			{ type: "tool-explain", input: { nodeId: "n2", topic: "t" } },
 		];
 		assert.equal(teachStepIndex(parts), 2);
+	});
+});
+
+describe("a lesson's labels", () => {
+	it("calls a lesson a lesson: its opening questions are Recall, never Quiz, a stopped one is done for today, and a check is a Check", () => {
+		assert.deepEqual(PHASE_WORDS, { probe: "Recall", plan: "Planning", teach: "Teaching", practice: "Practice", done: "Done for today" });
+		assert.deepEqual(QUESTION_WORDS, { check: "Check", predict: "Prediction", recall: "Recall", question: "Question" });
 	});
 });

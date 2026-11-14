@@ -71,6 +71,7 @@ import {
 	teachStepIndex,
 	toolQuestionKind,
 	questionNeedsReveal,
+	closedTonight,
 	doneTonightAtEnd,
 	replyCutOf,
 } from "@/src/core";
@@ -91,7 +92,7 @@ import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { formDraftText, strandedDraft } from "@/components/lesson/stranded-draft";
-import { LESSON_WORDS } from "@/components/study-words";
+import { LESSON_WORDS, PHASE_WORDS } from "@/components/study-words";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -785,6 +786,9 @@ export function Chat({
 	// Done for tonight (done-tonight.tsx): stops the session whatever is
 	// open; until he writes again, the session waits on nothing.
 	const doneTonight = doneTonightAtEnd(nativeMessages);
+	// Stopped for today, by him or by the tutor's close, until he writes
+	// again: the top bar says so, and has nothing left to stop.
+	const closedForToday = closedTonight(nativeMessages);
 	const sendTonight = useCallback(() => {
 		if (busy || compacting || doneTonight) return;
 		void send({ type: "tonight" });
@@ -1377,9 +1381,9 @@ export function Chat({
 						}
 						course={course?.title}
 						courseHref={course ? courseHref(course.workspace) : undefined}
-						phase={mode === "practice" ? "Practice" : chipLabel(messages, phases)}
+						phase={closedForToday ? PHASE_WORDS.done : mode === "practice" ? PHASE_WORDS.practice : chipLabel(messages, phases)}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
-						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
+						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
 						details={
 							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
 						}

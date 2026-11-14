@@ -1,5 +1,6 @@
 import { chipPhase, type Phase3, type PhaseMessage, type SessionMode } from "@/src/core";
 import { SectionBreak } from "@/components/lesson/section-break";
+import { PHASE_WORDS } from "@/components/study-words";
 
 /**
  * The in-session phase presentation: the phase label the lesson's top bar
@@ -11,11 +12,12 @@ import { SectionBreak } from "@/components/lesson/section-break";
  * "Planning"/"Teaching" are the two visible seams.
  */
 
-/** The phases as the learner thinks of them. */
+/** The phases as the learner thinks of them (PHASE_WORDS): the opening
+ *  questions read Recall, the label they carry. */
 export const CHIP_LABEL: Record<Phase3, string> = {
-	probe: "Quiz",
-	plan: "Planning",
-	teach: "Teaching",
+	probe: PHASE_WORDS.probe,
+	plan: PHASE_WORDS.plan,
+	teach: PHASE_WORDS.teach,
 };
 
 /** The top bar's phase word: none while the opening has asked nothing
@@ -36,5 +38,5 @@ export function PhaseDivider({ phase }: { phase: Phase3 }) {
 /** The rule where a handoff moves the session between teaching and
  *  practice. */
 export function ModeDivider({ mode }: { mode: SessionMode }) {
-	return <SectionBreak testId={`mode-divider-${mode}`} label={mode === "practice" ? "Practice" : "Teaching"} />;
+	return <SectionBreak testId={`mode-divider-${mode}`} label={mode === "practice" ? PHASE_WORDS.practice : PHASE_WORDS.teach} />;
 }

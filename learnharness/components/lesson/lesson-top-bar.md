@@ -9,8 +9,8 @@ The session's top bar, rendered in the shared `TopBar` at `size="slim"` (52px, p
 | sidebar toggle | `TopBar`'s own, only while the sidebar is closed |
 | course | 14 `muted-foreground`, first, at most 160px, truncates before the title does (`shrink-[2]`), then a 14px chevron at 60%. It is a link to the course's page (`courseHref`, components/course-page/course-page.md), lifting to full ink on hover as shadcn's breadcrumb link does, with a 2px focus ring; with no course page to open it stays plain text |
 | title | 14 at 500 (`text-control font-medium`), after the course as T3 Code's breadcrumb does (project › thread); truncates; a click (or F2) renames it in place, the input in the same style |
-| phase | 13/18 `muted-foreground`, sentence case ("Probing", "Planning", "Teaching", "Practice"); not interactive |
-| done for tonight | quiet button, 32px, "Done for tonight" at 13/400 (`LESSON_WORDS.doneTonight`); stops the session whatever is open: a waiting check is left unanswered with its answer hidden, an open problem is dropped, and the tutor closes (done-tonight.tsx). ⌘⇧D presses it. Waits while a turn runs and once he has stopped |
+| phase | 13/18 `muted-foreground`, sentence case (`PHASE_WORDS`: "Recall" while the tutor asks its opening questions, "Planning", "Teaching", "Practice"), and "Done for today" once the session stopped for the day, by his press or the tutor's close, until he writes again; not interactive |
+| done for today | quiet button, 32px, "Done for today" at 13/400 (`LESSON_WORDS.doneTonight`); stops the session whatever is open: a waiting check is left unanswered with its answer hidden, an open problem is dropped, and the tutor closes (done-tonight.tsx). ⌘⇧D presses it. Waits while a turn runs; gone once the session stopped for the day |
 | plan toggle | quiet button, 32px, 16px waypoints icon and "Plan" at 13/400; `data-slot="plan-toggle"`; the trigger of the plan popover (plan-map.md, popover.md), right-aligned under it |
 | details | quiet 32px icon button (ellipsis), the trigger of the details popover |
 
