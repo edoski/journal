@@ -38,7 +38,7 @@ describe("the page frame", () => {
 		const head = document.querySelector('[data-slot="page-frame"] > [data-slot="page-head"]')!;
 		assert.deepEqual(
 			[...head.querySelectorAll("[data-slot]")].map((el) => el.getAttribute("data-slot")).filter((slot) => slot !== "button"),
-			["page-eyebrow", "page-title", "page-actions", "page-lead", "next", "page-standing", "page-fact", "page-fact", "extra"],
+			["page-eyebrow", "page-title", "page-actions", "page-lines", "page-lead", "next", "page-standing", "page-fact", "page-fact", "extra"],
 		);
 		assert.equal(document.querySelector('[data-slot="page-title"]')!.tagName, "H1");
 		assert.match(document.querySelector('[data-slot="page-lead"]')!.className, /text-control font-medium text-foreground/, "what to do next leads in full ink");
@@ -53,10 +53,22 @@ describe("the page frame", () => {
 
 	it("leaves out what a page does not give, and makes the press a button without an href", () => {
 		const document = render(<PageHead title="Probability" actions={<PageAction disabled>Review</PageAction>} />);
-		assert.equal(document.querySelector('[data-slot="page-eyebrow"]'), null);
 		assert.equal(document.querySelector('[data-slot="page-standing"]'), null);
 		assert.equal(document.querySelector('[data-slot="page-lead"]'), null);
 		const press = document.querySelector('[data-slot="page-actions"] button')!;
 		assert.ok(press.hasAttribute("disabled"));
+	});
+
+	it("gives every page's head the same rows, so the title and the body sit at one height on every page", () => {
+		const rows = (node: React.ReactNode) => {
+			const head = render(node).querySelector('[data-slot="page-head"]')!;
+			return [...head.children].map((el) => `${el.getAttribute("data-slot") ?? el.tagName}:${el.className}`);
+		};
+		const course = rows(<PageHead title="Linear Algebra" lead="Every topic fits before the exam" standing={<PageFact icon={<i />}>Exam in 25 days</PageFact>} />);
+		const topic = rows(<PageHead eyebrow="Linear Algebra" title="Kernel" standing={<PageFact icon={<i />}>Right with help</PageFact>} />);
+		assert.deepEqual(course, topic, "the same rows with the same room, whatever a page fills them with");
+		const bare = render(<PageHead title="Probability" />).querySelector('[data-slot="page-eyebrow"]')!;
+		assert.equal(bare.textContent, "", "a page with no line above the title keeps its room, empty");
+		assert.equal(bare.getAttribute("aria-hidden"), "true", "and a screen reader skips it");
 	});
 });

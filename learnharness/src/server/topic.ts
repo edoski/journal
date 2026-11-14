@@ -8,7 +8,7 @@
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { derivePlanStatusesLh } from "../core/contracts/plan.ts";
-import type { SessionPlan, TopicAttempt, TopicReadResponse, TopicRecord } from "../core/contracts/topic.ts";
+import type { SessionPlan, TopicAttempt, TopicReadResponse, TopicRecord, TopicRef } from "../core/contracts/topic.ts";
 import { listCourses } from "./courses.ts";
 import { stores } from "./stores.ts";
 
@@ -55,9 +55,23 @@ function attemptOf(id: string, entry: unknown): { attempt: TopicAttempt; correct
 	};
 }
 
+/** The topic's `refs` as places in his material: each source named by
+ *  the title `show` gives it under `sources` (its handle when it has
+ *  none), with its locator; a ref to no listed source is left out. Pure. */
+function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>): TopicRef[] {
+	const refs = Array.isArray(topic.refs) ? topic.refs : [];
+	return refs.flatMap((entry) => {
+		const ref = record(entry);
+		const key = str(ref?.source);
+		const source = key ? record(sources[key]) : null;
+		return key && source ? [{ source: str(source.title) ?? key, locator: str(ref?.locator) }] : [];
+	});
+}
+
 /**
  * The page's view of the engine's `show <topic> <task>…` output, or null
  * when it does not hold the topic. Attempts keep the engine's order,
+ * and the topic's refs name the places in his material it points to,
  * newest first; a self-report is not an attempt, and an attempt a later
  * one corrects is left out, as the engine leaves it out of the standing.
  * Pure.
@@ -71,6 +85,7 @@ export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly 
 	const corrected = new Set(scored.flatMap((s) => s.corrects));
 	return {
 		attempts: scored.map((s) => s.attempt).filter((a) => !corrected.has(a.id)),
+		refs: refsOf(topic, record(record(show)?.sources) ?? {}),
 		tasks: taskKeys.flatMap((key) => {
 			const task = record(items[key]);
 			return task?.kind === "task" ? [{ key, updated: str(task.updated) }] : [];

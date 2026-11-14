@@ -24,10 +24,21 @@ export interface TopicAttempt {
 	text: string;
 }
 
+/** Where the topic is in his material, as the engine's record points to
+ *  it (a topic's `refs`): the source's title and, when the record has one,
+ *  the place in it ("Section 4.7"). */
+export interface TopicRef {
+	source: string;
+	locator: string | null;
+}
+
 /** What `show <topic> <task>…` adds to the map. */
 export interface TopicRecord {
 	/** Newest first; at most the engine's 30. */
 	attempts: TopicAttempt[];
+	/** Where it is in his material, in the record's order; absent or empty
+	 *  when the record points nowhere. */
+	refs?: TopicRef[];
 	/** The open tasks asked for, with the day each was last touched. */
 	tasks: { key: string; updated: string | null }[];
 }

@@ -23,13 +23,16 @@ const BETWEEN_FACTS = "*:not-first:before:ml-3 *:not-first:before:mr-1.5 *:not-f
 
 /**
  * The page's head, every line on the column's one left edge, in the order
- * he reads it (Edo, 14 Nov 2026: minimal, with more structure): an
- * optional line above the title (`eyebrow`, the topic page's course), the
- * title at 20/500 with the page's actions at its right end, what to do
- * next (`lead`, 14/500 in full ink), the standing line (a 16px mark and a
- * few words per fact, muted, a thin divider between facts), then any
- * lines under it (`children`: a mistake, an error). A hairline under it
- * closes the head off from the page's body.
+ * he reads it (Edo, 14 Nov 2026: minimal, with more structure): a line
+ * above the title (`eyebrow`, the topic page's course), the title at
+ * 20/500 with the page's actions at its right end, then the lines under
+ * it: what to do next (`lead`, 14/500 in full ink), the standing line (a
+ * 16px mark and a few words per fact, muted, a thin divider between
+ * facts), then any more (`children`: a mistake, an error). Every page's
+ * head has the same rows: the line above the title is kept, empty, when a
+ * page has none, and the lines under it take two lines' room at least, so
+ * the title and the body under the head sit at the same height on every
+ * page. A hairline under it closes the head off from the page's body.
  */
 export function PageHead({
 	eyebrow,
@@ -53,11 +56,9 @@ export function PageHead({
 } & Omit<ComponentProps<"header">, "title">) {
 	return (
 		<header data-slot="page-head" className={cn("flex shrink-0 flex-col gap-1 border-b border-border/60 pb-4", className)} {...rest}>
-			{eyebrow && (
-				<p data-slot="page-eyebrow" className="text-label text-muted-foreground">
-					{eyebrow}
-				</p>
-			)}
+			<p data-slot="page-eyebrow" aria-hidden={eyebrow ? undefined : true} className="h-4 truncate text-label text-muted-foreground">
+				{eyebrow}
+			</p>
 			<div className="flex min-h-8 items-center justify-between gap-4">
 				<h1 data-slot="page-title" className="min-w-0 text-heading font-medium text-pretty text-foreground">
 					{title}
@@ -68,17 +69,19 @@ export function PageHead({
 					</div>
 				)}
 			</div>
-			{lead && (
-				<div data-slot="page-lead" className="mt-1 min-w-0 text-control font-medium text-foreground">
-					{lead}
-				</div>
-			)}
-			{standing && (
-				<div data-slot="page-standing" className={cn("mt-1 flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-row text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
-					{standing}
-				</div>
-			)}
-			{children}
+			<div data-slot="page-lines" className="mt-1 flex min-h-12 flex-col gap-2">
+				{lead && (
+					<div data-slot="page-lead" className="flex min-h-5 min-w-0 items-center text-control font-medium text-foreground">
+						{lead}
+					</div>
+				)}
+				{standing && (
+					<div data-slot="page-standing" className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-row text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
+						{standing}
+					</div>
+				)}
+				{children}
+			</div>
 		</header>
 	);
 }

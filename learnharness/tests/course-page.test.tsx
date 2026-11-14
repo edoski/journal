@@ -20,7 +20,10 @@ import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
 import { CourseGroup } from "../components/course-page/course-group.tsx";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { courseHref, unitHref, workspaceOf } from "../components/unit-inbox/unit-href.ts";
-import { buildInbox, unitStatus } from "../components/unit-inbox/units.ts";
+import { buildInbox, unitStatus, type Unit } from "../components/unit-inbox/units.ts";
+import { nowFor, plannedKeys, restShelves, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
+import { claimedKeys, todayTop } from "../components/unit-inbox/today/today-top.ts";
+import { statusOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { headMarks } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 
@@ -102,8 +105,30 @@ describe("the course page's address", () => {
 	});
 });
 
-describe("every topic once, in the group he would act on it from", () => {
+describe("every topic once, in the group the sidebar puts it in, with the sidebar's words", () => {
 	const groups = courseGroups(course());
+	/** What the sidebar shows for each topic: Today's card (on top) with its reason, else its shelf row's fact. */
+	const sidebar = (c: StudyCourse, chats: readonly ChatListItem[] = []) => {
+		const inbox = buildInbox([c], chats, null);
+		const top = todayTop(nowFor([c], chats, null, c.map.today), inbox, chats);
+		const said = new Map<string, string>();
+		for (const item of top) for (const key of claimedKeys(item)) if (!said.has(key)) said.set(key, `Today: ${item.line.slot}`);
+		const shelves = restShelves(inbox, new Set(said.keys()));
+		const words = (u: Unit) => {
+			const status = shelfStatus(u, c.map.today, plannedKeys([c]));
+			return status.kind === "your-turn" ? "Your turn" : status.kind === "working" ? "Working" : "words" in status ? status.words : "";
+		};
+		for (const u of [...shelves.working, ...shelves.learning]) said.set(u.key, `Learning: ${words(u)}`);
+		for (const u of shelves.known) said.set(u.key, `On your own: ${words(u)}`);
+		return said;
+	};
+	/** What the page shows for each topic it lists in a group the sidebar has. */
+	const page = (gs: readonly Group[]) =>
+		new Map(
+			gs
+				.filter((g) => g.id !== "not-started")
+				.flatMap((g) => g.topics.map((t) => [`${WS}#${t.topic.handle}`, `${g.id === "needs-you" ? "Today" : g.title}: ${t.fact?.kind === "here" ? "" : (t.fact?.words ?? "")}`] as const)),
+		);
 
 	it("always gives the four groups in order, an empty one included, and each topic exactly once", () => {
 		assert.deepEqual(
@@ -123,28 +148,39 @@ describe("every topic once, in the group he would act on it from", () => {
 		);
 	});
 
-	it("puts every topic the map gives a reason in Needs you: slips first, a sure wrong answer on top, then the longest overdue review", () => {
-		assert.deepEqual(handles(groupOf(groups, "needs-you")), ["kernel", "independence", "span"]);
-		assert.deepEqual(
-			groupOf(groups, "needs-you").topics.map((t) => t.fact?.words),
-			["Sure, but wrong", "Mistake to fix", "10d overdue"],
-		);
+	it("says for every topic what the sidebar says: Today's reason for what Today takes up, else its shelf and its row's fact", () => {
+		const said = sidebar(course());
+		for (const [key, words] of page(groups)) assert.equal(words.replace(/: $/, ": " + (said.get(key)?.split(": ")[1] ?? "")), said.get(key), key);
+		assert.deepEqual([...page(groups).keys()].sort(), [...said.keys()].filter((k) => k.startsWith(WS)).sort(), "the page lists what the sidebar lists, nothing more");
 	});
 
-	it("keeps the sidebar's Learning shelf less those in Learning, says where he is, and where an open task was left", () => {
+	it("puts what Home's Today takes up in Needs you, with Today's reason", () => {
+		assert.deepEqual(handles(groupOf(groups, "needs-you")), ["span"]);
+		assert.deepEqual(groupOf(groups, "needs-you").topics[0]!.fact, { kind: "review", words: "10d overdue" });
+	});
+
+	it("keeps a weak topic Today does not take up in Learning, as the sidebar's Learning shelf does, saying why it is weak", () => {
 		const learning = groupOf(groups, "learning");
-		assert.deepEqual(handles(learning).sort(), ["cramer", "determinant", "rank"]);
-		const fact = (handle: string) => learning.topics.find((t) => t.topic.handle === handle)!.fact;
-		assert.deepEqual(fact("cramer"), { kind: "here", words: "You are here" });
-		assert.deepEqual(fact("rank"), { kind: "task", words: "Left off 7d ago" });
-		assert.equal(fact("determinant"), null, "a topic still being learned never says its review is due");
+		const kernel = learning.topics.find((t) => t.topic.handle === "kernel")!;
+		assert.deepEqual(kernel.fact, { kind: "slip", words: "Sure, but wrong" });
+		assert.equal(groupOf(groups, "needs-you").topics.some((t) => t.topic.weak), false, "a slip alone does not need him today");
 	});
 
-	it("lists what is not started in the engine's path order, and the solid topics resting, the soonest back first, with when it comes back", () => {
-		assert.deepEqual(handles(groupOf(groups, "not-started")), ["invertible", "eigen"]);
-		const own = groupOf(groups, "on-your-own");
-		assert.deepEqual(handles(own), ["vectors", "basis"]);
-		assert.deepEqual(own.topics[0]!.fact, { kind: "back", words: "Back in 5d" });
+	it("says where he is on the current topic, unless something more pressing holds it", () => {
+		const fact = (handle: string) => groups.flatMap((g) => g.topics).find((t) => t.topic.handle === handle)!.fact;
+		assert.deepEqual(fact("cramer"), { kind: "here", words: "You are here" });
+		const elsewhere = courseGroups(course({ current: h("rank") }));
+		assert.deepEqual(elsewhere.flatMap((g) => g.topics).find((t) => t.topic.handle === "rank")!.fact, { kind: "task", words: "Left off 7d ago" });
+	});
+
+	it("puts unfinished work before a review the plan dates later, on the page, the sidebar and the map alike", () => {
+		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
+		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held, tasks: ["sheet-4"] } : t)) });
+		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
+		assert.deepEqual(row.fact, { kind: "task", words: "Left off 7d ago" });
+		assert.equal(sidebar(map).get(`${WS}#basis`), "On your own: Left off 7d ago");
+		const basis = map.map.topics.find((t) => t.handle === "basis")!;
+		assert.equal(statusOf(basis, map.map.tasks, (x) => x, map.map.today)?.words, "Left off 7d ago");
 	});
 
 	it("says since when a review held past its day was due, in the words the sidebar and the topic page use", () => {
@@ -161,24 +197,27 @@ describe("every topic once, in the group he would act on it from", () => {
 		);
 	});
 
-	it("agrees with the sidebar: Needs you and Learning together are its listed topics outside Known, Not started is what it leaves out", () => {
-		const inbox = buildInbox([course()], [], WS);
-		const sidebar = new Set([...inbox.active, ...inbox.working].map((u) => u.topic.handle));
-		const page = new Set([...handles(groupOf(groups, "learning")), ...handles(groupOf(groups, "needs-you")).filter((h) => sidebar.has(h))]);
-		assert.deepEqual([...page].sort(), [...sidebar].sort());
-		assert.deepEqual(handles(groupOf(groups, "on-your-own")), inbox.known.map((u) => u.topic.handle));
-	});
-
-	it("puts a turn that waits on him first in Learning and says so, the accent fact on any group", () => {
+	it("puts a topic whose session waits on him in Needs you with Your turn, as Today's card for it", () => {
 		const waiting = chat("c1", { pendingQuestion: true, topics: [h("determinant")], updatedAt: "2026-11-08T08:00:00.000Z" });
 		const withChat = courseGroups(course(), [waiting]);
-		const learning = groupOf(withChat, "learning");
-		assert.equal(learning.topics[0]!.topic.handle, "determinant");
-		assert.deepEqual(learning.topics[0]!.fact, { kind: "your-turn", words: "Your turn" });
+		const needs = groupOf(withChat, "needs-you");
+		assert.equal(needs.topics[0]!.topic.handle, "determinant");
+		assert.deepEqual(needs.topics[0]!.fact, { kind: "your-turn", words: "Your turn" });
+		assert.equal(sidebar(course(), [waiting]).get(`${WS}#determinant`), "Today: Your turn");
+	});
+
+	it("lists what is not started in the order the plan starts it, those it has no day for last in path order", () => {
+		assert.deepEqual(handles(groupOf(groups, "not-started")), ["invertible", "eigen"], "no planned day: the engine's path order");
+		const planned = course({
+			topics: [...TOPICS, topic("diag", { title: "Diagonalization" }), topic("change", { title: "Change of basis" })].map((t) =>
+				t.handle === "eigen" ? { ...t, starts: "2026-11-10" } : t.handle === "change" ? { ...t, starts: "2026-11-12" } : t,
+			),
+		});
+		assert.deepEqual(handles(groupOf(courseGroups(planned), "not-started")), ["eigen", "change", "invertible", "diag"]);
 	});
 
 	it("links each topic to its page", () => {
-		assert.equal(groups[0]!.topics[0]!.href, unitHref(WS, "kernel"));
+		assert.equal(groupOf(groups, "learning").topics[0]!.href, unitHref(WS, "cramer"));
 	});
 });
 
@@ -234,7 +273,7 @@ describe("the course page's read", () => {
 		assert.equal(read.status, "ready");
 		if (read.status !== "ready") return;
 		const eigen = read.view.groups.flatMap((g) => g.topics).find((t) => t.topic.handle === "eigen")!;
-		assert.equal(eigen.group, "learning");
+		assert.equal(eigen.group, "needs-you", "Today takes it up, as the sidebar's card for the session");
 		assert.equal(eigen.fact?.kind, "your-turn");
 	});
 });
@@ -261,7 +300,7 @@ describe("the course topic row and group", () => {
 	const groups = courseGroups(course());
 
 	it("draws a topic as one link to its page: the pie, the title, its standing for a screen reader, and one fact", () => {
-		const kernel = groups[0]!.topics[0]!;
+		const kernel = groups.flatMap((g) => g.topics).find((t) => t.topic.handle === "kernel")!;
 		const document = render(<ul><CourseTopicRow row={kernel} /></ul>);
 		const link = document.querySelector('[data-slot="course-topic-row"]')!;
 		assert.equal(link.getAttribute("href"), unitHref(WS, "kernel"));
