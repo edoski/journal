@@ -134,12 +134,21 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
 	return step.topics.every((h) => topics.has(h));
 }
 
+/** Whether a course's line holds nothing for tonight: a course with
+ *  nothing to take up, such as one never studied, or a new topic the plan
+ *  starts on a later day. Such a line comes after every line with work
+ *  tonight, however near its exam. */
+function laterOnly(step: NextStep): boolean {
+	return step.kind === "none" || (step.kind === "topic" && step.fresh && !step.planned);
+}
+
 /**
  * Today's lines: each session to pick up since yesterday (it waits on the
  * learner, the tutor writes in it, or stopped mid-reply), most recent
- * first, then each course's next step, most urgent first, unless a session
- * shown already works on it. A session stays on its line while the tutor
- * writes. An older session to pick up stays in the sidebar. Pure.
+ * first, then each course's next step, most urgent first and a line with
+ * nothing for tonight last (`laterOnly`), unless a session shown already
+ * works on it. A session stays on its line while the tutor writes. An older
+ * session to pick up stays in the sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
@@ -147,11 +156,13 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
 	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
-	const rest = ordered.flatMap((course): TodayRow[] => {
-		const step = nextStepOf(course);
-		const taken = recent.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
-		return taken ? [] : [{ kind: "course", course, step }];
-	});
+	const rest = ordered
+		.flatMap((course): (TodayRow & { kind: "course" })[] => {
+			const step = nextStepOf(course);
+			const taken = recent.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
+			return taken ? [] : [{ kind: "course", course, step }];
+		})
+		.sort((a, b) => Number(laterOnly(a.step)) - Number(laterOnly(b.step)));
 	return [...sessions, ...rest];
 }
 

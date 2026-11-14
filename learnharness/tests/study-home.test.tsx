@@ -178,6 +178,16 @@ describe("study facts", () => {
 		assert.equal(nextStepOf(done).kind, "none", "nothing left to start: no Continue on a topic he has on his own");
 	});
 
+	it("a course never studied comes after every course with reviews tonight, even with the nearer exam", () => {
+		const fresh: StudyCourse = { map: map({ workspace: "/s/graphs", title: "Graph theory", exam: { date: "2026-11-20", daysLeft: 12 } }), unready: [], due: [], newToday: [], lastActiveDaysAgo: null };
+		const rows = todayRows([fresh, ANALYSIS], [], TODAY);
+		assert.deepEqual(
+			rows.map((r) => r.course?.map.title),
+			["Real Analysis", "Graph theory"],
+		);
+		assert.deepEqual(foldLines(todayRows([fresh, PROB, ANALYSIS, LINALG], [], TODAY)).shown.at(-1)?.course?.map.title, "Graph theory");
+	});
+
 	it("puts a course in its exam run-up first, the nearest exam first", () => {
 		assert.deepEqual(byUrgency([ANALYSIS, LINALG, PROB]).map((c) => c.map.title), ["Probability", "Linear Algebra", "Real Analysis"]);
 	});
