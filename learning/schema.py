@@ -871,6 +871,39 @@ def _predictions_alone(
     return found
 
 
+def _shows_a_miss(observation: dict[str, Any]) -> bool:
+    """Evidence a gap may rest on: a counted answer not right on his own and
+    sure (incorrect, partial, helped, uncertain or a guess), or his own
+    statement of what he does not get."""
+    if observation["kind"] == "self_report":
+        return True
+    return counts(observation) and not (
+        observation["result"] == "correct"
+        and unaided(observation)
+        and "uncertain" not in observation
+        and observation.get("sure") != "guess"
+    )
+
+
+def _miss_only_predicted(
+    after: dict[str, Any], topic: str, keys: Collection[str]
+) -> bool:
+    """Whether this save's only miss on ``topic`` (among its new ``keys``) is
+    a prediction's: its counted answers on it were all right, so a gap it
+    sets could only name what the prediction got wrong."""
+    new = [
+        after["observations"][key]
+        for key in keys
+        if key in after["observations"]
+        and topic in after["observations"][key]["topics"]
+    ]
+    predicted = any(
+        item.get("predicted") and item.get("result") != "correct" for item in new
+    )
+    answered = any(counts(item) for item in new)
+    return predicted and answered and not any(_shows_a_miss(item) for item in new)
+
+
 def _check_predictions(
     before: dict[str, Any],
     after: dict[str, Any],
@@ -881,7 +914,8 @@ def _check_predictions(
     only answers are predictions is not taught, mistaken or due, so the patch
     may not introduce it, give it a gap, date its review or move the path
     onto it, nor may a save whose only new answers on a topic are
-    predictions. Teaching with no question asked is still introduced."""
+    predictions; nor may a save set a gap whose only miss on the topic is a
+    prediction's. Teaching with no question asked is still introduced."""
     claims: dict[str, list[str]] = defaultdict(list)
     for key in outcome.introduced:
         claims[key].append(f"topics.{key}.introduced")
@@ -889,6 +923,14 @@ def _check_predictions(
         gap = (change or {}).get("gap")
         if gap is not None and gap != before["topics"].get(key, {}).get("gap"):
             claims[key].append(f"topics.{key}.gap")
+            if _miss_only_predicted(after, key, outcome.observations):
+                raise ValueError(
+                    f"topics.{key}.gap: the only miss on {key} in this save is a "
+                    "prediction, made before its step was taught, and a gap names "
+                    "a mistake an answer that counts showed, never a prediction's "
+                    "expected miss. Leave the gap as it was, or set it in a save "
+                    f"with the answer on {key} that counts and shows it"
+                )
     for key in outcome.tutor_reviews:
         claims[key].append(f"topics.{key}.review")
     current = (changes.get("path") or {}).get("current")

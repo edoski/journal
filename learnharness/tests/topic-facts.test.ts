@@ -283,6 +283,12 @@ describe("what went wrong", () => {
 		assert.equal(mistakeOf(TOPICS.matmul, []), null);
 	});
 
+	it("never quotes a prediction, which counts for nothing (round 7: a wrong guess before the teaching read as the mistake)", () => {
+		const guess = attempt({ id: "o12", result: "incorrect", predicted: true, text: "Read the eigenvalues off the diagonal" });
+		assert.equal(mistakeOf(TOPICS.matmul, [guess, missed]), "Multiplied a 2x3 by a 3x2 matrix and gave a 3x3 result", "the newest answer that counts");
+		assert.equal(mistakeOf(TOPICS.matmul, [guess, attempt()]), null, "the newest answer that counts was right");
+	});
+
 	it("is nothing for a topic the engine does not call weak, even after a miss", () => {
 		assert.equal(mistakeOf(TOPICS.span, [missed]), null);
 	});
