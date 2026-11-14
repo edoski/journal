@@ -4,6 +4,7 @@ import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MAR
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
+import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
@@ -85,8 +86,10 @@ export interface StartsReason {
 
 export interface TopicFacts {
 	course: { workspace: string; title: string };
-	/** The arc the topic lies in; null in a course without arcs. */
-	arc: { handle: ArcHandle; title: string } | null;
+	/** The arc the topic lies in, with its ring's share (the topics of it
+	 *  he can do on his own, as Home's ring counts a course); null in a
+	 *  course without arcs. */
+	arc: { handle: ArcHandle; title: string; share: number | null } | null;
 	topic: CourseMapTopic;
 	/** The engine's study day. */
 	today: string;
@@ -323,11 +326,15 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	return { result, words: counted === MARK_WORDS.ownWork ? null : counted };
 }
 
-/** The arc a topic lies in, by handle and title; null in a course
- *  without arcs or for a topic the arc list does not hold. Pure. */
-function arcOf(map: CourseMap, topic: CourseMapTopic): TopicFacts["arc"] {
-	const arc = topic.arc && map.arcs?.find((a) => a.handle === topic.arc);
-	return arc ? { handle: arc.handle, title: arc.title } : null;
+/** The arc a topic lies in, by handle and title, with the share of its
+ *  live topics he can do on his own (`courseProgress` over them); null in
+ *  a course without arcs or for a topic the arc list does not hold. Pure. */
+function arcOf(course: StudyCourse, topic: CourseMapTopic): TopicFacts["arc"] {
+	const arc = topic.arc && course.map.arcs?.find((a) => a.handle === topic.arc);
+	if (!arc) return null;
+	const live = course.map.topics.filter((t) => t.arc === arc.handle && t.excluded === undefined);
+	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
+	return { handle: arc.handle, title: arc.title, share: progress ? progress.solid / progress.of : null };
 }
 
 /** Everything the page draws, from the course, every course (Today
@@ -357,7 +364,7 @@ export function topicFacts({
 	const studied = lastStudiedDay(topic, entries, attempts);
 	return {
 		course: { workspace: map.workspace, title: map.title },
-		arc: arcOf(map, topic),
+		arc: arcOf(course, topic),
 		topic,
 		today: map.today,
 		standing: silent ? null : standingOf(topic),

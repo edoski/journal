@@ -129,8 +129,26 @@ describe("the topic page", () => {
 			assert.equal(eyebrow.textContent, "Linear Algebra");
 			assert.deepEqual([...eyebrow.querySelectorAll("a")].map((a) => a.getAttribute("href")), [courseHref("/s/linalg")]);
 		}
-		assert.deepEqual(topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null }).arc, { handle: "systems", title: "Linear systems" });
+	});
+
+	it("ends its facts row with the arc as a bubble with its ring, opening the course page on that arc, and has none without arcs", () => {
+		const facts = topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null });
+		assert.deepEqual(facts.arc, { handle: "systems", title: "Linear systems", share: 0 });
+		const doc = render(<TopicHead facts={facts} />);
+		const row = doc.querySelector('[data-slot="page-standing"]')!;
+		const pill = row.lastElementChild!.querySelector('[data-slot="arc-pill"]')!;
+		assert.ok(pill, "the pill is the row's last fact");
+		assert.equal(pill.textContent, "Linear systems");
+		assert.equal(pill.getAttribute("href"), arcHref("/s/linalg", "systems"));
+		assert.equal(pill.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
+		assert.ok(pill.querySelector("svg"), "its ring");
+		assert.ok(pill.getAttribute("class")!.includes("whitespace-nowrap") && pill.getAttribute("class")!.includes("truncate") === false, "one line");
+		assert.ok(pill.querySelector(".truncate"), "a long name ends in …");
+		const vectors = LINALG_ARCS.map.topics.find((t) => t.handle === "vectors")!;
+		assert.equal(topicFacts({ course: LINALG_ARCS, topic: vectors, chats: [], read: null }).arc?.share, 1, "Vectors and Linear independence are both his own");
+		const plain = render(<TopicHead facts={topicFacts({ course: LINALG, topic: rank, chats: [], read: null })} />);
 		assert.equal(topicFacts({ course: LINALG, topic: rank, chats: [], read: null }).arc, null);
+		assert.equal(plain.querySelector('[data-slot="arc-pill"]'), null);
 	});
 
 	it("says why a topic not started comes when it does, under its planned first lesson", () => {
