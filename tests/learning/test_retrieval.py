@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -825,3 +826,31 @@ def test_packer_counts_bytes_exactly_and_keeps_groups_whole() -> None:
     assert shared.used == size(shared.items)
     with pytest.raises(ValueError, match="at least 2 bytes"):
         packing.pack([], 1)
+
+
+# --- goldens ----------------------------------------------------------------
+
+GOLDEN = Path(__file__).parent / "golden"
+# The demo world's day (the seed's LEARNING_TODAY), when its records were played.
+SEED_DAY = "2026-11-08"
+
+
+def _golden(name: str, value: Any) -> None:
+    """Compare ``value`` with ``golden/<name>.json`` byte for byte; with
+    ``LEARNING_GOLDEN=write`` set, write it instead."""
+    path = GOLDEN / f"{name}.json"
+    text = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+    if os.environ.get("LEARNING_GOLDEN") == "write":
+        path.write_text(text, encoding="utf-8")
+    assert text == path.read_text(encoding="utf-8"), f"{path.name} changed"
+
+
+@pytest.mark.parametrize("course", ["linear-algebra"])
+def test_the_demo_courses_read_as_their_goldens(
+    course: str, workspace: Workspace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LEARNING_TODAY", SEED_DAY)
+    workspace.root.mkdir()
+    workspace.record.write_bytes((GOLDEN / f"{course}.course.json").read_bytes())
+    _golden(f"{course}.map", retrieval.course_map(workspace))
+    _golden(f"{course}.resume", retrieval.resume(workspace))
