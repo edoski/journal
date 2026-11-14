@@ -6,17 +6,18 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { moreWords } from "@/components/study-words";
 
-/** How many rows a shelf shows before "Show more", and how many each press
- *  adds: T3 Code's settled tail. */
+/** How many rows a shelf shows before "Show the rest": T3 Code's settled
+ *  tail. One press shows every hidden row, as a course page's group does,
+ *  so the sidebar names the action one way (round 4: "Show the rest" and
+ *  "Show more" were two names for it). */
 export const SHELF_TAIL = 10;
-export const SHELF_PAGE = 25;
 
 /** One folded shelf at the sidebar's foot (spec: unit-inbox.md), T3 Code's
  *  shelf: a 32px header with the name and a trailing chevron (no count: a
  *  bare number told him nothing, 13 Nov 2026),
  *  then its rows. A folded shelf still shows the open row, and a dot when
  *  a hidden row waits on the learner. Open, it shows its first rows, then
- *  "Show more" or "Show the rest" (`moreWords`). */
+ *  "Show the rest" (`moreWords`), which shows them all. */
 export function UnitShelf<T>({
 	id,
 	label,
@@ -42,11 +43,11 @@ export function UnitShelf<T>({
 	className?: string;
 }) {
 	const headerId = React.useId();
-	const [shownCount, setShownCount] = React.useState(SHELF_TAIL);
+	const [whole, setWhole] = React.useState(false);
 	if (items.length === 0) return null;
-	const shown = folded ? items.filter(isActive) : items.slice(0, shownCount);
+	const shown = folded ? items.filter(isActive) : whole ? items : items.slice(0, SHELF_TAIL);
 	const hidden = folded ? items.filter((i) => !isActive(i)) : [];
-	const more = folded ? 0 : Math.min(SHELF_PAGE, items.length - shown.length);
+	const rest = folded ? 0 : items.length - shown.length;
 	return (
 		<li data-slot="unit-shelf" className={cn("flex list-none flex-col", className)}>
 			<h2 className="contents">
@@ -75,7 +76,7 @@ export function UnitShelf<T>({
 			</h2>
 			<ul aria-labelledby={headerId} className="flex flex-col gap-px">
 				{shown.map(renderItem)}
-				{more > 0 && (
+				{rest > 0 && (
 					<li className="list-none">
 						<Button
 							variant="list"
@@ -83,11 +84,11 @@ export function UnitShelf<T>({
 							data-slot="unit-shelf-more"
 							data-sidebar-row={`more:${id}`}
 							data-sidebar-parent={`shelf:${id}`}
-							onClick={() => setShownCount((n) => n + SHELF_PAGE)}
+							onClick={() => setWhole(true)}
 							className="h-9 gap-2 px-2.5 text-control focus-visible:ring-inset"
 						>
 							<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
-							{moreWords(items.length - shown.length, SHELF_PAGE)}
+							{moreWords(rest, Infinity)}
 						</Button>
 					</li>
 				)}

@@ -325,8 +325,9 @@ export function courseShareWords(solid: number, of: number): string {
 export const CHOICE_NOTE = "Anything to add?";
 
 /** A folded list's last row: "Show the rest" when one press shows every
- *  hidden row, else "Show more". How many is left out: a bare number told
- *  him nothing (Edo, 13 Nov 2026). */
+ *  hidden row, as the sidebar's shelves and the course page's groups both
+ *  do, else "Show more". How many is left out: a bare number told him
+ *  nothing (Edo, 13 Nov 2026). */
 export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
 }
