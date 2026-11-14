@@ -10,8 +10,8 @@
  * row (their schema fields stay); reading size and the emphasis inks do.
  * Every row is a control, never free text: Text size is a menu of the
  * sizes the record takes, its factory size marked as the default (picking
- * it unsets the field); each ink is a swatch with the system colour picker
- * and Default, which stores null. The inks default to the regular text
+ * it unsets the field); each ink is a swatch that opens a panel of the
+ * app's inks, and Default, which stores null. The inks default to the regular text
  * colour (globals.css), which an unset swatch shows.
  */
 

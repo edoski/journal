@@ -9,11 +9,13 @@
  * control together) and the control itself locks — the row owns the dim.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Hint } from "@/components/ui/hint";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SwatchGrid, type Swatch } from "@/components/ui/swatch-grid";
 
 /** A section block: pronounced mono heading + content. */
 export function SettingsSection({
@@ -128,8 +130,8 @@ export function Toggle({
 	return title ? <Hint label={title}>{control}</Hint> : control;
 }
 
-/** A colour as `#rrggbb`, the one form the system colour picker takes:
- *  `#abc` grows to `#aabbcc`; anything else is null. Pure. */
+/** A colour as `#rrggbb`, the form the swatches are named in: `#abc`
+ *  grows to `#aabbcc`; anything else is null. Pure. */
 export function pickerHex(value: string | null): string | null {
 	if (!value) return null;
 	if (/^#[0-9a-f]{6}$/i.test(value)) return value.toLowerCase();
@@ -137,26 +139,32 @@ export function pickerHex(value: string | null): string | null {
 	return short ? `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase() : null;
 }
 
-/** The colour a swatch is painted with, as `#rrggbb`, read from one pixel,
- *  so a stylesheet colour in any notation (oklch) seeds the picker. */
-function paintedHex(element: Element): string | null {
-	const canvas = document.createElement("canvas");
-	canvas.width = canvas.height = 1;
-	const ctx = canvas.getContext("2d");
-	if (!ctx) return null;
-	ctx.fillStyle = getComputedStyle(element).backgroundColor;
-	ctx.fillRect(0, 0, 1, 1);
-	const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-	return `#${[r, g, b].map((n) => (n ?? 0).toString(16).padStart(2, "0")).join("")}`;
-}
+/** The inks a colour field offers: Apple's dark-mode system colours (HIG,
+ *  Color), each at least 4.5:1 on the app's dark background, so bold or
+ *  italic text in any of them reads (tested). Indigo and Teal are left out:
+ *  Indigo reads under 4.5:1, and Teal sits between Mint and Cyan. */
+export const INK_SWATCHES: readonly Swatch[] = [
+	{ name: "Red", color: "#ff453a" },
+	{ name: "Orange", color: "#ff9f0a" },
+	{ name: "Yellow", color: "#ffd60a" },
+	{ name: "Green", color: "#30d158" },
+	{ name: "Mint", color: "#63e6e2" },
+	{ name: "Cyan", color: "#64d2ff" },
+	{ name: "Blue", color: "#0a84ff" },
+	{ name: "Purple", color: "#bf5af2" },
+	{ name: "Pink", color: "#ff375f" },
+	{ name: "Brown", color: "#ac8e68" },
+];
+
+/** Two rows of the inks, so the panel stays a small square under the field. */
+const INK_COLUMNS = INK_SWATCHES.length / 2;
 
 /**
  * A colour setting (settings.md, "colour field"): a swatch in the field's
- * 28px outline that opens the system colour picker, and Default, which
- * clears the choice. `value` is the stored hex, or null for the default,
- * when the swatch shows `fallback` (a CSS colour, the ink the default
- * resolves to). The swatch follows the picker live; the choice commits
- * once, when the picker closes on a new colour.
+ * 28px outline that opens a panel of the app's inks (`SwatchGrid`), and
+ * Default, which clears the choice. `value` is the stored hex, or null for
+ * the default, when the swatch shows `fallback` (a CSS colour, the ink the
+ * default resolves to). Picking an ink commits it and closes the panel.
  */
 export function ColorField({
 	value,
@@ -172,56 +180,31 @@ export function ColorField({
 	label: string;
 	testid?: string;
 }) {
-	const [draft, setDraft] = useState<string | null>(null);
-	const swatch = useRef<HTMLSpanElement>(null);
-	const input = useRef<HTMLInputElement>(null);
+	const [open, setOpen] = useState(false);
 	const stored = pickerHex(value);
-	const shown = draft ?? stored;
-	// The record answering a commit replaces the live colour.
-	useEffect(() => setDraft(null), [value]);
-	// React's onChange is the input event, live while the picker is open;
-	// the native change fires once, when it closes on a new colour.
-	const commit = useRef(onCommit);
-	commit.current = onCommit;
-	useEffect(() => {
-		const el = input.current;
-		if (!el) return;
-		const onChange = () => {
-			if (el.value !== stored) commit.current(el.value);
-		};
-		el.addEventListener("change", onChange);
-		return () => el.removeEventListener("change", onChange);
-	}, [stored]);
-	/** A default colour opens the picker on the ink the swatch shows. */
-	const seed = (el: HTMLInputElement) => {
-		if (!shown && swatch.current) el.value = paintedHex(swatch.current) ?? el.value;
-	};
 	return (
 		<span data-slot="color-field" className="flex items-center gap-1">
-			<span
-				className="relative inline-flex h-7 w-12 items-center justify-center rounded-md border border-input transition-colors hover:bg-fill-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring motion-reduce:transition-none"
-			>
-				<span
-					ref={swatch}
-					aria-hidden
-					data-slot="color-swatch"
-					className="size-4 rounded-full ring-1 ring-white/15"
-					style={{ background: shown ?? fallback }}
-				/>
-				<input
-					type="color"
+			<Popover open={open} onOpenChange={setOpen}>
+				<PopoverTrigger
 					aria-label={label}
 					data-testid={testid}
-					value={shown ?? "#000000"}
-					ref={input}
-					onPointerDown={(e) => seed(e.currentTarget)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter" || e.key === " ") seed(e.currentTarget);
-					}}
-					onChange={(e) => setDraft(e.target.value)}
-					className="absolute inset-0 size-full cursor-pointer opacity-0"
-				/>
-			</span>
+					className="inline-flex h-7 w-12 items-center justify-center rounded-md border border-input outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-fill-selected motion-reduce:transition-none"
+				>
+					<span aria-hidden data-slot="color-swatch" className="size-4 rounded-full ring-1 ring-white/15" style={{ background: stored ?? fallback }} />
+				</PopoverTrigger>
+				<PopoverContent align="end" className="w-auto p-2">
+					<SwatchGrid
+						aria-label={label}
+						swatches={INK_SWATCHES}
+						columns={INK_COLUMNS}
+						value={stored}
+						onValueChange={(color) => {
+							setOpen(false);
+							if (color !== stored) onCommit(color);
+						}}
+					/>
+				</PopoverContent>
+			</Popover>
 			<Button
 				variant="quiet"
 				size="compact"
