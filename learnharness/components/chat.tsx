@@ -5,7 +5,7 @@ import { useChatSession } from "@/components/session";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
-import { useModelSetup, selectedModelUnavailable, openModelPicker, SignInPill } from "@/components/setup-cta";
+import { useModelSetup, SignInPill } from "@/components/setup-cta";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
 	Conversation,
@@ -38,7 +38,6 @@ import {
 	kbdEventForAction as kbdEventForChat,
 	type ChatInput,
 	type LhMessage,
-	type ModelSlotName,
 } from "@/src/core";
 import { latestTree } from "@/components/lesson/plan-facts";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
@@ -108,33 +107,14 @@ export const ChatActionsContext = createContext<{
 	syncFromServer: () => Promise<void>;
 	/** Send a user message into the session (demo error-fix loop, W6). */
 	sendText: (text: string) => void;
-	/** Opens the model setup dialog (BYOK, 2026-09-22): refused job cards
-	 *  deep-link into the same SetupDialog the send interception uses. */
+	/** Opens the sign-in dialog: refused job cards deep-link into the same
+	 *  SetupDialog the send interception uses. */
 	openSetup: () => void;
 } | null>(null);
 
-/** The BYOK refusal envelope from the transport's error text: the
- *  DefaultChatTransport throws the 503 body VERBATIM as the error message,
- *  so the machine-readable {code, missing} shape survives to here. Real
- *  errors (any other text) read as null and keep the honest banner.
- *  Exported pure for tests. */
-export function parseModelsRefusal(message: string | undefined): ModelSlotName[] | null {
-	if (!message) return null;
-	try {
-		const body = JSON.parse(message) as { code?: unknown; missing?: unknown };
-		if (body.code === "models_not_configured" && Array.isArray(body.missing)
-			&& body.missing.every((s) => typeof s === "string")) {
-			return body.missing as ModelSlotName[];
-		}
-		return null;
-	} catch {
-		return null;
-	}
-}
-
-/** The provider-key refusal's transport seam (zero-keys wave, Platform's
- *  66dbea9): same discipline as parseModelsRefusal — the 503 body rides
- *  the thrown error message verbatim, so the envelope's own matcher
+/** The signed-out-account refusal's transport seam (zero-keys wave,
+ *  Platform's 66dbea9): the DefaultChatTransport throws the 503 body
+ *  VERBATIM as the error message, so the envelope's own matcher
  *  (core, invariant-tail) decides; the wording can never drift client-
  *  side. Exported pure for tests. */
 export function parseProviderKeyRefusal(message: string | undefined): boolean {
@@ -191,7 +171,6 @@ export function Chat({
 	initialPrompt,
 	initiallyInFlight,
 	initiallyCompacting = false,
-	initialConfigured = false,
 	startedIn,
 	course,
 }: {
@@ -216,10 +195,6 @@ export function Chat({
 	 * compaction-changed event already fired). The transcript spinner
 	 * and send gates key on it. */
 	initiallyCompacting?: boolean;
-	/** slotsConfigured(server record) — the persistent setup CTA keys on
-	 *  it (BYOK, owner 2026-09-22). The server gate stays the truth; this
-	 *  only decides whether the pill rides the composer. */
-	initialConfigured?: boolean;
 }) {
 	// Reattach plumbing (background-turn runner wave): the hook holds the
 	// settled terminal's callback — a stable ref assigned below, once
@@ -557,12 +532,7 @@ export function Chat({
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
 	}, []);
-	// Saved slot completeness is live, but the session's selected route
-	// comes from its own ordinary model control, never today's Strong pin.
-	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
-	const catalogRef = useRef(catalog);
-	catalogRef.current = catalog;
-	const [selectedModel, setSelectedModel] = useState<string | undefined>();
+	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The last explicitly-sent draft (composer send): the
 	 *  refusal flow restores it into the composer, where it waits for the
@@ -631,24 +601,17 @@ export function Chat({
 		setOpeningError(false);
 	}, [chatId, hasConfirmedConversation, applyText]);
 
-	// THE BYOK REFUSAL (owner, 2026-09-22): a send that lands the server's
-	// 503 models_not_configured envelope renders as the SETUP FLOW, never
-	// the error banner. The gate refuses BEFORE the write-ahead persist,
-	// so the server record is the truth minus the refused send — the
-	// optimistic message is an orphan that goes HOME: refetch the record,
-	// drop the orphan, put the draft back in the composer, open the
-	// dialog (the prefilled tiers carry their picks, the unpinned ones the
-	// "needed" marks). The draft stays in the composer until the learner
-	// re-sends it (owner ruling 2026-10-09).
+	// THE SIGNED-OUT REFUSAL: a send that lands the server's 503
+	// provider_key_missing envelope (the Claude account is signed out)
+	// renders as the SIGN-IN FLOW, never the error banner. The gate refuses
+	// BEFORE the write-ahead persist, so the server record is the truth
+	// minus the refused send — the optimistic message is an orphan that
+	// goes HOME: refetch the record, drop the orphan, put the draft back in
+	// the composer, open the dialog. The draft stays in the composer until
+	// the learner re-sends it (owner ruling 2026-10-09).
 	useEffect(() => {
 		if (!error) return;
-		const missing = parseModelsRefusal(error.message);
-		// The key-refusal twin (zero-keys wave): a pinned model whose
-		// provider key is gone also restores the draft. With another provider
-		// connected, repair belongs to the ordinary current-session picker;
-		// otherwise setup derives its exclusive provider/loading stage.
-		const keyRefused = parseProviderKeyRefusal(error.message);
-		if (!missing && !keyRefused) return; // a real error keeps the honest banner
+		if (!parseProviderKeyRefusal(error.message)) return; // a real error keeps the honest banner
 		// ORDER MATTERS: clearError() flips this effect's own dep (`error`)
 		// and would cancel the in-flight work below — so the banner dismiss,
 		// the draft restore, and the dialog open all land TOGETHER after the
@@ -666,8 +629,7 @@ export function Chat({
 				draftRef.current = null;
 			}
 			clearError();
-			if (keyRefused && catalogRef.current?.providers.some((p) => p.connected)) openModelPicker();
-			else setSetupOpen(true);
+			setSetupOpen(true);
 		})();
 		return () => {
 			cancelled = true;
@@ -841,8 +803,6 @@ export function Chat({
 	// fetches the record. No turns yet → the labels read "—".
 	const [turns, setTurns] = useState<TurnUsage[]>([]);
 	const [pricing, setPricing] = useState<SessionPricing | undefined>();
-	// The per-chat model control state (model-picker writes via PUT; the
-	// record is the source of truth, lifted here so the details re-render).
 	// The dock's reserved tail height (DockOverlay reports it; the spacer at
 	// the end of the transcript renders it). Lives here because the spacer is
 	// inside the scroller while the dock overlays OUTSIDE it — two parents.
@@ -1139,10 +1099,6 @@ export function Chat({
 			setSetupOpen(true);
 			return;
 		}
-		if (selectedModelUnavailable(catalog, selectedModel)) {
-			openModelPicker();
-			return; // No optimistic send and no change to the learner's draft.
-		}
 		if (openingDraftRef.current !== null) {
 			deliverOpeningPrompt(t);
 			return;
@@ -1278,12 +1234,9 @@ export function Chat({
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
 						details={
 							<LessonDetails
-								chatId={chatId}
 								turns={turns}
 								contextTokens={contextTokens}
 								pricing={pricing}
-								selectedModel={selectedModel}
-								onModelChange={setSelectedModel}
 								extraction={mode !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
 							/>
 						}
@@ -1514,7 +1467,7 @@ export function Chat({
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
-									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} chatId={chatId} failure={claudeLimit} onContinue={retryFailedTurn} />}
+									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}
 						</div>
@@ -1548,22 +1501,7 @@ export function Chat({
 					onReserve={setDockReserve}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
 					setupCta={
-						unconnected ? (
-							<SignInPill onOpen={() => setSetupOpen(true)} />
-						) : (
-							!configured && (
-								<div className="pointer-events-auto mb-2 flex justify-center">
-									<button
-										type="button"
-										data-testid="setup-cta"
-										onClick={() => setSetupOpen(true)}
-										className="h-8 cursor-pointer rounded-full border px-3.5 text-row font-medium text-foreground outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-									>
-										Set up your models
-									</button>
-								</div>
-							)
-						)
+						unconnected && <SignInPill onOpen={() => setSetupOpen(true)} />
 					}
 					composer={
 						<ChatSessionComposer
@@ -1626,21 +1564,12 @@ export function Chat({
 		</ActiveProblemContext.Provider>
 		</JobsContext.Provider>
 		</SessionMermaidContext.Provider>
-		{/* The BYOK setup flow (owner, 2026-09-22): one mount serves the
-		    persistent CTA, the refused-send interception, and the job cards'
-		    deep-link. Save keeps the draft in the composer — it never sends
-		    (owner ruling 2026-10-09); Esc also keeps it (the dialog is
-		    closable by design — the gate is the server, not this modal). */}
-		<SetupDialog
-			open={setupOpen}
-			onClose={() => setSetupOpen(false)}
-			onDone={() => {
-				setSetupOpen(false);
-				// Save only saves (owner ruling 2026-10-09): the draft went
-				// home into the composer at refusal time and STAYS there —
-				// the learner sends it themselves.
-			}}
-		/>
+		{/* The sign-in flow: one mount serves the persistent pill, the
+		    refused-send interception, and the job cards' deep-link. The
+		    draft waits in the composer — signing in never sends (owner ruling
+		    2026-10-09); Esc also keeps it (the dialog is closable by design —
+		    the gate is the server, not this modal). */}
+		<SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} />
 		</ChatActionsContext.Provider>
 	);
 }

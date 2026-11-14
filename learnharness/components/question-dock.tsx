@@ -341,7 +341,7 @@ function QuestionDockForm({
 	   its input for typing), Enter submits once an answer exists.
 	   Tab toggles FOCUS between the thinking field and the answer rows
 	   (owner round 3) — nothing else; Shift+Tab is NOT ours (the global
-	   thinking-level cycle owns it). Two guards keep native behavior
+	   handler swallows it). Two guards keep native behavior
 	   intact: keys from a TYPING SURFACE keep their meaning (arrows move
 	   the caret, space types), and modifier combos are never ours
 	   (Alt+arrows cycle sessions — they must not ALSO walk the rows).
@@ -395,8 +395,8 @@ function QuestionDockForm({
 			// Alt/Cmd/Ctrl combos are never ours (Alt+arrows cycle sessions
 			// globally — they must not ALSO walk the question rows).
 			const modded = e.altKey || e.metaKey || e.ctrlKey;
-			// Plain Tab toggles focus: rows → thinking. Shift+Tab falls through (the global thinking-level cycle owns
-			// it), so the shift check matters.
+			// Plain Tab toggles focus: rows → thinking. Shift+Tab falls through
+			// to the global handler, which does nothing with it.
 			if (e.key === "Tab" && !e.shiftKey && !modded) {
 				e.preventDefault();
 				e.stopPropagation();

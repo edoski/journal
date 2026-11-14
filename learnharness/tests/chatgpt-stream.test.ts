@@ -2,7 +2,8 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeContext, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { piModels, piEngineForSpec } from "../src/agent/models.ts";
+import { piModels } from "../src/agent/models.ts";
+import { chatGPTEngine } from "./chatgpt-engine.ts";
 import { chatGPTAbortController, chatGPTModels, refreshChatGPTModels } from "../src/agent/chatgpt-bridge.ts";
 import { chatGPTHistory, chatGPTPayload } from "../src/agent/chatgpt-stream.ts";
 
@@ -61,7 +62,7 @@ test("alias resolves only OAuth; native Responses body is stateless/namespaced, 
 	const tool = { type: "function_call", id: "fc_scratch", call_id: "call_scratch", name: "scratch_tool", namespace: "learnharness", arguments: '{"value":"yes"}', status: "completed" };
 	const reasoning = { type: "reasoning", id: "rs_scratch", summary: [], encrypted_content: "scratch-encrypted-reasoning" };
 	responseEvents = [{ type: "response.created", response: { id: "resp_scratch" } }, { type: "response.output_item.added", output_index: 0, item: reasoning }, { type: "response.output_item.done", output_index: 0, item: reasoning }, { type: "response.output_item.added", output_index: 1, item: tool }, { type: "response.output_item.done", output_index: 1, item: tool }, complete([reasoning, tool])];
-	const engine = piEngineForSpec({ provider: "chatgpt", id: model.id }, false);
+	const engine = chatGPTEngine(model.id, false);
 	const stream = engine.streamFn(engine.model, context(), { temperature: 0.7, maxTokens: 1000, samplingParams: { top_p: 0.5 }, onPayload: (payload) => ({ ...payload as object, model: "caller-cannot-change", dangerous: true }) });
 	const events = [];
 	for await (const event of stream) { events.push(event); if ("partial" in event) assert.equal(event.partial.provider, "chatgpt"); }
@@ -99,7 +100,7 @@ test("mixed history never blanket-relabels API providers or reuses foreign reaso
 });
 
 test("no terminal completed is never success; late quota/incomplete streams are actionable/redacted", async () => {
-	const engine = piEngineForSpec({ provider: "chatgpt", id: model.id }, false);
+	const engine = chatGPTEngine(model.id, false);
 	for (const events of [[{ type: "response.created", response: { id: "resp_partial" } }], [{ type: "response.incomplete", response: { status: "incomplete", output: [], incomplete_details: { reason: "max_output_tokens" }, usage } }], [{ type: "error", code: "subscription_sharing_usage_limit_exceeded", message: "secret scratch provider diagnostic" }]]) {
 		responseEvents = events;
 		const result = await engine.streamFn(engine.model, context()).result();
@@ -113,7 +114,7 @@ test("OAuth failure and background denial NEVER use ambient OPENAI_API_KEY", asy
 	requests = [];
 	for (const error of ["expired ChatGPT session", "Background use is off", "catalog unavailable", "quota exceeded"]) {
 		leaseError = error;
-		const engine = piEngineForSpec({ provider: "chatgpt", id: model.id }, true);
+		const engine = chatGPTEngine(model.id, true);
 		assert.equal((await engine.streamFn(engine.model, context()).result()).stopReason, "error");
 	}
 	leaseError = null;
@@ -136,7 +137,7 @@ test("payload sanitizer omits unsupported fields and rejects unsupported hosted 
 
 test("native identity/session/cache/fetch and awaited caller observers survive enforcement; terminal outcome exactly once", async () => {
 	const { APP_IDENTITY } = await import("../src/agent/models.ts");
-	const engine = piEngineForSpec({ provider: "chatgpt", id: model.id }, false);
+	const engine = chatGPTEngine(model.id, false);
 	let headers = new Headers(), payload: any, observed = 0, responses = 0, delegated = 0;
 	responseEvents = [complete()];
 	const stream = engine.streamFn(engine.model, context(), {
@@ -162,7 +163,7 @@ test("native identity/session/cache/fetch and awaited caller observers survive e
 });
 
 test("case-insensitive Authorization overrides including null are refused before native fetch", async () => {
-	const engine = piEngineForSpec({ provider: "chatgpt", id: model.id }, false);
+	const engine = chatGPTEngine(model.id, false);
 	const before = requests.length;
 	for (const headers of [{ Authorization: "Bearer wrong" }, { authorization: null }, { AUTHORIZATION: "" }] as Record<string, string | null>[]) {
 		assert.equal((await engine.streamFn(engine.model, context(), { headers }).result()).stopReason, "error");

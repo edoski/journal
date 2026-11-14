@@ -9,8 +9,7 @@
  * control together) and the control itself locks — the row owns the dim.
  */
 
-import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
-import { ChevronDownIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -96,33 +95,6 @@ export function SettingsRow({
 			{children}
 		</div>
 	);
-}
-
-/** The Agent/Appearance collapsed-menu look.
- * `unavailable` preserves callers that gate clicks without native disabling;
- * `disabled` retains native button semantics where the caller requires them. */
-export function SettingsMenuTrigger({
-	value, unavailable, disabled, className, ...props
-}: Omit<ComponentPropsWithRef<"button">, "value" | "children"> & {
-	value: string;
-	unavailable?: boolean;
-}) {
-	return <button
-		type="button"
-		{...props}
-		disabled={disabled}
-		data-slot="settings-menu-trigger"
-		className={cn(
-			SETTINGS_FIELD,
-			"flex items-center gap-1.5 pr-1.5 text-left",
-			!(disabled || unavailable) && "hover:bg-fill-hover",
-			unavailable && "cursor-not-allowed",
-			className,
-		)}
-	>
-		<span className="min-w-0 flex-1 truncate">{value}</span>
-		<ChevronDownIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-	</button>;
 }
 
 /** The on/off switch. With a disc icon it is a plain button in the switch

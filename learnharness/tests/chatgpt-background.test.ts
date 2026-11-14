@@ -39,7 +39,6 @@ for (const revokedAfterQueue of [false, true]) {
 	test(`mixed learner+automatic batch: foreground runs, automatic result stays owned/deferred without consent (${revokedAfterQueue ? "revoked after handoff" : "initially off"})`, { timeout: 5000 }, async () => {
 		connection(revokedAfterQueue);
 		const chat = stores.chatStore.createChat("Scratch mixed queue");
-		stores.chatStore.saveSettings(chat.id, { model: { provider: "chatgpt", id: "gpt-5" } });
 		const job = stores.jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "scratch-job-call" });
 		const result = { brief: "Scratch completed job result", sources: [] };
 		stores.jobStore.updateJob(job.id, { status: "done", result, delivery: { kind: "result", status: "pending" } });

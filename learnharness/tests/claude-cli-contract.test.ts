@@ -10,6 +10,7 @@ import { Type } from "typebox";
 import { claudeSubscriptionModel, claudeSubscriptionStream, claudeTranscriptBlocks } from "../src/agent/claude-stream.ts";
 import { CLAUDE_MCP_SCRIPT, claudeWorkDir, writeClaudeCallFiles } from "../src/agent/claude-cli.ts";
 import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
+import { claudeModelMissing, resetClaudeUsage } from "../src/agent/claude-usage.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "lh-fake-claude-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -36,7 +37,7 @@ setInterval(() => {}, 1000);
 `);
 chmodSync(fake, 0o755);
 
-const model = claudeSubscriptionModel("claude-subscription", "claude-opus-5-5")!;
+const model = claudeSubscriptionModel("claude-subscription")!;
 const se = (event: unknown) => ({ type: "stream_event", event, parent_tool_use_id: null });
 const init = { type: "system", subtype: "init", apiKeySource: "none", mcp_servers: [{ name: "lh", status: "connected" }] };
 const toolUseLines = [
@@ -270,4 +271,16 @@ test("the declaration server lists the app's tools and never answers a tool call
 	assert.deepEqual(replies.map((r) => r.id), [1, 2, 4], "no reply to tools/call");
 	assert.equal((replies[0]!.result.serverInfo as { name: string }).name, "lh");
 	assert.deepEqual(replies[1]!.result.tools, tools);
+});
+
+test("an account whose plan lacks Opus 5.5 is marked for Settings until one of its calls finishes", async () => {
+	resetClaudeUsage();
+	const missing = scenario({ lines: [init, { type: "result", is_error: true, api_error_status: 404, result: "There's an issue with the selected model" }], exit: 1 });
+	const failed = await collect(missing.start().events);
+	assert.equal(failed.at(-1)?.type, "error");
+	assert.equal(claudeModelMissing(model.provider), true);
+	const ok = scenario({ lines: toolUseLines });
+	assert.equal((await collect(ok.start().events)).at(-1)?.type, "done");
+	assert.ok(await until(() => ok.killed()), "the finished child is stopped");
+	assert.equal(claudeModelMissing(model.provider), false, "a finished reply clears the mark");
 });

@@ -13,7 +13,7 @@ import {
 	createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall,
 	type JsonObject, type TranscriptContext, type Usage,
 } from "@earendil-works/pi-ai";
-import { piEngineForSpec, type PiEngine } from "../src/agent/models.ts";
+import { claudeEngine, type PiEngine } from "../src/agent/models.ts";
 import { runVisualMaker } from "../src/agent/subagents/visual-maker.ts";
 import { runPdfReaderAgent } from "../src/agent/subagents/pdf-reader.ts";
 import type { HeadlessApi } from "../src/agent/subagents/headless.ts";
@@ -182,7 +182,7 @@ describe("provider-neutral raw agent loops", { concurrency: false }, () => {
 	it("an API-key provider never runs, whatever keys the environment holds", async () => {
 		await isolated({ OPENROUTER_API_KEY: OR_KEY, OPENAI_API_KEY: "dummy-openai", ANTHROPIC_API_KEY: "dummy-anthropic", GEMINI_API_KEY: "dummy-google" }, async () => {
 			for (const provider of ["openrouter", "openai", "anthropic", "google", "opencode-go"]) {
-				assert.throws(() => piEngineForSpec({ provider, id: "any-model", thinkingLevel: "off" }), /catalog has no model/, provider);
+				assert.throws(() => claudeEngine(provider), /no claude-opus-5-5 on Claude account/, provider);
 			}
 		});
 	});

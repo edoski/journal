@@ -17,18 +17,6 @@ import { derivePlanStatusesLh } from "./contracts/plan.ts";
 import { sessionMarkdown } from "./session-markdown.ts";
 import { sessionModeOf, type LhMessage } from "./native-messages.ts";
 import { closedTonight } from "./session-end.ts";
-import { CLAUDE_ROLE_DEFAULT, claudeProviderId, isClaudeProvider } from "./contracts/claude.ts";
-
-/** The digest's model: Opus 5.5 at high effort, like every agent, on the
- *  Claude account the lesson ran on, or the default account when the
- *  lesson ran elsewhere. */
-export function digestModel(lessonProvider: string | undefined): { provider: string; id: string; thinkingLevel: "high" } {
-	return {
-		provider: lessonProvider && isClaudeProvider(lessonProvider) ? lessonProvider : claudeProviderId(null),
-		id: CLAUDE_ROLE_DEFAULT.id,
-		thinkingLevel: CLAUDE_ROLE_DEFAULT.thinkingLevel,
-	};
-}
 
 /** The part of a session one digest reads. */
 export interface DigestWindow {

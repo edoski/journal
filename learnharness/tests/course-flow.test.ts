@@ -300,7 +300,6 @@ describe("a session without a course", () => {
 describe("a course-linked turn", () => {
 	it("practice: the pose carries course topics and the attempt is saved to the linked course", async () => {
 		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: LINALG } })).json()) as { id: string };
-		chatStore.saveSettings(id, { model: { ...TEST_MODEL } });
 		const engine = scripted([
 			() => fauxAssistantMessage([fauxToolCall("course_resume", {}, { id: "r1" })], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxToolCall("problem", {
@@ -370,7 +369,6 @@ describe("a course-linked turn", () => {
 			return agent;
 		};
 		const linked = (await (await createChat({ title: "linked", course: { workspace: LINALG } })).json()) as { id: string };
-		chatStore.saveSettings(linked.id, { model: { ...TEST_MODEL } });
 		await turn(linked.id, { type: "text", text: "teach me rank" }, build(linked.id));
 		assert.ok(tools[0]?.includes("recall"), "free recall is the prober's graded tool");
 		assert.ok(!tools[0]?.includes("probe"), "no multiple-choice tool exists");

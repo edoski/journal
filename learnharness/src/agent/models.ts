@@ -1,22 +1,11 @@
-import {
-	clampThinkingLevel,
-	createModels,
-	getSupportedThinkingLevels,
-	type Api,
-	type Model,
-	type StreamFunction,
-} from "@earendil-works/pi-ai";
+import { createModels, type Api, type Model, type StreamFunction } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { type ModelRole } from "../../config.ts";
-import { DEFAULT_THINKING_ORDER } from "../core/settings.ts";
+import type { ModelRole } from "../../config.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
-import { chatGPTModel } from "./chatgpt-bridge.ts";
-import { chatGPTStream } from "./chatgpt-stream.ts";
-import type { ChatGPTDispatchLifecycle } from "./chatgpt-request-cycle.ts";
 import { claudeSubscriptionModel, claudeSubscriptionStream } from "./claude-stream.ts";
 import { claudeAccount } from "./claude-connection.ts";
-import { isClaudeProvider } from "../core/contracts/claude.ts";
+import { CLAUDE_MODEL } from "../core/contracts/claude.ts";
 
 /** App identity is immutable and shared by Models and every native Agent.
  * Agent's default Pi attribution otherwise overrides the Models identity. */
@@ -27,9 +16,9 @@ export const APP_IDENTITY = Object.freeze({
 
 /**
  * The one engine factory every agent's model comes from (the pi-ai swap,
- * docs/pi-engine-swap.md). There are no factory pins: every engine
- * resolves from a RESOLVED SPEC (the settings chain's output) to a
- * subscription model and its stream.
+ * docs/pi-engine-swap.md). Every agent runs CLAUDE_MODEL at its fixed
+ * thinking level (owner, 2026-11-14) on the user's own `claude` CLI, under
+ * one Claude account; the account is the only input.
  *
  * An "engine" is the model + the stream function the agent loop runs on —
  * the two things a test fake replaces.
@@ -38,8 +27,7 @@ export const APP_IDENTITY = Object.freeze({
 export interface PiEngine {
 	model: Model<Api>;
 	streamFn: StreamFunction;
-	/** The resolved (config-or-settings, CLAMPED) thinking level —
-	 *  observability + tests; the streamFn pins it anyway. */
+	/** The thinking level the streamFn pins — observability + tests. */
 	level?: ThinkingLevel;
 }
 
@@ -59,66 +47,28 @@ export function piModels() {
 	return collection;
 }
 
-/** A fully-resolved model pin — the shape every engine now comes from:
- *  the settings-resolution chain's output (role override → slot, or the
- *  chat's conversation chain). thinkingLevel is OPTIONAL: unset means
- *  the baked default resolves here (owner 2026-09-22) — the first entry
- *  of DEFAULT_THINKING_ORDER the model supports. */
-export interface ResolvedModelSpec {
-	provider: string;
-	id: string;
-	thinkingLevel?: ThinkingLevel;
-}
-
-/** The first entry of the baked default order the model supports (owner,
- *  2026-09-22). A non-reasoning model reports exactly ["off"], so the
- *  order walk lands there naturally. */
-function defaultThinkingLevel(model: Model<Api>): ThinkingLevel {
-	const supported = getSupportedThinkingLevels(model);
-	for (const level of DEFAULT_THINKING_ORDER) {
-		if (supported.includes(level)) return level;
-	}
-	return supported[0] ?? "off";
-}
-
-/** The production engine for a RESOLVED spec: a subscription model
- *  (ChatGPT, or a Claude account through the user's own `claude` CLI) plus
- *  the thinking clamp. Any other provider throws: the app has no API-key
- *  path, so a legacy pin to one can never bill a key. */
-export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (() => boolean) = true, lifecycle?: ChatGPTDispatchLifecycle): PiEngine {
-	const claude = isClaudeProvider(spec.provider);
-	const model = spec.provider === "chatgpt" ? chatGPTModel(spec.id) : claude ? claudeSubscriptionModel(spec.provider, spec.id) : undefined;
-	if (!model) {
-		throw new Error(`${spec.provider} catalog has no model ${spec.id}`);
-	}
-	// UNSET level → the baked default order (first entry the model
-	// supports); SET level → pi's native nearest-clamp (model swaps keep
-	// the user's intent and adapt honestly).
-	const level = spec.thinkingLevel
-		? clampThinkingLevel(model, spec.thinkingLevel)
-		: defaultThinkingLevel(model);
+/** The production engine on one Claude account: CLAUDE_MODEL at
+ *  CLAUDE_MODEL.thinkingLevel. Throws when the account is not set up in
+ *  T3 Code or pi's catalog lacks the model, so a call never runs on a
+ *  model or account it was not given. */
+export function claudeEngine(account: string): PiEngine {
+	const model = claudeSubscriptionModel(account);
+	if (!model) throw new Error(`no ${CLAUDE_MODEL.id} on Claude account ${account}`);
+	const level: ThinkingLevel = CLAUDE_MODEL.thinkingLevel;
 	return {
 		model,
 		level,
 		// bound streamSimple: the agent loop forwards state.thinkingLevel as
-		// `reasoning` (undefined = off on pi-ai's scale); the clamp above keeps
-		// the pin honest even when config or settings drift off the map.
-		streamFn: (requestModel, context, options) => {
-			const purpose = typeof background === "function" ? background : () => background;
-			const stream = spec.provider === "chatgpt" ? chatGPTStream(purpose, lifecycle) : claudeSubscriptionStream({ account: claudeAccount(spec.provider) ?? "missing" });
-			return stream(requestModel, context, { ...options, reasoning: level === "off" ? undefined : level });
-		},
+		// `reasoning`; the fixed level rides every call regardless.
+		streamFn: (requestModel, context, options) =>
+			claudeSubscriptionStream({ account: claudeAccount(account) ?? "missing" })(requestModel, context, { ...options, reasoning: level }),
 	};
 }
 
-/** The LEGACY role entry point — BYOK made it an honest THROWER (owner,
- *  2026-09-22): no factory pins exist to fall back to, and this module
- *  cannot read settings (architecture law — the agent layer never
- *  imports the server layer). Production resolves the chain in
- *  chat-handler and ALWAYS injects engines; reaching this means a
- *  wiring bug, so it fails loudly instead of guessing a model. */
+/** The role fallback agents reach only when no engine was injected. The
+ *  agent layer cannot read settings (architecture law — it never imports
+ *  the server layer) and production always injects (chat-handler), so this
+ *  is a wiring bug and fails loudly. */
 export function piEngineFor(role: ModelRole): PiEngine {
-	throw new Error(
-		`no configured model for role "${role}" — set your model slots (settings → models)`,
-	);
+	throw new Error(`no engine injected for role "${role}"`);
 }

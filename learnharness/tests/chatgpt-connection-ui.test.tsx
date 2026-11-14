@@ -7,9 +7,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRequire } from "node:module";
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
-import { ChatGPTBackgroundAccess, ChatGPTConnection, ChatGPTUIProvider, CHATGPT_NOTICE, CHATGPT_DISCONNECT_COPY } from "../components/settings/chatgpt-connection.tsx";
+import { ChatGPTConnection, ChatGPTUIProvider, CHATGPT_NOTICE, CHATGPT_DISCONNECT_COPY } from "../components/settings/chatgpt-connection.tsx";
 import { SettingsDialogBody } from "../components/settings/settings-dialog.tsx";
-import { ModelControl } from "../components/model-picker.tsx";
 import type { ChatGPTStatus, ChatGPTControlBridge } from "../src/core/index.ts";
 import { completedWithin } from "./completion.ts";
 
@@ -376,14 +375,6 @@ test("dismissed revocation warning stays dismissed across global setting changes
  await confirmDisconnect(); assert.equal(byTest("chatgpt-revocation-warning").textContent, warning);
 });
 
-test("contextual Enable action opens the same global control without silently enabling; no foreground/provider clutter", async () => {
- const f = fixture(connected(false)); await mount(<><ChatGPTBackgroundAccess provider="chatgpt" /><ChatGPTBackgroundAccess provider="openai" /><ChatGPTConnection /></>);
- assert.equal([...document.querySelectorAll("button")].filter((b) => b.textContent === "Enable background use").length, 1);
- await click(button("Enable background use")); assert.deepEqual(f.calls.consent, []);
- assert.equal(toggle().getAttribute("aria-checked"), "false"); await click(toggle()); assert.deepEqual(f.calls.consent, [true]); assert(!button("Enable background use"));
- await act(async () => f.push(disconnected(false))); assert(!button("Enable background use"));
-});
-
 test("error-only disconnect reply preserves coherent status/confirmation and permits explicit retry, not false forgotten/connected success", async () => {
  const f = fixture(connected(), { disconnect: async () => errorReply() }); await mount(); await click(button("Manage…"));
  await assert.doesNotReject(confirmDisconnect); assert.equal(document.querySelector('[role="alert"]')?.textContent, storageError);
@@ -477,11 +468,11 @@ test("late global-control reply cannot overwrite a newer authoritative global va
 
 test("late initial global draft reply cannot resurrect an older global value after a newer authoritative setting", async () => {
  const held = deferred<ChatGPTStatus>(); const f = fixture(disconnected(), { consent: () => held.promise });
- await mount(<><ChatGPTConnection /><ChatGPTBackgroundAccess provider="chatgpt" /></>);
+ await mount(<ChatGPTConnection />);
  await click(byTest("chatgpt-login")); await click(toggle()); await click(byTest("chatgpt-proceed")); await act(async () => f.complete());
  await act(async () => { f.push(connected(false)); f.push(connected(true)); });
  await act(async () => held.resolve(connected(false)));
- assert(!button("Enable background use")); assert(document.querySelector('[role="alert"]')); assert.equal((byTest("chatgpt-proceed") as HTMLButtonElement).disabled, false);
+ assert(document.querySelector('[role="alert"]')); assert.equal((byTest("chatgpt-proceed") as HTMLButtonElement).disabled, false);
 });
 
 test("coalesced verified completion before late pending acknowledgement is reconciled once from fresh status", async () => {
@@ -552,14 +543,6 @@ for (const holdSave of [false, true]) test(`real main/control bridge: immediate 
  } finally { releaseSave.resolve(); await act(async () => service.close()); }
 });
 
-test("browser-only sign-in is disabled; foreground toolbar has no plan badge or background action", async () => {
+test("browser-only sign-in is disabled", async () => {
  await mount(); assert((byTest("chatgpt-login") as HTMLButtonElement).disabled); await click(byTest("chatgpt-login")); assert(!document.querySelector('[data-testid="chatgpt-account-dialog"]'));
- await act(async () => root!.unmount()); host?.remove(); root = undefined;
- globalThis.fetch = async (input) => {
-  if (input === "/api/models") return Response.json({ models: [], providers: [], slots: {}, defaults: {} });
-  if (input === "/api/settings") return Response.json({ settings: { models: { strong: { model: { provider: "chatgpt", id: "gpt-5" } } } } });
-  throw new Error(`unexpected fixture request ${input}`);
- };
- fixture(connected(false)); await mount(<ModelControl />); assert.match(byTest("stats-model").textContent!, /gpt/i);
- assert(!document.body.textContent?.includes("Using ChatGPT plan")); assert(!document.body.textContent?.includes("Enable background use"));
 });

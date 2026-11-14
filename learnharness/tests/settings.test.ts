@@ -12,7 +12,6 @@ import { describe, it } from "node:test";
 import {
 	CURRENT_SETTINGS_VERSION,
 	FACTORY_SETTINGS,
-	BACKGROUND_MODEL_ROLES,
 	isHexColor,
 	sanitizeUserSettings,
 } from "../src/core/settings.ts";
@@ -31,9 +30,10 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		assert.equal(a.mdRendering.italicColor, null);
 	});
 
-	it("has NO factory model pin — chat defaults and role overrides start absent", () => {
+	it("has no model knob at all — every agent runs one fixed model", () => {
 		assert.equal("chat" in FACTORY_SETTINGS, false);
 		assert.equal("agent" in FACTORY_SETTINGS, false);
+		assert.equal("claude" in FACTORY_SETTINGS, false);
 	});
 });
 
@@ -50,17 +50,8 @@ describe("sanitizeUserSettings", () => {
 	it("round-trips a fully valid record field-for-field", () => {
 		const record = {
 			version: 1,
-			agent: {
-				models: {
-					researcher: { model: { provider: "openrouter", id: "qwen/qwen3.8-flash" }, thinkingLevel: "high" },
-					visualMaker: { thinkingLevel: "max" },
-				},
-				tools: { research: false, quiz: true },
-			},
-			models: {
-				strong: { model: { provider: "zai", id: "glm-5.3-flash" }, thinkingLevel: "low" },
-				cheap: { thinkingLevel: "medium" },
-			},
+			agent: { tools: { research: false, quiz: true } },
+			claude: { account: "claude-subscription-work" },
 			appearance: {
 				mode: "light",
 				background: "#ffffff",
@@ -129,23 +120,29 @@ describe("sanitizeUserSettings", () => {
 		}
 	});
 
-	it("agent roles: unknown roles drop, known roles keep only well-formed overrides", () => {
+	it("the claude section keeps only a Claude account id", () => {
+		assert.deepEqual(sanitizeUserSettings({ claude: { account: "claude-subscription" } })?.claude, { account: "claude-subscription" });
+		assert.deepEqual(sanitizeUserSettings({ claude: { account: "chatgpt" } })?.claude, {});
+		assert.deepEqual(sanitizeUserSettings({ claude: { account: 7 } })?.claude, {});
+	});
+
+	it("a record from the model-slot days drops its slots and role pins and keeps the slots' Claude account", () => {
 		const out = sanitizeUserSettings({
-			agent: {
-				models: {
-					teacher: { thinkingLevel: "low" }, // NOT a background role — drops
-					researcher: { model: { provider: "openrouter", id: "x/y" } },
-					extractor: { model: { provider: 3, id: "x/y" }, thinkingLevel: "high" }, // bad model, keeps thinking
-					auditor: { thinkingLevel: "banana" }, // invalid level → empty override drops
-				},
+			version: 1,
+			agent: { models: { researcher: { model: { provider: "claude-subscription-work", id: "claude-haiku-5-5" } } }, tools: { demo: false } },
+			models: {
+				strong: { model: { provider: "chatgpt", id: "gpt-5" }, thinkingLevel: "low" },
+				cheap: { model: { provider: "claude-subscription-work", id: "claude-sonnet-5-5" } },
+				vision: { model: { provider: "claude-subscription", id: "claude-opus-5-5" }, thinkingLevel: "high" },
 			},
 		});
-		assert.ok(out);
-		const models = out.agent?.models ?? {};
-		assert.equal("teacher" in models, false);
-		assert.deepEqual(models.researcher, { model: { provider: "openrouter", id: "x/y" } });
-		assert.deepEqual(models.extractor, { thinkingLevel: "high" });
-		assert.equal("auditor" in models, false);
+		assert.deepEqual(out, { version: 1, agent: { tools: { demo: false } }, claude: { account: "claude-subscription-work" } });
+		assert.deepEqual(sanitizeUserSettings({ version: 1, models: { strong: { model: { provider: "chatgpt", id: "gpt-5" } } } }), { version: 1 }, "no Claude slot, no account: the default runs");
+		assert.deepEqual(
+			sanitizeUserSettings({ version: 1, claude: { account: "claude-subscription" }, models: { strong: { model: { provider: "claude-subscription-work", id: "claude-opus-5-5" } } } })?.claude,
+			{ account: "claude-subscription" },
+			"a chosen account wins over the slots it replaced",
+		);
 	});
 
 	it("a retired search engine pin drops", () => {
@@ -171,15 +168,5 @@ describe("sanitizeUserSettings", () => {
 		const out = sanitizeUserSettings({ agent: { tools: { quiz: false, demo: true, visual: "x" } } });
 		assert.ok(out);
 		assert.deepEqual(out.agent?.tools, { quiz: false, demo: true });
-	});
-
-	it("BACKGROUND_MODEL_ROLES matches the five background roles (practice trio deleted 2026-10-04)", () => {
-		assert.deepEqual([...BACKGROUND_MODEL_ROLES], [
-			"researcher",
-			"demoBuilder",
-			"visualMaker",
-			"extractor",
-			"auditor",
-		]);
 	});
 });

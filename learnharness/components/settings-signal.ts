@@ -3,8 +3,7 @@
 /**
  * THE cross-surface settings signal (fix wave, owner ruling 2026-09-22):
  * every WRITER dispatches after a successful PUT, every READER re-reads —
- * the composer reflects the strong slot the instant setup saves, the
- * settings section reflects the composer's pick on its next mount... and
+ * the lesson reflects an account switch the instant Settings saves it, and
  * so on, by construction. CustomEvent on the window, the lh:chat-renamed
  * pattern: writers and readers live in different component subtrees
  * (portaled dialogs included), and the app already speaks this dialect.
@@ -20,7 +19,7 @@ export const SETTINGS_SAVED_EVENT = "lh:settings-saved";
 // "keys" joined the roster (zero-keys wave, 2026-09-25): keys-section
 // dispatches it after save AND delete — deletions used to be invisible to
 // the zero-keys pill and the setup dialog's auto-advance.
-export type SettingsSection = "keys" | "agent" | "models" | "appearance";
+export type SettingsSection = "keys" | "agent" | "claude" | "appearance";
 
 /** Writers call this after the PUT resolves ok — never before (a failed
  *  write notifies nothing; the record is unchanged). */

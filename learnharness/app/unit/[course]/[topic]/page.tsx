@@ -1,6 +1,4 @@
 import { notFound } from "next/navigation";
-import { readSettingsRecord } from "@/src/server";
-import { slotsConfigured } from "@/src/core";
 import { UnitPage } from "@/components/unit-inbox/unit-page";
 import { workspaceOf } from "@/components/unit-inbox/unit-href";
 
@@ -16,7 +14,6 @@ export default async function UnitRoute({ params }: { params: Promise<{ course: 
 			key={`${workspace}#${topic}`}
 			workspace={workspace}
 			handle={decodeURIComponent(topic)}
-			initialConfigured={slotsConfigured(readSettingsRecord()?.models)}
 		/>
 	);
 }

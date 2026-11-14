@@ -48,6 +48,24 @@ export function recordClaudeRateLimit(providerId: string, info: unknown, now = D
 	if (usage) state().readings.set(providerId, usage);
 }
 
+/** The accounts whose last finished call found CLAUDE_MODEL unavailable.
+ * Its own global, so a server reloaded in place keeps the usage state it had. */
+const MISSING_KEY = Symbol.for("lh.claude.modelMissing");
+function modelMissing(): Set<string> {
+	const g = globalThis as typeof globalThis & { [MISSING_KEY]?: Set<string> };
+	return (g[MISSING_KEY] ??= new Set());
+}
+
+export function claudeModelMissing(providerId: string): boolean {
+	return modelMissing().has(providerId);
+}
+
+/** A call that found CLAUDE_MODEL unavailable sets it; any finished reply clears it. */
+export function recordClaudeModelMissing(providerId: string, missing: boolean): void {
+	if (missing) modelMissing().add(providerId);
+	else modelMissing().delete(providerId);
+}
+
 /** Reads the probe's stream-json. A probe that reports an API key source is discarded: it would not reflect the plan. */
 export function parseClaudeProbe(stdout: string, now: number, previous: ClaudeUsage | null = null): ClaudeUsage | null {
 	for (const line of stdout.split("\n")) {
@@ -99,5 +117,5 @@ export async function refreshClaudeUsage(accounts: readonly LoadedClaudeAccount[
 
 export function resetClaudeUsage(): void {
 	const usage = state();
-	usage.readings.clear(); usage.attempts.clear(); usage.inflight.clear();
+	usage.readings.clear(); usage.attempts.clear(); usage.inflight.clear(); modelMissing().clear();
 }

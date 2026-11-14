@@ -15,7 +15,6 @@ import { AppearanceSection } from "../components/settings/appearance-section.tsx
 import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
-import { priceLabel } from "../components/settings/model-pickers.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
 import { hintBinding } from "../components/ui/hint.tsx";
 import { bindingForAction, formatBinding, KEYBOARD_ACTIONS } from "../src/core/index.ts";
@@ -44,12 +43,7 @@ describe("Settings › Appearance", () => {
 describe("Settings › Agent", () => {
 	it("names the tools plainly inside the Tools group, one switch each", () => {
 		const html = renderToStaticMarkup(
-			<AgentSection
-				agent={undefined}
-				models={undefined}
-				onSectionChange={() => {}}
-				onModelsChange={() => {}}
-			/>,
+			<AgentSection agent={undefined} onSectionChange={() => {}} />,
 		);
 		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
 		assert.ok(!html.includes("Tool · "), "no repeated Tool prefix");
@@ -60,12 +54,12 @@ describe("Settings › Agent", () => {
 });
 
 describe("Settings › Keyboard", () => {
-	it("lists every shortcut the Proposed design answers to, each changeable, in the app's words", () => {
+	it("lists every shortcut, each changeable, in the app's words", () => {
 		const doc = documentFor(<KeyboardSection />);
 		for (const def of KEYBOARD_ACTIONS) {
 			const row = doc.querySelector(`[data-testid="kbd-row-${def.id}"]`);
-			const listed = !def.displayOnly && !def.currentOnly;
-			assert.equal(Boolean(row), listed, `${def.id} ${listed ? "listed" : "left to the cheat sheet or the Current design"}`);
+			const listed = !def.displayOnly;
+			assert.equal(Boolean(row), listed, `${def.id} ${listed ? "listed" : "left to the cheat sheet"}`);
 			if (!row) continue;
 			assert.equal(row.querySelector('[data-slot="kbd"]')?.textContent, formatBinding(bindingForAction(def.id)));
 			assert.ok(row.querySelector(`[data-testid="kbd-rebind-${def.id}"]`), `${def.id} changeable`);
@@ -84,14 +78,6 @@ describe("the settings switch", () => {
 		assert.equal(on?.getAttribute("aria-checked"), "true");
 		assert.equal(off?.getAttribute("aria-checked"), "false");
 		assert.equal(on?.getAttribute("aria-label"), "graph tools");
-	});
-});
-
-describe("the model picker's prices", () => {
-	it("prints every price with two decimals", () => {
-		const cost = { input: 0.1, output: 0.5, cacheRead: 0, cacheWrite: 0 };
-		assert.equal(priceLabel(cost), "$0.10/$0.50");
-		assert.equal(priceLabel({ ...cost, input: 3, output: 15 }), "$3.00/$15.00");
 	});
 });
 

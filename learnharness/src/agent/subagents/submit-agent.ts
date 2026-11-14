@@ -117,7 +117,7 @@ export async function runSubmitAgent<T>(opts: {
 			onAssistantMessage: (message, step) =>
 				opts.onStep(
 					message.usage,
-					// Provider-qualified stamp (model slots wave, 2026-09-20):
+					// Provider-qualified stamp:
 					// pi reports the bare id; usage stamps carry provider:id to
 					// match the price table's uniform keys.
 					`${message.provider}:${message.model}`,

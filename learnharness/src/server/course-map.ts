@@ -14,16 +14,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createCourseMapBuilder, type CourseMapBuilder, type CourseMapStatus } from "../agent/subagents/course-map-builder.ts";
-import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
+import { claudeEngine, type PiEngine } from "../agent/models.ts";
 import { emit, subscribe, type ServerEvent } from "../core/events.ts";
-import { resolveRoleSpec } from "../core/settings-resolution.ts";
 import { sourcesRegisteredInLastTurn } from "../core/native-messages.ts";
-import { stores } from "./stores.ts";
+import { effectiveSettings, stores } from "./stores.ts";
 
-/** The app's default model: the one its lessons run on, at high effort. */
+/** The app's one model on its Claude account; undefined when that account
+ *  cannot run it, so the build reports it instead of starting. */
 function defaultEngine(): PiEngine | undefined {
-	const spec = resolveRoleSpec("teacher", stores.settingsStore.readSettings());
-	return spec ? piEngineForSpec({ ...spec, thinkingLevel: "high" }) : undefined;
+	try {
+		return claudeEngine(effectiveSettings().claude.account);
+	} catch {
+		return undefined;
+	}
 }
 
 interface LhCourseMapServerGlobal {

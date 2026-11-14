@@ -2,14 +2,10 @@ import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
 import { subscriptionLabel, subscriptionLabels, isSubscriptionModel, type TurnUsage } from "../src/core/index.ts";
 import { sessionCost, callCost } from "../src/server/pricing.ts";
 import { graphCostSummary } from "../src/core/cost-summary.ts";
 import { planCostLabel } from "../components/usage-format.ts";
-import { ModelCommand } from "../components/settings/model-pickers.tsx";
-import { toModelDto } from "../src/server/model-catalog.ts";
-import { piModels } from "../src/agent/models.ts";
 const step = { inputTokens: 1000, outputTokens: 100, cacheReadTokens: undefined, cacheWriteTokens: undefined, reasoningTokens: undefined };
 const turn = (model: string, id: string): TurnUsage => ({ id, messageId: id, at: "2026-10-24T00:00:00Z", model, steps: [step] });
 
@@ -30,9 +26,4 @@ test("graph stage/recent aggregates retain distinct subscription providers witho
 	const summary = graphCostSummary({ chats: [{ title: "Fixture", extractions: [{ startedAt: 1, at: "2026-10-24T00:00:00Z", durationMs: 1, stages: { extractor: { model: "claude-subscription:claude-haiku-5-5", steps: [step] }, auditor: { model: "chatgpt:gpt-5", steps: [step] } } }] }], sources: [] }, callCost);
 	assert.equal(summary.totalDollars, 0); assert.equal(summary.unpricedRuns, 0); assert.equal(summary.runs[0]!.dollars, null);
 	assert.deepEqual(summary.subscriptionProviders, ["Claude", "ChatGPT"]); assert.deepEqual(summary.runs[0]!.subscriptionProviders, ["Claude", "ChatGPT"]);
-});
-test("model picker distinguishes subscription connection and shows provider label rather than API prices", () => {
-	const native = piModels().getModels("openai").find((m) => m.api === "openai-responses")!;
-	const html = renderToStaticMarkup(<ModelCommand models={[toModelDto({ ...native, provider: "chatgpt" })]} effectiveId={undefined} onPick={() => {}} />);
-	assert(html.includes("ChatGPT (subscription)")); assert(html.includes(">ChatGPT</span>")); assert(!html.includes("$0"));
 });

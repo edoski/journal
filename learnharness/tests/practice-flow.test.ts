@@ -76,7 +76,6 @@ after(() => {
  *  before modes followed the transcript, which stored `kind` instead. */
 function createPracticeChat(title: string, stored = false) {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	if (stored) {
 		const file = path.join(PATHS.chats, `${chat.id}.json`);
 		fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf-8")), kind: "practice" }));

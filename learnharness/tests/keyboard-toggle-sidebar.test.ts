@@ -51,13 +51,6 @@ describe("the ⌘B chain — keypress → binding → action → event", () => {
 	});
 });
 
-describe("the thinking pill suffix — ⇧⇥ via the registry", () => {
-	it("shift+tab uses the platform's modifier label and maps to cycle-thinking", () => {
-		assert.equal(actionForBinding("shift+tab"), "cycle-thinking");
-		assert.equal(formatBinding("shift+tab"), IS_MAC ? "⇧⇥" : "Shift+⇥");
-	});
-});
-
 describe("the Alt session cycle is RETIRED (owner, 2026-10-10)", () => {
 	// Barely used, felt laggy — session navigation lives IN the search
 	// now (↑/↓ walk the filtered list, Enter opens; sidebar.tsx).

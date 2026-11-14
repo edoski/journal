@@ -1,12 +1,7 @@
-import { modelCatalog, refreshConnectionCatalog } from "@/src/server";
+import { modelStatus } from "@/src/server";
 
-/**
- * The model picker's data (model-control wave): pi-ai's configured-provider
- * catalog as client-safe DTOs — id/name/cost/context/modality plus each
- * model's SUPPORTED thinking levels (per its thinkingLevelMap). Static
- * catalog: no network, stable within a pi-ai version.
- */
+/** The account every agent runs CLAUDE_MODEL on, whether it is signed in,
+ *  and the model's context window (contracts/models.ts ModelStatus). */
 export async function GET() {
-	await refreshConnectionCatalog();
-	return Response.json(modelCatalog(), { headers: { "Cache-Control": "no-store" } });
+	return Response.json(await modelStatus(), { headers: { "Cache-Control": "no-store" } });
 }

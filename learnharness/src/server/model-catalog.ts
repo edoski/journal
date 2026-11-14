@@ -1,297 +1,42 @@
 /**
- * The model catalog's server surface: the models of every CONNECTED
- * subscription (ChatGPT, each Claude account), projected to client-safe
- * DTOs for the picker (GET /api/models), plus the validation gate for
- * settings writes. The app runs only on subscriptions: no API key, no
- * environment key, no keyed provider reaches a model call.
- *
- * pi-ai owns the model data (id/name/context/modality/thinkingLevelMap)
- * and the per-model thinking truth (getSupportedThinkingLevels /
- * clampThinkingLevel). This module only projects and validates.
+ * The model's server surface. Every agent runs CLAUDE_MODEL on one Claude
+ * account (owner, 2026-11-14), so there is no catalog to pick from: this
+ * module reports that account's state (GET /api/models) and the context
+ * windows the meters divide by. The app runs only on subscriptions: no API
+ * key, no environment key, no keyed provider reaches a model call.
  */
 
-import { clampThinkingLevel, getSupportedThinkingLevels, type Api, type Model } from "@earendil-works/pi-ai";
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { piModels } from "../agent/models.ts";
-import { chatGPTConnected, chatGPTModel, chatGPTModels, refreshChatGPTModels } from "../agent/chatgpt-bridge.ts";
-import { CLAUDE_SUBSCRIPTION, isClaudeProvider } from "../core/contracts/claude.ts";
-import { claudeAccountConnections, claudeConnected, refreshClaudeConnections } from "../agent/claude-connection.ts";
+import { claudeConnected, refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { claudeSubscriptionModel, claudeSubscriptionModels } from "../agent/claude-stream.ts";
-
-export async function refreshConnectionCatalog(provider?: string): Promise<void> {
-	await Promise.all([
-		!provider || provider === "chatgpt" ? refreshChatGPTModels(piModels().getModels("openai").filter((m): m is Model<"openai-responses"> => m.api === "openai-responses")) : Promise.resolve(),
-		!provider || isClaudeProvider(provider) ? refreshClaudeConnections() : Promise.resolve(),
-	]);
-}
-/** Every Claude account is a provider; before the first sign-in check, only the default one is known. */
-function claudeProviderIds(): string[] {
-	const ids = claudeAccountConnections().map((entry) => entry.account.providerId);
-	return ids.length ? ids : [CLAUDE_SUBSCRIPTION.providerId];
-}
-function connectionModel(provider: string, id: string): Model<Api> | undefined {
-	if (isClaudeProvider(provider)) return claudeConnected(provider) ? claudeSubscriptionModel(provider, id) : undefined;
-	return provider === "chatgpt" ? chatGPTModel(id) : undefined;
-}
-function connectionProviderIds(): string[] { return ["chatgpt", ...claudeProviderIds()]; }
-/** Whether a model call on this provider could run now: ChatGPT signed in,
- *  or the Claude account's Claude Code signed in to its plan. Any other
- *  provider (an API-key provider a legacy record still names) never runs. */
-export function providerConnected(provider: string): boolean {
-	if (isClaudeProvider(provider)) return claudeConnected(provider);
-	return provider === "chatgpt" && chatGPTConnected();
-}
-import { settingsStore } from "../store/settings.ts";
+import type { ModelStatus } from "../core/contracts/models.ts";
 import { effectiveSettings } from "./stores.ts";
-import type { ChatSettings } from "../core/contracts/chat.ts";
-import type {
-	CatalogDefaults,
-	CatalogProvider,
-	ModelCatalogEntry,
-	ModelCatalogResponse,
-	RolePins,
-	SlotPins,
-} from "../core/contracts/models.ts";
-import type { EffectiveModelSpec, EffectiveSlot } from "../core/settings-resolution.ts";
-import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS, type BackgroundModelRole, type ModelSlotName, type ModelsSettings } from "../core/settings.ts";
 
-/** The picker's client-safe model entry (contract: core/contracts/models.ts). */
-export type ModelDto = ModelCatalogEntry;
-
-/**
- * The conversation agents' resolved default (pure form — the strong slot
- * in, CatalogDefaults out; `catalogDefaults()` below is the fs wrapper).
- * PER-SESSION MODELS (owner, 2026-09-28): every session owns its model +
- * thinking level from birth, stamped verbatim from the strong slot — the
- * STRONG SLOT IS THE NEW-SESSION DEFAULT, and the resolve-time fallback
- * for legacy settings-less records. BYOK (owner, 2026-09-22): there is no
- * factory floor — when the strong slot names no model, the default is
- * NULL and the turn gate refuses with the 503 models_not_configured
- * envelope. An unset thinkingLevel resolves from DEFAULT_THINKING_ORDER at
- * engine build (reported as absent here).
- */
-export function catalogDefaultsFor(
-	strong: EffectiveSlot | null,
-): CatalogDefaults | null {
-	const model = strong ? { provider: strong.provider, id: strong.id } : undefined;
-	if (!model) return null;
-	const level = strong?.thinkingLevel;
-	return {
-		model,
-		...(level !== undefined ? { thinkingLevel: level } : {}),
-	};
+/** Whether a model call on this Claude account could run now: its Claude
+ *  Code is signed in to its plan. */
+export function providerConnected(provider: string): boolean {
+	return claudeConnected(provider);
 }
 
-/** The conversation agents' resolved default — what a settings-less chat
- *  runs: the strong slot, i.e. the birth-default for new sessions. */
-export function catalogDefaults(): CatalogDefaults | null {
-	return catalogDefaultsFor(effectiveSettings().models.strong);
-}
-
-/** Project the resolved per-role specs to the client DTO (pure — the
- *  settings UI's "Default: <actual pinned model>" caption reads this).
- *  BYOK (owner, 2026-09-22): an empty chain projects to NULL — the caption
- *  honestly shows "not configured", never a phantom default. */
-export function rolePinsFor(
-	models: Record<BackgroundModelRole, EffectiveModelSpec | undefined>,
-): RolePins {
-	const pins = {} as RolePins;
-	for (const role of BACKGROUND_MODEL_ROLES) {
-		const spec = models[role];
-		pins[role] = spec
-			? {
-					model: { provider: spec.provider, id: spec.id },
-					...(spec.thinkingLevel !== undefined ? { thinkingLevel: spec.thinkingLevel } : {}),
-				}
-			: null;
-	}
-	return pins;
-}
-
-/** The background roles' RESOLVED pins: the user's agent-models
- *  override → tier slot → nothing — the same resolution the agent wiring
- *  uses (src/server/stores.ts effectiveSettings), so the caption can
- *  never drift from what actually runs. */
-export function catalogRolePins(): RolePins {
-	return rolePinsFor(effectiveSettings().agent.models);
-}
-
-/** The three slot tiers' RESOLVED pins — effectiveSettings().models
- *  verbatim: the same resolution the engine wiring uses, so the Models
- *  settings page's captions cannot drift from what actually runs. NULL
- *  per tier that holds no model. */
-export function catalogSlots(): SlotPins {
-	const slots = effectiveSettings().models;
-	const pins = {} as SlotPins;
-	for (const name of ["strong", "cheap", "vision"] as const) {
-		const slot: EffectiveSlot | null = slots[name];
-		pins[name] = slot
-			? {
-					model: { provider: slot.provider, id: slot.id },
-					...(slot.thinkingLevel !== undefined ? { thinkingLevel: slot.thinkingLevel } : {}),
-				}
-			: null;
-	}
-	return pins;
-}
-
-/** One row per subscription provider, read fresh per call. */
-export function catalogProviders(): CatalogProvider[] {
-	return connectionProviderIds().map((id) => ({ id, connected: providerConnected(id) })).sort((a, b) => a.id.localeCompare(b.id));
-}
-
-/** Project one catalog model to the client DTO. */
-export function toModelDto(model: Model<Api>): ModelDto {
-	return {
-		id: model.id,
-		name: model.name,
-		provider: model.provider,
-		reasoning: model.reasoning,
-		input: [...model.input],
-		supportedLevels: getSupportedThinkingLevels(model),
-		cost: {
-			input: model.cost.input,
-			output: model.cost.output,
-			cacheRead: model.cost.cacheRead,
-			cacheWrite: model.cost.cacheWrite,
-		},
-		contextWindow: model.contextWindow,
-		maxTokens: model.maxTokens,
-	};
-}
-
-/** The live-limits index: provider:id → contextWindow over the connected
- *  subscriptions' models. The one source for every context meter's
- *  denominator — the lesson top bar's join holds /api/models' copy, and the
- *  activity feed (observability.ts) resolves job limits server-side
- *  through this. A model missing here reads limit-null (usage-only). */
+/** The live-limits index: provider:id → contextWindow over the signed-in
+ *  accounts. The one source for every context meter's denominator — the
+ *  activity feed (observability.ts) and compaction resolve job and turn
+ *  limits through this. A model missing here reads limit-null (usage-only). */
 export function catalogContextLimits(): Map<string, number> {
-	return new Map([...chatGPTModels(), ...claudeSubscriptionModels()].map((model) => [`${model.provider}:${model.id}`, model.contextWindow]));
+	return new Map(claudeSubscriptionModels().map((model) => [`${model.provider}:${model.id}`, model.contextWindow]));
 }
 
-/** The full picker payload: every model of every connected subscription +
- *  the defaults a settings-less chat runs + the background roles'
- *  resolved pins (the settings UI's per-role default captions). */
-export function modelCatalog(): ModelCatalogResponse {
-	const models = [...chatGPTModels(), ...claudeSubscriptionModels()].map(toModelDto);
+/** Whether T3 Code (or the plain signed-in `claude`) has this Claude account. */
+export function claudeAccountKnown(provider: string): boolean {
+	return claudeSubscriptionModel(provider) !== undefined;
+}
+
+/** GET /api/models: the settings' account, re-checked, and the model's window. */
+export async function modelStatus(): Promise<ModelStatus> {
+	await refreshClaudeConnections();
+	const account = effectiveSettings().claude.account;
 	return {
-		models,
-		defaults: catalogDefaults(),
-		rolePins: catalogRolePins(),
-		slots: catalogSlots(),
-		providers: catalogProviders(),
+		account,
+		connected: claudeConnected(account),
+		contextWindow: claudeSubscriptionModel(account)?.contextWindow ?? null,
 	};
-}
-
-/** One validated outcome for a settings write. */
-export type SettingsValidation =
-	| { ok: true }
-	| { ok: false; error: string; supported?: ThinkingLevel[] };
-
-/** Validate a picker write against the catalog (the settings route's gate).
- *  `settings` is replace-whole: absent fields mean "config default".
- *  - model: provider must be configured, id must exist in its catalog.
- *  - thinkingLevel: must be in the resolved model's supported list —
- *    the model the picker writes against (settings.model, else config's
- *    prober/teacher pin; one controller, so the two specs share it). */
-export function validateChatSettings(settings: ChatSettings): SettingsValidation {
-	const providers = connectionProviderIds();
-	if (settings.model) {
-		const { provider, id } = settings.model;
-		if (!providers.includes(provider)) {
-			return { ok: false, error: `Unknown provider "${provider}" — configured: ${providers.join(", ")}` };
-		}
-		if (!connectionModel(provider, id)) {
-			return { ok: false, error: `No model "${id}" in the ${provider} catalog` };
-		}
-	}
-	// BYOK interlude (owner, 2026-09-22): thinking levels NEVER reject a
-	// write — a model swap with a pinned level JUST WORKS. The WRITE clamps
-	// the pin to the new model's nearest supported level (clampChatLevel
-	// below, applied by the routes) and stores the clamped result; a bare
-	// level with no model anywhere rides unchecked and clamps against
-	// whatever the chain later holds at engine build.
-	return { ok: true };
-}
-
-/** Validate introduced/replaced model selections, not unchanged saved pins.
- * A disconnected subscription loses its available catalog, but its stored
- * selections must not prevent repairing another slot or editing thinking.
- * Only the SAME slot's provider+id can pass through; runtime admission stays
- * separate. Callers without a stored section retain strict catalog checking. */
-export function validateModelsSettings(settings: ModelsSettings, stored?: ModelsSettings): SettingsValidation {
-	for (const name of MODEL_SLOTS) {
-		const slot = settings[name];
-		if (!slot) continue;
-		const previous = stored?.[name]?.model;
-		if (slot.model && previous && slot.model.provider === previous.provider && slot.model.id === previous.id) continue;
-		const verdict = validateSlotSpec(name, slot);
-		if (!verdict.ok) return verdict;
-	}
-	return { ok: true };
-}
-
-function validateSlotSpec(name: ModelSlotName, slot: { model?: { provider: string; id: string }; thinkingLevel?: ThinkingLevel }): SettingsValidation {
-	const providers = connectionProviderIds();
-	if (slot.model) {
-		const { provider, id } = slot.model;
-		if (!providers.includes(provider)) {
-			return { ok: false, error: `Unknown provider "${provider}" — configured: ${providers.join(", ")}` };
-		}
-		if (!connectionModel(provider, id)) {
-			return { ok: false, error: `No model "${id}" in the ${provider} catalog` };
-		}
-	}
-	// BYOK interlude (owner, 2026-09-22): the supported-level verdict is
-	// DEAD — a slot write with a pinned level never rejects; the WRITE
-	// clamps the level to the model's nearest supported (clampModelsLevels
-	// below, applied by the route) and stores the clamped result.
-	return { ok: true };
-}
-
-// ─── clamp-on-write (owner ruling, interlude 2026-09-22) ─────────────────────
-// A model swap with a pinned thinking level must JUST WORK: the pin
-// translates to the new model's nearest supported level — pi's
-// clampThinkingLevel, the SAME translation piEngineForSpec applies at
-// runtime — and the clamped value is what lands in the record. The
-// server is the truth: the record shows the clamped level after write.
-
-/** Clamp one level against one model. Preserve the preference when metadata
- *  is unavailable for an unchanged saved pin; runtime clamps after reconnect. */
-function clampLevelFor(provider: string, id: string, level: ThinkingLevel): ThinkingLevel {
-	const model = connectionModel(provider, id);
-	return model ? clampThinkingLevel(model, level) : level;
-}
-
-/** The models-section write's level translation: every slot's pinned
- *  thinkingLevel clamps against THE SLOT'S OWN model (the parser requires
- *  a model on every slot write — owner, 2026-09-22). Pure: catalog in,
- *  clamped section out; the route applies it after validation. */
-export function clampModelsLevels(settings: ModelsSettings): ModelsSettings {
-	const out: ModelsSettings = {};
-	for (const name of MODEL_SLOTS) {
-		const slot = settings[name];
-		if (!slot?.model) continue;
-		out[name] =
-			slot.thinkingLevel !== undefined
-				? {
-						model: slot.model,
-						thinkingLevel: clampLevelFor(slot.model.provider, slot.model.id, slot.thinkingLevel),
-					}
-				: slot;
-	}
-	return out;
-}
-
-/** The chat-section write's level translation: a pinned thinkingLevel
- *  clamps against the body's own model, else the record's resolved strong
- *  slot (the conversation chain's fallback — what a settings-less chat
- *  would run). No model anywhere → rides unchecked (runtime clamps at
- *  engine build; the turn gate refuses the model-less chat anyway). */
-export function clampChatLevel(settings: ChatSettings, strong: EffectiveSlot | null): ChatSettings {
-	if (settings.thinkingLevel === undefined) return settings;
-	const provider = settings.model?.provider ?? strong?.provider;
-	const id = settings.model?.id ?? strong?.id;
-	if (!provider || !id) return settings;
-	return { ...settings, thinkingLevel: clampLevelFor(provider, id, settings.thinkingLevel) };
 }

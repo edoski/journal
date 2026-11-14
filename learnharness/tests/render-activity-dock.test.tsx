@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { ActivitySection, formatElapsed, toBlobs, type ActivityFeed, type FeedExtraction } from "../components/activity-dock.tsx";
 import { formatTokens, formatUsd } from "../components/usage-format.ts";
 import { jobCost } from "../src/server/pricing.ts";
+import { providerKeyMissing } from "../src/core/settings.ts";
 
 // The section's pure layer: folds, formatting, and blob order — then the
 // render (one row per process, the abort affordance, the always-present
@@ -89,22 +90,14 @@ describe("activity dock pure layer", () => {
 		const refused = job({
 			status: "error",
 			activity: "failed",
-			// the runner composes the envelope's error verbatim (invariant tail)
-			error: "openrouter runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent",
+			// the runner composes the envelope's error verbatim
+			error: providerKeyMissing("claude-subscription").error,
 		});
 		const blob = toBlobs({ jobs: [refused], extractions: [] })[0]!;
 		assert.equal(blob.activity, "needs a sign-in");
 	});
 
-	it("a models-refused job reads as info — 'needs model setup', not 'failed' (BYOK, 2026-09-22)", () => {
-		const refused = job({
-			status: "error",
-			activity: "failed",
-			error: "No model configured — set up your models first (missing: vision)",
-		});
-		const blob = toBlobs({ jobs: [refused], extractions: [] })[0]!;
-		assert.equal(blob.activity, "needs model setup");
-		// A real failure keeps the runner's honest wording.
+	it("a real failure keeps the runner's honest wording", () => {
 		const crashed = job({ status: "error", activity: "failed", error: "FAILED: headless crashed" });
 		const real = toBlobs({ jobs: [crashed], extractions: [] })[0]!;
 		assert.equal(real.activity, "failed");

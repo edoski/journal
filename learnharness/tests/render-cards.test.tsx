@@ -22,6 +22,7 @@ import { DispatchCard } from "../components/artifacts/dispatch-card.tsx";
 import { JobsContext } from "../components/jobs-context.ts";
 import { ChatActionsContext } from "../components/chat.tsx";
 import type { JobRecord } from "../src/core/contracts.ts";
+import { providerKeyMissing } from "../src/core/settings.ts";
 import { AnsweredCard } from "../components/answered-card.tsx";
 import {
 	buildAnswer,
@@ -101,7 +102,7 @@ describe("question submission draft restoration", () => {
 	});
 });
 
-describe("DispatchCard — the BYOK refusal tone (owner, 2026-09-22)", () => {
+describe("DispatchCard — the refusal tone", () => {
 	const job = (over: Partial<JobRecord>): JobRecord => ({
 		id: "j1",
 		kind: "research",
@@ -123,27 +124,16 @@ describe("DispatchCard — the BYOK refusal tone (owner, 2026-09-22)", () => {
 		</JobsContext.Provider>
 	);
 
-	it("a models-refused job is INFO: quiet card, 'needs model setup', deep-link to the dialog", () => {
+	it("a connection-refused job is INFO: quiet card, 'needs a sign-in', deep-link to the dialog", () => {
 		const html = renderToStaticMarkup(
-			inJobs([job({ error: "No model configured — set up your models first (missing: cheap)" })]),
-		);
-		assert.ok(html.includes('data-testid="dispatch-refused"'));
-		assert.ok(html.includes("needs model setup"));
-		assert.ok(html.includes('data-testid="dispatch-setup-link"'));
-		assert.ok(html.includes("Set up models"));
-		assert.ok(!html.includes("failed"));
-		assert.ok(!html.includes("text-red-500"));
-	});
-
-	it("a connection-refused job is INFO: 'needs a sign-in', 'Sign in'", () => {
-		const html = renderToStaticMarkup(
-			inJobs([job({ error: "openrouter runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent" })]),
+			inJobs([job({ error: providerKeyMissing("claude-subscription").error })]),
 		);
 		assert.ok(html.includes('data-testid="dispatch-refused"'));
 		assert.ok(html.includes("needs a sign-in"));
 		assert.ok(html.includes(">Sign in<"));
 		assert.ok(html.includes('data-testid="dispatch-setup-link"'));
 		assert.ok(!html.includes("failed"));
+		assert.ok(!html.includes("text-red-500"));
 	});
 
 	it("a real failure reads as its plain failure line, not a setup prompt", () => {

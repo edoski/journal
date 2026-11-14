@@ -69,7 +69,6 @@ import type { TurnInput } from "../core/input-events.ts";
 import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, type LhMessage } from "../core/native-messages.ts";
 import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores, effectiveSettings } from "./stores.ts";
-import { resolveConversationSpec } from "../core/settings-resolution.ts";
 import { connectionBackgroundAllowed, isSubscriptionProvider, onSubscriptionChange } from "../agent/subscription-connections.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
 import { subscribe, type ServerEventType } from "../core/events.ts";
@@ -237,6 +236,17 @@ function queueSteer(chatId: string, steer: SteerMessage): QueuedSteer {
 	return entry;
 }
 
+/** The provider the chat's latest reply ran on: once its live agent is gone,
+ *  that is whose background consent a wake would spend. */
+function lastProvider(chatId: string): string | undefined {
+	const messages = stores.chatStore.getChat(chatId)?.messages ?? [];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const message = messages[i] as { role?: string; provider?: string };
+		if (message.role === "assistant" && message.provider) return message.provider;
+	}
+	return undefined;
+}
+
 /** Hand every eligible pending marker to a live agent's steering queue
  *  (idempotent per agent via handedTo). Called from BOTH the pump's live
  *  path and registerLiveAgent — a parked marker (stranded behind a quiz)
@@ -247,7 +257,7 @@ function queueSteer(chatId: string, steer: SteerMessage): QueuedSteer {
  *  coalescing). */
 export function automaticFollowUpAllowed(chatId: string, agent?: Agent): boolean {
 	if (agent && state().automaticDeferred.has(agent)) return false;
-	const provider = agent?.state?.model?.provider ?? resolveConversationSpec(stores.chatStore.getChat(chatId)?.settings, effectiveSettings().models.strong)?.provider;
+	const provider = agent?.state?.model?.provider ?? lastProvider(chatId) ?? effectiveSettings().claude.account;
 	return connectionBackgroundAllowed(provider);
 }
 

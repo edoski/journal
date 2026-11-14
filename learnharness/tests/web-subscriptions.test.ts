@@ -15,7 +15,6 @@ const { createWebSubscriptionOwner, webSubscriptionOwner, webSubscriptionsEnable
 const { subscriptionControlsResponse, subscriptionBrowserResponse } = await import("../src/server/web-subscription-http.ts");
 const chat = await import("../src/agent/chatgpt-bridge.ts");
 const { piModels } = await import("../src/agent/models.ts");
-const { refreshConnectionCatalog } = await import("../src/server/model-catalog.ts");
 const model = piModels().getModels("openai").find((entry) => entry.api === "openai-responses")!;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (input) => {
@@ -29,7 +28,7 @@ function request(command?: Record<string, unknown>, origin = "http://192.168.1.1
 after(async () => { webSubscriptionOwner().close(); globalThis.fetch = originalFetch; await fs.rm(directory, { recursive: true, force: true }); });
 
 test("ordinary web restores configured sibling credentials, private runtime leases work for LAN-owned requests", async () => {
-	await refreshConnectionCatalog();
+	await chat.refreshChatGPTModels(piModels().getModels("openai").filter((entry): entry is typeof model & { api: "openai-responses" } => entry.api === "openai-responses"));
 	assert(chat.chatGPTConnected());
 	assert.equal((await chat.chatGPTLease(chat.chatGPTScope(model.id), false)).accessToken, "fixture-chatgpt-access");
 	const response = await subscriptionControlsResponse(request());

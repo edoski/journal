@@ -40,7 +40,6 @@ after(() => {
 for (const revokeAfterQueue of [false, true]) test(`chatgpt: foreground survives and automatic queue retains ownership with background ${revokeAfterQueue ? "revoked" : "off"}`, { timeout: 5000 }, async () => {
 	connection(revokeAfterQueue);
 	const chat = stores.chatStore.createChat("Fixture mixed queue"); const model = { ...piModels().getModels("openai").find((m) => m.api === "openai-responses")!, provider: "chatgpt" };
-	stores.chatStore.saveSettings(chat.id, { model: { provider: "chatgpt", id: model.id } });
 	const job = stores.jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "fixture-job-call" }); const result = { brief: "Fixture helper result", sources: [] };
 	stores.jobStore.updateJob(job.id, { status: "done", result, delivery: { kind: "result", status: "pending" } }); const steer = buildSubagentSteer(job, result); const contexts: string[] = [];
 	const agent = new Agent({ initialState: { model, messages: [{ id: "fixture-initial", role: "user", content: "Initial learner input", timestamp: 1 } as AgentMessage] }, convertToLlm: toLlmMessages, streamFn: () => {

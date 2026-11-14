@@ -10,9 +10,9 @@ import { useCalendarRead } from "@/components/calendar/use-calendar";
 
 /** `/calendar`: the calendar over the engine's read and the sessions; a
  *  press starts a session as the topic page would, linked to its topic. */
-export function CalendarPage({ initialConfigured }: { initialConfigured: boolean }) {
+export function CalendarPage() {
 	const read = useCalendarRead();
-	const lesson = useLessonStart(initialConfigured);
+	const lesson = useLessonStart();
 	const [scope, setScope] = useState<string | null>(null);
 	const ready = read.status === "ready" ? read : null;
 	const entries = useMemo(
@@ -45,7 +45,7 @@ export function CalendarPage({ initialConfigured }: { initialConfigured: boolean
 					{lesson.error}
 				</p>
 			)}
-			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} onDone={lesson.closeSetup} />
+			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</>
 	);
 }

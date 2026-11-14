@@ -19,7 +19,7 @@ process.env.LH_DATA_DIR = TMP_DATA;
 const { chatStore } = await import("../src/store/chats.ts");
 const { emit, subscribe } = await import("../src/core/events.ts");
 const { newSessionModeMessage, newUserMessage } = await import("../src/core/native-messages.ts");
-const { digestChanges, digestModel, digestWindow, knowledgeHandle } = await import("../src/core/lesson-digest.ts");
+const { digestChanges, digestWindow, knowledgeHandle } = await import("../src/core/lesson-digest.ts");
 const { createLessonDigest } = await import("../src/agent/subagents/lesson-digest.ts");
 const { extractionStatuses } = await import("../src/agent/subagents/extraction.ts");
 const { onLessonEvents, resumeCutDigests } = await import("../src/server/lesson-finish.ts");
@@ -262,14 +262,6 @@ describe("the digest's patch", () => {
 	it("knowledge handles come from the text, so a repeat merges into the same entry", () => {
 		assert.equal(knowledgeHandle("The course writes rank as $r(A)$"), knowledgeHandle("The course writes rank as $r(A)$ "));
 		assert.notEqual(knowledgeHandle("Rank is r(A)"), knowledgeHandle("Rank is rk(A)"));
-	});
-});
-
-describe("the digest's model", () => {
-	it("is Opus 5.5 at high effort, on the lesson's Claude account or the default one", () => {
-		assert.deepEqual(digestModel("claude-subscription-work"), { provider: "claude-subscription-work", id: "claude-opus-5-5", thinkingLevel: "high" });
-		assert.deepEqual(digestModel("openrouter"), { provider: "claude-subscription", id: "claude-opus-5-5", thinkingLevel: "high" });
-		assert.deepEqual(digestModel(undefined), { provider: "claude-subscription", id: "claude-opus-5-5", thinkingLevel: "high" });
 	});
 });
 

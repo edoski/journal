@@ -1,26 +1,18 @@
 /**
  * The shared settings-PUT body parsers — one seam per settings surface.
- * Extracted verbatim from the per-chat route (default-settings wave,
- * 2026-09-18): identical parse, identical errors. The section parsers
- * (settings-storage wave, 2026-09-19) follow the same house rules.
+ * The section parsers (settings-storage wave, 2026-09-19) follow the
+ * house rules below.
  *
  * Replace-whole semantics: the client sends the complete desired SECTION;
  * absent fields are absent overrides ({} clears everything). No merges, so
  * a stale client can never resurrect a cleared override. Unknown body keys
- * are dropped (same tolerance as parseSettingsBody) — unknown DISK keys are
+ * are dropped — unknown DISK keys are
  * a different concern and are preserved by the sanitizer (core/settings.ts).
  */
 
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { isHexColor, type ChatSettings } from "../core";
-import type {
-	AgentSettings,
-	AppearanceSettings,
-	BackgroundModelRole,
-	ModelsSettings,
-	RoleModelOverride,
-} from "../core/settings.ts";
-import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS } from "../core/settings.ts";
+import { isHexColor } from "../core";
+import { isClaudeProvider } from "../core/contracts/claude.ts";
+import type { AgentSettings, AppearanceSettings, ClaudeSettings } from "../core/settings.ts";
 import { TOGGLEABLE_TOOLS } from "../core/pending.ts";
 
 /** Parsed-or-rejected — `ok: false` carries the 400's error message. */
@@ -28,77 +20,14 @@ export type SettingsBodyResult<T> =
 	| { ok: true; settings: T }
 	| { ok: false; error: string };
 
-export function parseSettingsBody(body: unknown): SettingsBodyResult<ChatSettings> {
-	if (!body || typeof body !== "object" || Array.isArray(body)) {
-		return { ok: false, error: "Invalid JSON body" };
-	}
-	const raw = body as {
-		model?: { provider?: unknown; id?: unknown };
-		thinkingLevel?: unknown;
-	};
-	const settings: ChatSettings = {};
-	if (raw.model !== undefined) {
-		if (
-			typeof raw.model !== "object" ||
-			raw.model === null ||
-			typeof raw.model.provider !== "string" ||
-			typeof raw.model.id !== "string"
-		) {
-			return { ok: false, error: "model must be {provider, id}" };
-		}
-		settings.model = { provider: raw.model.provider, id: raw.model.id };
-	}
-	if (raw.thinkingLevel !== undefined) {
-		if (typeof raw.thinkingLevel !== "string") {
-			return { ok: false, error: "thinkingLevel must be a string" };
-		}
-		settings.thinkingLevel = raw.thinkingLevel as ThinkingLevel;
-	}
-	// Wave 7 killed the graph-context injection (owner: zero configuration
-	// beyond chat models — the prober reads its map through tools now); its
-	// budget dial is gone with it. A stale client sending the old key has
-	// it silently dropped here (forward-compatible, like any unknown key).
-	return { ok: true, settings };
-}
-
 // ─── Section parsers (settings-storage wave, 2026-09-19) ────────────────────
 // One parser per settings.json section; the route maps the URL section to
-// its parser via SETTINGS_SECTIONS below. Same discipline as
-// parseSettingsBody: strict on every known field (a bad type/shape is a
-// 400, never a silent clamp/drop), unknown keys dropped.
+// its parser via SETTINGS_SECTIONS below. Strict on every known field (a
+// bad type/shape is a 400, never a silent clamp/drop), unknown keys dropped.
 
 function asRecord(body: unknown): Record<string, unknown> | null {
 	if (!body || typeof body !== "object" || Array.isArray(body)) return null;
 	return body as Record<string, unknown>;
-}
-
-/** agent.models: only the six known background roles; each override's
- *  fields mirror ChatSettings (model pair + independent thinkingLevel). */
-function parseRoleOverride(value: unknown, role: string): { ok: true; override: RoleModelOverride } | { ok: false; error: string } {
-	const raw = asRecord(value);
-	if (!raw) return { ok: false, error: `${role} must be an object` };
-	const override: RoleModelOverride = {};
-	if (raw.model !== undefined) {
-		if (
-			typeof raw.model !== "object" ||
-			raw.model === null ||
-			typeof (raw.model as Record<string, unknown>).provider !== "string" ||
-			typeof (raw.model as Record<string, unknown>).id !== "string"
-		) {
-			return { ok: false, error: `${role}.model must be {provider, id}` };
-		}
-		override.model = {
-			provider: (raw.model as { provider: string }).provider,
-			id: (raw.model as { id: string }).id,
-		};
-	}
-	if (raw.thinkingLevel !== undefined) {
-		if (typeof raw.thinkingLevel !== "string") {
-			return { ok: false, error: `${role}.thinkingLevel must be a string` };
-		}
-		override.thinkingLevel = raw.thinkingLevel as ThinkingLevel;
-	}
-	return { ok: true, override };
 }
 
 /** A boolean map (tool switches): every value must be boolean. */
@@ -114,28 +43,11 @@ function parseBooleanMap(value: unknown, field: string): { map?: Record<string, 
 	return { map: out };
 }
 
-/** agent: { models?, tools?, graphTools? } — model/thinking validity
- *  against the catalog is checked by the route (validateChatSettings
- *  discipline). */
+/** agent: { tools?, graphTools? }. */
 export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
 	const settings: AgentSettings = {};
-	if (raw.models !== undefined) {
-		const models = asRecord(raw.models);
-		if (!models) return { ok: false, error: "models must be an object" };
-		const known = BACKGROUND_MODEL_ROLES as readonly string[];
-		const parsed: NonNullable<AgentSettings["models"]> = {};
-		for (const [role, value] of Object.entries(models)) {
-			if (!known.includes(role)) {
-				return { ok: false, error: `unknown role "${role}" (supported: ${known.join(", ")})` };
-			}
-			const override = parseRoleOverride(value, role);
-			if (!override.ok) return { ok: false, error: override.error };
-			if (Object.keys(override.override).length) parsed[role as BackgroundModelRole] = override.override;
-		}
-		if (Object.keys(parsed).length) settings.models = parsed;
-	}
 	const tools = parseBooleanMap(raw.tools, "tools");
 	if (tools.error) return { ok: false, error: tools.error };
 	if (tools.map) {
@@ -249,40 +161,23 @@ export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<A
 	return { ok: true, settings };
 }
 
-/** models: { strong?, cheap?, vision? } — the slot tiers (model slots
- *  wave, 2026-09-20). Each slot is the same shape as a role override; a
- *  present-but-empty slot object is rejected (absent slot = unset; say
- *  what you mean). Catalog validity is checked by the route
- *  (validateChatSettings discipline). */
-export function parseModelsSettingsBody(body: unknown): SettingsBodyResult<ModelsSettings> {
+/** claude: { account? } — the Claude account every agent runs on. Whether
+ *  T3 Code still has that account is the route's check. */
+export function parseClaudeSettingsBody(body: unknown): SettingsBodyResult<ClaudeSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
-	const settings: ModelsSettings = {};
-	for (const key of Object.keys(raw)) {
-		const known = MODEL_SLOTS as readonly string[];
-		if (!known.includes(key)) {
-			return { ok: false, error: `unknown slot "${key}" (supported: ${known.join(", ")})` };
-		}
-		const parsed = parseRoleOverride(raw[key], key);
-		if (!parsed.ok) return { ok: false, error: parsed.error };
-		// BYOK (owner, 2026-09-22): a slot IS a model choice — no factory
-		// floor exists, so a thinkingLevel alone can never run; every slot
-		// write must carry the model (the level is an optional rider). An
-		// absent slot key clears the tier (replace-whole section).
-		if (!parsed.override.model) {
-			return { ok: false, error: `slot "${key}" must set a model (thinkingLevel alone cannot run — absent slot = unset)` };
-		}
-		settings[key as (typeof MODEL_SLOTS)[number]] = parsed.override;
+	if (raw.account === undefined) return { ok: true, settings: {} };
+	if (typeof raw.account !== "string" || !isClaudeProvider(raw.account)) {
+		return { ok: false, error: "account must be a Claude account id" };
 	}
-	return { ok: true, settings };
+	return { ok: true, settings: { account: raw.account } };
 }
 
 /** The section→parser map for PUT /api/settings/[section]. */
 export const SETTINGS_SECTIONS = {
-	chat: parseSettingsBody,
 	agent: parseAgentSettingsBody,
 	appearance: parseAppearanceSettingsBody,
-	models: parseModelsSettingsBody,
+	claude: parseClaudeSettingsBody,
 } as const;
 
 export type SettingsSectionName = keyof typeof SETTINGS_SECTIONS;

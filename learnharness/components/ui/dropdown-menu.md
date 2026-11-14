@@ -1,6 +1,6 @@
 # Dropdown menu
 
-A menu of actions or one choice opened from a button: the course picker, the thinking level. `dropdown-menu.tsx`, shadcn's Radix dropdown menu drawing the menu anatomy (`menu.md`). It exports the shared class strings (`MENU_CONTENT`, `MENU_ROW`, `MENU_ROW_CHECKED`, `MENU_ROW_DESTRUCTIVE`, `MENU_LABEL`, `MENU_SEPARATOR`, `MENU_SHORTCUT`, `MENU_INDICATOR`) that `context-menu`, `select` and `command` reuse. Overlay rules: `overlay.md`.
+A menu of actions or one choice opened from a button: the course picker. `dropdown-menu.tsx`, shadcn's Radix dropdown menu drawing the menu anatomy (`menu.md`). It exports the shared class strings (`MENU_CONTENT`, `MENU_ROW`, `MENU_ROW_CHECKED`, `MENU_ROW_DESTRUCTIVE`, `MENU_LABEL`, `MENU_SEPARATOR`, `MENU_SHORTCUT`, `MENU_INDICATOR`) that `context-menu`, `select` and `command` reuse. Overlay rules: `overlay.md`.
 
 ## Anatomy
 

@@ -13,7 +13,6 @@ import type { CourseMapLedger } from "./course-map-build.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type {
 	ChatRecord,
-	ChatSettings,
 	ChatSummary,
 	DigestLedger,
 	GraphChain,
@@ -58,14 +57,11 @@ export interface ChatStore {
 	/** Replace the lesson digest's ledger. Silent, like the usage logs, and
 	 *  never conversation activity: updatedAt stays put. */
 	saveDigestLedger(id: string, ledger: DigestLedger): void;
-	/** Persist the per-chat model/thinking settings (the model control).
-	 *  Replace-whole: the picker sends the complete settings object. */
-	saveSettings(id: string, settings: ChatSettings): void;
 	/** Link the session to a registered course (the banner on a session
-	 *  that has none, or whose course is gone). Silent, like saveSettings. */
+	 *  that has none, or whose course is gone). Silent, like saveTree. */
 	linkCourse(id: string, course: CourseLink): void;
 	/** Rename a session (the header's click-to-edit title, 2026-09-17).
-	 * Like saveSettings: a rename is NOT conversation activity — updatedAt
+	 * Like saveTree: a rename is NOT conversation activity — updatedAt
 	 * stays put, so sidebar order never churns on a rename. */
 	renameChat(id: string, title: string): ChatRecord;
 	/** Delete the session record entirely (session-deletion wave 6, owner

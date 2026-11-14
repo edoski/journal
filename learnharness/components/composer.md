@@ -26,4 +26,4 @@ Enter sends, Shift+Enter is a newline, ⌘/Ctrl+Enter sends; the stop and next-p
 
 ## Sources
 
-Radius 20, muted controls inside, one 32px round send, 14px text, padding 16 × 14/8, toolbar padding 8: T3 Code and Claude desktop composers (research/agent-apps.md). Model, thinking level and cost leave the composer: the owner's "agent chrome out" decision; they stay in Settings.
+Radius 20, muted controls inside, one 32px round send, 14px text, padding 16 × 14/8, toolbar padding 8: T3 Code and Claude desktop composers (research/agent-apps.md). Model, thinking level and cost leave the composer: the owner's "agent chrome out" decision. There is no model or thinking choice at all (every agent runs Claude Opus 5.5 at high effort, owner 2026-11-14); cost stays in the lesson's details.

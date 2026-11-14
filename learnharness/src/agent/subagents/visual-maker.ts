@@ -141,8 +141,7 @@ export async function runVisualMaker(input: VisualMakerInput, opts: VisualMakerO
 	const tools = createVisualTools();
 	const toolDeclarations = Object.values(tools);
 	const engine = opts.engine ?? piEngineFor("visualMaker");
-	// BYOK (owner, 2026-09-22): the level rides the injected engine — no
-	// factory pin to consult (engine.level is the resolved/clamped value).
+	// The level rides the injected engine (engine.level, the fixed one).
 	const reasoning = engine.level;
 	const sessionId = randomUUID();
 	const prompt = [

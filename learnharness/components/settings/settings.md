@@ -18,11 +18,14 @@ The settings sheet and its control kit: `settings-dialog.tsx` draws the frame, `
 | section hint | 12/16 muted, on the group headers' edge (Keyboard: "Stored on this device") |
 | group (`SettingsGroup`) | header 12/16 at 500, muted, sentence case, inset 4; optional description 12/16 muted; then one box, 1px `border`, radius 12, rows split by hairlines |
 | row (`SettingsRow`) | min 48px, padding 8 16, label 13/18 over an optional 12/16 muted hint, the control at the right; a dimmed row is 50% |
-| field | `Input variant="sm"`: 28px, radius 8, `input` edge (white 11%), 13px, 2px `ring` on focus; number fields right-align tabular figures. `SettingsMenuTrigger` is the same field with a 14px chevron, used as a picker's trigger |
+| field | `Input variant="sm"`: 28px, radius 8, `input` edge (white 11%), 13px, 2px `ring` on focus; number fields right-align tabular figures |
 | switch (`Toggle`) | the shadcn `Switch` (components/ui/switch.md): 32 × 20 track, 16px disc inset 2; on: `muted-foreground` track with a `foreground` disc (owner, 2026-09-20: grey with a white disc, never a bright track), off: `input` track with a muted disc; 2px ring offset 2 on focus; its tooltip is a `Hint` |
 | disclosure | a prompt part's Show text / Hide text is a `Collapsible`; the original and your version are `Textarea`s |
-| buttons | `Button` at 28px: quiet for secondary actions (Show text, Change, Refresh), outline for Connect, default (the accent) for Save |
-| pickers | model: a modal picker `Popover` with `ModelCommand`; thinking: a `DropdownMenu` with `ThinkingMenuItems` (model-pickers.md). Modal, so the pane holds still while one is open |
+| buttons | `Button` at 28px: quiet for secondary actions (Show text, Change, Refresh), outline for Connect and Use this account, default (the accent) for Save |
+
+## What Tutor and Accounts leave out
+
+Every agent runs Claude Opus 5.5 at high effort (owner, 2026-11-14), so Tutor has no model or thinking rows, only Tools. The only choice left is the Claude account they run on: in Accounts each signed-in Claude account offers Use this account, and the one in use reads "In use" (12/16 muted) instead. An account whose plan or Claude Code version lacks the model shows one danger line saying so (`claude-model-missing`); nothing falls back to another model. The sign-in dialog (`setup-dialog.tsx`) shows the same Claude rows and closes once the account in use is signed in.
 
 ## What Appearance leaves out
 

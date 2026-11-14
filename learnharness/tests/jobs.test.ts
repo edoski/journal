@@ -72,7 +72,7 @@ import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
 import { createJobRunner, demoModelOverride, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
 import { headlessOverride, type HeadlessApi } from "../src/agent/subagents/headless.ts";
-import { providerKeyMissing, type ModelSlotName } from "../src/core/settings.ts";
+import { providerKeyMissing } from "../src/core/settings.ts";
 import type { PiEngine } from "../src/agent/models.ts";
 import { PATHS } from "../config.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
@@ -503,7 +503,6 @@ describe("dispatch (async protocol §2)", () => {
 		trackChat(chat.id);
 		// BYOK turn gate (owner, 2026-09-22): the scripted chat needs a
 		// conversation model — the per-chat pin, exactly like the setup flow.
-		chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 
 		const delivery = fakeDeliver();
 		const testRunner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
@@ -1793,10 +1792,10 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 	});
 });
 
-// ─── BYOK: the unresolvable-engine refusal (owner, 2026-09-22) ──────────────
+// ─── the unwired-engine refusal ─────────────────────────────────────────────
 
-describe("BYOK job refusal (no factory floor)", () => {
-	it("runJob with NO resolvable engine lands the job as error — the envelope wording, no phantom run", async () => {
+describe("unwired job refusal", () => {
+	it("runJob with NO injected engine lands the job as error — a plain reason, no phantom run", async () => {
 		const chat = chatStore.createChat("Test: unconfigured spawn");
 		trackChat(chat.id);
 		chatStore.saveMessages(chat.id, nativeToolMessages("hi", "research", "call-nc1", RESEARCH_INPUT));
@@ -1805,23 +1804,22 @@ describe("BYOK job refusal (no factory floor)", () => {
 		trackJob(job.id);
 
 		const delivery = fakeDeliver();
-		// NO test override, NO engineFor: the chain (override → slot → floor)
-		// comes up empty — the runner must refuse honestly, not fall back.
+		// NO test override, NO engineFor: a wiring bug — the runner must
+		// refuse honestly, not fall back.
 		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
 		await runner.runJob(job.id);
 
 		const done = jobStore.getJob(job.id)!;
 		// The refusal lands through the SAME convention as every other
-		// failed job (BYOK review fix, Teacher stream 2026-09-22): the kind's
-		// failure result steers the teacher — a dispatched job is never
-		// stranded waiting for a result that will never come — and
-		// finalizeJob flips the record to error after the delivery.
+		// failed job: the kind's failure result steers the teacher — a
+		// dispatched job is never stranded waiting for a result that will
+		// never come — and finalizeJob flips the record to error after the
+		// delivery.
 		assert.equal(done.status, "error", "the job lands error, never a phantom run");
-		assert.match(done.error ?? "", /No model configured/);
-		assert.match(done.error ?? "", /missing: cheap/);
+		assert.equal(done.error, 'no engine injected for role "researcher"');
 		assert.equal(delivery.steers.length, 1, "the refusal STEERED — the teacher is not stranded");
 		assert.ok(
-			delivery.steers[0]!.content.includes("Research failed: No model configured"),
+			delivery.steers[0]!.content.includes('Research failed: no engine injected for role "researcher"'),
 			"the steer carries the kind's failure shape",
 		);
 		const result = done.result as ResearchResult;
@@ -1841,19 +1839,19 @@ describe("provider-key job refusal (key-presence interlude)", () => {
 		trackJob(job.id);
 
 		const delivery = fakeDeliver();
-		// The chain RESOLVES (an engine exists) — the KEY is what's missing.
-		// The injected check is the server seam's stand-in: it sees the
-		// engine's provider + the kind's slot tier, exactly as wired.
+		// An engine exists — the sign-in is what's missing. The injected
+		// check is the server seam's stand-in: it sees the engine's account,
+		// exactly as wired.
 		const engine = fauxEngine([]);
-		const seen: Array<[string, ModelSlotName]> = [];
+		const seen: string[] = [];
 		const runner = createJobRunner({
 			chatStore,
 			jobStore,
 			deliver: delivery.deliver,
 			engineFor: () => engine,
-			providerKeyMissing: (provider, tier) => {
-				seen.push([provider, tier]);
-				return providerKeyMissing(provider, [tier]);
+			providerKeyMissing: (provider) => {
+				seen.push(provider);
+				return providerKeyMissing(provider);
 			},
 		});
 		await runner.runJob(job.id);
@@ -1862,11 +1860,11 @@ describe("provider-key job refusal (key-presence interlude)", () => {
 		// honest record, kind failure shape steered, terminal flip after.
 		const done = jobStore.getJob(job.id)!;
 		assert.equal(done.status, "error", "the job lands error, never a phantom run");
-		assert.equal(done.error, providerKeyMissing(engine.model.provider, ["cheap"]).error, "the envelope's error line verbatim");
-		assert.deepEqual(seen, [[engine.model.provider, "cheap"]], "the check saw the engine's provider + the researcher's tier");
+		assert.equal(done.error, providerKeyMissing(engine.model.provider).error, "the envelope's error line verbatim");
+		assert.deepEqual(seen, [engine.model.provider], "the check saw the engine's account");
 		assert.equal(delivery.steers.length, 1, "the refusal STEERED — the teacher is not stranded");
 		assert.ok(
-			delivery.steers[0]!.content.includes(`Research failed: ${engine.model.provider} runs only with an API key`),
+			delivery.steers[0]!.content.includes("Research failed: Claude Code is not signed in"),
 			"the steer carries the kind's failure shape",
 		);
 		const result = done.result as ResearchResult;

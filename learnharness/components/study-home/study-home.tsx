@@ -24,12 +24,11 @@ const FOLLOW_DWELL_MS = 150;
  * map follows Today: it shows the course of the line he points at, with
  * that line's topics lit (home-map.md).
  */
-export function StudyHome({ initialConfigured }: { initialConfigured: boolean }) {
+export function StudyHome() {
 	const [enlarged, setEnlarged] = useState(false);
 
 	return (
 		<HomeFrame
-			initialConfigured={initialConfigured}
 			quiet={enlarged}
 			className={cn("mx-auto flex h-full w-full flex-col gap-5 px-8 pt-13 pb-6", !enlarged && "max-w-[60rem]")}
 		>

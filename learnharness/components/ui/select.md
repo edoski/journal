@@ -1,6 +1,6 @@
 # Select
 
-One value from a short fixed list, shown in a field: the study root in New course, thinking levels in Settings and setup, the connection dialogs' account and prompt choices. `select.tsx`, shadcn's Radix select; `data-slot` `select`, `select-trigger`, `select-value`, `select-content`, `select-item`, `select-item-indicator`, `select-label`, `select-separator`. Overlay rules: `overlay.md`. A choice with actions in it ("New course…") is a dropdown menu instead.
+One value from a short fixed list, shown in a field: the study root in New course, the connection dialogs' account and prompt choices. `select.tsx`, shadcn's Radix select; `data-slot` `select`, `select-trigger`, `select-value`, `select-content`, `select-item`, `select-item-indicator`, `select-label`, `select-separator`. Overlay rules: `overlay.md`. A choice with actions in it ("New course…") is a dropdown menu instead.
 
 ## Anatomy
 

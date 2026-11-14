@@ -90,7 +90,7 @@ test("the binary is found on PATH first, then in the usual install locations", (
 });
 
 test("a turn refused for Claude points at Claude Code's own sign-in, not at a key", () => {
-	const envelope = providerKeyMissing("claude-subscription", ["strong"]);
+	const envelope = providerKeyMissing("claude-subscription");
 	assert.match(envelope.error, /run `claude` in a terminal, sign in with your Claude account/);
 	assert(!/Settings → Keys/.test(envelope.error));
 	assert(isProviderKeyRefusal(envelope.error));

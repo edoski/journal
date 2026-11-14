@@ -7,19 +7,15 @@ import {
 	type AgentKind,
 	type TeachingAgent,
 } from "../agent/teacher-agent.ts";
-import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
+import { claudeEngine, type PiEngine } from "../agent/models.ts";
 import { connectionBackgroundAllowed, connectionScopeCurrent, isSubscriptionProvider } from "../agent/subscription-connections.ts";
-import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
-import { claudeErrorMessage, claudeTurnError } from "../agent/claude-stream.ts";
-import { isClaudeProvider } from "../core/contracts/claude.ts";
-import { digestModel } from "../core/lesson-digest.ts";
-import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
+import { CLAUDE_MODEL_MISSING, claudeTurnError } from "../agent/claude-stream.ts";
+import { SubscriptionRequestCycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
 import { createLessonDigest } from "../agent/subagents/lesson-digest.ts";
 import { onLessonEvents, resumeCutDigests } from "./lesson-finish.ts";
-import type { ModelRole } from "../../config.ts";
 import {
 	deliverJobResult,
 	noteSteersDurable,
@@ -38,12 +34,8 @@ import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
 import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
-import {
-	graphToolsEnabled,
-	resolveConversationSpec,
-	resolveRoleSpec,
-} from "../core/settings-resolution.ts";
-import { modelsNotConfigured, providerKeyMissing as providerKeyMissingEnvelope, type ProviderKeyMissing } from "../core/settings.ts";
+import { graphToolsEnabled } from "../core/settings-resolution.ts";
+import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settings.ts";
 import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
@@ -52,7 +44,8 @@ import { hasProbeDone, hasUnresolvedQuestion, resumesLesson, sessionModeOf, type
 import type { ChatRecord, SessionMode } from "../core/contracts/chat.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
-import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
+import { catalogContextLimits } from "./model-catalog.ts";
+import { refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { emit } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
 import { asAgentMessages } from "../core/native-messages.ts";
@@ -95,46 +88,35 @@ const jobRunner = createJobRunner({
 	chatStore: stores.chatStore,
 	jobStore: stores.jobStore,
 	deliver: deliverJobResult,
-	// BYOK (owner, 2026-09-22): job engines resolve the chain — role
-	// override → slot → NOTHING — read FRESH per job (a settings PUT
-	// between dispatch and spawn lands); an empty chain flows through as
-	// undefined and the runner refuses the spawn honestly.
-	engineFor: (role) =>
-		resolveEngine(role),
-	// Key-presence gate (provider-key interlude, 2026-09-25): the runner
-	// reads the resolved engine's provider and asks THIS check (the agent
-	// layer may not read the key store); a missing key refuses the spawn
-	// with the 503-envelope family instead of dying mid-run.
-	providerKeyMissing: (provider, tier) =>
-		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider, [tier]),
+	// Read FRESH per job, so an account switch between dispatch and spawn lands.
+	engineFor: agentEngine,
+	// The runner asks THIS check about the engine's account (the agent layer
+	// may not read the connection state); a signed-out account refuses the
+	// spawn with the 503-envelope family instead of dying mid-run.
+	providerKeyMissing: (provider) =>
+		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider),
 });
 /** The app's ONE extraction pipeline instance — both front doors share it:
  *  quiz-triggered session runs (turn-service) and notes imports
  *  (/api/graph/import) hit the same single-flight registry. */
 export const extraction = createExtractionPipeline({
 	...stores,
-	// BYOK (owner, 2026-09-22): the extraction stages resolve the chain —
-	// role override → slot → NOTHING — read FRESH per stage call; an empty
-	// chain flows through as undefined and the pipeline refuses the run
-	// with the typed ModelsNotConfiguredError. Direct test values still win.
-	engineFor: (role) =>
-		resolveEngine(role),
-	// Key-presence gate (provider-key interlude, 2026-09-25): same check
-	// the job runner gets — a stage engine whose provider key is gone
+	// Read FRESH per stage call. Direct test values still win.
+	engineFor: agentEngine,
+	// The job runner's check: a stage engine whose account is signed out
 	// refuses BEFORE any batch runs (the typed throw), never mid-run.
-	providerKeyMissing: (provider, tier) =>
-		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider, [tier]),
+	providerKeyMissing: (provider) =>
+		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider),
 });
 
 /** The lesson digest: a finished lesson's gaps, notes and task step, saved
- *  to the course record, on the app's default model (digestModel). */
+ *  to the course record, on the app's one model (agentEngine). */
 const lessonDigest = createLessonDigest({
 	chatStore: stores.chatStore,
 	courseRecords: stores.courseRecords,
-	engineFor: (record) => {
-		const lesson = resolveConversationSpec(record.settings, effectiveSettings().models.strong);
+	engineFor: () => {
 		try {
-			return piEngineForSpec(digestModel(lesson?.provider));
+			return agentEngine();
 		} catch {
 			return undefined;
 		}
@@ -177,13 +159,12 @@ setTurnRunner(async (chatId, input) => {
 	await res.arrayBuffer().catch(() => undefined);
 	return res.status;
 });
-/** The settings-resolved engine for one role — BYOK (owner, 2026-09-22):
- *  the chain (role override → slot → NOTHING) may end empty, and undefined
- *  flows through to the per-need refusal gates (runner/extraction), read
- *  FRESH so a settings PUT between dispatch and spawn lands. */
-function resolveEngine(role: ModelRole): PiEngine | undefined {
-	const spec = resolveRoleSpec(role, stores.settingsStore.readSettings());
-	return spec ? piEngineForSpec(spec) : undefined;
+/** The engine every background agent runs, whatever its role (owner,
+ *  2026-11-14): CLAUDE_MODEL at its fixed thinking level on the settings'
+ *  Claude account, read FRESH so an account switch lands on the next call.
+ *  The conversation builds the same engine on the account its gate read. */
+export function agentEngine(): PiEngine {
+	return claudeEngine(effectiveSettings().claude.account);
 }
 
 /** The agent a turn over these messages runs: practice in practice mode;
@@ -262,40 +243,20 @@ export async function handleChatInput(
 		}
 	}
 
-	// THE UNIVERSAL TURN GATE (BYOK, owner, 2026-09-22): a turn needs the
-	// CONVERSATION chain — the chat's own model override over the strong
-	// slot — and there is no factory floor; when both are empty the turn
-	// refuses honestly with the machine-readable 503 envelope (new sessions
-	// and continuing ones alike — wake-pipeline turns ride this same path).
-	// Placement is deliberate: BEFORE beginTurn (no liveness effects), the
-	// write-ahead persist (nothing durable changes), and every downstream
-	// resolution (jobs/extraction gate per-need on their own tiers).
-	const effective = effectiveSettings();
-	const conversation = resolveConversationSpec(record.settings, effective.models.strong);
-	if (!conversation) {
-		const envelope = modelsNotConfigured(["strong"]);
-		console.info(`[chat ${chatId}] turn refused — ${JSON.stringify(envelope)}`);
-		return Response.json(envelope, { status: 503 });
-	}
-
-	// THE KEY-PRESENCE GATE (provider-key interlude, owner, 2026-09-25): a
-	// pinned model is not enough — its PROVIDER's key must be present, or
-	// the turn dies mid-stream masked to a generic error. Truth is env-first
-	// (providerKeyPresent reads what pi-ai would read at request time), so
-	// an env-shadowed key passes. Same placement discipline as the models
-	// gate: BEFORE beginTurn (no liveness effects) and the write-ahead
+	// THE CONNECTION GATE: every agent runs CLAUDE_MODEL on the settings'
+	// Claude account (owner, 2026-11-14), which must be signed in, or the
+	// turn dies mid-stream masked to a generic error. Placement is
+	// deliberate: BEFORE beginTurn (no liveness effects) and the write-ahead
 	// persist (nothing durable changes); wake-pipeline turns ride the same
-	// path. The affected tier is strong — the conversation chain's own tier
-	// (a chat.model override still resolves through it).
-	if (isClaudeProvider(conversation.provider)) await refreshConnectionCatalog(conversation.provider);
-	if (isSubscriptionProvider(conversation.provider)) {
-		await refreshConnectionCatalog(conversation.provider);
-		if (input.type === "steers" && !connectionBackgroundAllowed(conversation.provider)) {
-			return Response.json({ error: "Background use is off for this connection. Automatic follow-up remains deferred in its queue." }, { status: 403 });
-		}
+	// path.
+	const effective = effectiveSettings();
+	const account = effective.claude.account;
+	await refreshClaudeConnections();
+	if (isSubscriptionProvider(account) && input.type === "steers" && !connectionBackgroundAllowed(account)) {
+		return Response.json({ error: "Background use is off for this connection. Automatic follow-up remains deferred in its queue." }, { status: 403 });
 	}
-	if (!providerKeyPresent(conversation.provider)) {
-		const envelope = providerKeyMissingEnvelope(conversation.provider, ["strong"]);
+	if (!providerKeyPresent(account)) {
+		const envelope = providerKeyMissingEnvelope(account);
 		console.info(`[chat ${chatId}] turn refused — ${JSON.stringify(envelope)}`);
 		return Response.json(envelope, { status: 503 });
 	}
@@ -306,25 +267,20 @@ export async function handleChatInput(
 	// kick usually finished inside the learner's answer pause), and if
 	// the record is STILL over threshold, compact synchronously — this
 	// request waits. Skipped under tests (the extraction precedent);
-	// placement mirrors the BYOK/key gates — BEFORE appends and
+	// placement mirrors the connection gate — BEFORE appends and
 	// beginTurn, no liveness effects — and the record re-reads after
 	// because compaction appends the marker.
 	const callPurpose = { background: input.type === "steers" || (input.type === "continue" && reconstructRequestCause(record.messages) !== "foreground") };
 	let requestCycle: SubscriptionRequestCycle | undefined;
-	const lifecycle: SubscriptionDispatchLifecycle = {
-		captured: (scope) => requestCycle?.captured(scope),
-		beforeDispatch: (scope) => requestCycle?.beforeDispatch(scope),
-		noDispatch: (kind) => requestCycle?.noDispatch(kind),
-	};
 	let conversationEngine: PiEngine;
-	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
-	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : "The selected model is unavailable." }, { status: 503 }); }
+	try { conversationEngine = claudeEngine(account); }
+	catch { return Response.json({ error: CLAUDE_MODEL_MISSING }, { status: 503 }); }
 	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
 	await ensureCompacted(
 		{
 			chatStore: stores.chatStore,
-			engine: piEngineForSpec(conversation, true),
-			canStart: () => connectionBackgroundAllowed(conversation.provider),
+			engine: conversationEngine,
+			canStart: () => connectionBackgroundAllowed(account),
 			modelId: modelIdForCompaction,
 			kind: compactionKind(record),
 			thresholdTokens: effectiveThresholdTokens(
@@ -423,7 +379,7 @@ export async function handleChatInput(
 	// failures only. Count that SAME temporary prefix at settlement, or the
 	// retained failures would make persistTurn skip genuinely new output.
 	const agentMessages = input.type === "retry" ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
-	const stagedAutomatic = isSubscriptionProvider(conversation.provider) && input.type === "steers";
+	const stagedAutomatic = isSubscriptionProvider(account) && input.type === "steers";
 	let persistBaseCount = stagedAutomatic ? record.messages.length : agentMessages.length;
 	try {
 		if (!stagedAutomatic) stores.chatStore.saveMessages(chatId, merged);
@@ -471,12 +427,9 @@ export async function handleChatInput(
 	// agent differs.
 	const agentKind = agentKindOf(agentMessages, record.kind);
 	const teaching = agentKind === "teacher";
-	// BYOK (owner, 2026-09-22): the conversation chain was resolved by the
-	// turn gate above (chat.model override → strong slot → refused) — the
-	// engine build is pure from here; thinking levels clamp natively.
-	// (Built once above the compaction gate; reused verbatim.)
+	// Built once above the compaction gate; reused verbatim.
 	const engine = conversationEngine;
-	// Provider-qualified stamp (model slots wave): matches the price table's
+	// Provider-qualified stamp: matches the price table's
 	// provider:id keys.
 	const modelId = `${engine.model.provider}:${engine.model.id}`;
 	// Tests inject a factory: the agent is stateless per turn, so each
@@ -488,12 +441,12 @@ export async function handleChatInput(
 	// enabled). The definitive toggleable set is TOGGLEABLE_TOOLS — the
 	// sub-agent JOB tools (research/demo/visual/pdf; adjudicated with the
 	// user: quiz/ask/fs/plan/probe_done are always-on).
-	if (isSubscriptionProvider(conversation.provider)) requestCycle = new SubscriptionRequestCycle({
+	if (isSubscriptionProvider(account)) requestCycle = new SubscriptionRequestCycle({
 		initialMessages: asAgentMessages(agentMessages),
 		staged: stagedAutomatic ? asAgentMessages(appends) : undefined,
 		foregroundOwed: !callPurpose.background,
 		purpose: callPurpose,
-		scopeCurrent: (scope) => connectionScopeCurrent(conversation.provider, scope),
+		scopeCurrent: (scope) => connectionScopeCurrent(account, scope),
 		commitStaged: () => {
 			stores.chatStore.saveMessages(chatId, merged);
 			persistBaseCount = merged.length;
@@ -611,13 +564,8 @@ export async function handleChatInput(
 			// route through here: they ride the error-result path and reach the
 			// transcript directly (the retry context the model saw).
 			onError: (error) => {
-				if (conversation.provider === "chatgpt") return chatGPTStreamError(String(error));
-				if (isClaudeProvider(conversation.provider)) {
-					console.error(`[chat ${chatId}] Claude turn error:`, error);
-					return claudeTurnError(error instanceof Error ? error.message : String(error));
-				}
-				console.error(`[chat ${chatId}] turn error:`, error);
-				return "An error occurred.";
+				console.error(`[chat ${chatId}] Claude turn error:`, error);
+				return claudeTurnError(error instanceof Error ? error.message : String(error));
 			},
 			onSettleError: settlementErrorText,
 			onSettleFailure: (error, reportedErrorText) => {
@@ -695,18 +643,17 @@ export async function handleChatInput(
 				// fixtures; the service itself is pinned directly).
 				if (process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
 					kickCompaction(() => {
-						const fresh = effectiveSettings();
-						const spec = resolveConversationSpec(stores.chatStore.getChat(chatId)?.settings, fresh.models.strong);
-						if (!spec || !connectionBackgroundAllowed(spec.provider)) return null;
+						const kickAccount = effectiveSettings().claude.account;
+						if (!connectionBackgroundAllowed(kickAccount)) return null;
 						let kickEngine: PiEngine;
-						try { kickEngine = piEngineForSpec(spec, true); } catch { return null; }
+						try { kickEngine = claudeEngine(kickAccount); } catch { return null; }
 						const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
 						const freshRecord = stores.chatStore.getChat(chatId);
 						if (!freshRecord) return null;
 						return {
 							chatStore: stores.chatStore,
 							engine: kickEngine,
-							canStart: () => connectionBackgroundAllowed(spec.provider),
+							canStart: () => connectionBackgroundAllowed(kickAccount),
 							modelId: kickModelId,
 							kind: compactionKind(freshRecord),
 							thresholdTokens: effectiveThresholdTokens(

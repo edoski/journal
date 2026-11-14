@@ -62,7 +62,7 @@ export interface JobRecord {
  * money-channel doctrine; cost renders "—", never $0). */
 export interface JobUsage {
 	/** The model that ran the sub-agent, provider-qualified ("provider:id" —
-	 *  model slots wave, 2026-09-20; matches Pi catalog lookup keys). */
+	 *  matches Pi catalog lookup keys). */
 	model: string;
 	/** Running totals summed over the run's model calls so far. */
 	inputTokens: number | undefined;

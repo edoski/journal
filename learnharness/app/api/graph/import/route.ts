@@ -19,12 +19,7 @@
  */
 import { convertPdf, extraction, joinPages, NotesImportError } from "@/src/server";
 import { MAX_IMPORT_BODY_BYTES, MAX_IMPORT_BYTES } from "@/lib/notes-import-limits.ts";
-import {
-	ModelsNotConfiguredError,
-	PROVIDER_KEY_MISSING_CODE,
-	ProviderKeyMissingError,
-	type EmissionStats,
-} from "@/src/core";
+import { PROVIDER_KEY_MISSING_CODE, ProviderKeyMissingError, type EmissionStats } from "@/src/core";
 
 export const dynamic = "force-dynamic";
 
@@ -35,14 +30,11 @@ interface ImportResult {
 	ok: boolean;
 	stats?: EmissionStats;
 	error?: string;
-	/** The machine discriminator when ok:false is a config refusal — the
-	 * BYOK models refusal (owner, 2026-09-22) or the provider-key refusal
-	 * (2026-09-25); the client can open the setup/keys flow off it. */
-	code?: "models_not_configured" | (typeof PROVIDER_KEY_MISSING_CODE);
-	missing?: string[];
-	/** The key-refusal specifics (provider_key_missing only). */
+	/** The machine discriminator when ok:false is the signed-out-account
+	 * refusal; the client can open the sign-in flow off it. */
+	code?: typeof PROVIDER_KEY_MISSING_CODE;
+	/** The signed-out Claude account. */
 	provider?: string;
-	slots?: string[];
 	/** Shown beside a completed import (every PDF: scanner text may be wrong). */
 	notice?: string;
 }
@@ -142,17 +134,6 @@ export async function POST(request: Request) {
 				const stats = await extraction.importNotes({ filePath: file.name, text: notes.text });
 				results.push({ filePath: file.name, requestIndex, outcome: "completed", ok: true, stats, ...(notes.notice ? { notice: notes.notice } : {}) });
 			} catch (err) {
-				if (err instanceof ModelsNotConfiguredError) {
-					results.push({
-						filePath: file.name,
-						ok: false,
-						requestIndex, outcome: "failed",
-						error: err.envelope.error,
-						code: "models_not_configured",
-						missing: err.envelope.missing,
-					});
-					continue;
-				}
 				if (err instanceof ProviderKeyMissingError) {
 					results.push({
 						filePath: file.name,
@@ -161,7 +142,6 @@ export async function POST(request: Request) {
 						error: err.envelope.error,
 						code: PROVIDER_KEY_MISSING_CODE,
 						provider: err.envelope.provider,
-						slots: err.envelope.slots,
 					});
 					continue;
 				}

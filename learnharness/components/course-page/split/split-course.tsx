@@ -20,9 +20,9 @@ import { aimOf, litOf, markedOf, revealOf, shownGroups, tieOf, type Pointed } fr
  * view; pointing at a node marks its row. A click on either opens the
  * topic's page. The page fits the window; each pane scrolls inside itself.
  */
-export function SplitCourse({ workspace, initialConfigured }: { workspace: string; initialConfigured: boolean }) {
+export function SplitCourse({ workspace }: { workspace: string }) {
 	return (
-		<CourseFrame workspace={workspace} initialConfigured={initialConfigured} className="flex h-full w-full flex-col gap-6 px-8 pt-5 pb-6">
+		<CourseFrame workspace={workspace} className="flex h-full w-full flex-col gap-6 px-8 pt-5 pb-6">
 			{({ view, busy, onContinue }) => <SplitBody view={view} header={<CourseHeader view={view} busy={busy} onContinue={onContinue} />} />}
 		</CourseFrame>
 	);

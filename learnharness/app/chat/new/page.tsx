@@ -1,6 +1,4 @@
 import { StartScreen } from "@/components/start/start-screen";
-import { readSettingsRecord } from "@/src/server";
-import { slotsConfigured } from "@/src/core";
 
 export const dynamic = "force-dynamic";
 
@@ -11,5 +9,5 @@ export const dynamic = "force-dynamic";
  * Static segment beats the dynamic [id] route — "new" is never a chat id.
  */
 export default function NewSessionPage() {
-	return <StartScreen initialConfigured={slotsConfigured(readSettingsRecord()?.models)} />;
+	return <StartScreen />;
 }

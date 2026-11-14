@@ -88,6 +88,7 @@ const status = (providerId: string, usage: Partial<ClaudeUsage> | null, connecti
 	account: { providerId, label: providerId, email, auth: "token" },
 	connection,
 	usage: usage && { percentLeft: 50, resetsAt: RESET, limited: false, checkedAt: 0, ...usage },
+	modelMissing: false,
 });
 const NOW = (RESET - 100) * 1000;
 
