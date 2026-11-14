@@ -45,7 +45,6 @@ const HOW_ICON: Record<MarkHow, LucideIcon> = {
 	predicted: CircleDashedIcon,
 	gaveUp: FlagOffIcon,
 	withHelp: HandHelpingIcon,
-	countedHelped: HandHelpingIcon,
 	ownWork: UserIcon,
 };
 

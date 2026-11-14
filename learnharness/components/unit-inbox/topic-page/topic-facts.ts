@@ -330,7 +330,7 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
  *  one). */
 export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "wrong"; words: string | null } {
 	const result = attempt.result === "correct" ? "right" : attempt.result === "partial" ? "partly" : "wrong";
-	const how = markHow({ ...attempt, helped: !attempt.unaided, grade: attempt.grade ?? (attempt.unaided ? "solid" : "helped") });
+	const how = markHow({ ...attempt, helped: !attempt.unaided });
 	if (how === "predicted" || how === "gaveUp") return { result, words: MARK_HOW_WORDS[how] };
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
 	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : null };

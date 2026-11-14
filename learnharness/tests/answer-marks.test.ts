@@ -166,9 +166,10 @@ describe("the mark that stands", () => {
 		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, reported), {});
 	});
 
-	it("a right guess counted as helped says so", () => {
-		assert.equal(countedWords({ grade: "helped", helped: false, predicted: false, gaveUp: false }), "Counted as helped");
-		assert.equal(countedWords({ grade: "solid", helped: false, predicted: false, gaveUp: false }), "On your own");
+	it("an answer with no help reads On your own whatever its grade: a guess or a partly right answer was never helped (round 6)", () => {
+		assert.equal(countedWords({ helped: false, predicted: false, gaveUp: false }), "On your own");
+		assert.equal(countedWords({ helped: true, predicted: false, gaveUp: false }), "With help");
+		assert.ok(!Object.values(MARK_HOW_WORDS).includes("Counted as helped"), "no card names help he never got");
 	});
 
 	it("⌘⇧M picks the newest marked answer", () => {
@@ -207,10 +208,10 @@ describe("the dispute input", () => {
 
 	it("tells the tutor how the card words each grade, so the ruling never contradicts the card (round 5)", () => {
 		const content = String((inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q1", observations: ["o4"], said: "It is my own work" }).at(-1) as { content: string }).content);
-		for (const how of ["withHelp", "countedHelped", "predicted", "gaveUp", "ownWork"] as const) {
+		for (const how of ["withHelp", "predicted", "gaveUp", "ownWork"] as const) {
 			assert.ok(content.includes(`"${MARK_HOW_WORDS[how]}"`), `the dispute names the card's words for ${how}`);
 		}
-		assert.match(content, /never call it his own work/);
+		assert.doesNotMatch(content, /Counted as helped/);
 	});
 
 	it("is refused for an answer with no mark", () => {

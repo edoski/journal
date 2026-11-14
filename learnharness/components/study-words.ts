@@ -101,16 +101,14 @@ export const ATTEMPT_WORDS = {
 	wrong: "Not right",
 } as const;
 
-/** How an attempt counted (`markHow`), in the words the answer card and
- *  the topic page's Earlier both say: a prediction before its step was
- *  taught never counts; he gave up without an answer; help was given; no
- *  help, but a guess, an unsure or a partly right answer counts as helped
- *  all the same; or his own work. */
+/** How an attempt went (`markHow`), in the words the answer card and the
+ *  topic page's Earlier both say: a prediction before its step was taught
+ *  never counts; he gave up without an answer; help was given; or no help,
+ *  a guess or a partly right answer included. */
 export const MARK_HOW_WORDS: Record<MarkHow, string> = {
 	predicted: "Prediction, not counted",
 	gaveUp: "Gave up",
 	withHelp: "With help",
-	countedHelped: "Counted as helped",
 	ownWork: "On your own",
 };
 

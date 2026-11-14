@@ -266,12 +266,12 @@ const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {
 	incorrect: "not right (incorrect)",
 };
 
-/** How his answer card words an attempt's grade (study-words.ts
- *  `MARK_HOW_WORDS`, the rule `markHow`), so a ruling says what the card
- *  says (round 5: "it already counts as your own work, with no help" sat on
- *  a card reading "Counted as helped"). */
+/** How his answer card words an attempt (study-words.ts `MARK_HOW_WORDS`,
+ *  the rule `markHow`), so a ruling says what the card says (round 5: "it
+ *  already counts as your own work, with no help" sat on a card that said
+ *  otherwise). */
 const CARD_WORDS_FOR_RULING =
-	'His card says how each attempt counts, from its grade: help given reads "With help"; no help, but a guess, an unsure or a partly right answer reads "Counted as helped"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; any other attempt with no help reads "On your own". In your ruling and in `ruling`, say how it counts in the card\'s words for the attempt as you re-mark it: when its grade is helped with no help given, never call it his own work.';
+	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it. In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
 
 /** The longest question excerpt a dispute quotes. */
 const DISPUTE_QUOTE = 400;

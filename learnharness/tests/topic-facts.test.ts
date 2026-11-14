@@ -401,7 +401,7 @@ describe("how an attempt went", () => {
 	it("says right, partly or wrong (never missed, which reads as skipped), and the one thing worth saying about it", () => {
 		assert.deepEqual(attemptMark(attempt(), titleOf), { result: "right", words: null });
 		assert.deepEqual(attemptMark(attempt({ result: "partial", unaided: false }), titleOf), { result: "partly", words: "With help" });
-		assert.deepEqual(attemptMark(attempt({ grade: "helped", sure: "guess" }), titleOf), { result: "right", words: "Counted as helped" });
+		assert.deepEqual(attemptMark(attempt({ grade: "helped", sure: "guess" }), titleOf), { result: "right", words: null }, "a guess with no help was his own answer");
 		assert.deepEqual(attemptMark(attempt({ grade: "solid" }), titleOf), { result: "right", words: null });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", gaveUp: true, unaided: false }), titleOf), { result: "wrong", words: "Gave up" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", predicted: true, sure: "confident" }), titleOf), { result: "wrong", words: "Prediction, not counted" });
