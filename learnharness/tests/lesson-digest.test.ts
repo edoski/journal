@@ -216,6 +216,25 @@ describe("the digest's patch", () => {
 		assert.equal("observations" in (patch?.changes ?? {}), false);
 	});
 
+	it("after the lesson's close it introduces no topic and creates none, so no day the close named moves; gaps, knowledge and the task still save", () => {
+		const patch = digestChanges(
+			{
+				topics: [
+					{ handle: "nullity", introduced: true, gap: "You forget the free columns", step: "rank-picture" },
+					{ handle: "pivot", title: "Pivots", needs: ["rank"], step: "rank-picture" },
+				],
+				knowledge: [{ text: "Pivots are circled in the notes", topics: ["rank", "pivot"], step: "warm-up" }],
+				task: { key: "sheet-2", step: "Exercise 2" },
+			},
+			{ ...view, closed: true },
+		);
+		assert.deepEqual(patch?.changes, {
+			topics: { nullity: { gap: "You forget the free columns" } },
+			knowledge: { [knowledgeHandle("Pivots are circled in the notes")]: { text: "Pivots are circled in the notes", topics: ["rank"] } },
+			tasks: { "sheet-2": { step: "Exercise 2" } },
+		});
+	});
+
 	it("is null when nothing changes", () => {
 		assert.equal(digestChanges({ topics: [{ handle: "rank", gap: "Old gap", step: "rank-picture" }], knowledge: [], current: "rank" }, view), null);
 	});
@@ -386,7 +405,7 @@ describe("a digest run", () => {
 		assert.equal(outcome.status, "saved");
 		assert.deepEqual(course.saves, [
 			{
-				topics: { rank: { gap: "You count rows instead of pivots" }, nullity: { introduced: true } },
+				topics: { rank: { gap: "You count rows instead of pivots" } },
 				knowledge: { [knowledgeHandle("Pivots are circled in the notes")]: { text: "Pivots are circled in the notes", topics: ["rank"] } },
 				tasks: { "sheet-2": { step: "Exercise 2: find the rank of $B$" } },
 			},
@@ -421,9 +440,9 @@ describe("a digest run", () => {
 		assert.deepEqual((course.saves[0]!.topics as Record<string, unknown>).rank, { gap: "You count rows instead of pivots" });
 	});
 
-	it("in a course with arcs, a new topic joins the lesson's arc, and the summary names the arc the engine placed the others in", async () => {
+	it("in a course with arcs, a new topic from a lesson left partway joins the lesson's arc, and the summary names the arc the engine placed the others in", async () => {
 		const record = chatStore.createChat("Bases", { workspace: "/courses/linalg", title: "Linear algebra" }, ["basis"]);
-		chatStore.saveMessages(record.id, closedLesson());
+		chatStore.saveMessages(record.id, lesson("Pivots it is."));
 		chatStore.saveTree(record.id, TREE);
 		const course = memoryCourse(() => null, {
 			whole: {
