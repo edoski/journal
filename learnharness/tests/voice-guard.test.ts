@@ -1,0 +1,206 @@
+/**
+ * The voice held per turn (round 6, 14 Nov 2026): every message and
+ * question the tutor sends is read against the voice before he sees it,
+ * and one that breaks it is rewritten once, silently. The slips below are
+ * the round-6 evaluators' recorded turns, word for word.
+ */
+import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { after, describe, it } from "node:test";
+import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep, type ToolCall } from "@earendil-works/pi-ai";
+import { fakeEngine, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import type { LhMessage } from "../src/core/native-messages.ts";
+
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-voice-guard-"));
+const originalEnv = process.env;
+process.env = { ...originalEnv, NODE_ENV: "test", LH_DATA_DIR: path.join(scratch, "data"), LH_CREDENTIALS_DIR: scratch, HOME: path.join(scratch, "home") };
+after(() => {
+	process.env = originalEnv;
+	fs.rmSync(scratch, { recursive: true, force: true });
+});
+
+const { VoiceGuard, turnInputOf } = await import("../src/agent/voice-guard.ts");
+const { createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
+const { sendToUserTool } = await import("../src/agent/tools/send-to-user.ts");
+const { SEND_TO_USER_TOOL, newDoneTonightMessage, newUserMessage, asAgentMessages } = await import("../src/core/native-messages.ts");
+const { projectView } = await import("../src/core/view.ts");
+
+let n = 0;
+const send = (message: string): ToolCall => ({ type: "toolCall", id: `send-${++n}`, name: SEND_TO_USER_TOOL, arguments: { message } });
+const ask = (question: string, tool = "explain"): ToolCall => ({ type: "toolCall", id: `q-${++n}`, name: tool, arguments: { question, type: "check" } });
+const assistant = (content: unknown[]): LhMessage => ({ ...fauxAssistantMessage(""), content, id: `a-${++n}` }) as LhMessage;
+/** His answer to a question, as the dock returns it. */
+const answered = (callId: string, text: string): LhMessage =>
+	({ id: `r-${++n}`, role: "toolResult", toolCallId: callId, toolName: "explain", content: [{ type: "text", text }], details: { kind: "explain", text, answeredAt: "2026-11-08T21:00:00Z" }, isError: false, timestamp: 1 }) as LhMessage;
+const hinted = (callId: string): LhMessage =>
+	({ id: `r-${++n}`, role: "toolResult", toolCallId: callId, toolName: "explain", content: [{ type: "text", text: "hint" }], details: { kind: "explain", hintRequested: true }, isError: false, timestamp: 1 }) as LhMessage;
+const thinking = (text: string): LhMessage => ({ id: `t-${++n}`, role: "custom", customType: "practice-thinking", content: `Your thinking: ${text}`, display: true, details: {}, timestamp: 1 }) as LhMessage;
+const nextProblem = (): LhMessage => ({ id: `x-${++n}`, role: "custom", customType: "practice-next", content: "[NEXT PROBLEM]", display: true, details: {}, timestamp: 1 }) as LhMessage;
+
+/** A lesson so far that asked one question and has his answer to it. */
+function answering(text: string): LhMessage[] {
+	const q = ask("A question.");
+	return [newUserMessage("Invertible matrices"), assistant([q]), answered(q.id, text)];
+}
+
+const rules = (guard: InstanceType<typeof VoiceGuard>, call: ToolCall): string[] => {
+	guard.screen(call);
+	const refused = (guard as unknown as { decisions: Map<string, { details: { rules?: string[]; withheld: string } } | null> }).decisions.get(call.id);
+	return refused ? (refused.details.rules ?? [refused.details.withheld]) : [];
+};
+
+describe("the round-6 slips are rewritten before he sees them", () => {
+	it("a 9-sentence direct answer to his question", () => {
+		const turn = [newUserMessage("Rank"), assistant([send("A step.")]), newUserMessage("why is the number of pivots the same however I row reduce?")];
+		const answer =
+			"No. Whatever order you use, you always get the same number of pivots, because that number measures something that row operations leave unchanged. Think of the rows of $A$ as vectors that span a subspace, called the row space. Each row operation replaces one row with a combination of the rows, and it can be undone, so every row you have before and after an operation still lies in the same subspace. The rows move around inside it, but the subspace is the same. The nonzero rows of any echelon form are independent, because each one starts in a pivot column where the rows below it have zeros. They also still span the row space, so they form a basis of it:\n\n$$\n\\text{number of pivots} = \\dim(\\text{row space of } A)\n$$\n\nA dimension does not depend on which basis you happen to reach. In problem 1, every order of operations gives you two independent rows that span the same plane in $\\mathbb{R}^5$, so you always get two pivots.";
+		assert.deepEqual(rules(new VoiceGuard(turn), send(answer)), ["length"]);
+	});
+
+	it("a 3-sentence close after Done for today", () => {
+		const close = "You stopped today with the Poisson formula derived. Next time you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
+		assert.deepEqual(rules(new VoiceGuard([newUserMessage("Poisson"), assistant([send("A step.")]), newDoneTonightMessage("teacher") as LhMessage]), send(close)), ["length"]);
+	});
+
+	it("closing words after a problem: too long, and advice said earlier in the session", () => {
+		const earlier = assistant([ask("Show that $N$ is not invertible by finding a nonzero vector $v$ with $Nv = 0$.")]);
+		const turn = [newUserMessage("Rank practice"), assistant([send("The check only protects you when you multiply out every entry.")]), earlier, thinking("2u - v - w = 0")];
+		const guard = new VoiceGuard(turn);
+		guard.screen({ type: "toolCall", id: "c1", name: "conclude", arguments: {} });
+		const close = "The decisive move was not trusting \"no two are parallel\" with three vectors, and you made it on your own. Before you write down a dependence relation, multiply it out to check it. A one-line check would have caught the sign.";
+		assert.deepEqual(rules(guard, send(close)), ["length", "repeat"]);
+	});
+
+	it("two questions in one question", () => {
+		const q = "Suppose row operations $E_1, \\dots, E_k$ reduce $A$ all the way to $I$, so $E_k \\cdots E_1 A = I$. What is the product $E_k \\cdots E_1$? And how could you get that product written down while you reduce $A$, without ever multiplying the $E_i$ together?";
+		assert.deepEqual(rules(new VoiceGuard(answering("E^{-1}")), ask(q)), ["questions"]);
+	});
+
+	it("advice under a question", () => {
+		const q = "Show that\n$$\nN = \\begin{pmatrix} 1 & 2 & 0 \\\\ 0 & 1 & -1 \\\\ 2 & 1 & 3 \\end{pmatrix}\n$$\nis not invertible by finding a nonzero vector $v$ with $Nv = 0$. Check your $v$ by multiplying it out.";
+		assert.deepEqual(rules(new VoiceGuard(answering("v = (1,1,1)")), ask(q)), ["advice"]);
+		const message = "Here $AB$ sends $x$ to $A(Bx)$. In $ABx$, which map acts on $x$ first? Think of $AB$ as a composition of maps.";
+		assert.deepEqual(rules(new VoiceGuard(answering("A first")), send(message)), ["advice"]);
+	});
+
+	it("the same advice four times in a lesson, however reworded", () => {
+		const turn = [newUserMessage("Invertible matrices"), assistant([ask("Find $v$ with $Nv = 0$. Write it down.")]), assistant([send("Check your $v$ by multiplying it out.")])];
+		const q = ask("Use $[A \\mid I]$ to find $A^{-1}$. The check only protects you when you multiply out every entry.");
+		assert.ok(rules(new VoiceGuard([...turn, answered("x", "done")]), q).includes("repeat"));
+	});
+
+	it("his answer handed back to him", () => {
+		const reply = "That is $E$, and the reason it works for every $A$ is that row $i$ of $EA$ is the combination of the rows of $A$ whose coefficients are row $i$ of $E$.";
+		assert.deepEqual(rules(new VoiceGuard(answering("Yes, E = [[1,0,0],[-2,1,0],[0,0,1]], apply the operation to I")), send(reply)), ["echo"]);
+		const product = "The product is $A^{-1}$, and writing $I$ beside $A$ makes the right-hand block collect $E_k \\cdots E_1 I$ with no multiplication.";
+		assert.deepEqual(rules(new VoiceGuard(answering("It's A^{-1}, apply the same ops to I alongside")), send(product)), ["echo"]);
+		assert.deepEqual(rules(new VoiceGuard(answering("rank 2")), send("You got it right: rank 2, with pivots in columns 1 and 3.")), ["echo"]);
+	});
+
+	it("\"just explain\" answered with the topic's planned day", () => {
+		const turn = [newUserMessage("Graph representations"), assistant([send("A step.")]), newUserMessage("Can you just explain BFS to me and why it gives shortest paths?")];
+		const reply = "BFS starts at a source $s$ with $d[s] = 0$ and puts $s$ in a FIFO queue. BFS is planned to start on Thursday 19 November. If you'd like it as a full lesson now, with the proof built step by step, say so.";
+		assert.deepEqual(rules(new VoiceGuard(turn), send(reply)), ["plan"]);
+	});
+});
+
+describe("turns within the voice pass untouched", () => {
+	const good: Array<[string, LhMessage[], ToolCall]> = [
+		["a hint, one question", [newUserMessage("Graphs"), assistant([ask("Build the transpose.", "recall")]), hinted("x")], send("When you meet $v$ in the list of $u$, which edge of $G$ is that, and which edge does it become in $G^T$?")],
+		[
+			"a wrong answer, where it broke and the correct move",
+			answering("No row is a multiple of another, so rank 3"),
+			send("That's not right. \"No row is a multiple of another\" only rules out dependence between pairs, and here $R_3 = R_1 + R_2$. Row reducing gives two pivots, so the rank is $2$, and $A$ is not invertible."),
+		],
+		["a lesson's first step", [newUserMessage("Poisson")], send("Today: the exact probability of $k$ events when they arrive independently at an average rate, derived by taking your slot model to its limit.")],
+		["a two-sentence close", [newUserMessage("Rank"), assistant([send("A step.")]), newDoneTonightMessage("practice") as LhMessage], send("Next time you pick up with part (c) of sheet 4. Your rank review comes back on Friday 13 November.")],
+		["a check question", answering("rank 2"), ask("Calls arrive at an average of $\\lambda$ per minute, and the minute is split into $n$ slots. Write $P(X_n = k)$ in terms of $n$, $\\lambda$ and $k$.")],
+		["a correction that starts with the right value", answering("the product is AB"), send("That's not right: the product is $BA$, since $B$ acts first.")],
+	];
+	for (const [name, turn, call] of good) {
+		it(name, () => assert.deepEqual(rules(new VoiceGuard(turn), call), []));
+	}
+});
+
+describe("the guard's turn", () => {
+	it("reads the turn's input: his question, his answer, a hint, a close", () => {
+		assert.equal(turnInputOf([newUserMessage("Poisson")]).kind, "teach", "a lesson's first message is its topic");
+		assert.equal(turnInputOf([newUserMessage("Poisson"), assistant([send("x")]), newUserMessage("why?")]).kind, "direct");
+		assert.deepEqual(turnInputOf(answering("rank 2")), { kind: "wrong", answers: true, words: "rank 2" });
+		assert.equal(turnInputOf([newUserMessage("x"), assistant([ask("q")]), hinted("q")]).kind, "hint");
+		assert.equal(turnInputOf([newUserMessage("x"), assistant([send("x")]), nextProblem()]).kind, "close");
+	});
+
+	it("takes a refused message's text out of the live call, so no view draws it", () => {
+		const guard = new VoiceGuard(answering("rank 2"));
+		const call = send("You got it right: rank 2.");
+		guard.screen(call);
+		assert.deepEqual(call.arguments, {});
+		const view = projectView([...answering("rank 2"), assistant([call])] as LhMessage[], { executions: new Map(), inFlight: true, streamingIds: new Set() });
+		assert.ok(!JSON.stringify(view).includes("You got it right"));
+	});
+
+	it("refuses once a turn for each kind of call: a rewrite that still slips is shown", () => {
+		const guard = new VoiceGuard(answering("rank 2"));
+		assert.deepEqual(rules(guard, send("You got it right: rank 2.")), ["echo"]);
+		assert.deepEqual(rules(guard, send("Yes, rank 2.")), []);
+		assert.deepEqual(rules(guard, ask("What is $A^2$? Why?")), ["questions"]);
+		assert.deepEqual(rules(guard, ask("What is $A^3$? Why?")), []);
+	});
+
+	it("never shows the same message twice in a turn", () => {
+		const guard = new VoiceGuard([newUserMessage("Rank")]);
+		const text = "The rank is the number of pivots.";
+		assert.deepEqual(rules(guard, send(text)), []);
+		assert.deepEqual(rules(guard, send(text)), ["duplicate"]);
+	});
+
+	it("the wrapped tool returns the refusal, with what to fix and the refused text kept", async () => {
+		const guard = new VoiceGuard(answering("rank 2"));
+		const result = await guard.wrap(sendToUserTool).execute("s1", { message: "You got it right: rank 2." });
+		assert.equal(result.isError, true);
+		assert.match((result.content[0] as { text: string }).text, /^Not shown to him[\s\S]*Start with the content[\s\S]*Send it again with send_to_user/);
+		assert.deepEqual(result.details, { withheld: "voice", rules: ["echo"], text: "You got it right: rank 2." });
+		const passed = await guard.wrap(sendToUserTool).execute("s2", { message: "The pivots sit in columns 1 and 3." });
+		assert.equal(passed.isError, undefined);
+	});
+});
+
+describe("a real turn on the Agent SDK", () => {
+	function scripted(steps: FauxResponseStep[]) {
+		const faux = createFauxCore({ provider: "anthropic", models: [{ id: "claude-opus-5-5" }] });
+		faux.setResponses(steps);
+		const model: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
+		return { engine: fakeEngine(model), faux };
+	}
+
+	it("he sees only the rewrite: the tutor reads what to fix and sends again in the same turn", async () => {
+		const close = "You stopped today with the Poisson formula derived. Next time you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
+		const rewrite = "Next time you pick up the Poisson lesson at its open check. Your Poisson review comes back on Saturday 14 November.";
+		let told = "";
+		const { engine, faux } = scripted([
+			fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: close }, { id: "close-1" })], { stopReason: "toolUse" }),
+			(context) => {
+				const refused = context.messages.find((m) => m.role === "toolResult" && m.toolCallId === "close-1");
+				told = refused && refused.role === "toolResult" ? (refused.content[0] as { text: string }).text : "";
+				return fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: rewrite }, { id: "close-2" })], { stopReason: "toolUse" });
+			},
+			fauxAssistantMessage(""),
+		]);
+		const record = asAgentMessages([newUserMessage("Poisson"), assistant([send("A step.")]), newDoneTonightMessage("teacher") as LhMessage]);
+		const agent = createTeacherAgent(undefined, { engine, messages: record });
+		const views: string[] = [];
+		agent.subscribe((event) => {
+			if (event.type === "message_update") views.push(JSON.stringify(projectView(agent.state.messages.concat(event.message) as LhMessage[])));
+		});
+		await agent.continue();
+		assert.equal(faux.state.callCount, 3);
+		assert.match(told, /^Not shown to him: this message breaks the voice\.\n- It is too long for a close \(3 sentences, budget 2\)/);
+		const shown = JSON.stringify(projectView(agent.state.messages as LhMessage[]));
+		assert.ok(shown.includes("Your Poisson review comes back"), "the rewrite shows");
+		assert.ok(!shown.includes("You stopped today"), "the refused close never shows");
+		assert.ok(views.every((v) => !v.includes("You stopped today")), "not even while the reply streams");
+	});
+});

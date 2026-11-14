@@ -10,6 +10,10 @@
  * - `promptVoiceBreaks(text)`: an instruction text the agents read, whose
  *   quoted examples must not model what the voice bans, and which must not
  *   ask for a banned form.
+ *
+ * The turn guard (src/agent/voice-guard.ts) adds the rules a turn needs its
+ * context for: advice under a question, advice said earlier in the session,
+ * and his answer handed back to him.
  */
 
 /** The kinds of turn the voice budgets (### How long each kind of turn is). */
@@ -30,6 +34,9 @@ export type VoiceRule =
 	| "questions"
 	| "headings"
 	| "repeat"
+	| "advice"
+	| "echo"
+	| "duplicate"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -205,4 +212,75 @@ export function promptVoiceBreaks(text: string): VoiceBreak[] {
 		if (m) out.push({ rule: "asks-banned", excerpt: `${m[0]} (asks for ${asks})` });
 	}
 	return out;
+}
+
+/** A sentence of advice on how he should work: checking, verifying, what
+ *  to think of, where to stop, what would have caught a slip. */
+const ADVICE =
+	/^(?:check|verify|make sure|remember|be careful|note that|don'?t forget|try to|think of|always)\b|^(?:before|when|whenever|if) you\b[^,]*,\s*(?:check|verify|multiply|make sure|always)\b|\b(?:should have caught|would have caught|protects you|you can stop there|stop there)\b/i;
+
+/** The sentences of a text that give advice on how to work. */
+export function adviceSentences(text: string): string[] {
+	return sentences(prose(text).text).filter((s) => ADVICE.test(s));
+}
+
+const STOP = new Set(
+	"a an the of to it its it's your you you're by on in at and or but is are was were be been that this these those when before after every each one only would should could have has had with for from as so if then there here not no".split(" "),
+);
+
+/** The content words of a sentence, each cut to a rough stem, so "multiply
+ *  it out" and "multiplying out" share one. */
+function stems(sentence: string): Set<string> {
+	const out = new Set<string>();
+	for (const w of sentence.toLowerCase().match(/[a-z]+/g) ?? []) {
+		if (STOP.has(w) || w === "x" || w.length < 3) continue;
+		out.add(w.length > 4 ? w.replace(/(?:ing|ed|es|s)$/, "") : w);
+	}
+	return out;
+}
+
+/** The first advice sentence of `text` that says again what an advice
+ *  sentence of `earlier` said: two content words in common, however
+ *  reworded. Null when none repeats. */
+export function repeatedAdvice(text: string, earlier: readonly string[]): { said: string; before: string } | null {
+	const before = earlier.flatMap(adviceSentences).map((s) => ({ s, stems: stems(s) }));
+	for (const said of adviceSentences(text)) {
+		const mine = stems(said);
+		const match = before.find((b) => [...mine].filter((w) => b.stems.has(w)).length >= 2);
+		if (match) return { said, before: match.s };
+	}
+	return null;
+}
+
+/** The prose sentences after a message's last question: what sits under
+ *  the question, list items aside (a question's options). */
+export function afterQuestion(text: string): string[] {
+	const lines = prose(text)
+		.text.split(/\n+/)
+		.filter((l) => !/^\s*(?:[-*+]|\d+\.)\s/.test(l))
+		.join("\n");
+	const said = sentences(lines);
+	const last = said.map((s) => s.trim().endsWith("?")).lastIndexOf(true);
+	return last < 0 ? [] : said.slice(last + 1);
+}
+
+/** A first sentence that hands his answer back to him or grades a right
+ *  one: "You got it right: …", "Yes, …", "That is right, …" always; "That
+ *  is X, …" and "The product is X, …" when X is what he answered. */
+const GRADES = /^(?:you got it|you(?:'re| are) right|you said|your answer (?:is|was)|yes\b|(?:that|this|it)(?:'s| is) (?:right|correct)\b|(?:right|correct)[,.])/i;
+const RESTATES = /^(?:(?:that|this|it)(?:'s| is) X\b|the [a-z]+(?: [a-z]+){0,3} (?:is|are) X\s*[,.])/i;
+
+const bare = (math: string) => math.replace(/\\(?:left|right)|[\s${}]/g, "");
+
+/** The opening sentence of a reply to his answer when it echoes or grades
+ *  his answer instead of starting with the content; `answer` is his words. */
+export function echoOf(text: string, answer: string | null): string | null {
+	const raw = sentences(text.replace(FENCE, " ").replace(/\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]/g, "\n"))[0]?.trim();
+	const plain = raw ? sentences(prose(raw).text)[0]?.trim() : undefined;
+	if (!raw || !plain) return null;
+	if (GRADES.test(plain)) return raw;
+	if (!answer || !RESTATES.test(plain)) return null;
+	const said = bare(answer);
+	const maths = [...raw.matchAll(/\$([^$\n]+)\$/g)].map((m) => bare(m[1]!)).filter(Boolean);
+	return maths.some((m) => said.includes(m)) ? raw : null;
 }
