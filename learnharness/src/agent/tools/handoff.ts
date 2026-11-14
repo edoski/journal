@@ -50,7 +50,7 @@ export const teachHandoffInput = Type.Object({
 	topic: Type.String({
 		description: "REQUIRED — what to teach: his words, or the course topic handle that lapsed.",
 	}),
-	reason: Type.String({ description: "REQUIRED — one line: why teaching now (he asked, or the topic lapsed again)." }),
+	reason: Type.String({ description: "REQUIRED — one line: why teaching now (he asked for an explanation, he asked to be taught, or the topic lapsed again)." }),
 });
 
 function handedOff(ctx: HandoffContext, toolCallId: string, mode: SessionMode): AgentToolResult<{ ok: true; mode: SessionMode }> {

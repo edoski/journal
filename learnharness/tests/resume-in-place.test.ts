@@ -213,7 +213,7 @@ async function pressContinue(factory: Parameters<typeof handleChatRequest>[1]): 
 }
 
 const PROBE_OR_PLAN = new Set(["probe_done", "recall", "probe", "plan_init"]);
-const ROUTING_STEP = "## 0. Practice or a lesson";
+const ROUTING_STEP = "# The opening — answer, practise or probe";
 
 describe("Continue on a lesson stopped at part (c)", () => {
 	it("opens it at its step: no new session, no new probe question, no new plan", async () => {

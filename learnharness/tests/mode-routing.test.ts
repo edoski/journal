@@ -25,7 +25,7 @@ import {
 } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { PiEngine } from "../src/agent/models.ts";
-import { createPracticeAgent, createProberAgent, createTeacherAgent, type AgentKind } from "../src/agent/teacher-agent.ts";
+import { composeInstructions, createPracticeAgent, createProberAgent, createTeacherAgent, type AgentKind } from "../src/agent/teacher-agent.ts";
 import { practiceHandoffTool, teachHandoffTool } from "../src/agent/tools/handoff.ts";
 import { practiceTools } from "../src/agent/tools/practice.ts";
 import { createProberTools } from "../src/agent/tools.ts";
@@ -85,6 +85,27 @@ function callPair(name: string, id: string, details: unknown): LhMessage[] {
 async function run(tool: AgentTool<any>, callId: string, args: unknown) {
 	return tool.execute(callId, args as never, undefined, undefined);
 }
+
+describe("a focused question gets a direct answer", () => {
+	it("the prober decides answer, practise or probe before any probing, and leans to the answer", () => {
+		const prober = composeInstructions("prober");
+		const opening = prober.indexOf("# The opening — answer, practise or probe");
+		assert.ok(opening >= 0 && opening < prober.indexOf("# The probe"), "the opening's choice comes before the probe");
+		for (const pin of ["## A focused question — answer it", "**When it is unclear**", "**A direct answer records nothing.**", "**End on the next step, in one line**", "## Practice — `practice`", "**Back from practice.**"]) {
+			assert.ok(prober.includes(pin), `the opening lost: ${pin}`);
+		}
+		assert.ok(!prober.includes("Anything else is a lesson: probe as below."), "the old everything-is-a-lesson routing is gone");
+	});
+
+	it("the teacher answers his own questions directly and plans only lessons; practice says which he asked for", () => {
+		const teacher = composeInstructions("teacher");
+		assert.ok(teacher.includes("### His own questions — answered directly"));
+		assert.ok(teacher.includes("A direct answer to a focused question is not a lesson and needs no plan"));
+		assert.ok(teacher.includes("**Back from practice.**"));
+		assert.ok(composeInstructions("practice").includes("Its `reason` says which he asked for, an explanation or to be taught"));
+		assert.match(JSON.stringify(teachHandoffTool({ chatId: "c", chatStore, deliver: () => {} }, { problemActive: false }).teach!.parameters), /asked for an explanation/);
+	});
+});
 
 describe("the handoff tools", () => {
 	it("practice: hands off, ends the turn and queues one wake for the practice agent", async () => {
@@ -239,7 +260,7 @@ function waitFor(cond: () => boolean, what: string, timeoutMs = 15_000): Promise
 
 const messagesOf = (chatId: string) => chatStore.getChat(chatId)!.messages;
 const call = (name: string, args: unknown, id: string) => fauxAssistantMessage([fauxToolCall(name, args as never, { id })], { stopReason: "toolUse" });
-const ROUTING_STEP = "## 0. Practice or a lesson";
+const ROUTING_STEP = "# The opening — answer, practise or probe";
 
 afterEach(() => setTurnRunner(async () => 200));
 
@@ -270,7 +291,8 @@ describe("routing end to end (scripted model)", () => {
 			(seen) => {
 				assert.equal(seen.agent, "prober", "back in teaching, the probe has not concluded");
 				assert.ok(seen.last.includes("[TEACHING]"));
-				return fauxAssistantMessage([fauxText("Where does rank first feel unclear to you?")]);
+				assert.ok(seen.prompt.includes("**Back from practice.**"), "the prober reads why the session came back");
+				return fauxAssistantMessage([fauxText("Rank is the number of pivots after elimination. Back to the problems, or a full lesson on rank?")]);
 			},
 		]);
 
@@ -281,7 +303,7 @@ describe("routing end to end (scripted model)", () => {
 
 		await send(chatId, { type: "thinking", problemCallId: "p-rank", text: "actually just explain it", confidence: "neutral" }, factory);
 		await waitFor(() => agents.length === 4, "the teaching wake");
-		await waitFor(() => JSON.stringify(messagesOf(chatId).at(-1)).includes("Where does rank"), "the prober's reply");
+		await waitFor(() => JSON.stringify(messagesOf(chatId).at(-1)).includes("Back to the problems"), "the prober's direct answer");
 
 		const messages = messagesOf(chatId);
 		assert.deepEqual(agents, ["prober", "practice", "practice", "prober"]);
@@ -291,19 +313,28 @@ describe("routing end to end (scripted model)", () => {
 		assert.deepEqual(dividers, ["practice", "teach"], "the transcript marks both switches");
 	});
 
-	it("\"explain eigenvalues\" stays in teaching", async () => {
+	it("\"explain eigenvalues\" stays in teaching, answered directly, and the lesson stays one yes away", async () => {
 		const chatId = newChat("stays teaching");
 		const { agents, factory } = session(chatId, [
 			(seen) => {
 				assert.equal(seen.agent, "prober");
 				assert.ok(seen.tools.includes("practice") && seen.prompt.includes(ROUTING_STEP));
 				assert.match(seen.last, /explain eigenvalues/);
+				return fauxAssistantMessage([fauxText("An eigenvector of $A$ is a direction $A$ only stretches: $Av = \\lambda v$. Want a quick question to check it, or a full lesson on eigenvalues?")]);
+			},
+			(seen) => {
+				assert.equal(seen.agent, "prober", "a direct answer concludes no probe: a full lesson still starts with the probe");
+				assert.match(seen.last, /full lesson/);
 				return fauxAssistantMessage([fauxText("What do you want to be able to do with eigenvalues?")]);
 			},
 		]);
 		await send(chatId, { type: "text", text: "explain eigenvalues" }, factory);
-		const messages = messagesOf(chatId);
-		assert.deepEqual(agents, ["prober"]);
+		let messages = messagesOf(chatId);
+		const calls = messages.flatMap((m) => (m.role === "assistant" ? m.content.filter((b) => b.type === "toolCall").map((b) => b.name) : []));
+		assert.deepEqual(calls, [], "the direct answer poses no question and saves nothing");
+		await send(chatId, { type: "text", text: "a full lesson please" }, factory);
+		messages = messagesOf(chatId);
+		assert.deepEqual(agents, ["prober", "prober"]);
 		assert.equal(sessionModeOf(messages), "teach");
 		assert.ok(!messages.some((m) => m.role === "custom" && m.customType === "mode-handoff"));
 	});

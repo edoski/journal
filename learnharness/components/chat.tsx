@@ -1380,7 +1380,7 @@ export function Chat({
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="New session"
-									description="The teacher will open by probing what you already know."
+									description="Ask one thing for a straight answer, or name a topic for a full lesson."
 								/>
 							)}
 
