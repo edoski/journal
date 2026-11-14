@@ -333,7 +333,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	// header and one 32px row per process, its detail opening under it.
 	// Cost and context live in the detail, not on the row's face.
 	return (
-		<NavSection data-testid="activity-section" title="Background agents" className="shrink-0 px-2 pt-2">
+		<NavSection data-testid="activity-section" title="Working in the background" className="shrink-0 px-2 pt-2">
 			<div className="flex max-h-[40dvh] flex-col overflow-y-auto">
 				{blobs.map((blob) => (
 					<ActivityRow
@@ -352,10 +352,10 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 }
 
 /** A run of the shared background registry in words: a finished lesson's
- *  digest, a course's map being built from its material, or the graph
- *  extraction's phase. */
+ *  digest saving what it taught to the course, a course's map being built
+ *  from its material, or the graph extraction's phase. */
 function extractionLabel(phase: string | undefined): string {
-	if (phase === "digesting") return "Digesting lesson";
+	if (phase === "digesting") return "Saving what you learned";
 	if (phase === "mapping") return "Building the course map";
 	return `Extraction — ${phase ?? "running"}`;
 }

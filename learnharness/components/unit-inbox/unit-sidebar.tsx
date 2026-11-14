@@ -73,7 +73,7 @@ const ICON_BUTTON =
  * the mark and collapse, then the search with the course filter and New
  * lesson beside it, then one list: Home's Today, each line that needs him
  * now as a card that opens its page, with everything else on the folded
- * shelves at the foot (inbox-today.md). Background agents show only while
+ * shelves at the foot (inbox-today.md). Background work shows only while
  * one runs; Settings is the footer's icon. Its right edge drags to resize,
  * as T3 Code's does; the width lasts across reloads.
  */
