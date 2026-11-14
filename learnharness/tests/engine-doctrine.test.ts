@@ -5,7 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { PATHS } from "../config.ts";
-import { ENGINE_DOCTRINE, courseMapDoctrine, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
+import { ARC_CUT_DOCTRINE, ARC_EDGES_DOCTRINE, ENGINE_DOCTRINE, composeDoctrine, courseMapDoctrine, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
+import { COURSE_MAP_INSTRUCTIONS } from "../src/agent/subagents/course-map-builder.ts";
+import { DIGEST_INSTRUCTIONS, digestSystemPrompt } from "../src/agent/subagents/lesson-digest.ts";
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-engine-doctrine-"));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
@@ -24,6 +26,27 @@ function copyReferences(dir: string, edit: (file: string, text: string) => strin
 		fs.writeFileSync(path.join(dir, file), edit(file, fs.readFileSync(path.join(PATHS.tutorReferences, file), "utf8")));
 	}
 }
+
+/** arcs.md's `## ` sections by title, each as composed: heading and body, trimmed. */
+function arcSections(dir: string = PATHS.tutorReferences): Map<string, string> {
+	const text = fs.readFileSync(path.join(dir, "arcs.md"), "utf8").trim();
+	return new Map(text.split(/\r?\n(?=## )/).slice(1).map((chunk) => [chunk.split(/\r?\n/, 1)[0]!.slice(3).trim(), chunk.trim()]));
+}
+const RECORD = ["What an arc is", "Placing a new topic", "Changing arcs"];
+/** Every prompt path that reads arcs.md, and the sections it reads (design-v2, 3.0). */
+const ARC_PATHS: ReadonlyArray<{ name: string; prompt: (dir?: string) => string; sections: readonly string[] }> = [
+	{ name: "prober", prompt: (dir) => courseRecordPrompt("prober", dir), sections: [...RECORD, "Probing an arc's start"] },
+	{ name: "teacher", prompt: (dir) => courseRecordPrompt("teacher", dir), sections: [...RECORD, "Teaching with arcs"] },
+	{ name: "practice", prompt: (dir) => courseRecordPrompt("practice", dir), sections: [...RECORD, "Teaching with arcs"] },
+	{ name: "course map builder", prompt: (dir) => courseMapDoctrine(dir), sections: RECORD },
+	{ name: "lesson digest", prompt: (dir) => digestSystemPrompt(dir), sections: ["Placing a new topic"] },
+	{ name: "arc cut", prompt: (dir) => composeDoctrine(ARC_CUT_DOCTRINE, dir), sections: ["What an arc is", "Forming arcs"] },
+	{ name: "arc edges", prompt: (dir) => composeDoctrine(ARC_EDGES_DOCTRINE, dir), sections: [] },
+];
+/** A section's sentences long enough to identify it, never its heading. */
+const sentences = (section: string) =>
+	section.split(/\r?\n/).slice(1).flatMap((line) => line.split(/(?<=[.;:])\s+/)).map(normalize).filter((s) => s.length >= 40);
+const ARC_RULE = /later arc|held arc|re-plan|arc_change/i;
 
 describe("engine doctrine", () => {
 	it("reads the engine's tutor references from the same repository", () => {
@@ -164,6 +187,79 @@ describe("engine doctrine", () => {
 		const dir = path.join(TMP, "renamed-recipe");
 		copyReferences(dir, (file, text) => (file === "course.md" ? text.replace("## Building the path", "## The path") : text));
 		assert.throws(() => courseMapDoctrine(dir), /engine doctrine: no "## Building the path" in course\.md/);
+	});
+
+	it("every prompt path composes its arcs.md sections verbatim, and no sentence of any other", () => {
+		const sections = arcSections();
+		for (const { name, prompt, sections: listed } of ARC_PATHS) {
+			const text = prompt();
+			for (const title of listed) assert.ok(text.includes(sections.get(title) ?? `missing ## ${title}`), `${name}: "## ${title}" is not arcs.md's text`);
+			const read = normalize(listed.map((title) => sections.get(title)!).join(" "));
+			for (const [title, section] of sections) {
+				if (listed.includes(title)) continue;
+				for (const sentence of sentences(section).filter((s) => !read.includes(s))) {
+					assert.ok(!normalize(text).includes(sentence), `${name} reads "${sentence}" from "## ${title}", which it does not list`);
+				}
+			}
+		}
+	});
+
+	it("every section of arcs.md is read by some prompt path", () => {
+		const read = new Set(ARC_PATHS.flatMap((p) => p.sections));
+		for (const title of arcSections().keys()) assert.ok(read.has(title), `arcs.md "## ${title}" reaches no prompt`);
+	});
+
+	it("an edit to arcs.md reaches every path that reads the section, with no copy left behind", () => {
+		const dir = path.join(TMP, "arcs-edited");
+		const marks = new Map([...arcSections().keys()].map((title, i) => [title, `Edited sentence ${i} for the drift test.`]));
+		copyReferences(dir, (file, text) => (file === "arcs.md" ? [...marks].reduce((t, [title, mark]) => t.replace(`## ${title}\n\n`, `## ${title}\n\n${mark} `), text) : text));
+		for (const { name, prompt, sections } of ARC_PATHS) {
+			for (const title of sections) assert.ok(prompt(dir).includes(marks.get(title)!), `${name}: "## ${title}" is not read from arcs.md`);
+		}
+	});
+
+	it("no prompt file, app instruction or course.md section states an arc rule or pastes arcs.md", () => {
+		const prompts = path.join(PATHS.root, "src", "agent", "prompts");
+		const files = (fs.readdirSync(prompts, { recursive: true }) as string[]).filter((f) => f.endsWith(".md"));
+		const texts: Array<[string, string]> = [
+			...files.map((f): [string, string] => [`prompts/${f}`, fs.readFileSync(path.join(prompts, f), "utf8")]),
+			["COURSE_MAP_INSTRUCTIONS", COURSE_MAP_INSTRUCTIONS],
+			["DIGEST_INSTRUCTIONS", DIGEST_INSTRUCTIONS],
+			["course.md", fs.readFileSync(path.join(PATHS.tutorReferences, "course.md"), "utf8")],
+		];
+		const all = [...arcSections().values()].flatMap(sentences);
+		for (const [name, text] of texts) {
+			assert.doesNotMatch(text, ARC_RULE, `${name} states an arc rule; it belongs in arcs.md`);
+			for (const sentence of all) assert.ok(!normalize(text).includes(sentence), `${name} pastes arcs.md: "${sentence}"`);
+		}
+	});
+
+	it("the edge step reads the prerequisite test alone, and nothing about arcs", () => {
+		const edges = composeDoctrine(ARC_EDGES_DOCTRINE);
+		assert.match(edges, /^# Course, exam and path\n\n## Building the path\n\n3\. \*\*Prerequisites\.\*\*/);
+		assert.match(edges, /could the learner work an exercise on B having never seen A/);
+		assert.doesNotMatch(edges, /\barcs?\b|4\. \*\*/i);
+	});
+
+	it("an arc's first lesson: the prober brackets its entry, the teacher's goal line is its purpose, and the close points elsewhere for the check", () => {
+		const prober = normalize(courseRecordPrompt("prober"));
+		const teacher = normalize(courseRecordPrompt("teacher"));
+		assert.ok(prober.includes("its `entry`, are one more strand to bracket, lapsed topics first"));
+		assert.ok(!teacher.includes("one more strand to bracket"), "the teacher recalls no entry a second time");
+		assert.ok(teacher.includes("The lesson's one-line goal is the arc's purpose line, in your words: no other preamble, and teaching starts in the same turn."));
+		assert.ok(teacher.includes("it points to **Check it** on the course page or to the next session, and never asks for a yes in this one"));
+	});
+
+	it("\"arc\" means only an arc of the course in the prompts that compose arcs.md", () => {
+		const practice = path.join(PATHS.root, "src", "agent", "prompts", "practice");
+		for (const file of fs.readdirSync(practice)) assert.doesNotMatch(fs.readFileSync(path.join(practice, file), "utf8"), /\barc\b/i, `practice/${file}`);
+	});
+
+	it("one meaning of excluded: no exam session examines it", () => {
+		const recipe = normalize(courseMapDoctrine());
+		assert.ok(recipe.includes("`excluded` is only for what no exam session of the course examines"));
+		assert.ok(normalize(arcSections().get("Changing arcs")!).includes("`excluded` is only for what no exam session of the course ever examines"));
+		assert.doesNotMatch(recipe, /What the exam leaves out stays out of the path/);
 	});
 
 	it("every example in course.md registers the sources it cites", () => {
