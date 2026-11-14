@@ -25,7 +25,7 @@ export interface BackgroundRun {
 	 *  built for. Aborts and the chat-deletion wind-down match on it. */
 	chatId: string;
 	kind: RunKind;
-	/** What the dock row says, when the run names itself ("Mapping Linear algebra"). */
+	/** What the dock row says, when the run names itself (a map build by its course, "Linear algebra"). */
 	label?: string;
 	phase: RunPhase;
 	startedAt: number;

@@ -78,7 +78,7 @@ export function activityFeed(): {
 	const extractions: ActivityExtraction[] = backgroundRuns().map((run) => ({
 		id: run.id,
 		chatId: run.chatId,
-		// A map build names itself ("Mapping Linear algebra"); a digest
+		// A map build names itself by its course ("Linear algebra"); a digest
 		// takes its lesson's title.
 		title: run.label ?? chatStore.getChat(run.chatId)?.title ?? run.chatId,
 		phase: run.phase,

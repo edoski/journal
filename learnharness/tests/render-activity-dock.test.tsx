@@ -57,7 +57,7 @@ describe("activity dock pure layer", () => {
 	it("a digest and a map build are one row each, keyed by their registry key", () => {
 		const rows: FeedExtraction[] = [
 			{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 1000 },
-			{ id: "algebra#course-map", chatId: "algebra", title: "Mapping Algebra", phase: "mapping", startedAt: NOW - 500 },
+			{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 500 },
 		];
 		const blobs = toBlobs({ jobs: [], extractions: rows });
 		assert.deepEqual(blobs.map((b) => b.id), ["cx#digest", "algebra#course-map"], "unique row ids — no duplicate React keys");
@@ -220,18 +220,18 @@ describe("activity section render", () => {
 	it("renders one row per running process with elapsed time and the abort affordance; the detail carries activity and cost", async () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "j1", kind: "demo", activity: "building sandbox…", title: "Chain-rule demo" })],
-			extractions: [{ id: "algebra#course-map", chatId: "algebra", title: "Mapping Algebra", phase: "mapping", startedAt: NOW - 60_000 }],
+			extractions: [{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 60_000 }],
 		};
 		const html = renderToStaticMarkup(<ActivitySection feed={feed} />);
 		assert.match(html, /data-testid="activity-section"/);
 		assert.match(html, /data-testid="activity-blob-job"/);
 		assert.match(html, /data-testid="activity-blob-extraction"/);
 		assert.match(html, /Chain-rule demo/);
-		assert.match(html, /Mapping Algebra/);
+		assert.match(html, /Mapping course · Algebra|Mapping course[\s\S]*Algebra/);
 		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g)?.length, 2, "elapsed on every row");
 		assert.equal(html.match(/data-testid="activity-abort"/g)?.length, 2, "END on every row's face, detail-independent");
 		assert.match(html, /aria-label="End Demo builder in Chain-rule demo"/, "the stop button names what it stops");
-		assert.match(html, /aria-label="End Mapping course in Mapping Algebra"/);
+		assert.match(html, /aria-label="End Mapping course in Algebra"/);
 		assert.match(html, /Background agents/);
 		assert.doesNotMatch(html, /building sandbox…/, "what it is doing waits in the detail");
 

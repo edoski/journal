@@ -288,7 +288,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		let signal: AbortSignal | undefined;
 		try {
 			// The dock row shows a run's label: what it does and for which course.
-			const outcome = await build(workspace, (title) => (signal = setRunPhase(jobKey, "mapping", "course-map", `Mapping ${title}`).controller.signal));
+			const outcome = await build(workspace, (title) => (signal = setRunPhase(jobKey, "mapping", "course-map", title).controller.signal));
 			if (outcome.status === "skipped") {
 				console.info(`[course-map ${workspace}] skipped: ${outcome.reason}`);
 				const sources = window(workspace);
