@@ -27,7 +27,14 @@ const render = (node: React.ReactNode) =>
 
 describe("NowCard", () => {
 	const inbox = buildInbox(COURSES, CHATS, null);
-	const { lines } = needsYouNow(COURSES, CHATS, TODAY);
+	/** The demo's two waiting sessions, then its first two course lines:
+	 *  Today lists the sessions after the plan, folded (round 10, 1 m2), and
+	 *  a card draws the same either way. */
+	const lines = (() => {
+		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
+		const all = [...lines, ...also];
+		return [...all.filter((l) => l.row.kind === "session"), ...all.filter((l) => l.row.kind === "course").slice(0, 2)];
+	})();
 
 	it("draws each line on its lead topic, under Home's name for it, with Today's reason and the line's action", () => {
 		const doc = render(

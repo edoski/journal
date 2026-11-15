@@ -25,10 +25,10 @@ describe("needsYouNow", () => {
 		for (const line of needs.lines) assert.deepEqual(line.why, whyOf(line.row));
 	});
 
-	it("gives every session to pick up since yesterday its own line, the newest first, before every course; a course keeps its line when no session shown works on its step", () => {
+	it("gives every session to pick up since yesterday its own line, the newest first, after the plan's reviews (round 10, 1 m2); a course keeps its line when no session shown works on its step", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
-		assert.deepEqual(lines.map((l) => label(l.row)), ["session chat_eigen", "session chat_rank", "Probability", "Linear Algebra"]);
-		assert.deepEqual(also.map((l) => label(l.row)), ["Real Analysis", "Calculus I"]);
+		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Linear Algebra", "Real Analysis", "Calculus I"]);
+		assert.deepEqual(also.map((l) => label(l.row)), ["session chat_eigen", "session chat_rank"]);
 		assert.ok(!lines.some((l) => l.key === "chat_old"), "a session waiting from before yesterday gets no line");
 	});
 
@@ -50,7 +50,7 @@ describe("needsYouNow", () => {
 		assert.ok(needsYouNow(COURSES, [{ ...gone, courseDeleted: false }], TODAY).rows.some((r) => r.kind === "session"), "the same lesson in a course still there keeps its line");
 	});
 
-	it("orders the courses after the sessions by urgency: the exam run-up, the nearest exam, then the most recent study", () => {
+	it("orders the courses by urgency: the exam run-up, the nearest exam, then the most recent study", () => {
 		const { lines } = needsYouNow([CALCULUS, ANALYSIS, PROB], [], TODAY);
 		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Real Analysis", "Calculus I"]);
 	});
@@ -59,7 +59,7 @@ describe("needsYouNow", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
 			[...lines, ...also].map((l) => l.lead?.title),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule"],
+			["Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule", "Eigenvalues and eigenvectors", "Rank and the column space"],
 		);
 		const empty: StudyCourse = { ...PROB, due: [], map: { ...PROB.map, current: null, topics: [] } };
 		assert.deepEqual(needsYouNow([empty], [], TODAY).lines, [], "a course with nothing to take up has no line");
@@ -69,7 +69,7 @@ describe("needsYouNow", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
 			[...lines, ...also].map((l) => l.slot),
-			["Your turn", "Your turn", "Due since 5 Nov", "Due since 4 Nov", "Due since 1 Nov", "Not right last time"],
+			["Due since 5 Nov", "Due since 4 Nov", "Due since 1 Nov", "Not right last time", "Your turn", "Your turn"],
 		);
 		const task: StudyCourse = {
 			...LINALG,

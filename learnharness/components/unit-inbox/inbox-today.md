@@ -54,7 +54,7 @@ Keyboard: the app keeps Tab dead (`keyboard-shortcuts.tsx`, the owner's ruling o
 
 - The system picks: the top is `needsYouNow`, with no sort control (the owner's "taking care of the selection process").
 - A short top and a little choice: at most five cards, row 1 next, rows 2 to 5 in any order.
-- Open loops lead: each session waiting on him since yesterday is its own card, first.
+- The plan leads, open loops next: each course's review and new topics for today first, then each session waiting on him since yesterday as its own card (round 10, 1 m2: only opening Problem sheet 4 put it above the exam's review). A session folded past the fifth line stays on its shelf with the shelf's dot.
 - Due but bounded: the top follows the engine's day plan, never every topic whose review is due.
 - Interleave: Review on a course card starts that course's mixed review, as Home's line does (`useContinueCourse`).
 - Fold with a plan: shelves fold by default, and every shelf row says when it comes back (how overdue for a topic in today's plan, "Back in 5d"), else when he last studied it; a topic returns to the top by itself when the engine plans it.

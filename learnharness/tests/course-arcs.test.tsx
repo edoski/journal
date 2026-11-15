@@ -283,8 +283,8 @@ describe("what next, above the arcs", () => {
 		assert.equal(next.pickUp?.line.why?.short, "Due since 4 Nov");
 		assert.equal(next.pickUp?.arc?.handle, "spaces", "You are here is in Linear systems");
 		const waiting = whatNext(ARCS, CHATS)!;
-		assert.equal(waiting.pickUp?.line.why?.short, "Your turn", "a session waiting on him comes first, as on Today");
-		assert.equal(waiting.pickUp?.arc?.handle, "eigenvalues");
+		assert.equal(waiting.pickUp?.line.title, "Review Linear independence", "today's review comes before a session waiting on him, as on Today (round 10, 1 m2)");
+		assert.equal(waiting.pickUp?.arc?.handle, "spaces");
 	});
 
 	it("then names the next new topic the plan starts, with why then as Today's rows say it", () => {

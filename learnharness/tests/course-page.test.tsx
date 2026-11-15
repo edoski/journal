@@ -200,8 +200,8 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const waiting = chat("c1", { pendingQuestion: true, topics: [h("determinant")], updatedAt: "2026-11-08T08:00:00.000Z" });
 		const withChat = courseGroups(course(), [waiting]);
 		const needs = groupOf(withChat, "needs-you");
-		assert.equal(needs.topics[0]!.topic.handle, "determinant");
-		assert.deepEqual(needs.topics[0]!.fact, { kind: "your-turn", words: "Your turn" });
+		const det = needs.topics.find((t) => t.topic.handle === "determinant");
+		assert.deepEqual(det?.fact, { kind: "your-turn", words: "Your turn" });
 		assert.equal(sidebar(course(), [waiting]).get(`${WS}#determinant`), "Today: Your turn");
 	});
 
@@ -253,10 +253,11 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(next.why?.short, "Due since 29 Oct");
 	});
 
-	it("resumes a session in this course that has waited on him since yesterday, and ignores one in another course", () => {
+	it("resumes a session in this course that has waited on him since yesterday, once nothing is planned before it, and ignores one in another course", () => {
 		const mine = chat("c1", { title: "Rank practice", pendingQuestion: true, updatedAt: "2026-11-08T08:00:00.000Z" });
 		const other = chat("c2", { pendingQuestion: true, course: { workspace: "/study/prob", title: "Probability" }, updatedAt: "2026-11-08T09:00:00.000Z" });
-		const next = courseNext(course(), [other, mine]);
+		assert.equal(courseNext(course(), [other, mine]).action, "Review", "today's review comes first, as on Home (round 10, 1 m2)");
+		const next = courseNext(course({}, { due: [] }), [other, mine]);
 		assert.equal(next.action, "Resume");
 		assert.equal(next.lesson.title, "Rank practice");
 		assert.deepEqual(next.lesson.open, { kind: "session", href: "/chat/c1" });

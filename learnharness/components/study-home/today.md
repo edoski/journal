@@ -1,6 +1,6 @@
 # Today
 
-The home's list of what to study today: each session waiting on him, then every step each course's plan holds today, then lessons left for next time (`todaySteps`): its review, each open task, today's new topics. `today.tsx`, `data-slot` `today`, title `day-heading`, lines `today-line`, overflow `today-also`. Facts in `study-facts.ts` (`todayRows`, `nextStepOf`). The lines are the hybrid rows (`agenda-rows/hybrid/hybrid.md`), Edo's pick of 13 Nov 2026: their anatomy, words and marks are specified there.
+The home's list of what to study today: each course's plan for today (its review and new topics), then each session waiting on him, then each open task and lesson left for next time (`todaySteps`). `today.tsx`, `data-slot` `today`, title `day-heading`, lines `today-line`, overflow `today-also`. Facts in `study-facts.ts` (`todayRows`, `nextStepOf`). The lines are the hybrid rows (`agenda-rows/hybrid/hybrid.md`), Edo's pick of 13 Nov 2026: their anatomy, words and marks are specified there.
 
 ## Anatomy
 
@@ -16,12 +16,15 @@ No line has a button: the first row's blue Open looked ugly and every line alrea
 
 ## Order
 
-The day's plan leads (round 9, 1 D1: every session closed with Done for today came back to the top as "Left for next time", due or not, and by 17 Nov the exam heading sat over four Linear Algebra leftovers while the plan was in cut-off "Also today" chips):
+The day's plan leads (round 9, 1 D1: every session closed with Done for today came back to the top as "Left for next time", due or not, and by 17 Nov the exam heading sat over four Linear Algebra leftovers while the plan was in cut-off "Also today" chips; round 10, 1 m2: only opening Problem sheet 4 made it the first row, above the exam's review, and leftovers on the course's tasks pushed the plan's new topic into "Also today"):
 
-1. each session waiting on him since yesterday (it waits on the learner, the tutor writes in it, or it stopped mid-reply), most recent first, and kept while the tutor writes;
-2. each course's steps for today (`todaySteps`), most urgent course first (`byUrgency`: in the exam run-up, nearest exam, most recent activity), so the exam's course leads: today's review, each open task (the focused one first), then the new topics the plan starts today, the same facts the calendar lists for today; with none of these, the course's one next step. A step a lesson left for next time works on is that lesson's line, in the step's place; a step a waiting session, or one he ended today, works on has no line;
-3. each other lesson left for next time on an earlier day, however long ago, most recent first;
-4. the lines with nothing today (`laterOnly`), which Today leaves out.
+1. each course's plan for today (`planned`): today's review, then the new topics the plan starts today, the same facts the calendar lists for today, most urgent course first (`byUrgency`: in the exam run-up, nearest exam, most recent activity), so the exam's course leads. A step a waiting session, or a lesson left for next time, works on is that session's line, in the step's place, so a review or new topic he has started keeps its place;
+2. each other session waiting on him since yesterday (it waits on the learner, the tutor writes in it, or it stopped mid-reply), most recent first, and kept while the tutor writes;
+3. each course's other steps for today, in the same course order: each open task (the focused one first), or, with nothing planned, the course's one next step. A task a lesson left for next time holds is that lesson's line, in its place; a task a waiting session holds has no line, since the session has its own;
+4. each other lesson left for next time on an earlier day, however long ago, most recent first;
+5. the lines with nothing today (`laterOnly`), which Today leaves out.
+
+A step he ended today with Done for today works on has no line.
 
 A review left for next time has no line of its own: it waits for its topics' next review day, when the plan's "Review … · Due today" line opens it (`courseMove` picks up a review session on those topics), so the open question he left rides with the review it belongs to; its topic page lists it under Next meanwhile. A lesson left for next time whose topics are all in today's review gives its line to that review, so a promised review is a review row that opens a review, as the calendar lists it, never the unfinished lesson (round 8); the lesson's line returns once the review is done. A review step is covered only by a review session (`isReviewSession`: opened on topics with a review's words), never by a lesson that touched the topic. One he ended with Done for today has no line until tomorrow, and its course's step it works on stays off too: he said he is done with it for today, and the Studied today line names it (round 4: the finished lesson stayed the first row). Round 7: Today showed one step per course, so Problem sheet 4 left Home from the first Done for today while the calendar listed it as Unfinished every day, and Poisson, planned for Tuesday and promised by the tutor, hid behind Probability's review. A course with nothing today (nothing to take up, or a next item the plan dates on a later day, `laterOnly`) has no line on Today, in its fold or on the sidebar's top; the course page still names its next item with the plan's day ("Review Cauchy sequences", "Planned Sun 15 Nov"), and Home's tabs still list it (`todayCourses`). A finished session, a sign-off included, has no line. An older session waiting on him stays in the sidebar. Home reads again whenever a turn starts or settles, a record or the session list changes.
 

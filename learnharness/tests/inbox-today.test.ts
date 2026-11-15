@@ -44,7 +44,8 @@ describe("todayTop", () => {
 		);
 		assert.deepEqual(
 			top.map((i) => (i.kind === "topic" ? i.unit.topic.title : i.line.title)),
-			["Eigenvalues lesson", "Rank practice", "Random variables and distributions", "Linear independence"],
+			["Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule"],
+			"each course's review first, the sessions waiting on him folded after the plan (round 10, 1 m2)",
 		);
 		assert.ok(top.length <= 5);
 	});
@@ -99,8 +100,8 @@ describe("todayTop", () => {
 		assert.deepEqual(
 			top.map((i) => [i.kind, itemKey(i)]),
 			[
-				["session", sessionKey("loose")],
 				["topic", "/s/prob#rv"],
+				["session", sessionKey("loose")],
 			],
 		);
 	});
@@ -108,7 +109,7 @@ describe("todayTop", () => {
 	it("keeps only the chosen course's lines under the course filter", () => {
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/linalg").top.map((i) => itemKey(i)),
-			[sessionKey("chat_eigen"), sessionKey("chat_rank"), "/s/linalg#independence"],
+			["/s/linalg#independence", sessionKey("chat_eigen"), sessionKey("chat_rank")],
 		);
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/calc").top.map((i) => itemKey(i)),
@@ -123,9 +124,9 @@ describe("todayTop", () => {
 		assert.deepEqual(
 			top.map((i) => [i.line.key, itemKey(i)]),
 			[
+				["/s/linalg#review:independence", "/s/linalg#independence"],
 				["a", sessionKey("a")],
 				["b", sessionKey("b")],
-				["/s/linalg#review:independence", "/s/linalg#independence"],
 			],
 		);
 	});
@@ -170,7 +171,7 @@ describe("one lesson, one card", () => {
 				[[sessionKey("tour"), "Eigenvalues lesson"]],
 				`after touching ${touched.join(", ") || "nothing else"}`,
 			);
-			assert.equal(needs.lines[0]!.lead?.handle, "eigen", "its topic is the one it belongs to, never the step it is on");
+			assert.equal(needs.lines.find((l) => l.key === "tour")?.lead?.handle, "eigen", "its topic is the one it belongs to, never the step it is on");
 		}
 	});
 
@@ -215,18 +216,18 @@ describe("steadyTop", () => {
 	}
 
 	it("keeps the lesson he is in at its place, as Working, while the tutor writes, so a turn changes neither order nor count", () => {
-		const { top } = topOf(COURSES);
+		const { top } = topOf([LINALG]);
 		for (const id of ["chat_eigen", "chat_rank"]) {
-			const during = turn(COURSES, top, writing(CHATS, id));
+			const during = turn([LINALG], top, writing(CHATS, id));
 			assert.deepEqual(keysOf(during), keysOf(top), `${id} while the tutor writes`);
 			const card = during.find((i) => i.line.key === id);
 			assert.ok(card?.kind === "session" && sessionState(card.chat) === "working", "drawn as Working");
 		}
 		for (const id of ["chat_eigen", "chat_rank"]) {
-			const during = turn(COURSES, top, writing(CHATS, id));
-			const after = turn(COURSES, during, answered(CHATS, id, "2026-11-08T10:00:00.000Z"));
+			const during = turn([LINALG], top, writing(CHATS, id));
+			const after = turn([LINALG], during, answered(CHATS, id, "2026-11-08T10:00:00.000Z"));
 			assert.deepEqual(keysOf(after), keysOf(top), `${id} back on his turn, where it was`);
-			assert.deepEqual(keysOf(turn(COURSES, after, answered(CHATS, id, "2026-11-08T10:00:00.000Z"))), keysOf(top), "and it stays there");
+			assert.deepEqual(keysOf(turn([LINALG], after, answered(CHATS, id, "2026-11-08T10:00:00.000Z"))), keysOf(top), "and it stays there");
 		}
 	});
 
@@ -236,15 +237,16 @@ describe("steadyTop", () => {
 		const next = turn(COURSES, top, woke);
 		assert.deepEqual(keysOf(next), keysOf(topOf(COURSES, woke).top));
 		const rankFirst = answered(CHATS, "chat_rank", "2026-11-08T10:00:00.000Z");
-		assert.deepEqual(keysOf(turn(COURSES, [], rankFirst)).slice(0, 2), [sessionKey("chat_rank"), sessionKey("chat_eigen")]);
+		const sessions = (top: readonly NowItem[]) => keysOf(top).filter((k) => k.startsWith("chat:"));
+		assert.deepEqual(sessions(turn([LINALG], [], rankFirst)), [sessionKey("chat_rank"), sessionKey("chat_eigen")]);
 	});
 
 	it("keeps a course's due review on its own line beside a kept session on another topic, as Today does", () => {
 		const alone = CHATS.filter((c) => c.id !== "chat_rank");
-		const { top } = topOf(COURSES, alone);
-		assert.equal(itemKey(top[0]!), sessionKey("chat_eigen"));
+		const { top } = topOf([LINALG], alone);
+		assert.deepEqual(keysOf(top).slice(0, 2), ["/s/linalg#independence", sessionKey("chat_eigen")]);
 		assert.ok(top.some((i) => i.line.key.startsWith("/s/linalg#review")), "the eigen lesson does not hide Linear Algebra's review");
-		const during = turn(COURSES, top, writing(alone, "chat_eigen"));
+		const during = turn([LINALG], top, writing(alone, "chat_eigen"));
 		assert.deepEqual(keysOf(during), keysOf(top));
 	});
 
@@ -256,7 +258,8 @@ describe("steadyTop", () => {
 			during.map((i) => [i.kind, itemKey(i)]),
 			top.map((i) => [i.kind, itemKey(i)]),
 		);
-		assert.ok(during[0]?.kind === "session" && during[0].chat.busy);
+		const card = during.find((i) => i.kind === "session");
+		assert.ok(card?.kind === "session" && card.chat.busy);
 		const done = turn([PROB], during, [{ ...loose, pendingQuestion: false }]);
 		assert.deepEqual(keysOf(done), ["/s/prob#rv"]);
 	});
@@ -295,7 +298,7 @@ describe("TodayList", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues lesson", "Rank practice", "Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence"],
+			["Review Random variables and distributions, Law of total probability, Bayes' rule", "Review Linear independence", "Review Convergent sequences, Cauchy sequences", "Review Chain rule, Riemann sums, Improper integrals"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
@@ -304,7 +307,7 @@ describe("TodayList", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Your turn", "Your turn", "Due since 5 Nov", "Due since 4 Nov"],
+			["Due since 5 Nov", "Due since 4 Nov", "Due since 1 Nov", "Not right last time"],
 		);
 		assert.deepEqual(
 			[...doc.querySelectorAll('[data-slot="unit-section-header"]')].map((h) => h.textContent),
@@ -316,7 +319,7 @@ describe("TodayList", () => {
 	});
 
 	it("marks the open session's card", () => {
-		const doc = renderList({ pathname: "/chat/chat_rank" });
+		const doc = renderList({ pathname: "/chat/chat_rank" }, [LINALG]);
 		const open = [...doc.querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute("data-sidebar-row"));
 		assert.deepEqual(open, [sessionKey("chat_rank")]);
 	});

@@ -33,6 +33,6 @@ What was left off, by the signal test: the review's day (the reason says "Due si
 
 ## Order
 
-As today.md says: a reply waiting on him first, then the plan, courses in the exam run-up first, nearest exam first, then the most recently studied; lessons left for next time after the plan.
+As today.md says: the plan first (each course's review and new topics for today), courses in the exam run-up first, nearest exam first, then the most recently studied; then the sessions waiting on him, then open tasks and lessons left for next time.
 
 Trade-offs: the richest row of the candidates, at 64px against the old line's 52; four courses still fit 1024×700 with no page scroll. The pie has no number: its words are for a screen reader, and the definition lives here.

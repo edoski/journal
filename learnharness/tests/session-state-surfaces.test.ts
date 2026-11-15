@@ -183,16 +183,18 @@ describe("a lesson waiting on his answer", () => {
 		assert.equal(sidebarRow(chats, "diagonalization"), null, "a topic never started is not listed");
 		assert.deepEqual(topicAction(DIAG, MAP, chats), { kind: "start", opening: "Diagonalization" });
 		assert.deepEqual(topicAction(EIGEN, MAP, chats), { kind: "resume", chat: eigen });
-		const [first] = todayRows([COURSE], openSessions(chats), TODAY);
-		assert.ok(first?.kind === "session" && first.chat.id === waiting);
-		assert.deepEqual(whyOf(first!), { kind: "reply", short: "Your turn" });
+		const line = todayRows([COURSE], openSessions(chats), TODAY).find((r) => r.kind === "session");
+		assert.ok(line?.kind === "session" && line.chat.id === waiting);
+		assert.deepEqual(whyOf(line!), { kind: "reply", short: "Your turn" });
 	});
 
 	it("keeps its line on Home while the tutor writes, saying so", () => {
 		const chats = listed([waiting]);
-		const [first] = todayRows([COURSE], openSessions(chats), TODAY);
-		assert.ok(first?.kind === "session" && first.chat.id === waiting, "the lesson stays first, not swapped for another");
-		assert.deepEqual(whyOf(first!), { kind: "working", short: "Tutor writing" });
+		const rows = todayRows([COURSE], openSessions(chats), TODAY);
+		const line = rows.find((r) => r.kind === "session");
+		assert.ok(line?.kind === "session" && line.chat.id === waiting, "the lesson keeps its line, not swapped for another");
+		assert.deepEqual(rows, todayRows([COURSE], openSessions(listed()), TODAY).map((r) => (r.kind === "session" && r.chat.id === waiting ? line : r)), "in the place it had on his turn");
+		assert.deepEqual(whyOf(line!), { kind: "working", short: "Tutor writing" });
 		assert.deepEqual(topicAction(EIGEN, MAP, chats).kind, "open");
 	});
 });

@@ -59,7 +59,7 @@ describe("Home's rows", () => {
 
 	it("give Home's map the arc of the row he points at: a course's step and a waiting session", () => {
 		const waiting = chat("q", { pendingQuestion: true, updatedAt: `${TODAY}T09:00:00.000Z`, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
-		const [session, review] = todayRows([LINALG_ARCS], [waiting], TODAY);
+		const [review, session] = todayRows([LINALG_ARCS], [waiting], TODAY);
 		assert.equal(lessonOf(session!).place?.handle, "eigenvalues");
 		assert.equal(lessonOf(review!).place?.handle, "spaces");
 		assert.equal(lessonOf(todayRows([LINALG], [], TODAY)[0]!).place, null, "a course without arcs picks none");
