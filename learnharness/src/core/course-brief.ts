@@ -266,7 +266,7 @@ function planLines(plans: CoursePlans | undefined): string[] {
 	const courses = ordered.flatMap(({ map, days }) => coursePlanLines(map, days, own(map.workspace)));
 	if (courses.length === 0) return [];
 	return [
-		"Daily plan of every course, as the calendar shows it: each day's reviews and new topics, every review of every topic. A day you tell him is one of these, unless a save this turn gave the topic a newer one:",
+		"Daily plan of every course, as the calendar shows it: each day's reviews and new topics, every review of every topic. A day you tell him is one of these, unless a save this turn gave the topic a newer one. Say a day moved only where its note says “moved from”, with that note's cause; otherwise name the day alone:",
 		...courses,
 		...(plans.unread.length > 0 ? [`Not in this plan, its record could not be read: ${plans.unread.join(", ")}`] : []),
 	];
