@@ -217,9 +217,11 @@ describe("today's lines", () => {
 	});
 
 	it("lets a session that works on the step stand for it", () => {
-		const review = chat({ id: "r", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"] });
+		const review = chat({ id: "r", title: "Review Linear independence, Rank, Span", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"], ownTopics: ["independence", "rank", "span"] });
 		const rows = todayRows([LINALG], [review], TODAY);
-		assert.deepEqual(rows.map((r) => r.kind), ["session"]);
+		assert.deepEqual(rows.map((r) => r.kind), ["session"], "a review of those topics stands for today's review");
+		const lesson = chat({ id: "l", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"], ownTopics: ["rank"] });
+		assert.deepEqual(todayRows([LINALG], [lesson], TODAY).map((r) => r.kind), ["session", "course"], "a lesson on the topics never stands for their review (round 8, 1 D3)");
 		const sheet = chat({ id: "s", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, tasks: ["sheet-4"] });
 		assert.deepEqual(todayRows([{ ...LINALG, due: [] }], [sheet], TODAY).map((r) => r.kind), ["session"], "the open task's lesson");
 	});
