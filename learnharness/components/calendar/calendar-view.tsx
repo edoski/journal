@@ -210,7 +210,7 @@ export function CalendarView({
 						</Button>
 					</Hint>
 				</div>
-				<h1 data-slot="calendar-range" className="min-w-0 truncate text-heading font-medium text-foreground">
+				<h1 data-slot="calendar-range" className="min-w-0 truncate text-title-1 system-current:text-heading system-current:font-medium text-foreground">
 					{view ? rangeTitle(viewId, view.currentStart, view.currentEnd) : ""}
 				</h1>
 				<div className="lh-no-drag ml-auto flex items-center gap-3">

@@ -65,7 +65,7 @@ export function DialogHeader({ className, ...props }: React.ComponentProps<"div"
 
 /** 18/24 at 600. */
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-	return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-subheading font-semibold text-foreground", className)} {...props} />;
+	return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-title-1 system-current:text-subheading system-current:font-semibold text-foreground", className)} {...props} />;
 }
 
 /** 14/20, muted. */

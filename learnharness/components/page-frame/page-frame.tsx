@@ -65,7 +65,7 @@ export function PageHead({
 				{eyebrow}
 			</p>
 			<div className="flex min-h-8 items-center justify-between gap-4">
-				<h1 data-slot="page-title" className="min-w-0 text-heading font-medium text-pretty text-foreground">
+				<h1 data-slot="page-title" className="min-w-0 text-title-1 system-current:text-heading system-current:font-medium text-pretty text-foreground">
 					{title}
 				</h1>
 				{actions && (

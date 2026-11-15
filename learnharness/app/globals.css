@@ -188,6 +188,9 @@ main [class*="focus-visible:outline-"]:not([class*="focus-visible:outline-none"]
 	--text-large-title: 26px;
 	--text-large-title--line-height: calc(32 / 26);
 	--text-large-title--font-weight: 400;
+	--text-title-1: 22px;
+	--text-title-1--line-height: calc(26 / 22);
+	--text-title-1--font-weight: 400;
 	--text-title-3: 15px;
 	--text-title-3--line-height: calc(20 / 15);
 	--text-title-3--font-weight: 400;

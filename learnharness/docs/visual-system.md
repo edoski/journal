@@ -9,6 +9,7 @@ The app's visual system on one page: what every page draws with, where each valu
 | Token | Apple style | Size / line / weight | Job |
 |---|---|---|---|
 | `text-large-title` | Large Title | 26 / 32 / 400 | the composer's question |
+| `text-title-1` | Title 1 | 22 / 26 / 400 | a page's title, Home's question and every dialog's and sheet's title: one kind of title, one look |
 | `text-title-3` | Title 3 | 15 / 20 / 400 | the calendar's day numbers |
 | `text-headline` | Headline | 13 / 16 / 700 | an item's title over its own line: a sidebar card, a Today row, the topic page's Now, a mistake, a page's lead, the lesson's name in its top bar |
 | `text-body` | Body | 13 / 16 / 400 | everything else that reads: nav, tabs, buttons, page facts, one-line list rows (the course page's topics), the maps' card titles, Settings, the lesson's trail |
@@ -79,4 +80,3 @@ Words come from `study-words.ts` and `topic-standing.ts` (`standingOf`, `slipBes
 ## Open (Edo's call)
 
 - The research's budget of one icon stroke would mean lucide's `absoluteStrokeWidth` everywhere.
-- Dialog titles at 18/600 against page titles at 20/500.
