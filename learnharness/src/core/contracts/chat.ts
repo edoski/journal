@@ -256,8 +256,12 @@ export const NEXT_PROBLEM_TEXT =
  *  close. What he left open comes back as it was, so the close says only
  *  what he picks up and when: a cue toward its answer would make the
  *  pick-up count as helped (round 5, 14 Nov 2026). */
-const DONE_CLOSE =
-	"Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel problem, part (c) of the sheet), never by what it asks, and its day when the plan gives one. Never a step, cue, method or hint toward anything he left open, and no praise or summary of the session.";
+const DONE_LIMITS = "Never a step, cue, method or hint toward anything he left open, and no praise or summary of the session.";
+const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one. ${DONE_LIMITS}`;
+/** Practice keeps nothing of a problem dropped at Done for today, so its
+ *  close names only what the record keeps (round 9, 3 m7: "You still have
+ *  the kernel problem you closed … to pick up"). */
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: only what his record keeps for next time, an open task at its place (part (c) of the sheet) and the day of his next review when the plan gives one, never by what it asks. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:
@@ -267,8 +271,8 @@ export const DONE_TONIGHT_TEXT = {
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
 		DONE_CLOSE,
 	practice:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more today. " +
-		DONE_CLOSE,
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so never name it as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
+		DONE_CLOSE_PRACTICE,
 } as const;
 
 /** The mark he thinks is right, in the record's words and his. */

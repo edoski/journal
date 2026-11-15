@@ -21,6 +21,7 @@ const { chatStore } = await import("../src/store/chats.ts");
 const { emit, subscribe } = await import("../src/core/events.ts");
 const { newSessionModeMessage, newUserMessage } = await import("../src/core/native-messages.ts");
 const { digestArcs, digestChanges, digestProblems, digestWindow, knowledgeHandle, placedIn } = await import("../src/core/lesson-digest.ts");
+const { learnerWords } = await import("../src/core/session-markdown.ts");
 const { createLessonDigest, DIGEST_INSTRUCTIONS } = await import("../src/agent/subagents/lesson-digest.ts");
 const { backgroundRuns } = await import("../src/agent/subagents/background-runs.ts");
 const { onLessonEvents, resumeCutDigests } = await import("../src/server/lesson-finish.ts");
@@ -160,7 +161,7 @@ function memoryCourse(refuse: (changes: Record<string, unknown>) => string | nul
 
 const SUBMIT = {
 	topics: [
-		{ handle: "rank", gap: "You count rows instead of pivots", note: "Reads matrices by rows", step: "rank-picture" },
+		{ handle: "rank", gap: "You count rows instead of pivots", shows: "does rank count the rows?", note: "Reads matrices by rows", step: "rank-picture" },
 		{ handle: "nullity", introduced: true, step: "rank-picture" },
 	],
 	knowledge: [{ text: "Pivots are circled in the notes", topics: ["rank"], step: "rank-picture" }],
@@ -184,6 +185,53 @@ function submitEngine(input: unknown | ((prompt: string) => unknown), onCall?: (
 describe("the digest and predictions (round 8, 1 D2)", () => {
 	it("is told a prediction's miss is never a gap, and reads each prediction as one", () => {
 		assert.match(DIGEST_INSTRUCTIONS, /Never write what a prediction got wrong as a `gap`, on its topic or any other/);
+	});
+});
+
+describe("a background gap rests on his own words, never on a prediction's (the fix round's open J2 item)", () => {
+	const call = (id: string, callId: string, name: string, args: unknown) =>
+		({ id, role: "assistant", content: [{ type: "toolCall", id: callId, name, arguments: args }], api: "x", provider: "x", model: "x", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, stopReason: "toolUse", timestamp: 0 }) as unknown as LhMessage;
+	const answer = (id: string, callId: string, name: string, text: string) =>
+		({ id, role: "toolResult", toolCallId: callId, toolName: name, content: [], details: { questionText: "Q", text }, isError: false, timestamp: 0 }) as unknown as LhMessage;
+	const messages = [
+		call("a1", "p1", "explain", { type: "predict", question: "Which matrices can be made diagonal?" }),
+		answer("r1", "p1", "explain", "Only symmetric matrices can be made diagonal"),
+		call("a2", "c1", "explain", { type: "check", question: "Find a vector of $E_2$." }),
+		answer("r2", "c1", "explain", "(1, 2) works, since 2x + y = 0"),
+		newUserMessage("why does the trace equal the sum of the eigenvalues?"),
+	];
+	const view = {
+		topics: [{ handle: "diagonalization", title: "Diagonalization", introduced: true, gap: null, note: null }],
+		current: "diagonalization",
+		tasks: [],
+		planFinished: false,
+		knowledge: [],
+		reached: null,
+		said: learnerWords(messages),
+	};
+	const gap = (text: string, shows?: string) => ({ topics: [{ handle: "diagonalization", gap: text, ...(shows !== undefined ? { shows } : {}), step: "warm-up" }], knowledge: [] });
+
+	it("reads which of his words were a prediction's answer", () => {
+		assert.deepEqual(view.said, [
+			{ text: "Only symmetric matrices can be made diagonal", predicted: true },
+			{ text: "(1, 2) works, since 2x + y = 0", predicted: false },
+			{ text: "why does the trace equal the sum of the eigenvalues?", predicted: false },
+		]);
+	});
+
+	it("refuses a gap resting on a prediction's answer, even when the lesson also has a counted miss on the topic", () => {
+		assert.match(digestProblems(gap("You think only symmetric matrices diagonalize", "only symmetric matrices"), view) ?? "", /diagonalization's gap quotes his answer to a prediction/);
+	});
+
+	it("refuses a new gap that quotes none of his words", () => {
+		assert.match(digestProblems(gap("You plug in vectors without checking"), view) ?? "", /diagonalization's gap: quote in shows/);
+		assert.match(digestProblems(gap("You plug in vectors without checking", "I never check"), view) ?? "", /diagonalization's gap: "I never check" is not in his words/);
+	});
+
+	it("takes a gap quoting his counted answer or his own message, and a gap cleared needs no quote", () => {
+		assert.equal(digestProblems(gap("You read $(1,2)$ as a solution of $2x+y=0$", "(1, 2) works,  since"), view), null);
+		assert.equal(digestProblems(gap("You don't see why the trace sums the eigenvalues", "Why does the trace"), view), null);
+		assert.equal(digestProblems({ topics: [{ handle: "diagonalization", gap: null, step: "warm-up" }], knowledge: [] }, view), null);
 	});
 });
 
@@ -525,7 +573,7 @@ describe("what starts a digest", () => {
 		const engine = submitEngine((prompt: string) => ({
 			topics: [
 				prompt.includes("both rows are nonzero")
-					? { handle: "rank", gap: "You count nonzero rows instead of pivots", note: "Step 1 needed a correction", step: "rank-picture" }
+					? { handle: "rank", gap: "You count nonzero rows instead of pivots", shows: "because both rows are nonzero", note: "Step 1 needed a correction", step: "rank-picture" }
 					: { handle: "rank", note: "Step 1 went smoothly", step: "rank-picture" },
 			],
 			knowledge: [],

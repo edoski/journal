@@ -88,6 +88,8 @@ export interface DigestTopic {
 	introduced?: boolean;
 	/** A testable misconception; null once the lesson showed it resolved. */
 	gap?: string | null;
+	/** His own words in the lesson that showed the gap, quoted exactly. */
+	shows?: string;
 	note?: string;
 }
 
@@ -134,6 +136,10 @@ export interface DigestCourseView {
 	/** In a course with arcs; absent in one without, which the digest
 	 *  treats exactly as before arcs. */
 	arcs?: DigestArcs;
+	/** What the learner wrote in the lesson (`learnerWords`), each marked
+	 *  when it answered a prediction: a new gap must quote one that did not.
+	 *  Absent skips the check. */
+	said?: ReadonlyArray<{ text: string; predicted: boolean }>;
 	/** The lesson ended on its close, which marked its topics introduced and
 	 *  named their days from the plan after that save. A topic introduced or
 	 *  created later would move those days, so the patch does neither. */
@@ -186,20 +192,42 @@ function twinOf(t: DigestTopic, arcs: DigestArcs): { twin: string; within: boole
 
 const proposesNew = (t: DigestTopic, view: DigestCourseView) => validHandle(t.handle) && !view.topics.some((k) => k.handle === t.handle) && !!t.title?.trim();
 
-/** What the agent must resolve before the save, in a course with arcs: a
- *  new topic named like a topic in an arc it could not join, which may be
+/** Words compared without case, spacing or a closing full stop. */
+const plainWords = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ").replace(/\.$/, "");
+
+/** Why a new gap may not be saved: it quotes none of his words, or only
+ *  his answer to a prediction, a guess before the teaching whose miss is
+ *  expected. The digest once wrote a prediction's miss as a gap, and its
+ *  instructions alone could not stop it while the lesson also had a real
+ *  miss on that topic (the fix round's open J2 item). Null when it may. */
+function gapProblem(t: DigestTopic, view: DigestCourseView): string | null {
+	const said = view.said;
+	const gap = typeof t.gap === "string" ? t.gap.trim() : "";
+	if (!said || !gap || gap === view.topics.find((k) => k.handle === t.handle)?.gap) return null;
+	const quote = plainWords(t.shows ?? "");
+	if (!quote) return `${t.handle}'s gap: quote in shows his own words in the lesson that showed it, exactly as he wrote them.`;
+	const found = said.filter((w) => plainWords(w.text).includes(quote));
+	if (found.some((w) => !w.predicted)) return null;
+	if (found.length > 0) return `${t.handle}'s gap quotes his answer to a prediction, a guess before the teaching: a gap never names what a prediction got wrong. Leave the gap out, or quote the answer that counts or his own words that showed it.`;
+	return `${t.handle}'s gap: "${t.shows!.trim()}" is not in his words. Quote in shows his own words in the lesson exactly, or leave the gap out.`;
+}
+
+/** What the agent must resolve before the save: a new gap with no quote
+ *  of his words that counts (`gapProblem`); in a course with arcs, a new
+ *  topic named like a topic in an arc it could not join, which may be
  *  another topic sharing a name, never folded in silence. Null when there
  *  is nothing. Pure. */
 export function digestProblems(submit: DigestSubmit, view: DigestCourseView): string | null {
+	const gaps = submit.topics.flatMap((t) => gapProblem(t, view) ?? []);
 	const arcs = view.arcs;
-	if (!arcs) return null;
-	const problems = submit.topics.flatMap((t) => {
+	const named = !arcs ? [] : submit.topics.flatMap((t) => {
 		const found = proposesNew(t, view) ? twinOf(t, arcs) : null;
 		if (!found || found.within) return [];
 		const other = arcs.names[found.twin]?.title ?? found.twin;
 		const arc = arcs.order.find((a) => a.handle === arcs.topicArc[found.twin])?.title ?? "";
 		return [`${t.handle} ("${t.title}") has the name of the course's topic ${found.twin} ("${other}") in "${arc}": if the lesson taught that topic, use the handle ${found.twin}; if not, give the new topic a title that tells the two apart.`];
 	});
+	const problems = [...gaps, ...named];
 	return problems.length > 0 ? problems.join("\n") : null;
 }
 

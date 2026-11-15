@@ -443,12 +443,15 @@ export const EXAM_GAP_TOPIC_WORDS: {
 		full: "Not before the exam, every study day is full at your pace",
 		too_late: "Not before the exam",
 	},
+	// The final review has no slot for it, whatever reviews come before
+	// it: "No review before the exam" read false beside "Review Wed 11 Nov"
+	// (round 9, 2 M1). The words match `finalReviewMissWords`.
 	review: {
-		none: "No review before the exam",
-		no_study_day: "No review before the exam, no study day is left in the final review",
-		not_ready: "No review before the exam",
-		full: "No review before the exam, the final review is full at your pace",
-		too_late: "No review before the exam, it starts too close to it",
+		none: "No room in the final review",
+		no_study_day: "No room in the final review, no study day is left in it",
+		not_ready: "No room in the final review",
+		full: "No room in the final review at your pace",
+		too_late: "No room in the final review, it starts too close to the exam",
 	},
 };
 

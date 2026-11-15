@@ -109,6 +109,12 @@ describe("the tonight input", () => {
 		assert.equal(activeProblemOf([...record.messages, ...appends]), null);
 	});
 
+	it("closes practice on what the record keeps, never on the problem it dropped (round 9, 3 m7: \"You still have the kernel problem you closed … to pick up\")", () => {
+		assert.match(DONE_TONIGHT_TEXT.practice, /never name it as something he picks up or still has/);
+		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps/);
+		assert.doesNotMatch(DONE_TONIGHT_TEXT.practice, /the kernel problem/, "no dropped problem offered as the example of what he picks up");
+	});
+
 	it("carries the conclude pair a discard left waiting", () => {
 		const record = { messages: [...problemPose(), newProblemDismissedMarker("call_p1")], kind: "practice" as const };
 		const appends = inputAppends(record, { type: "tonight" });

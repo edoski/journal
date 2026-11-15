@@ -24,6 +24,24 @@ describe("the calendar's words and marks (2 m5, 1 §6)", () => {
 		assert.equal(sessionType(chat({ title: "Chain rule review", review: true })), "review", "a review named another way is still one, by its opening");
 	});
 
+	it("keeps Review on a review that turned into teaching and left work open (round 9, 2 m4: it read Unfinished)", () => {
+		const task = { key: "binomial-formula", title: "Building the binomial formula", step: "Count the sequences with 3 successes", updated: TODAY };
+		const course: CalendarCourse = {
+			...COURSE,
+			map: map({ tasks: [task], topics: [topic("binomial", "Binomial distribution", { tasks: [task.key] })] }),
+			due: [],
+			planned: [],
+			doesNotFit: [],
+			finalReview: null,
+		};
+		const review = chat({ id: "r", title: "Review Binomial distribution", topics: ["binomial"], ownTopics: ["binomial"], tasks: [task.key], ended: "left", updatedAt: `${TODAY}T10:00:00.000Z` });
+		const entries = calendarEntries({ courses: [course], chats: [review], scope: null });
+		const entry = entries.find((e) => e.kind === "session")!;
+		assert.equal(entry.kind === "session" && entry.task?.key, task.key, "the open task folds into the review's entry");
+		assert.equal(lookWords(entry, TODAY), "Review");
+		assert.equal(entries.filter((e) => e.kind === "task").length, 0, "one entry for the one piece of work");
+	});
+
 	it("draws an overdue review with the review's History icon, muted, as Home and the sidebar do", () => {
 		assert.equal(ICONS.overdue, HistoryIcon);
 		assert.equal(ICON_INK.overdue, undefined);
