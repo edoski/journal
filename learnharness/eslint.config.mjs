@@ -2,6 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextPlugin from "@next/eslint-plugin-next";
 import tsParser from "@typescript-eslint/parser";
 import importPlugin from "eslint-plugin-import";
+import noDomNodeInAssert from "./eslint/no-dom-node-in-assert.mjs";
 
 /**
  * ESLint with one job here: ENFORCE THE IMPORT LAW (the shell/core
@@ -16,7 +17,9 @@ import importPlugin from "eslint-plugin-import";
  *                    the storage ports, the composition — arrive via
  *                    factories/closures from the chat-handler)
  *
- * tests/ and scripts/ are internal — unrestricted.
+ * tests/ and scripts/ are internal — unrestricted by the import law. tests/
+ * also get type information for one rule: no DOM node in a node:assert
+ * comparison (eslint/no-dom-node-in-assert.mjs).
  */
 
 export default defineConfig([
@@ -70,5 +73,13 @@ export default defineConfig([
 				},
 			],
 		},
+	},
+	{
+		files: ["tests/**/*.{ts,tsx}"],
+		languageOptions: {
+			parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+		},
+		plugins: { learnharness: { rules: { "no-dom-node-in-assert": noDomNodeInAssert } } },
+		rules: { "learnharness/no-dom-node-in-assert": "error" },
 	},
 ]);
