@@ -79,7 +79,7 @@ describe("Context on the course head", () => {
 		await press(document.activeElement ?? sheet, "Escape");
 		await act(async () => new Promise((r) => setTimeout(r, 0)));
 
-		assert.equal(document.querySelector("[role=dialog]"), null, "Escape closes the sheet");
-		assert.equal(document.activeElement, opener, "focus goes back to Context");
+		assert.ok(document.querySelector("[role=dialog]") === null, "Escape closes the sheet");
+		assert.ok(document.activeElement === opener, "focus goes back to Context");
 	});
 });

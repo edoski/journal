@@ -44,7 +44,7 @@ describe("the session overlay", () => {
 		await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
 		assert.equal(closed, 1, "one Esc closes it");
 		assert.equal(reachedWindow, 0, "the window's turn abort never hears it");
-		assert.equal(document.activeElement, opener, "focus goes back to what opened it");
+		assert.ok(document.activeElement === opener, "focus goes back to what opened it");
 		await act(async () => root.unmount());
 		host.remove();
 		opener.remove();

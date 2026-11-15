@@ -31,7 +31,7 @@ describe("Home's map keys (N2)", () => {
 		await press("f");
 		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]'));
 		await press("f");
-		assert.equal(document.querySelector('[data-slot="home-map"][data-enlarged]'), null);
+		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
 	});
 
 	it("never fires while he types in a field or while a dialog is open", async () => {
@@ -42,13 +42,13 @@ describe("Home's map keys (N2)", () => {
 		await press("ArrowRight", field);
 		await press("f", field);
 		assert.equal(tab(), tabTitles()[0]);
-		assert.equal(document.querySelector('[data-slot="home-map"][data-enlarged]'), null);
+		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
 		field.remove();
 		const dialog = document.createElement("div");
 		dialog.setAttribute("role", "dialog");
 		document.body.appendChild(dialog);
 		await press("f", document.body);
-		assert.equal(document.querySelector('[data-slot="home-map"][data-enlarged]'), null);
+		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
 		dialog.remove();
 	});
 });
