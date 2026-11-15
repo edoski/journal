@@ -278,9 +278,9 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 		case "moral":
 			return `A direct answer stops where the answer does, with no closing lesson: drop ${quoted(b.excerpt)}.`;
 		case "reason":
-			return `He was unsure of his answer, and this only states it again: say in one or two sentences why it holds, starting with the content: ${quoted(b.excerpt)}.`;
+			return `He was unsure of his answer, and this only states it again: give in one or two sentences the reason it holds, opening on the fact itself, never on "That holds": ${quoted(b.excerpt)}.`;
 		case "echo":
-			return `Start with the content, never by handing his answer back or grading a right one: ${quoted(b.excerpt)}.`;
+			return `Start with the content, never by handing his answer back or grading a right one: ${quoted(b.excerpt)}.${/^(?:(?:that|this|it) holds|(?:you|your \w+) (?:were|was) right)\b/i.test(b.excerpt) ? " Open on the fact that makes it hold." : ""}`;
 		case "feedback":
 			return `A right answer gets no feedback sentence: ${quoted(b.excerpt)}.`;
 		case "review-lesson":
@@ -358,7 +358,7 @@ const UNSURE = (why: string): AgentToolResult<unknown> => ({
 	content: [
 		{
 			type: "text",
-			text: `Not posed: he was unsure of his answer (${why}), and you gave him no words on it. First send him with send_to_user, in one or two sentences, why his answer holds or where it broke, starting with the content; then ask this again.`,
+			text: `Not posed: he was unsure of his answer (${why}), and you gave him no words on it. First send him with send_to_user, in one or two sentences, the reason his answer holds or where it broke, opening on the fact itself, never on a grade ("That holds", "You were right"); then ask this again.`,
 		},
 	],
 	isError: true,

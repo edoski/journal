@@ -135,3 +135,19 @@ describe("his reason is asked one way, and every refusal of another way names it
 		assert.match(voice, /the only way to ask for his reason: never a sentence under the question \("Say why\.", "Justify your answer\."\)/);
 	});
 });
+
+describe("a reply to an unsure answer is told to open on the fact, not on \"That holds\" (round 10)", () => {
+	it("the voice and the guard's note name the opening it must not use, which it wrote four times", () => {
+		const voice = fs.readFileSync(path.join(import.meta.dirname, "..", "src", "agent", "prompts", "shared", "10-voice.md"), "utf-8");
+		const line = voice.split("\n").find((l) => l.startsWith("- A right answer:")) ?? "";
+		assert.match(line, /never on a grade \("That holds because…", "You were right"\)/);
+		assert.doesNotMatch(line, /say in one or two sentences why it holds/);
+		const q = ask("What does the map do to the unit cube?");
+		const guard = new VoiceGuard([newUserMessage("Invertible matrices"), assistant([q]), { ...answered(q.id, "volume zero means it squashes it flat, I guess"), details: { kind: "explain", text: "volume zero means it squashes it flat, I guess", confidence: "guessing" } } as LhMessage]);
+		const unsure = decision(guard, ask("Which matrix squashes the cube flat?"));
+		assert.match(unsure!.content[0]!.text, /never on a grade \("That holds", "You were right"\)/);
+		const echo = decision(guard, send("That holds because $|\\det A|$ is the factor by which $A$ scales volume, and the image of the cube is the box spanned by the columns of $A$. Volume $0$ means those three columns lie in one plane or on one line."));
+		assert.deepEqual(echo?.details.rules, ["echo"]);
+		assert.match(echo!.content[0]!.text, /Open on the fact that makes it hold\./);
+	});
+});
