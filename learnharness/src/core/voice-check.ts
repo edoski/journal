@@ -48,6 +48,7 @@ export type VoiceRule =
 	| "reason"
 	| "machinery"
 	| "review-lesson"
+	| "confidence"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -484,6 +485,13 @@ export function closingMoral(text: string): string | null {
 	if (!last || last.endsWith("?")) return null;
 	const tail = /^(?:so|that(?:'s| is) why|this is why|which is why)\b.*|,\s*which is why\b.*$/i.exec(last)?.[0];
 	return tail && !/\bX\b|\d/.test(tail) ? last : null;
+}
+
+/** A sentence that tells him how sure he was ("You were sure the kernel
+ *  came from the number of rows."): his card shows his confidence, so it
+ *  only narrates (round 10, 3 m3: practice's closing words). */
+export function narratedConfidence(text: string): string | null {
+	return sentences(prose(text).text).find((s) => /^\s*you (?:were|felt|seemed|sounded) (?:so |very |quite )?(?:sure|confident|certain)\b/i.test(s))?.trim() ?? null;
 }
 
 /** The prose sentences after a message's last question: what sits under

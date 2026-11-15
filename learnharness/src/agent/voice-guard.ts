@@ -25,7 +25,7 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, problemAdvice, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, narratedConfidence, problemAdvice, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -270,6 +270,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `Start with the content, never by handing his answer back or grading a right one: ${quoted(b.excerpt)}.`;
 		case "feedback":
 			return `A right answer gets no feedback sentence: ${quoted(b.excerpt)}.`;
+		case "confidence":
+			return `Closing words never tell him how sure he was, which his card already shows, and never restate the break your feedback named: drop ${quoted(b.excerpt)} and keep only the one move that was not obvious.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -643,6 +645,8 @@ export class VoiceGuard {
 		if (unsureEcho && !echo) out.push({ rule: "reason", excerpt: unsureEcho });
 		const moral = kind === "direct" ? closingMoral(text) : null;
 		if (moral) out.push({ rule: "moral", excerpt: moral });
+		const sure = kind === "close" ? narratedConfidence(text) : null;
+		if (sure) out.push({ rule: "confidence", excerpt: sure });
 		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
 			const { words } = lengthOf(text);
 			if (words > this.lengthDraft.allowed) out.push({ rule: "length", excerpt: `${words} words where the draft had ${this.lengthDraft.words}, so no whole sentence was cut` });
