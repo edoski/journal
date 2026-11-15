@@ -19,13 +19,17 @@ import {
 	needsContinuation,
 	pendingQuestionOf,
 	failedResponseAtEnd,
+	isQuestionTool,
 	measuredContextTokens,
 	newAnswerResult,
 	newNextMessage,
 	newProblemDismissedMarker,
 	newThinkingMessage,
+	newPracticeRequestMessage,
 	newUserMessage,
 	projectView,
+	tonightAppends,
+	disputeAppends,
 	type ChatInput,
 	type LhMarkerMessage,
 	type LhMessage,
@@ -33,21 +37,26 @@ import {
 	type LiveExecution,
 	type QuestionAnswerData,
 	type QuestionDraft,
+	type Photo,
+	PHOTO_STEER_LINE,
 } from "../src/core";
+import { LESSON_WORDS } from "./study-words.ts";
 
 export type SessionStatus = "ready" | "submitted" | "streaming" | "error";
 
-/** How often to poll turnInFlight while a racing turn runs (409 retry). */
-export const TURN_POLL_MS = 500;
 /** Give up waiting (a wake turn can run long) and surface the 409. */
 export const TURN_WAIT_MAX_MS = 30_000;
+
+/** The chat's next turn-settled, subscribed when called; `cancel` drops it. */
+export type TurnSettledWaiter = () => { promise: Promise<void>; cancel: () => void };
 
 export interface SessionModelDeps {
 	/** Injectable fetch (tests); defaults to the global. */
 	fetch?: typeof globalThis.fetch;
-	/** Injectable retry timing (tests). */
-	pollMs?: number;
+	/** Injectable retry deadline (tests). */
 	waitMaxMs?: number;
+	/** The 409 retry's wait (the adapter wires the events channel). */
+	turnSettled?: TurnSettledWaiter;
 }
 
 /** A local optimistic id (never a server stamp — absorption and the
@@ -57,17 +66,17 @@ function localId(): string {
 	return `c_${Date.now().toString(36)}_${(localSeq++).toString(36)}`;
 }
 
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const t = setTimeout(resolve, ms);
-		signal?.addEventListener(
-			"abort",
-			() => {
-				clearTimeout(t);
-				reject(new DOMException("Aborted", "AbortError"));
-			},
-			{ once: true },
-		);
+/** Resolves when `event` does, when `ms` pass (the retry's deadline), or
+ *  when `signal` aborts, whichever comes first. */
+function settleOrDeadline(event: Promise<void> | undefined, ms: number, signal?: AbortSignal): Promise<void> {
+	return new Promise((resolve) => {
+		const t = setTimeout(resolve, Math.max(0, ms));
+		const done = () => {
+			clearTimeout(t);
+			resolve();
+		};
+		void event?.then(done);
+		signal?.addEventListener("abort", done, { once: true });
 	});
 }
 
@@ -81,7 +90,7 @@ async function turnInFlight(model: SessionModel): Promise<boolean | null> {
 	}
 }
 
-const STREAM_DROPPED = "The connection dropped before the turn completed.";
+export const STREAM_DROPPED = LESSON_WORDS.connectionDropped;
 
 /** Mark transport failures without confusing JSON/application bugs with drops. */
 class StreamReadError extends Error {
@@ -229,8 +238,8 @@ export class SessionModel {
 	fetch: typeof globalThis.fetch;
 	/** Steers sent but not yet drained (the queued indicator's truth). */
 	private steerQueueValue: SteerQueueItem[] = [];
-	private readonly pollMs: number;
 	private readonly waitMaxMs: number;
+	private turnSettled?: TurnSettledWaiter;
 	private onReattachSettled?: () => void;
 	/** The hook's re-render trigger (set by the adapter). */
 	onChange?: () => void;
@@ -275,10 +284,15 @@ export class SessionModel {
 		// (Node's undici doesn't care, so the tests never saw it). Always go
 		// through a receiver-preserving wrapper.
 		this.fetch = opts.fetch ?? ((...args) => globalThis.fetch(...args));
-		this.pollMs = opts.pollMs ?? TURN_POLL_MS;
 		this.waitMaxMs = opts.waitMaxMs ?? TURN_WAIT_MAX_MS;
+		this.turnSettled = opts.turnSettled;
 		this.onChange = opts.onChange;
 		this.onReattachSettled = opts.onReattachSettled;
+	}
+
+	/** The 409 retry's wait for the racing turn (the adapter wires the hub). */
+	setTurnSettled(fn: TurnSettledWaiter | undefined): void {
+		this.turnSettled = fn;
 	}
 
 	/** Injectable settle hook (the adapter wires its ref). */
@@ -337,7 +351,8 @@ export class SessionModel {
 
 	/** The 409 identity-retry fetch (the Wave B contract): the event was
 	 *  never persisted (write-ahead happens only on acceptance), so the
-	 *  retry waits out the running turn and re-POSTs the SAME body. */
+	 *  retry waits for the racing turn to settle (the events channel's
+	 *  turn-settled, within the deadline) and re-POSTs the SAME body. */
 	async postInputEvent(input: ChatInput, signal?: AbortSignal): Promise<Response> {
 		const body = JSON.stringify({ chatId: this.chatId, input });
 		const init: RequestInit = {
@@ -347,14 +362,18 @@ export class SessionModel {
 			signal,
 		};
 		let response = await this.fetch("/api/chat", init);
-		let waited = 0;
+		// A continue that finds a turn running asks for nothing of its own:
+		// that turn is the reply it wanted, so the caller attaches to it.
+		if (input.type === "continue") return response;
+		const deadline = Date.now() + this.waitMaxMs;
 		while (response.status === 409) {
 			await response.body?.cancel().catch(() => {});
-			if (signal?.aborted || waited >= this.waitMaxMs) return response;
-			await delay(this.pollMs, signal);
-			waited += this.pollMs;
-			if (signal?.aborted) return response;
-			if ((await turnInFlight(this)) !== false) continue;
+			if (signal?.aborted || Date.now() >= deadline) return response;
+			// Subscribed before the check, so a settle in between is not missed.
+			const settled = this.turnSettled?.();
+			if ((await turnInFlight(this)) !== false) await settleOrDeadline(settled?.promise, deadline - Date.now(), signal);
+			settled?.cancel();
+			if (signal?.aborted || Date.now() >= deadline) return response;
 			response = await this.fetch("/api/chat", init); // may 409 again → loop
 		}
 		return response;
@@ -535,13 +554,16 @@ export class SessionModel {
 		await this.resumeStream(true, false);
 	}
 
+	/** A view read of a turn the server owns. Failing to reach the app is a
+	 *  dropped connection to that turn, never a refused input: the turn
+	 *  was accepted, so the record decides what it still owes. */
 	private async fetchView(url: string, signal: AbortSignal, recoveringDrop: boolean): Promise<Response> {
 		try {
 			const res = await this.fetch(url, { signal });
 			if (recoveringDrop && !res.ok) throw new Error((await res.text()) || STREAM_DROPPED);
 			return res;
 		} catch (err) {
-			if (recoveringDrop && !signal.aborted) throw new StreamReadError(err);
+			if (!signal.aborted && (recoveringDrop || err instanceof TypeError)) throw new StreamReadError(err);
 			throw err;
 		}
 	}
@@ -637,7 +659,7 @@ export class SessionModel {
 				this.tail = this.tail.filter(m => !this.unconfirmedAnswers.has(m.id));
 				this.unconfirmedAnswers.clear();
 			});
-			this.setError(!allowRecovery && err instanceof StreamReadError ? STREAM_DROPPED : (err as Error).message);
+			this.setError(err instanceof StreamReadError ? STREAM_DROPPED : (err as Error).message);
 			this.setStatus("error");
 		}
 	}
@@ -697,19 +719,35 @@ export class SessionModel {
 		// write-ahead will persist (inputAppends), with LOCAL ids so
 		// adoption can tell them from the record's absorbed copies.
 		const optimistic: LhMessage[] = [];
-		if (input.type === "text") optimistic.push({ ...newUserMessage(input.text), id: localId() });
+		if (input.type === "text") optimistic.push({ ...newUserMessage(input.text, input.photos), id: localId() });
 		else if (input.type === "thinking") {
 			// The practice submissions (2026-10-04): the marker lands
 			// optimistically — the card renders from its details the
 			// moment the button fires.
-			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text, input.confidence), id: localId() });
+			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text, input.confidence, input.photos), id: localId() });
+		} else if (input.type === "request") {
+			optimistic.push({ ...newPracticeRequestMessage(input.problemCallId, input.request, input.text), id: localId() });
 		} else if (input.type === "next") {
 			// The move-on signal (owner round 16): the NEXT PROBLEM line
 			// renders the instant the chip/Enter fires.
 			optimistic.push({ ...newNextMessage(), id: localId() });
+		} else if (input.type === "tonight") {
+			// Done for tonight: the withheld questions, a dropped problem and
+			// the line land at once. A dropped problem's synthesized conclude
+			// pair waits for the record.
+			for (const m of tonightAppends({ messages: [...this.base, ...this.tail] })) {
+				if (m.role === "custom" || (m.role === "toolResult" && isQuestionTool(m.toolName))) optimistic.push({ ...m, id: localId() });
+			}
+		} else if (input.type === "dispute") {
+			// His dispute row lands at once; the record refuses one with no mark.
+			try {
+				for (const m of disputeAppends({ messages: [...this.base, ...this.tail] }, input)) {
+					if (m.role === "custom") optimistic.push({ ...m, id: localId() });
+				}
+			} catch { /* the POST's 400 says why */ }
 		} else if (input.type === "answer") {
 			const tool = pendingCallTool([...this.base, ...this.tail], input.toolCallId) ?? "explain";
-			const result = { ...newAnswerResult(input.toolCallId, tool, input.answer), id: localId() };
+			const result = { ...newAnswerResult(input.toolCallId, tool, input.answer, input.photos), id: localId() };
 			optimistic.push(result);
 			this.unconfirmedAnswers.set(result.id, expectedKey ?? input.toolCallId);
 		}
@@ -731,6 +769,12 @@ export class SessionModel {
 			// STREAM consume stays on the controller — releasing that held
 			// connection is Diet A's whole job.
 			const res = await this.postInputEvent(input);
+			if (res.status === 409 && input.type === "continue") {
+				await res.body?.cancel().catch(() => {});
+				if (this.consumeAbort !== controller) return false;
+				await this.resumeStream(true);
+				return false;
+			}
 			if (res.status === 409) {
 				throw new Error("A turn is already running — try again in a moment.");
 			}
@@ -779,7 +823,7 @@ export class SessionModel {
 			// existing setup recovery. A newer send/reattach ALWAYS owns errors
 			// and status instead, even if that request has since been stopped.
 			// Ordinary text and answer teardown behavior stays unchanged.
-			if (input.type === "answer") {
+			if (input.type === "answer" || input.type === "thinking" || input.type === "request" || input.type === "tonight" || input.type === "dispute") {
 				const ids = new Set(optimistic.map(m => m.id));
 				this.mutate(() => {
 					this.tail = this.tail.filter(m => !ids.has(m.id));
@@ -807,11 +851,11 @@ export class SessionModel {
 	 *  settled mid-send (the race): fall back to the plain text send —
 	 *  the entry is dropped and send() pushes its own optimistic card.
 	 */
-	async steer(text: string): Promise<void> {
+	async steer(text: string, photos?: Photo[]): Promise<boolean> {
 		const t = text.trim();
-		if (!t) return;
+		if (!t && !photos?.length) return false;
 		const id = `steer_${localId()}`;
-		this.steerQueueValue = [...this.steerQueueValue, { id, text: t }];
+		this.steerQueueValue = [...this.steerQueueValue, { id, text: t || PHOTO_STEER_LINE }];
 		this.onChange?.();
 		const dropSteer = () => {
 			this.steerQueueValue = this.steerQueueValue.filter((s) => s.id !== id);
@@ -821,27 +865,28 @@ export class SessionModel {
 			const res = await this.fetch(`/api/chats/${this.chatId}/steer`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ input: { type: "steer", id, text: t } }),
+				body: JSON.stringify({ input: { type: "steer", id, text: t, ...(photos?.length ? { photos } : {}) } }),
 			});
-			if (res.ok) return; // parked or delivered — the stream lands the card
+			if (res.ok) return true; // parked or delivered — the stream lands the card
 			if (res.status === 409) {
 				dropSteer();
-				await this.send({ type: "text", text: t }); // the settle race: plain send
-				return;
+				return await this.send({ type: "text", text: t, ...(photos?.length ? { photos } : {}) }); // the settle race: plain send
 			}
 			dropSteer();
 			this.setError((await res.text()) || `The steer failed (${res.status}).`);
+			return false;
 		} catch (err) {
 			dropSteer();
 			this.setError((err as Error).message);
+			return false;
 		}
 	}
 
 	/** The answer path (the dock): the answer IS the question call's tool
 	 *  result (fork 1), riding as its input event. */
-	submitAnswer(tool: string, toolCallId: string, output: QuestionAnswerData, questionKey?: string): Promise<void> {
+	submitAnswer(tool: string, toolCallId: string, output: QuestionAnswerData, questionKey?: string, photos?: Photo[]): Promise<void> {
 		void tool;
-		return this.send({ type: "answer", toolCallId, answer: output }, undefined, questionKey).then(() => undefined);
+		return this.send({ type: "answer", toolCallId, answer: output, ...(photos?.length ? { photos } : {}) }, undefined, questionKey).then(() => undefined);
 	}
 
 	/** The dismissal path (owner design 2026-10-03, "A2"): the skipped
@@ -849,11 +894,12 @@ export class SessionModel {
 	 * — no turn, no stream, nothing wakes. The session pauses at the
 	 * user's choice; the next plain send is the wake. On failure the
 	 * durable record wins: the error surfaces, the record-changed sync
-	 * (or any later refetch) replaces the optimistic append with truth. */
-	async dismissQuestion(toolCallId: string, answer: QuestionAnswerData, questionKey?: string): Promise<void> {
-		if (!this.readyRef) return;
+	 * (or any later refetch) replaces the optimistic append with truth.
+	 * Resolves whether the record took it, so a message may follow it. */
+	async dismissQuestion(toolCallId: string, answer: QuestionAnswerData, questionKey?: string): Promise<boolean> {
+		if (!this.readyRef) return false;
 		const subject = pendingQuestionOf([...this.base, ...this.tail]);
-		if (questionKey !== undefined && (subject?.key !== questionKey || subject.toolCallId !== toolCallId)) return;
+		if (questionKey !== undefined && (subject?.key !== questionKey || subject.toolCallId !== toolCallId)) return false;
 		const tool = pendingCallTool([...this.base, ...this.tail], toolCallId) ?? "explain";
 		this.mutate(() => {
 			this.tail = [...this.tail, { ...newAnswerResult(toolCallId, tool, answer), id: localId() }];
@@ -865,8 +911,10 @@ export class SessionModel {
 				body: JSON.stringify({ input: { type: "dismiss", toolCallId, answer } }),
 			});
 			if (!res.ok) throw new Error(`The dismissal failed (${res.status}).`);
+			return true;
 		} catch (err) {
 			this.setError((err as Error).message);
+			return false;
 		}
 	}
 
@@ -967,5 +1015,15 @@ export class SessionModel {
 
 	clearError(): void {
 		this.setError(null);
+	}
+
+	/** The app came back after a restart cut the turn this view was reading.
+	 *  A dropped connection is no failure of the tutor's, so the record alone
+	 *  decides what is owed next, as when the lesson opens. */
+	recoverDroppedStream(): void {
+		if (this.statusValue !== "error" || this.errorValue?.message !== STREAM_DROPPED) return;
+		this.automaticContinuationBlocked = false;
+		this.setError(null);
+		this.setStatus("ready");
 	}
 }

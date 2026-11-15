@@ -21,13 +21,17 @@ import { lsTool } from "./ls.ts";
 import { findTool } from "./find.ts";
 import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
-import { proberGraphTools, type GraphToolContext } from "./graph.ts";
-import { activeProblemOf } from "../../core/native-messages.ts";
+import { teachHandoffTool } from "./handoff.ts";
+import { nameSessionTool } from "./name-session.ts";
+import type { ChatStore } from "../../core/ports.ts";
+import type { SteerMessage } from "../../core/contracts/jobs.ts";
+import { activeProblemOf, finalSubmissionOf, seenBeforeAsked } from "../../core/native-messages.ts";
 import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
-import type { CourseToolContext } from "./course.ts";
+import { saveCourse, type CourseToolContext } from "./course.ts";
+import { studyDay, withDayWords } from "../../core/day-words.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
 import { CONFIDENCE_STATES } from "../../core/contracts/course.ts";
@@ -37,13 +41,13 @@ import { conclusionProblem, practiceObservations, type PracticeConclusion } from
 /** The record-reading context the gates need (the plan-tools idiom). */
 export interface PracticeToolContext {
 	chatId: string;
-	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null };
-	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the map readers
-	 *  behind the SAME settings gate as the prober's (graphToolsEnabled at
-	 *  the composition root); the research + pdf jobs (both keyless).
-	 *  Each absent context (tests) = absent from the registry. */
-	graph?: GraphToolContext;
+	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null } & Partial<Pick<ChatStore, "nameSession">>;
+	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the research +
+	 *  pdf jobs (both keyless). Absent (tests) = absent from the registry. */
 	jobs?: JobToolContext;
+	/** Queue a handoff's wake: present = the `teach` handoff is registered
+	 *  (the composition root always passes it). */
+	deliver?: (steer: SteerMessage) => void;
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
@@ -121,6 +125,16 @@ function attemptResult(description: string) {
 	return Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")], { description });
 }
 
+function brokeAtField() {
+	return Type.Optional(
+		Type.String({
+			minLength: 1,
+			description:
+				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone; give the topics answered right before the break their result in byTopic.",
+		}),
+	);
+}
+
 function byTopicField() {
 	return Type.Optional(
 		Type.Record(Type.String(), attemptResult("correct, partial or incorrect"), {
@@ -142,11 +156,11 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the outcome: solved, solvedWithHints, movedOn, or surrendered — bare words, no quotes (dismissed is synthesized, never yours)." },
 	),
 	verdict: Type.String({
-		description: "REQUIRED — the plain-language verdict: what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
+		description: "REQUIRED — the plain-language verdict, shown to the learner on the card: addressed to him as \"you\", what was credited, where it broke, with math in `$…$` LaTeX. On a wrong answer: localize the break, do NOT give the correction.",
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
-		{ description: "REQUIRED — the rung of the strongest hint actually given, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes)." },
+		{ description: "REQUIRED — the rung of the strongest hint actually given before he answered or gave up, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes). The solution revealed after he gives up is not a hint." },
 	),
 	missClass: Type.Union(
 		[
@@ -160,10 +174,11 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the miss classification: cue, discrimination, execution, careless, or structural — or null = no miss (bare, no quotes)." },
 	),
 	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
-	result: attemptResult(
-		"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect. A right guess is correct; his confidence travels separately.",
-	),
-	response: Type.String({ description: "REQUIRED — his final answer, in a short line." }),
+	result: Type.Union([attemptResult("correct, partial or incorrect"), Type.Null()], {
+		description:
+			"REQUIRED — the attempt's result for his course record: correct, partial (part of it right: some of its parts right and others not, or a right answer reached by reasoning that does not hold; a verdict that names a part he got right is never incorrect) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
+	}),
+	response: Type.String({ description: "REQUIRED — his final answer, in a short line, with math in `$…$` LaTeX (it is recorded as the attempt the learner reads later)." }),
 	chose: Type.Optional(
 		Type.String({
 			minLength: 1,
@@ -172,11 +187,12 @@ export const concludeInputObject = Type.Object({
 		}),
 	),
 	byTopic: byTopicField(),
+	brokeAt: brokeAtField(),
 	firstTry: Type.Optional(
 		Type.Object(
 			{
 				result: attemptResult("REQUIRED — the result of his first answer."),
-				response: Type.String({ description: "REQUIRED — his first answer, in a short line." }),
+				response: Type.String({ description: "REQUIRED — his first answer, in a short line, with math in `$…$` LaTeX." }),
 				sure: Type.Union([...CONFIDENCE_STATES.map((s) => Type.Literal(s)), Type.Null()], {
 					description:
 						"REQUIRED — the Confidence line of the submission that made this first claim (guessing, neutral or confident), or null when it had none. A working note before the claim is not the claim.",
@@ -185,6 +201,7 @@ export const concludeInputObject = Type.Object({
 					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
 				),
 				byTopic: byTopicField(),
+				brokeAt: brokeAtField(),
 			},
 			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
 		),
@@ -200,19 +217,19 @@ export interface ConcludeRecording {
 	course: CourseToolContext;
 }
 
-/** The confidence of the last submission on one problem: the one the
- *  final answer came with. */
-function lastSubmissionConfidence(messages: readonly LhMessage[], problemCallId: string): string | undefined {
-	const states = messages
-		.filter((m): m is LhMessage & LhMarkerMessage => (m as { customType?: string }).customType === "practice-thinking")
-		.map((m) => m.details as { problemCallId?: unknown; confidence?: unknown } | null)
-		.filter((d) => d?.problemCallId === problemCallId)
-		.map((d) => (typeof d?.confidence === "string" ? d.confidence : undefined));
-	return states[states.length - 1];
+/** True when he pressed Explain instead on this problem before submitting
+ *  any work on it: he asked to be taught, so nothing was attempted. */
+function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: string): boolean {
+	const onProblem = messages
+		.filter((m): m is LhMessage & LhMarkerMessage => m.role === "custom")
+		.filter((m) => (m.details as { problemCallId?: unknown } | null)?.problemCallId === problemCallId);
+	const explained = onProblem.some((m) => m.customType === "practice-request" && (m.details as { request?: unknown }).request === "explain");
+	const worked = onProblem.some((m) => m.customType === "practice-thinking" || (m.customType === "practice-request" && typeof (m.details as { text?: unknown }).text === "string"));
+	return explained && !worked;
 }
 
 /** Save a concluded problem's attempts; a refusal names what to fix. */
-async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): Promise<{ refused?: string; text: string }> {
+async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, concludeCallId: string): Promise<{ refused?: string; text: string }> {
 	if (input.outcome === "dismissed") return { text: "" };
 	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
 	const active = record ? activeProblemOf(record.messages) : null;
@@ -223,6 +240,9 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
 	}
 	const topics = pose.topics;
+	if (explainedBeforeAnyWork(record.messages, active.toolCallId)) {
+		return { text: "No attempt recorded: he asked to be taught before submitting any work on this problem." };
+	}
 	const conclusion: PracticeConclusion = {
 		outcome: input.outcome,
 		rung: input.rung,
@@ -230,24 +250,39 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 		response: input.response,
 		...(input.chose ? { chose: input.chose } : {}),
 		...(input.byTopic ? { byTopic: input.byTopic } : {}),
+		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};
 	const problem = conclusionProblem(conclusion, topics);
 	if (problem) return { refused: problem, text: "" };
+	// His newest message came from Ask: a question, never his answer, and
+	// the confidence of an earlier note is not its (round 5).
+	const final = finalSubmissionOf(record.messages, active.toolCallId);
+	if (final?.kind === "asked" && conclusion.result !== null && input.outcome !== "surrendered") {
+		return { refused: "his newest message came from Ask: a question to you, not his answer, so it concludes nothing. Answer his question; his answer comes as his work", text: "" };
+	}
+	if (conclusion.result === null) {
+		return { text: "No attempt recorded: he claimed no answer." };
+	}
 	const observations = practiceObservations(
 		{ statement: pose.statement, topics },
 		conclusion,
-		lastSubmissionConfidence(record.messages, active.toolCallId),
+		final?.kind === "work" ? final.confidence : undefined,
 	);
-	const saved = await rec.course.records.run(rec.course.course.workspace, { verb: "save", changes: { observations } });
-	if (saved.ok) return { text: `Course record: ${JSON.stringify(saved.json)}` };
+	// The same problem posed again after its solution was shown: his
+	// answer repeats what he saw (shown-help.ts).
+	const seen = seenBeforeAsked(record.messages, active.toolCallId);
+	const saved = await saveCourse(rec.course, { observations }, { id: concludeCallId, seen });
+	if (saved.ok) return { text: `Course record: ${JSON.stringify(withDayWords(saved.json, studyDay()))}` };
 	// The problem still concludes: a pose's topics cannot change after the
 	// fact, so holding the problem open would lock the session.
 	const repair =
 		saved.kind === "validation"
 			? "Repair it with course_save (for example, create the missing topic in the same patch, placed in the path) and send these observations: "
 			: "On your next turn, re-send exactly this with course_save: ";
-	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations })}` };
+	// Each names this conclude, so the problem's card shows the mark.
+	const resend = observations.map((o) => ({ ...o, question: concludeCallId }));
+	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations: resend })}` };
 }
 
 export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording): AgentTool<typeof concludeInputObject> {
@@ -257,17 +292,17 @@ export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording):
 		description:
 			"Conclude the active problem: records the outcome + verdict, reveals the committed solution, and frees " +
 			"the learner's composer. After the result, say your closing words about the learner's work if useful, then " +
-			"END YOUR TURN — no further tool calls. The next problem is NEVER posed here: it waits for the learner's " +
+			"END YOUR TURN — no further tool calls, except `teach` when he asked to be taught. The next problem is NEVER posed here: it waits for the learner's " +
 			"explicit go-ahead (a *Next problem* message, or their own words asking for the next one). Between problems, " +
 			"answer their questions about the concluded one. Nothing may conclude unless a problem is active.",
 		parameters: concludeInputObject,
 		prepareArguments: (args: unknown) => healEncodedArguments(args, concludeInputObject) as never,
 		executionMode: "sequential",
-		execute: async (_toolCallId, input) => {
+		execute: async (toolCallId, input) => {
 			if (!gate.problemActive) {
 				return invalidInputResult("conclude", ["no active problem to conclude — pose one first"]);
 			}
-			const recorded = recording ? await recordConclusion(recording, input) : { text: "" };
+			const recorded = recording ? await recordConclusion(recording, input, toolCallId) : { text: "" };
 			if (recorded.refused) return invalidInputResult("conclude", [recorded.refused]);
 			gate.problemActive = false;
 			const ack = concludeResult();
@@ -285,9 +320,9 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 	// learner's files (always — the same read-only set the teacher and
 	// prober carry), the research + pdf jobs (available without search
 	// keys; demo/visual stay teach-only), and
-	// the prober's map readers when the settings gate opened. None are
-	// toggle-filtered: problem/conclude are the session; these are
-	// exceptions the doctrine says to reach for rarely.
+	// the prober's map readers when the settings gate opened.
+	// problem/conclude are the session; these are exceptions the doctrine
+	// says to reach for rarely.
 	const jobs = ctx.jobs ? jobTools(ctx.jobs) : null;
 	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry. problem/conclude
@@ -302,6 +337,8 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 		grep: grepTool,
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
-		...(ctx.graph ? proberGraphTools(ctx.graph) : {}),
+		...(ctx.deliver ? teachHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }, gate) : {}),
+		// A practice session started on no topic names itself in its first reply (name-session.ts).
+		...(ctx.chatStore.nameSession ? nameSessionTool({ chatId: ctx.chatId, chatStore: ctx.chatStore as Pick<ChatStore, "getChat" | "nameSession"> }) : {}),
 	});
 }

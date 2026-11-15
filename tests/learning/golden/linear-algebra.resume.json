@@ -1,0 +1,626 @@
+{
+  "today": "2026-11-08",
+  "revision": 24,
+  "course": {
+    "title": "Linear Algebra",
+    "goal": "Pass the written exam: prove and compute with spaces, maps and spectra",
+    "exam": {
+      "date": "2026-12-03",
+      "format": "Written, 3 hours, 6 problems",
+      "coverage": "Chapters 1-7 of the lecture notes",
+      "final_review": "2026-11-18",
+      "days_left": 25
+    }
+  },
+  "last_activity": {
+    "date": "2026-11-08",
+    "days_ago": 0
+  },
+  "due": [
+    {
+      "topic": "kernel",
+      "due": "2026-11-07",
+      "overdue": 1,
+      "level": "attempted"
+    }
+  ],
+  "due_later": [
+    {
+      "topic": "matmul",
+      "planned": "2026-11-09"
+    },
+    {
+      "topic": "cramer",
+      "planned": "2026-11-11"
+    },
+    {
+      "topic": "rank",
+      "planned": "2026-11-14"
+    },
+    {
+      "topic": "independence",
+      "planned": "2026-11-16"
+    },
+    {
+      "topic": "elimination",
+      "planned": "2026-11-18"
+    }
+  ],
+  "due_later_more": 3,
+  "starts": {
+    "inner-product": "2026-11-11",
+    "projection": "2026-11-12",
+    "invertibility": "2026-11-14",
+    "change-basis": "2026-11-15",
+    "diagonalization": "2026-11-18"
+  },
+  "starts_why": {
+    "inner-product": {
+      "kind": "early",
+      "waiting_on": [
+        "rank",
+        "determinant"
+      ]
+    },
+    "projection": {
+      "kind": "early",
+      "waiting_on": [
+        "rank",
+        "determinant"
+      ]
+    },
+    "invertibility": {
+      "kind": "after",
+      "needs": [
+        "rank",
+        "determinant"
+      ]
+    },
+    "change-basis": {
+      "kind": "after",
+      "needs": [
+        "invertibility"
+      ]
+    },
+    "diagonalization": {
+      "kind": "after",
+      "needs": [
+        "change-basis"
+      ]
+    }
+  },
+  "path": {
+    "current": "eigen",
+    "basis": "Lecture order, weeks 1-7 examinable",
+    "topics": [
+      [
+        "vectors",
+        "retained"
+      ],
+      [
+        "span",
+        "retained"
+      ],
+      [
+        "independence",
+        "independent"
+      ],
+      [
+        "basis",
+        "retained"
+      ],
+      [
+        "matmul",
+        "retained"
+      ],
+      [
+        "elimination",
+        "retained"
+      ],
+      [
+        "rank",
+        "assisted"
+      ],
+      [
+        "kernel",
+        "attempted"
+      ],
+      [
+        "determinant",
+        "assisted"
+      ],
+      [
+        "cramer",
+        "introduced"
+      ],
+      [
+        "invertibility",
+        "new"
+      ],
+      [
+        "change-basis",
+        "new"
+      ],
+      [
+        "eigen",
+        "assisted"
+      ],
+      [
+        "diagonalization",
+        "new"
+      ],
+      [
+        "inner-product",
+        "new"
+      ],
+      [
+        "projection",
+        "new"
+      ]
+    ]
+  },
+  "weak": [
+    {
+      "topic": "independence",
+      "level": "independent",
+      "lapsed": true,
+      "stale": true,
+      "repaired": true,
+      "repaired_with_help": true
+    },
+    {
+      "topic": "matmul",
+      "level": "retained",
+      "lapsed": true,
+      "last": {
+        "id": "o30",
+        "date": "2026-11-05",
+        "result": "incorrect",
+        "unaided": true
+      }
+    },
+    {
+      "topic": "elimination",
+      "level": "retained",
+      "lapsed": true
+    },
+    {
+      "topic": "rank",
+      "level": "assisted",
+      "stale": true,
+      "repaired": true,
+      "repaired_with_help": true
+    },
+    {
+      "topic": "kernel",
+      "level": "attempted"
+    }
+  ],
+  "task": {
+    "key": "sheet-4",
+    "title": "Problem sheet 4: rank and nullity",
+    "topics": [
+      "rank",
+      "basis",
+      "kernel"
+    ],
+    "refs": [
+      {
+        "source": "sheets",
+        "locator": "Sheet 4"
+      }
+    ],
+    "goal": "Solve all five parts with justification",
+    "step": "Part (c): show $\\dim \\ker A = 2$ for the $3 \\times 5$ matrix $A$",
+    "help": "A reminder of rank-nullity in part (b)",
+    "created": "2026-11-06",
+    "updated": "2026-11-06"
+  },
+  "topics": {
+    "independence": {
+      "title": "Linear independence",
+      "needs": [
+        "span"
+      ],
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Section 2.1"
+        },
+        {
+          "source": "sheets",
+          "locator": "Sheet 2"
+        }
+      ],
+      "introduced": "2026-10-05",
+      "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
+      "review": {
+        "due": "2026-10-28",
+        "by": "engine",
+        "planned": "2026-11-16"
+      },
+      "judged": "2026-10-22",
+      "standing": {
+        "level": "independent",
+        "attempts": 5,
+        "unaided_days": 1,
+        "last": {
+          "id": "o20",
+          "date": "2026-10-26",
+          "result": "correct",
+          "unaided": false
+        },
+        "lapsed": true,
+        "confident_errors": 1,
+        "stale": true,
+        "repaired": true,
+        "repaired_with_help": true
+      }
+    },
+    "basis": {
+      "title": "Basis and dimension",
+      "needs": [
+        "independence"
+      ],
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Section 2.2"
+        },
+        {
+          "source": "sheets",
+          "locator": "Sheet 2"
+        }
+      ],
+      "introduced": "2026-10-07",
+      "review": {
+        "due": "2026-10-29",
+        "by": "engine",
+        "planned": "2026-11-21"
+      },
+      "standing": {
+        "level": "retained",
+        "attempts": 5,
+        "unaided_days": 2,
+        "last": {
+          "id": "o19",
+          "date": "2026-10-22",
+          "result": "correct",
+          "unaided": true
+        }
+      }
+    },
+    "elimination": {
+      "title": "Gaussian elimination",
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Section 4.1"
+        },
+        {
+          "source": "sheets",
+          "locator": "Sheet 4"
+        }
+      ],
+      "introduced": "2026-10-15",
+      "review": {
+        "due": "2026-11-06",
+        "by": "engine",
+        "planned": "2026-11-18"
+      },
+      "standing": {
+        "level": "retained",
+        "attempts": 4,
+        "unaided_days": 2,
+        "last": {
+          "id": "o29",
+          "date": "2026-11-05",
+          "result": "incorrect",
+          "unaided": true
+        },
+        "lapsed": true,
+        "choice_errors": {
+          "cramer": 1
+        }
+      }
+    },
+    "rank": {
+      "title": "Rank and the column space",
+      "needs": [
+        "basis",
+        "elimination"
+      ],
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Section 4.2"
+        },
+        {
+          "source": "sheets",
+          "locator": "Sheet 4"
+        }
+      ],
+      "introduced": "2026-11-03",
+      "gap": "You count nonzero entries instead of pivots, and mix up rank with the number of rows",
+      "review": {
+        "due": "2026-11-06",
+        "by": "engine",
+        "planned": "2026-11-14"
+      },
+      "judged": "2026-10-30",
+      "standing": {
+        "level": "assisted",
+        "attempts": 4,
+        "unaided_days": 0,
+        "right": "helped",
+        "last": {
+          "id": "o26",
+          "date": "2026-11-04",
+          "result": "correct",
+          "unaided": false
+        },
+        "stale": true,
+        "repaired": true,
+        "repaired_with_help": true
+      }
+    },
+    "kernel": {
+      "title": "Kernel and rank-nullity",
+      "needs": [
+        "rank"
+      ],
+      "refs": [
+        {
+          "source": "notes",
+          "locator": "Section 4.3"
+        },
+        {
+          "source": "sheets",
+          "locator": "Sheet 4"
+        }
+      ],
+      "introduced": "2026-11-06",
+      "review": {
+        "due": "2026-11-07",
+        "by": "engine",
+        "planned": "2026-11-08"
+      },
+      "standing": {
+        "level": "attempted",
+        "attempts": 1,
+        "unaided_days": 0,
+        "last": {
+          "id": "o31",
+          "date": "2026-11-06",
+          "result": "incorrect",
+          "unaided": true
+        },
+        "confident_errors": 1
+      }
+    }
+  },
+  "evidence": {
+    "o33": {
+      "kind": "attempt",
+      "topics": [
+        "eigen"
+      ],
+      "text": "Explained why an eigenvector stays on its own line under $A$",
+      "help": "Prompted to name the scaling factor",
+      "result": "partial",
+      "date": "2026-11-08"
+    },
+    "o32": {
+      "kind": "attempt",
+      "topics": [
+        "determinant"
+      ],
+      "text": "Read $\\det$ as the area scale of the unit square under a $2 \\times 2$ map",
+      "help": "Hinted at the unit square",
+      "result": "correct",
+      "date": "2026-11-07",
+      "due_topics": [
+        "determinant"
+      ]
+    },
+    "o31": {
+      "kind": "attempt",
+      "topics": [
+        "kernel"
+      ],
+      "text": "Gave $\\dim \\ker A = 3$ for a $3 \\times 5$ matrix of rank $3$",
+      "response": "3",
+      "help": "none",
+      "result": "incorrect",
+      "sure": "confident",
+      "date": "2026-11-06"
+    },
+    "o29": {
+      "kind": "attempt",
+      "topics": [
+        "elimination"
+      ],
+      "text": "Reached for Cramer's rule on a $4 \\times 4$ system and stalled on the determinants",
+      "response": "Started expanding four $4 \\times 4$ determinants",
+      "help": "none",
+      "result": "incorrect",
+      "chose": "cramer",
+      "date": "2026-11-05"
+    },
+    "o26": {
+      "kind": "attempt",
+      "topics": [
+        "rank"
+      ],
+      "text": "Found the rank of a $3 \\times 3$ matrix by counting pivots",
+      "help": "A reminder of the definition",
+      "result": "correct",
+      "date": "2026-11-04",
+      "due_topics": [
+        "rank"
+      ]
+    },
+    "o25": {
+      "kind": "attempt",
+      "topics": [
+        "rank"
+      ],
+      "text": "Counted nonzero entries instead of pivots on a $3 \\times 4$ matrix",
+      "help": "Walked through the echelon form",
+      "result": "partial",
+      "date": "2026-11-03"
+    },
+    "o24": {
+      "kind": "attempt",
+      "topics": [
+        "rank"
+      ],
+      "text": "Found the rank of a $3 \\times 3$ matrix by counting pivots",
+      "help": "Pointed at the first step",
+      "result": "correct",
+      "date": "2026-11-02",
+      "due_topics": [
+        "rank"
+      ]
+    },
+    "o23": {
+      "kind": "attempt",
+      "topics": [
+        "elimination"
+      ],
+      "text": "Solved a $3 \\times 4$ system by elimination",
+      "help": "none",
+      "result": "correct",
+      "sure": "confident",
+      "date": "2026-11-02",
+      "due_topics": [
+        "elimination"
+      ]
+    },
+    "o20": {
+      "kind": "attempt",
+      "topics": [
+        "independence"
+      ],
+      "text": "Checked independence of three vectors in $\\mathbb{R}^3$ by row reduction",
+      "help": "Suggested drawing it first",
+      "result": "correct",
+      "date": "2026-10-26",
+      "due_topics": [
+        "independence"
+      ]
+    },
+    "o19": {
+      "kind": "attempt",
+      "topics": [
+        "basis"
+      ],
+      "text": "Gave a basis for the plane $x + y + z = 0$",
+      "help": "none",
+      "result": "correct",
+      "sure": "confident",
+      "date": "2026-10-22",
+      "due_topics": [
+        "basis"
+      ]
+    },
+    "o18": {
+      "kind": "attempt",
+      "topics": [
+        "independence"
+      ],
+      "text": "Claimed $(1,0,1)$, $(0,1,1)$, $(1,1,2)$ are independent because no two are parallel",
+      "response": "Independent",
+      "help": "none",
+      "result": "incorrect",
+      "sure": "confident",
+      "date": "2026-10-22",
+      "due_topics": [
+        "independence"
+      ]
+    },
+    "o17": {
+      "kind": "attempt",
+      "topics": [
+        "elimination"
+      ],
+      "text": "Row-reduced a $3 \\times 3$ system to echelon form",
+      "help": "none",
+      "result": "correct",
+      "sure": "neutral",
+      "date": "2026-10-16",
+      "due_topics": [
+        "elimination"
+      ]
+    },
+    "o13": {
+      "kind": "attempt",
+      "topics": [
+        "basis"
+      ],
+      "text": "Found the dimension of a homogeneous system's solutions",
+      "help": "none",
+      "result": "correct",
+      "sure": "confident",
+      "date": "2026-10-12",
+      "due_topics": [
+        "basis"
+      ]
+    },
+    "o12": {
+      "kind": "attempt",
+      "topics": [
+        "independence"
+      ],
+      "text": "Said why four vectors in $\\mathbb{R}^3$ are always dependent",
+      "help": "none",
+      "result": "correct",
+      "sure": "confident",
+      "date": "2026-10-12",
+      "due_topics": [
+        "independence"
+      ]
+    },
+    "o11": {
+      "kind": "attempt",
+      "topics": [
+        "basis"
+      ],
+      "text": "Gave a basis for the plane $x + y + z = 0$ with one vector off the plane",
+      "help": "Pointed out the second vector was not in the plane",
+      "result": "partial",
+      "date": "2026-10-08",
+      "due_topics": [
+        "basis"
+      ]
+    }
+  },
+  "evidence_omitted": [
+    "o22",
+    "o16",
+    "o10",
+    "o9",
+    "o8",
+    "o7"
+  ],
+  "knowledge": {
+    "notation": {
+      "text": "The notes write vectors as columns and use $A^T$ for the transpose; ker and im, never null space",
+      "pinned": true,
+      "updated": "2026-09-28"
+    }
+  },
+  "sources": {
+    "notes": {
+      "path": "material/la-lecture-notes-contents.md",
+      "title": "Lecture notes, contents"
+    },
+    "sheets": {
+      "path": "material/la-problem-sheets-contents.md",
+      "title": "Problem sheets, contents"
+    }
+  },
+  "preferences": {
+    "explanation_depth": "Geometric picture first, then the algebra"
+  }
+}

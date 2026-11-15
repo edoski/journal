@@ -1,0 +1,427 @@
+{
+	"version": 1,
+	"id": "chat_demo_det",
+	"title": "Determinants as volume scaling",
+	"createdAt": "2026-11-07T16:30:00.000Z",
+	"updatedAt": "2026-11-07T16:45:00.000Z",
+	"course": {
+		"workspace": "/study/linear-algebra",
+		"title": "Linear Algebra"
+	},
+	"tree": {
+		"nodes": [
+			{
+				"id": "area",
+				"title": "Columns span a parallelogram"
+			},
+			{
+				"id": "scale",
+				"title": "det is the area scale factor"
+			},
+			{
+				"id": "sign",
+				"title": "The sign records orientation"
+			},
+			{
+				"id": "product",
+				"title": "det(AB) = det A · det B"
+			}
+		],
+		"edges": [
+			{
+				"from": "area",
+				"to": "scale"
+			},
+			{
+				"from": "scale",
+				"to": "sign"
+			},
+			{
+				"from": "scale",
+				"to": "product"
+			}
+		],
+		"version": 1
+	},
+	"messages": [
+		{
+			"id": "msg_det_0023",
+			"role": "user",
+			"content": "Determinants, the geometric version please.",
+			"timestamp": 1794069000000
+		},
+		{
+			"id": "msg_det_0024",
+			"role": "assistant",
+			"content": [
+				{
+					"type": "text",
+					"text": "You already read a determinant as an area last week, so I will skip the probe and plan from there."
+				},
+				{
+					"type": "toolCall",
+					"id": "toolu_det_done",
+					"name": "probe_done",
+					"arguments": {
+						"assessment": {
+							"strands": [
+								{
+									"strand": "Determinant as area",
+									"assessment": "Assisted in the record; the picture is there."
+								}
+							],
+							"summary": "Plan from the area picture."
+						}
+					}
+				}
+			],
+			"api": "anthropic-messages",
+			"provider": "anthropic",
+			"model": "claude-opus-5-5",
+			"usage": {
+				"input": 3000,
+				"output": 300,
+				"cacheRead": 0,
+				"cacheWrite": 0,
+				"totalTokens": 3300,
+				"cost": {
+					"input": 0.015000000000000001,
+					"output": 0.007500000000000001,
+					"cacheRead": 0,
+					"cacheWrite": 0,
+					"total": 0.022500000000000003
+				}
+			},
+			"stopReason": "toolUse",
+			"timestamp": 1794069020000
+		},
+		{
+			"id": "msg_det_0025",
+			"role": "toolResult",
+			"toolCallId": "toolu_det_done",
+			"toolName": "probe_done",
+			"content": [
+				{
+					"type": "text",
+					"text": "Assessment recorded."
+				}
+			],
+			"details": {
+				"ok": true
+			},
+			"isError": false,
+			"timestamp": 1794069021000
+		},
+		{
+			"id": "probe-handoff_det_26",
+			"role": "custom",
+			"customType": "probe-handoff",
+			"content": "Next: plan the full teaching arc.",
+			"display": true,
+			"details": {
+				"chatId": "chat_demo_det"
+			},
+			"timestamp": 1794069022000
+		},
+		{
+			"id": "msg_det_0027",
+			"role": "assistant",
+			"content": [
+				{
+					"type": "text",
+					"text": "Four steps, from the parallelogram to the product rule."
+				},
+				{
+					"type": "toolCall",
+					"id": "toolu_det_plan",
+					"name": "plan_init",
+					"arguments": {
+						"mermaid": "graph TD\n  area[Columns span a parallelogram] --> scale[det is the area scale factor]\n  scale[det is the area scale factor] --> sign[The sign records orientation]\n  scale[det is the area scale factor] --> product[det(AB) = det A · det B]"
+					}
+				}
+			],
+			"api": "anthropic-messages",
+			"provider": "anthropic",
+			"model": "claude-opus-5-5",
+			"usage": {
+				"input": 3600,
+				"output": 500,
+				"cacheRead": 3000,
+				"cacheWrite": 0,
+				"totalTokens": 7100,
+				"cost": {
+					"input": 0.018000000000000002,
+					"output": 0.0125,
+					"cacheRead": 0.0015,
+					"cacheWrite": 0,
+					"total": 0.032
+				}
+			},
+			"stopReason": "toolUse",
+			"timestamp": 1794069060000
+		},
+		{
+			"id": "msg_det_0028",
+			"role": "toolResult",
+			"toolCallId": "toolu_det_plan",
+			"toolName": "plan_init",
+			"content": [
+				{
+					"type": "text",
+					"text": "{\"ok\":true,\"nodeIds\":[\"area\",\"scale\",\"sign\",\"product\"]}"
+				}
+			],
+			"details": {
+				"ok": true,
+				"tree": {
+					"nodes": [
+						{
+							"id": "area",
+							"title": "Columns span a parallelogram"
+						},
+						{
+							"id": "scale",
+							"title": "det is the area scale factor"
+						},
+						{
+							"id": "sign",
+							"title": "The sign records orientation"
+						},
+						{
+							"id": "product",
+							"title": "det(AB) = det A · det B"
+						}
+					],
+					"edges": [
+						{
+							"from": "area",
+							"to": "scale"
+						},
+						{
+							"from": "scale",
+							"to": "sign"
+						},
+						{
+							"from": "scale",
+							"to": "product"
+						}
+					],
+					"version": 1
+				}
+			},
+			"isError": false,
+			"timestamp": 1794069061000
+		},
+		{
+			"id": "plan-block_det_29",
+			"role": "custom",
+			"customType": "plan-block",
+			"content": "",
+			"display": true,
+			"details": {
+				"planCallId": "toolu_det_plan",
+				"block": {
+					"kind": "full",
+					"at": "2026-11-07T16:31:01.000Z",
+					"current": null,
+					"nodes": [
+						{
+							"id": "area",
+							"title": "Columns span a parallelogram",
+							"status": "upcoming"
+						},
+						{
+							"id": "scale",
+							"title": "det is the area scale factor",
+							"status": "upcoming"
+						},
+						{
+							"id": "sign",
+							"title": "The sign records orientation",
+							"status": "upcoming"
+						},
+						{
+							"id": "product",
+							"title": "det(AB) = det A · det B",
+							"status": "upcoming"
+						}
+					],
+					"edges": [
+						{
+							"from": "area",
+							"to": "scale"
+						},
+						{
+							"from": "scale",
+							"to": "sign"
+						},
+						{
+							"from": "scale",
+							"to": "product"
+						}
+					]
+				}
+			},
+			"timestamp": 1794069061000
+		},
+		{
+			"id": "msg_det_0030",
+			"role": "user",
+			"content": "Go.",
+			"timestamp": 1794069120000
+		},
+		{
+			"id": "msg_det_0031",
+			"role": "assistant",
+			"content": [
+				{
+					"type": "text",
+					"text": "The columns of $A$ are the images of $e_1$ and $e_2$, so the unit square goes to the parallelogram they span. Its signed area is $\\det A$. A negative sign means the parallelogram is flipped.\n\nComposition multiplies scale factors. One check:"
+				},
+				{
+					"type": "toolCall",
+					"id": "toolu_det_explain",
+					"name": "explain",
+					"arguments": {
+						"type": "check",
+						"nodeId": "product",
+						"question": "Why must $\\det(AB) = \\det A \\cdot \\det B$, thinking of determinants as area scale factors?",
+						"correctAnswer": "Applying $B$ scales every area by $\\det B$; applying $A$ afterwards scales by $\\det A$. The composition $AB$ scales by both factors in turn, so $\\det(AB) = \\det A \\cdot \\det B$."
+					}
+				}
+			],
+			"api": "anthropic-messages",
+			"provider": "anthropic",
+			"model": "claude-opus-5-5",
+			"usage": {
+				"input": 5200,
+				"output": 700,
+				"cacheRead": 4000,
+				"cacheWrite": 0,
+				"totalTokens": 9900,
+				"cost": {
+					"input": 0.026000000000000002,
+					"output": 0.0175,
+					"cacheRead": 0.002,
+					"cacheWrite": 0,
+					"total": 0.045500000000000006
+				}
+			},
+			"stopReason": "toolUse",
+			"timestamp": 1794069600000
+		},
+		{
+			"id": "msg_det_0032",
+			"role": "toolResult",
+			"toolCallId": "toolu_det_explain",
+			"toolName": "explain",
+			"content": [
+				{
+					"type": "text",
+					"text": "{\"kind\":\"explain\",\"text\":\"B scales areas by det B, then A scales those by det A, so together it's the product.\",\"confidence\":\"confident\"}"
+				}
+			],
+			"details": {
+				"kind": "explain",
+				"tool": "explain",
+				"questionText": "Why must $\\det(AB) = \\det A \\cdot \\det B$, thinking of determinants as area scale factors?",
+				"options": [],
+				"dontKnow": false,
+				"answers": [],
+				"answeredAt": "2026-11-07T16:44:30.000Z",
+				"text": "B scales areas by det B, then A scales those by det A, so together it's the product.",
+				"confidence": "confident",
+				"committed": "Applying $B$ scales every area by $\\det B$; applying $A$ afterwards scales by $\\det A$. The composition $AB$ scales by both factors in turn, so $\\det(AB) = \\det A \\cdot \\det B$."
+			},
+			"isError": false,
+			"timestamp": 1794069870000
+		},
+		{
+			"id": "msg_chat_demo_det_save_toolu_chat_demo_det_save",
+			"role": "assistant",
+			"content": [
+				{
+					"type": "toolCall",
+					"id": "toolu_chat_demo_det_save",
+					"name": "course_save",
+					"arguments": {
+						"changes": {
+							"observations": [
+								{
+									"topics": [
+										"determinant"
+									],
+									"text": "Read det as the area scale of the unit square under a 2x2 map",
+									"result": "correct",
+									"help": "Hinted at the unit square"
+								}
+							]
+						}
+					}
+				}
+			],
+			"api": "anthropic-messages",
+			"provider": "anthropic",
+			"model": "claude-opus-5-5",
+			"usage": {
+				"input": 1800,
+				"output": 300,
+				"cacheRead": 0,
+				"cacheWrite": 0,
+				"totalTokens": 2100,
+				"cost": {
+					"input": 0.009,
+					"output": 0.0075,
+					"cacheRead": 0,
+					"cacheWrite": 0,
+					"total": 0.0165
+				}
+			},
+			"stopReason": "toolUse",
+			"timestamp": 1794069600000
+		},
+		{
+			"id": "msg_chat_demo_det_saved_toolu_chat_demo_det_save",
+			"role": "toolResult",
+			"toolCallId": "toolu_chat_demo_det_save",
+			"toolName": "course_save",
+			"content": [
+				{
+					"type": "text",
+					"text": "{\"revision\":1,\"changed\":true,\"observations\":[\"o99\"]}"
+				}
+			],
+			"isError": false,
+			"timestamp": 1794069600500
+		},
+		{
+			"id": "msg_det_0033",
+			"role": "assistant",
+			"content": [
+				{
+					"type": "text",
+					"text": "Exactly right. That covers the whole plan:\n\n- the columns span the image of the unit square,\n- $\\det A$ is its signed area,\n- composition multiplies the factors.\n\nI saved today's work to the course: **determinants** moves up, and a review is set for Tuesday. Good place to stop."
+				}
+			],
+			"api": "anthropic-messages",
+			"provider": "anthropic",
+			"model": "claude-opus-5-5",
+			"usage": {
+				"input": 5900,
+				"output": 160,
+				"cacheRead": 5000,
+				"cacheWrite": 0,
+				"totalTokens": 11060,
+				"cost": {
+					"input": 0.029500000000000002,
+					"output": 0.004,
+					"cacheRead": 0.0025,
+					"cacheWrite": 0,
+					"total": 0.036000000000000004
+				}
+			},
+			"stopReason": "stop",
+			"timestamp": 1794069900000
+		}
+	]
+}

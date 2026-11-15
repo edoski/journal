@@ -46,6 +46,7 @@ import {
 } from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
+import { photosOf } from "./photos.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
 import type { PlanBlockData } from "./contracts/chat.ts";
 
@@ -118,6 +119,9 @@ function applyResult(part: LhViewPart, result: ToolResultMessage): void {
 	} else {
 		part.state = "output-available";
 		part.output = result.details;
+		// A photo of his working answered with it (the answered card's strip).
+		const photos = photosOf(result.content);
+		if (photos.length) part.photos = photos;
 	}
 }
 
@@ -170,6 +174,30 @@ function textAfterFinalOutput(messages: readonly LhMessage[], live: LiveTurnStat
 	return dropped;
 }
 
+/** The `send_to_user` calls that repeat, word for word, a message the same
+ *  turn already delivered (round 6: Claude Code asked the model to answer
+ *  again after a turn that ended on the tool, and it sent the paragraph a
+ *  second time). Each message shows once per turn. */
+function repeatedOutputCalls(messages: readonly LhMessage[]): ReadonlySet<string> {
+	const repeated = new Set<string>();
+	const failed = failedOutputCallIds(messages);
+	let delivered = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "assistant") {
+			if (opensTurn(m)) delivered = new Set();
+			continue;
+		}
+		if (m.stopReason === "error" || m.stopReason === "aborted") continue;
+		for (const block of m.content) {
+			const text = block.type === "toolCall" && !failed.has(block.id) ? sendToUserText(block) : undefined;
+			if (text === undefined) continue;
+			if (delivered.has(text)) repeated.add((block as { id: string }).id);
+			else delivered.add(text);
+		}
+	}
+	return repeated;
+}
+
 /** Project the native record (+ live turn working list) into the client's
  *  view messages. Pure: the same input always projects to the same list. */
 export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
@@ -184,6 +212,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 	}
 
 	const afterFinalOutput = textAfterFinalOutput(messages, live);
+	const repeatedOutputs = repeatedOutputCalls(messages);
 
 	const lastAssistant = (): LhViewMessage | undefined => {
 		const last = out[out.length - 1];
@@ -216,7 +245,10 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 	for (const m of messages) {
 		const role = (m as { role?: string }).role;
 
-		if (compaction && m.id === compaction.details.firstKeptMessageId) {
+		// Claude Code's own compaction keeps no verbatim tail (an empty
+		// firstKeptMessageId): its cut is the marker itself.
+		const cutHere = compaction && (compaction.details.firstKeptMessageId === "" ? m === compaction : m.id === compaction.details.firstKeptMessageId);
+		if (compaction && cutHere) {
 			out.push({
 				id: `cut_${compaction.id}`,
 				role: "user",
@@ -236,7 +268,9 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 				typeof content === "string"
 					? [content]
 					: content.filter((c) => c.type === "text").map((c) => (c as { text: string }).text);
-			out.push({ id: m.id, role: "user", parts: texts.map(textPart) });
+			// His photos follow his words, one part for the strip.
+			const photos = photosOf(content);
+			out.push({ id: m.id, role: "user", parts: [...texts.map(textPart), ...(photos.length ? [{ type: "photos", id: `ph_${m.id}`, data: photos }] : [])] });
 			continue;
 		}
 
@@ -273,7 +307,9 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
-					if (afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
+					// Ordinary text shows only from a settled reply: the voice guard
+					// takes the tutor's out as each block ends (an empty block).
+					if (streamingMessage || !block.text || afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });
@@ -286,7 +322,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 					if (block.name === SEND_TO_USER_TOOL) {
 						// Failed/aborted generations never execute their calls;
 						// the provider error/abort UI already owns that outcome.
-						if (assistant.stopReason === "error" || assistant.stopReason === "aborted") continue;
+						if (assistant.stopReason === "error" || assistant.stopReason === "aborted" || repeatedOutputs.has(block.id)) continue;
 						const error = outputErrors.get(block.id);
 						if (error) applyResult(part, error);
 						if (part.state === "output-error") {
@@ -429,6 +465,10 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 	switch (marker.customType) {
 		case "course-context":
 			return; // model-facing course brief: nothing to render
+		case "ungraded-answer":
+			return; // model-facing: grade the answer a stop cut off
+		case "session-mode":
+			return; // the creation's starting mode: nothing to render
 		case "graph-context": {
 			// The session's map context (owner, 2026-10-04): user-side —
 			// a minimal collapsible card ABOVE the first user message;
@@ -440,11 +480,27 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "session-resume": {
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-session-resume", id: `sr_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "probe-handoff": {
 			out.push({
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-probe-handoff", id: `ph_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "mode-handoff": {
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-mode-handoff", id: `mh_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}
@@ -488,7 +544,17 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			out.push({
 				id: marker.id,
 				role: "user",
-				parts: [{ type: "data-practice-thinking", id: `pt_${marker.id}`, data: marker.details }],
+				parts: [{ type: "data-practice-thinking", id: `pt_${marker.id}`, data: marker.images?.length ? { ...(marker.details as object), photos: marker.images } : marker.details }],
+			});
+			return;
+		}
+		case "practice-request": {
+			// The dock's Hint, Show me or Explain instead: a learner row naming
+			// the request (and the work he had written), never an answer card.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-practice-request", id: `pr_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}
@@ -501,6 +567,26 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-practice-next", id: `pn_${marker.id}`, data: null }],
+			});
+			return;
+		}
+		case "done-tonight": {
+			// His Done for tonight: a quiet section break, its words in the
+			// renderer. The model reads the content; the transcript never does.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-done-tonight", id: `dt_${marker.id}`, data: null }],
+			});
+			return;
+		}
+		case "dispute": {
+			// His dispute of a mark: a learner row with what he said or
+			// picked. The model reads the content; the row reads the details.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-dispute", id: `dp_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}

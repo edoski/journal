@@ -1,26 +1,24 @@
 /**
  * Settings-surface render tests (thin settings wave): SSR of the section
- * components pins the THIN markup — toggle rows, the graph ladder's
- * graying, the mode control's honest disabled state, the role rows and
- * tool rows. Fetches don't run under renderToStaticMarkup (effects never
+ * components pins the markup — the dialog frame and the appearance rows
+ * that still apply. Fetches don't run under renderToStaticMarkup (effects never
  * fire), so the SSR state IS the loading state — asserted as such.
  * Same tsx classic-JSX shim as render-sidebar.test.tsx.
  */
-import React from "react";
+import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TOGGLE_TOOLS, AgentSection } from "../components/settings/agent-section.tsx";
-import { AppearanceSection, GraphSection } from "../components/settings/appearance-section.tsx";
-import { KeysSection } from "../components/settings/keys-section.tsx";
+import { createRoot } from "react-dom/client";
+import { AppearanceSection } from "../components/settings/appearance-section.tsx";
+import { INK_SWATCHES } from "../components/settings/controls.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
-import type { GraphSettings } from "../src/core/index.ts";
+import { Dialog } from "../components/ui/dialog.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
 import { KEYBOARD_ACTIONS } from "../src/core/index.ts";
-import { SettingsMenuTrigger } from "../components/settings/controls.tsx";
-import { SubscriptionConnections } from "../components/settings/subscription-connections.tsx";
 
 /** The full opening tag of the element carrying a testid — attribute
  *  order in React output is not contractual, so assertions run on the
@@ -43,18 +41,18 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 		assert.ok(!html.includes("settings-dialog"));
 	});
 
-	it("the dialog frame: role=dialog + the ✕ + the six-section nav, Providers first and General last", () => {
-		const html = renderToStaticMarkup(<SettingsDialogBody onClose={() => {}} />);
-		assert.ok(html.includes('role="dialog"'));
-		assert.ok(html.includes('aria-modal="true"'));
+	it("the dialog frame: the ✕ + the section nav, Providers first and General last", () => {
+		const html = renderToStaticMarkup(<Dialog open><SettingsDialogBody onClose={() => {}} /></Dialog>);
 		assert.ok(html.includes('aria-label="Close settings"'));
-		for (const id of ["general", "keys", "agent", "appearance", "graph", "keyboard"]) {
+		for (const id of ["general", "keys", "appearance", "keyboard"]) {
 			assert.ok(html.includes(`data-testid="settings-nav-${id}"`), id);
 		}
+		assert.ok(!html.includes("settings-nav-graph"), "no Graph tab");
+		assert.ok(!html.includes("settings-nav-agent"), "no Tutor tab: every tutor tool is always on");
 		// Providers is the first landing section; internal keys deep links survive.
-		assert.ok(tagOf(html, "settings-nav-keys").includes('aria-current="true"'));
+		assert.ok(tagOf(html, "settings-nav-keys").includes('aria-selected="true"'));
 		assert.ok(html.indexOf('data-testid="settings-nav-keys"') < html.indexOf('data-testid="settings-nav-general"'));
-		assert.ok(tagOf(html, "settings-nav-keyboard").includes('aria-current="false"'));
+		assert.ok(tagOf(html, "settings-nav-keyboard").includes('aria-selected="false"'));
 		// Fetches don't run under SSR — the loading state IS the SSR state.
 		assert.ok(html.includes("Loading settings…"));
 		// Modal-only doctrine: no link back to /settings anywhere in it.
@@ -62,239 +60,128 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 	});
 });
 
-describe("the shared settings dropdown trigger", () => {
-	it("Agent and Appearance use the same compact dark mono trigger", () => {
-		const surfaces = [
-			[renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />), "slot-model-strong"],
-			[renderToStaticMarkup(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />), "font-trigger"],
-		] as const;
-		for (const [html, id] of surfaces) {
-			const tag = tagOf(html, id);
-			const classes = tag.match(/class="([^"]+)"/)![1]!.split(" ");
-			for (const token of ["h-7", "rounded-sm", "border", "border-border", "bg-background", "px-1.5", "font-ui", "text-xs", "hover:border-muted-foreground/50"]) {
-				assert.ok(classes.includes(token), `${id}: ${token}`);
-			}
-			assert.ok(html.includes("▾"), `${id}: shared dropdown indicator`);
-		}
-	});
-
-	it("preserves native disabling separately from callers' existing click-gated unavailable state", () => {
-		const disabled = tagOf(renderToStaticMarkup(<SettingsMenuTrigger value="English" disabled data-testid="disabled-trigger" />), "disabled-trigger");
-		const unavailable = tagOf(renderToStaticMarkup(<SettingsMenuTrigger value="Automatic" unavailable data-testid="unavailable-trigger" />), "unavailable-trigger");
-		assert.ok(disabled.includes('disabled=""'));
-		assert.ok(!unavailable.includes('disabled=""'));
-		assert.ok(unavailable.includes("cursor-not-allowed"));
-		assert.ok(!unavailable.includes("hover:border-muted-foreground/50"));
-	});
-});
-
-describe("Providers settings-label typography", () => {
-	it("only Providers subscription labels use sans; setup labels retain their compact mono styling", () => {
-		const settings = renderToStaticMarkup(<SubscriptionConnections />);
-		const setup = renderToStaticMarkup(<SubscriptionConnections setup />);
-		for (const label of ["ChatGPT", "GitHub Copilot", "Grok"]) {
-			assert.ok(settings.includes(`<span class="font-prose text-(length:--lh-prose-size) text-foreground">${label}</span>`), `${label}: settings sans label`);
-			assert.ok(setup.includes(`<span class="font-ui text-xs text-foreground">${label}</span>`), `${label}: unchanged setup label`);
-		}
-		assert.equal((settings.match(/>Connect<\/button>/g) ?? []).length, 3);
-		assert.equal((setup.match(/>Connect<\/button>/g) ?? []).length, 3);
-	});
-});
-
-describe("AgentSection (thin SSR)", () => {
-	it("renders the three model SLOT rows (slots-only, fix wave: unpicked reads —, no Default option)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		for (const slot of ["strong", "cheap", "vision"]) {
-			assert.ok(html.includes(`data-testid="slot-row-${slot}"`), slot);
-			// The shared model-picker dropdown as the opened menu (owner,
-			// 2026-09-20), the thin trigger as the collapsed look.
-			assert.ok(html.includes(`data-testid="slot-model-${slot}"`), `${slot} model trigger`);
-			assert.ok(html.includes(`data-testid="slot-thinking-${slot}"`), `${slot} thinking trigger`);
-			// the roster hint rides every row
-			assert.ok(html.includes("The main model for your sessions") || slot !== "strong", "strong roster");
-		}
-		// Fix wave: no Default anywhere — an unpicked slot reads "—"
-		// (the owner's no-factory-fallback language), and no menu
-		// carries a Default row (menu-default testid is retired).
-		assert.equal((html.match(/>Default<\/span>/g) ?? []).length, 0, "no Default trigger");
-		assert.ok(!html.includes('data-testid="menu-default"'), "no Default row");
-		assert.equal((html.match(/>—<\/span>/g) ?? []).length, 6, "three slots × two — triggers");
-		// the per-role rows are GONE (slots-only)
-		for (const role of ["researcher", "demoBuilder", "visualMaker"]) {
-			assert.ok(!html.includes(`data-testid="role-row-${role}"`), `${role} retired`);
-		}
-		assert.ok(html.includes('data-testid="group-models"'), "Models sub-group");
-		assert.ok(html.includes('data-testid="group-tools"'), "Tools sub-group");
-		assert.ok(html.includes('data-testid="group-prompts"'), "System prompts sub-group");
-	});
-
-	it("has no search-engine row", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		assert.ok(!html.includes('data-testid="search-engine-row"'));
-	});
-
-	it("the prober graph-tools row: FIRST in the Tools group, default ON, its own key (wave 7)", () => {
-		// Default state: graph on, graphTools absent → ON, the describing
-		// hint rides.
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		const toolsGroup = html.split('data-testid="group-tools"')[1] ?? "";
-		const rows = [...toolsGroup.matchAll(/data-testid="(graph-tools-row|tool-row-\w+)"/g)].map((m) => m[1]);
-		assert.equal(rows[0], "graph-tools-row", "graph tools is the FIRST row of the Tools group");
-		// (the apostrophe in "sessions'" HTML-escapes — match up to it)
-		assert.ok(html.includes("Lets the tutor consult your knowledge map between sessions"), "the describing hint");
-		assert.ok((html.split('data-testid="graph-tools-row"')[1] ?? "").includes('aria-checked="true"'), "absent = on");
-		const rowHtml = html.split('data-testid="graph-tools-row"')[1]?.split('data-testid="tool-row-')[0] ?? "";
-		assert.ok(!rowHtml.includes("opacity-40"), "lit while the graph is on (the search row may dim — no keys in SSR)");
-	});
-
-	it("graph disabled dims the graph-tools row with the honest hint (the predicate composes)", () => {
-		const html = renderToStaticMarkup(
-			<AgentSection agent={undefined} models={undefined} graph={{ enabled: false }} onSectionChange={() => {}} onModelsChange={() => {}} />,
-		);
-		const row = html.split('data-testid="graph-tools-row"')[1]?.split('data-testid="tool-row-')[0] ?? "";
-		assert.ok(row.includes("opacity-40"), "row dims when the graph is off");
-		assert.ok(row.includes("Graph is disabled"), "the reason hint replaces the description");
-		assert.ok(row.includes("disabled"), "toggle untouchable while the graph is off");
-	});
-
-	it("an explicit graphTools off shows stored-off (the record never lies)", () => {
-		const html = renderToStaticMarkup(
-			<AgentSection agent={{ graphTools: { enabled: false } }} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />,
-		);
-		const row = html.split('data-testid="graph-tools-row"')[1] ?? "";
-		assert.ok(row.includes('aria-checked="false"'), "stored-off renders off");
-	});
-
-	it("renders the owner's FINAL tool list — research, demo, visual, pdf", () => {
-		assert.deepEqual([...TOGGLE_TOOLS], ["research", "demo", "visual", "pdf"]);
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		for (const id of TOGGLE_TOOLS) assert.ok(html.includes(`data-testid="tool-row-${id}"`), id);
-	});
-
-	it("tools default ON (absent key = enabled)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		for (const id of TOGGLE_TOOLS) {
-			assert.ok(tagOf(html, `toggle-tool-${id}`).includes('aria-checked="true"'), `${id} defaults on`);
-		}
-	});
-
-	it("an overridden SLOT shows its model in the trigger, tools carry the delta", () => {
-		const html = renderToStaticMarkup(
-			<AgentSection
-				agent={{ tools: { demo: false } }}
-				models={{ strong: { model: { provider: "zai", id: "glm-4.7-flash" } } }}
-				onSectionChange={() => {}}
-				onModelsChange={() => {}}
-			/>,
-		);
-		// The trigger shows the stored id even with no catalog loaded (a
-		// trigger reading "Default" over a live override would lie).
-		assert.ok(html.includes("glm-4.7-flash"), "the override id is visible (prettyModel form, no auto-caps)");
-		assert.ok(tagOf(html, "toggle-tool-demo").includes('aria-checked="false"'), "demo off");
-		assert.ok(tagOf(html, "toggle-tool-visual").includes('aria-checked="true"'), "visual still on");
-	});
-
-	it("prompts show the loading state under SSR (effects never fire)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		assert.ok(html.includes("Loading prompt segments"));
-	});
-});
-
-describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", () => {
-	// Wave 7 (owner ruling 2026-09-23): the section is the master switch —
-	// the embedding/clustering/labeling rungs and the BYOK model picker are
-	// gone (clustering is the free birth-session partition, labels ARE
-	// session names). The chunk budget (2026-10-02) joined as the second and
-	// only other control — it denominates the coverage ring and gates the
-	// auto-extraction trigger, resolved through the same core resolver the
-	// server uses (the 4096-fallback fix).
-	it("renders the master-switch row — EXTRACTION since 2026-10-06 (the data channel, renamed when rendering split off)", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
-		assert.ok(html.includes('data-testid="graph-row-enabled"'));
-		assert.ok(html.includes(">Extraction<"), "the row names the DATA channel, not 'Graph'");
-		assert.ok(!html.includes("graph-row-embedding"), "the dead rungs render nothing");
-		assert.ok(!html.includes("Embedding model"), "the picker is gone");
-		assert.ok(!html.includes("graph-row-clustering"));
-		assert.ok(!html.includes("graph-row-labeling"));
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="true"'), "absent record = factory ON");
-	});
-
-	it("a stored off record shows the extraction switch off", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={{ enabled: false }} onSectionChange={() => {}} />);
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="false"'));
-	});
-
-	it("the GRAPH RENDERING row (2026-10-06): display-only — absent record = factory ON, stored off shows off", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
-		assert.ok(html.includes('data-testid="graph-row-rendering"'));
-		assert.ok(html.includes(">Graph rendering<"));
-		assert.ok(tagOf(html, "toggle-graph-rendering-enabled").includes('aria-checked="true"'), "the home defaults to the canvas");
-		const off = renderToStaticMarkup(<GraphSection graph={{ rendering: false }} onSectionChange={() => {}} />);
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="true"'), "rendering off does NOT touch extraction");
-		assert.ok(tagOf(off, "toggle-graph-rendering-enabled").includes('aria-checked="false"'));
-	});
-
-	it("the chunk-budget row: unset shows EMPTY with the factory placeholder + hint — one truth with the trigger", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
-		const input = tagOf(html, "input-chunk-tokens");
-		assert.ok(input.includes('placeholder="4096"'), "the placeholder IS the resolved factory default");
-		assert.ok(!/value="\d/.test(input), "unset renders EMPTY, not a materialized 4096");
-		assert.ok(html.includes(">4096 tok</"), "the hint reports the resolved truth");
-	});
-
-	it("a stored budget shows its value and denominates the hint", () => {
-		const html = renderToStaticMarkup(
-			<GraphSection graph={{ enabled: true, extractionChunkTokens: 6000 }} onSectionChange={() => {}} />,
-		);
-		assert.ok(tagOf(html, "input-chunk-tokens").includes('value="6000"'));
-		assert.ok(html.includes(">6000 tok</"));
-	});
-});
-
-describe("KeysSection (thin SSR)", () => {
-	it("SSR = the loading state (effects never fire)", () => {
-		const html = renderToStaticMarkup(<KeysSection />);
-		assert.ok(html.includes("Loading keys…"));
-	});
-});
-
 describe("AppearanceSection (thin SSR)", () => {
-	it("mode is rendered DISABLED — dark-only this wave, no lying control", () => {
+	it("every row is a control: a size menu and two colour pickers, each with Default", () => {
 		const html = renderToStaticMarkup(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />);
-		assert.ok(tagOf(html, "select-mode").includes("disabled"), "mode select disabled");
-		assert.ok(html.includes("Coming soon"));
-		// The whole row dims, graph-view style (the control never adds its own).
-		assert.ok(tagOf(html, "row-mode").includes("opacity-40"), "mode row dims whole");
+		const size = tagOf(html, "input-prose-size");
+		assert.match(size, /^<button/, "Text size is a menu, not a field");
+		// Round 5: the swatches were native colour inputs, the system picker's look.
+		assert.doesNotMatch(html, /type="color"/, "no native colour input");
+		for (const ink of ["input-bold-color", "input-italic-color"]) {
+			assert.match(tagOf(html, ink), /^<button[^>]*aria-haspopup="dialog"/, `${ink} opens the app's swatch panel`);
+			assert.match(tagOf(html, `${ink}-default`), /disabled=""/, `${ink}'s Default is off while the default is in use`);
+		}
+		assert.equal(html.match(/Same as the text/g)?.length, 2, "an unset ink says it follows the text");
+		assert.doesNotMatch(html, /type="(text|number)"/, "nothing is typed");
 	});
 
-	it("hex inputs carry the factory placeholders; prose size resolves against the factory", () => {
-		const html = renderToStaticMarkup(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />);
-		assert.ok(html.includes(`placeholder="#141414"`));
-		// The reading font is the searchable dropdown now (font-menu
-		// wave): its trigger shows the factory family; the emphasis
-		// inks' empty state is "same as text" (the old hexes died with
-		// the factory token change).
-		assert.ok(html.includes('data-testid="font-trigger"'));
-		assert.equal((html.match(/Empty = same as text/g) ?? []).length, 2);
-		assert.ok(html.includes("16px"));
-	});
-
-	it("a set background shows in the input, not the placeholder", () => {
+	it("a set ink shows in the picker and its Default clears it to null", () => {
+		const changes: unknown[] = [];
 		const html = renderToStaticMarkup(
-			<AppearanceSection appearance={{ background: "#1a1a2e" }} onSectionChange={() => {}} />,
+			<AppearanceSection appearance={{ mdRendering: { boldColor: "#abc" }, proseFontSize: 18 }} onSectionChange={(next) => changes.push(next)} />,
 		);
-		assert.ok(html.includes(`value="#1a1a2e"`));
+		assert.match(html, /data-slot="color-swatch"[^>]*style="background:#aabbcc"/, "the swatch shows the stored ink, a short hex grown to its long form");
+		assert.doesNotMatch(tagOf(html, "input-bold-color-default"), /disabled=""/);
+		assert.equal(html.match(/Same as the text/g)?.length, 1, "only the unset ink follows the text");
+	});
+
+	it("the size menu names the size in use, the factory one as the default", async () => {
+		for (const [appearance, words] of [[undefined, "16 px, default"], [{ proseFontSize: 18 }, "18 px"]] as const) {
+			const host = dom.document.createElement("div");
+			dom.document.body.appendChild(host);
+			const root = createRoot(host);
+			await act(async () => {
+				root.render(<AppearanceSection appearance={appearance} onSectionChange={() => {}} />);
+			});
+			assert.equal(host.querySelector('[data-testid="input-prose-size"]')?.textContent?.trim(), words);
+			await act(async () => root.unmount());
+			host.remove();
+		}
+	});
+
+	it("Default stores null, the record's unset ink", async () => {
+		const changes: { mdRendering?: { boldColor?: string | null } }[] = [];
+		const host = dom.document.createElement("div");
+		dom.document.body.appendChild(host);
+		const root = createRoot(host);
+		await act(async () => {
+			root.render(<AppearanceSection appearance={{ mdRendering: { boldColor: "#1a1a2e" } }} onSectionChange={(next) => changes.push(next)} />);
+		});
+		const reset = host.querySelector<HTMLButtonElement>('[data-testid="input-bold-color-default"]');
+		await act(async () => reset?.click());
+		assert.equal(changes.at(-1)?.mdRendering?.boldColor, null);
+		await act(async () => root.unmount());
+		host.remove();
+	});
+});
+
+describe("the colour field's swatch panel", () => {
+	const keyOn = async (el: Element, key: string) => {
+		await act(async () => {
+			const event = new dom.window.Event("keydown", { bubbles: true, cancelable: true });
+			Object.assign(event, { key });
+			el.dispatchEvent(event);
+			// Radix's roving focus moves on the next task.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+	};
+
+	it("opens a grid of the app's inks, which the arrows walk, a row at a time on up and down, and Enter picks", async () => {
+		const changes: { mdRendering?: { boldColor?: string | null } }[] = [];
+		const host = dom.document.createElement("div");
+		dom.document.body.appendChild(host);
+		const root = createRoot(host);
+		await act(async () => {
+			root.render(<AppearanceSection appearance={undefined} onSectionChange={(next) => changes.push(next)} />);
+		});
+		const trigger = host.querySelector<HTMLButtonElement>('[data-testid="input-bold-color"]')!;
+		await act(async () => {
+			trigger.dispatchEvent(new dom.window.Event("pointerdown", { bubbles: true, cancelable: true }));
+			trigger.click();
+		});
+		const grid = dom.document.querySelector('[data-slot="swatch-grid"]');
+		assert.ok(grid, "the swatch panel opens");
+		assert.equal(grid.getAttribute("aria-label"), "Bold color");
+		const swatches = [...grid.querySelectorAll<HTMLButtonElement>('[data-slot="swatch"]')];
+		assert.deepEqual(swatches.map((s) => s.getAttribute("aria-label")), INK_SWATCHES.map((s) => s.name), "each swatch is named");
+		assert.equal(dom.document.querySelector('input[type="text"], input[type="color"]'), null, "nothing is typed");
+		const columns = Number(grid.getAttribute("data-columns"));
+		swatches[0]!.focus();
+		await keyOn(swatches[0]!, "ArrowRight");
+		assert.equal(dom.document.activeElement, swatches[1], "→ moves along the row");
+		await keyOn(swatches[1]!, "ArrowDown");
+		assert.equal(dom.document.activeElement, swatches[1 + columns], "↓ moves down a row");
+		await keyOn(swatches[1 + columns]!, "ArrowUp");
+		assert.equal(dom.document.activeElement, swatches[1], "↑ moves back up");
+		assert.equal(changes.length, 0, "moving never picks");
+		await act(async () => swatches[1]!.click());
+		assert.equal(changes.at(-1)?.mdRendering?.boldColor, INK_SWATCHES[1]!.color, "Enter or a click picks the swatch's ink");
+		assert.equal(dom.document.querySelector('[data-slot="swatch-grid"]'), null, "picking closes the panel");
+		await act(async () => root.unmount());
+		host.remove();
+	});
+
+	it("offers only inks that read on the app's dark background", () => {
+		const luminance = (hex: string) => {
+			const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+			return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+		};
+		const background = luminance("#121212");
+		for (const { name, color } of INK_SWATCHES) {
+			const ratio = (luminance(color) + 0.05) / (background + 0.05);
+			assert.ok(ratio >= 4.5, `${name} ${color} reads at ${ratio.toFixed(2)}:1, under WCAG's 4.5:1 for text`);
+		}
 	});
 });
 
 describe("KeyboardSection (thin SSR)", () => {
-	it("renders every registry action in its scope group", () => {
+	it("renders every changeable registry action in its scope group", () => {
 		const html = renderToStaticMarkup(<KeyboardSection />);
-		for (const def of KEYBOARD_ACTIONS) {
+		for (const def of KEYBOARD_ACTIONS.filter((a) => !a.displayOnly)) {
 			assert.ok(html.includes(`data-testid="kbd-row-${def.id}"`), def.id);
 		}
 		assert.ok(html.includes("kbd-scope-global"));
-		assert.ok(html.includes("kbd-scope-chat"));
+		assert.ok(html.includes("kbd-scope-lesson"));
 	});
 
 	it("open-settings is in the registry with the settings chord", () => {
@@ -304,9 +191,9 @@ describe("KeyboardSection (thin SSR)", () => {
 		assert.equal(def?.binding, "mod+,");
 	});
 
-	it("displayOnly actions list but never offer Rebind", () => {
+	it("displayOnly actions are left to the cheat sheet and never offer Rebind", () => {
 		const html = renderToStaticMarkup(<KeyboardSection />);
-		assert.ok(html.includes("Fixed — part of this screen"));
+		assert.ok(!html.includes(`data-testid="kbd-row-question-next-row"`), "a screen's own keys are not listed");
 		assert.ok(!html.includes(`data-testid="kbd-rebind-question-next-row"`), "surface keys stay put");
 		// The model-menu entries are GONE entirely (owner, 2026-10-10):
 		// obvious in-field navigation, not settings material.

@@ -13,10 +13,10 @@
  *            its answer: the block that poses the first node question is
  *            where teaching starts.
  *
- * There is no verdict gate anymore: presenting the plan ends the teacher's
- * turn, and the learner's next message is a natural reply (a change
- * request, or the go-ahead). The live indicator LAGS by design (owner
- * accepted): "teach" shows only once the first node's question is posed.
+ * There is no verdict gate and no approval step (Edo, 14 Nov 2026): the
+ * teacher writes the plan, says the goal in one line and starts teaching
+ * in the same turn. The live indicator LAGS by design (owner accepted):
+ * "teach" shows only once the first node's question is posed.
  * A teacher that never tags a question can no longer exist — nodeId is
  * schema-required at the teach explain boundary (owner ruling 2026-09-26),
  * so the seam signal is structural, not prompt-mandated.
@@ -37,6 +37,7 @@
  */
 
 import { POSITION_QUESTION_TOOLS } from "./question-core.ts";
+import { QUESTION_TOOLS } from "./pending.ts";
 
 /** The three phases of a session, as the picker / header / dividers see them. */
 export type Phase3 = "probe" | "plan" | "teach";
@@ -86,6 +87,9 @@ function advance(
 		// plan → teach only via the first nodeId-tagged question CALL (the call,
 		// not its answer — an errored-and-retried call still proves teaching
 		// began, and the retry lands in the same group anyway).
+		// A session that picks up an earlier lesson starts teaching: its
+		// plan carried over, so no probe or plan of its own.
+		if (part.type === "data-session-resume") phase = "teach";
 		if (
 			phase === "probe" && part.type === "tool-probe_done" && part.state === "output-available" &&
 			(part.output as { ok?: unknown } | null | undefined)?.ok !== false
@@ -101,42 +105,6 @@ function advance(
 		}
 	}
 	return phase;
-}
-
-/**
- * WHERE inside the flipping message teaching begins (owner round 8,
- * 2026-10-05 — the stacked-dividers bug): plan→teach flips at the first
- * tagged explain CALL, but the plan PRESENTATION often lives in the
- * same assistant message — an earlier provider STEP than that call.
- * A message-level seam therefore drew the Teaching divider before the
- * plan presentation too (Planning and Teaching stacked back-to-back).
- * This returns the part index of the STEP BOUNDARY governing the flip
- * call: -1 when the call sits in the message's FIRST step (the divider
- * belongs before the whole message), else the index of the step-start
- * part whose generation contains the call — the divider renders there,
- * between the plan presentation and the teaching block.
- */
-export function teachStepIndex(
-	parts: ReadonlyArray<{ type: string; state?: string; input?: unknown }>,
-): number {
-	let stepStarts = 0; // how many step-start parts seen so far
-	let latest = -1; // index of the latest step-start
-	for (let i = 0; i < parts.length; i++) {
-		const part = parts[i]!;
-		if (part.type === "step-start") {
-			stepStarts++;
-			latest = i;
-			continue;
-		}
-		if (isPositionPart(part.type) && taggedNodeId(part.input)) {
-			// The call's governing step: 0–1 step-starts seen = the message's
-			// FIRST step → -1 (the divider belongs before the whole message);
-			// a later step → that step-start's index (the divider renders at
-			// the boundary, replacing the plain hairline there).
-			return stepStarts <= 1 ? -1 : latest;
-		}
-	}
-	return -1;
 }
 
 /**
@@ -171,7 +139,9 @@ export function phaseAt3Lh(messages: readonly LhMessage[], upToIndex?: number): 
 	for (let i = 0; i <= last; i++) {
 		const m = messages[i]!;
 		const role = (m as { role?: string }).role;
-		if (role === "toolResult") {
+		if (role === "custom" && (m as { customType?: string }).customType === "session-resume") {
+			phase = "teach";
+		} else if (role === "toolResult") {
 			if (phase === "probe" && concluded.has(m.id)) phase = "plan";
 		} else if (role === "assistant") {
 			const content = (m as { content?: ReadonlyArray<{ type?: string; name?: string; arguments?: unknown }> }).content ?? [];

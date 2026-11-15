@@ -17,9 +17,10 @@
  * exited and resumed mid-question for free.
  */
 
+import type { Photo } from "./photos.ts";
 import { Type, type Static } from "typebox";
 import { stripModelValueDebris } from "./value-debris.ts";
-import { DEFAULT_CONFIDENCE, type Confidence } from "./contracts/course.ts";
+import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 
 // ─── shared types ───────────────────────────────────────────────────────────
 
@@ -85,6 +86,15 @@ export function askOptionProblems(options: Array<{ label: string; value?: string
 	return problems;
 }
 
+/** An option's label becomes his answer's words when he picks it, so it
+ *  holds only what he would say: a tag such as "(Recommended)" would show
+ *  in his bubble. Checked where the tutor asks, never on recorded asks. */
+export function askLabelProblems(options: Array<{ label: string }>): string[] {
+	return options
+		.filter((option) => /\((?:recommended|suggested|default)\)/i.test(option.label))
+		.map((option) => `"${option.label.trim()}" carries a tag: a label is his words when he picks it, so drop the parenthesis and list the option you recommend first.`);
+}
+
 // The teaching-cycle role (owner design 2026-10-03, "two questions per
 // teaching unit"): `type` declares the teach question's role. The ROLE
 // DOCTRINE lives in the system prompt; tool descriptions stay mechanical.
@@ -141,9 +151,6 @@ export const explainInputBase = Type.Object({
 			"text — never revise the commitment after seeing his words, and never mark a wrong answer right to be kind. " +
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
-	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
-	),
 });
 
 /** The TEACH-side explain object: base + the teaching-cycle role field
@@ -199,9 +206,6 @@ export const askInputSchema = Type.Object({
 		description:
 			"The single question to ask the learner. ONE question per turn: ask, then end your turn — the answer determines the next question.",
 	}),
-	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
-	),
 	options: Type.Optional(
 		Type.Array(Type.Object(askOptionProps), {
 			minItems: 2,
@@ -237,7 +241,6 @@ export interface QuestionData {
 	id: string;
 	kind: QuestionKind;
 	question: string;
-	context?: string;
 	mode: QuestionMode;
 	options: QuestionOption[];
 	// explain only. NEVER send to the client before answering:
@@ -277,9 +280,23 @@ export interface QuestionAnswerData {
 	 *  and on explain answers recorded before 7 Nov 2026. */
 	confidence?: Confidence;
 	committed?: string; // explain only (rendering): the model's committed answer
+	/** explain: he pressed Hint instead of answering. Not an answer, so no
+	 *  committed answer is revealed and no confidence is read. */
+	hintRequested?: boolean;
+	/** explain: he pressed Show me: he gives up on it and sees its answer.
+	 *  An attempt he gave up, never a grade on his words. */
+	showMe?: boolean;
 	dismissed?: boolean;
+	/** Why a dismissal happened: "tonight" when Done for today closed the
+	 *  session with this question open, "asked" when he asked the tutor
+	 *  something first and the question waits to be asked again. Set only
+	 *  through dismissedAnswer, so it never rides an answer. */
+	reason?: DismissReason;
 	answeredAt: string;
 }
+
+/** The reasons a dismissal names. A plain Esc skip names none. */
+export type DismissReason = "tonight" | "asked";
 
 /** What the dock passes to buildAnswer when the learner answers. */
 export interface AnswerRequest {
@@ -288,7 +305,9 @@ export interface AnswerRequest {
 	text?: string; // ask/explain text-mode
 	thinking?: string; // the reasoning-on-the-question channel (was `note`)
 	readingThinking?: string; // the thinking-while-reading channel (check answers)
-	confidence?: Confidence; // explain only; defaults to neutral
+	confidence?: Confidence; // explain only; sent only when he chose one (chosenConfidence)
+	hint?: boolean; // explain only: a hint request, never an answer
+	showMe?: boolean; // explain only: he gives up and sees the answer
 }
 
 // ─── dock selection (the client state machine, pure for tests) ─────────────
@@ -309,6 +328,8 @@ export interface QuestionFormDraft {
 	other: string;
 	text: string;
 	confidence: Confidence;
+	/** Photos of his working waiting in the answer (photos.ts). */
+	photos?: { id: string; photo: Photo }[];
 }
 
 export interface QuestionDraft {
@@ -400,10 +421,18 @@ export function buildAnswer(qd: QuestionData, req: AnswerRequest, tool?: string)
 	}
 	if (req.other?.trim()) base.other = req.other.trim();
 	if (req.text?.trim()) base.text = req.text.trim();
-	if (qd.kind === "explain") {
+	if (qd.kind === "explain" && req.hint) {
+		// A hint request: the committed answer stays hidden.
+		base.hintRequested = true;
+	} else if (qd.kind === "explain" && req.showMe) {
+		// He gives up: the committed answer shows, and no confidence is read.
+		base.showMe = true;
+		base.committed = qd.committedAnswer;
+	} else if (qd.kind === "explain") {
 		// The commitment snapshots for the reveal + rendering.
 		base.committed = qd.committedAnswer;
-		base.confidence = req.confidence ?? DEFAULT_CONFIDENCE;
+		const chosen = chosenConfidence(req.confidence);
+		if (chosen) base.confidence = chosen;
 	}
 	return base;
 }
@@ -414,15 +443,30 @@ export function buildAnswer(qd: QuestionData, req: AnswerRequest, tool?: string)
  *  renders the question text + "skipped". Rides the same answer path —
  *  the teacher acknowledges the skip in its next turn, exactly like any
  *  answer. */
-export function dismissedAnswer(kind: QuestionKind, questionText: string): QuestionAnswerData {
+export function dismissedAnswer(kind: QuestionKind, questionText: string, reason?: DismissReason): QuestionAnswerData {
 	return {
 		kind,
 		questionText,
 		answers: [],
 		dismissed: true,
+		...(reason ? { reason } : {}),
 		answeredAt: new Date().toISOString(),
 	};
 }
+
+/** What the agent reads when he pressed Show me on a check. */
+export const SHOW_ME_TEXT =
+	"He pressed Show me: he gives up on this question, with the work below if he wrote any. Save it as an attempt he gave up (result incorrect, gave_up true, his work as the response). Then show him the worked answer: where his work stopped, when he wrote some, then the steps. Ask nothing more about it.";
+
+/** What the agent reads for a question left open by Done for today. */
+export const LEFT_FOR_TONIGHT_TEXT =
+	"He stopped for today with this question open. Not an answer: no grade, no attempt recorded. Its answer was never shown to him.";
+
+/** What the agent reads for a question he set aside to ask something
+ *  (round 6: the question stays open, so it comes back as it was and the
+ *  transcript draws it once). */
+export const ASKED_INSTEAD_TEXT =
+	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message, then ask this question again, word for word, with a fresh call.";
 
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):
@@ -434,15 +478,24 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string): Quest
  * actually reads.
  */
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
-	if (ad.dismissed) return { kind: ad.kind, dismissed: true };
+	if (ad.dismissed) {
+		if (ad.reason === "tonight") return { kind: ad.kind, dismissed: true, reason: LEFT_FOR_TONIGHT_TEXT };
+		if (ad.reason === "asked") return { kind: ad.kind, dismissed: true, reason: ASKED_INSTEAD_TEXT };
+		return { kind: ad.kind, dismissed: true };
+	}
 	const out: Record<string, unknown> = { kind: ad.kind };
+	if (ad.hintRequested) {
+		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";
+	}
+	if (ad.showMe) out.showMe = SHOW_ME_TEXT;
 	// Array.isArray: the seam is called with `unknown` answers (test
 	// fixtures, foreign records) — degrade to omission, never crash.
 	if (Array.isArray(ad.answers) && ad.answers.length > 0)
 		out.answers = ad.answers.map((a) => ({ index: a.index, label: a.label }));
 	if (ad.text) out.text = ad.text;
 	if (ad.other) out.other = ad.other;
-	if (ad.confidence !== undefined) out.confidence = ad.confidence;
+	const chosen = chosenConfidence(ad.confidence);
+	if (chosen) out.confidence = chosen;
 	// Two DISTINCT thinking channels, clearly keyed so the model never
 	// conflates them (owner 2026-10-03): reasoning on the question vs
 	// thinking while reading the teaching. `note` is the pre-rename key —

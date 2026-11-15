@@ -6,13 +6,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { parseHTML } from "linkedom";
 import { MessageResponse, ToolContentResponse } from "../components/ai-elements/message.tsx";
-import { Reasoning, ReasoningContent } from "../components/ai-elements/reasoning.tsx";
 import { transformMathDelimiters } from "../src/core/math-delims.ts";
 
 const surfaces = {
 	message: (source: string) => <MessageResponse>{source}</MessageResponse>,
 	tool: (source: string) => <ToolContentResponse>{source}</ToolContentResponse>,
-	reasoning: (source: string) => <Reasoning open><ReasoningContent>{source}</ReasoningContent></Reasoning>,
 };
 const documentFor = (element: React.ReactElement) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(element)}</body></html>`).document;
@@ -72,6 +70,24 @@ for (const [name, surface] of Object.entries(surfaces)) describe(`streaming math
 		assert.equal(complete.body.textContent, "before bold TAIL");
 	});
 
+	it("reads a half-open interval as maths, never as an unfinished link", () => {
+		// Round 4: `$[2,\infty)$` left `](streamdown:incomplete-link)` in a finished reply.
+		for (const [source, tex] of [
+			[String.raw`positive and decreasing on $[2,\infty)$, so the test applies.`, [String.raw`[2,\infty)`]],
+			[String.raw`$x \in [0,1)$ and $(a,b]$ and $\sqrt[3]{x}$ TAIL`, [String.raw`x \in [0,1)`, "(a,b]", String.raw`\sqrt[3]{x}`]],
+			["$$\n[0,1)\n$$\n\nTAIL", ["[0,1)"]],
+		] as const) {
+			const document = documentFor(surface(source));
+			assert.deepEqual(annotations(document), tex, source);
+			assert.ok(!document.body.textContent.includes("streamdown:incomplete-link"), source);
+			assert.ok(!document.body.textContent.includes("[blocked]"), source);
+			assert.ok(!document.body.textContent.includes("\uE000"), source);
+		}
+		const after = documentFor(surface(String.raw`On $[2,\infty)$ see [the notes TAIL`));
+		assert.deepEqual(annotations(after), [String.raw`[2,\infty)`]);
+		assert.ok(after.body.textContent.includes("[blocked]"), "a real unfinished link after the maths is still completed");
+	});
+
 	it("keeps the other incomplete-Markdown repairs", () => {
 		const bold = documentFor(surface("**bold TAIL"));
 		assert.equal(bold.querySelector("strong")?.textContent, "bold TAIL");
@@ -105,8 +121,8 @@ it("preserves native TeX source in both streaming and static modes", () => {
 // mistaking independent server renders for incremental streaming coverage.
 it("retains less-than prefixes through mounted streaming updates on every entry point", async () => {
 	const dom = parseHTML("<html><body></body></html>");
-	// linkedom has no layout/animation engine; Radix's open reasoning panel
-	// only needs these inert browser hooks. This test checks text, not layout.
+	// linkedom has no layout/animation engine; the renderers only need these
+	// inert browser hooks. This test checks text, not layout.
 	const globals = { window: dom.window, document: dom.document, Element: dom.window.Element,
 		HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true,
 		getComputedStyle: () => ({ display: "block", animationName: "none" }),

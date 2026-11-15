@@ -18,8 +18,6 @@
  *   not per-child discipline; manual lh-no-drag is only for clickable
  *   non-natives (spans/divs with onClick).
  * - select-none — dragging never highlights the title.
- * - SidebarToggle FIRST — the sidebar reopen when closed, with its
- *   Electron traffic-light gutter (lh-closed-toggle).
  * - border-b border-border px-3, gap-3 rhythm.
  *
  * The consumer brings the title (font-title text-3xl tracking-tight) and
@@ -39,23 +37,25 @@
  */
 
 import type { ReactNode } from "react";
-import { SidebarToggle } from "@/components/sidebar";
 
 export function TopBar({
 	drag = true,
 	onMouseDown,
+	size = "default",
 	children,
 }: {
 	drag?: boolean;
 	onMouseDown?: React.MouseEventHandler<HTMLElement>;
+	/** "slim": the Proposed lesson bar (lesson/lesson-top-bar.md), 52px
+	 *  with 16px sides; the default is the 60px band. */
+	size?: "default" | "slim";
 	children?: ReactNode;
 }) {
 	return (
 		<header
 			onMouseDown={onMouseDown}
-			className={`${drag ? "lh-drag " : ""}lh-wco-gutter flex h-15 select-none items-center gap-3 border-b border-border px-3`}
+			className={`${drag ? "lh-drag " : ""}lh-wco-gutter flex select-none items-center border-b border-border ${size === "slim" ? "h-13 gap-2 px-4" : "h-15 gap-3 px-3"}`}
 		>
-			<SidebarToggle />
 			{children}
 		</header>
 	);

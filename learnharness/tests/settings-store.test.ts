@@ -68,7 +68,7 @@ describe("the settings store", () => {
 		assert.deepEqual(out.graph, { enabled: true }); // siblings survive
 	});
 
-	it("a saved search engine pin loads and is dropped", () => {
+	it("a saved agent section (search engine pin, tool switches) loads and is dropped", () => {
 		fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
 		fs.writeFileSync(
 			SETTINGS_FILE,
@@ -77,8 +77,7 @@ describe("the settings store", () => {
 		);
 		const out = readSettings();
 		assert.ok(out);
-		assert.equal("search" in (out.agent ?? {}), false);
-		assert.deepEqual(out.agent?.tools, { research: false });
+		assert.equal("agent" in out, false);
 	});
 
 	it("corrupt settings.json → null (first-boot semantics), never throws", () => {

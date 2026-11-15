@@ -33,6 +33,21 @@ export interface PlanTree {
 	version: number;
 }
 
+/**
+ * How big a lesson's plan map may be: what the topic page's lesson map
+ * shows whole, without panning, at Edo's window (1512×982, his ruling of
+ * 14 Nov 2026), each step one idea. Measured there with the sidebar open,
+ * the map's pane is 696×786; inside its fade it opens a plan whole down to
+ * the 75% scale its titles stay readable at (`WHOLE_COURSE_ZOOM`), which
+ * holds 8 rows of steps, 4 across. A plan's rows are its longest chain of
+ * steps, so `deep` caps that chain; `steps` caps the count, since a map
+ * that fills its rows spreads past 4 across: at 12 steps 9 plans in 10 of
+ * a tutor's shapes still open whole. Pinned to the pane's geometry in
+ * tests/plan-map-cap.test.ts; the planning prompt and plan_init state
+ * these numbers and point here.
+ */
+export const PLAN_MAP_CAP = { steps: 12, deep: 8 } as const;
+
 // NOTE (2026-09-11 pivot, docs/probe-teach-split.md): the tree once carried
 // `currentNodeId` / `doneNodeIds` — progress fields. They are GONE by
 // design: the tree carries structure ONLY; position and visited-ness derive
@@ -70,6 +85,9 @@ export interface DerivedPlanStatuses {
 	current: string | null;
 	/** Nodes referenced by earlier tagged calls — been there, monotonic. */
 	visited: ReadonlySet<string>;
+	/** Nodes a lesson_progress call named done: taught, and he showed he
+	 *  has it (each is also visited). */
+	done: ReadonlySet<string>;
 }
 
 /** Statuses of a node: the derived view the plan panel should render. */
@@ -79,24 +97,68 @@ export function derivedNodeStatus(statuses: DerivedPlanStatuses, nodeId: string)
 	return "upcoming";
 }
 
-export function derivePlanStatuses(tree: PlanTree, messages: readonly PartsCarrier[]): DerivedPlanStatuses {
+/** The teacher's progress tool: marks plan steps done and closes the
+ *  session for today. Its calls feed the same fold as the question tags. */
+export const LESSON_PROGRESS_TOOL = "lesson_progress";
+
+export const lessonProgressInput = Type.Object({
+	done: Type.Array(Type.String({ minLength: 1 }), {
+		description:
+			"REQUIRED — the plan node ids this turn finished teaching (taught, and he showed he has it), or [] when none. They show as done on his map.",
+	}),
+	close: Type.Optional(
+		Type.Boolean({
+			description: "true when this turn ends the session for today (your close). Omit otherwise.",
+		}),
+	),
+});
+export type LessonProgressInput = Static<typeof lessonProgressInput>;
+
+/** A recorded lesson_progress call's arguments, read the way the tool
+ *  boundary accepted them (a `done` sent as a JSON string included). */
+export function lessonProgressOf(input: unknown): LessonProgressInput | undefined {
+	return boundaryParse<LessonProgressInput>(lessonProgressInput, input);
+}
+
+/** One tool call, as the fold reads it. */
+interface PlanCall {
+	name: string;
+	input: unknown;
+}
+
+/** Where the lesson stands, from its calls in order: a tagged question
+ *  moves the position there (leaving a node marks it visited); a
+ *  lesson_progress call marks its `done` nodes visited and, when one is the
+ *  current node, leaves it, so nothing is current until the next tag.
+ *  Ids missing from the tree move nothing. */
+function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanStatuses {
 	const ids = new Set(tree.nodes.map((n) => n.id));
-	const runs: string[] = []; // distinct tagged nodes in call order, CONSECUTIVE
-	// duplicates collapsed (several checks on one node = one stay on it)
-	for (const m of messages) {
-		for (const part of m.parts) {
-			if (!part.type.startsWith("tool-") || !POSITION_QUESTION_TOOLS.includes(part.type.slice("tool-".length))) continue;
-			const nodeId = (part.input as { nodeId?: unknown } | undefined)?.nodeId;
-			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue; // untagged/unknown — moves nothing
-			if (runs.at(-1) !== nodeId) runs.push(nodeId);
+	let current: string | null = null;
+	const visited = new Set<string>();
+	const done = new Set<string>();
+	for (const call of calls) {
+		if (POSITION_QUESTION_TOOLS.includes(call.name)) {
+			const nodeId = (call.input as { nodeId?: unknown } | undefined)?.nodeId;
+			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue;
+			if (current !== null && current !== nodeId) visited.add(current);
+			current = nodeId;
+		} else if (call.name === LESSON_PROGRESS_TOOL) {
+			for (const id of lessonProgressOf(call.input)?.done ?? []) {
+				if (!ids.has(id)) continue;
+				visited.add(id);
+				done.add(id);
+				if (current === id) current = null;
+			}
 		}
 	}
-	const current = runs.at(-1) ?? null;
-	// Visited = been there in an EARLIER stay: everything before the current
-	// run. A revisit (a→b→a) puts a in visited AND current — current wins at
-	// render (derivedNodeStatus), visited records it has been left before.
-	const visited = new Set(runs.slice(0, -1));
-	return { current, visited };
+	return { current, visited, done };
+}
+
+export function derivePlanStatuses(tree: PlanTree, messages: readonly PartsCarrier[]): DerivedPlanStatuses {
+	return foldPlanCalls(
+		tree,
+		messages.flatMap((m) => m.parts.filter((p) => p.type.startsWith("tool-")).map((p) => ({ name: p.type.slice("tool-".length), input: p.input }))),
+	);
 }
 
 /**
@@ -125,24 +187,23 @@ export interface PlanToolResult {
 
 import type { LhMessage } from "../native-messages.ts";
 import { POSITION_QUESTION_TOOLS } from "../question-core.ts";
+import { Type, type Static } from "typebox";
+import { boundaryParse } from "../tool-parts.ts";
 
 /** The same derivation over the NATIVE record: tagged question CALLS only (any state —
  *  a dangling call still moves position; results feed nothing). */
 export function derivePlanStatusesLh(tree: PlanTree, messages: readonly LhMessage[]): DerivedPlanStatuses {
-	const ids = new Set(tree.nodes.map((n) => n.id));
-	const runs: string[] = [];
-	for (const m of messages) {
-		if ((m as { role?: string }).role !== "assistant") continue;
+	return foldPlanCalls(tree, lhToolCalls(messages));
+}
+
+/** Every tool call the record's assistant messages made, in order. */
+export function lhToolCalls(messages: readonly LhMessage[]): PlanCall[] {
+	return messages.flatMap((m) => {
+		if ((m as { role?: string }).role !== "assistant") return [];
 		const content = (m as { content?: unknown }).content;
-		if (!Array.isArray(content)) continue;
-		for (const block of content as Array<{ type?: string; name?: string; arguments?: unknown }>) {
-			if (block.type !== "toolCall" || !POSITION_QUESTION_TOOLS.includes(block.name ?? "")) continue;
-			const nodeId = (block.arguments as { nodeId?: unknown } | undefined)?.nodeId;
-			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue;
-			if (runs.at(-1) !== nodeId) runs.push(nodeId);
-		}
-	}
-	const current = runs.at(-1) ?? null;
-	const visited = new Set(runs.slice(0, -1));
-	return { current, visited };
+		if (!Array.isArray(content)) return [];
+		return (content as Array<{ type?: string; name?: string; arguments?: unknown }>)
+			.filter((block) => block.type === "toolCall")
+			.map((block) => ({ name: block.name ?? "", input: block.arguments }));
+	});
 }

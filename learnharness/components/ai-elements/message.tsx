@@ -29,11 +29,13 @@ import {
   useState,
 } from "react";
 import remarkBreaks from "remark-breaks";
+import { remarkPlainNumbers } from "@/components/plain-numbers";
 import {
   Streamdown,
   type PluginConfig,
 } from "streamdown";
 import { mdComponents } from "@/components/md-blocks";
+import { mathSafeLinks } from "./remend-math";
 import { repairMathForDisplay, transformMathDelimiters } from "@/src/core";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
@@ -340,7 +342,9 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 // PluginConfig API): Streamdown's bare `remarkPlugins` PROP would REPLACE the
 // defaults ([remark-gfm, codeMeta]), silently dropping GFM and code-fence
 // metastring parsing. The slot appends after the defaults, which is the
-// standard remark-gfm → remark-breaks order.
+// standard remark-gfm → remark-breaks order. remarkPlainNumbers rides the
+// same slot: a bare number written as math reads in the prose's type
+// (plain-numbers.ts).
 //
 // MERMAID is app-owned since the chrome-melt wave (2026-09-19): the md-blocks
 // `code` override intercepts mermaid fences and renders via
@@ -349,7 +353,7 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 export const streamdownPlugins = {
   cjk: {
     ...cjk,
-    remarkPluginsAfter: [...cjk.remarkPluginsAfter, remarkBreaks],
+    remarkPluginsAfter: [...cjk.remarkPluginsAfter, remarkBreaks, remarkPlainNumbers],
   },
   code,
   math: createMathPlugin({ singleDollarTextMath: true }),
@@ -359,7 +363,14 @@ export const streamdownPlugins = {
 // partial tag and deletes the remaining source before math can tokenize.
 // Preserve that text (unfinished prose HTML may show literally); Streamdown's
 // separate sanitization/hardening and all other Markdown repairs stay enabled.
-export const streamdownRemend = { htmlTags: false } satisfies NonNullable<ComponentProps<typeof Streamdown>["remend"]>;
+// Its link repair likewise reads the `[` of `$[2,\infty)$` as an unfinished
+// link, so links are completed by a pass that skips maths (remend-math.ts).
+export const streamdownRemend = {
+  htmlTags: false,
+  links: false,
+  images: false,
+  handlers: [mathSafeLinks],
+} satisfies NonNullable<ComponentProps<typeof Streamdown>["remend"]>;
 
 export const MessageResponse = memo(
   ({ className, children, ...props }: MessageResponseProps) => {
@@ -374,8 +385,8 @@ export const MessageResponse = memo(
     return (
       <Streamdown
         className={cn(
-          // Source Sans 3 + emphasis-color tokens on every markdown surface
-          // (labels stay JetBrains Mono). Unlayered plain CSS wins over text-sm.
+          // The prose font + emphasis-color tokens on every markdown surface.
+          // Unlayered plain CSS wins over text-sm.
           "lh-prose size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
           className
         )}

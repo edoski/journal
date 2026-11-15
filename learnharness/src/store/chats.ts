@@ -11,11 +11,15 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
+import { studyNow } from "../core/day-words.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSettings, ChatSummary, CourseLink, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
+import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, SessionGoal, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
-import { activeProblemOf, danglingQuestionOf } from "../core/native-messages.ts";
+import type { ChatSession } from "../core/sdk-session.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
+import { sessionEndOf } from "../core/session-end.ts";
+import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
@@ -25,27 +29,26 @@ function chatFile(id: string): string {
 }
 
 /** THE SILENCE LAW (push S6, 2026-10-02): chats-changed announces ONLY
- *  list-SHAPE mutations — createChat, renameChat, deleteChat (below,
+ *  list-SHAPE mutations — createChat, renameChat, nameSession, deleteChat (below,
  *  each emits post-write). The content writers (saveMessages,
- *  appendTurnUsage, appendExtractionUsage, saveSettings, saveTree) are
+ *  appendTurnUsage, saveDigestLedger, saveTree) are
  *  DELIBERATELY SILENT: saveMessages fires per turn-persist and would
  *  spam the bus, and every list-visible change it causes (title, order,
  *  phase, busy, pendingQuestion, pendingProblem) is already announced by
  *  turn-started / turn-settled, or for a turn-less write (a dismissal,
  *  compaction) by record-changed, which the sidebar refetches on. Silence
  *  here is law, not oversight. */
-function createChat(title: string, kind?: "practice", course?: CourseLink): ChatRecord {
-	const now = new Date().toISOString();
+function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string): ChatRecord {
+	const now = studyNow().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
 		title: title.trim() || "Untitled session",
 		createdAt: now,
 		updatedAt: now,
 		messages: [],
-		// Practice sessions carry the marker; teach stays ABSENT (absence
-		// reads as teach — pre-practice records never migrate).
-		...(kind === "practice" ? { kind: "practice" as const } : {}),
 		...(course ? { course: { workspace: course.workspace, title: course.title } } : {}),
+		...(topics.length > 0 ? { topics: [...topics] } : {}),
+		...(arcCheck ? { arcCheck } : {}),
 	};
 	fs.mkdirSync(PATHS.chats, { recursive: true });
 	writeChat(record);
@@ -86,20 +89,27 @@ function listChats(): ChatSummary[] {
 			.readdirSync(PATHS.chats)
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
-			.filter((r): r is ChatRecord => r !== null)
-			.map(({ messages, tree, turns, extractions, ...summary }) => {
+			// Older records may still carry the retired graph extraction's
+			// usage log (`extractions`); it stays out of the list too.
+			.filter((r): r is ChatRecord & { extractions?: unknown } => r !== null)
+			.map(({ messages, tree, turns, extractions: _extractions, digest: _digest, ...summary }) => {
 				// Per-record isolation (Wave B): a record whose messages fail the
 				// projection (e.g. pre-Wave-B UIMessage-format scratch — the
 				// zero-back-compat wipe makes these "corrupt") must not blank the
 				// whole sidebar — same isolation getChat's per-file catch gives.
 				try {
+					// Its own topics: the ones it was started on or named after, else
+					// for practice its first problem's.
+					const kind = sessionModeOf(messages, summary.kind);
+					const own = summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : [];
 					return {
-						// turns and extractions stay out of the list payload (list =
+						// turns stay out of the list payload (list =
 						// summaries; usage aggregates ride the full record, the picker
 						// never needs them).
 						...summary,
-						// Normalized kind: absent record field reads as teach.
-						kind: summary.kind ?? "teach",
+						// The mode now, folded over the transcript from the
+						// mode an older record stored at creation.
+						kind,
 						messageCount: messages.length,
 						// Record-derived status for the session picker: phase from the
 						// transcript's explicit events (probe_done concluded / verdict
@@ -110,10 +120,14 @@ function listChats(): ChatSummary[] {
 						// NOT record-derived — the API route merges it (ChatListItem).
 						phase: phaseAt3Lh(messages),
 						pendingQuestion: danglingQuestionOf(messages) !== null,
-						// Practice: a posed problem with no conclude (the sidebar's
-						// "Problem waiting"); false on teaching sessions, which
-						// have no problem tool.
-						pendingProblem: summary.kind === "practice" && activeProblemOf(messages) !== null,
+						// A posed problem with no conclude (the sidebar's "Problem
+						// waiting"); only practice poses, and a handoff to teaching
+						// is refused while one is active.
+						pendingProblem: activeProblemOf(messages) !== null,
+						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
+						ownTopics: own,
+						ended: sessionEndOf(messages, tree, summary.kind, own),
+						tasks: sessionTasksOf(messages),
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);
@@ -134,7 +148,7 @@ function saveMessages(id: string, messages: LhMessage[]): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
 	record.messages = messages;
-	record.updatedAt = new Date().toISOString();
+	record.updatedAt = studyNow().toISOString();
 	writeChat(record);
 }
 
@@ -151,26 +165,12 @@ function appendTurnUsage(id: string, entry: TurnUsage): void {
 	writeChat(record);
 }
 
-/** Append one extraction-run usage entry to the record's extractions
- * log — idempotent per startedAt: a retry that reaches the append twice
- * (abort replays) does not double-count spend. */
-function appendExtractionUsage(id: string, entry: ExtractionRunUsage): void {
+/** Replace the lesson digest's ledger. Silent, and not conversation
+ * activity: updatedAt stays put. */
+function saveDigestLedger(id: string, ledger: DigestLedger): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
-	record.extractions = record.extractions?.some((r) => r.startedAt === entry.startedAt)
-		? record.extractions
-		: [...(record.extractions ?? []), entry];
-	writeChat(record);
-}
-
-/** Persist the per-chat model/thinking settings — replace-whole (the
- * picker sends the complete object; absent = config defaults). */
-function saveSettings(id: string, settings: ChatSettings): void {
-	const record = getChat(id);
-	if (!record) throw new Error(`Chat not found: ${id}`);
-	// Like saveTree: a settings tweak is not conversation activity, so it
-	// deliberately does NOT bump updatedAt (sidebar order must not churn).
-	record.settings = settings;
+	record.digest = ledger;
 	writeChat(record);
 }
 
@@ -184,7 +184,7 @@ function linkCourse(id: string, course: CourseLink): void {
 }
 
 /** Rename a session (the header's click-to-edit title, 2026-09-17). Like
- * saveSettings, a rename is NOT conversation activity: updatedAt stays put
+ * saveTree, a rename is NOT conversation activity: updatedAt stays put
  * so sidebar order never churns. Same fallback as createChat — the empty
  * string becomes "Untitled session" (the API gate rejects it first; this
  * is the honest floor for any other caller). */
@@ -192,20 +192,40 @@ function renameChat(id: string, title: string): ChatRecord {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
 	record.title = title.trim() || "Untitled session";
+	record.renamed = true;
 	writeChat(record);
 	emit("chats-changed", {});
 	return record;
 }
 
+/** Name a session once (the port's rule): only a session started on no
+ *  topic, its topic while it has none, and its title only while the
+ *  learner has not renamed it and nothing named it before. Like a rename,
+ *  announced and not conversation activity. */
+function nameSession(id: string, goal: SessionGoal): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	if ((record.topics ?? []).length > 0) return;
+	const topic = goal.topic?.trim();
+	if (topic) record.topics = [topic];
+	if (!record.renamed && !record.named && onFirstTurn(record.messages) && goal.title.trim()) record.title = goal.title.trim();
+	record.named = true;
+	writeChat(record);
+	emit("chats-changed", { named: { id, title: record.title } });
+}
+
 /** Delete the session record file entirely (session-deletion wave 6,
  *  owner 2026-09-22). False when the id is unknown — the route turns that
- *  into a 404. The record's graph traces and jobs are the route's
- *  choreography (core/graph-deletion.ts), not the store's. */
+ *  into a 404. The session's jobs are the caller's choreography
+ *  (server/chats.ts), not the store's. */
 function deleteChat(id: string): boolean {
 	try {
 		fs.unlinkSync(chatFile(id));
 		removeLeftoverTemps(chatFile(id));
-		emit("chats-changed", {}); // only a real removal — the present-entry law
+		// The app's copy of the lesson's Claude Code session (agent/sdk/session-files.ts).
+		fs.rmSync(path.join(PATHS.chats, `${id}.session.jsonl`), { force: true });
+		fs.rmSync(path.join(PATHS.chats, `${id}.session`), { recursive: true, force: true });
+		emit("chats-changed", { deleted: id }); // only a real removal — the present-entry law
 		return true;
 	} catch {
 		return false; // never existed, already deleted, or unreadable — same answer
@@ -222,16 +242,25 @@ function saveTree(id: string, tree: PlanTree): void {
 	writeChat(record);
 }
 
+/** Persist the record's map to its Claude Code session; silent, like saveTree. */
+function saveSession(id: string, session: ChatSession): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.session = session;
+	writeChat(record);
+}
+
 export const chatStore: ChatStore = {
 	createChat,
 	getChat,
 	listChats,
 	saveMessages,
 	saveTree,
-	saveSettings,
+	saveSession,
 	linkCourse,
 	renameChat,
+	nameSession,
 	deleteChat,
 	appendTurnUsage,
-	appendExtractionUsage,
+	saveDigestLedger,
 };

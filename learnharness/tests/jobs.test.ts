@@ -34,6 +34,7 @@ import {
 	buildAbortSteer,
 	buildSubagentSteer,
 	isSubagentFailure,
+	JOB_TIME_LIMIT_MS,
 	steerDelivered,
 	type DemoResult,
 	type JobUsage,
@@ -47,6 +48,7 @@ import {
 import { composeInstructions, createTeacherAgent } from "../src/agent/teacher-agent.ts";
 import { createTeacherTools } from "../src/agent/tools.ts";
 import { createWebTools } from "../src/agent/tools/web.ts";
+import { runResearcherAgent } from "../src/agent/subagents/researcher.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import {
@@ -69,23 +71,26 @@ import { beginTurn, endTurn, isTurnRunning } from "../src/server/turn-liveness.t
 import { persistTurn } from "../src/server/turn-service.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
-import { createJobRunner, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
-import { providerKeyMissing, type ModelSlotName } from "../src/core/settings.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import { createJobRunner, demoModelOverride, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
+import { headlessOverride, type HeadlessApi } from "../src/agent/subagents/headless.ts";
+import { providerKeyMissing } from "../src/core/settings.ts";
+import type { SdkEngine } from "../src/agent/models.ts";
 import { PATHS } from "../config.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
-import { subscribe } from "../src/core/events.ts";
-import type { LhMessage } from "../src/core/native-messages.ts";
+import { emit, subscribe } from "../src/core/events.ts";
+import { newAnswerResult, newDoneTonightMessage, type LhMessage } from "../src/core/native-messages.ts";
+import { buildAnswer } from "../src/core/question-core.ts";
 import type { SteerInput, TurnInput } from "../src/core/input-events.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
+import { fakeEngine, fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 const JOBS_DIR = path.join(PATHS.data, "jobs");
 
 const createdChats: string[] = [];
 
-// The key-presence turn gate (provider-key interlude, 2026-09-25): scripted
-// turns pin openrouter per chat — the gate reads env-first truth, so the
-// key must be present in the test process like any real setup.
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+// The connection turn gate: scripted turns pin a signed-in (fake) Claude
+// account, the only kind of model the app runs.
+await signInTestClaude();
 const createdJobs: string[] = [];
 
 function trackChat(id: string) {
@@ -173,14 +178,19 @@ after(() => {
 	researchModelOverride.current = undefined;
 });
 
-/** A scripted pi engine (faux provider): the response queue replaces the
+/** A scripted model (faux provider): the response queue replaces the
  *  old doStream/doGenerate turn counters. tokenSize is set so every test
  *  string streams as ONE delta — the SSE-body assertions ("Back with the
  *  brief.") read contiguous text. */
-function fauxEngine(steps: FauxResponseStep[]): PiEngine {
+function fauxScripted(steps: FauxResponseStep[]): ScriptedModel {
 	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
 	faux.setResponses(steps);
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
+}
+
+/** The scripted model behind the fake Agent SDK: the engine a job runs on. */
+function fauxEngine(steps: FauxResponseStep[]): SdkEngine {
+	return fakeEngine(fauxScripted(steps));
 }
 
 /** A scripted response factory whose model call never resolves until its
@@ -485,8 +495,8 @@ const RESEARCH_INPUT = {
 };
 
 /** A teacher that calls research (text → call), then plain text thereafter. */
-function researchCallingTeacher(): PiEngine {
-	return fauxEngine([
+function researchCallingTeacher(): ScriptedModel {
+	return fauxScripted([
 		fauxAssistantMessage(
 			[fauxText("Let me check the current state of the library."), fauxToolCall("research", RESEARCH_INPUT, { id: "call-r1" })],
 			{ stopReason: "toolUse" },
@@ -501,7 +511,6 @@ describe("dispatch (async protocol §2)", () => {
 		trackChat(chat.id);
 		// BYOK turn gate (owner, 2026-09-22): the scripted chat needs a
 		// conversation model — the per-chat pin, exactly like the setup flow.
-		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 
 		const delivery = fakeDeliver();
 		const testRunner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
@@ -515,7 +524,7 @@ describe("dispatch (async protocol §2)", () => {
 		// The handler hands the factory the native build options — the
 		// record IS the agent state (Wave B: no adapter conversion).
 		const agent: Parameters<typeof handleChatRequest>[1] = (opts) =>
-			createTeacherAgent(undefined, { engine, tools, messages: opts.messages });
+			createTeacherAgent(undefined, { ...onFake(engine, opts), tools });
 
 		researchModelOverride.current = researcherModel();
 		const body = await drainTurn(post(chat.id, { type: "text", text: "teach me graph rendering" }), agent);
@@ -564,7 +573,7 @@ sigma.js v3 is current.
 
 /** The researcher loop's scripted engine. Turn 1: a web_search tool call;
  *  turn 2: the final text brief. */
-function researcherModel(): PiEngine {
+function researcherModel(): SdkEngine {
 	return fauxEngine([fauxAssistantMessage([fauxText(BRIEF)])]);
 }
 
@@ -658,11 +667,13 @@ describe("research runner (async protocol §3)", () => {
 
 		const errored = jobStore.getJob(job.id)!;
 		assert.equal(errored.status, "error");
-		assert.match(errored.error ?? "", /model exploded/);
+		// A provider failure reaches the app through Claude Code, which reads
+		// it as Claude's plain failure line, not the raw provider text.
+		assert.match(errored.error ?? "", /^Claude request failed\./);
 
 		const steer = delivery.steers[0]!;
 		assert.ok(steer, "failure still delivers a steer");
-		assert.ok(steer.content.includes("Research failed: model exploded"), "failure brief on the steer text");
+		assert.ok(steer.content.includes("Research failed: Claude request failed."), "failure brief on the steer text");
 		assert.deepEqual(((steer.details as { result: ResearchResult }).result).sources, []);
 	});
 
@@ -728,7 +739,7 @@ describe("pdf runner (sources v0)", () => {
 	});
 
 	/** A pdf-reader that triages, extracts pages 1-2, then briefs. */
-	function pdfReaderModel(): PiEngine {
+	function pdfReaderModel(): SdkEngine {
 		return fauxEngine([
 			fauxAssistantMessage([fauxToolCall("pdf_info", {}, { id: "i1" })], { stopReason: "toolUse" }),
 			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "1-2" }, { id: "e1" })], { stopReason: "toolUse" }),
@@ -847,16 +858,26 @@ describe("pdf runner (sources v0)", () => {
 });
 
 describe("researcher agent", () => {
-	it("runs with the web tool set (no network touched)", () => {
-		const webTools = createWebTools(async () => "");
-		assert.deepEqual(Object.keys(webTools).sort(), ["web_fetch", "web_search"], "ONLY the web tools — no question/plan tools");
+	it("runs with the web tool set (no network touched)", async () => {
+		let seen: string[] = [];
+		const scripted = fauxScripted([
+			((context: { messages: { role: string; toolsAdded?: { name: string }[] }[] }) => {
+				seen = (context.messages.find((m) => m.role === "system")?.toolsAdded ?? []).map((t) => t.name).sort();
+				return fauxAssistantMessage([fauxText(BRIEF)]);
+			}) as unknown as FauxResponseStep,
+		]);
+		const brief = await runResearcherAgent("which sigma version?", { engine: fakeEngine(scripted) });
+		assert.equal(brief, BRIEF);
+		assert.deepEqual(seen, Object.keys(createWebTools()).sort(), "ONLY the web tools — no question/plan tools");
+		assert.deepEqual(seen, ["web_fetch"]);
+		assert.deepEqual(fakeFor(scripted).calls.map((c) => c.tools), [["WebSearch"]], "search is Claude Code's own WebSearch, and nothing else of Claude Code's");
 		// reset any accidental global override
 		researchModelOverride.current = undefined;
 	});
 
 	it("the pdf-reader declares exactly the four skill tools (sources v0)", async () => {
 		const { createPdfTools } = await import("../src/agent/subagents/pdf-reader.ts");
-		const tools = createPdfTools(path.join(import.meta.dirname, "fixtures", "sample-3page.pdf"));
+		const tools = createPdfTools(path.join(import.meta.dirname, "fixtures", "sample-3page.pdf"), { consulted: new Set(), read: new Set() }, {} as HeadlessApi, fauxEngine([]));
 		assert.deepEqual(Object.keys(tools).sort(), ["pdf_extract", "pdf_info", "pdf_render", "pdf_search"]);
 		// reset any accidental global override
 		pdfModelOverride.current = undefined;
@@ -870,8 +891,8 @@ describe("researcher agent", () => {
  * (setTurnRunner) — the real wiring (chat-handler's handleChatRequest
  * adapter) never fires here, so no teacher model is touched.
  *
- * Timing: the pump polls at 400ms with a 1.5s grace after the gates open —
- * each happy-path test takes ~2s; waitFor tolerates it.
+ * Timing: the pump waits on the bus (turn-settled, record-changed) and
+ * fires as soon as the gates open; waitFor tolerates the async hops.
  */
 describe("wake pipeline (src/server/jobs.ts)", () => {
 	/** A chat with a finished job ready for delivery. */
@@ -994,6 +1015,8 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 				timestamp: 1,
 			} as never,
 		]);
+		// The answer's write announces itself, as the chat handler's does.
+		emit("record-changed", { chatId });
 
 		await waitFor(() => fired > 0, 8000, "wake after the quiz answer");
 		await delivery; // now it resolves — the steer was delivered
@@ -1070,6 +1093,47 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 		assert.equal(jobStore.getJob(jobId)!.status, "done");
 	});
 
+	it("fires the moment the blocking turn settles: no poll and no grace", async () => {
+		const { chatId, steer } = setup();
+		let firedAt = 0;
+		setTurnRunner(async () => {
+			firedAt = performance.now();
+			return 200;
+		});
+		assert.ok(beginTurn(chatId));
+		const delivery = deliverJobResult(steer);
+		await delay(100);
+		assert.equal(firedAt, 0, "no wake while the turn runs");
+		const settledAt = performance.now();
+		endTurn(chatId);
+		await waitFor(() => firedAt > 0, 2000, "wake after the turn settles");
+		assert.ok(firedAt - settledAt < 200, `fired ${Math.round(firedAt - settledAt)}ms after the turn settled`);
+		await delivery;
+	});
+
+	it("after a 409 it waits for the racing turn to settle, then fires at once", async () => {
+		const { chatId, steer } = setup();
+		let calls = 0;
+		let firedAt = 0;
+		setTurnRunner(async () => {
+			calls++;
+			if (calls === 1) {
+				assert.ok(beginTurn(chatId), "a client turn races in");
+				return 409;
+			}
+			firedAt = performance.now();
+			return 200;
+		});
+		const delivery = deliverJobResult(steer);
+		await delay(100);
+		assert.equal(calls, 1, "no retry while the racing turn runs");
+		const settledAt = performance.now();
+		endTurn(chatId);
+		await waitFor(() => firedAt > 0, 2000, "retry after the racing turn settles");
+		assert.ok(firedAt - settledAt < 200, `retried ${Math.round(firedAt - settledAt)}ms after the turn settled`);
+		await delivery;
+	});
+
 	it("is idempotent: a steer already in the transcript flips the job without firing a turn", async () => {
 		const { chatId, jobId, steer } = setup();
 		// Simulate the crash window: the wake completed but the flip didn't.
@@ -1085,6 +1149,100 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 		await deliverJobResult(steer);
 		assert.equal(fired, 0, "no duplicate wake for an already-delivered steer");
 		assert.equal(jobStore.getJob(jobId)!.status, "done", "the job still flips — recovery completes");
+	});
+
+	/** A tutor reply holding these tool calls (the record's assistant shape). */
+	function reply(id: string, calls: [string, string, unknown][], stopReason = "toolUse"): LhMessage {
+		return {
+			id, role: "assistant", content: calls.map(([callId, name, args]) => ({ type: "toolCall", id: callId, name, arguments: args })),
+			api: "anthropic-messages", provider: "claude-subscription", model: "test",
+			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, stopReason, timestamp: 1,
+		} as never;
+	}
+	function result(id: string, callId: string, name: string, details: unknown): LhMessage {
+		return { id, role: "toolResult", toolCallId: callId, toolName: name, content: [{ type: "text", text: "ok" }], details, isError: false, timestamp: 1 } as never;
+	}
+	function assistantText(id: string, text: string): LhMessage {
+		return { ...reply(id, [], "stop"), content: [{ type: "text", text }] } as LhMessage;
+	}
+	function answerTo(callId: string): LhMessage {
+		const answer = buildAnswer({ id: callId, kind: "explain", question: "Q?", mode: "text", options: [], createdAt: "fixture" }, { text: "rank 2" });
+		return { ...newAnswerResult(callId, "explain", answer), id: `ans_${callId}` } as LhMessage;
+	}
+	/** Round 6, report 8 B1: the prober concluded, then asked once more in
+	 *  the same turn, so the handoff queued behind that question. */
+	function probedThenAsked(): LhMessage[] {
+		return [
+			{ id: "u1", role: "user", content: "Invertible matrices", timestamp: 1 } as never,
+			reply("a_pd", [["pd", "probe_done", { strands: [] }]]),
+			result("r_pd", "pd", "probe_done", { ok: true }),
+			reply("a_q1", [["q1", "explain", { question: "Q?" }]]),
+		];
+	}
+
+	it("a probe handoff the teacher already acted on never fires, even once a close leaves the lesson idle", async () => {
+		const chat = chatStore.createChat("Test: stale probe handoff");
+		trackChat(chat.id);
+		chatStore.saveMessages(chat.id, probedThenAsked());
+		let fired = 0;
+		setTurnRunner(async () => {
+			fired++;
+			return 200;
+		});
+		const delivery = deliverJobResult(buildProbeHandoffSteer(chat.id));
+		await delay(300);
+		assert.equal(fired, 0, "the question he owes holds the wake");
+
+		// He answers: the teacher's run plans and teaches, then poses its own
+		// question; he presses Done for today and the tutor closes.
+		const taught = [
+			...probedThenAsked(),
+			answerTo("q1"),
+			reply("a_plan", [["pi", "plan_init", { nodes: [] }], ["q2", "explain", { question: "Q2?" }]]),
+			result("r_pi", "pi", "plan_init", { ok: true }),
+		];
+		chatStore.saveMessages(chat.id, taught);
+		settleSteers(chat.id, taught.slice(4));
+		const closed = [
+			...taught,
+			{ ...newDoneTonightMessage("teacher"), id: "done" },
+			reply("a_close", [["lp", "lesson_progress", { done: [], close: true }]]),
+			result("r_lp", "lp", "lesson_progress", { ok: true }),
+			assistantText("a_bye", "Tomorrow: rank by pivots."),
+		];
+		chatStore.saveMessages(chat.id, closed);
+		settleSteers(chat.id, closed.slice(taught.length));
+		emit("record-changed", { chatId: chat.id });
+
+		await delivery;
+		await delay(300);
+		assert.equal(fired, 0, "the handoff his answer overtook never wakes the closed lesson");
+	});
+
+	it("a job result that lands after a close waits for his next message, then rides it", async () => {
+		const { chatId, steer } = setup();
+		const closed = [
+			{ id: "u1", role: "user", content: "hello", timestamp: 1 } as never,
+			{ ...newDoneTonightMessage("teacher"), id: "done" },
+			reply("a_close", [["lp", "lesson_progress", { done: [], close: true }]]),
+			result("r_lp", "lp", "lesson_progress", { ok: true }),
+			assistantText("a_bye", "Tomorrow: rank by pivots."),
+		];
+		chatStore.saveMessages(chatId, closed);
+		let fired = 0;
+		setTurnRunner(async () => {
+			fired++;
+			return 200;
+		});
+		const delivery = deliverJobResult(steer);
+		await delay(600);
+		assert.equal(fired, 0, "nothing queued may reopen a lesson closed for today");
+
+		const reopened = [...closed, { id: "u2", role: "user", content: "one more thing", timestamp: 2 } as never];
+		chatStore.saveMessages(chatId, reopened);
+		settleSteers(chatId, reopened);
+		await waitFor(() => fired > 0, 8000, "the held result rides his next message");
+		await delivery;
 	});
 
 // ─── continuation coalescing (the delivery-starvation fix) ───────────────────
@@ -1496,14 +1654,14 @@ describe("prompt composition", () => {
 describe("abort (src/server/jobs.ts abortJob)", () => {
 	/** A hanging model whose call never resolves until its abort signal
 	 *  fires — the real-kill path: the in-flight call itself is killed. */
-	function hangingModel(): PiEngine {
+	function hangingModel(): SdkEngine {
 		return fauxEngine([abortableFactory()]);
 	}
 
 	/** One step (billed) then a hang — proves usage-so-far survives the kill. */
-	function oneStepThenHangModel(): PiEngine {
+	function oneStepThenHangModel(): SdkEngine {
 		return fauxEngine([
-			fauxAssistantMessage([fauxToolCall("web_search", { query: "anything" }, { id: "ws1" })], {
+			fauxAssistantMessage([fauxToolCall("WebSearch", { query: "anything" }, { id: "ws1" })], {
 				stopReason: "toolUse",
 			}),
 			abortableFactory(),
@@ -1669,12 +1827,6 @@ describe("abort (src/server/jobs.ts abortJob)", () => {
 // immediacy by running the sweep on FRESH records.
 
 describe("stale-job recovery sweep (liveness-gated)", () => {
-	/** Reset the sweep's 30s throttle — tests fire it directly, repeatedly. */
-	function resetSweepThrottle(): void {
-		const g = globalThis as { __lhWakePipeline?: { lastSweepAt: number } };
-		if (g.__lhWakePipeline) g.__lhWakePipeline.lastSweepAt = 0;
-	}
-
 	/** A FRESH "running" record (no loop registration): the orphan shape.
 	 *  Freshness is the point — the old code needed 15 minutes of age. */
 	function orphanJob(withResult?: ResearchResult): { chatId: string; jobId: string } {
@@ -1702,7 +1854,6 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 		setJobRespawn((id) => {
 			respawnedIds.push(id);
 		});
-		resetSweepThrottle();
 		recoverStaleJobs();
 		assert.ok(!respawnedIds.includes(jobId), "a live loop is provably executing — no respawn beside it");
 		assert.equal(jobStore.getJob(jobId)!.activity, "starting", "the record is untouched");
@@ -1720,13 +1871,25 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 		setJobRespawn((id) => {
 			respawnedIds.push(id);
 		});
-		resetSweepThrottle();
 		recoverStaleJobs();
 		assert.ok(respawnedIds.includes(jobId), "the orphan's loop is re-spawned at once");
 		assert.equal(jobStore.getJob(jobId)!.activity, "recovering: re-running");
 		// Hermetic teardown (see above) — the respawned loop is the TEST's
 		// fake seam, nothing real runs.
 		jobStore.updateJob(jobId, { status: "done", activity: "settled (test)" });
+	});
+
+	it("runs whenever it is called (once, at server start): no 30 s throttle swallows a second sweep", () => {
+		const respawnedIds: string[] = [];
+		setJobRespawn((id) => {
+			respawnedIds.push(id);
+		});
+		const first = orphanJob();
+		recoverStaleJobs();
+		const second = orphanJob();
+		recoverStaleJobs();
+		assert.ok(respawnedIds.includes(first.jobId) && respawnedIds.includes(second.jobId), "both sweeps recovered their orphan");
+		for (const { jobId } of [first, second]) jobStore.updateJob(jobId, { status: "done", activity: "settled (test)" });
 	});
 
 	it("an orphan WITH a stored result is re-delivered: the wake fires and the job flips done", async () => {
@@ -1736,7 +1899,6 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 			fired++;
 			return 200;
 		});
-		resetSweepThrottle();
 		recoverStaleJobs();
 		await waitFor(() => fired > 0, 8000, "recovery wake fired");
 		await waitFor(() => jobStore.getJob(jobId)!.status !== "running", 8000, "orphan settled after re-delivery");
@@ -1744,10 +1906,10 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 	});
 });
 
-// ─── BYOK: the unresolvable-engine refusal (owner, 2026-09-22) ──────────────
+// ─── the unwired-engine refusal ─────────────────────────────────────────────
 
-describe("BYOK job refusal (no factory floor)", () => {
-	it("runJob with NO resolvable engine lands the job as error — the envelope wording, no phantom run", async () => {
+describe("unwired job refusal", () => {
+	it("runJob with NO injected engine lands the job as error — a plain reason, no phantom run", async () => {
 		const chat = chatStore.createChat("Test: unconfigured spawn");
 		trackChat(chat.id);
 		chatStore.saveMessages(chat.id, nativeToolMessages("hi", "research", "call-nc1", RESEARCH_INPUT));
@@ -1756,23 +1918,22 @@ describe("BYOK job refusal (no factory floor)", () => {
 		trackJob(job.id);
 
 		const delivery = fakeDeliver();
-		// NO test override, NO engineFor: the chain (override → slot → floor)
-		// comes up empty — the runner must refuse honestly, not fall back.
+		// NO test override, NO engineFor: a wiring bug — the runner must
+		// refuse honestly, not fall back.
 		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
 		await runner.runJob(job.id);
 
 		const done = jobStore.getJob(job.id)!;
 		// The refusal lands through the SAME convention as every other
-		// failed job (BYOK review fix, Teacher stream 2026-09-22): the kind's
-		// failure result steers the teacher — a dispatched job is never
-		// stranded waiting for a result that will never come — and
-		// finalizeJob flips the record to error after the delivery.
+		// failed job: the kind's failure result steers the teacher — a
+		// dispatched job is never stranded waiting for a result that will
+		// never come — and finalizeJob flips the record to error after the
+		// delivery.
 		assert.equal(done.status, "error", "the job lands error, never a phantom run");
-		assert.match(done.error ?? "", /No model configured/);
-		assert.match(done.error ?? "", /missing: cheap/);
+		assert.equal(done.error, 'no engine injected for role "researcher"');
 		assert.equal(delivery.steers.length, 1, "the refusal STEERED — the teacher is not stranded");
 		assert.ok(
-			delivery.steers[0]!.content.includes("Research failed: No model configured"),
+			delivery.steers[0]!.content.includes('Research failed: no engine injected for role "researcher"'),
 			"the steer carries the kind's failure shape",
 		);
 		const result = done.result as ResearchResult;
@@ -1784,7 +1945,7 @@ describe("BYOK job refusal (no factory floor)", () => {
 
 describe("provider-key job refusal (key-presence interlude)", () => {
 	it("an engine whose provider key is gone refuses the spawn — envelope wording, no phantom run", async () => {
-		const chat = chatStore.createChat("Test: keyless spawn");
+		const chat = chatStore.createChat("Test: unconnected spawn");
 		trackChat(chat.id);
 		chatStore.saveMessages(chat.id, nativeToolMessages("hi", "research", "call-km1", RESEARCH_INPUT));
 
@@ -1792,19 +1953,19 @@ describe("provider-key job refusal (key-presence interlude)", () => {
 		trackJob(job.id);
 
 		const delivery = fakeDeliver();
-		// The chain RESOLVES (an engine exists) — the KEY is what's missing.
-		// The injected check is the server seam's stand-in: it sees the
-		// engine's provider + the kind's slot tier, exactly as wired.
+		// An engine exists — the sign-in is what's missing. The injected
+		// check is the server seam's stand-in: it sees the engine's account,
+		// exactly as wired.
 		const engine = fauxEngine([]);
-		const seen: Array<[string, ModelSlotName]> = [];
+		const seen: string[] = [];
 		const runner = createJobRunner({
 			chatStore,
 			jobStore,
 			deliver: delivery.deliver,
 			engineFor: () => engine,
-			providerKeyMissing: (provider, tier) => {
-				seen.push([provider, tier]);
-				return providerKeyMissing(provider, [tier]);
+			providerKeyMissing: (provider) => {
+				seen.push(provider);
+				return providerKeyMissing(provider);
 			},
 		});
 		await runner.runJob(job.id);
@@ -1813,15 +1974,140 @@ describe("provider-key job refusal (key-presence interlude)", () => {
 		// honest record, kind failure shape steered, terminal flip after.
 		const done = jobStore.getJob(job.id)!;
 		assert.equal(done.status, "error", "the job lands error, never a phantom run");
-		assert.equal(done.error, providerKeyMissing(engine.model.provider, ["cheap"]).error, "the envelope's error line verbatim");
-		assert.deepEqual(seen, [[engine.model.provider, "cheap"]], "the check saw the engine's provider + the researcher's tier");
+		assert.equal(done.error, providerKeyMissing(engine.model.provider).error, "the envelope's error line verbatim");
+		assert.deepEqual(seen, [engine.model.provider], "the check saw the engine's account");
 		assert.equal(delivery.steers.length, 1, "the refusal STEERED — the teacher is not stranded");
 		assert.ok(
-			delivery.steers[0]!.content.includes(`Research failed: No ${engine.model.provider} key is set`),
+			delivery.steers[0]!.content.includes("Research failed: Claude Code is not signed in"),
 			"the steer carries the kind's failure shape",
 		);
 		const result = done.result as ResearchResult;
 		assert.equal(result.sources.length, 0, "the failure result matches the research convention");
+	});
+});
+
+// ─── time limits: a hung helper fails with a plain reason ───────────────────
+
+describe("job time limit", () => {
+	const DEMO_INPUT = { title: "Eigenvectors", brief: "Drag a vector; show when Av stays on its line." };
+	const SHORT_LIMITS = { ...JOB_TIME_LIMIT_MS, demo: 300 };
+
+	function demoJob(label: string, toolCallId: string): string {
+		const chat = chatStore.createChat(`Test: ${label}`);
+		trackChat(chat.id);
+		chatStore.saveMessages(chat.id, nativeToolMessages("show me", "demo", toolCallId, DEMO_INPUT));
+		const job = jobStore.createJob({ kind: "demo", chatId: chat.id, toolCallId, input: DEMO_INPUT });
+		trackJob(job.id);
+		return job.id;
+	}
+
+	/** A browser that is always there and never used: the hung model call
+	 *  is the whole run. */
+	function withHeadless<T>(body: () => Promise<T>): Promise<T> {
+		headlessOverride.current = { unavailableReason: () => null } as unknown as HeadlessApi;
+		demoModelOverride.current = fauxEngine([abortableFactory()]);
+		return body().finally(() => {
+			headlessOverride.current = undefined;
+			demoModelOverride.current = undefined;
+		});
+	}
+
+	it("a demo whose model never answers fails after its limit, and the tutor is told once to carry on without it", () =>
+		withHeadless(async () => {
+			const jobId = demoJob("hung demo", "call-limit1");
+			const delivery = fakeDeliver();
+			const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver, timeLimitMs: SHORT_LIMITS });
+			await runner.runJob(jobId, DEMO_INPUT);
+			await new Promise((r) => setTimeout(r, 100));
+
+			const done = jobStore.getJob(jobId)!;
+			assert.equal(done.status, "error");
+			assert.match(done.error ?? "", /^took longer than /);
+			assert.equal(delivery.steers.length, 1, "exactly one steer");
+			const text = delivery.steers[0]!.content;
+			assert.match(text, /could not be built/);
+			assert.match(text, /carry on teaching in prose without it/);
+			assert.ok(!text.includes("FAILED:"), "the tutor reads a plain reason");
+		}));
+
+	it("an orphan past its limit, re-spawned by recovery, fails at once without running", async () => {
+		const jobId = demoJob("expired orphan", "call-limit2");
+		jobStore.updateJob(jobId, { createdAt: new Date(Date.now() - JOB_TIME_LIMIT_MS.demo - 1000).toISOString() } as never);
+		let modelCalls = 0;
+		demoModelOverride.current = fauxEngine([
+			() => {
+				modelCalls++;
+				return fauxAssistantMessage("never");
+			},
+		] as unknown as FauxResponseStep[]);
+		const delivery = fakeDeliver();
+		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
+		setJobRespawn((id) => {
+			if (id === jobId) void runner.runJob(id);
+		});
+		try {
+			recoverStaleJobs();
+			await waitFor(() => jobStore.getJob(jobId)!.status !== "running", 8000, "orphan settled");
+			const done = jobStore.getJob(jobId)!;
+			assert.equal(done.status, "error");
+			assert.equal(done.error, `took longer than ${JOB_TIME_LIMIT_MS.demo / 60_000} minutes`);
+			assert.equal(modelCalls, 0, "the expired job never reached its model");
+			assert.equal(delivery.steers.length, 1);
+			assert.match(delivery.steers[0]!.content, /could not be built/);
+		} finally {
+			demoModelOverride.current = undefined;
+		}
+	});
+
+	it("a learner abort still produces only the abort steer, and the limit stays quiet afterwards", () =>
+		withHeadless(async () => {
+			const jobId = demoJob("aborted demo", "call-limit3");
+			const fired: SteerMessage[] = [];
+			setTurnRunner(async (_cid, input) => {
+				fired.push(...((input as SteerInput).steers as SteerMessage[]));
+				return 200;
+			});
+			const runner = createJobRunner({
+				chatStore,
+				jobStore,
+				deliver: async () => {
+					throw new Error("an aborted job must never deliver a result steer");
+				},
+				timeLimitMs: SHORT_LIMITS,
+			});
+			const settled = runner.runJob(jobId, DEMO_INPUT);
+			await waitFor(() => isJobLive(jobId), 8000, "loop started");
+			assert.ok(abortJob(jobId).ok);
+			await settled;
+			await new Promise((r) => setTimeout(r, SHORT_LIMITS.demo + 100));
+
+			const done = jobStore.getJob(jobId)!;
+			assert.equal(done.error, "Aborted by learner");
+			assert.equal(done.result, undefined);
+			await waitFor(() => fired.length > 0, 8000, "abort wake fired");
+			assert.deepEqual(fired.map((m) => m.customType), ["subagent-abort"]);
+		}));
+
+	it("a model the settings name but the catalog lacks fails the job instead of leaving it running", async () => {
+		const chat = chatStore.createChat("Test: unknown model");
+		trackChat(chat.id);
+		chatStore.saveMessages(chat.id, nativeToolMessages("hi", "research", "call-limit4", RESEARCH_INPUT));
+		const job = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "call-limit4" });
+		trackJob(job.id);
+		const delivery = fakeDeliver();
+		const runner = createJobRunner({
+			chatStore,
+			jobStore,
+			deliver: delivery.deliver,
+			engineFor: () => {
+				throw new Error("catalog has no model claude-haiku-5-5");
+			},
+		});
+		await runner.runJob(job.id);
+		const done = jobStore.getJob(job.id)!;
+		assert.equal(done.status, "error");
+		assert.equal(done.error, "catalog has no model claude-haiku-5-5");
+		assert.equal(delivery.steers.length, 1, "the tutor learns the outcome");
 	});
 });
 

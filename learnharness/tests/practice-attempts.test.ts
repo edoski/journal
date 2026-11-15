@@ -20,7 +20,7 @@ describe("a concluded practice problem as engine observations", () => {
 		);
 		assert.deepEqual(observations.map((o) => [o.help, o.result, o.response, o.sure]), [
 			["none", "incorrect", "No", "confident"],
-			["Hint R3: named the idea to use", "correct", "Yes, additive and homogeneous", "neutral"],
+			["Hint R3: named the idea to use", "correct", "Yes, additive and homogeneous", undefined],
 		]);
 	});
 
@@ -113,6 +113,28 @@ describe("a concluded practice problem as engine observations", () => {
 		assert.deepEqual(practiceObservations(pose, gaveUp, undefined).map((o) => [o.topics, o.result]), [[["hypergeometric"], "correct"], [["binomial"], "incorrect"]]);
 	});
 
+	it("a given-up problem is marked given up, and the solution revealed after it is not help", () => {
+		const [o] = practiceObservations(POSE, { ...base, outcome: "surrendered", result: "incorrect", response: "no idea" }, "guessing");
+		assert.deepEqual([o!.help, o!.result, o!.gave_up, "shown" in o!], ["none", "incorrect", true, false]);
+		const [nudged] = practiceObservations(POSE, { ...base, outcome: "surrendered", rung: "R1", result: "incorrect", response: "stuck" }, undefined);
+		assert.deepEqual([nudged!.help, nudged!.gave_up], ["Hint R1: re-described the pattern class", true]);
+	});
+
+	it("an answer after the step was worked for him is marked shown; a lesser hint is not", () => {
+		const [shown] = practiceObservations(POSE, { ...base, outcome: "solvedWithHints", rung: "R5" }, undefined);
+		assert.deepEqual([shown!.help, shown!.shown], ["Hint R5: worked the step", true]);
+		const [hinted] = practiceObservations(POSE, { ...base, outcome: "solvedWithHints", rung: "R4" }, undefined);
+		assert.equal("shown" in hinted!, false);
+		assert.equal("gave_up" in hinted!, false);
+	});
+
+	it("a problem he claimed no answer to records nothing", () => {
+		assert.deepEqual(practiceObservations(POSE, { ...base, outcome: "movedOn", result: null, response: "asked to be taught instead" }, "neutral"), []);
+		assert.equal(conclusionProblem({ ...base, outcome: "movedOn", result: null }, POSE.topics), null);
+		assert.match(conclusionProblem({ ...base, outcome: "surrendered", result: null }, POSE.topics)!, /incorrect/);
+		assert.match(conclusionProblem({ ...base, result: null }, POSE.topics)!, /correct or partial/);
+	});
+
 	it("refuses conclusions that contradict their outcome or the pose", () => {
 		const topics = POSE.topics;
 		assert.match(conclusionProblem({ ...base, outcome: "surrendered" }, topics)!, /incorrect/);
@@ -165,6 +187,18 @@ describe("conclude records the attempt, and never locks the session", async () =
 			(saves[0] as { changes: { observations: { topics: string[]; result: string }[] } }).changes.observations.map((o) => [o.topics, o.result]),
 			[[["independence"], "correct"], [["conditional"], "partial"]],
 		);
+	});
+
+	it("asking to be taught before any answer saves nothing and frees the problem", async () => {
+		const saves: unknown[] = [];
+		const records = { list: async () => ({ available: true, courses: [], roots: [] }), run: async (_w: string, req: unknown) => (saves.push(req), { ok: true, json: {} }) };
+		const tools = practiceTools({ chatId: "c", chatStore }, { course: { workspace: "/w", title: "T" }, records } as never);
+		const result = await tools.conclude!.execute("c1", { ...conclusion, outcome: "movedOn", result: null, response: "asked to be taught instead" }, undefined);
+		assert.notEqual(result.isError, true);
+		assert.deepEqual(saves, []);
+		assert.match((result.content[0] as { text: string }).text, /No attempt recorded/);
+		const next = await tools.problem!.execute("p2", pose, undefined);
+		assert.notEqual(next.isError, true, "the problem slot is free again");
 	});
 
 	it("a conclusion that contradicts its outcome is refused and the problem stays active", async () => {

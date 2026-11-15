@@ -1,11 +1,11 @@
-import { Agent } from "@earendil-works/pi-agent-core";
-import type { AgentEvent, AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
+import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult } from "./tool-execute.ts";
-import { providerEventObserver } from "./provider-events.ts";
 import type { Api, Model, Usage } from "@earendil-works/pi-ai";
-import { PATHS } from "../../config.ts";
-import { APP_IDENTITY, piEngineFor, type PiEngine } from "./models.ts";
-import { courseRecordPrompt, effectivePromptSegments } from "./prompt-segments.ts";
+import { SdkAgent } from "./sdk/agent.ts";
+import type { SdkEngine } from "./sdk/engine.ts";
+import type { SessionStore } from "./sdk/session-files.ts";
+import type { ChatSession } from "../core/sdk-session.ts";
+import { courseRecordPrompt, sourcePromptTexts } from "./prompt-segments.ts";
 import { courseTools, type CourseToolContext } from "./tools/course.ts";
 import {
 	askUserQuestionTool,
@@ -23,21 +23,20 @@ import { createFindTool, findTool } from "./tools/find.ts";
 import { createGrepTool, grepTool } from "./tools/grep.ts";
 import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
-import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
-import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
-import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
-import { usageWasAdmitted } from "./subscription-request-cycle.ts";
+import { QUESTION_TOOLS } from "../core/pending.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../core/native-messages.ts";
+import { VoiceGuard } from "./voice-guard.ts";
 
 /**
  * The two teaching-side agents (docs/probe-teach-split.md): the PROBER and
  * the TEACHER. Same transcript, different prompts and tool sets; the
  * chat-handler constructs ONE per request off the transcript's seam
- * (probe_done = teacher) — the STATELESS per-turn engine (docs/
- * pi-engine-swap.md §2): the persisted record is the source of truth, the
- * agent is rebuilt from it every POST and discarded at turn end.
+ * (probe_done = teacher). Each turn builds one from the record and the
+ * record's map to the lesson's Claude Code session (sdk/agent.ts): the
+ * record is what every page reads, the session is the model's memory.
  *
- * Engines are injectable so tests can pass a scripted faux engine and drive
- * deterministic lessons (see tests/chat-flow.test.ts).
+ * Engines are injectable so tests can pass a scripted fake of the Agent SDK
+ * and drive deterministic lessons (see tests/chat-flow.test.ts).
  *
  * System prompts are COMPOSED per agent: system-prompt.md (the shared base:
  * agent, voice, philosophy, accuracy) + every numeric-prefix fragment in
@@ -56,40 +55,17 @@ import { usageWasAdmitted } from "./subscription-request-cycle.ts";
  *  composes ONLY its own directory — see prompt-segments.ts. */
 export type AgentKind = "prober" | "teacher" | "practice";
 
-// P2 (2026-09-19): segment discovery + override resolution live in ONE
-// canonical place now — src/store/prompt-overrides.ts (listSourceSegments
-// mirrors this loader's rules, shared/ included). The agent imports it for
-// the static-file seam; the local fragment discovery helpers are retired.
-
 /** Exported for tests: assert what composes into the model's prompt.
- *  Composition order: shared base → shared/ fragments (both agents, the
- *  sources-v1 seam for cross-agent doctrine) → the agent's own fragments.
- *
- *  P2 reconciliation (2026-09-19): composition is DELEGATED to the store
- *  module's effectivePromptSegments — one canonical segment-discovery
- *  rule (its listSourceSegments mirrors this loader's, now including
- *  shared/) — so per-segment OVERRIDES ride the same path: a segment
- *  whose switch is ON and whose override file exists composes the
- *  override text instead of the source. `switches` is the settings
- *  record's agent.prompts map (absent key = off), threaded per turn via
- *  AgentBuildOptions.promptSwitches; a switches-less call composes pure
- *  source (byte-identical to the pre-refactor loader — pinned in
- *  tests/prompt-overrides.test.ts). Overrides are a static-file read
- *  through config paths, not request state — the store import carries no
- *  chat/job machinery. */
-export function composeInstructions(kind: AgentKind, switches?: Record<string, boolean>): string {
-	const segments = effectivePromptSegments(kind, switches ?? {});
-	return segments
-		.map((s) => (s.enabled ? s.overrideText! : s.sourceText))
+ *  Composition order: shared base → the agent's own fragments → shared/
+ *  fragments (src/agent/prompt-segments.ts owns the discovery rule). */
+export function composeInstructions(kind: AgentKind): string {
+	return sourcePromptTexts(kind)
 		.map((t) => t.trim())
 		.filter(Boolean)
 		.join("\n\n---\n\n");
 }
 
-// The switch-free source composition, cached per kind (module-load once).
-// With promptSwitches provided, baseAgentOptions composes FRESH per turn —
-// an override file written while its switch is ON must flip the next
-// turn's composition; the cache serves only the switches-less path.
+// The composition, cached per kind (module-load once).
 const composedInstructions: Record<AgentKind, string> = {
 	prober: composeInstructions("prober"),
 	teacher: composeInstructions("teacher"),
@@ -103,36 +79,18 @@ export type StepUsageCollector = (usage: Usage) => void;
 
 /** Per-request construction options (the handler wires all of these). */
 export interface AgentBuildOptions {
-	/** Model + stream function — tests inject a scripted faux engine. */
-	engine?: PiEngine;
-	callPurpose?: { background: boolean };
-	requestCycle?: ChatGPTRequestCycle;
-	/** The initial transcript, as pi messages (the record IS agent state). */
+	/** The Agent SDK engine: tests inject a scripted fake. */
+	engine?: SdkEngine;
+	/** The record the turn runs on. */
 	messages?: AgentMessage[];
 	/** Money channel: one call per model request. */
 	onUsage?: StepUsageCollector;
-	/** Tests may pass a bare tool registry to drive deterministic flows.
-	 *  An explicit registry is NEVER toggle-filtered — the caller owns it. */
+	/** Tests may pass a bare tool registry to drive deterministic flows. */
 	tools?: Record<string, AgentTool<any>>;
-	/** The resolved per-user tool toggles (core/pending EnabledTools — the
-	 *  2026-09-19 P2 bridge: Platform's chat-handler passes
-	 *  effective.agent.tools; the factories drop any tool explicitly false.
-	 *  THE DEFINITIVE toggleable set is TOGGLEABLE_TOOLS (job tools only);
-	 *  the filtering is generic, but writes validate against the list). */
-	toolToggles?: EnabledTools;
-	/** Per-segment system-prompt override SWITCHES (the settings record's
-	 *  agent.prompts map, absent key = off — same keys the settings routes
-	 *  and effectivePromptSegments use). Provided → the prompt composes
-	 *  fresh per turn, honoring enabled overrides (switch on + file
-	 *  exists); absent → the cached pure-source composition. */
-	promptSwitches?: Record<string, boolean>;
-	/** Native conversation identity: the existing persisted chat id, reused
-	 * across reconstructed prober, teacher, and practice Agents.
-	 * Debug: when set AND LH_PROVIDER_EVENTS=1, raw provider stream events
-	 *  (pre-normalization) append to data/debug/provider-events/
-	 *  <chatId>.jsonl via providerEventObserver — the GLM-truncation /
-	 *  DeepSeek-id incident layer. Absent or env-off → no observer. */
-	chatId?: string;
+	/** The record's map to the lesson's Claude Code session. */
+	session?: ChatSession;
+	/** Where the app keeps its copy of that session. */
+	sessionStore?: SessionStore;
 	/** The session's course link: present = the course-record tools join
 	 *  the registry and the course doctrine joins the prompt, for every
 	 *  agent kind. Absent = no course (nothing changes). */
@@ -140,47 +98,19 @@ export interface AgentBuildOptions {
 }
 
 /**
- * The turn's question-stop rule (docs/pi-engine-swap.md §2; Wave A
- * 2026-09-26, owner Option A): a question tool call (explain /
- * recall / ask_user_question) that RESOLVED — its synthetic "question posed" result
- * is not an error — ends the run: the learner's answer arrives as the next
- * POST. A call that FAILED authoring validation (error result) must NOT
- * stop the run — the model retries within the same turn, exactly the old
- * InvalidToolInputError semantics.
- *
- * Question results also carry terminate: true (tool-execute's
- * questionResult), so single-question batches stop natively at the pi
- * loop's own batch check; this finishTurn hook (0.87.1 rename of
- * shouldStopAfterTurn) is the
- * belt-and-suspenders HALF for the mixed batch (a question + other calls
- * in one message) that terminate-only semantics would let run on — the
- * learner cannot answer while a turn is in flight (per-chat 409), so a
- * cleanly-posed question MUST always end the turn. Practice's problem pose
- * has the same wait-for-the-learner contract, including mixed output/problem
- * batches; failed poses must still retry. maxTurns is gone
- * (owner ruling 2026-09-25: no maximum-agent-turns net on the teaching
- * turn).
+ * The turn's question-stop rule: a question tool call (explain / recall /
+ * ask_user_question) that resolved cleanly ends the turn, and the learner's
+ * answer arrives with the next input. A call that failed authoring
+ * validation does not: the model retries within the same turn. Practice's
+ * problem pose and the mode handoffs have the same wait-for-the-answer
+ * contract, mixed batches included (sdk/agent.ts holds a clean pose until
+ * every pose of its reply resolved cleanly).
  */
-function makeQuestionStopper(kind: AgentKind) {
-	return (context: {
-		message: { content: Array<{ type: string; id?: string; name?: string }> };
-		toolResults: Array<{ toolCallId: string; isError?: boolean }>;
-	}): boolean => {
-		const called = new Set(
-			context.message.content
-				.filter((c) => c.type === "toolCall" && c.name !== undefined && (
-					(QUESTION_TOOLS as readonly string[]).includes(c.name) ||
-					(kind === "practice" && c.name === PRACTICE_PROBLEM_TOOL)
-				))
-				.map((c) => c.id!),
-		);
-		if (called.size === 0) return false;
-		// Stop only when every question/problem pose resolved cleanly.
-		for (const result of context.toolResults) {
-			if (called.has(result.toolCallId) && result.isError) return false;
-		}
-		return true;
-	};
+function endsTurnFor(kind: AgentKind): (toolName: string) => boolean {
+	return (name) =>
+		(QUESTION_TOOLS as readonly string[]).includes(name) ||
+		(kind === "practice" && name === PRACTICE_PROBLEM_TOOL) ||
+		MODE_HANDOFF_TOOLS[name] !== undefined;
 }
 
 const SEARCH_TOOLS: Record<string, { shared: AgentTool<any>; create: (courseDir: string) => AgentTool<any> }> = {
@@ -203,96 +133,35 @@ function sessionTool(tool: AgentTool<any, any>, model: Model<Api>, courseDir: st
 }
 
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
-	// Practice never reaches the role fallback (the handler ALWAYS injects
-	// the session's conversation engine — practice rides the same
-	// conversation-spec resolution as teaching); the cast keeps AgentKind
-	// ("practice" is not a ModelRole) honest about that.
-	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
-	const stopper = makeQuestionStopper(kind);
-	const composed = opts.promptSwitches
-		? composeInstructions(kind, opts.promptSwitches)
-		: composedInstructions[kind]!;
-	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt(kind)}` : composed;
-	// Debug recorder (owner, 2026-10-04): raw provider events when
-	// LH_PROVIDER_EVENTS=1 and the caller handed a chatId; undefined is
-	// the normal no-observer path (tests, env-off).
-	const providerEvents = opts.chatId ? providerEventObserver(opts.chatId, kind) : undefined;
-	const seenInputs = new Set((opts.messages ?? []).map((m) => (m as { id?: string }).id).filter(Boolean));
-	const agent = new Agent({
-		identity: APP_IDENTITY,
-		sessionId: opts.chatId,
-		initialState: {
-			systemPrompt,
-			model: engine.model,
-			thinkingLevel: engine.level,
-			// Conditional registry inclusion, like the graph-tool gates: when
-			// closed, neither the tool nor its usage instructions reach the model.
-			// The shared file tools are bound to this agent (sessionTool), in
-			// every registry including explicit ones. The
-			// send_to_user gate matches Claude across providers (including
-			// OpenRouter), not the API transport; explicit registries opt out.
-			tools: [
-				...tools.map((tool) => sessionTool(tool, engine.model, opts.course?.course.workspace)),
-				...(opts.course ? Object.values(courseTools(opts.course)) : []),
-				...(opts.tools === undefined && engine.model.id.toLowerCase().includes("claude")
-					? [withArgumentHeal(sendToUserTool)]
-					: []),
-			],
-			messages: opts.messages ?? [],
-		},
-		streamFn: engine.streamFn,
-		...(providerEvents ? { onProviderStreamEvent: providerEvents } : {}),
-		// 0.87.1: shouldStopAfterTurn → finishTurn. Same call point (after
-		// tool results attach, before turn_end) and `{ action: "end" }` still
-		// exits BEFORE the steering poll — the parked-marker stranding our
-		// Wave C registerLiveAgent-before-runPiTurn design depends on.
-		// undefined preserves normal scheduling (the old boolean false).
-		finishTurn: (turn) => (stopper(turn) ? { action: "end" } : undefined),
-		// Wave C (2026-09-26, owner correction same day): markers handed to a
-		// live run drain from pi's STEERING queue — the lesson loop is one
-		// continuous teach→quiz→teach run, so delivery must inject at turn
-		// boundaries INSIDE the run, not wait for it to stop (follow-ups).
-		// "all" joins every handed marker at one boundary, matching the idle
-		// wake's carry-everything semantics (the default "one-at-a-time"
-		// would spend one teacher turn per marker).
-		steeringMode: "all",
-		// Wave B (owner-approved 2026-09-26): the model-facing conversion is
-		// THE app seam — markers flatten to their canonical user text
-		// (HANDOFF_TEXT / steer text, all single-sourced),
-		// UI-only markers (plan-block) drop, the app's id fields strip, and
-		// an abort's dangling question call gets its INTERRUPTED result. It
-		// must never throw (pi's convertToLlm contract).
-		convertToLlm: toLlmMessages,
-		prepareRequest: (request) => {
-			if (opts.callPurpose) {
-				let learner = false, automatic = false;
-				const messages = request.context.messages;
-				for (const message of messages) {
-					const id = (message as { id?: string }).id;
-					const cause = nativeInputCause(message, messages.slice(0, messages.indexOf(message)));
-					if (cause === "neutral") continue;
-					if (id && seenInputs.has(id)) continue;
-					if (id) seenInputs.add(id);
-					if (cause === "learner" && id) learner = true;
-					else automatic = true; // missing/unrecognized identity never grants foreground
-				}
-				if (automatic) opts.callPurpose.background = true;
-				else if (learner) opts.callPurpose.background = false;
-			}
-			opts.requestCycle?.prepare(request);
-		},
+	if (!opts.engine) throw new Error(`no engine injected for the ${kind}`);
+	const engine = opts.engine;
+	const composed = composedInstructions[kind]!;
+	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt(kind, { arcs: opts.course.arcs })}` : composed;
+	// Every message and question of the turn is read against the voice
+	// before he sees it, and one that breaks it is rewritten.
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind));
+	const spoken = (tool: AgentTool<any, any>) => (voice.guards(tool.name) ? voice.wrap(tool) : tool);
+	return new SdkAgent({
+		engine,
+		systemPrompt,
+		// Conditional registry inclusion: when a tool's gate is closed, neither
+		// the tool nor its usage instructions reach the model. The shared file
+		// tools are bound to this agent (sessionTool), in every registry
+		// including explicit ones; explicit registries opt out of send_to_user.
+		tools: [
+			...tools.map((tool) => sessionTool(tool, engine.model, opts.course?.course.workspace)),
+			...(opts.course ? Object.values(courseTools(opts.course)) : []),
+			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
+		].map(spoken),
+		screen: (call) => voice.screen(call),
+		// Ordinary text never reaches him where send_to_user is his channel.
+		...(opts.tools === undefined ? { screenText: (text: string) => voice.screenText(text), beforeEnd: () => voice.beforeEnd() } : {}),
+		messages: opts.messages ?? [],
+		endsTurn: endsTurnFor(kind),
+		session: opts.session,
+		sessionStore: opts.sessionStore,
+		onUsage: opts.onUsage,
 	});
-	if (opts.onUsage) {
-		agent.subscribe((event: AgentEvent) => {
-			if (event.type === "message_end" && event.message.role === "assistant" && "usage" in event.message) {
-				// A cancelled call is not a billed step (partial/estimated
-				// usage on an aborted message is not money spent).
-				if (event.message.stopReason === "aborted" || !usageWasAdmitted(event.message.usage) || (opts.requestCycle && !opts.requestCycle.acceptsUsage(event.message))) return;
-				opts.onUsage!(event.message.usage);
-			}
-		});
-	}
-	return agent;
 }
 
 /**
@@ -303,7 +172,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
  * handler keys teacher construction on.
  */
 export function createProberAgent(ctx: ProberToolContext, opts: AgentBuildOptions = {}) {
-	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx, opts.toolToggles)));
+	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx)));
 }
 
 /**
@@ -319,7 +188,7 @@ export function createTeacherAgent(
 	ctx?: TeacherToolContext,
 	opts: AgentBuildOptions = {},
 ) {
-	const tools = opts.tools ?? (ctx ? createTeacherTools(ctx, opts.toolToggles) : bareQuestionTools());
+	const tools = opts.tools ?? (ctx ? createTeacherTools({ ...ctx, ...(opts.course ? { course: opts.course } : {}) }) : bareQuestionTools());
 	return baseAgentOptions("teacher", opts, Object.values(tools));
 }
 

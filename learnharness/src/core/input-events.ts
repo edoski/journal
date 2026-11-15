@@ -6,7 +6,7 @@
  * like. The 409 merge-retry died with the full-list body (an input event
  * retries idempotently: nothing was appended when a POST is refused).
  *
- * The four events (the complete client-originated input taxonomy):
+ * The events (the complete client-originated input taxonomy):
  *   text    — a learner-authored user message (composer send, initial
  *             topic, the demo error-fix loop)
  *   answer  — the pending question's graded result (QuestionAnswerData,
@@ -19,6 +19,9 @@
  *   retry   — retry a failed model response (issue #110), without new
  *             input. Failed attempts stay in the record; only the retry's
  *             temporary agent history omits the trailing failures.
+ *   tonight — Done for tonight: whatever he left open resolves unanswered
+ *             (a question as a dismissal, its answer never shown; a
+ *             problem as dismissed, nothing recorded) and the agent closes.
  *
  * (The plan verdict input died 2026-09-26 with the verdict itself — the
  * learner's post-plan reply is a natural text message.)
@@ -28,29 +31,48 @@
  * turn rides one composition.
  */
 
-import type { QuestionAnswerData } from "./question-core.ts";
+import { dismissedAnswer, type QuestionAnswerData } from "./question-core.ts";
+import { parsePhotos, type Photo } from "./photos.ts";
+import { parseQuestionInput } from "./tool-parts.ts";
 import type { LhMessage } from "./native-messages.ts";
+import type { SessionMode } from "./contracts/chat.ts";
 import {
 	activeProblemOf,
+	sessionModeOf,
 	concludedByDismissalPair,
 	danglingQuestionOf,
 	newAnswerResult,
 	newNextMessage,
+	newDoneTonightMessage,
+	newDisputeMessage,
+	DISPUTED_HOWS,
+	type DisputedHow,
+	respondingAgentOf,
 	newProblemDismissedMarker,
 	newThinkingMessage,
+	newPracticeRequestMessage,
+	hintsAsked,
 	newUserMessage,
 	newMessageId,
 	malformedQuestionsOf,
 	questionCallsOf,
 	pendingProblemDismissalOf,
+	newUngradedAnswerMessage,
+	ungradedAnswerOf,
+	newAskedMessage,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
+import { markLinks } from "./answer-marks.ts";
+import { isMarkResult, MARK_RESULTS, type MarkResult } from "./contracts/marks.ts";
 import { CONFIDENCE_STATES, isConfidence, type Confidence } from "./contracts/course.ts";
+import { isPracticeRequest, PRACTICE_REQUESTS, type PracticeRequest } from "./contracts/chat.ts";
 
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
-	| { type: "text"; text: string }
-	| { type: "answer"; toolCallId: string; answer: QuestionAnswerData }
+	/** `photos`: his handwritten working (photos.ts). With a photo, the
+	 *  text may be empty. */
+	| { type: "text"; text: string; photos?: Photo[]; asked?: true }
+	| { type: "answer"; toolCallId: string; answer: QuestionAnswerData; photos?: Photo[] }
 	| { type: "continue" }
 	/** The failed-turn retry (issue #110): the banner's Retry button. */
 	| { type: "retry" }
@@ -60,12 +82,22 @@ export type ChatInput =
 	 *  thinking on the ACTIVE problem — one lane (owner 2026-10-05):
 	 *  whether it claims an answer is read from the text. One
 	 *  problem may carry many submissions; each is its own turn. */
-	| { type: "thinking"; problemCallId: string; text: string; confidence?: Confidence }
+	| { type: "thinking"; problemCallId: string; text: string; confidence?: Confidence; photos?: Photo[] }
+	/** The practice dock's request buttons (Hint, Show me, Explain
+	 *  instead) on the ACTIVE problem: a request, never an answer. `text`
+	 *  is the work in the field when he pressed it, if any. */
+	| { type: "request"; problemCallId: string; request: PracticeRequest; text?: string }
 	/** The practice move-on signal (owner round 16): the learner's
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
 	 *  only with nothing active (mid-problem input rides the dock). */
-	| { type: "next" };
+	| { type: "next" }
+	/** Done for tonight: he stops now, whatever is open. */
+	| { type: "tonight" }
+	/** His dispute of an answer's mark (Edo, 14 Nov 2026): the answer's
+	 *  call, the attempts that stood for it when he pressed Dispute, and
+	 *  what he said is wrong or the mark he thinks is right (at least one). */
+	| { type: "dispute"; answerId: string; observations: string[]; said?: string; proposed?: MarkResult; proposedHow?: DisputedHow };
 
 /** A wake-pipeline steer delivery — same turn composition, server-origin.
  *  Wave C (2026-09-26): the idle wake carries EVERY queued marker as its
@@ -121,7 +153,7 @@ export function parseDismissInput(input: unknown): DismissInput {
  *  (a send with no live turn is a plain text send, which already exists).
  *  The id is client-minted (steer_<localid>): the queued indicator keys on
  *  it, and the drain's message events upsert the real card by the same id. */
-export type UserSteerInput = { type: "steer"; id: string; text: string };
+export type UserSteerInput = { type: "steer"; id: string; text: string; photos?: Photo[] };
 
 /** Parse and validate a steer event off a request body. */
 export function parseUserSteerInput(input: unknown): UserSteerInput {
@@ -131,10 +163,11 @@ export function parseUserSteerInput(input: unknown): UserSteerInput {
 	if (typeof i.id !== "string" || i.id.length === 0) {
 		throw new ChatInputError("steer input requires a client-minted id");
 	}
-	if (typeof i.text !== "string" || i.text.trim().length === 0) {
-		throw new ChatInputError("steer input requires non-empty text");
+	const photos = photosOrThrow(i.photos);
+	if (typeof i.text !== "string" || (i.text.trim().length === 0 && photos.length === 0)) {
+		throw new ChatInputError("steer input requires non-empty text or a photo");
 	}
-	return { type: "steer", id: i.id, text: i.text };
+	return { type: "steer", id: i.id, text: i.text, ...(photos.length ? { photos } : {}) };
 }
 
 /** The native appends a dismissal makes (pure — same orphan discipline
@@ -161,16 +194,25 @@ export function dismissAppends(record: { messages: LhMessage[] }, input: Dismiss
 /** A malformed input event (the honest 400 — the orphan-trap discipline). */
 export class ChatInputError extends Error {}
 
+function photosOrThrow(raw: unknown): Photo[] {
+	const photos = parsePhotos(raw);
+	if (typeof photos === "string") throw new ChatInputError(photos);
+	return photos;
+}
+
 /** Parse and validate an input event off a request body. */
 export function parseChatInput(input: unknown): ChatInput {
 	if (typeof input !== "object" || input === null) throw new ChatInputError("input must be an object");
 	const i = input as Record<string, unknown>;
 	switch (i.type) {
-		case "text":
-			if (typeof i.text !== "string" || (i.text as string).trim().length === 0) {
-				throw new ChatInputError("text input requires non-empty text");
+		case "text": {
+			// A photo alone is a message (his working, no words).
+			const photos = photosOrThrow(i.photos);
+			if (typeof i.text !== "string" || ((i.text as string).trim().length === 0 && photos.length === 0)) {
+				throw new ChatInputError("text input requires non-empty text or a photo");
 			}
-			return { type: "text", text: i.text };
+			return { type: "text", text: i.text, ...(photos.length ? { photos } : {}), ...(i.asked === true ? { asked: true as const } : {}) };
+		}
 		case "answer":
 			if (typeof i.toolCallId !== "string" || i.toolCallId.length === 0) {
 				throw new ChatInputError("answer input requires toolCallId");
@@ -184,7 +226,13 @@ export function parseChatInput(input: unknown): ChatInput {
 					throw new ChatInputError(`answer confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
 				}
 			}
-			return { type: "answer", toolCallId: i.toolCallId, answer: i.answer as QuestionAnswerData };
+			{
+				const photos = photosOrThrow(i.photos);
+				if (photos.length && (i.answer as { dismissed?: unknown }).dismissed === true) {
+					throw new ChatInputError("a skipped question carries no photo");
+				}
+				return { type: "answer", toolCallId: i.toolCallId, answer: i.answer as QuestionAnswerData, ...(photos.length ? { photos } : {}) };
+			}
 		case "continue":
 			return { type: "continue" };
 		case "retry":
@@ -199,20 +247,61 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
 				throw new ChatInputError("thinking input requires problemCallId");
 			}
-			if (typeof i.text !== "string" || i.text.trim().length === 0) {
-				throw new ChatInputError("thinking input requires non-empty text");
+			{
+				// A photo of the working alone is a submission.
+				const photos = photosOrThrow(i.photos);
+				if (typeof i.text !== "string" || (i.text.trim().length === 0 && photos.length === 0)) {
+					throw new ChatInputError("thinking input requires non-empty text or a photo");
+				}
+				if (i.confidence !== undefined && !isConfidence(i.confidence)) {
+					throw new ChatInputError(`thinking input confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
+				}
+				return {
+					type: "thinking",
+					problemCallId: i.problemCallId,
+					text: i.text,
+					...(i.confidence !== undefined ? { confidence: i.confidence } : {}),
+					...(photos.length ? { photos } : {}),
+				};
 			}
-			if (i.confidence !== undefined && !isConfidence(i.confidence)) {
-				throw new ChatInputError(`thinking input confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
+		case "request":
+			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
+				throw new ChatInputError("request input requires problemCallId");
 			}
+			if (!isPracticeRequest(i.request)) {
+				throw new ChatInputError(`request input must be one of ${PRACTICE_REQUESTS.join(", ")}`);
+			}
+			if (i.text !== undefined && typeof i.text !== "string") throw new ChatInputError("request input text must be a string");
 			return {
-				type: "thinking",
+				type: "request",
 				problemCallId: i.problemCallId,
-				text: i.text,
-				...(i.confidence !== undefined ? { confidence: i.confidence } : {}),
+				request: i.request,
+				...(typeof i.text === "string" && i.text.trim() ? { text: i.text } : {}),
 			};
 		case "next":
 			return { type: "next" };
+		case "tonight":
+			return { type: "tonight" };
+		case "dispute": {
+			if (typeof i.answerId !== "string" || i.answerId.length === 0) throw new ChatInputError("dispute input requires answerId");
+			const observations = Array.isArray(i.observations) ? i.observations : [];
+			if (observations.length === 0 || !observations.every((id) => typeof id === "string" && /^o\d+$/.test(id))) {
+				throw new ChatInputError("dispute input requires the observation ids (o12) that stand for the answer");
+			}
+			if (i.said !== undefined && typeof i.said !== "string") throw new ChatInputError("dispute input said must be a string");
+			if (i.proposed !== undefined && !isMarkResult(i.proposed)) throw new ChatInputError(`dispute input proposed must be one of ${MARK_RESULTS.join(", ")}`);
+			if (i.proposedHow !== undefined && !(DISPUTED_HOWS as readonly unknown[]).includes(i.proposedHow)) throw new ChatInputError(`dispute input proposedHow must be one of ${DISPUTED_HOWS.join(", ")}`);
+			const said = typeof i.said === "string" ? i.said.trim() : "";
+			if (!said && i.proposed === undefined && i.proposedHow === undefined) throw new ChatInputError("dispute input requires what he says is wrong, the mark he thinks is right or how it should count");
+			return {
+				type: "dispute",
+				answerId: i.answerId,
+				observations: observations as string[],
+				...(said ? { said } : {}),
+				...(i.proposed !== undefined ? { proposed: i.proposed } : {}),
+				...(i.proposedHow !== undefined ? { proposedHow: i.proposedHow as DisputedHow } : {}),
+			};
+		}
 		default:
 			throw new ChatInputError(`unknown input type: ${String(i.type)}`);
 	}
@@ -228,18 +317,18 @@ export function parseChatInput(input: unknown): ChatInput {
  * double-answering.
  */
 export function inputAppends(
-	record: { messages: LhMessage[]; kind?: string },
+	record: { messages: LhMessage[]; kind?: SessionMode },
 	input: ChatInput,
 ): LhMessage[] {
 	switch (input.type) {
 		case "text":
-			return [...dismissalConclusion(record), newUserMessage(input.text)];
+			return [...dismissalConclusion(record), ...ungradedNote(record), ...askedNote(record, input), newUserMessage(input.text, input.photos)];
 		case "answer": {
 			const pending = danglingQuestionOf(record.messages);
 			if (!pending || pending.toolCallId !== input.toolCallId) {
 				throw new ChatInputError("answer input targets no pending question call");
 			}
-			return [newAnswerResult(input.toolCallId, pending.tool, input.answer)];
+			return [newAnswerResult(input.toolCallId, pending.tool, input.answer, input.photos)];
 		}
 		case "continue":
 			return dismissalConclusion(record);
@@ -254,14 +343,21 @@ export function inputAppends(
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("thinking input targets no active problem");
 			}
-			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, input.confidence)];
+			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, input.confidence, input.photos)];
+		}
+		case "request": {
+			const active = activeProblemOf(record.messages);
+			if (!active || active.toolCallId !== input.problemCallId) {
+				throw new ChatInputError("request input targets no active problem");
+			}
+			return [newPracticeRequestMessage(input.problemCallId, input.request, input.text, hintsAsked(record.messages, input.problemCallId) + 1)];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a
-			// between-problems affordance — practice sessions only, nothing
+			// between-problems affordance — practice mode only, nothing
 			// active (mid-problem input rides the dock), and the client gates
 			// make violations unreachable in practice anyway.
-			if (record.kind !== "practice") {
+			if (sessionModeOf(record.messages, record.kind) !== "practice") {
 				throw new ChatInputError("next input is a practice-session affordance");
 			}
 			if (activeProblemOf(record.messages)) {
@@ -269,7 +365,95 @@ export function inputAppends(
 			}
 			return [...dismissalConclusion(record), newNextMessage()];
 		}
+		case "tonight":
+			return tonightAppends(record);
+		case "dispute":
+			return disputeAppends(record, input);
 	}
+}
+
+/** The question an answer answered: a graded question's text, the
+ *  statement of the problem a conclude ended, or for an answer he gave in
+ *  words what the tutor asked before it. Null when the record holds no
+ *  such answer. Pure. */
+export function answeredQuestionText(messages: readonly LhMessage[], answerId: string): string | null {
+	const said = messages.findIndex((m) => m.role === "user" && m.id === answerId);
+	if (said >= 0) return askedBefore(messages, said);
+	const at = messages.findIndex((m) => m.role === "toolResult" && m.toolCallId === answerId && !m.isError);
+	if (at < 0) return null;
+	const result = messages[at] as LhMessage & { role: "toolResult" };
+	if (result.toolName !== "conclude") {
+		const text = (result.details as { questionText?: unknown } | null)?.questionText;
+		return typeof text === "string" ? text : null;
+	}
+	for (let i = at - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const pose = m.content.findLast((b) => b.type === "toolCall" && b.name === "problem");
+		if (pose?.type !== "toolCall") continue;
+		const args = typeof pose.arguments === "string" ? (JSON.parse(pose.arguments) as unknown) : pose.arguments;
+		const statement = (args as { statement?: unknown } | null)?.statement;
+		return typeof statement === "string" ? statement : "";
+	}
+	return "";
+}
+
+/** What the tutor asked before an answer he gave in words: the last
+ *  paragraph of its newest words before his message ("" when none). */
+function askedBefore(messages: readonly LhMessage[], at: number): string {
+	for (let i = at - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const words = m.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();
+		if (words) return words.split(/\n\s*\n/).at(-1)!.trim();
+	}
+	return "";
+}
+
+/** A dispute's appends (pure): a pending problem dismissal's conclude
+ *  pair, then the dispute itself. Refused when the answer carries no mark
+ *  the record links to it (answer-marks.ts). An open question is left as
+ *  it is: the agent reads it as set aside and asks it again. */
+export function disputeAppends(record: { messages: LhMessage[] }, input: Extract<ChatInput, { type: "dispute" }>): LhMessage[] {
+	const question = answeredQuestionText(record.messages, input.answerId);
+	if (question === null || !markLinks(record.messages)[input.answerId]) {
+		throw new ChatInputError("dispute input targets no marked answer");
+	}
+	const { answerId, observations, said, proposed, proposedHow } = input;
+	return [...dismissalConclusion(record), newDisputeMessage({ answerId, observations, ...(said ? { said } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) }, question)];
+}
+
+/** Done for tonight's appends (pure). Every answerable question in the
+ *  newest batch resolves as a dismissal with reason "tonight", adjacent to
+ *  its call, so its answer is never revealed and nothing grades it. An
+ *  active problem is dropped the way a discard drops it, with its conclude
+ *  pair carried now instead of by a later input. The marker comes last:
+ *  the learner input the turn answers. */
+export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMode }): LhMessage[] {
+	const withheld = questionCallsOf(record.messages)
+		.filter((call) => call.status === "answerable")
+		.map((call) => newAnswerResult(call.toolCallId, call.tool,
+			dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight")));
+	const active = activeProblemOf(record.messages);
+	const dropped = active
+		? [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId, "tonight")]
+		: dismissalConclusion(record);
+	return [...withheld, ...dropped, ...ungradedNote(record), newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))];
+}
+
+/** The note an answer cut off before its grade rides his next input
+ *  with (`ungradedAnswerOf`), so the record holds it however he goes on:
+ *  Try again resumes that turn by itself. */
+/** A message he sent from Ask goes to the tutor marked as a question:
+ *  beside the open problem, or after the question it set aside. */
+function askedNote(record: { messages: LhMessage[] }, input: Extract<ChatInput, { type: "text" }>): LhMessage[] {
+	if (!input.asked) return [];
+	return [newAskedMessage(activeProblemOf(record.messages) && !pendingProblemDismissalOf(record.messages) ? "problem" : "question")];
+}
+
+function ungradedNote(record: { messages: LhMessage[] }): LhMessage[] {
+	const question = ungradedAnswerOf(record.messages);
+	return question === null ? [] : [newUngradedAnswerMessage(question)];
 }
 
 /** Validate before any turn effects, then again against current saved truth.

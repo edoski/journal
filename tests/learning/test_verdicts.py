@@ -5,6 +5,18 @@ from typing import Any
 
 from learning import progress, schema
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
+
+def planned(record: dict[str, Any]) -> dict[str, Any]:
+    """The record read with the final review these tests were written for."""
+    when = record.get("exam", {}).get("date")
+    start = date.fromisoformat(when) - timedelta(days=LEAD) if when else None
+    return progress.with_final_review(record, start)
+
+
 DAY1 = date(2026, 1, 1)
 TOPICS = {"topics": {"a": {"title": "A"}, "b": {"title": "B"}}}
 
@@ -39,7 +51,9 @@ class Course:
         stamp = datetime(today.year, today.month, today.day, 8, tzinfo=None)
         now = (stamp + timedelta(minutes=self.minute)).isoformat() + "+00:00"
         patched, outcome = schema.apply_patch(self.record, patch, today=today, now=now)
-        self.record, self.scheduled = progress.schedule(patched, outcome, today)
+        self.record, self.scheduled = progress.schedule(
+            planned(patched), outcome, today
+        )
         return self
 
     def attempts(self, day: int, *observations: dict[str, Any]) -> "Course":
@@ -188,6 +202,54 @@ def test_transferred_needs_a_solid_transfer_on_a_day_not_missed() -> None:
     assert doubtful.standing["level"] == "independent"
 
 
+def test_a_transfer_raises_the_level_only_after_an_earlier_solid_day() -> None:
+    first = learned(att("correct", text="taught"))
+    first.attempts(2, att("correct", text="new setting", transfer=True))
+    assert first.verdicts[-1] == (on(2).isoformat(), "solid")
+    assert first.standing["level"] == "independent"
+    first.attempts(5, att("correct", text="another new setting", transfer=True))
+    assert first.standing["level"] == "transferred"
+    same_day = started(att("correct"), att("correct", text="t", transfer=True))
+    assert same_day.standing["level"] == "independent"
+
+
+def test_an_existing_record_whose_only_solid_day_is_its_transfer_drops_a_level() -> (
+    None
+):
+    """A record as saved before the rule: taught, then one transfer answer the
+    next day, which read as transferred. Levels are derived on every read, so
+    the stored record reads independent with no migration."""
+    record = schema.empty()
+    record["topics"] = {
+        "a": {"title": "A", "review": {"due": "2026-01-05", "by": "engine"}}
+    }
+    record["observations"] = {
+        "o1": {
+            "kind": "attempt",
+            "topics": ["a"],
+            "text": "taught",
+            "help": "none",
+            "result": "correct",
+            "date": "2026-01-01",
+            "recorded": "2026-01-01T08:40:00+00:00",
+        },
+        "o2": {
+            "kind": "attempt",
+            "topics": ["a"],
+            "text": "new setting",
+            "help": "none",
+            "result": "correct",
+            "transfer": True,
+            "date": "2026-01-02",
+            "recorded": "2026-01-02T09:20:00+00:00",
+            "due_topics": ["a"],
+        },
+    }
+    record["next_observation"] = 3
+    stored = schema.validate_record(record)
+    assert progress.standing(stored, "a")["level"] == "independent"
+
+
 def test_uncertain_answers_are_never_solid_but_can_lower_a_verdict() -> None:
     course = started(att("correct", uncertain="Read from the notes"))
     assert course.verdicts == [(on(1).isoformat(), "helped")]
@@ -235,7 +297,7 @@ def test_a_correction_takes_the_place_of_what_it_replaced() -> None:
     course = started(att("correct"))
     course.attempts(5, att("incorrect", text="first try"))
     course.attempts(5, att("correct", text="retry"))
-    course.attempts(6, att("correct", text="first try regraded", corrects=["o2"]))
+    course.attempts(5, att("correct", text="first try regraded", corrects=["o2"]))
     third = course.record["observations"]["o4"]
     assert third["date"] == on(5).isoformat()
     assert course.verdicts == [
@@ -243,7 +305,7 @@ def test_a_correction_takes_the_place_of_what_it_replaced() -> None:
         (on(5).isoformat(), "solid"),
     ]
     assert course.standing["level"] == "retained"
-    assert course.due == on(12).isoformat()
+    assert course.due == on(13).isoformat()
 
 
 def test_a_topic_dropped_by_a_correction_is_rescheduled() -> None:
@@ -296,13 +358,86 @@ def test_a_self_report_that_supersedes_a_miss_reschedules_its_topic() -> None:
     assert course.due == on(4).isoformat()
 
 
-def test_the_exam_clamp_applies_to_every_replayed_interval() -> None:
-    course = Course({**TOPICS, "exam": {"date": on(10).isoformat()}})
-    course.attempts(1, att("correct"))
-    course.attempts(4, att("correct", text="probe"))
+def dispute(result: str, *targets: str, **extra: Any) -> dict[str, Any]:
+    return att(
+        result,
+        corrects=list(targets),
+        disputed=extra.pop("disputed", "My answer was right"),
+        ruling=extra.pop("ruling", "You are right: the answer holds"),
+        **extra,
+    )
+
+
+def test_an_accepted_dispute_days_later_moves_the_level_and_the_review() -> None:
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", text="the review"))
+    assert course.verdicts[-1] == (on(5).isoformat(), "missed")
     assert course.due == on(6).isoformat()
-    course.attempts(6, att("correct", text="probe 2"))
-    assert course.due == on(7).isoformat()
+    course.attempts(9, dispute("correct", "o2", text="the review"))
+    remark = course.record["observations"]["o3"]
+    assert remark["date"] == on(5).isoformat()
+    assert course.verdicts == [
+        (on(1).isoformat(), "solid"),
+        (on(5).isoformat(), "solid"),
+    ]
+    assert course.standing["level"] == "retained"
+    assert course.due == on(13).isoformat()
+
+
+def test_a_re_mark_days_later_keeps_the_tags_the_engine_stamped_on_the_attempt() -> (
+    None
+):
+    course = started(att("correct"))
+    arc = {"title": "Arc", "question": "Why?", "purpose": "To know."}
+    course.save(
+        2,
+        {
+            "arcs": {"first": arc, "second": {**arc, "title": "Second arc"}},
+            "topics": {"a": {"arc": "first"}, "b": {"arc": "second"}},
+            "path": {"arcs": ["first", "second"]},
+        },
+    )
+    course.attempts(5, att("incorrect", text="the review", checkpoint="first"))
+    assert course.record["observations"]["o2"]["due_topics"] == ["a"]
+    course.attempts(9, dispute("correct", "o2", text="the review"))
+    assert course.record["observations"]["o3"]["due_topics"] == ["a"]
+    assert course.record["observations"]["o3"]["checkpoint"] == "first"
+    assert progress.replays(course.record)["a"].days[on(5).isoformat()] == "probe"
+
+
+def test_a_rejected_dispute_keeps_the_verdicts_and_the_review() -> None:
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", text="the review"))
+    before = (course.verdicts, course.due, course.standing["level"])
+    course.attempts(
+        7, dispute("incorrect", "o2", text="the review", ruling="The sign is wrong")
+    )
+    assert (course.verdicts, course.due, course.standing["level"]) == before
+    assert course.record["observations"]["o3"]["ruling"] == "The sign is wrong"
+
+
+def test_the_final_review_caps_every_replayed_interval() -> None:
+    course = Course({**TOPICS, "exam": {"date": on(14).isoformat()}})
+    course.attempts(1, att("correct"))
+    course.attempts(2, att("correct", text="probe"))
+    assert course.due == on(5).isoformat()
+    course.attempts(5, att("correct", text="probe 2"))
+    assert course.due == on(8).isoformat()
+    course.attempts(8, att("correct", text="the final review"))
+    assert course.due == on(24).isoformat()
+    assert course.scheduled.notes == [
+        f"a: next review {on(24).isoformat()}, after the exam"
+    ]
+
+
+def test_a_review_answered_late_earns_a_longer_interval() -> None:
+    course = started(att("correct"))
+    course.attempts(1, att("correct", text="on time"))
+    assert course.due == on(4).isoformat()
+    course.attempts(9, att("correct", text="five days late"))
+    assert course.due == on(9 + 7 + 5).isoformat()
+    course.attempts(30, att("incorrect", text="late and missed"))
+    assert course.due == on(31).isoformat()
 
 
 def test_an_identical_attempt_is_skipped_at_5_minutes_and_kept_at_31() -> None:
@@ -348,3 +483,44 @@ def test_a_helped_step_then_an_unaided_solve_before_the_review_changes_nothing()
     assert course.verdicts == [(on(1).isoformat(), "solid")]
     assert course.scheduled.reviews == {}
     assert course.due == on(4).isoformat()
+
+
+def test_two_misses_in_a_row_ask_for_reteaching_first() -> None:
+    course = started(att("correct"))
+    course.attempts(1, att("incorrect", text="first miss"))
+    assert "relearn" not in course.standing
+    course.attempts(2, att("incorrect", text="second miss"))
+    assert course.standing["relearn"] is True
+    item = progress.due(course.record, on(3))[0]
+    assert item["topic"] == "a"
+    course.attempts(3, att("correct", text="after reteaching"))
+    assert "relearn" not in course.standing
+
+
+def test_with_an_exam_ahead_a_late_review_earns_no_longer_gap() -> None:
+    course = Course({**TOPICS, "exam": {"date": on(60).isoformat()}})
+    course.attempts(0, att("correct"))
+    course.attempts(1, att("correct", text="on time"))
+    course.attempts(9, att("correct", text="five days late"))
+    assert course.due == on(16).isoformat()
+
+
+def test_a_prediction_before_its_step_is_taught_never_counts() -> None:
+    course = started(att("correct"))
+    before = (course.verdicts, course.due, course.standing["level"])
+    course.attempts(
+        2,
+        att("incorrect", text="guess the next step", sure="confident", predicted=True),
+    )
+    assert (course.verdicts, course.due, course.standing["level"]) == before
+    assert "confident_errors" not in course.standing
+    assert "lapsed" not in course.standing
+    assert course.record["observations"]["o2"]["predicted"] is True
+
+
+def test_a_prediction_on_a_due_day_is_not_the_review() -> None:
+    course = started(att("correct"))
+    due = course.due
+    course.attempts(2, att("correct", text="predict the next step", predicted=True))
+    assert "due_topics" not in course.record["observations"]["o2"]
+    assert course.due == due

@@ -1,36 +1,19 @@
 /**
- * THE canonical prompt-segment discovery + override resolution (P2
- * reconciliation, 2026-09-19). The agent layer owns it because composition
- * lives here: composeInstructions (teacher-agent.ts) composes through
- * effectivePromptSegments, and the discovery reads THIS layer's own tree
- * (src/agent/prompts — base, shared/, per-agent fragments) — the exact
- * rules the pre-P2 loader used, now in one place.
- *
- * The architecture law pins the layout: the agent layer never imports the
- * store adapters, so the override-file READ lives here too (config-anchored
- * static file, same discipline as reading the source fragments); the
- * override-file CRUD (write/delete/list — the mutating store behind the
- * core port) stays in src/store/prompt-overrides.ts. Both sides share the
- * pure path grammar (src/core/prompt-segments.ts).
+ * THE canonical prompt-segment discovery. The agent layer owns it because
+ * composition lives here: composeInstructions (teacher-agent.ts) composes
+ * the source segments of this layer's own tree (src/agent/prompts — base,
+ * shared/, per-agent fragments).
  *
  * SEGMENTS: the SHARED base (src/agent/system-prompt.md), then every
  * numeric-prefix *.md fragment in the agent's own directory (sorted by
  * filename), then the shared/ fragments directory (composed by BOTH
- * agents as a trailing appendix — the 2026-09-27 reorder). The segment
- * list adapts to the code: an override keyed to a segment the source no
- * longer ships stops composing automatically.
- *
- * OVERRIDES: override files mirror the source layout under
- * config.PROMPTS_OVERRIDE_DIR — "system-prompt.md" at the root,
- * "shared/<file>", "teacher/<file>" / "prober/<file>". File presence is NOT
- * the override: the settings SWITCH is (owner decision) — the user keeps
- * their file and flips back to the source default to compare.
+ * agents as a trailing appendix — the 2026-09-27 reorder).
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import { PATHS, PROMPTS_OVERRIDE_DIR } from "../../config.ts";
-import { FRAGMENT_RE, isValidSegmentPath, type PromptAgent, type PromptSegmentInfo } from "../core/prompt-segments.ts";
+import { PATHS } from "../../config.ts";
+import { FRAGMENT_RE, type PromptAgent } from "../core/prompt-segments.ts";
 
 const PROMPTS_DIR = path.join(PATHS.root, "src", "agent", "prompts");
 
@@ -39,24 +22,28 @@ const PROMPTS_DIR = path.join(PATHS.root, "src", "agent", "prompts");
  *  and the prompt-refinement round of 2026-10-07) — personality, the
  *  truth contract, and the thinking-fields doctrine are ONE law across
  *  every agent. The question/confidence/file mechanics stay out
- *  (practice has no such tools). */
-const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-model.md", "40-formatting.md"];
+ *  (practice has no such tools). Reading a photo of his working (45) is
+ *  the same law for every agent that marks him (14 Nov 2026). */
+const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-model.md", "40-formatting.md", "45-photos.md"];
 
-/** Absolute path for an override file (unchecked — validate first). */
-function overrideFileFor(segmentPath: string): string {
-	return path.join(PROMPTS_OVERRIDE_DIR, ...segmentPath.split("/"));
-}
+/** The voice's sections that govern every text he reads, a chat turn or a
+ *  record he reads days later: the digest, which writes only the latter,
+ *  composes these and leaves out the turn budgets. */
+export const WRITTEN_VOICE = ["Register", "Punctuation"] as const;
 
-/** Read one override file, or null when absent/invalid — the composition
- *  side's reader (the store's readOverride is the same mirror layout,
- *  kept separate because the layers may not import each other). */
-export function readPromptOverride(segmentPath: string): string | null {
-	if (!isValidSegmentPath(segmentPath)) return null;
-	try {
-		return fs.readFileSync(overrideFileFor(segmentPath), "utf-8");
-	} catch {
-		return null;
-	}
+/** The listed `### ` sections of the voice (shared/10-voice.md), for an
+ *  agent that writes records he reads rather than chat turns. Throws when a
+ *  section is missing, so a rename fails the doctrine test, not a digest. */
+export function writtenVoice(titles: readonly string[] = WRITTEN_VOICE): string {
+	const text = fs.readFileSync(path.join(PROMPTS_DIR, "shared", "10-voice.md"), "utf-8").trim();
+	const chunks = text.split(/\r?\n(?=### )/).slice(1);
+	const picked = titles.map((title) => {
+		const chunk = chunks.find((c) => c.split(/\r?\n/, 1)[0]?.trim() === `### ${title}`);
+		if (!chunk) throw new Error(`voice: no "### ${title}" in shared/10-voice.md`);
+		return chunk.trim();
+	});
+	const head = '## Voice: every text he reads\n\n"He" below is the learner; what you write still speaks to him as "you".';
+	return [head, ...picked].join("\n\n");
 }
 
 /** List the SOURCE segments for one agent, in composition order — the
@@ -96,55 +83,51 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 	return segments;
 }
 
-/**
- * The effective segment view for one agent — every segment with its source
- * text, override text, and effective switch state. `switches` is the
- * settings record's agent.prompts map (absent key = off); enabled =
- * switch on AND the override file exists.
- */
-export function effectivePromptSegments(
-	agent: PromptAgent,
-	switches: Record<string, boolean>,
-): PromptSegmentInfo[] {
+/** Every source segment's text for one agent, in composition order. */
+export function sourcePromptTexts(agent: PromptAgent): string[] {
 	return listSourceSegments(agent).map((segment) => {
-		let sourceText: string;
 		try {
-			sourceText = fs.readFileSync(segment.file, "utf-8");
+			return fs.readFileSync(segment.file, "utf-8");
 		} catch {
-			sourceText = ""; // source unreadable — the agent loader would crash anyway
+			return ""; // source unreadable — the agent loader would crash anyway
 		}
-		const overrideText = readPromptOverride(segment.path);
-		return {
-			path: segment.path,
-			sourceText,
-			overrideText,
-			enabled: switches[segment.path] === true && overrideText !== null,
-			shared: segment.shared,
-		};
 	});
 }
 
 /** One file of the engine's doctrine: whole, or its opening (the title and
  *  the text before its first `## ` heading) followed by the listed `## `
  *  sections. `intro: false` keeps only the title of the opening, for an agent
- *  whose job the opening's general rules do not fit. */
+ *  whose job the opening's general rules do not fit. `step` keeps only that
+ *  numbered step of the one listed section, under the section's heading. */
 export type DoctrinePart =
 	| { readonly file: string }
-	| { readonly file: string; readonly sections: readonly string[]; readonly intro?: false };
+	| { readonly file: string; readonly sections: readonly string[]; readonly intro?: false; readonly step?: number };
 
 /** What each agent composes from the tutor skill's host-neutral references,
  *  so the tutor and the app teach from one text and each agent reads only
- *  the parts its job uses. Left out: the week and the exam run-up, which
- *  read figures the app's course brief does not carry, and *Difficulty*,
- *  which practice states more specifically in its own doctrine. The prober
+ *  the parts its job uses. Practice reads the exam run-up, whose figures
+ *  its course brief carries. Left out: the week, which reads figures no
+ *  brief carries, and *Difficulty*, which practice states more
+ *  specifically in its own doctrine. The prober
  *  skips teaching.md's opening: it measures, and the lesson's teaching
  *  rules belong to the teacher. From records.md and course.md every agent
- *  reads only what keeps the record coherent across sessions: tasks and
- *  `focus`, `preferences`, and the exam facts. */
+ *  reads only what keeps the record coherent across sessions: which texts
+ *  the learner reads and how to write them, tasks and `focus`,
+ *  `preferences`, and the exam facts. */
 const ACROSS_SESSIONS: readonly DoctrinePart[] = [
-	{ file: "records.md", sections: ["Path and tasks", "Preferences"], intro: false },
+	{ file: "records.md", sections: ["What the learner reads", "Path and tasks", "Preferences"], intro: false },
 	{ file: "course.md", sections: ["Exam facts"], intro: false },
 ];
+
+/** What every agent that creates or places topics reads of arcs.md, the one
+ *  text on arcs: forming them is the grouping pass's alone. Each part joins
+ *  a prompt only in a course with arcs, so a course without them gets no
+ *  arc field to write. */
+const ARC_RECORD = ["What an arc is", "Placing a new topic", "Changing arcs"] as const;
+const ARCS_ACROSS_SESSIONS: DoctrinePart = { file: "arcs.md", sections: ARC_RECORD, intro: false };
+/** The prober brackets an arc's entry; the teacher and practice teach from its map. */
+const ARCS_PROBING: DoctrinePart = { file: "arcs.md", sections: [...ARC_RECORD, "Probing an arc's start"], intro: false };
+const ARCS_TEACHING: DoctrinePart = { file: "arcs.md", sections: [...ARC_RECORD, "Teaching with arcs"], intro: false };
 
 export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart[]>> = {
 	prober: [
@@ -162,10 +145,23 @@ export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart
 	practice: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Mixing methods", "Transfer", "Corrections and diagrams"] },
-		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close", "Exam run-up"] },
 		...ACROSS_SESSIONS,
 	],
 };
+
+/** What each agent adds of arcs.md in a course with arcs. */
+export const ARCS_DOCTRINE: Readonly<Record<PromptAgent, DoctrinePart>> = {
+	prober: ARCS_PROBING,
+	teacher: ARCS_TEACHING,
+	practice: ARCS_TEACHING,
+};
+
+/** What a prompt's composition knows of the course. */
+export interface CourseShape {
+	/** Whether the record groups its topics into arcs (`recordHasArcs`). */
+	arcs: boolean;
+}
 
 function doctrineText(dir: string, part: DoctrinePart): string {
 	const text = fs.readFileSync(path.join(dir, part.file), "utf-8").trim();
@@ -174,7 +170,10 @@ function doctrineText(dir: string, part: DoctrinePart): string {
 	const picked = part.sections.map((title) => {
 		const section = rest.find((chunk) => chunk.split(/\r?\n/, 1)[0]?.trim() === `## ${title}`);
 		if (!section) throw new Error(`engine doctrine: no "## ${title}" in ${part.file}`);
-		return section.trim();
+		if (part.step === undefined) return section.trim();
+		const step = section.split(/\r?\n/).find((line) => line.startsWith(`${part.step}. `));
+		if (!step) throw new Error(`engine doctrine: no step ${part.step} in "## ${title}" of ${part.file}`);
+		return `## ${title}\n\n${step.trim()}`;
 	});
 	const head = part.intro === false ? (opening.trim().split(/\r?\n/, 1)[0] ?? "") : opening.trim();
 	return [head, ...picked].filter(Boolean).join("\n\n");
@@ -182,19 +181,38 @@ function doctrineText(dir: string, part: DoctrinePart): string {
 
 /** The course-record doctrine, appended to every agent's prompt in a
  *  course session: the app's adapter, then the agent's engine doctrine read
- *  from `dir`. Throws when a listed file or section is missing, so a rename
- *  in the engine fails the doctrine test instead of a lesson. Not an
- *  override segment. */
-export function courseRecordPrompt(agent: PromptAgent, dir: string = PATHS.tutorReferences): string {
+ *  from `dir`, with its part of arcs.md in a course with arcs. Throws when a
+ *  listed file or section is missing, so a rename in the engine fails the
+ *  doctrine test instead of a lesson. */
+export function courseRecordPrompt(agent: PromptAgent, course: CourseShape, dir: string = PATHS.tutorReferences): string {
 	const adapter = fs.readFileSync(path.join(PROMPTS_DIR, "course", "10-record.md"), "utf-8").trim();
-	return [adapter, ...ENGINE_DOCTRINE[agent].map((part) => doctrineText(dir, part))].join("\n\n");
+	const parts = course.arcs ? [...ENGINE_DOCTRINE[agent], ARCS_DOCTRINE[agent]] : ENGINE_DOCTRINE[agent];
+	return [adapter, ...parts.map((part) => doctrineText(dir, part))].join("\n\n");
 }
 
-/** Every known segment path across both agents (route validation). */
-export function allSegmentPaths(): string[] {
-	const paths = new Set<string>();
-	for (const agent of ["prober", "teacher", "practice"] as const) {
-		for (const segment of listSourceSegments(agent)) paths.add(segment.path);
-	}
-	return [...paths].sort();
+/** The one path-building recipe every host follows. */
+const BUILDING_THE_PATH: DoctrinePart = { file: "course.md", sections: ["Building the path"], intro: false };
+
+/** The lesson digest's part of arcs.md, in a course with arcs: its code
+ *  places the topics it adds. */
+export const DIGEST_DOCTRINE: readonly DoctrinePart[] = [{ file: "arcs.md", sections: ["Placing a new topic"], intro: false }];
+
+/** The grouping pass's edge step reads the prerequisite test alone, so it
+ *  never settles an edge to make room for a cut. */
+export const ARC_EDGES_DOCTRINE: readonly DoctrinePart[] = [{ file: "course.md", sections: ["Building the path"], intro: false, step: 3 }];
+
+/** The grouping pass's cut step: what an arc is and how arcs are formed. */
+export const ARC_CUT_DOCTRINE: readonly DoctrinePart[] = [{ file: "arcs.md", sections: ["What an arc is", "Forming arcs"], intro: false }];
+
+/** A producer's doctrine, read from `dir`. Throws like courseRecordPrompt
+ *  when a section is renamed. */
+export function composeDoctrine(parts: readonly DoctrinePart[], dir: string = PATHS.tutorReferences): string {
+	return parts.map((part) => doctrineText(dir, part)).join("\n\n");
+}
+
+/** The course map builder's recipe, read from `dir`: building the path, and
+ *  in a course with arcs how a new topic joins them. The builder extends
+ *  arcs and never forms them. */
+export function courseMapDoctrine(course: CourseShape, dir: string = PATHS.tutorReferences): string {
+	return composeDoctrine(course.arcs ? [BUILDING_THE_PATH, ARCS_ACROSS_SESSIONS] : [BUILDING_THE_PATH], dir);
 }

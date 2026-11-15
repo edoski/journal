@@ -5,12 +5,12 @@
  * is owned outright by its stream — cross-domain schema changes go through
  * master. Pure types + protocol docs + tiny pure helpers. See docs/vision.md.
  */
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { LhMessage } from "../native-messages.ts";
 import type { Phase3 } from "../phases.ts";
 import type { PlanNodeStatus, PlanTree } from "./plan.ts";
-import type { EmissionStats } from "./graph.ts";
 import type { CourseLink } from "./course.ts";
+import type { MarkResult } from "./marks.ts";
+import type { ChatSession } from "../sdk-session.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
 
@@ -22,11 +22,10 @@ import type { CourseLink } from "./course.ts";
  * is the client's own grouping fold (core/view.ts, Wave D) — a pending quiz
  * is an unanswered question tool call, which is exactly what makes
  * resume-mid-question free. */
-/** The session's kind (practice sessions, owner 2026-10-04): "teach" is
- *  the default and ABSENT on pre-practice records (no migration — absence
- *  reads as teach); "practice" marks an adaptive-practice session — the
- *  practice agent, its two tools, no extraction, no graph writes. */
-export type ChatKind = "teach" | "practice";
+/** What a session is doing: teaching (the prober, then the teacher) or
+ *  practice (the practice agent). It follows the transcript: the agents
+ *  hand the session to each other (core/native-messages.ts sessionModeOf). */
+export type SessionMode = "teach" | "practice";
 
 export interface ChatRecord {
 	id: string;
@@ -34,14 +33,33 @@ export interface ChatRecord {
 	createdAt: string;
 	updatedAt: string;
 	messages: LhMessage[];
-	/** The session's kind — absent = teach (pre-practice records). */
-	kind?: ChatKind;
+	/** The mode the session started in, on records made before the mode
+	 *  followed the transcript; never written now. Absent = teach. */
+	kind?: SessionMode;
 	/** The registered course this session studies, set at creation.
 	 *  Absent only on sessions older than that rule: they stay readable and
 	 *  take no learner turn until the learner links a course. */
 	course?: CourseLink;
+	/** The session's own topics, the topic it belongs to first: the course
+	 *  topics it was started on (a topic's page, Home's review of those
+	 *  topics), set at creation, else the topic its first plan's goal names
+	 *  (`SessionGoal`). Set once; the step the lesson is on never moves it. */
+	topics?: readonly string[];
+	/** The arc this session checks, by handle: set at creation when he
+	 *  starts it from an arc's Check it on the course page, so the course
+	 *  brief carries that arc's check (`arcs_ready`). */
+	arcCheck?: string;
+	/** The learner renamed the session: a plan's goal no longer names it. */
+	renamed?: true;
+	/** The session was named once (`ChatStore.nameSession`): only its first
+	 *  turn may change the title, so a later turn or its first plan gives
+	 *  at most the topic it lacked, and nothing names it again. */
+	named?: true;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
+	/** The lesson's Claude Code session, the model's memory of it
+	 *  (core/sdk-session.ts); absent until its first turn reached Claude. */
+	session?: ChatSession;
 	/** Append-only usage log (observability, 2026-09): one entry per model
 	 * turn. DELIBERATELY a parallel log, not per-message metadata — the client
 	 * re-POSTs its message list every turn and its copies never carry
@@ -50,13 +68,9 @@ export interface ChatRecord {
 	 * each entry onto its message; aggregates are folds over this log
 	 * (core/prices.ts). */
 	turns?: TurnUsage[];
-	/** Append-only background-extraction usage log (2026-09 observability):
-	 *  one entry per finished pipeline run on THIS chat — extraction is real
-	 *  spend too. Same parallel-log discipline as `turns` (nothing rides
-	 *  inside messages). Keyed by startedAt; idempotent appends. */
-	extractions?: ExtractionRunUsage[];
-	/** Per-chat model/thinking overrides for the conversation agents. */
-	settings?: ChatSettings;
+	/** The lesson digest's ledger: what the background digest already carried
+	 *  into the course record from this session. */
+	digest?: DigestLedger;
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
 	 *  existing records stay unstamped (absence reads as v1); every write
 	 *  stamps the current version. A record stamped NEWER than this build
@@ -65,57 +79,26 @@ export interface ChatRecord {
 	version?: number;
 }
 
+/** One finished digest: the session's messages through `throughMessageId`,
+ *  hashed as `fingerprint`, were read and their result saved to the engine. */
+export interface LessonDigest {
+	throughMessageId: string;
+	fingerprint: string;
+	at: string;
+	/** What the save changed, in one line, or why nothing was saved. */
+	outcome: string;
+}
+
+/** The digest ledger. `pending` is written before a digest starts and
+ *  cleared when it ends, so the app's next start finishes one a quit cut
+ *  short. */
+export interface DigestLedger {
+	done: LessonDigest[];
+	pending?: { fingerprint: string; throughMessageId: string };
+}
+
 /** The chat record format this build writes and understands. */
 export const CURRENT_CHAT_VERSION = 1;
-
-/** The conversation agents' runtime model choice (model-control wave,
- *  2026-09-12): a per-chat override of config.ts's pinned prober/teacher
- *  spec. Absent fields fall back to config; written by the model picker
- *  (PUT /api/chats/[id]/settings) and read at turn composition — the
- *  agents are stateless per turn, so a change takes effect on the next
- *  turn by construction. Background sub-agents are NEVER overridden
- *  (config-pinned: they're infrastructure, not conversation). */
-export interface ChatSettings {
-	/** pi-ai catalog coordinates: the provider that owns the model. Only
-	 *  "openrouter" is configured today; the field exists so a second
-	 *  provider needs no schema change. */
-	model?: { provider: string; id: string };
-	/** pi thinking level — must be in the chosen model's supported list
-	 *  (getSupportedThinkingLevels; enforced by the settings route). */
-	thinkingLevel?: ThinkingLevel;
-}
-
-
-// ─── Background-extraction usage (the money channel, extraction side) ────────
-
-/** One pipeline stage's model usage — the stage's model + every step it
- *  billed (CallUsage per agent step). Steps, not a sum: cost and context
- *  folds happen at read time (core/prices.ts). */
-export interface ExtractionStageUsage {
-	/** The model that ran this stage, provider-qualified ("provider:id")
-	 * for key-independent Pi catalog lookup at read time. */
-	model: string;
-	steps: CallUsage[];
-}
-
-/** One finished (or failed mid-flight) extraction run's usage record.
- *  Appended to the chat's `extractions` log when the run ends — success or
- *  failure, because money was spent either way; `stats` is present only
- *  when the merger actually ran. */
-export interface ExtractionRunUsage {
-	/** The run's registry startedAt (ms) — the idempotency key. */
-	startedAt: number;
-	at: string;
-	durationMs: number;
-	/** What the run merged into the graph; absent when it failed first. */
-	stats?: EmissionStats;
-	/** Model usage per stage, in pipeline order (merger is deterministic —
-	 *  no model call, no entry). */
-	stages: {
-		extractor: ExtractionStageUsage;
-		auditor: ExtractionStageUsage;
-	};
-}
 
 // ─── Usage accounting (the money channel) ─────────────────────────────────────
 
@@ -185,16 +168,43 @@ export interface TurnUsage {
  *  ("author now") and the teacher skipped the deliberation the planning
  *  fragment asks for. So the wake paces it: reason out the optimal way to
  *  teach THIS person THIS thing BEFORE plan_init. Honest to the machinery
- *  — plan_init is still the first tool, the plan map still the first
- *  artifact, and presenting still ends the turn (the verdict death,
- *  2026-09-26: the learner's next message is a natural reply — a change
- *  request or the go-ahead). */
+ *  — plan_init is still the first tool and the plan map the first
+ *  artifact; then the goal in one line and the first step, in the same
+ *  turn (Edo, 14 Nov 2026: no approval of a map of material he doesn't
+ *  know yet; he interrupts when he wants). */
 export const HANDOFF_TEXT =
 	"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
+	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else.";
+
+/** The model-facing opening of a fresh session that picks up a finished
+ *  lesson: its plan carries over, so the teacher neither probes nor plans
+ *  again, and reconnects in one sentence from where it stopped. */
+export function sessionResumeText(title: string, steps: readonly { id: string; title: string }[], stoppedAt: string | null): string {
+	const plan = steps.length > 0 ? ` Its plan carries over, as this session's plan map: ${steps.map((s) => `${s.id} (${s.title})`).join("; ")}.` : "";
+	const where = stoppedAt ? ` It stopped at ${stoppedAt}.` : "";
+	return (
+		`[CONTINUING] This session picks up the lesson "${title}" from an earlier session.${plan}${where} ` +
+		"Do not probe and do not present a new plan. Reconnect in one sentence to where it stopped, from the course record's task step when there is one, " +
+		"then carry on with the next step, tagging its questions with the plan's node ids."
+	);
+}
+
+/** The model-facing text of a mode handoff's wake, by the mode it starts.
+ *  The new agent reads what to do from the handoff call above it: the
+ *  scope to practise, or the topic to teach. */
+export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> = {
+	practice:
+		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says and pose the first problem, with no line before it about what you chose or why.",
+	teach:
+		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says.",
+};
+
+/** The handoff tools' ack: the turn ends at the handoff, and the next
+ *  agent's run starts from the wake. */
+export const MODE_HANDOFF_ACK_TEXT = "Handoff recorded. Say nothing more and end your turn: the next agent takes over from here.";
 
 // ─── Practice sessions (owner, 2026-10-04) — marker + ack texts ──────────────
 // Single-sourced here per the marker law: the model-facing text of every
@@ -216,14 +226,113 @@ export const THINKING_LABEL = "Your thinking";
  *  stop calling tools); the next problem waits for the learner's
  *  explicit go-ahead. */
 export const CONCLUDE_ACK_TEXT =
-	"Problem concluded. Say your closing words about the learner's work if useful, then END YOUR TURN — no further tool calls. The next problem is NEVER posed here: it waits for the learner's explicit go-ahead (a *Next problem* message, or their own words asking for the next one). Between problems, answer their questions about the concluded one.";
+	"Problem concluded. Say your closing words about the learner's work if useful, then END YOUR TURN — no further tool calls, except `teach` when he asked to be taught. The next problem is NEVER posed here: it waits for the learner's explicit go-ahead (a *Next problem* message, or their own words asking for the next one). Between problems, answer their questions about the concluded one.";
 
 /** The learner's explicit move-on signal (owner round 16, 2026-10-06):
  *  the model-facing text of the practice-next marker — single-sourced
  *  like THINKING_LABEL. The button/Enter-on-empty path appends the
  *  marker; the model reads this and poses (or wraps) per the doctrine. */
 export const NEXT_PROBLEM_TEXT =
-	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or wrap the session in text if the arc is complete.";
+	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or, if the arc is complete, close in at most two sentences: the one move the session showed was not obvious yet, or what comes next.";
+
+/** What the agent reads when he presses Done for today: the
+ *  done-tonight marker's content, per answering agent (only the teacher
+ *  has `lesson_progress`). Anything he left open arrives just before it
+ *  already resolved: a question as a dismissal with reason "tonight", a
+ *  problem as a dismissed conclude. */
+/** How every agent closes on Done for today, in the voice's budget for a
+ *  close. What he left open comes back as it was, so the close says only
+ *  what he picks up and when: a cue toward its answer would make the
+ *  pick-up count as helped (round 5, 14 Nov 2026). */
+const DONE_CLOSE =
+	"Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel problem, part (c) of the sheet), never by what it asks, and its day when the plan gives one. Never a step, cue, method or hint toward anything he left open, and no praise or summary of the session.";
+
+export const DONE_TONIGHT_TEXT = {
+	prober:
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. " +
+		DONE_CLOSE,
+	teacher:
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
+		DONE_CLOSE,
+	practice:
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more today. " +
+		DONE_CLOSE,
+} as const;
+
+/** The mark he thinks is right, in the record's words and his. */
+const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {
+	correct: "right (correct)",
+	partial: "partly right (partial)",
+	incorrect: "not right (incorrect)",
+};
+
+/** How his answer card words an attempt (study-words.ts `MARK_HOW_WORDS`,
+ *  the rule `markHow`), so a ruling says what the card says (round 5: "it
+ *  already counts as your own work, with no help" sat on a card that said
+ *  otherwise). */
+const CARD_WORDS_FOR_RULING =
+	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; a right answer recorded as uncertain reads "Not yet confirmed"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it. In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
+
+/** The longest question excerpt a dispute quotes. */
+const DISPUTE_QUOTE = 400;
+
+/** What the agent reads when he disputes a mark (Edo, 14 Nov 2026): the
+ *  dispute marker's content. The rules for judging it live in the course
+ *  record's doctrine; this names the answer, its attempts and what he
+ *  said. Pure. */
+/** How he thinks a disputed answer should count, in the card's words and
+ *  the record's. */
+const PROPOSED_HOW_WORDS: Readonly<Record<"ownWork" | "withHelp", string>> = {
+	ownWork: 'on his own ("On your own": help "none")',
+	withHelp: 'with help ("With help": the help he had)',
+};
+
+export function disputeText(
+	dispute: { observations: readonly string[]; said?: string; proposed?: MarkResult; proposedHow?: "ownWork" | "withHelp" },
+	question: string,
+): string {
+	const quoted = question.length > DISPUTE_QUOTE ? `${question.slice(0, DISPUTE_QUOTE)}…` : question;
+	return [
+		`[MARK DISPUTED] — the learner pressed Dispute on the mark recorded for his answer to: "${quoted}".`,
+		`The attempts that stand for it: ${dispute.observations.join(", ")}.`,
+		dispute.said ? `What he says is wrong with the mark: "${dispute.said}"` : null,
+		dispute.proposed ? `The mark he thinks is right: ${PROPOSED_WORDS[dispute.proposed]}.` : null,
+		dispute.proposedHow ? `How he thinks it should count: ${PROPOSED_HOW_WORDS[dispute.proposedHow]}.` : null,
+		"Re-judge it now, as the course record says for a disputed mark: read those attempts whole, judge his response against the question and its committed answer, record the re-marked attempt with `course_save` whether you agree or not, then give him your ruling in one or two lines.",
+		CARD_WORDS_FOR_RULING,
+		"A question he had open when he disputed was set aside unanswered, its answer not shown: after your ruling, ask it again as it was. An active problem stays active.",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+/** The practice dock's request buttons: a hint, the rest of the
+ *  solution, or teaching instead of this problem. A request is never an
+ *  answer: it rides its own marker (`practice-request`), so the agent and
+ *  the record both read what was asked, never a claimed answer. */
+export const PRACTICE_REQUESTS = ["hint", "show", "explain"] as const;
+export type PracticeRequest = (typeof PRACTICE_REQUESTS)[number];
+
+export function isPracticeRequest(value: unknown): value is PracticeRequest {
+	return typeof value === "string" && (PRACTICE_REQUESTS as readonly string[]).includes(value);
+}
+
+/** What the agent reads for each request (the marker's content head). */
+export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = {
+	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
+	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
+	explain:
+		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
+};
+
+/** Which rung a Hint request asks for, by how many hints this problem has
+ *  had: the first is a question, the second a nudge, the third and later
+ *  one step. Show me reveals the rest. */
+export function hintRungText(nth: number): string {
+	if (nth <= 1) return "This is his first hint on this problem: ask him one question that points at where to look (R0 or R1). No method, no step, no answer.";
+	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
+	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
+}
 
 /** The compaction marker's model-facing header (owner round 14,
  *  2026-10-05). The marker's content is this header + the summary — the
@@ -251,6 +360,23 @@ export interface PlanBlockData {
 	edges: Array<{ from: string; to: string }>;
 }
 
+/** What a session is for, as its first turn (`name_session`) or its first
+ *  plan names it: a short `title`, and the course `topic` it is about when
+ *  it is about one. It names a session started on no topic, once
+ *  (`ChatStore.nameSession`). */
+export interface SessionGoal {
+	title: string;
+	topic?: string;
+}
+
+/** How the tutor's last turn left a session that waits on no question or
+ *  problem it posed: its words asked him something, or it wrote the plan
+ *  but taught no step, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
+ *  the tutor's ("cut"), his Done for today stopped it with work still open
+ *  ("left", left for next time), or it ended the lesson, a practice round
+ *  or a one-off answer ("closed"). */
+export type SessionEnd = "mid-lesson" | "cut" | "left" | "closed";
+
 /** The list view's shape (messageCount instead of full messages) + the
  *  per-session status the picker renders. `phase` and `pendingQuestion`
  *  derive from the stored record (tree + messages); the store computes
@@ -266,8 +392,8 @@ export interface ChatSummary {
 	title: string;
 	createdAt: string;
 	updatedAt: string;
-	/** Normalized kind (absent record field reads as teach). */
-	kind: ChatKind;
+	/** The session's current mode (sessionModeOf over the transcript). */
+	kind: SessionMode;
 	messageCount: number;
 	/** The session's current phase, derived from the stored plan tree. */
 	phase: Phase3;
@@ -276,10 +402,24 @@ export interface ChatSummary {
 	/** Practice sessions (2026-10-04): a posed problem with no conclude —
 	 *  the sidebar meta's "Problem waiting". False on teaching sessions. */
 	pendingProblem: boolean;
-	/** The record's model-control settings — rides the list payload via the
-	 *  summary spread (the picker never needs it from here; the full record
-	 *  is its source). */
-	settings?: ChatSettings;
+	/** The course the session studies (the record's own field, carried by
+	 *  the summary spread); absent on sessions older than the course rule. */
+	course?: CourseLink;
+	/** The course topics the session was started on, then those its
+	 *  transcript worked on (sessionTopicsOf): candidates a caller checks
+	 *  against the course map.
+	 *  The list always sets it; a summary made elsewhere may leave it out. */
+	topics?: readonly string[];
+	/** The session's own topics (the record's `topics`), the topic it
+	 *  belongs to first: fixed once, never the step the lesson is on. The
+	 *  list always sets it; a summary made elsewhere may leave it out. */
+	ownTopics?: readonly string[];
+	/** How the tutor's last turn left the session (sessionEndOf); a summary
+	 *  made elsewhere may leave it out, which reads as closed. */
+	ended?: SessionEnd;
+	/** The engine tasks the session last saved as open, by key
+	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
+	tasks?: readonly string[];
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list
@@ -296,6 +436,10 @@ export interface ChatListItem extends ChatSummary {
 	 *  route attaches it from the compaction registry — never
 	 *  record-derived (the marker persists, the RUN is ephemeral). */
 	compacting: boolean;
+	/** Its course was deleted (the record is gone, `courseDeleted` on the
+	 *  server): the session is history, off Today, kept in search and the
+	 *  calendar. The route attaches it; absent reads as not deleted. */
+	courseDeleted?: boolean;
 }
 
 // ─── Artifact renderer registry (client extension point) ────────────────────
@@ -324,4 +468,38 @@ export interface ArtifactPartProps {
 		 *  projectView — the reveal is never re-authored. */
 		reveal?: unknown;
 	};
+}
+
+// ─── Titles ──────────────────────────────────────────────────────────────────
+
+/** The auto-title's character cap (owner, 2026-10-06): long enough to
+ *  stay informative in the sidebar and the top bar, short enough that a
+ *  first message never reads as a paragraph. Tunable — one number, one
+ *  place. */
+export const TITLE_MAX_CHARS = 72;
+
+/** Derive a short chat title from the learner's first message (pure).
+ *  Smart truncation (owner, 2026-10-06): the cut snaps to a word boundary
+ *  AT OR UNDER the cap — a title never ends mid-word. The one exception
+ *  is a single word longer than the cap (rare, but real: identifiers,
+ *  URLs): it cuts at the cap, splitting the word. Whitespace collapses to
+ *  single spaces first, so boundaries are always single-space boundaries.
+ *  Used on chat creation; deterministic so tests can pin it. */
+export function titleFromPrompt(prompt: string): string {
+	const oneLine = prompt.replace(/\s+/g, " ").trim();
+	if (oneLine.length <= TITLE_MAX_CHARS) return oneLine;
+	// Last space among the first TITLE_MAX_CHARS characters; the cut sits
+	// before it so no trailing space rides into the title.
+	let cut = -1;
+	for (let i = TITLE_MAX_CHARS; i > 0; i--) {
+		if (oneLine[i - 1] === " ") {
+			cut = i - 1;
+			break;
+		}
+	}
+	// One long word: no boundary exists under the cap — split it (owner's
+	// special case). This also lands correctly when the first word exactly
+	// fills the cap: cutting at the cap IS the boundary.
+	if (cut < 0) cut = TITLE_MAX_CHARS;
+	return `${oneLine.slice(0, cut)}…`;
 }

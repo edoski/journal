@@ -46,6 +46,8 @@ Sessions created before this change have no course. They stay readable. Opening 
 
 ## 3. One knowledge model at two levels
 
+**Superseded, 14 Nov 2026:** the app's statement graph was deleted with the whole knowledge-graph engine (extraction, graph store, graph tools, notes import), so the per-course graph below was never built. A finished lesson's digest saves its gaps, notes and task step to the course record instead, and the course map builds topics from the course's material. The old `data/graph/` files stay on disk, read by nothing.
+
 Engine topics are the unit of review and scheduling: 10 to 40 per course, with `needs`, `contrasts` and source refs. The app's statements are the content inside a topic: the true propositions and the reasoning chains among them, extracted from what the teacher said.
 
 - **Where the graph lives:** in the app's data dir, one graph per course: `data/courses/<course key>/graph/*.jsonl`, where the key is a hash of the workspace directory. The engine's `.study/` directory has one writer, the engine, and the vault syncs through iCloud, which is the wrong place for append-heavy ledgers. A course's content never mixes with another's: the graph view, the chain table and practice picks all show the current course.
@@ -126,7 +128,7 @@ The course adds about 16 to 19 KB per turn on SMM (doctrine, tools and brief), a
 ## Delivery
 
 1. **This branch:** the CLI adapter, course required for every session, the New course flow, linking older sessions, free response everywhere with the multiple-choice and confidence code deleted, `target` replaced by `topics`, the role briefs, and the slimmer doctrine. Proven on a throwaway course in the real app, with measured token counts.
-2. **Next branch:** the per-course graph and statement topic tags. It touches extraction, the snapshot, the chain table, the home view and practice picks.
+2. **Dropped (14 Nov 2026):** the per-course graph and statement topic tags; the graph engine was deleted instead (section 3).
 3. **The move into the journal repository (done):** the engine root defaults to the repository root, and the course prompt composes the engine's doctrine from the same repository.
 4. **E3 (done):** the host-neutral `evidence.md`, `teaching.md` and `reviews.md`; each agent composes its parts of them, and the app's duplicate doctrine is deleted. **Next:** the week and the exam run-up in the app, once the course brief carries `plan`'s `week` and `runup` figures.
 

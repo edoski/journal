@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CourseControl, useCourseChoice, type CourseChoice } from "@/components/course-picker";
+import { CourseControl, CoursesUnavailable, useCourseChoice, type CourseChoice } from "@/components/course-picker";
+import { Button } from "@/components/ui/button";
+import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
+import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 
-const DOCK = "mx-auto w-full max-w-[46rem] px-4";
-
-/** The banner's pure body: the render-test seam. */
+/** The banner's pure body (the render-test seam): one line on the dock
+ *  surface, the course chooser and one Link action at its end. */
 export function CourseLinkBody({ choice, busy, error, onLink }: {
 	choice: CourseChoice;
 	busy: boolean;
@@ -14,25 +16,28 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 	onLink: () => void;
 }) {
 	return (
-		<div data-testid="course-link-banner" className="pointer-events-auto rounded-2xl border bg-card p-4 shadow-lg">
-			<p className="text-sm text-card-foreground">
-				This session has no course yet. Pick the course it belongs to, to continue.
-			</p>
-			<div className="mt-3 flex flex-wrap items-center gap-2">
-				<CourseControl choice={choice} />
+		<div data-testid="course-link-banner" data-slot="dock-surface" className={`pointer-events-auto p-2 pl-4 ${DOCK_SURFACE}`}>
+			<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+				<p className="min-w-0 flex-1 text-row text-muted-foreground">Link this session to a course to continue.</p>
+				{choice.state.status === "unavailable" ? (
+					<CoursesUnavailable reason={choice.state.reason} />
+				) : (
+					<CourseControl choice={choice} />
+				)}
 				{choice.state.status === "ready" && (
-					<button
+					<Button
 						type="button"
 						data-testid="course-link"
 						onClick={onLink}
 						disabled={busy}
-						className="rounded-sm border border-border bg-card px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:bg-accent disabled:opacity-40"
+						size="pill"
+						className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
 					>
 						{busy ? "Linking…" : "Link"}
-					</button>
+					</Button>
 				)}
 			</div>
-			{error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
+			{error && <p role="alert" className="px-0 pb-1 pt-2 text-row text-danger">{error}</p>}
 		</div>
 	);
 }
@@ -70,7 +75,7 @@ export function CourseLinkBanner({ chatId }: { chatId: string }) {
 		<div className="pointer-events-none absolute inset-x-0 bottom-0">
 			<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 			<div className="bg-background pb-5">
-				<div className={DOCK}>
+				<div className={LESSON_COLUMN}>
 					<CourseLinkBody choice={choice} busy={busy} error={error} onLink={() => void link()} />
 				</div>
 			</div>

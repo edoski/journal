@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { CLAUDE_SUBSCRIPTION, claudeProviderId, type ClaudeAccount } from "../core/contracts/claude.ts";
+import { CLAUDE_ACCOUNT_SIGNED_OUT, CLAUDE_SUBSCRIPTION, claudeProviderId, type ClaudeAccount } from "../core/contracts/claude.ts";
 import type { ClaudeLaunch } from "./claude-cli.ts";
 
 /** The Claude accounts the user set up in T3 Code (another app on the same
@@ -68,7 +68,7 @@ export function loadClaudeAccounts({ t3Dir, home: homeArg }: ClaudeAccountPaths 
 		if (accounts.some((account) => account.providerId === base.providerId)) continue;
 		if (hasToken) {
 			const secret = join(t3, "userdata", "secrets", `provider-env-${b64url(instanceId)}-${b64url(TOKEN_VAR)}.bin`);
-			accounts.push({ ...base, auth: "token", token: () => readToken(secret, base.label) });
+			accounts.push({ ...base, auth: "token", token: () => readToken(secret) });
 		} else if (isDefaultHome) accounts.push({ ...base, auth: "default" });
 		else accounts.push({ ...base, auth: "profile", configDir: configDir! });
 	}
@@ -76,10 +76,10 @@ export function loadClaudeAccounts({ t3Dir, home: homeArg }: ClaudeAccountPaths 
 	return accounts;
 }
 
-function readToken(path: string, label: string): string {
+function readToken(path: string): string {
 	let token = "";
 	try { token = readFileSync(path, "utf8").trim(); } catch { /* reported below */ }
-	if (!token) throw new Error(`LearnHarness could not read T3 Code's setup token for ${label}. Check the account in T3 Code, then press Refresh.`);
+	if (!token) throw new Error(CLAUDE_ACCOUNT_SIGNED_OUT);
 	return token;
 }
 

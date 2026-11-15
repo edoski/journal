@@ -2,11 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as fs from "node:fs";
 import { chatStore } from "../src/store/chats.ts";
-import { graphStore } from "../src/store/graph.ts";
-import { PATHS, SOURCES_FILE } from "../config.ts";
+import { PATHS } from "../config.ts";
 import { callCost, jobCost, sessionCost, turnCost } from "../src/server/pricing.ts";
 import { sumSteps } from "../src/core/prices.ts";
-import type { CallUsage, ExtractionRunUsage, JobRecord, TurnUsage } from "../src/core/contracts.ts";
+import type { CallUsage, JobRecord, TurnUsage } from "../src/core/contracts.ts";
 
 const call = (over: Partial<CallUsage> = {}): CallUsage => ({
 	inputTokens: 0, outputTokens: 0, cacheReadTokens: undefined,
@@ -73,42 +72,12 @@ test("appendTurnUsage: idempotent per turn; continuations survive saveMessages; 
 	} finally { fs.unlinkSync(`${PATHS.chats}/${record.id}.json`); }
 });
 
-const runEntry = (startedAt: number): ExtractionRunUsage => ({
-	startedAt, at: "2026-09-09T00:00:00Z", durationMs: 42_000,
-	stats: { nodes: 1, chains: 2 }, stages: {
-		extractor: { model: "openai:gpt-5", steps: [call({ inputTokens: 100, outputTokens: 10 })] },
-		auditor: { model: "openai:gpt-5", steps: [call({ inputTokens: 50, outputTokens: 5 })] },
-	},
-});
-
-test("appendExtractionUsage: idempotent; failed runs persist; list omits log", () => {
-	const record = chatStore.createChat("extraction usage fixture");
+test("an older record's graph extraction usage log stays out of the list", () => {
+	const record = chatStore.createChat("legacy extraction usage fixture");
 	try {
-		chatStore.appendExtractionUsage(record.id, runEntry(1));
-		chatStore.appendExtractionUsage(record.id, runEntry(1));
-		chatStore.appendExtractionUsage(record.id, runEntry(2));
-		chatStore.appendExtractionUsage(record.id, { ...runEntry(3), stats: undefined });
-		assert.equal(chatStore.getChat(record.id)?.extractions?.length, 3);
-		assert.equal(chatStore.getChat(record.id)?.extractions?.at(-1)?.stats, undefined);
+		const file = `${PATHS.chats}/${record.id}.json`;
+		const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+		fs.writeFileSync(file, JSON.stringify({ ...raw, extractions: [{ startedAt: 1, at: "2026-09-09T00:00:00Z", durationMs: 1, stages: {} }] }));
 		assert.equal("extractions" in chatStore.listChats().find((c) => c.id === record.id)!, false);
 	} finally { fs.unlinkSync(`${PATHS.chats}/${record.id}.json`); }
-});
-
-test("appendSourceUsage: idempotent; reimport keeps history; absent source is a no-op", () => {
-	fs.mkdirSync(PATHS.graph, { recursive: true });
-	const backup = fs.existsSync(SOURCES_FILE) ? fs.readFileSync(SOURCES_FILE) : undefined;
-	try {
-		const id = "src_usagetest01";
-		graphStore.upsertSource({ id, filePath: "/fixture/notes.md", importedAt: "2026-09-13T00:00:00Z" });
-		graphStore.appendSourceUsage(id, runEntry(1));
-		graphStore.appendSourceUsage(id, runEntry(1));
-		graphStore.appendSourceUsage(id, runEntry(2));
-		assert.equal(graphStore.readSources().find((s) => s.id === id)?.extractions?.length, 2);
-		graphStore.upsertSource({ id, filePath: "/fixture/notes.md", importedAt: "2026-09-14T00:00:00Z" });
-		assert.equal(graphStore.readSources().find((s) => s.id === id)?.extractions?.length, 2);
-		graphStore.appendSourceUsage("src_missing", runEntry(1));
-	} finally {
-		if (backup) fs.writeFileSync(SOURCES_FILE, backup);
-		else fs.rmSync(SOURCES_FILE, { force: true });
-	}
 });

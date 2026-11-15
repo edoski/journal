@@ -22,7 +22,7 @@ process.env.LH_DATA_DIR = TMP_DATA;
 /** The route handler + the store seam, loaded AFTER the env is set. */
 type Get = (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>;
 let GET: Get;
-let createChat: (title: string, kind?: "practice") => { id: string; title: string };
+let createChat: (title: string) => { id: string; title: string };
 let saveMessages: (id: string, messages: unknown[]) => void;
 
 before(async () => {

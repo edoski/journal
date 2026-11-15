@@ -74,7 +74,7 @@ def vault(tmp_path: Path) -> tuple[Path, Path, Workspace]:
     (msc / "Algebra").mkdir(parents=True)
     learn.mkdir()
     course = initialize(msc / "Algebra")
-    course.record.write_text('{"schema": 6}')
+    course.record.write_text('{"schema": 7}')
     return msc, learn, course
 
 
@@ -589,3 +589,19 @@ def test_installed_study_command_initializes_and_links(
     )
     assert unknown.returncode == 2 and "MCP server" in unknown.stderr
     assert not (repo / ".study").exists()
+
+
+def test_the_desktop_archive_carries_the_repository_arc_doctrine(
+    tmp_path: Path,
+) -> None:
+    package = install.package_directory()
+    archive = install.install_archive(package, tmp_path)
+    with zipfile.ZipFile(archive) as packed:
+        arcs = packed.read("tutor/references/arcs.md")
+        skill = packed.read("tutor/SKILL.md").decode()
+    assert arcs == (package / "skills/tutor/references/arcs.md").read_bytes()
+    assert (
+        "In a course with arcs (its record's `arcs` is not empty), read "
+        "[arcs.md](references/arcs.md) before any save that adds a topic, changes "
+        "arcs or sets an exam"
+    ) in skill

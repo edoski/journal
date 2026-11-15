@@ -15,8 +15,7 @@ import { pdfExtract, pdfInfo, pdfProbe, pdfSearch } from "../subagents/pdf-ops.t
  * web_fetch_pdf acquires the file (download, size-capped, probe-validated)
  * into a per-job temp dir; every path-taking tool is SCOPED to that dir
  * (the researcher can never read outside it). pdf_render is deliberately
- * absent: the researcher's model slot has no vision — visual reading of
- * math-heavy pages stays the pdf job's job.
+ * absent: visual reading of math-heavy pages stays the pdf job's job.
  *
  * Tool contract (the web.ts law): NEVER throw into the agent loop — every
  * failure path returns a clear error STRING the researcher can adapt to.

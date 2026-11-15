@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 import json
 from pathlib import Path
 import shutil
@@ -14,6 +15,7 @@ from learning.workspace import (
     resolve,
     support_directory,
     unlink,
+    unreadable,
 )
 
 
@@ -40,7 +42,7 @@ def test_init_registers_is_idempotent_and_nested_workspace_is_independent(
     parent = initialize(tmp_path)
     assert registry_path() == support_directory() / "workspaces.json"
     assert entries() == {str(tmp_path): {}}
-    parent.record.write_text('{"schema": 6}\n')
+    parent.record.write_text('{"schema": 7}\n')
     before = {p: p.read_bytes() for p in parent.root.rglob("*") if p.is_file()}
     assert initialize(tmp_path) == parent
     assert before == {p: p.read_bytes() for p in parent.root.rglob("*") if p.is_file()}
@@ -271,3 +273,31 @@ def test_registered_lists_valid_workspaces_sorted_by_directory(tmp_path: Path) -
     second, first, broken = (initialize(tmp_path / name) for name in names)
     (broken.root / "workspace.json").write_text("{")
     assert registered() == [first, second]
+
+
+@pytest.fixture
+def closed(tmp_path: Path) -> Iterator[Workspace]:
+    """A registered workspace whose `.study` folder the app may not open."""
+    (tmp_path / "closed").mkdir()
+    workspace = initialize(tmp_path / "closed")
+    workspace.root.chmod(0)
+    yield workspace
+    workspace.root.chmod(0o755)
+
+
+def test_a_workspace_that_cannot_be_opened_is_unreadable_and_stays_registered(
+    tmp_path: Path, closed: Workspace
+) -> None:
+    (tmp_path / "broken").mkdir()
+    broken = initialize(tmp_path / "broken")
+    (broken.root / "workspace.json").write_text("{")
+    (tmp_path / "open").mkdir()
+    open_ = initialize(tmp_path / "open")
+    assert registered() == [open_]
+    assert [directory for directory, _ in unreadable()] == [
+        broken.directory,
+        closed.directory,
+    ]
+    assert "Permission denied" in str(unreadable()[1][1])
+    register(open_)
+    assert str(closed.directory) in entries()

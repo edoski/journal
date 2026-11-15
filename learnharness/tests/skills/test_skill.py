@@ -69,11 +69,6 @@ class SkillFolderTest(unittest.TestCase):
                 ("sessions.py", ["read", "chat_mv27rrra_feff23b6"]),
                 ("sessions.py", ["read", "chat_mv293wv5_10656952"]),
                 ("sessions.py", ["read", "chat_mv293wv5_10656952", "--include-agent-thinking", "--include-operations"]),
-                ("graph.py", ["sessions"]),
-                ("graph.py", ["propositions"]),
-                ("graph.py", ["find", "*"]),
-                ("graph.py", ["chains"]),
-                ("graph.py", ["chains", "--node", "n_nonexistent"]),
             ]
             for filename, arguments in commands:
                 for output_format in ("markdown", "json"):

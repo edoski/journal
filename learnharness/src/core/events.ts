@@ -4,7 +4,7 @@
  *
  * One bus, every layer: server emits turn lifecycle here, the store
  * adapters emit job/chat mutations, the agent layer's background
- * registries (extraction) emit activity changes — and
+ * registries (lesson digests, course maps) emit activity changes — and
  * GET /api/events turns every emission into an SSE frame for any open
  * window. The events carry the FACT, never the data: consumers fetch
  * truth on receipt (push the poke, pull the data), so payloads stay
@@ -34,12 +34,19 @@ export interface ServerEvents {
 	/** A job record changed (dispatch, progress, settle, abort, recovery).
 	 *  chatId when known — consumers that own one chat filter on it. */
 	"jobs-changed": { chatId?: string };
-	/** An extraction run changed phase (activity dock). */
+	/** A background run started, changed phase or ended (activity dock). */
 	"activity-changed": Record<string, never>;
-	/** The session list changed (create, delete, title). */
-	"chats-changed": Record<string, never>;
-	/** Web subscription state changed. No account or credential data on the bus. */
-	"subscriptions-changed": Record<string, never>;
+	/** The session list changed (create, delete, title). `named` carries a
+	 *  session's new title when its first plan named it, so its open header
+	 *  shows the one name the list does. `deleted` names a session just
+	 *  deleted, so a window that has it open says so at once. */
+	"chats-changed": { named?: { id: string; title: string }; deleted?: string };
+	/** The course list changed: a course was created, renamed or deleted. */
+	"courses-changed": Record<string, never>;
+	/** A course's engine record changed: a save through the app, or another
+	 *  host's (Claude Code, Claude Desktop) seen on disk. Views of that
+	 *  course's levels, reviews and tasks refetch. */
+	"course-changed": { workspace: string };
 	/** A chat's record changed WITHOUT a turn (the silent dismissal write).
 	 *  Same notify-then-fetch contract as the turn events: open views of
 	 *  the chat refetch and adopt the durable record. */
@@ -63,15 +70,15 @@ export const SERVER_EVENT_TYPES = [
 	"jobs-changed",
 	"activity-changed",
 	"chats-changed",
-	"subscriptions-changed",
+	"courses-changed",
+	"course-changed",
 	"record-changed",
 	"compaction-changed",
 ] as const satisfies readonly ServerEventType[];
 
-/** One notification: the type discriminates the payload. */
-export type ServerEvent<K extends ServerEventType = ServerEventType> = {
-	type: K;
-} & ServerEvents[K];
+/** One notification: the type discriminates the payload (distributed over
+ *  the names, so checking `type` narrows it). */
+export type ServerEvent<K extends ServerEventType = ServerEventType> = K extends ServerEventType ? { type: K } & ServerEvents[K] : never;
 
 export type ServerEventListener = (event: ServerEvent) => void;
 

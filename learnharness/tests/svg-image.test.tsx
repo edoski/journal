@@ -94,7 +94,7 @@ describe("generated SVG image boundary", () => {
 				: <MermaidOverlay svg={FIGURE} inverted onClose={() => {}} />);
 			const { document } = parseHTML(html);
 			const holder = document.querySelector(mode === "inline" ? '[data-testid="visual-svg"]' : "[data-lh-overlay-chart]")!;
-			assert.match(holder.getAttribute("style")!, /invert\(1\) hue-rotate\(180deg\)/);
+			assert.match(holder.getAttribute("style")!, /invert\(0\.929\d*\) hue-rotate\(180deg\)/);
 			assert.ok(holder.classList.contains("bg-white"));
 			assertImageBoundary(holder, FIGURE);
 		});
@@ -134,13 +134,15 @@ it("the fullscreen button opens the same SVG image and inversion; download keeps
 	const originalSvg = FIGURE.replace(' xmlns="http://www.w3.org/2000/svg"', '').replace("θ &amp; φ", "θ&nbsp;&amp; φ");
 	const displaySvg = FIGURE.replace("θ &amp; φ", "θ&#160;&amp; φ");
 	const dom = parseHTML("<html><body></body></html>");
-	const names = ["window", "document", "Element", "HTMLElement", "IS_REACT_ACT_ENVIRONMENT"] as const;
+	const names = ["window", "document", "Element", "HTMLElement", "HTMLFormElement", "IS_REACT_ACT_ENVIRONMENT"] as const;
 	const originals = names.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
 	Object.assign(globalThis, {
 		window: dom.window,
 		document: dom.document,
 		Element: dom.window.Element,
 		HTMLElement: dom.window.HTMLElement,
+		// The invert switch is Radix's, which asks whether it sits in a form.
+		HTMLFormElement: dom.window.HTMLFormElement ?? class {},
 		IS_REACT_ACT_ENVIRONMENT: true,
 	});
 	const host = dom.document.createElement("div");
@@ -161,7 +163,7 @@ it("the fullscreen button opens the same SVG image and inversion; download keeps
 	function Harness() {
 		const [focus, setFocus] = useState<{ svg: string; inverted: boolean } | null>(null);
 		return (
-			<SessionMermaidContext.Provider value={{ openMermaid: () => {}, openFigure: (svg, inverted) => setFocus({ svg, inverted }) }}>
+			<SessionMermaidContext.Provider value={{ openMermaid: () => {}, openFigure: (svg, inverted) => setFocus({ svg, inverted }), openPhoto: () => {} }}>
 				<VisualOutputCard output={{ svg: originalSvg }} initialInverted />
 				{focus && <MermaidOverlay svg={focus.svg} inverted={focus.inverted} onClose={() => setFocus(null)} />}
 			</SessionMermaidContext.Provider>
@@ -174,7 +176,7 @@ it("the fullscreen button opens the same SVG image and inversion; download keeps
 		const overlayHolder = host.querySelector("[data-lh-overlay-chart]")!;
 		const fullscreen = assertImageBoundary(overlayHolder, displaySvg);
 		assert.equal(fullscreen.getAttribute("src"), inline.getAttribute("src"));
-		assert.match(overlayHolder.getAttribute("style")!, /invert\(1\) hue-rotate\(180deg\)/);
+		assert.match(overlayHolder.getAttribute("style")!, /invert\(0\.929\d*\) hue-rotate\(180deg\)/);
 
 		// Intercept only the download anchor; never navigate or write a real file.
 		dom.document.createElement = ((...args: Parameters<typeof originalCreateElement>) => {

@@ -2,13 +2,13 @@
  * The auto-title's smart truncation (owner, 2026-10-06): the cut snaps to
  * a word boundary at or under TITLE_MAX_CHARS (72); a single word longer
  * than the cap splits at the cap. Pure seam: titleFromPrompt in
- * core/contracts/graph.ts, applied server-side at chat creation (the one
+ * core/contracts/chat.ts, applied server-side at chat creation (the one
  * seam — home and both drafts post raw text; the route derives).
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { TITLE_MAX_CHARS, titleFromPrompt } from "../src/core/contracts/graph.ts";
+import { TITLE_MAX_CHARS, titleFromPrompt } from "../src/core/contracts/chat.ts";
 
 describe("titleFromPrompt (smart truncation)", () => {
 	it("short prompts pass through untouched — no ellipsis, whitespace collapsed", () => {

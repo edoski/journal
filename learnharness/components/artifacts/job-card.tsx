@@ -3,6 +3,7 @@
 import { DispatchCard } from "@/components/artifacts/dispatch-card";
 import { MessageResponse } from "@/components/ai-elements/message";
 import type { ArtifactPartProps, PdfResult, ResearchResult } from "@/src/core";
+import { LessonCard } from "@/components/lesson/lesson-card";
 
 /**
  * The research tool-call box (contracts.ts "THE ASYNC PROTOCOL" §4).
@@ -87,33 +88,19 @@ export function ResearchBriefCard({ output }: { output: unknown }) {
 	}
 	const failed = result.brief.startsWith("Research failed");
 	return (
-		<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="research-brief-card">
-			<div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-				Research brief
-				{failed && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">failed</span>}
-			</div>
-			<div className="text-sm [&_p:first-child]:mt-0 [&_p:last-child]:mb-0">
-				<MessageResponse>{result.brief}</MessageResponse>
-			</div>
+		<LessonCard data-testid="research-brief-card" label="Research brief" note={failed ? <span className="text-danger">Failed</span> : undefined}>
+			<MessageResponse>{result.brief}</MessageResponse>
 			{result.sources.length > 0 && (
-				<div className="mt-3 border-t pt-2">
-					<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Sources</div>
-					<ul className="flex flex-col gap-0.5 text-xs">
-						{result.sources.map((s) => (
-							<li key={s.url} className="truncate">
-								<a
-									href={s.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="text-primary underline-offset-2 hover:underline"
-								>
-									{s.title}
-								</a>
-							</li>
-						))}
-					</ul>
-				</div>
+				<ul className="mt-3 flex flex-col gap-1 border-t pt-3 text-row">
+					{result.sources.map((s) => (
+						<li key={s.url} className="truncate">
+							<a href={s.url} target="_blank" rel="noopener noreferrer" className="text-link underline-offset-2 hover:underline">
+								{s.title}
+							</a>
+						</li>
+					))}
+				</ul>
 			)}
-		</div>
+		</LessonCard>
 	);
 }

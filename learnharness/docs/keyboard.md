@@ -25,9 +25,8 @@ second pillar of input).
 ## Rules
 
 - **Tab is dead everywhere** (owner decision: browser tab-focus
-  navigation abandoned). Shift+Tab cycles the thinking level — also
-  while typing in a field (modifier combos are the only keys that fire
-  from typing surfaces; bare keys never do).
+  navigation abandoned). Modifier combos are the only keys that fire
+  from typing surfaces; bare keys never do.
 - **Esc priority chain**: topmost popover → cheat sheet → abort turn
   (local stream only — a server-side wake turn has
   no client request to abort). Every element/document-level Esc handler
@@ -41,19 +40,21 @@ second pillar of input).
 
 | Action | Binding | Seam |
 |---|---|---|
-| Model selector | ⌘K | `lh:kbd-open-model-picker` (model-picker.tsx) |
-| Cycle thinking level | Shift+Tab | `lh:kbd-cycle-thinking` (model-picker.tsx) |
+| Where this lesson is | ⌘K | `lh:kbd-open-model-picker` (lesson-roadmap.tsx; the id predates the roadmap and stays, since saved rebinds key on it) |
 | Toggle sidebar | ⌘B | `lh:toggle-sidebar` (sidebar.tsx) |
 | Sessions search | ⌘⇧F | `lh:kbd-sessions-search` (sidebar.tsx) |
-| Walk search results | ↑ / ↓ *in the search field* | sidebar.tsx (cycles the filtered rows, wraps) |
-| Open search result | Enter *in the search field* | sidebar.tsx (walked row, else the first match) |
+| Walk search results | ↑ / ↓ *in the search field* | sidebar-state.ts: focus goes to the first (↓) or last (↑) result row, course, topic or lesson, and the list's own arrows walk on (sidebar-tree.ts) |
+| Open search result | Enter *in the search field* (the first result shown), or on a walked row | sidebar-state.ts |
 | ~~Cycle session~~ | ~~⌥↑ / ⌥↓~~ | RETIRED (owner, 2026-10-10) — the search walk above replaces it |
 | ~~Open selected session~~ | ~~⌥Enter~~ | RETIRED (owner, 2026-10-10) — the search Enter above replaces it |
 | Jump to graph (home) | ⌘G | router.push in keyboard-shortcuts.tsx |
 | New session | ⌘N | router.push in keyboard-shortcuts.tsx |
 | Rename session | F2 | `lh:kbd-rename-session` (chat.tsx) |
 | Cheat sheet | ? | keyboard-shortcuts.tsx |
-| Find (graph: node search) | ⌘F | `lh:kbd-find` (graph-view.tsx; chat transcript search rides the same event when that feature lands) |
+| Find in this lesson | ⌘F | `lh:kbd-find` (session-find.tsx) |
+| Try again | Enter *on the empty message box, or outside any field* | composer.tsx `enterAction` (`empty-action`) after a reply that never came or a failed turn |
+| Stop the tutor | Esc, or a click on the square | the "Abort this turn?" confirm (abort-turn-dialog.tsx); Enter never stops a turn (round 3, 14 Nov 2026) |
+| Go to the newest reply | ⌘↓ | `lh:kbd-jump-latest` (lesson/scroll-cue.tsx; acts only while the cue above the dock shows) |
 
 ## Model menu keyboard machine (owner polish, 2026-09-17)
 
@@ -86,7 +87,7 @@ While a question is expanded, the dock owns ↑/↓/Space/Enter/Tab:
   focuses the walked (or first) row; from the rows it returns to the
   thinking field. Focus follows the walk while the user is in the rows,
   so focused and walked never diverge. Shift+Tab is NOT the dock's —
-  the global thinking-level cycle owns it everywhere.
+  the global handler swallows it everywhere.
 - Guards: keys from a typing surface keep their native meaning (arrows
   move the caret, space types — the thinking field is never hijacked),
   and modifier combos are never the dock's — Alt+arrows cycle sessions

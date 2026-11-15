@@ -3,17 +3,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { Agent } from "@earendil-works/pi-agent-core";
 import { after, afterEach, test } from "node:test";
 import { createFauxCore, fauxAssistantMessage } from "@earendil-works/pi-ai";
-import { toLlmMessages, type LhMessage } from "../src/core/native-messages.ts";
+import type { LhMessage } from "../src/core/native-messages.ts";
+import { SdkAgent } from "../src/agent/sdk/agent.ts";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import { buildSubagentSteer, type JobKind, type SteerMessage } from "../src/core/contracts.ts";
 
 // Install isolation before importing any storage/configuration composition.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lh-job-delivery-"));
 process.env.LH_DATA_DIR = path.join(directory, "data");
-process.env.LH_AUTH_FILE = path.join(directory, "auth.json");
-fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
+process.env.LH_CREDENTIALS_DIR = directory;
 const { stores } = await import("../src/server/stores.ts");
 const { jobTools } = await import("../src/agent/tools/jobs.ts");
 const { createJobRunner, researchModelOverride } = await import("../src/agent/subagents/runner.ts");
@@ -37,8 +37,6 @@ async function until(predicate: () => boolean): Promise<void> {
 	while (!predicate()) { assert(Date.now() < end, "fixture condition timed out"); await delay(10); }
 }
 function sweep(): void {
-	const global = globalThis as { __lhWakePipeline?: { lastSweepAt: number } };
-	if (global.__lhWakePipeline) global.__lhWakePipeline.lastSweepAt = 0;
 	recoverStaleJobs();
 }
 function chat(blocked = false) {
@@ -97,7 +95,7 @@ test("saved question survives absent transcript; runner ends while delivery is s
 	const faux = createFauxCore({});
 	let seen = "";
 	faux.setResponses([(context) => { seen = JSON.stringify(context.messages); return fauxAssistantMessage("Fixture brief"); }]);
-	researchModelOverride.current = { model: faux.getModel(), streamFn: faux.streamSimple };
+	researchModelOverride.current = fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 	let delivery: Promise<void> | undefined;
 	const runner = createJobRunner({ ...stores, deliver: (steer) => { delivery = deliverJobResult(steer); return delivery; } });
 	await runner.runJob(job.id);
@@ -118,7 +116,7 @@ test("missing or blank research question records an honest failure without invok
 		const job = stores.jobStore.createJob({ kind: "research", chatId: owner.id, toolCallId: "missing-question", input });
 		const faux = createFauxCore({}); let calls = 0;
 		faux.setResponses([() => { calls++; return fauxAssistantMessage("must not run"); }]);
-		researchModelOverride.current = { model: faux.getModel(), streamFn: faux.streamSimple };
+		researchModelOverride.current = fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 		const steers: SteerMessage[] = [];
 		await createJobRunner({ ...stores, deliver: async (steer) => { steers.push(steer); } }).runJob(job.id);
 		assert.equal(calls, 0);
@@ -220,7 +218,7 @@ test("a racing foreground settlement cannot release an outstanding staged wake",
 			modelCopies = JSON.stringify(context.messages).split(result.brief).length - 1;
 			return fauxAssistantMessage("Fixture wake response");
 		}]);
-		const wake = new Agent({ initialState: { model: faux.getModel(), messages: input.steers }, convertToLlm: toLlmMessages, streamFn: faux.streamSimple });
+		const wake = new SdkAgent({ engine: fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }), systemPrompt: "Teach.", tools: [], endsTurn: () => false, messages: input.steers });
 		assert(beginTurn(id));
 		registerLiveAgent(id, wake, false, new Set(input.steers.map((message) => message.id)));
 		await wake.continue();
@@ -288,7 +286,7 @@ test("fresh process restores a pending delivery on registration without a jobs p
 	`;
 	const child = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], {
 		cwd: process.cwd(), encoding: "utf8", timeout: 15000,
-		env: { PATH: process.env.PATH, HOME: path.join(directory, "home"), NODE_ENV: "test", LH_DATA_DIR: process.env.LH_DATA_DIR, LH_AUTH_FILE: process.env.LH_AUTH_FILE },
+		env: { PATH: process.env.PATH, HOME: path.join(directory, "home"), NODE_ENV: "test", LH_DATA_DIR: process.env.LH_DATA_DIR, LH_CREDENTIALS_DIR: process.env.LH_CREDENTIALS_DIR },
 	});
 	assert.equal(child.status, 0, child.stderr);
 	assert.deepEqual(JSON.parse(child.stdout.trim()), [steer.id]);
@@ -300,7 +298,7 @@ test("deleting legacy completed work needs no preceding recovery poll", async ()
 	const owner = chat(true);
 	const old = stores.jobStore.createJob({ kind: "research", chatId: owner.id, toolCallId: "legacy-delete" });
 	stores.jobStore.updateJob(old.id, { result });
-	const outcome = await deleteChatSession(owner.id, "preserve-graph");
+	const outcome = await deleteChatSession(owner.id);
 	assert(outcome.ok);
 	assert.equal(stores.jobStore.getJob(old.id), null);
 	assert.equal(stores.chatStore.getChat(owner.id), null);
@@ -309,11 +307,11 @@ test("deleting legacy completed work needs no preceding recovery poll", async ()
 test("deletion still refuses a computing worker or a live turn", async () => {
 	const owner = chat();
 	const computing = stores.jobStore.createJob({ kind: "research", chatId: owner.id, toolCallId: "computing-delete" });
-	const blocked = await deleteChatSession(owner.id, "preserve-graph");
+	const blocked = await deleteChatSession(owner.id);
 	assert(!blocked.ok && blocked.code === "jobs_running");
 	stores.jobStore.updateJob(computing.id, { status: "done" });
 	assert(beginTurn(owner.id));
-	const live = await deleteChatSession(owner.id, "preserve-graph");
+	const live = await deleteChatSession(owner.id);
 	assert(!live.ok && live.code === "turn_in_flight");
 	endTurn(owner.id);
 });
@@ -322,7 +320,7 @@ test("deleting a session discards its pending deliveries without starting a turn
 	const owner = chat(true); const { job, steer } = pending(owner.id);
 	let wakes = 0; setTurnRunner(async () => { wakes++; return 500; });
 	const delivery = deliverJobResult(steer);
-	const outcome = await deleteChatSession(owner.id, "preserve-graph");
+	const outcome = await deleteChatSession(owner.id);
 	assert(outcome.ok);
 	await delivery; await delay(450);
 	assert.equal(stores.jobStore.getJob(job.id), null);

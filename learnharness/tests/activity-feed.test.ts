@@ -14,6 +14,7 @@ import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
 import { PATHS } from "../config.ts";
 import { activityFeed } from "../src/server/observability.ts";
+import { signInTestClaude } from "./claude-fixture.ts";
 
 test("activityFeed: running jobs across ALL chats, running-only, title-joined, oldest first", () => {
 	const chatA = chatStore.createChat("feed chat A");
@@ -48,8 +49,8 @@ test("activityFeed: running jobs across ALL chats, running-only, title-joined, o
 		const order = feedJobs.map((j) => j.id);
 		assert.equal(order.indexOf(jobB2.id), order.length - 1);
 
-		// extraction runs are absent when the pipeline is idle (registry empty)
-		assert.deepEqual(feed.extractions, []);
+		// background runs are absent when nothing runs (registry empty)
+		assert.deepEqual(feed.runs, []);
 	} finally {
 		fs.unlinkSync(`${PATHS.chats}/${chatA.id}.json`);
 		fs.unlinkSync(`${PATHS.chats}/${chatB.id}.json`);
@@ -60,10 +61,8 @@ test("activityFeed: running jobs across ALL chats, running-only, title-joined, o
 	}
 });
 
-test("activityFeed: contextLimit is the server's live-catalog join (owner amendment, 2026-09-23)", () => {
-	// keyed-provider federation — the same env-key pattern as the
-	// model-catalog tests; file-local (each test file is its own process)
-	process.env.OPENROUTER_API_KEY ??= "test-key-openrouter-catalog";
+test("activityFeed: contextLimit is the server's live-catalog join (owner amendment, 2026-09-23)", async () => {
+	await signInTestClaude();
 	const chat = chatStore.createChat("limit join chat");
 	const createdJobs: string[] = [];
 	const usageFor = (model: string) => ({
@@ -79,16 +78,18 @@ test("activityFeed: contextLimit is the server's live-catalog join (owner amendm
 		const known = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "tc_known" });
 		const unknown = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "tc_unknown" });
 		const bare = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "tc_bare" });
-		createdJobs.push(known.id, unknown.id, bare.id);
-		jobStore.updateJob(known.id, { usage: usageFor("openrouter:z-ai/glm-5.3-flash") });
+		const legacy = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "tc_legacy" });
+		createdJobs.push(known.id, unknown.id, bare.id, legacy.id);
+		jobStore.updateJob(known.id, { usage: usageFor("claude-subscription:claude-opus-5-5") });
+		jobStore.updateJob(legacy.id, { usage: usageFor("openrouter:z-ai/glm-5.3-flash") });
 		jobStore.updateJob(unknown.id, { usage: usageFor("nope/unknown") });
 
 		const feed = activityFeed();
 		const knownJob = feed.jobs.find((j) => j.id === known.id)!;
-		// pi 1.0.2's catalog: glm-5.3-flash contextWindow 1_048_575 (was
-		// 1_048_576 at 0.87.1 — upstream models.dev refresh).
-		assert.equal(knownJob.contextLimit, 1_048_575, "pi's catalog, joined server-side onto the feed");
-		assert.ok(knownJob.costUsd !== null && Math.abs(knownJob.costUsd - 0.0002) < 1e-12, "Pi's price is projected on the server");
+		assert.equal(knownJob.contextLimit, 1_000_000, "the signed-in model's window, joined server-side onto the feed");
+		const legacyJob = feed.jobs.find((j) => j.id === legacy.id)!;
+		assert.equal(legacyJob.contextLimit, null, "an older API-key record is not in the live catalog");
+		assert.ok(legacyJob.costUsd !== null && Math.abs(legacyJob.costUsd - 0.0002) < 1e-12, "its price is still projected from Pi's catalog");
 		const unknownJob = feed.jobs.find((j) => j.id === unknown.id)!;
 		assert.equal(unknownJob.contextLimit, null, "missing from the live catalog → null, never a guessed window");
 		assert.equal(unknownJob.costUsd, null);

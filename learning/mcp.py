@@ -21,7 +21,7 @@ from learning import clock, progress, records
 from learning.workspace import Workspace, registered, resolve
 
 PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
-SERVER_INFO = {"name": "learning", "title": "Learning", "version": "6"}
+SERVER_INFO = {"name": "learning", "title": "Learning", "version": "7"}
 PACKAGE = Path(__file__).resolve().parent
 SKILL = PACKAGE / "skills" / "tutor"
 GUIDES = (
@@ -30,6 +30,7 @@ GUIDES = (
     "teaching",
     "reviews",
     "course",
+    "arcs",
     "lifecycle",
     "research",
 )
@@ -52,32 +53,46 @@ SAVE_RULES = "\n".join(
         "Record what happened, once per turn after your teaching (a review saves "
         "once at its end). changes is one patch of only what changed:",
         "- title, goal, journal, focus (a task key): replace; null clears.",
-        "- exam {date, format, coverage, criteria, constraints, unknowns, refs} and "
-        "path {current, order, basis}: merge by field; null clears a field or the "
-        "whole object.",
-        "- topics, knowledge, tasks, sources: maps by handle (a-z0-9_-, one "
+        "- exam {date, format, coverage, criteria, constraints, unknowns, refs, "
+        "arcs, leaves_out} and path {current, order, basis, arcs}: merge by field; "
+        "null clears a field or the whole object.",
+        "- topics, knowledge, tasks, sources, arcs: maps by handle (a-z0-9_-, one "
         "namespace); an entry merges by field, a null field clears it, a null entry "
         "removes it. Create a topic in the patch that first uses it.",
-        "  topic {title, needs, contrasts, refs, aliases, introduced: true, gap, "
-        "note, review: {in_days|due, prompt, points: 1-5 key points} or null}; "
+        "  topic {title, arc, needs, contrasts, refs, aliases, introduced: true, "
+        "gap, note, review: {in_days|due, prompt, points: 1-5 key points} or "
+        "null}; arc {title, question, purpose, refs}; "
         "knowledge {text, topics, refs, aliases, "
         "uncertain, pinned}; task {title, topics, goal, step, help, note, refs}; "
         "source {path, title}",
         "- Lists replace whole; refs are [{source, locator}].",
-        "- observations: new entries, appended: {topics, text, kind, help, result, "
-        "sure, response, chose, transfer, date, task, refs, corrects, uncertain}. "
+        "- observations: new entries, appended: {topics, text, kind, help, shown, "
+        "result, gave_up, sure, response, chose, transfer, date, task, refs, "
+        "corrects, disputed, ruling, uncertain, checkpoint}. "
         'kind attempt (default) needs help ("none" if unaided) and result correct|'
         "partial|incorrect; exam needs result; self_report (the learner's own "
         "statement) takes neither. sure: guess|neutral|confident, only when the "
         "learner marked the answer; a guess is never solid, and a "
         "confident incorrect answer is a confident error. transfer: true only when "
-        "correct. chose: the topic of a "
+        "correct. shown: true when the help showed the method or the answer "
+        "before the attempt, not a hint during it. gave_up: true when the learner "
+        "abandoned it without an answer (result incorrect). chose: the topic of a "
         "wrongly chosen method, on an attempt that was not correct, recorded on "
         'the topic that should have been chosen. corrects: ["oN"] supersedes '
-        "earlier ones and, without a date, takes the earliest one's day. Work you "
-        "did not see produced is uncertain.",
+        "earlier ones and, without a date, takes the earliest one's day; an attempt "
+        "may correct only observations recorded today, a self_report any. When "
+        "the learner disputes a mark, re-judge the attempt against its question "
+        "and response and record the re-marked attempt, agreeing or not, with "
+        "corrects, disputed (his words) and ruling (why, one or two lines); it "
+        "may re-mark an attempt from any day. Work you did not see produced is "
+        "uncertain.",
         "- preferences (this course), global_preferences (every course): "
         "{dimension: instruction}; null deletes.",
+        "- In a course with arcs, read the arcs guide before a save that adds a "
+        "topic, changes arcs or sets an exam. arc_change {reason, asked} says why "
+        "an arc changes, and asked quotes the learner when the change needs his "
+        "request; a new exam date states exam.arcs (null for the whole course). "
+        "The receipt's arcs_placed says which arc a new topic joined.",
         "Attempts schedule reviews; only the first try on a due day counts, retries "
         "are relearning. Helper fields (revision, recorded, judged, updated, "
         "created, by, standing, level) are rejected. An identical observation "

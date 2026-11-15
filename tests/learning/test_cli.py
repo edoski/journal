@@ -68,6 +68,11 @@ def test_save_then_read_through_every_read_verb(
     assert shown["items"]["rank"]["standing"]["level"] == "assisted"
     _, everything = run(capsys, monkeypatch, workspace, "show", "--all")
     assert everything["standings"]["rank"]["attempts"] == 1
+    _, mapped = run(capsys, monkeypatch, workspace, "map")
+    assert mapped["current"] == "rank"
+    assert mapped["topics"][0]["level"] == "assisted"
+    _, arcs = run(capsys, monkeypatch, workspace, "arcs", "--report")
+    assert arcs == {"studied": ["rank"], "held": [], "arcs": []}
     _, found = run(capsys, monkeypatch, workspace, "search", "Rango")
     assert found["hits"][0]["handle"] == "rank"
     _, words = run(capsys, monkeypatch, workspace, "search", "found", "rank")
@@ -93,7 +98,7 @@ def test_failures_print_one_error_object_and_exit_1(
     assert error["kind"] == "validation"
     _, error = run(capsys, monkeypatch, workspace, "show", "--limit", "0", "x")
     assert error["kind"] == "validation" and "--limit" in error["message"]
-    _, error = run(capsys, monkeypatch, workspace, "migrate")
+    _, error = run(capsys, monkeypatch, workspace, "migrat")
     assert error["kind"] == "validation" and "invalid choice" in error["message"]
     (workspace / ".study" / "course.json").mkdir()
     _, error = run(capsys, monkeypatch, workspace, "resume")
@@ -243,8 +248,8 @@ def test_study_prints_usage_for_anything_else(
     "broken",
     [
         ("course", "{"),
-        ("course", '{"schema": 5}'),
-        ("course", '{"schema": 6, "focus": "missing"}'),
+        ("course", '{"schema": 6}'),
+        ("course", '{"schema": 7, "focus": "missing"}'),
         ("global", "{not json"),
         ("global", '{"schema": 1, "preferences": {"Bad": "x"}}'),
     ],
@@ -318,3 +323,33 @@ def test_init_and_link_configure_codex_and_report_claude_code_reach(
     _, linked = run(capsys, monkeypatch, course, "link", str(material))
     assert linked["hosts"]["codex"] == "unchanged"
     assert not install.course_codex_config(material).exists()
+
+
+def test_the_arc_reads_take_the_lesson_he_is_in(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, workspace: Path
+) -> None:
+    def arc(title: str) -> dict[str, str]:
+        return {"title": title, "question": f"Why {title}?", "purpose": f"Do {title}."}
+
+    formed = {
+        "arcs": {"systems": arc("Linear systems"), "spectra": arc("Eigenvalues")},
+        "topics": {
+            "rank": {"title": "Rank", "arc": "systems"},
+            "eigen": {"title": "Eigen", "needs": ["rank"], "arc": "spectra"},
+        },
+        "path": {"arcs": ["systems", "spectra"], "current": "rank"},
+        "arc_change": {"reason": "Chapters 4 and 6"},
+    }
+    assert run(capsys, monkeypatch, workspace, "save", stdin=formed)[0] == 0
+    _, mapped = run(capsys, monkeypatch, workspace, "map", "--here", "eigen")
+    assert mapped["current_arc"] == "spectra"
+    _, brief = run(capsys, monkeypatch, workspace, "resume", "--here", "eigen")
+    assert brief["arc"]["arc"] == "spectra"
+    _, standing = run(
+        capsys, monkeypatch, workspace, "arcs", "--here", "eigen", "--open", "eigen"
+    )
+    assert (standing["current_arc"], standing["studied"], standing["held"]) == (
+        "spectra",
+        ["rank", "eigen"],
+        ["systems", "spectra"],
+    )

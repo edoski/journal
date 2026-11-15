@@ -15,6 +15,8 @@ import { after, describe, it } from "node:test";
 import { derivePlanStatuses, derivedNodeStatus, type PlanTree, type PlanToolResult } from "../src/core/contracts.ts";
 import { createTree, emptyTree, PlanTreeError } from "../src/core/plan-tree.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
+import { nameSessionTool } from "../src/agent/tools/name-session.ts";
+import { nameFromFirstTurn } from "../src/server/session-naming.ts";
 import { parseMermaidPlan } from "../src/agent/tools/mermaid-plan.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { PATHS } from "../config.ts";
@@ -110,6 +112,153 @@ function newChat(title: string): string {
 	return chat.id;
 }
 
+describe("plan titles that hold math", () => {
+	it("keeps a $…$ formula in a title whole, brackets included in the quoted form", () => {
+		const { problems, plan } = parseMermaidPlan('graph TD\n  det-product[$\\det(AB) = \\det A \\det B$]\n  closed-interval("Continuity on $[a, b]$")\n  det-product --> closed-interval');
+		assert.deepEqual(problems, []);
+		assert.deepEqual(
+			plan!.nodes.map((n) => n.title),
+			["$\\det(AB) = \\det A \\det B$", "Continuity on $[a, b]$"],
+		);
+	});
+});
+
+describe("plan_init names a lesson once, by its goal", () => {
+	const PLAN = "graph TD\n  setup[Write out A - lambda I] --> solve[Solve the kernel]\n";
+	const GOAL = { title: "Eigenvalues by hand", topic: "eigen" };
+
+	it("names a session started from a free message: its title and the topic it belongs to", async () => {
+		const chatId = newChat("Starting linear algebra tonight. I added the syllabus and the week 1 notes");
+		await exec(planTools({ chatId, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.equal(named.title, "Eigenvalues by hand");
+		assert.deepEqual(named.ownTopics, ["eigen"]);
+	});
+
+	it("never moves it again: a rewrite keeps the first name and topic", async () => {
+		const chatId = newChat("Some free question");
+		const tools = planTools({ chatId, chatStore });
+		await exec(tools, "plan_init", { mermaid: PLAN, goal: GOAL });
+		await exec(tools, "plan_init", { mermaid: "graph TD\n  rank[Rank counts pivots] --> setup[Setup]\n", goal: { title: "Rank and the column space", topic: "rank" } });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Eigenvalues by hand", ["eigen"]]);
+	});
+
+	it("leaves a session started on a topic as it was opened, and a renamed one its own title", async () => {
+		const onTopic = chatStore.createChat("Review Rank and the column space", undefined, ["rank"]);
+		createdChats.push(onTopic.id);
+		await exec(planTools({ chatId: onTopic.id, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		const kept = chatStore.listChats().find((c) => c.id === onTopic.id)!;
+		assert.deepEqual([kept.title, kept.ownTopics], ["Review Rank and the column space", ["rank"]]);
+		const renamed = newChat("first words");
+		chatStore.renameChat(renamed, "My eigen night");
+		await exec(planTools({ chatId: renamed, chatStore }), "plan_init", { mermaid: PLAN, goal: GOAL });
+		const own = chatStore.listChats().find((c) => c.id === renamed)!;
+		assert.deepEqual([own.title, own.ownTopics], ["My eigen night", ["eigen"]]);
+	});
+});
+
+describe("name_session names a session on its first turn, once", () => {
+	const name = (chatId: string, input: unknown) => nameSessionTool({ chatId, chatStore }).name_session!.execute("test", input);
+	const PLAN = "graph TD\n  setup[Write out A - lambda I] --> solve[Solve the kernel]\n";
+
+	it("names a focused question that never gets a plan, its title and topic everywhere", async () => {
+		const chatId = newChat("can you explain why det(AB) equals det A times det B, I never got that in the lecture");
+		await name(chatId, { title: "Why det(AB) = det A det B", topic: "determinant" });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Why det(AB) = det A det B", ["determinant"]]);
+	});
+
+	it("keeps the first name: a later call and the first plan's goal leave it", async () => {
+		const chatId = newChat("teach me eigenvalues");
+		await name(chatId, { title: "Eigenvalues" });
+		await name(chatId, { title: "Something else", topic: "rank" });
+		await exec(planTools({ chatId, chatStore }), "plan_init", { mermaid: PLAN, goal: { title: "Eigenvalues by hand", topic: "eigen" } });
+		const named = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Eigenvalues", ["eigen"]], "the plan only gives the topic it lacked");
+	});
+
+	it("never renames a session opened on a topic or renamed by him", async () => {
+		const onTopic = chatStore.createChat("Review Rank and the column space", undefined, ["rank"]);
+		createdChats.push(onTopic.id);
+		const result = await name(onTopic.id, { title: "Rank review", topic: "eigen" });
+		assert.match(JSON.stringify(result.content), /keeps its name/);
+		const renamed = newChat("first words");
+		chatStore.renameChat(renamed, "My eigen night");
+		await name(renamed, { title: "Eigenvalues", topic: "eigen" });
+		const [kept, own] = [onTopic.id, renamed].map((id) => chatStore.listChats().find((c) => c.id === id)!);
+		assert.deepEqual([kept!.title, kept!.ownTopics], ["Review Rank and the column space", ["rank"]]);
+		assert.deepEqual([own!.title, own!.ownTopics], ["My eigen night", ["eigen"]], "his name stays; the topic it is about is set");
+	});
+});
+
+describe("a session past its first turn keeps its name", () => {
+	// Round 4: "Rank practice" became "Rank and the column space" after Explain
+	// instead, and "Eigenvalues and eigenvectors" became "Eigenvalues of 2×2
+	// matrices" at the hand-off to practice.
+	const STAMPS = { api: "faux", provider: "test", model: "test", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+	const pastFirstTurn = [
+		{ id: "u1", role: "user", content: "rank practice please", timestamp: 1 },
+		{ id: "a1", role: "assistant", content: [{ type: "text", text: "Here is a problem." }], stopReason: "stop", timestamp: 2, ...STAMPS },
+		{ id: "u2", role: "user", content: "actually just explain it", timestamp: 3 },
+	] as never;
+	const name = (chatId: string, input: unknown) => nameSessionTool({ chatId, chatStore }).name_session!.execute("test", input);
+	const PLAN = "graph TD\n  setup[Write out A - lambda I] --> solve[Solve the kernel]\n";
+
+	it("a later turn's name_session leaves the name he knows it by", async () => {
+		const chatId = newChat("Rank practice");
+		chatStore.saveMessages(chatId, pastFirstTurn);
+		const result = await name(chatId, { title: "Rank and the column space", topic: "rank" });
+		assert.match(JSON.stringify(result.content), /keeps its name/);
+		assert.equal(chatStore.listChats().find((c) => c.id === chatId)!.title, "Rank practice");
+	});
+
+	it("a first plan after the first turn gives the topic, never a new name", async () => {
+		const chatId = newChat("Eigenvalues and eigenvectors");
+		chatStore.saveMessages(chatId, pastFirstTurn);
+		await exec(planTools({ chatId, chatStore }), "plan_init", { mermaid: PLAN, goal: { title: "Eigenvalues of 2×2 matrices", topic: "eigen" } });
+		const kept = chatStore.listChats().find((c) => c.id === chatId)!;
+		assert.deepEqual([kept.title, kept.ownTopics], ["Eigenvalues and eigenvectors", ["eigen"]]);
+	});
+
+	it("the first reply still names it, a question that ends the turn included", async () => {
+		const chatId = newChat("can you go over kernels");
+		chatStore.saveMessages(chatId, [pastFirstTurn[0]] as never);
+		await name(chatId, { title: "Kernel and rank-nullity" });
+		assert.equal(chatStore.listChats().find((c) => c.id === chatId)!.title, "Kernel and rank-nullity");
+	});
+});
+
+describe("a first turn that did not name its session", () => {
+	const STAMPS = { api: "faux", provider: "test", model: "test", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+	const map = { ok: true as const, map: { topics: [{ handle: "the-derivative", title: "The derivative" }, { handle: "chain-rule", title: "Chain rule" }] } } as never;
+	const records = { map: async () => map };
+	const answered = (handles: unknown) => [
+		{ id: "u", role: "user", content: "why does the chain rule multiply?", timestamp: 1 },
+		{ id: "a1", role: "assistant", content: [{ type: "toolCall", id: "s", name: "course_show", arguments: { handles } }], stopReason: "toolUse", timestamp: 2, ...STAMPS },
+		{ id: "r", role: "toolResult", toolCallId: "s", toolName: "course_show", content: [{ type: "text", text: "{}" }], details: null, isError: false, timestamp: 3 },
+		{ id: "a2", role: "assistant", content: [{ type: "text", text: "Because…" }], stopReason: "stop", timestamp: 4, ...STAMPS },
+	] as never;
+
+	it("takes the name of the course topic that turn looked up, its first on the map", async () => {
+		const chat = chatStore.createChat("quick one: why does the chain rule multiply the derivatives instead of adding them?", { workspace: "/s/calc", title: "Calculus" });
+		createdChats.push(chat.id);
+		chatStore.saveMessages(chat.id, answered('["chain-rule", "the-derivative"]'));
+		assert.equal(await nameFromFirstTurn({ chatStore, courseRecords: records }, chat.id), true);
+		const named = chatStore.listChats().find((c) => c.id === chat.id)!;
+		assert.deepEqual([named.title, named.ownTopics], ["Chain rule", ["chain-rule"]]);
+	});
+
+	it("leaves a session the tutor named, or one he renamed, as it is", async () => {
+		const chat = chatStore.createChat("why does the chain rule multiply?", { workspace: "/s/calc", title: "Calculus" });
+		createdChats.push(chat.id);
+		chatStore.saveMessages(chat.id, answered(["chain-rule"]));
+		chatStore.nameSession(chat.id, { title: "Why the chain rule multiplies" });
+		assert.equal(await nameFromFirstTurn({ chatStore, courseRecords: records }, chat.id), false);
+		assert.equal(chatStore.listChats().find((c) => c.id === chat.id)!.title, "Why the chain rule multiplies");
+	});
+});
+
 describe("plan_init — the author-once mermaid tool (execute against the real store)", () => {
 	it("parses a mermaid block, builds the tree, persists, returns the full tree", async () => {
 		const chatId = newChat("Plan: init");
@@ -186,9 +335,9 @@ describe("plan_init — the author-once mermaid tool (execute against the real s
 		assert.equal(res.tree, undefined, "no tree echo on failure (context diet, 2026-10-09)");
 	});
 
-	it("only plan_init exists — the seven mutation/tracking tools are gone by design", () => {
+	it("plan_init writes the map and lesson_progress marks steps done; the seven mutation tools stay gone", () => {
 		const tools = planTools({ chatId: "chat_x", chatStore });
-		assert.deepEqual(Object.keys(tools), ["plan_init"]);
+		assert.deepEqual(Object.keys(tools).sort(), ["lesson_progress", "plan_init"]);
 	});
 
 	it("unknown chat returns ok:false with the empty tree", async () => {

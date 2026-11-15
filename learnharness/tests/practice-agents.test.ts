@@ -10,7 +10,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
+import { createFauxCore, type AssistantMessage, type ToolResultMessage } from "@earendil-works/pi-ai";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 
 import {
 	activeProblemOf,
@@ -19,9 +20,10 @@ import {
 	type LhMessage,
 } from "../src/core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
+import { PLAN_MAP_CAP } from "../src/core/contracts/plan.ts";
 import { concludeInputObject, concludeTool, createPracticeGate, problemTool, practiceTools } from "../src/agent/tools/practice.ts";
 import { composeInstructions, createPracticeAgent } from "../src/agent/teacher-agent.ts";
-import { allSegmentPaths } from "../src/agent/prompt-segments.ts";
+import { listSourceSegments } from "../src/agent/prompt-segments.ts";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -162,35 +164,25 @@ describe("the practice agent", () => {
 		);
 	});
 
-	it("THE RARELY-NEEDED SET (owner round 10): jobs + map readers compose in when their roots are passed", () => {
+	it("THE RARELY-NEEDED SET (owner round 10): the jobs compose in when their root is passed", () => {
 		const jobs = { chatId: "c1", jobStore: null as never, spawn: (() => {}) as never };
-		const graph = { chatStore: null as never, graphStore: null as never };
-		const tools = practiceTools({ ...ctxOf([]), jobs, graph });
-		// Both jobs compose in; the prober's two map
-		// readers stay behind their existing settings gate. Practice does
-		// not apply the teacher/prober user tool-toggle filter.
-		assert.deepEqual(
-			Object.keys(tools).sort(),
-			["conclude", "find", "grep", "list_propositions", "list_sessions", "ls", "pdf", "problem", "read", "research"],
-		);
+		const tools = practiceTools({ ...ctxOf([]), jobs });
+		// Both jobs compose in. Practice does not apply the teacher/prober
+		// user tool-toggle filter.
+		assert.deepEqual(Object.keys(tools).sort(), ["conclude", "find", "grep", "ls", "pdf", "problem", "read", "research"]);
 	});
 
-	it("constructs with exactly the two practice tools", () => {
-		// baseAgentOptions needs an engine (the BYOK thrower is the only
-		// fallback) — inject a never-streamed faux engine for the smoke.
-		const agent = createPracticeAgent(ctxOf([]), {
-			engine: {
-				model: { api: "faux", provider: "faux", id: "faux-model", contextWindow: 8192 } as never,
-				streamFn: (async () => {
-					throw new Error("not streamed in this test");
-				}) as never,
-			},
-		});
-		// The agent built with the live turn API (the registry itself is
-		// pinned above; pi's Agent exposes no state getter).
-		assert.equal(typeof agent.prompt, "function");
+	it("constructs with exactly the practice registry", () => {
+		// A never-streamed faux engine for the smoke: the agent is built, not run.
+		const faux = createFauxCore({});
+		const agent = createPracticeAgent(ctxOf([]), { engine: fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple }) });
+		assert.deepEqual(
+			agent.state.tools.map((tool) => tool.name).sort(),
+			[...Object.keys(practiceTools(ctxOf([]))), "send_to_user"].sort(),
+			"the agent runs the practice registry, plus send_to_user, and nothing else",
+		);
+		assert.equal(typeof agent.continue, "function");
 		assert.equal(typeof agent.steer, "function");
-		assert.equal(typeof agent.waitForIdle, "function");
 	});
 });
 
@@ -275,9 +267,9 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 	it("composes base + doctrine — never the teaching base or question/confidence mechanics", () => {
 		const prompt = composeInstructions("practice");
 		// The base's voice section and the doctrine's spine are present…
-		assert.match(prompt, /Everything in this section deletes a default/);
+		assert.match(prompt, /A sentence earns its place only by teaching, asking or correcting/);
 		assert.match(prompt, /You run practice sessions\./);
-		assert.match(prompt, /## IX\. The arc/);
+		assert.match(prompt, /## IX\. The session's shape/);
 		// …and nothing from the teaching system prompt or shared fragments.
 		assert.doesNotMatch(prompt, /install understanding/);
 		// The shared 20-question-tools doctrine (predict/check) must not
@@ -301,7 +293,7 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		// the teacher composes the same shared chunks (one law)
 		const teacher = composeInstructions("teacher");
 		assert.match(teacher, /one confidently-delivered hallucination poisons that/);
-		assert.match(teacher, /Everything in this section deletes a default/);
+		assert.match(teacher, /A sentence earns its place only by teaching, asking or correcting/);
 		assert.match(teacher, /The bar is the doubt itself/);
 		assert.match(teacher, /primary data/);
 		// the no-double-plan rule (owner-reported: plan drawn twice)
@@ -310,9 +302,16 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.match(teacher, /Rewriting is a normal, common event/);
 		// planning is the natural verification moment
 		assert.match(teacher, /planning is the natural moment for verification/);
-		// no size ceilings, and the detour keeps the pace (owner round, 2026-10-07)
-		assert.ok(!teacher.includes("Typically 5–15 nodes"), "the node-count cap is dead");
-		assert.match(teacher, /No size ceiling/);
+		// one screen of map, each step one idea (Edo, 14 Nov 2026), the numbers
+		// PLAN_MAP_CAP's; and the detour keeps the pace (owner round, 2026-10-07)
+		assert.ok(!teacher.includes("No size ceiling"), "the map has a size: one screen");
+		assert.match(teacher, /Each node holds one idea/);
+		assert.ok(teacher.includes(`at most ${PLAN_MAP_CAP.steps} steps, and no chain of steps longer than ${PLAN_MAP_CAP.deep} (\`PLAN_MAP_CAP\``));
+		// no approval step before a lesson (Edo, 14 Nov 2026)
+		assert.match(teacher, /he is not asked to approve a map/);
+		assert.ok(!/confirm the plan|once he's on board|Presenting ends your turn/.test(teacher), "no plan confirmation");
+		// demos and figures are built unasked when they help (Edo, 14 Nov 2026)
+		assert.match(teacher, /\*\*Just build it\.\*\* When a demo or a figure would help him understand, dispatch it in that turn, unasked/);
 		assert.match(teacher, /never rush the repair/);
 		assert.match(teacher, /one and only pace/);
 		assert.match(teacher, /nothing to rush/, "the goal reiteration composes");
@@ -345,8 +344,9 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.ok(prompt.indexOf("The agent") < prompt.indexOf("# The practice session"));
 	});
 
-	it("the segment registry knows practice (override paths resolve)", () => {
-		assert.ok(allSegmentPaths().includes("practice/00-base.md"));
-		assert.ok(allSegmentPaths().includes("practice/10-doctrine.md"));
+	it("the segment registry knows practice", () => {
+		const paths = listSourceSegments("practice").map((segment) => segment.path);
+		assert.ok(paths.includes("practice/00-base.md"));
+		assert.ok(paths.includes("practice/10-doctrine.md"));
 	});
 });

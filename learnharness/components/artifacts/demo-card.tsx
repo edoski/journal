@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DownloadIcon } from "lucide-react";
 import { Toggle } from "@/components/settings/controls";
@@ -189,16 +191,11 @@ function DemoFrame({
 						title="Invert colors"
 						discIcon={<InvertDiscIcon className="size-3" />}
 					/>
-					<button
-						type="button"
-						aria-label="Download demo as HTML"
-						title="Download as HTML"
-						onClick={() => downloadFile(`${slugFilename(title)}.html`, html, "text/html")}
-						data-testid="demo-download"
-						className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-					>
-						<DownloadIcon className="size-3.5" />
-					</button>
+					<Hint label="Download as HTML">
+						<Button variant="quiet" size="icon-inline" aria-label="Download demo as HTML" onClick={() => downloadFile(`${slugFilename(title)}.html`, html, "text/html")} data-testid="demo-download" className="size-6.5 hover:bg-accent">
+							<DownloadIcon className="size-3.5" />
+						</Button>
+					</Hint>
 				</div>
 			</div>
 			{state.error && (
@@ -247,7 +244,7 @@ export function DemoErrorChip({
 }) {
 	return (
 		<div
-			className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500"
+			className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger"
 			data-testid="demo-error-chip"
 		>
 			<span className="font-medium">This demo threw an error</span>
@@ -255,14 +252,9 @@ export function DemoErrorChip({
 				{message}
 			</span>
 			{onSend && (
-				<button
-					type="button"
-					onClick={onSend}
-					className="rounded-md border border-red-500/40 px-2 py-1 text-xs font-medium hover:bg-red-500/15"
-					data-testid="demo-error-send"
-				>
+				<Button variant="outline" size="xs" onClick={onSend} className="h-auto border-danger/40 bg-transparent px-2 py-1 text-danger shadow-none hover:bg-danger/15 hover:text-danger dark:border-danger/40 dark:bg-transparent dark:hover:bg-danger/15" data-testid="demo-error-send">
 					Send to teacher
-				</button>
+				</Button>
 			)}
 		</div>
 	);

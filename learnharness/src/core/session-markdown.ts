@@ -1,23 +1,12 @@
 /**
- * Session → markdown — the ONE formatting engine (owner ruling 2026-09-27).
+ * Session → markdown — the session export's formatting engine (owner ruling
+ * 2026-09-27): a session is rendered as clean, readable markdown — speaker
+ * headers, quiz/check-in blocks, tool notes — with optional message-id
+ * anchors; `anchors: false` mints the same document without them.
  *
- * The extractor's view of a teaching session and the future user-facing
- * session export share this engine: a session is rendered as clean,
- * readable markdown — speaker headers, quiz/check-in blocks, tool notes —
- * with optional message-id anchors. Since the submit-schema slim
- * (2026-09-28) propositions no longer report message ids — the extractor
- * renders anchorless and provenance is chat-level — so the anchors today
- * serve only the future user-facing export; `anchors: false` mints the
- * same document without them.
- *
- * Pure core: native messages in (LhMessage), string out. Content parity
- * with the coverage line builder (core/coverage.ts messageViewLines) is
- * deliberate — every message that produces view lines produces a markdown
- * block, in the same order — but the formats are SEPARATE by design
- * (2026-09-27): coverage fingerprints hash the line format and stay stable
- * (no mass re-extraction when presentation changes); markdown is
- * presentation. A failed tool call renders nothing (retry context, not
- * learning evidence); custom markers are invisible, same as the view.
+ * Pure core: native messages in (LhMessage), string out. A failed tool
+ * call renders nothing (retry context, not learning evidence); custom
+ * markers are invisible, same as the view.
  */
 
 import type { LhMessage } from "./native-messages.ts";
@@ -30,6 +19,19 @@ import {
 	userFacingTextOf,
 } from "./native-messages.ts";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import { photosOf, photoSrc, type Photo } from "./photos.ts";
+
+/** How photos of his working render: `embed` puts each image in the file
+ *  (the export), `note` says one is there (the lesson digest, whose
+ *  reader needs the fact, not the bytes). */
+export type MarkdownPhotos = "embed" | "note";
+
+/** The photo lines for one message. */
+function photoLines(photos: readonly Photo[], mode: MarkdownPhotos): string[] {
+	if (photos.length === 0) return [];
+	if (mode === "note") return ["*(with a photo of his handwritten working)*"];
+	return photos.map((p, i) => `![Photo of the learner's working${photos.length > 1 ? ` ${i + 1}` : ""}](${photoSrc(p)})`);
+}
 
 /** The practice join context (owner-approved, 2026-10-06 export round):
  *  practice tool RESULTS are acks — the statement, outcome, and verdict
@@ -39,6 +41,7 @@ import type { ToolResultMessage } from "@earendil-works/pi-ai";
  *  and renders nothing before this join is ever reached). */
 export interface MarkdownContext {
 	messages: ReadonlyArray<LhMessage>;
+	photos?: MarkdownPhotos;
 	/** toolCallId → the call part's name + arguments. */
 	calls: Map<string, { name: string; args: Record<string, unknown> | undefined }>;
 	failedOutputCalls?: ReadonlySet<string>;
@@ -79,6 +82,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 				answers: string[];
 				other: string;
 				dismissed: boolean;
+				reason: string;
 		  }>
 		| undefined;
 
@@ -86,9 +90,12 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		const heading = result.toolName === "recall" ? "Recall" : "Recall check"; // explain — the teach free-recall name
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
-		if (out?.dismissed === true) body.push("The learner skipped this check.");
+		if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for today before answering; the answer was not shown.");
+		else if (out?.dismissed === true && out.reason === "asked") body.push("The learner asked something before answering; the check was asked again.");
+		else if (out?.dismissed === true) body.push("The learner skipped this check.");
 		else if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered in his own words: ${out.text.trim()}`);
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
+		body.push(...photoLines(photosOf(result.content), ctx?.photos ?? "note"));
 		return { heading, body };
 	}
 
@@ -124,8 +131,11 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		];
 		if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered: ${out.text.trim()}`);
 		else if (chosen.length > 0) body.push(`The learner chose: ${chosen.join(", ")}`);
+		else if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for today before answering.");
+		else if (out?.dismissed === true && out.reason === "asked") body.push("The learner asked something before answering; the question was asked again.");
 		else if (out?.dismissed === true) body.push("The learner skipped this question.");
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
+		body.push(...photoLines(photosOf(result.content), ctx?.photos ?? "note"));
 		return { heading: "Question", body };
 	}
 
@@ -149,9 +159,17 @@ export function messageMarkdown(
 	const parts: string[] = [];
 
 	if (role === "user") {
-		for (const text of userFacingTextOf((message as { content: unknown }).content)) {
-			parts.push(`### Learner${anchor}\n\n${text.trim()}`);
-		}
+		const content = (message as { content: unknown }).content;
+		const texts = userFacingTextOf(content).map((text) => text.trim());
+		const photos = photoLines(photosOf(content), ctx?.photos ?? "note");
+		if (photos.length > 0) parts.push(`### Learner${anchor}\n\n${[...texts, ...photos].join("\n\n")}`);
+		else for (const text of texts) parts.push(`### Learner${anchor}\n\n${text}`);
+	} else if (role === "custom" && (message as { customType?: string }).customType === "practice-thinking" && (message as { images?: Photo[] }).images?.length) {
+		// A practice submission with photos: the photo needs its words
+		// beside it. Submissions without one stay invisible, as markers are.
+		const text = ((message as { details?: { text?: unknown } }).details?.text ?? "") as string;
+		const body = [...(typeof text === "string" && text.trim() ? [text.trim()] : []), ...photoLines((message as { images: Photo[] }).images, ctx?.photos ?? "note")];
+		parts.push(`### Learner's working${anchor}\n\n${body.join("\n\n")}`);
 	} else if (role === "assistant") {
 		for (const text of userFacingTextOf((message as { content: unknown }).content, ctx?.failedOutputCalls ?? failedOutputCallIds([message]))) {
 			parts.push(`### Teacher${anchor}\n\n${text.trim()}`);
@@ -175,11 +193,11 @@ export function messageMarkdown(
  */
 export function sessionMarkdown(
 	messages: ReadonlyArray<LhMessage>,
-	opts: { title?: string; anchors?: boolean } = {},
+	opts: { title?: string; anchors?: boolean; photos?: MarkdownPhotos } = {},
 ): string {
 	const blocks: string[] = [];
 	if (opts.title !== undefined && opts.title.length > 0) blocks.push(`# ${opts.title}`);
-	const ctx = markdownContext(messages);
+	const ctx = { ...markdownContext(messages), photos: opts.photos ?? "note" };
 	for (const message of messages) {
 		const block = messageMarkdown(message, (message as { id?: string }).id ?? "", opts.anchors ?? true, ctx);
 		if (block !== null) blocks.push(block);

@@ -32,12 +32,6 @@ describe("kbdEventForAction — the one spelling for action events", () => {
 });
 
 describe("the ⌘B chain — keypress → binding → action → event", () => {
-	it("mod+t is the toggle-user-thinking action (owner round, 2026-10-07)", () => {
-		assert.equal(actionForBinding("mod+t"), "toggle-user-thinking");
-		assert.equal(bindingForAction("toggle-user-thinking"), "mod+t");
-		assert.equal(kbdEventForAction("toggle-user-thinking"), "lh:kbd-toggle-user-thinking");
-	});
-
 	it("mod+b is the toggle-sidebar action", () => {
 		assert.equal(actionForBinding("mod+b"), "toggle-sidebar");
 		assert.equal(bindingForAction("toggle-sidebar"), "mod+b");
@@ -48,13 +42,6 @@ describe("the ⌘B chain — keypress → binding → action → event", () => {
 		const action = actionForBinding("mod+b");
 		assert.equal(action, "toggle-sidebar");
 		assert.equal(kbdEventForAction(action), "lh:kbd-toggle-sidebar");
-	});
-});
-
-describe("the thinking pill suffix — ⇧⇥ via the registry", () => {
-	it("shift+tab uses the platform's modifier label and maps to cycle-thinking", () => {
-		assert.equal(actionForBinding("shift+tab"), "cycle-thinking");
-		assert.equal(formatBinding("shift+tab"), IS_MAC ? "⇧⇥" : "Shift+⇥");
 	});
 });
 

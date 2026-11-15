@@ -1,6 +1,5 @@
-import { chainsForSelection, formatChainLine } from "@/src/core";
-import { newGraphContextMessage, type GraphContextPick } from "@/src/core";
-import { compactionInFlight, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
+import { derivePlanStatusesLh, newSessionModeMessage, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
+import { compactionInFlight, courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
 /** The session picker's list: record-derived summaries (phase, pending
@@ -9,22 +8,25 @@ import type { ChatListItem } from "@/src/core";
  *  the merge point). Owner, minimal-color round: background jobs NO LONGER
  *  count — the sidebar's Background agents section is their channel now
  *  (a running spinner per row would double-signal them), so busy means
- *  exactly "a teach turn is in flight". */
+ *  exactly "a teach turn is in flight". A session whose course was deleted
+ *  says so (`courseDeleted`), as its lesson page does. */
 export async function GET() {
 	const chats: ChatListItem[] = listChats().map((c) => ({
 		...c,
 		busy: isTurnRunning(c.id),
 		compacting: compactionInFlight(c.id),
+		courseDeleted: courseGone(c.course),
 	}));
 	return Response.json({ chats });
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; course?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
-	// Practice sessions (owner, 2026-10-04): kind "practice" marks the
-	// record — the practice agent + its tools from turn 1, no extraction.
-	const kind = body.kind === "practice" ? ("practice" as const) : undefined;
+	// The Current design's Practice switch starts the session in practice;
+	// without it the prober routes the opening, and the agents hand the
+	// session between teaching and practice from there.
+	const practice = body.kind === "practice";
 	// Every session belongs to one registered course. A workspace the
 	// engine does not list is refused, never guessed.
 	const workspace = (body.course as { workspace?: unknown } | undefined)?.workspace;
@@ -33,47 +35,29 @@ export async function POST(req: Request) {
 	}
 	const course = await courseLinkFor(workspace);
 	if (!course) return Response.json({ error: "Unknown course", code: "unknown_course" }, { status: 400 });
-	const chat = createChat(titleFromPrompt(title || "Untitled session"), kind, course);
-	// PER-SESSION MODELS (owner, 2026-09-28): a session owns its model +
-	// thinking level from birth — stamped verbatim from the STRONG slot,
-	// the new-session default. From here the strong slot never reaches
-	// this session again: in-session picks write the session's own record
-	// (PUT /api/chats/:id/settings). No strong slot configured (fresh BYOK
-	// boot) → no stamp; the turn gate's 503 models_not_configured envelope
-	// refuses honestly until the setup flow fills the slot.
-	const strong = readSettingsRecord()?.models?.strong;
-	if (strong?.model) {
-		stores.chatStore.saveSettings(chat.id, {
-			model: { provider: strong.model.provider, id: strong.model.id },
-			thinkingLevel: strong.thinkingLevel,
-		});
+	// Continue on a finished lesson, when it starts fresh (FINISHED_LESSON):
+	// the lesson it picks up must be one of this course's.
+	const from = (body.resume as { from?: unknown } | undefined)?.from;
+	const resumed = typeof from === "string" ? stores.chatStore.getChat(from) : null;
+	if (typeof from === "string" && resumed?.course?.workspace !== workspace) {
+		return Response.json({ error: "Unknown lesson", code: "unknown_lesson" }, { status: 400 });
 	}
-	// The session's map context (owner, 2026-10-04): the picked
-	// propositions ride the CREATION — message[0] is a graph-context
-	// marker (a separate custom message BEFORE the learner's first user
-	// message), carrying the picks plus the reasoning chains among them.
-	// The picks carry their own name/statement (what the learner saw at
-	// pick time); the chains derive from the CURRENT graph snapshot.
-	const rawPicks = (body.graphContext as { propositions?: unknown } | undefined)?.propositions;
-	const picks: GraphContextPick[] = Array.isArray(rawPicks)
-		? rawPicks
-				.filter(
-						(p): p is GraphContextPick =>
-							typeof p === "object" &&
-							p !== null &&
-							typeof (p as GraphContextPick).id === "string" &&
-							typeof (p as GraphContextPick).name === "string" &&
-							typeof (p as GraphContextPick).statement === "string",
-					)
-					.slice(0, 64)
-			: [];
-	if (picks.length > 0) {
-		const byId = new Map(stores.graphStore.readNodes().map((n) => [n.id, n]));
-		const pickedNodes = picks.map((p) => byId.get(p.id)).filter((n) => n !== undefined);
-		const chainLines = chainsForSelection(pickedNodes, stores.graphStore.readChains()).map((c) =>
-			formatChainLine(c, Object.fromEntries(byId)),
-		);
-		stores.chatStore.saveMessages(chat.id, [newGraphContextMessage(picks, chainLines)]);
+	// The course topics it is started on, by handle: a topic's page, Home's
+	// review of those topics. The lists keep only handles the map has.
+	const topics = Array.isArray(body.topics) ? body.topics.filter((t): t is string => typeof t === "string" && t.length > 0).slice(0, 32) : [];
+	// The arc a session started from Check it checks; the brief reads its check from the engine.
+	const arcCheck = typeof body.arcCheck === "string" && body.arcCheck.length > 0 ? body.arcCheck : undefined;
+	const chat = createChat(titleFromPrompt(title || "Untitled session"), course, topics, arcCheck);
+	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
+	if (resumed) {
+		// The lesson's plan carries over as this session's plan map, so the
+		// teacher picks it up at the step it stopped on.
+		const steps = resumed.tree?.nodes ?? [];
+		const at = resumed.tree ? derivePlanStatusesLh(resumed.tree, resumed.messages).current : null;
+		if (resumed.tree) stores.chatStore.saveTree(chat.id, resumed.tree);
+		const text = sessionResumeText(resumed.title, steps, steps.find((s) => s.id === at)?.title ?? null);
+		opening.push(newSessionResumeMessage({ id: resumed.id, title: resumed.title }, text, sessionTasksOf(resumed.messages)) as LhMessage);
 	}
+	if (opening.length > 0) stores.chatStore.saveMessages(chat.id, opening);
 	return Response.json({ id: chat.id, title: chat.title });
 }

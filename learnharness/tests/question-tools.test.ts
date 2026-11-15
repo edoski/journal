@@ -20,7 +20,6 @@ import {
 	teachExplainToolFor,
 	type TeacherToolContext,
 } from "../src/agent/tools.ts";
-import { TOGGLEABLE_TOOLS } from "../src/core/pending.ts";
 import { jobStore } from "../src/store/jobs.ts";
 import { explainInputObject } from "../src/core/question-core.ts";
 import { chatStore } from "../src/store/chats.ts";
@@ -170,68 +169,23 @@ describe("teachExplainToolFor: the dynamic plan-nodeId validation (position sign
 });
 
 describe("the prober's registry", () => {
-	it("carries the nodeId-less recall, probe_done, and the learner-filesystem set", () => {
+	it("carries the nodeId-less recall, probe_done, the practice handoff, and the learner-filesystem set", () => {
 		const chatId = newChat("Prober: registry");
 		const tools = createProberTools({ chatId, chatStore, deliver: () => {}, jobStore, spawn: () => {} });
 		// Fix wave (2026-09-20): the owner ruling adds research + pdf dispatch
 		// to the probe phase's registry (demo/visual stay teach-only).
 		assert.deepEqual(Object.keys(tools).sort(), [
-			"ask_user_question", "find", "grep", "ls", "pdf", "probe_done", "read", "recall", "research",
+			"ask_user_question", "find", "grep", "ls", "name_session", "pdf", "practice", "probe_done", "read", "recall", "research",
 		]);
 	});
 });
-// ─── tool availability (2026-09 settings seam) ───────────────────────────────
-
-describe("tool toggles (core/pending.ts + factories)", () => {
-	it("TOGGLEABLE_TOOLS: the sub-agent dispatch tools; graded/ask/read stay off the list", () => {
-		// THE DEFINITIVE vocabulary (adjudicated with the user 2026-09-19, P2
-		// reconciliation): the job tools only. The graded tool and ask are
-		// permanently always-on (the prober's assessment + teaching doctrine
-		// are built on graded questions — the wedge danger), as are the
-		// learner-fs set, plan tools, and probe_done. The settings WRITE side
-		// validates against this list (settings-body).
-		assert.deepEqual(TOGGLEABLE_TOOLS, ["research", "demo", "visual", "pdf"]);
-	});
-
-	it("createProberTools: absent record = full set; explicit false drops exactly that tool; recall and probe_done survive everything", () => {
-		const chatId = newChat("Prober: toggles");
-		const ctx = { chatId, chatStore, deliver: () => {}, jobStore, spawn: () => {} };
-		const full = ["ask_user_question", "find", "grep", "ls", "pdf", "probe_done", "read", "recall", "research"];
-		assert.deepEqual(Object.keys(createProberTools(ctx)).sort(), full);
-
-		const noAsk = createProberTools(ctx, { ask_user_question: false });
-		assert.deepEqual(Object.keys(noAsk).sort(), full.filter((t) => t !== "ask_user_question"));
-
-		// A stored `explain: false` from the retired quizzing switch (or any
-		// hand-written false on the graded tool) never drops it.
-		assert.deepEqual(Object.keys(createProberTools(ctx, { explain: false, recall: false })).sort(), full);
-		assert.ok(createProberTools(ctx, { probe_done: false }).probe_done, "probe_done always-on");
-	});
-
-	it("createTeacherTools: {research: false} removes exactly research; unknown keys are no-ops", () => {
-		const chatId = newChat("Teacher: toggles");
-		const ctx: TeacherToolContext = {
-			chatId,
-			chatStore,
-			jobStore,
-			spawn: () => {},
-		};
-		const full = Object.keys(createTeacherTools(ctx)).sort();
-		assert.deepEqual(full, ["ask_user_question", "demo", "explain", "find", "grep", "ls", "pdf", "plan_init", "read", "research", "visual"]);
-
-		const noResearch = Object.keys(createTeacherTools(ctx, { research: false })).sort();
-		assert.deepEqual(noResearch, full.filter((t) => t !== "research"));
-
-		// absent = enabled: an empty record and undefined behave identically
-		assert.deepEqual(
-			Object.keys(createTeacherTools(ctx, {})).sort(),
-			full,
-			"absent keys mean enabled — old records behave exactly as today",
-		);
-
-		// A stored `explain: false` from the retired quizzing switch never
-		// drops the only graded tool.
-		assert.deepEqual(Object.keys(createTeacherTools(ctx, { explain: false })).sort(), full);
+describe("createTeacherTools: the whole set, always on", () => {
+	it("research, demo, visual and pdf sit beside the question, plan and file tools", () => {
+		const chatId = newChat("Teacher: full set");
+		const ctx: TeacherToolContext = { chatId, chatStore, jobStore, spawn: () => {}, deliver: () => {} };
+		assert.deepEqual(Object.keys(createTeacherTools(ctx)).sort(), [
+			"ask_user_question", "demo", "explain", "find", "grep", "lesson_progress", "ls", "pdf", "plan_init", "practice", "read", "research", "visual",
+		]);
 	});
 });
 

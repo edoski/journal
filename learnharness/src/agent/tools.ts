@@ -3,25 +3,25 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult, serverExecute } from "./tool-execute.ts";
 import {
 	askInputSchema,
+	askLabelProblems,
 	askOptionProblems,
 	explainInputBase,
 	explainInputObject,
 	explainInputProblems,
 	parseOptionsIfString,
 } from "../core/question-core.ts";
-import { filterEnabledTools, type EnabledTools } from "../core/pending.ts";
-import type { JobRecord } from "../core/contracts.ts";
+import type { JobRecord, SteerMessage } from "../core/contracts.ts";
 import type { JobStore } from "../core/ports.ts";
 import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type VisualInput } from "./tools/jobs.ts";
 import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
-import { proberGraphTools } from "./tools/graph.ts";
+import { nameSessionTool } from "./tools/name-session.ts";
+import { withPracticeHandoff } from "./tools/handoff.ts";
 import { readTool } from "./tools/read.ts";
 import { lsTool } from "./tools/ls.ts";
 import { findTool } from "./tools/find.ts";
 import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
-import type { GraphStore } from "../core/ports.ts";
 
 export { jobTools };
 export type { ProbeDoneContext } from "./tools/probe.ts";
@@ -83,7 +83,7 @@ export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 	prepareArguments: prepareQuestionArguments,
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {
-		const problems = askOptionProblems(input.options ?? []);
+		const problems = [...askOptionProblems(input.options ?? []), ...askLabelProblems(input.options ?? [])];
 		if (problems.length > 0) return invalidInputResult("ask_user_question", problems);
 		return questionResult();
 	},
@@ -111,8 +111,8 @@ function explainDescription(name: "explain" | "recall", nodeId: boolean): string
 		" always has one. THE COMMITMENT RULE: " +
 		"correctAnswer is the FULL correct answer in your own words, reasoning included, COMMITTED before he ever " +
 		"sees the question. When his answer returns, grade it strictly against the commitment — never revise it " +
-		"after seeing his words. He sees the committed answer on submit. His answer arrives with `confidence`: " +
-		"guessing, neutral or confident, his own one-tap read of it. " +
+		"after seeing his words. He sees the committed answer on submit. His answer arrives with `confidence` " +
+		"when he marked one: guessing or confident, his own one-tap read of it; none means he left it unmarked. " +
 		(nodeId
 			? "Set `nodeId` (required) to the plan node this question is about — validated at call time against the session's plan map. "
 			: "") +
@@ -168,26 +168,12 @@ export interface ProberToolContext extends ProbeDoneContext {
 	jobStore: JobStore;
 	/** Fire the background runner for a freshly created job. */
 	spawn: (job: JobRecord, input: ResearchInput | DemoInput | VisualInput | PdfInput) => void;
-	/** The prober's graph-map reader (wave 7): present = the two map tools
-	 *  (list_sessions / list_propositions) are registered. The composition
-	 *  root passes it only when graphToolsEnabled(effective) — the graph
-	 *  master switch AND the agent.graphTools toggle (settings-resolution).
-	 *  Absent = the gate is closed, no map tools (tests drive this seam). */
-	graphStore?: GraphStore;
 }
 
 /** The prober's tool set: recall (no nodeId) + ask + the learner-fs
- *  set + probe_done + the two phase-omnipresent job dispatch tools +
- *  (wave 7, gated) the graph-map reader. `enabled` is the resolved
- *  settings seam (core/pending.ts): any tool explicitly false is dropped
- *  from the registry. recall and probe_done stay always-on regardless —
- *  they are how the phase measures and ENDS. */
-export function createProberTools(
-	ctx: ProberToolContext,
-	enabled?: EnabledTools,
-): Record<string, AgentTool<any>> {
-	// probe_done is re-added AFTER the filter, always-on by construction — it
-	// is how the phase ENDS; a prober that can never conclude is a lockout.
+ *  set + probe_done + the two phase-omnipresent job dispatch tools. Every
+ *  tool is always on (owner, 2026-11-14): nothing switches one off. */
+export function createProberTools(ctx: ProberToolContext): Record<string, AgentTool<any>> {
 	const done = probeDoneTool(ctx);
 	// The job tools build over the SAME context/gates as the teacher's
 	// (one builder, one gating semantic); the prober carries a SUBSET:
@@ -199,37 +185,26 @@ export function createProberTools(
 	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry — every tool,
 	// not just the one the latest wobble incident landed on.
-	return healToolRecord({
-		...filterEnabledTools(
-			{
-				ask_user_question: askUserQuestionTool,
-				// The learner-filesystem set is always-on (user-decided 2026-09,
-				// sources v1): the prober inspects and LOCATES learner-referenced
-				// files while assessing the edge. Read-only by construction.
-				read: readTool,
-				ls: lsTool,
-				find: findTool,
-				grep: grepTool,
-				// Job dispatch in the probe phase (owner ruling, 2026-09-20):
-				// research + pdf are ALWAYS available in every phase — the
-				// prober can verify facts or read learner PDFs while assessing.
-				// demo/visual stay teach-phase-only (they need the lesson's plan
-				// context). Same user-toggle filtering as the teacher.
-				...(jobs.research ? { research: jobs.research } : {}),
-				pdf: jobs.pdf!,
-				// The map reader (wave 7): present only when the settings gate
-				// opened.
-				...(ctx.graphStore
-					? proberGraphTools({ chatStore: ctx.chatStore, graphStore: ctx.graphStore })
-					: {}),
-			},
-			enabled,
-		),
-		// Past the filter: a stored `explain: false` from the retired
-		// quizzing switch must never drop the only graded tool.
+	return withPracticeHandoff(healToolRecord({
+		ask_user_question: askUserQuestionTool,
+		// The learner-filesystem set (sources v1): the prober inspects and
+		// LOCATES learner-referenced files while assessing the edge.
+		// Read-only by construction.
+		read: readTool,
+		ls: lsTool,
+		find: findTool,
+		grep: grepTool,
+		// Job dispatch in the probe phase (owner ruling, 2026-09-20):
+		// research + pdf are available in every phase — the prober can
+		// verify facts or read learner PDFs while assessing. demo/visual
+		// stay teach-phase-only (they need the lesson's plan context).
+		...(jobs.research ? { research: jobs.research } : {}),
+		pdf: jobs.pdf!,
 		recall: probeExplainTool,
 		...done,
-	});
+		// The opening names the session in its first reply (name-session.ts).
+		...nameSessionTool(ctx),
+	}), ctx); // the prober routes the opening: a request to practise hands off
 }
 
 // ─── the teacher's question tool (explain carries the position field) ────────
@@ -258,42 +233,30 @@ export interface TeacherToolContext extends PlanToolContext {
 	 *  rides along — the spawn fires mid-stream, before the tool part is
 	 *  persisted to the transcript (a transcript scan would race it). */
 	spawn: (job: JobRecord, input: ResearchInput | DemoInput | VisualInput | PdfInput) => void;
+	/** Queue a handoff's wake: present = the `practice` handoff is
+	 *  registered (the composition root always passes it). */
+	deliver?: (steer: SteerMessage) => void;
 }
 
 /**
  * Per-request teacher tool registry: teach questions (validated nodeId) +
- * plan tools + job tools, all closing over the ctx.
- *
- * `enabled` is the resolved settings seam (core/pending.ts EnabledTools —
- * Platform's chat-handler wiring passes it through from settings). Today
- * only the sub-agent tools (research/demo/visual) are user-toggleable, but
- * the filtering is GENERIC: any name explicitly false is dropped, so
- * future toggleables need no change here. The graded question tool is
- * added past the filter, never toggleable.
- * Absent/undefined = enabled — tests and old records see today's set.
+ * plan tools + job tools, all closing over the ctx. Every tool is always
+ * on (owner, 2026-11-14): nothing switches one off.
  */
-export function createTeacherTools(
-	ctx: TeacherToolContext,
-	enabled?: EnabledTools,
-): Record<string, AgentTool<any>> {
+export function createTeacherTools(ctx: TeacherToolContext): Record<string, AgentTool<any>> {
 	// healToolRecord — same standard as the prober's registry (above).
-	return healToolRecord({
-		...filterEnabledTools(
-			{
-			ask_user_question: askUserQuestionTool,
-			// The learner-filesystem set is always-on (user-decided 2026-09,
-			// sources v1): the teacher locates and reads learner-referenced
-			// files on its own terms — nothing auto-injects. Read-only by
-			// construction (fs-shared.ts).
-			read: readTool,
-			ls: lsTool,
-			find: findTool,
-			grep: grepTool,
-			...planTools(ctx),
-			...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn }),
-		},
-		enabled,
-		),
+	const tools = healToolRecord({
+		ask_user_question: askUserQuestionTool,
+		// The learner-filesystem set (sources v1): the teacher locates and
+		// reads learner-referenced files on its own terms — nothing
+		// auto-injects. Read-only by construction (fs-shared.ts).
+		read: readTool,
+		ls: lsTool,
+		find: findTool,
+		grep: grepTool,
+		...planTools(ctx),
+		...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn }),
 		explain: teachExplainToolFor(ctx),
 	});
+	return ctx.deliver ? withPracticeHandoff(tools, { chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }) : tools;
 }

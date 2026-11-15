@@ -34,24 +34,27 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { sameQuestionKey } from "./shown-help.ts";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
+	DONE_TONIGHT_TEXT,
 	HANDOFF_TEXT,
+	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
+	PRACTICE_REQUEST_TEXT,
+	hintRungText,
 	THINKING_LABEL,
+	type PracticeRequest,
+	type SessionMode,
+	disputeText,
 } from "./contracts/chat.ts";
-import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
-import type { Confidence } from "./contracts/course.ts";
-import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
+import { compactAnswerForModel, normalizeQuestionType, type QuestionAnswerData } from "./question-core.ts";
+import { chosenConfidence, type Confidence } from "./contracts/course.ts";
+import type { MarkResult } from "./contracts/marks.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
-
-/** The hard-invariant wording for an aborted turn's unanswered calls —
- *  carried over verbatim from the pre-native era so the model's view
- *  never drifted. */
-export const INTERRUPTED_TEXT =
-	"The question was interrupted — the learner never answered; continue without holding a result for it.";
+import { PHOTO_ONLY_TEXT, WORKING_PHOTO_NOTE, type Photo } from "./photos.ts";
 
 // ─── The record's message type ───────────────────────────────────────────────
 
@@ -68,21 +71,34 @@ export interface LhMarkerMessage {
 	id: string;
 	role: "custom";
 	customType:
+		// Older sessions started from picks on the retired knowledge map.
 		| "graph-context"
 		| "course-context"
 		| "probe-handoff"
+		| "session-mode"
+		| "mode-handoff"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
 		| "practice-thinking"
 		| "practice-next"
+		| "practice-request"
+		| "done-tonight"
+		| "dispute"
 		| "problem-dismissed"
-		| "compaction";
+		| "compaction"
+		| "session-resume"
+		| "ungraded-answer"
+		| "asked";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
 	/** The UI payload — per-customType, never model-visible. */
 	details: unknown;
+	/** Photos of his handwritten working (photos.ts), model-facing like
+	 *  `content`: toLlmMessages sends them after it. A practice
+	 *  submission's only. */
+	images?: Photo[];
 	timestamp: number;
 }
 
@@ -161,13 +177,20 @@ export function newMessageId(): string {
 //     core/input-events.ts; steers in core/contracts/jobs.ts) ─────────────────
 
 /** A learner-authored user message (text input, verdict note). */
-export function newUserMessage(text: string): LhMessage & UserMessage {
+export function newUserMessage(text: string, photos?: readonly Photo[]): LhMessage & UserMessage {
 	return {
 		id: newMessageId(),
 		role: "user",
-		content: text,
+		content: withPhotos(text, photos),
 		timestamp: Date.now(),
 	};
+}
+
+/** A user message's content: the plain string, or with photos his words
+ *  (when he typed any) followed by the image parts. */
+function withPhotos(text: string, photos?: readonly Photo[]): UserMessage["content"] {
+	if (!photos?.length) return text;
+	return [...(text.trim() ? [{ type: "text" as const, text }] : []), ...photos.map((p) => ({ type: "image" as const, data: p.data, mimeType: p.mimeType }))];
 }
 
 /** A steered user message (mid-turn composer steering, owner 2026-10-03):
@@ -175,8 +198,8 @@ export function newUserMessage(text: string): LhMessage & UserMessage {
  *  rides agent.steer(), the live stream's message events, and the settled
  *  record, so the optimistic queued indicator and the transcript card
  *  upsert by one identity. */
-export function newUserSteer(text: string, id: string): LhMessage & UserMessage {
-	return { id, role: "user", content: text, timestamp: Date.now() };
+export function newUserSteer(text: string, id: string, photos?: readonly Photo[]): LhMessage & UserMessage {
+	return { id, role: "user", content: withPhotos(text, photos), timestamp: Date.now() };
 }
 
 /** The learner's answer — the question call's tool result (fork 1).
@@ -189,13 +212,20 @@ export function newAnswerResult(
 	toolCallId: string,
 	toolName: string,
 	answer: unknown,
+	photos?: readonly Photo[],
 ): LhMessage & ToolResultMessage {
+	// A photo of his working rides the result as image parts after the
+	// answer, and the answer says it is there.
+	// An answer to a graded question carries its id first: the attempt the
+	// tutor saves names it (`question`), so his card shows that mark.
+	const compact = GRADED_QUESTION_TOOLS.includes(toolName) && isRealAnswer(answer) ? { question: toolCallId, ...compactAnswerForModel(answer as QuestionAnswerData) } : compactAnswerForModel(answer as QuestionAnswerData);
+	if (photos?.length) compact.photo = WORKING_PHOTO_NOTE;
 	return {
 		id: newMessageId(),
 		role: "toolResult",
 		toolCallId,
 		toolName,
-		content: [{ type: "text", text: JSON.stringify(compactAnswerForModel(answer as QuestionAnswerData)) }],
+		content: [{ type: "text", text: JSON.stringify(compact) }, ...(photos ?? []).map((p) => ({ type: "image" as const, data: p.data, mimeType: p.mimeType }))],
 		// 0.87.1 narrowed ToolResultMessage.details to JsonRepresentation —
 		// our payloads are JSON-safe answer structures, so the cast is honest.
 		details: answer as ToolResultMessage["details"],
@@ -216,6 +246,101 @@ export function newHandoffMessage(chatId: string): LhMarkerMessage {
 		details: { chatId },
 		timestamp: Date.now(),
 	};
+}
+
+// ─── the session's mode: teaching or practice ───────────────────────────────
+
+/** The handoff tools, by the mode each one switches the session to. */
+export const MODE_HANDOFF_TOOLS: Readonly<Record<string, SessionMode>> = { practice: "practice", teach: "teach" };
+
+/** The mode a session starts in, chosen at creation (Current design's
+ *  Teach/Practice switch). UI-only: the model never sees it, since the
+ *  agent's system prompt already says what it runs. */
+export function newSessionModeMessage(mode: SessionMode): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "session-mode",
+		content: "",
+		display: false,
+		details: { mode },
+		timestamp: Date.now(),
+	};
+}
+
+/** The wake a handoff queues: it starts the new mode's agent, which reads
+ *  the handoff call's arguments above it. One per handoff call. */
+export function newModeHandoffMessage(chatId: string, toolCallId: string, mode: SessionMode): LhMarkerMessage {
+	return {
+		id: `steer_mode_${toolCallId}`,
+		role: "custom",
+		customType: "mode-handoff",
+		content: MODE_HANDOFF_TEXT[mode],
+		display: true,
+		details: { chatId, mode },
+		timestamp: Date.now(),
+	};
+}
+
+/** Walks the transcript's mode: `written[i]` is the mode message i was
+ *  written in, `now` the mode after the last one. `initial` is a record's
+ *  stored `kind` (sessions made before modes followed the transcript),
+ *  else teach. A session-mode marker sets the mode; a handoff call
+ *  switches it from its successful result on. A call from a failed or
+ *  aborted generation, an error result or a refusal (`details.ok: false`)
+ *  switches nothing. */
+function foldModes(messages: readonly LhMessage[], initial: SessionMode): { written: SessionMode[]; now: SessionMode } {
+	let mode = initial;
+	const calls = new Map<string, SessionMode>();
+	const written = messages.map((m) => {
+		const at = mode;
+		if (m.role === "custom" && m.customType === "session-mode") {
+			mode = (m.details as { mode?: unknown } | null)?.mode === "practice" ? "practice" : "teach";
+			return mode;
+		}
+		if (m.role === "assistant" && m.stopReason !== "error" && m.stopReason !== "aborted") {
+			for (const block of m.content) {
+				if (block.type === "toolCall" && MODE_HANDOFF_TOOLS[block.name]) calls.set(block.id, MODE_HANDOFF_TOOLS[block.name]!);
+			}
+		} else if (m.role === "toolResult" && !m.isError && (m.details as { ok?: unknown } | null | undefined)?.ok !== false) {
+			const target = calls.get(m.toolCallId);
+			if (target && MODE_HANDOFF_TOOLS[m.toolName] === target) mode = target;
+		}
+		return at;
+	});
+	return { written, now: mode };
+}
+
+/** The mode each message was written in, index for index. */
+export function sessionModesOf(messages: readonly LhMessage[], initial: SessionMode = "teach"): SessionMode[] {
+	return foldModes(messages, initial).written;
+}
+
+/** The mode the session is in now: the one its next turn runs. */
+export function sessionModeOf(messages: readonly LhMessage[], initial: SessionMode = "teach"): SessionMode {
+	return foldModes(messages, initial).now;
+}
+
+/** The opening of a fresh session that picks up a finished lesson
+ *  (`from`): model-facing (sessionResumeText), and it stands for the
+ *  concluded probe and the plan, which the record's tree carries over. It
+ *  also carries the open tasks the lesson held, so the new session holds
+ *  them from its first message. */
+export function newSessionResumeMessage(from: { id: string; title: string }, text: string, tasks: readonly string[]): LhMarkerMessage {
+	return {
+		id: `resume_${from.id}_${newMessageId()}`,
+		role: "custom",
+		customType: "session-resume",
+		content: text,
+		display: true,
+		details: { from: from.id, title: from.title, tasks: [...tasks] },
+		timestamp: Date.now(),
+	};
+}
+
+/** Does the session pick up an earlier lesson (a session-resume opening)? */
+export function resumesLesson(messages: readonly LhMessage[]): boolean {
+	return messages.some((m) => m.role === "custom" && m.customType === "session-resume");
 }
 
 /** The plan presentation block: pure UI history (a frozen snapshot), no
@@ -274,45 +399,13 @@ export function visibleCourseBriefKey(messages: readonly LhMessage[]): string | 
 	return null;
 }
 
-/** One picked proposition of the graph-context marker (the learner's map
- *  pick — name + statement as the learner SAW them at pick time). */
-export interface GraphContextPick {
-	id: string;
-	name: string;
-	statement: string;
-}
-
-/** The session's map context (owner, 2026-10-04): a SEPARATE custom
- *  message BEFORE the learner's first user message — the picked
- *  propositions plus the reasoning chains among them (pre-formatted
- *  lines, formatChainLine shape). The model reads `content` (flattened
- *  to a user message by toLlmMessages like every marker); `details`
- *  feeds the transcript's collapsible GraphContextCard. No more seed
- *  text glued into the first prompt. */
-export function newGraphContextMessage(picks: readonly GraphContextPick[], chains: readonly string[]): LhMarkerMessage {
-	const lines = [
-		// PREAMBLE LAW (owner, 2026-10-10): custom markers flatten to
-		// USER-role messages on the wire (toLlmMessages) — this text arrives
-		// in the learner's voice channel, so it must not read like a system
-		// broadcast. The bracket convention (NEXT_PROBLEM_TEXT's kin) marks
-		// it honestly as injected session context, not learner speech.
-		"[Session context] — picked from the learner's knowledge map when starting this session:",
-		"",
-		"Propositions (name: statement):",
-		...picks.map((p) => `- ${p.name}: ${p.statement}`),
-	];
-	if (chains.length > 0) {
-		lines.push("", "Reasoning chains among them (premises → conclusion):", ...chains.map((c) => `- ${c}`));
-	}
-	return {
-		id: newMessageId(),
-		role: "custom",
-		customType: "graph-context",
-		content: lines.join("\n"),
-		display: true,
-		details: { propositions: picks, chains },
-		timestamp: Date.now(),
-	};
+/** How many Hint requests this problem has had so far. */
+export function hintsAsked(messages: readonly LhMessage[], problemCallId: string): number {
+	return messages.filter((m) => {
+		if (m.role !== "custom" || m.customType !== "practice-request") return false;
+		const d = m.details as Partial<PracticeRequestDetails> | null;
+		return d?.problemCallId === problemCallId && d.request === "hint";
+	}).length;
 }
 
 /** The learner's thinking submission (ONE send lane, owner round
@@ -321,15 +414,42 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
  *  content label is the single "Your thinking"; `details` keeps the raw
  *  payload for the transcript card. One problem may carry many
  *  submissions. `confidence` is the learner's one-tap read of the
- *  submission; the dock always sends one. */
-export function newThinkingMessage(problemCallId: string, text: string, confidence?: Confidence): LhMarkerMessage {
+ *  submission, kept only when he chose one (`chosenConfidence`). */
+export function newThinkingMessage(problemCallId: string, text: string, picked?: Confidence, photos?: readonly Photo[]): LhMarkerMessage {
+	const confidence = chosenConfidence(picked);
+	const typed = text.trim() ? text : photos?.length ? PHOTO_ONLY_TEXT : text;
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-thinking",
-		content: `${THINKING_LABEL}:\n${text}${confidence ? `\n\nConfidence: ${confidence}` : ""}`,
+		content: `${THINKING_LABEL}:\n${typed}${photos?.length ? `\n\n${WORKING_PHOTO_NOTE}` : ""}${confidence ? `\n\nConfidence: ${confidence}` : ""}`,
 		display: true,
 		details: { problemCallId, text, ...(confidence ? { confidence } : {}) },
+		...(photos?.length ? { images: photos.map((p) => ({ type: "image" as const, data: p.data, mimeType: p.mimeType })) } : {}),
+		timestamp: Date.now(),
+	};
+}
+
+/** A practice request (the dock's Hint, Show me and Explain instead):
+ *  never an answer. `details.request` names it for the record and the
+ *  transcript; `text` is any work he had written when he pressed it. */
+export interface PracticeRequestDetails {
+	problemCallId: string;
+	request: PracticeRequest;
+	text?: string;
+}
+
+/** `nth`: which hint on this problem a Hint request is (1 for the first). */
+export function newPracticeRequestMessage(problemCallId: string, request: PracticeRequest, text?: string, nth = 1): LhMarkerMessage {
+	const work = text?.trim();
+	const head = request === "hint" ? `${PRACTICE_REQUEST_TEXT.hint} ${hintRungText(nth)}` : PRACTICE_REQUEST_TEXT[request];
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "practice-request",
+		content: work ? `${head}\n\nHis work so far:\n${work}` : head,
+		display: true,
+		details: { problemCallId, request, ...(work ? { text: work } : {}) } satisfies PracticeRequestDetails,
 		timestamp: Date.now(),
 	};
 }
@@ -348,6 +468,145 @@ export function newNextMessage(): LhMarkerMessage {
 		content: NEXT_PROBLEM_TEXT,
 		display: true,
 		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** The marker for an answer whose grading turn was cut (`ungradedAnswerOf`). */
+export const UNGRADED_ANSWER = "ungraded-answer";
+
+/**
+ * A graded answer he gave whose turn stopped before the tutor graded it
+ * (round 3: a stop right after a confident wrong answer left it unrecorded
+ * unless he pressed Try again). He answered and the question showed him its
+ * answer, so by the engine's rules it is an attempt, and the record must
+ * hold it whatever he does next. The question he answered, when the newest
+ * graded answer (a check or a recall, never a prediction, which is not
+ * graded) has no save that went through after it and every reply since was
+ * cut; else null. Pure.
+ */
+export function ungradedAnswerOf(messages: readonly LhMessage[]): string | null {
+	const at = messages.findLastIndex((m) => m.role === "toolResult" && (m.toolName === "explain" || m.toolName === "recall") && !m.isError && !isDismissedResult(m));
+	if (at < 0) return null;
+	const result = messages[at] as ToolResultMessage;
+	const call = messages
+		.slice(0, at)
+		.flatMap((m) => (m.role === "assistant" ? m.content : []))
+		.find((b) => b.type === "toolCall" && b.id === result.toolCallId);
+	if (!call || call.type !== "toolCall" || !questionNeedsGrade(call.arguments)) return null;
+	const after = messages.slice(at + 1);
+	const clean = cleanToolCallIds(after);
+	for (const m of after) {
+		if (m.role !== "assistant") continue;
+		if (m.stopReason !== "aborted" && m.stopReason !== "error") return null;
+		if (m.content.some((b) => b.type === "toolCall" && b.name === "course_save" && clean.has(b.id))) return null;
+	}
+	const question = (result.details as { questionText?: unknown } | null)?.questionText;
+	return typeof question === "string" ? question : "";
+}
+
+/** A question whose answer is graded: every check and recall but a
+ *  prediction. */
+function questionNeedsGrade(input: unknown): boolean {
+	const type = (input as { type?: unknown } | null)?.type;
+	return !(typeof type === "string" && type.replace(/["']/g, "").trim() === "predict");
+}
+
+/** The note riding his next input after `ungradedAnswerOf`: grade and save
+ *  that answer first. Model-facing only. */
+export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
+	const which = question ? ` to "${question}"` : "";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: UNGRADED_ANSWER,
+		content: `[UNGRADED ANSWER] His answer${which} was submitted and its answer shown to him, but your turn stopped before you graded it. It is an attempt, not a question left open: grade it and save it with course_save in this turn, before anything else, then answer what follows.`,
+		display: false,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** The note riding a message he sent from Ask (round 5: an answer typed
+ *  while Ask stayed on was graded, with an earlier note's confidence):
+ *  what follows is a question to the tutor, never an answer. Model-facing
+ *  only. */
+export function newAskedMessage(open: "question" | "problem"): LhMarkerMessage {
+	const beside = open === "problem" ? "while the problem stays open" : "after setting the question aside";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "asked",
+		content: `[ASKED] He sent his next message from Ask, ${beside}: a question to you, not his answer. Answer it. Never grade it, save it as an attempt or conclude a problem from it as solved; his answer comes as his work.`,
+		display: false,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** What he sent last on a problem: his work, with the confidence he chose
+ *  for it, or a message from Ask (any message of his while the problem is
+ *  open, a question by the composer's rule); null before either. A request
+ *  (Hint, Show me, Explain instead) is neither. Pure. */
+export function finalSubmissionOf(messages: readonly LhMessage[], problemCallId: string): { kind: "work"; confidence?: Confidence } | { kind: "asked" } | null {
+	const posed = messages.findIndex((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.id === problemCallId));
+	if (posed < 0) return null;
+	for (let i = messages.length - 1; i > posed; i--) {
+		const m = messages[i]!;
+		if (m.role === "user") return { kind: "asked" };
+		if (m.role === "custom" && m.customType === "practice-thinking") {
+			const details = m.details as { problemCallId?: unknown; confidence?: unknown } | null;
+			if (details?.problemCallId !== problemCallId) continue;
+			const confidence = chosenConfidence(details.confidence);
+			return { kind: "work", ...(confidence ? { confidence } : {}) };
+		}
+	}
+	return null;
+}
+
+/** His Done for tonight: he stops now. The content tells the agent that
+ *  answers it to close without grading what he left open; the
+ *  transcript draws its own quiet line off the marker. */
+export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "done-tonight",
+		content: DONE_TONIGHT_TEXT[agent],
+		display: true,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** His dispute of an answer's mark (Edo, 14 Nov 2026), the transcript's
+ *  record of it: which answer, the attempts that stood for it, and what he
+ *  said or the mark he picked. */
+export interface DisputeDetails {
+	/** The answer's tool call: a question's, or a problem's conclude. */
+	answerId: string;
+	observations: string[];
+	said?: string;
+	proposed?: MarkResult;
+	/** How he thinks it should count: as his own work, or with help. */
+	proposedHow?: DisputedHow;
+}
+
+/** How a disputed answer should count, as his answer card says it. */
+export type DisputedHow = "ownWork" | "withHelp";
+export const DISPUTED_HOWS: readonly DisputedHow[] = ["ownWork", "withHelp"];
+
+/** His dispute, as its own message to the tutor: the content names the
+ *  answer and its attempts, so the agent re-judges them as the course
+ *  record says (prompts/course/10-record.md). */
+export function newDisputeMessage(details: DisputeDetails, question: string): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "dispute",
+		content: disputeText(details, question),
+		display: true,
+		details,
 		timestamp: Date.now(),
 	};
 }
@@ -379,6 +638,9 @@ export function newProblemDismissedMarker(problemCallId: string): LhMarkerMessag
  *  pair appends at most once per marker). */
 export function concludedByDismissalPair(
 	problemCallId: string,
+	/** "tonight" when Done for today dropped it (the card says it was left
+	 *  for next time); the model's face is the same either way. */
+	reason?: "tonight",
 ): [LhMessage & AssistantMessage, LhMessage & ToolResultMessage] {
 	const callId = `call_conc_${problemCallId}`;
 	const now = Date.now();
@@ -414,7 +676,7 @@ export function concludedByDismissalPair(
 			toolCallId: callId,
 			toolName: PRACTICE_CONCLUDE_TOOL,
 			content: [{ type: "text", text: CONCLUDE_ACK_TEXT }],
-			details: { outcome: "dismissed", problemCallId },
+			details: { outcome: "dismissed", problemCallId, ...(reason ? { reason } : {}) },
 			isError: false,
 			timestamp: now,
 		},
@@ -436,6 +698,268 @@ function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
 		if (!result.isError) ids.add(result.toolCallId);
 	}
 	return ids;
+}
+
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
+
+/** A course_save's changes as the engine read them: the tool takes an
+ *  object, and also its JSON text, which the tutor often sends. Null when
+ *  neither. Pure. */
+function saveChanges(args: Record<string, unknown>): Record<string, unknown> | null {
+	let changes = args.changes;
+	if (typeof changes === "string") {
+		try {
+			changes = JSON.parse(changes);
+		} catch {
+			return null;
+		}
+	}
+	return typeof changes === "object" && changes !== null && !Array.isArray(changes) ? (changes as Record<string, unknown>) : null;
+}
+
+/** The sources the last turn's clean course_saves registered: material
+ *  added during a lesson. Pure. */
+export function sourcesRegisteredInLastTurn(messages: readonly LhMessage[]): string[] {
+	const start = messages.findLastIndex((m) => m.role === "user") + 1;
+	const turn = messages.slice(start);
+	const clean = cleanToolCallIds(turn);
+	const added: string[] = [];
+	for (const m of turn) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const sources = saveChanges(block.arguments as Record<string, unknown>)?.sources;
+			if (typeof sources !== "object" || sources === null) continue;
+			for (const [handle, entry] of Object.entries(sources)) if (entry !== null && !added.includes(handle)) added.push(handle);
+		}
+	}
+	return added;
+}
+
+/** The course topics a session worked on, by its own transcript, in the
+ *  order it first touched them: the topics of each problem it posed and of
+ *  each observation it saved, and the topics a save introduced. Only calls
+ *  that went through count; a plan step never does, whatever its name.
+ *  Candidates only: a caller keeps the ones its course map lists. Pure. */
+export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	const topics = new Set<string>();
+	for (const m of messages) {
+		if ((m as { role?: string }).role !== "assistant") continue;
+		for (const block of (m as AssistantMessage).content) {
+			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
+			const args = block.arguments as Record<string, unknown>;
+			if (block.name === PRACTICE_PROBLEM_TOOL) for (const t of strings(args.topics)) topics.add(t);
+			const changes = block.name === "course_save" ? saveChanges(args) : null;
+			if (!changes) continue;
+			for (const o of Array.isArray(changes.observations) ? changes.observations : []) {
+				for (const t of strings((o as { topics?: unknown } | null)?.topics)) topics.add(t);
+			}
+			if (typeof changes.topics === "object" && changes.topics !== null) {
+				for (const [t, patch] of Object.entries(changes.topics)) {
+					if ((patch as { introduced?: unknown } | null)?.introduced === true) topics.add(t);
+				}
+			}
+		}
+	}
+	return [...topics];
+}
+
+/** The topics a practice session's first problem is on. A practice session
+ *  with no topic of its own (one the naming rule never reached) belongs to
+ *  them, so it stays with its topic while open (round 6 N10); a lesson
+ *  still belongs to none until its plan names one. */
+export function firstProblemTopicsOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	for (const m of messages) {
+		if ((m as { role?: string }).role !== "assistant") continue;
+		for (const block of (m as AssistantMessage).content) {
+			if (block.type === "toolCall" && clean.has(block.id) && block.name === PRACTICE_PROBLEM_TOOL && strings((block.arguments as Record<string, unknown>).topics).length > 0) {
+				return strings((block.arguments as Record<string, unknown>).topics);
+			}
+		}
+	}
+	return [];
+}
+
+/** A JSON array the tutor may send as its text, as a list of strings. */
+function stringList(value: unknown): string[] {
+	if (typeof value !== "string") return strings(value);
+	try {
+		return strings(JSON.parse(value));
+	} catch {
+		return [];
+	}
+}
+
+/** A question he answered in this session, or a practice problem that
+ *  ended: what a saved attempt names as its `question`. */
+export interface AnsweredQuestion {
+	/** The tool the answer came through: `explain`, `recall`, a problem's
+	 *  `conclude`, or `message` for an answer in words (`HIS_MESSAGE`). */
+	tool: string;
+	/** Its solution was shown to him before it was asked: the same words
+	 *  were asked earlier in the session and answered, or posed as a
+	 *  problem that ended (shown-help.ts). */
+	seenBefore: boolean;
+	/** Asked as a prediction (an `explain` with `type` predict): only such
+	 *  an answer may be saved `predicted`, and only when the tutor judges it
+	 *  was not answerable from what was taught. Absent for an answer in
+	 *  words, which no question declared. */
+	predicted?: boolean;
+	/** The confidence he chose with this answer, null for none (the meter
+	 *  left alone, or a message, which has no meter). Absent for a
+	 *  problem's conclude, whose attempts carry the confidence of each
+	 *  submission. */
+	confidence?: Exclude<Confidence, "neutral"> | null;
+	/** A save that went through already recorded it, or its problem's
+	 *  conclude did. */
+	recorded: boolean;
+}
+
+/** The name a save gives an answer he gave in words, in a message of his
+ *  rather than through a question (round 5: such an answer was recorded
+ *  and showed no mark). It stands for his newest message before the save:
+ *  the message the turn answers. */
+export const HIS_MESSAGE = "his-message";
+
+/** The graded question tools: an answer to one is an attempt. */
+export const GRADED_QUESTION_TOOLS: readonly string[] = ["explain", "recall"];
+
+/** A graded question's result that is his answer: not a Hint press, not a
+ *  question left unanswered. */
+export function isRealAnswer(details: unknown): boolean {
+	const d = details as { dismissed?: unknown; hintRequested?: unknown } | null;
+	return !!d && typeof d === "object" && d.dismissed !== true && d.hintRequested !== true;
+}
+
+/** Every question he answered and every problem that ended, keyed by the
+ *  call a saved attempt names: the graded question's call, or the
+ *  problem's `conclude`; and `HIS_MESSAGE` once he has sent a message.
+ *  Only calls that went through count; a problem left for today ended
+ *  unseen. Pure. */
+export function answeredQuestionsOf(messages: readonly LhMessage[]): Map<string, AnsweredQuestion> {
+	return questionScan(messages).answered;
+}
+
+/** True when the solution of the question or problem a call asked had been
+ *  shown to him before it was asked (`AnsweredQuestion.seenBefore`). Pure. */
+export function seenBeforeAsked(messages: readonly LhMessage[], callId: string): boolean {
+	return questionScan(messages).posed.get(callId)?.seen === true;
+}
+
+/** A conclude's result says its attempts were not recorded: the save
+ *  failed or the pose was lost (tools/practice.ts). Any other result of a
+ *  problem that ended recorded them, or had nothing to record. */
+const UNSAVED_CONCLUDE = /The attempt was not saved|The attempt could not be recorded/;
+
+function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { key: string; seen: boolean; predicted: boolean }>; answered: Map<string, AnsweredQuestion> } {
+	const clean = cleanToolCallIds(messages);
+	const revealed = new Set<string>();
+	const posed = new Map<string, { key: string; seen: boolean; predicted: boolean }>();
+	const answered = new Map<string, AnsweredQuestion>();
+	// Each save's named answers, until its result says whether it went
+	// through; an answer in words stands for his newest message then.
+	const naming = new Map<string, string[]>();
+	const recorded = new Set<string>();
+	let problem: string | null = null;
+	let lastSaid: string | null = null;
+	const pose = (callId: string, text: unknown, type?: unknown) => {
+		if (typeof text !== "string") return;
+		const key = sameQuestionKey(text);
+		posed.set(callId, { key, seen: revealed.has(key), predicted: normalizeQuestionType(type) === "predict" });
+	};
+	for (const m of messages) {
+		if (m.role === "user") lastSaid = m.id;
+		else if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
+		else if (m.role === "assistant") {
+			for (const block of m.content) {
+				if (block.type !== "toolCall") continue;
+				const args = (block.arguments ?? {}) as Record<string, unknown>;
+				if (GRADED_QUESTION_TOOLS.includes(block.name)) pose(block.id, args.question, args.type);
+				else if (block.name === "course_save") {
+					naming.set(block.id, savedQuestionsOf(args).flatMap((q) => (q === null ? [] : [q === HIS_MESSAGE ? `${HIS_MESSAGE}:${lastSaid}` : q])));
+				} else if (block.name === PRACTICE_PROBLEM_TOOL && clean.has(block.id)) {
+					pose(block.id, args.statement);
+					problem = block.id;
+				} else if (block.name === PRACTICE_CONCLUDE_TOOL && clean.has(block.id) && problem) {
+					const asked = posed.get(problem);
+					problem = null;
+					if (!asked || args.outcome === "dismissed") continue;
+					revealed.add(asked.key);
+					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: asked.seen, predicted: false, recorded: false });
+				}
+			}
+		} else if (m.role === "toolResult" && !m.isError && m.toolName === "course_save") {
+			for (const key of naming.get(m.toolCallId) ?? []) recorded.add(key);
+		} else if (m.role === "toolResult" && !m.isError && m.toolName === PRACTICE_CONCLUDE_TOOL) {
+			if (!UNSAVED_CONCLUDE.test(resultText(m))) recorded.add(m.toolCallId);
+		} else if (m.role === "toolResult" && GRADED_QUESTION_TOOLS.includes(m.toolName) && !m.isError && isRealAnswer(m.details)) {
+			const asked = posed.get(m.toolCallId);
+			if (!asked) continue;
+			revealed.add(asked.key);
+			const confidence = chosenConfidence((m.details as { confidence?: unknown }).confidence) ?? null;
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, recorded: false });
+		}
+	}
+	for (const [key, answer] of answered) answer.recorded = recorded.has(key);
+	if (lastSaid) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false, confidence: null, recorded: recorded.has(`${HIS_MESSAGE}:${lastSaid}`) });
+	return { posed, answered };
+}
+
+function resultText(m: ToolResultMessage): string {
+	return m.content.map((part) => (part.type === "text" ? part.text : "")).join("");
+}
+
+/** The question each observation of a course_save call names
+ *  (`question`), in order; null where it names none. */
+export function savedQuestionsOf(args: unknown): (string | null)[] {
+	const changes = saveChanges((args ?? {}) as Record<string, unknown>);
+	const listed = Array.isArray(changes?.observations) ? changes.observations : [];
+	return listed.map((o) => {
+		const q = (o as { question?: unknown } | null)?.question;
+		return typeof q === "string" && q.trim() ? q.trim() : null;
+	});
+}
+
+/** The course saves a session made that went through, each as the changes
+ *  the engine read, in order. Pure. */
+export function sessionSavesOf(messages: readonly LhMessage[]): Record<string, unknown>[] {
+	const clean = cleanToolCallIds(messages);
+	return messages.flatMap((m) =>
+		m.role === "assistant"
+			? m.content.flatMap((block) => {
+					if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) return [];
+					const changes = saveChanges(block.arguments as Record<string, unknown>);
+					return changes ? [changes] : [];
+				})
+			: [],
+	);
+}
+
+/** The engine tasks a session holds: each task key its saves that went
+ *  through last wrote as open (a task patch, or the `focus`), or that the
+ *  lesson it picked up held, and never removed after (a `null` entry). Which of them the engine still has open,
+ *  and at which step, is the engine's to say. Pure. */
+export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	const held = new Map<string, boolean>();
+	for (const m of messages) {
+		if (m.role === "custom" && m.customType === "session-resume") {
+			for (const key of strings((m.details as { tasks?: unknown } | null)?.tasks)) held.set(key, true);
+		}
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const changes = saveChanges(block.arguments as Record<string, unknown>);
+			if (!changes) continue;
+			if (typeof changes.tasks === "object" && changes.tasks !== null) {
+				for (const [key, patch] of Object.entries(changes.tasks)) held.set(key, patch !== null);
+			}
+			if (typeof changes.focus === "string") held.set(changes.focus, true);
+		}
+	}
+	return [...held].filter(([, open]) => open).map(([key]) => key);
 }
 
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
@@ -571,110 +1095,6 @@ function resultIdsFrom(messages: readonly AgentMessage[]): Set<string> {
 	return ids;
 }
 
-/**
- * AgentMessage[] → the provider wire (the agent's convertToLlm — required
- * by pi-agent-core's loop config, the ONE place model-facing decisions
- * live):
- *
- * - user / assistant / toolResult pass through VERBATIM — signatures,
- *   usage, provider stamps all native — minus our record-`id` field.
- * - markers flatten to a user message carrying their content (the
- *   canonical text single-sourced in core/contracts); plan blocks are
- *   UI-only and filtered.
- * - dangling calls from successfully generated assistant messages (for
- *   example, an unanswered question) get a synthesized interrupted result.
- *   Error/aborted generations do not: Pi drops those assistant messages,
- *   so manufacturing their results would leave orphan results on the wire.
- *
- * Contract (pi-agent-core): never throws — an unknown shape passes
- * through untouched rather than killing the loop.
- */
-export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
-	// THE COMPACTION CUT (owner round 14, 2026-10-05): the ACTIVE marker
-	// (the newest — chained compactions rule last) names the first kept
-	// message; everything before it is replaced by the marker's content
-	// (header + summary) rendered ONCE, up top. All compaction markers
-	// in the retained tail are then skipped, including older summaries
-	// whose stored positions still lie after the cut. A cut naming a
-	// missing id degrades honestly (everything renders — never throw).
-	const lhMessages = messages as readonly LhMessage[];
-	const active = activeCompactionOf(lhMessages);
-	let start = 0;
-	let head: Message | null = null;
-	if (active) {
-		const kept = keptIndexFor(lhMessages, active);
-		if (kept > 0) {
-			start = kept;
-			head = {
-				role: "user",
-				content: [{ type: "text", text: active.content }],
-				timestamp: active.timestamp,
-			};
-		}
-	}
-	// THE LEADING SYSTEM MESSAGE IS REQUEST CHROME, NEVER COMPACTABLE
-	// PAYLOAD (the OpenRouter no-tools incident, owner 2026-10-05):
-	// pi-agent-core's Agent seeds a SystemMessage carrying the system
-	// prompt AND the tool declarations at state.messages[0]
-	// (createInitialSystemMessage — "messages declare the provider-visible
-	// loadout"). The record never persists it (ui-stream's settleWith
-	// filters the role), so RECORD-path callers never see it — but the
-	// Agent's convertToLlm DOES. The cut slices the RECORD's history;
-	// when [0] is the chrome it must carry through AHEAD of the
-	// compaction head, exactly as pi's own prepareRequest re-applies
-	// context.systemPrompt + context.tools around its projection.
-	const leading =
-		(messages[0] as { role?: string } | undefined)?.role === "system" ? (messages[0] as Message) : null;
-	const out: Message[] = [];
-	if (leading) out.push(leading);
-	if (head) out.push(head);
-	for (let i = leading ? Math.max(start, 1) : start; i < messages.length; i++) {
-		const m = messages[i]!;
-		const role = (m as { role?: string }).role;
-		if (role === "custom") {
-			const marker = m as LhMarkerMessage;
-			// UI-only markers: plan blocks, and problem dismissals (the
-			// synthesized conclude pair carries the model's face).
-			if (isUiOnlyMarker(marker)) continue;
-			// The head supersedes every compaction marker, not only its own
-			// stored position. Without a resolved head, preserve the existing
-			// full-history fallback, including the summary text.
-			if (marker.customType === "compaction" && head !== null) continue;
-			out.push({
-				role: "user",
-				content: [{ type: "text", text: marker.content }],
-			timestamp: marker.timestamp,
-			});
-			continue;
-		}
-		// Strip the record id: the wire carries the native shape only.
-		const { id: _id, ...native } = m as LhMessage;
-		out.push(native as Message);
-		// Repair unanswered calls from completed generations, not calls in
-		// failed generations. Pi filters error/aborted assistants itself;
-		// adding results for their unexecuted calls would leave orphans.
-		if (role === "assistant") {
-			const assistant = m as AssistantMessage;
-			if (assistant.stopReason === "error" || assistant.stopReason === "aborted") continue;
-			const calls = assistant.content.filter((b) => b.type === "toolCall");
-			if (calls.length === 0) continue;
-			const answered = resultIdsFrom(messages.slice(i + 1));
-			for (const call of calls) {
-				if (answered.has(call.id)) continue;
-				out.push({
-					role: "toolResult",
-					toolCallId: call.id,
-					toolName: call.name,
-					content: [{ type: "text", text: INTERRUPTED_TEXT }],
-					isError: false,
-					timestamp: assistant.timestamp,
-				});
-			}
-		}
-	}
-	return out;
-}
-
 // ─── native scans (the UIMessage-era pending/phase seams, natively) ──────────
 
 /** The pending-question gate (findPendingToolCall's native twin): the
@@ -798,6 +1218,14 @@ export function hasProbeDone(messages: readonly LhMessage[]): boolean {
 	return probeDoneResultIds(messages).size > 0;
 }
 
+/** Which agent answers the record's next input: practice in a practice
+ *  session, else the prober until the probe concluded or the session picks
+ *  up a lesson, then the teacher. */
+export function respondingAgentOf(messages: readonly LhMessage[], startedIn?: SessionMode): "prober" | "teacher" | "practice" {
+	if (sessionModeOf(messages, startedIn) === "practice") return "practice";
+	return hasProbeDone(messages) || resumesLesson(messages) ? "teacher" : "prober";
+}
+
 // ─── the continuation fold (Wave D: the SDK's
 //     lastAssistantMessageIsCompleteWithToolCalls, natively) ──────────────────
 
@@ -846,11 +1274,9 @@ export function endsInQuestionRecovery(messages: readonly LhMessage[]): boolean 
 		(last.details as { questionRecovery?: unknown } | null)?.questionRecovery === true;
 }
 
-export type RequestCause = "foreground" | "background";
-export type ReconstructedCause = RequestCause | "ambiguous";
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
 /** Markers that carry context, never a new input. */
-const NEUTRAL_MARKERS = ["graph-context", "course-context", "plan-block", "problem-dismissed", "compaction"];
+export const NEUTRAL_MARKERS: readonly string[] = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction", "session-resume"];
 
 /** Whether a message is an input that starts a new agent turn: exactly
  *  the messages `nativeInputCause` does not call neutral, decided without
@@ -868,8 +1294,8 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "user") return "learner";
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
-		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
+		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
@@ -884,54 +1310,33 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	}
 	return "unrecognizable";
 }
-/** Full persisted native record, including pre-compaction causes. Never guessed foreground. */
-export function reconstructRequestCause(messages: readonly LhMessage[]): ReconstructedCause {
-	let inherited: ReconstructedCause = "ambiguous";
-	let triggers: NativeInputCause[] = [];
-	const seen = new Map<string, string>();
-	const history: AgentMessage[] = [];
-	const resolve = (): ReconstructedCause => {
-		if (triggers.includes("unrecognizable")) return "ambiguous";
-		const lastLearner = triggers.lastIndexOf("learner"), lastAutomatic = triggers.lastIndexOf("automatic");
-		if (lastLearner < 0 && lastAutomatic < 0) return inherited;
-		if (lastAutomatic < 0) return "foreground";
-		if (lastLearner < lastAutomatic) return "background";
-		return "ambiguous";
-	};
-	for (const message of messages) {
-		const cause = nativeInputCause(message, history);
-		const id = (message as { id?: string }).id;
-		if (id) {
-			const value = JSON.stringify(message);
-			if (seen.has(id)) { if (seen.get(id) !== value) triggers.push("unrecognizable"); continue; }
-			seen.set(id, value);
-		} else if (cause !== "neutral") triggers.push("unrecognizable");
-		if (message.role === "assistant" && !(message.provider === "synthetic" && message.api === "faux" && message.model === "synthetic-conclude" && message.content.some((b) => b.type === "toolCall" && b.name === "conclude" && b.arguments?.outcome === "dismissed"))) {
-			inherited = resolve(); triggers = [];
-		} else if (cause !== "neutral") triggers.push(cause);
-		history.push(message);
-	}
-	return resolve();
-}
-
 /** Markers toLlmMessages drops: the model never sees them between a call
  *  and its result. */
-function isUiOnlyMarker(m: LhMessage): boolean {
-	return m.role === "custom" && (m.customType === "plan-block" || m.customType === "problem-dismissed");
+export function isUiOnlyMarker(m: LhMessage): boolean {
+	return m.role === "custom" && (m.customType === "plan-block" || m.customType === "problem-dismissed" || m.customType === "session-mode");
 }
 
 /** The index of the assistant whose call batch ends the record: only its
- *  tool results and UI-only markers follow it (contiguous by construction —
- *  the agent appends its batch; the question gate keeps a quiz call and its
- *  learner answer adjacent). -1 when model-facing input, a context marker,
- *  or a compaction follows the newest assistant. */
+ *  tool results, UI-only markers and a compaction marker follow it
+ *  (contiguous by construction — the agent appends its batch; the question
+ *  gate keeps a quiz call and its learner answer adjacent; a compaction run
+ *  in his pause lands between them, and the session keeps its own summary,
+ *  so the marker is nothing the tutor reads). -1 when model-facing input or
+ *  a context marker follows the newest assistant. */
 function trailingBatchOwner(messages: readonly LhMessage[]): number {
 	let i = messages.length - 1;
-	while (i >= 0 && (messages[i]!.role === "toolResult" || isUiOnlyMarker(messages[i]!))) i--;
+	while (i >= 0 && (messages[i]!.role === "toolResult" || isUiOnlyMarker(messages[i]!) || (messages[i]!.role === "custom" && (messages[i] as LhMarkerMessage).customType === "compaction"))) i--;
 	return messages[i]?.role === "assistant" ? i : -1;
 }
 
-export function needsContinuation(messages: readonly LhMessage[]): boolean {
+export function needsContinuation(record: readonly LhMessage[]): boolean {
+	// Context markers written after an answer (the course brief rides every
+	// learner input) carry no input of their own: what is owed is read from
+	// the input before them. Without this, a turn the app's restart cut
+	// right after his answer was never resumed.
+	let end = record.length;
+	while (end > 0 && record[end - 1]!.role === "custom" && NEUTRAL_MARKERS.includes((record[end - 1] as { customType: string }).customType)) end--;
+	const messages = end === record.length ? record : record.slice(0, end);
 	const last = messages[messages.length - 1];
 	if (!last || (last as { role?: string }).role !== "toolResult") return false;
 	// The dismissal rule (A2 + owner ruling 2026-10-03, round-1 incident):
@@ -959,6 +1364,12 @@ export function needsContinuation(messages: readonly LhMessage[]): boolean {
 		(m) => m.toolName === PRACTICE_PROBLEM_TOOL && !m.isError && m.details == null,
 	);
 	if (posedProblem) return false;
+	// A mode handoff ends its turn the same way: its wake starts the next
+	// agent's run, so a continuation here would run that agent twice.
+	const handedOff = results.some(
+		(m) => MODE_HANDOFF_TOOLS[m.toolName] !== undefined && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true,
+	);
+	if (handedOff) return false;
 	const answered = new Set(results.map((m) => m.toolCallId));
 	const calls = (content as Array<{ type?: string; id?: string }>).filter(
 		(b) => b.type === "toolCall" && typeof b.id === "string",

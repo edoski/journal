@@ -90,7 +90,7 @@ test("the binary is found on PATH first, then in the usual install locations", (
 });
 
 test("a turn refused for Claude points at Claude Code's own sign-in, not at a key", () => {
-	const envelope = providerKeyMissing("claude-subscription", ["strong"]);
+	const envelope = providerKeyMissing("claude-subscription");
 	assert.match(envelope.error, /run `claude` in a terminal, sign in with your Claude account/);
 	assert(!/Settings → Keys/.test(envelope.error));
 	assert(isProviderKeyRefusal(envelope.error));
@@ -100,7 +100,7 @@ test("the account checks run in parallel, one per account, each with its own env
 	const accounts: LoadedClaudeAccount[] = [
 		DEFAULT,
 		{ providerId: "claude-subscription-work", label: "Work", email: null, auth: "profile", instanceId: "work", configDir: "/fake/.claude-work" },
-		{ providerId: "claude-subscription-spare", label: "Spare", email: null, auth: "token", instanceId: "spare", token: () => { throw new Error("LearnHarness could not read T3 Code's setup token for Spare."); } },
+		{ providerId: "claude-subscription-spare", label: "Spare", email: null, auth: "token", instanceId: "spare", token: () => { throw new Error("Claude isn't signed in on this account."); } },
 	];
 	let active = 0, peak = 0;
 	const dirs: (string | undefined)[] = [];
@@ -113,13 +113,12 @@ test("the account checks run in parallel, one per account, each with its own env
 	const result = await refreshClaudeConnections({ force: true, load: () => accounts, run, binary: () => "/fake/claude", env: { CLAUDE_CONFIG_DIR: "/parent/dir" } });
 	assert.equal(peak, 2, "both runnable accounts were checked at once");
 	assert.deepEqual(dirs.sort(), ["/fake/.claude-work", "/parent/dir"], "the synthetic default keeps the inherited config dir; the profile gets its own");
-	assert.deepEqual(result.map((entry) => entry.connection.state), ["connected", "connected", "error"]);
+	assert.deepEqual(result.map((entry) => entry.connection.state), ["connected", "connected", "signed-out"], "an unreadable token is an account not signed in");
 	assert.equal(claudeConnected("claude-subscription-work"), true);
-	assert.match((claudeConnection("claude-subscription-spare") as { message: string }).message, /setup token for Spare/);
 	assert.equal(claudeConnected("claude-subscription-gone"), false);
 });
 
-const ALL_CLAUDE_FILES = ["src/agent/claude-accounts.ts", "src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-stream.ts", "src/agent/claude-usage.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "components/claude-limit-prompt.tsx", "src/core/contracts/claude.ts"];
+const ALL_CLAUDE_FILES = ["src/agent/claude-accounts.ts", "src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-errors.ts", "src/agent/sdk/engine.ts", "src/agent/sdk/agent.ts", "src/agent/sdk/session-files.ts", "src/agent/sdk/compact.ts", "src/agent/claude-usage.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "components/claude-limit-prompt.tsx", "src/core/contracts/claude.ts"];
 
 test("no Claude file reads the keychain or Claude Code's credential files, runs setup-token, or passes --bare", async () => {
 	const { readFileSync } = await import("node:fs");
@@ -136,12 +135,14 @@ test("only the accounts module reads T3 Code's files or a Claude config dir's .c
 	for (const file of ALL_CLAUDE_FILES.filter((f) => f !== "src/agent/claude-accounts.ts")) {
 		const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
 		for (const forbidden of [/\.t3\b/, /provider-env-/, /secrets/, /\.claude\.json/, /["'\/]\.claude["'\/]/, /readFileSync/]) {
-			if (file === "src/agent/claude-cli.ts" && forbidden.source === "readFileSync") continue;
+			// A session lives in its account's config dir (~/.claude by default):
+			// the engine names that dir, and nothing else in it.
+			if (file === "src/agent/sdk/engine.ts" && forbidden.source === String.raw`["'\/]\.claude["'\/]`) continue;
 			assert(!forbidden.test(source), `${file} must not contain ${forbidden}`);
 		}
 	}
-	const cli = readFileSync(new URL("../src/agent/claude-cli.ts", import.meta.url), "utf8");
-	assert.equal((cli.match(/readFileSync/g) ?? []).length, 1, "claude-cli.ts reads only the tool list, inside the MCP script");
+	const sessions = readFileSync(new URL("../src/agent/sdk/session-files.ts", import.meta.url), "utf8");
+	assert(/"projects"/.test(sessions) && !/\.claude\.json|credentials/.test(sessions), "the session keeper touches only the config dir's projects folder");
 	const accounts = readFileSync(new URL("../src/agent/claude-accounts.ts", import.meta.url), "utf8");
 	assert(!/writeFileSync|appendFileSync|console\./.test(accounts), "the accounts module never writes or logs");
 });

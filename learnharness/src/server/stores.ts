@@ -7,29 +7,28 @@
  */
 
 import { chatStore } from "../store/chats.ts";
-import { graphStore } from "../store/graph.ts";
 import { jobStore } from "../store/jobs.ts";
 import { settingsStore } from "../store/settings.ts";
 import { createCourseRecords } from "../store/course-records.ts";
+import { courseMapLedgers } from "../store/course-map-ledgers.ts";
+import { arcPassLedgers } from "../store/arc-pass-ledgers.ts";
 import { LEARNING_ENGINE } from "../../config.ts";
 import { resolveSettings, type EffectiveSettings } from "../core/settings-resolution.ts";
-/** The wired adapters. Satisfies core/graph.ts's GraphDeps structurally. */
+/** The wired adapters. */
 export const stores = {
 	chatStore,
-	graphStore,
 	jobStore,
 	settingsStore,
 	courseRecords: createCourseRecords(LEARNING_ENGINE),
+	courseMapLedgers,
+	arcPassLedgers,
 };
 
 export type Stores = typeof stores;
 
 /**
  * The resolved view of the settings record (core/settings-resolution.ts):
- * every knob concrete over its factory default — EXCEPT MODELS (BYOK all
- * the way down, owner 2026-09-22): no factory pins exist, so unset model
- * slots resolve to null and per-need refusal gates fire downstream. Read
- * fresh on every call — the record is a small file and turns are rare, so
+ * every knob concrete over its factory default. Read fresh on every call — the record is a small file and turns are rare, so
  * no caching layer (stale toggles after a settings PUT would be worse).
  */
 export function effectiveSettings(): EffectiveSettings {

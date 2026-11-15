@@ -4,30 +4,28 @@
  *
  * THE ACTIVITY FEED (2026-09 observability design): the bottom-right dock is
  * visible in every view, so it needs the complete running-process picture —
- * sub-agent jobs across ALL chats (not just the open one) plus the global
- * extraction runs — in one poll. The dock is BACKGROUND PROCESSES ONLY
+ * sub-agent jobs across ALL chats (not just the open one) plus the
+ * background runs (lesson digests, course-map builds) — in one poll. The dock is BACKGROUND PROCESSES ONLY
  * (user decision, 2026-09-11): teaching sessions already have their own
  * observability, so in-flight teacher turns are deliberately NOT in the
  * feed. /api/jobs stays chat-scoped untouched: it is the transcript
  * machinery's poll and carries turnInFlight for the re-attach seam
  * (chat-transport); the dock is a different consumer with a different
  * shape, served here. Single sources of truth are unchanged: the job
- * store and the pipeline registry — this file only composes them.
+ * store and the background-run registry — this file only composes them.
  *
- * The extraction side of the dock's controls also surfaces here:
- * abortExtraction (true mid-run cancellation, user-decided) is exported
- * from the pipeline's module for the abort route to call.
+ * The runs' side of the dock's controls also surfaces here: abortRuns
+ * (true mid-run cancellation) is exported for the abort route to call.
  */
 
-import { extractionStatuses, type ExtractionPhase } from "../agent/subagents/extraction.ts";
+import { backgroundRuns, type RunPhase } from "../agent/subagents/background-runs.ts";
 import { chatStore } from "../store/chats.ts";
-import { graphRevision } from "./graph.ts";
 import { catalogContextLimits } from "./model-catalog.ts";
 import { listJobs } from "./jobs.ts";
 import { jobCost } from "./pricing.ts";
 import type { JobRecord } from "../core/contracts.ts";
 
-export { abortExtraction, extractionStatuses, type ExtractionPhase, type RunningExtraction } from "../agent/subagents/extraction.ts";
+export { abortRuns, backgroundRuns, type BackgroundRun, type RunPhase } from "../agent/subagents/background-runs.ts";
 export { chatStore } from "../store/chats.ts";
 
 /** A running sub-agent job, joined with its chat's title for the dock.
@@ -42,17 +40,14 @@ export interface ActivityJob extends JobRecord {
 	contextLimit: number | null;
 }
 
-/** One extraction-pipeline JOB (title joined), oldest first. Per-chunk
- *  jobs (owner, 2026-09-28): a multi-chunk source owns SEVERAL rows — id
- *  is the unique job key (source id, or "src#i"), chatId stays the SOURCE
- *  id (abort + chat links are source-scoped), and the title carries the
- *  "· i/N" part suffix. */
-export interface ActivityExtraction {
+/** One background run (a lesson digest or a course-map build), title
+ *  joined, oldest first. id is the registry key; chatId is the key's chat
+ *  or course, which the dock's abort sends. The feed's `runs`. */
+export interface ActivityRun {
 	id: string;
 	chatId: string;
-	part?: { i: number; n: number };
 	title: string;
-	phase: ExtractionPhase;
+	phase: RunPhase;
 	startedAt: number;
 }
 
@@ -60,16 +55,9 @@ export interface ActivityExtraction {
  *  Jobs are RUNNING-ONLY — finished jobs belong to their chat's transcript;
  *  the blob disappears when the process ends. Costs are joined here through
  *  the server-side Pi pricing adapter; clients never reconstruct rates. */
-/** The dock's whole world + the graph's version stamp (wave 6 session
- *  deletion): the payload carries graphRevision (max mtime across the
- *  graph data files — see server/graph.ts) so any view can detect "the
- *  graph changed underneath me" (a merge landed, a deletion purged) and
- *  refetch clusters/layout. Reads never move it; the DELETE response
- *  returns the same stamp. */
 export function activityFeed(): {
 	jobs: ActivityJob[];
-	extractions: ActivityExtraction[];
-	graphRevision: number;
+	runs: ActivityRun[];
 } {
 	const chats = chatStore.listChats();
 	const limits = catalogContextLimits();
@@ -86,16 +74,12 @@ export function activityFeed(): {
 			}
 		}
 	}
-	const extractions: ActivityExtraction[] = extractionStatuses().map((run) => ({
-		id: run.part ? `${run.chatId}#${run.part.i}` : run.chatId,
+	const runs: ActivityRun[] = backgroundRuns().map((run) => ({
+		id: run.id,
 		chatId: run.chatId,
-		part: run.part,
-		// The run's own label never reaches this feed (unlike the graph
-		// status route) — the chat store's title, or the bare id for notes
-		// sources, plus the chunk suffix when the source fanned out.
-		title:
-			(run.label ?? chatStore.getChat(run.chatId)?.title ?? run.chatId) +
-			(run.part ? ` · ${run.part.i}/${run.part.n}` : ""),
+		// A map build names itself by its course ("Linear algebra"); a digest
+		// takes its lesson's title.
+		title: run.label ?? chatStore.getChat(run.chatId)?.title ?? run.chatId,
 		phase: run.phase,
 		startedAt: run.startedAt,
 	}));
@@ -103,7 +87,6 @@ export function activityFeed(): {
 	jobs.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 	return {
 		jobs,
-		extractions: extractions.sort((a, b) => a.startedAt - b.startedAt),
-		graphRevision: graphRevision(),
+		runs: runs.sort((a, b) => a.startedAt - b.startedAt),
 	};
 }

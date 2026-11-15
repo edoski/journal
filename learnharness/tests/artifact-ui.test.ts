@@ -23,7 +23,7 @@ process.env.LH_DATA_DIR = TMP_DATA;
 
 type Post = (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>;
 let POST: Post;
-let createChat: (title: string, kind?: "practice") => { id: string; title: string };
+let createChat: (title: string) => { id: string; title: string };
 let saveMessages: (id: string, messages: unknown[]) => void;
 let getChat: (id: string) => { messages: unknown[] } | undefined;
 let buildSubagentSteerFn: typeof import("../src/core/contracts.ts").buildSubagentSteer;

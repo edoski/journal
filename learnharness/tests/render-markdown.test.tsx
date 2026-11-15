@@ -2,17 +2,20 @@
  * Render tests for the presentation layer (W3): the \(...\)/\[...\] math
  * delimiter contract, single-newline line breaks, and mermaid rendering.
  *
- * Same idiom as render-cards.test.tsx: static HTML via react-dom/server, no
- * DOM. tsx note: tsx uses the CLASSIC JSX transform, so `React` must be a
- * resolvable global — the shim below provides it.
+ * Same idiom as render-cards.test.tsx: static HTML via react-dom/server;
+ * only the mermaid fallback mounts on the Radix DOM helper, to open its
+ * source. tsx note: tsx uses the CLASSIC JSX transform, so `React` must be
+ * a resolvable global — the shim below provides it.
  */
 
-import React from "react";
+import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createRoot } from "react-dom/client";
 import { MessageResponse } from "../components/ai-elements/message.tsx";
 import { MermaidError } from "../components/mermaid-error.tsx";
 import { transformMathDelimiters, healOverescapedCommands } from "../src/core/math-delims.ts";
@@ -140,6 +143,26 @@ describe("render — standard dollar math + legacy compatibility (streamdown + K
 		assert.ok(!html.includes("katex-error"), "both formulas are valid");
 	});
 
+	it("renders a display formula written on one line as display math", () => {
+		for (const md of [
+			"So\n\n$$c + 2c + 3c + 4c = 10c = 1,$$\n\nthen",
+			"So the limit is\n$$P(X = k) = \\lim_{n \\to \\infty} \\binom{n}{k} \\left(\\frac{\\lambda}{n}\\right)^k$$\nwhich",
+			"$$X_n \\sim \\mathrm{Bin}(n, \\lambda/n)$$",
+			"> [!IMPORTANT]\n> The Poisson formula:\n> $$P(X = k) = e^{-\\lambda} \\frac{\\lambda^k}{k!}$$",
+		]) {
+			const html = render(md);
+			assert.ok(html.includes("katex-display"), `a one-line $$…$$ on its own line is display: ${md}`);
+			assert.ok(!html.includes("$$"), "no literal $$ leaks");
+			assert.ok(!html.includes("katex-error"), "no KaTeX parse errors");
+		}
+	});
+
+	it("keeps $$…$$ inside a sentence inline", () => {
+		const html = render("The sum $$a + b$$ is small.");
+		assert.ok(html.includes("katex"), "renders");
+		assert.ok(!html.includes("katex-display"), "mid-sentence two-dollar math stays inline");
+	});
+
 	it("keeps dollar examples in inline code and code fences literal", () => {
 		const html = render("Use `$x$` here.\n\n```text\n$$\ny = x^2\n$$\n```");
 		assert.ok(!html.includes("katex"), "code examples are not math");
@@ -208,21 +231,34 @@ describe("render — mermaid", () => {
 		assert.ok(html.includes('data-streamdown="code-block"'), "js fences keep the code-block path");
 	});
 
-	it("renders the error fallback for invalid mermaid: error + source + retry", () => {
+	it("renders the error fallback for invalid mermaid: error + collapsed source + retry", async () => {
 		// The fallback component mounts client-side when mermaid fails to
-		// parse; render it directly to pin its contract.
-		const html = renderToStaticMarkup(
-			<MermaidError
-				chart={"not a diagram @@@\nA --> B"}
-				error="Parse error on line 1: unexpected text"
-				retry={() => {}}
-			/>,
-		);
-		assert.match(html, /Diagram failed to render/);
-		assert.match(html, /Parse error on line 1/);
-		assert.match(html, /Show diagram source/);
-		assert.match(html, /not a diagram/);
-		assert.match(html, />Retry</);
+		// parse; mount it directly to pin its contract.
+		const host = dom.document.createElement("div");
+		dom.document.body.appendChild(host);
+		const root = createRoot(host);
+		try {
+			await act(async () =>
+				root.render(
+					<MermaidError
+						chart={"not a diagram @@@\nA --> B"}
+						error="Parse error on line 1: unexpected text"
+						retry={() => {}}
+					/>,
+				),
+			);
+			assert.match(host.innerHTML, /Diagram failed to render/);
+			assert.match(host.innerHTML, /Parse error on line 1/);
+			assert.match(host.innerHTML, />Retry</);
+			const trigger = host.querySelector('[data-slot="collapsible-trigger"]');
+			assert.equal(trigger?.textContent, "Show diagram source");
+			assert.ok(!host.innerHTML.includes("not a diagram"), "the source stays collapsed so a broken diagram doesn't flood the transcript");
+			await act(async () => trigger!.dispatchEvent(new dom.window.Event("click", { bubbles: true })));
+			assert.match(host.innerHTML, /not a diagram/, "the source opens in place");
+		} finally {
+			await act(async () => root.unmount());
+			host.remove();
+		}
 	});
 });
 
@@ -290,9 +326,10 @@ describe("escaped dollars inside math — transform units", () => {
 		assert.equal(transformMathDelimiters(md), md);
 	});
 
-	it("leaves display spans untouched — a lone $ can't close $$, \\$ already survives", () => {
-		const md = "$$x = \\$5,\\ q = \\$12$$";
-		assert.equal(transformMathDelimiters(md), md);
+	it("leaves display bodies untouched — a lone $ can't close $$, \\$ already survives", () => {
+		assert.equal(transformMathDelimiters("$$x = \\$5,\\ q = \\$12$$"), "$$\nx = \\$5,\\ q = \\$12\n$$");
+		const inline = "so $$x = \\$5$$ here";
+		assert.equal(transformMathDelimiters(inline), inline);
 	});
 
 	it("leaves code spans, fences, and unbalanced spans untouched", () => {

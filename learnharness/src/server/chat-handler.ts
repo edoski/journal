@@ -1,28 +1,25 @@
 import type { Usage } from "@earendil-works/pi-ai";
+import { COURSE_DELETED, courseDeleted } from "./courses.ts";
 import {
 	createPracticeAgent,
 	createProberAgent,
 	createTeacherAgent,
 	type AgentBuildOptions,
+	type AgentKind,
 	type TeachingAgent,
 } from "../agent/teacher-agent.ts";
-import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
-import { connectionBackgroundAllowed, connectionScopeCurrent, isSubscriptionProvider } from "../agent/subscription-connections.ts";
-import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
-import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
-import { claudeErrorMessage, claudeTurnError } from "../agent/claude-stream.ts";
-import { isClaudeProvider } from "../core/contracts/claude.ts";
-import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
-import { reconstructRequestCause } from "../core/native-messages.ts";
+import { claudeEngine, type SdkEngine } from "../agent/models.ts";
+import { connectionBackgroundAllowed } from "../agent/subscription-connections.ts";
+import { CLAUDE_MODEL_MISSING, claudeTurnError } from "../agent/claude-errors.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
-import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
-import type { ModelRole } from "../../config.ts";
+import { createLessonDigest } from "../agent/subagents/lesson-digest.ts";
+import { onLessonEvents, resumeCutDigests } from "./lesson-finish.ts";
+import { onSessionNaming } from "./session-naming.ts";
 import {
 	deliverJobResult,
 	noteSteersDurable,
 	reconcileUserSteers,
 	registerLiveAgent,
-	restoreUncommittedAutomatic,
 	setJobRespawn,
 	setTurnRunner,
 	settleSteers,
@@ -30,28 +27,25 @@ import {
 	unregisterLiveAgent,
 } from "./jobs.ts";
 import { runPiTurn } from "./pi/ui-stream.ts";
-import { collectToolCallIds } from "./pi/call-ids.ts";
-import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
-import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
-import { providerKeyPresent } from "./keys.ts";
-import {
-	extractionEnabled,
-	graphToolsEnabled,
-	resolveConversationSpec,
-	resolveRoleSpec,
-} from "../core/settings-resolution.ts";
-import { modelsNotConfigured, providerKeyMissing as providerKeyMissingEnvelope, type ProviderKeyMissing } from "../core/settings.ts";
-import { beginTurn, endTurn } from "./turn-liveness.ts";
+import { courseBriefMarker, fetchCourseArcs, fetchCourseBrief } from "./course-brief.ts";
+import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
+import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settings.ts";
+import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
-import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
-import { persistTurn, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
-import { hasProbeDone, hasUnresolvedQuestion } from "../core/native-messages.ts";
-import { composeInstructions } from "../agent/teacher-agent.ts";
+import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
+import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
+import { answeredQuestionsOf, hasUnresolvedQuestion, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
+import type { ChatRecord } from "../core/contracts/chat.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
-import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
-import { emit } from "../core/events.ts";
+import { PATHS } from "../../config.ts";
+import { nextChatSession } from "../core/sdk-session.ts";
+import type { SessionStore } from "../agent/sdk/session-files.ts";
+import { catalogContextLimits } from "./model-catalog.ts";
+import { refreshClaudeConnections } from "../agent/claude-connection.ts";
+import { emit, subscribe } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
+import { continuationOwed, stoppedReplyIds } from "../core/turn-cut.ts";
 import { asAgentMessages } from "../core/native-messages.ts";
 import {
 	ChatInputError,
@@ -62,6 +56,8 @@ import {
 	type TurnInput,
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
+import { listenForCourseMaps } from "./course-map.ts";
+import { preparePhotos } from "./photos.ts";
 import type {CallUsage} from "../core/contracts.ts";
 
 /**
@@ -91,37 +87,54 @@ const jobRunner = createJobRunner({
 	chatStore: stores.chatStore,
 	jobStore: stores.jobStore,
 	deliver: deliverJobResult,
-	// BYOK (owner, 2026-09-22): job engines resolve the chain — role
-	// override → slot → NOTHING — read FRESH per job (a settings PUT
-	// between dispatch and spawn lands); an empty chain flows through as
-	// undefined and the runner refuses the spawn honestly.
-	engineFor: (role) =>
-		resolveEngine(role),
-	// Key-presence gate (provider-key interlude, 2026-09-25): the runner
-	// reads the resolved engine's provider and asks THIS check (the agent
-	// layer may not read the key store); a missing key refuses the spawn
-	// with the 503-envelope family instead of dying mid-run.
-	providerKeyMissing: (provider, tier) =>
-		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider, [tier]),
+	// Read FRESH per job, so an account switch between dispatch and spawn lands.
+	engineFor: agentEngine,
+	// The runner asks THIS check about the engine's account (the agent layer
+	// may not read the connection state); a signed-out account refuses the
+	// spawn with the 503-envelope family instead of dying mid-run.
+	providerKeyMissing: (provider) =>
+		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider),
 });
-/** The app's ONE extraction pipeline instance — both front doors share it:
- *  quiz-triggered session runs (turn-service) and notes imports
- *  (/api/graph/import) hit the same single-flight registry. */
-export const extraction = createExtractionPipeline({
-	...stores,
-	// BYOK (owner, 2026-09-22): the extraction stages resolve the chain —
-	// role override → slot → NOTHING — read FRESH per stage call; an empty
-	// chain flows through as undefined and the pipeline refuses the run
-	// with the typed ModelsNotConfiguredError. Direct test values still win.
-	engineFor: (role) =>
-		resolveEngine(role),
-	// Key-presence gate (provider-key interlude, 2026-09-25): same check
-	// the job runner gets — a stage engine whose provider key is gone
-	// refuses BEFORE any batch runs (the typed throw), never mid-run.
-	providerKeyMissing: (provider, tier) =>
-		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider, [tier]),
+/** The lesson digest: a finished lesson's gaps, notes and task step, saved
+ *  to the course record, on the app's one model (agentEngine). */
+const lessonDigest = createLessonDigest({
+	chatStore: stores.chatStore,
+	courseRecords: stores.courseRecords,
+	engineFor: () => {
+		try {
+			return agentEngine();
+		} catch {
+			return undefined;
+		}
+	},
+	backgroundAllowed: connectionBackgroundAllowed,
 });
 
+const lessonFinishDeps = {
+	chatStore: stores.chatStore,
+	digest: lessonDigest,
+};
+
+interface LhLessonFinishGlobal {
+	__lhLessonFinish?: () => void;
+	__lhSessionNaming?: () => void;
+}
+
+// One subscriber per process: Next dev compiles this module once per route
+// entry, so each load replaces the last one's subscription. Skipped under
+// tests: scripted chats are fixtures.
+if (process.env.NODE_ENV !== "test") {
+	const g = globalThis as typeof globalThis & LhLessonFinishGlobal;
+	g.__lhLessonFinish?.();
+	g.__lhLessonFinish = onLessonEvents(lessonFinishDeps);
+	g.__lhSessionNaming?.();
+	g.__lhSessionNaming = onSessionNaming({ chatStore: stores.chatStore, courseRecords: stores.courseRecords });
+}
+
+/** At app start: finish every lesson digest a quit cut short. */
+export function resumeLessonDigests(): void {
+	resumeCutDigests(lessonFinishDeps);
+}
 
 // Wake-pipeline wiring (contracts.ts "THE ASYNC PROTOCOL" §4): the pipeline
 // delivers its steers through THIS composition root (one event: the steer
@@ -130,25 +143,47 @@ export const extraction = createExtractionPipeline({
 setTurnRunner(async (chatId, input) => {
 	const res = await handleChatInput(chatId, input);
 	// Drive the stream to completion server-side — nobody else will read it,
-	// and onFinish (persist, extraction, endTurn) only runs when it drains.
+	// and onFinish (persist, endTurn) only runs when it drains.
 	await res.arrayBuffer().catch(() => undefined);
 	return res.status;
 });
-/** The settings-resolved engine for one role — BYOK (owner, 2026-09-22):
- *  the chain (role override → slot → NOTHING) may end empty, and undefined
- *  flows through to the per-need refusal gates (runner/extraction), read
- *  FRESH so a settings PUT between dispatch and spawn lands. */
-function resolveEngine(role: ModelRole): PiEngine | undefined {
-	const spec = resolveRoleSpec(role, stores.settingsStore.readSettings());
-	return spec ? piEngineForSpec(spec) : undefined;
+/** The engine every background agent runs, whatever its role (owner,
+ *  2026-11-14): CLAUDE_MODEL at its fixed thinking level on the settings'
+ *  Claude account, read FRESH so an account switch lands on the next call.
+ *  The conversation builds the same engine on the account its gate read. */
+export function agentEngine(): SdkEngine {
+	return claudeEngine(effectiveSettings().claude.account);
+}
+
+function compactionKind(record: ChatRecord): "teach" | "practice" | "probe" {
+	const agent = respondingAgentOf(record.messages, record.kind);
+	return agent === "practice" ? "practice" : agent === "teacher" ? "teach" : "probe";
+}
+
+/** Where the app keeps its copy of a lesson's Claude Code session: beside the record. */
+function sessionStoreFor(chatId: string): SessionStore {
+	return { dir: PATHS.chats, chatId };
+}
+
+function compactionDeps(chatId: string, record: ChatRecord, engine: SdkEngine, account: string) {
+	return {
+		chatStore: stores.chatStore,
+		engine,
+		canStart: () => connectionBackgroundAllowed(account),
+		kind: compactionKind(record),
+		thresholdTokens: effectiveThresholdTokens(catalogContextLimits().get(`${engine.model.provider}:${engine.model.id}`)),
+		sessionStore: sessionStoreFor(chatId),
+	};
 }
 
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
+// A lesson's save that registers material extends the course's map.
+listenForCourseMaps();
 
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(
 	req: Request,
-	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean }) => TeachingAgent,
+	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean; agent: AgentKind }) => TeachingAgent,
 ): Promise<Response> {
 	let body: { chatId?: unknown; input?: unknown };
 	try {
@@ -160,7 +195,7 @@ export async function handleChatRequest(
 	if (!chatId) return Response.json({ error: "Unknown chat" }, { status: 404 });
 	let input: TurnInput;
 	try {
-		input = parseChatInput(body.input);
+		input = await preparePhotos(parseChatInput(body.input));
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });
@@ -168,6 +203,23 @@ export async function handleChatRequest(
 		throw err;
 	}
 	return handleChatInput(chatId, input, buildAgent);
+}
+
+/** Stops the chat's running turn and resolves once it has settled (its
+ *  partial saved). Event-driven: each pass waits for the turn-settled. */
+async function stopRunningTurn(chatId: string): Promise<void> {
+	while (isTurnRunning(chatId)) {
+		const settled = new Promise<void>((resolve) => {
+			const off = subscribe((event) => {
+				if (event.type !== "turn-settled" || event.chatId !== chatId) return;
+				off();
+				resolve();
+			});
+		});
+		stopTurn(chatId);
+		await settled;
+	}
+	forgetStop(chatId);
 }
 
 /**
@@ -178,12 +230,22 @@ export async function handleChatRequest(
 export async function handleChatInput(
 	chatId: string,
 	input: TurnInput,
-	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean }) => TeachingAgent,
+	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean; agent: AgentKind }) => TeachingAgent,
 ): Promise<Response> {
 	let record = stores.chatStore.getChat(chatId);
 	if (!record) {
 		return Response.json({ error: "Unknown chat" }, { status: 404 });
 	}
+	// A lesson of a deleted course is history: no turn, so nothing can write
+	// its course record back (round 3: a ghost "calculus" course appeared).
+	if (courseDeleted(chatId)) {
+		return Response.json({ error: COURSE_DELETED, code: "course_deleted" }, { status: 410 });
+	}
+
+	// Done for today wins over whatever the tutor is doing (round 7: pressed
+	// as a practice handoff woke the teacher, it was refused and the teacher
+	// went on): the running turn stops, its partial saves, then the close.
+	if (input.type === "tonight") await stopRunningTurn(chatId);
 
 	// Refuse an ineligible Retry before catalog refresh, compaction, or any
 	// turn/write effects. Revalidate after the awaited gates below too.
@@ -196,6 +258,12 @@ export async function handleChatInput(
 		}
 	}
 
+	// A continue asks for the reply the record still owes. With two windows
+	// open both ask after a restart: the one that lost the race gets here
+	// once the reply came, and attaches to the record instead of running
+	// the tutor a second time over an input it already answered.
+	if (input.type === "continue" && !continuationOwed(record.messages)) return settledTurnResponse(chatId);
+
 	if (input.type === "retry-question") {
 		try { questionRecoveryAppends(record.messages, input); }
 		catch (err) {
@@ -204,40 +272,17 @@ export async function handleChatInput(
 		}
 	}
 
-	// THE UNIVERSAL TURN GATE (BYOK, owner, 2026-09-22): a turn needs the
-	// CONVERSATION chain — the chat's own model override over the strong
-	// slot — and there is no factory floor; when both are empty the turn
-	// refuses honestly with the machine-readable 503 envelope (new sessions
-	// and continuing ones alike — wake-pipeline turns ride this same path).
-	// Placement is deliberate: BEFORE beginTurn (no liveness effects), the
-	// write-ahead persist (nothing durable changes), and every downstream
-	// resolution (jobs/extraction gate per-need on their own tiers).
-	const effective = effectiveSettings();
-	const conversation = resolveConversationSpec(record.settings, effective.models.strong);
-	if (!conversation) {
-		const envelope = modelsNotConfigured(["strong"]);
-		console.info(`[chat ${chatId}] turn refused — ${JSON.stringify(envelope)}`);
-		return Response.json(envelope, { status: 503 });
-	}
-
-	// THE KEY-PRESENCE GATE (provider-key interlude, owner, 2026-09-25): a
-	// pinned model is not enough — its PROVIDER's key must be present, or
-	// the turn dies mid-stream masked to a generic error. Truth is env-first
-	// (providerKeyPresent reads what pi-ai would read at request time), so
-	// an env-shadowed key passes. Same placement discipline as the models
-	// gate: BEFORE beginTurn (no liveness effects) and the write-ahead
+	// THE CONNECTION GATE: every agent runs CLAUDE_MODEL on the settings'
+	// Claude account (owner, 2026-11-14), which must be signed in, or the
+	// turn dies mid-stream masked to a generic error. Placement is
+	// deliberate: BEFORE beginTurn (no liveness effects) and the write-ahead
 	// persist (nothing durable changes); wake-pipeline turns ride the same
-	// path. The affected tier is strong — the conversation chain's own tier
-	// (a chat.model override still resolves through it).
-	if (isClaudeProvider(conversation.provider)) await refreshConnectionCatalog(conversation.provider);
-	if (isSubscriptionProvider(conversation.provider)) {
-		await refreshConnectionCatalog(conversation.provider);
-		if (input.type === "steers" && !connectionBackgroundAllowed(conversation.provider)) {
-			return Response.json({ error: "Background use is off for this connection. Automatic follow-up remains deferred in its queue." }, { status: 403 });
-		}
-	}
-	if (!providerKeyPresent(conversation.provider)) {
-		const envelope = providerKeyMissingEnvelope(conversation.provider, ["strong"]);
+	// path.
+	const effective = effectiveSettings();
+	const account = effective.claude.account;
+	await refreshClaudeConnections();
+	if (!providerKeyPresent(account)) {
+		const envelope = providerKeyMissingEnvelope(account);
 		console.info(`[chat ${chatId}] turn refused — ${JSON.stringify(envelope)}`);
 		return Response.json(envelope, { status: 503 });
 	}
@@ -247,48 +292,35 @@ export async function handleChatInput(
 	// running compaction): await any in-flight compaction (the settle
 	// kick usually finished inside the learner's answer pause), and if
 	// the record is STILL over threshold, compact synchronously — this
-	// request waits. Skipped under tests (the extraction precedent);
-	// placement mirrors the BYOK/key gates — BEFORE appends and
+	// request waits. Skipped under tests (scripted chats are fixtures);
+	// placement mirrors the connection gate — BEFORE appends and
 	// beginTurn, no liveness effects — and the record re-reads after
 	// because compaction appends the marker.
-	const callPurpose = { background: input.type === "steers" || (input.type === "continue" && reconstructRequestCause(record.messages) !== "foreground") };
-	let requestCycle: SubscriptionRequestCycle | undefined;
-	const lifecycle: SubscriptionDispatchLifecycle = {
-		captured: (scope) => requestCycle?.captured(scope),
-		beforeDispatch: (scope) => requestCycle?.beforeDispatch(scope),
-		noDispatch: (kind) => requestCycle?.noDispatch(kind),
-	};
-	let conversationEngine: PiEngine;
-	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
-	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
-	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
-	await ensureCompacted(
-		{
-			chatStore: stores.chatStore,
-			engine: piEngineForSpec(conversation, true),
-			canStart: () => connectionBackgroundAllowed(conversation.provider),
-			modelId: modelIdForCompaction,
-			kind: record.kind === "practice" ? "practice" : hasProbeDone(record.messages) ? "teach" : "probe",
-			thresholdTokens: effectiveThresholdTokens(
-				effective.compaction?.thresholdTokens,
-				catalogContextLimits().get(modelIdForCompaction),
-			),
-			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : "teacher").length / 4),
-		},
-		chatId,
-	);
+	let conversationEngine: SdkEngine;
+	try { conversationEngine = claudeEngine(account); }
+	catch { return Response.json({ error: CLAUDE_MODEL_MISSING }, { status: 503 }); }
+	await ensureCompacted(compactionDeps(chatId, record, conversationEngine, account), chatId);
 	// The course brief rides learner input only, fetched before the record
 	// is re-read below. A question recovery is a retry: its results must stay
 	// adjacent to their calls and end the record, so it carries no brief.
 	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "retry-question" && input.type !== "continue";
-	const courseBrief = learnerInput ? await fetchCourseBrief(record) : null;
+	// A mode handoff starts the other agent, whose brief differs.
+	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
+	const [courseBrief, courseArcs] = await Promise.all([
+		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
+		fetchCourseArcs(record),
+	]);
 	const compactedRecord = stores.chatStore.getChat(chatId);
 	if (!compactedRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
 	record = compactedRecord;
 	// Recompute Retry eligibility on current truth, still before beginTurn.
 	// A compaction marker or another writer may have landed during awaits.
 	// These omissions affect ONLY the agent context, never the saved record.
+	if (input.type === "continue" && !continuationOwed(record.messages)) return settledTurnResponse(chatId);
 	let retryOmissions = new Set<string>();
+	// Try again after a stop: the empty stopped reply stays in the record,
+	// and the tutor resumes from the input before it.
+	if (input.type === "continue") retryOmissions = stoppedReplyIds(record.messages);
 	if (input.type === "retry") {
 		try {
 			retryOmissions = retryDrops(record.messages);
@@ -340,9 +372,15 @@ export async function handleChatInput(
 	}
 
 	// The brief precedes the learner's words; an answer's result must stay
-	// adjacent to its question call, so there the brief follows it.
+	// adjacent to its question call, so there the brief follows it. Done
+	// for tonight may lead with withheld results: its brief sits just
+	// before the marker.
 	const briefMarker = courseBriefMarker(courseBrief, [...record.messages, ...appends]);
-	if (briefMarker) appends = input.type === "answer" ? [...appends, briefMarker] : [briefMarker, ...appends];
+	if (briefMarker) {
+		appends = input.type === "answer" ? [...appends, briefMarker]
+			: input.type === "tonight" ? [...appends.slice(0, -1), briefMarker, ...appends.slice(-1)]
+			: [briefMarker, ...appends];
+	}
 
 	// One turn per chat, ever. A second request while a turn runs means a
 	// stale/remounted client raced a live one — letting it through would
@@ -363,11 +401,10 @@ export async function handleChatInput(
 	// tail to start continue(), so its temporary history omits the trailing
 	// failures only. Count that SAME temporary prefix at settlement, or the
 	// retained failures would make persistTurn skip genuinely new output.
-	const agentMessages = input.type === "retry" ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
-	const stagedAutomatic = isSubscriptionProvider(conversation.provider) && input.type === "steers";
-	let persistBaseCount = stagedAutomatic ? record.messages.length : agentMessages.length;
+	const agentMessages = retryOmissions.size > 0 ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
+	const persistBaseCount = agentMessages.length;
 	try {
-		if (!stagedAutomatic) stores.chatStore.saveMessages(chatId, merged);
+		stores.chatStore.saveMessages(chatId, merged);
 	} catch (err) {
 		console.error(`[chat ${chatId}] write-ahead persist failed:`, err);
 		endTurn(chatId);
@@ -376,10 +413,13 @@ export async function handleChatInput(
 	// Visibility bookkeeping is not the canonical save. Its failure must
 	// neither misreport a saved input as lost nor prevent the turn running.
 	try {
-		if (!stagedAutomatic) noteSteersDurable(chatId, merged);
+		noteSteersDurable(chatId, merged);
 	} catch (err) {
 		console.error(`[chat ${chatId}] input visibility bookkeeping failed:`, err);
 	}
+	// A wake's markers land in the record after turn-started, so a view that
+	// attached on it would miss them until settle: announce the write.
+	if (input.type === "steers" && appends.length > 0) emit("record-changed", { chatId });
 
 	// MONEY CHANNEL (wave 4): one collector per request, fed by the agent's
 	// message_end events. Every model call's usage lands in the chat record's
@@ -399,82 +439,55 @@ export async function handleChatInput(
 	};
 
 	// AGENT CONSTRUCTION BRANCH (docs/probe-teach-split.md §2): the transcript
-	// is the seam — a probe_done call in the record means the probe is
-	// concluded: build the TEACHER (planning + the full toolset). Otherwise
-	// the session is still probing: build the PROBER (quiz/ask + probe_done).
-	// Both share this whole composition (write-ahead persist, liveness,
-	// steers, usage, extraction) — only the agent differs.
-	const teaching = hasProbeDone(agentMessages);
-	// BYOK (owner, 2026-09-22): the conversation chain was resolved by the
-	// turn gate above (chat.model override → strong slot → refused) — the
-	// engine build is pure from here; thinking levels clamp natively.
-	// (Built once above the compaction gate; reused verbatim.)
+	// is the seam. Its mode picks practice or teaching; in teaching a
+	// concluded probe_done means the TEACHER (planning + the full toolset),
+	// else the PROBER (quiz/ask + probe_done). All three share this whole
+	// composition (write-ahead persist, liveness, steers, usage) — only the
+	// agent differs.
+	const agentKind = respondingAgentOf(agentMessages, record.kind);
+	const teaching = agentKind === "teacher";
+	// Built once above the compaction gate; reused verbatim.
 	const engine = conversationEngine;
-	// Provider-qualified stamp (model slots wave): matches the price table's
+	// Provider-qualified stamp: matches the price table's
 	// provider:id keys.
 	const modelId = `${engine.model.provider}:${engine.model.id}`;
 	// Tests inject a factory: the agent is stateless per turn, so each
 	// request builds a fresh one off the record — the factory mirrors that
 	// seam exactly. Wave B: the record IS the agent state (native messages;
 	// the record's id field strips at the wire in toLlmMessages).
-	// CROSS-STREAM SEAM (P2 reconciliation, 2026-09-19): `toolToggles`
-	// rides the build opts as the user-level DELTA map (absent key =
-	// enabled). The definitive toggleable set is TOGGLEABLE_TOOLS — the
-	// sub-agent JOB tools (research/demo/visual/pdf; adjudicated with the
-	// user: quiz/ask/fs/plan/probe_done are always-on).
-	if (isSubscriptionProvider(conversation.provider)) requestCycle = new SubscriptionRequestCycle({
-		initialMessages: asAgentMessages(agentMessages),
-		staged: stagedAutomatic ? asAgentMessages(appends) : undefined,
-		foregroundOwed: !callPurpose.background,
-		purpose: callPurpose,
-		scopeCurrent: (scope) => connectionScopeCurrent(conversation.provider, scope),
-		commitStaged: () => {
-			stores.chatStore.saveMessages(chatId, merged);
-			persistBaseCount = merged.length;
-			noteSteersDurable(chatId, merged);
-		},
-		restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
-	});
 	const agentOpts: AgentBuildOptions = {
 		engine,
-		callPurpose,
-		requestCycle,
 		messages: asAgentMessages(agentMessages),
 		onUsage: collectUsage,
-		toolToggles: effective.agent.tools,
-		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
-		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
-		chatId,
-		// The prompt-override switches (P2, 2026-09-19): same resolution
-		// point as the tool delta — the agent layer composes the system
-		// prompt fresh per turn, swapping in any enabled override segments.
-		promptSwitches: effective.agent.prompts,
+		// The lesson's Claude Code session: the model's memory of it.
+		session: record.session,
+		sessionStore: sessionStoreFor(chatId),
 		// A course-linked session reads and writes the learner's course
-		// record through the engine, whatever the agent kind.
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords } } : {}),
+		// record through the engine, whatever the agent kind, with the
+		// answers a save may name (answeredQuestionsOf), read from the
+		// whole record.
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: answeredQuestionsOf(merged) } } : {}),
 	};
-	// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
-	// session builds the practitioner from turn 1 — no prober→teacher
-	// split, no plan/question/job tools; the whole registry is
-	// problem + conclude. buildAgent stays honored (the test seam is
-	// uniform across kinds).
+	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
+	// practitioner — no plan/question tools; problem + conclude, and the
+	// handoff back to teaching. buildAgent stays honored (the test seam is
+	// uniform across agents).
 	const constructed: TeachingAgent = buildAgent
-		? buildAgent({ ...agentOpts, teaching })
-		: record.kind === "practice"
+		? buildAgent({ ...agentOpts, teaching, agent: agentKind })
+		: agentKind === "practice"
 			? createPracticeAgent(
 					{
 						chatId,
 						chatStore: stores.chatStore,
 						// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
 						// (same runner/gating as the teacher's — research honestly
-						// absent when no engine is live) and the map readers behind
-						// the SAME settings gate as the prober's.
+						// absent when no engine is live).
 						jobs: {
 							chatId,
 							jobStore: stores.jobStore,
 							spawn: (job, input) => void jobRunner.runJob(job.id, input),
 						},
-						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
+						deliver: (steer) => void deliverJobResult(steer),
 					},
 					agentOpts,
 				)
@@ -485,6 +498,7 @@ export async function handleChatInput(
 						chatStore: stores.chatStore,
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
+						deliver: (steer) => void deliverJobResult(steer),
 					},
 					agentOpts,
 				)
@@ -498,10 +512,6 @@ export async function handleChatInput(
 						// needs the same job wiring as the teacher's.
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						// The map reader (wave 7): the prober reads the learner's
-						// knowledge graph through tools when the gate opens —
-						// graph master switch AND the agent.graphTools toggle.
-						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
 					},
 					agentOpts,
 				);
@@ -525,36 +535,24 @@ export async function handleChatInput(
 		// a streamed response, which never happens inside the constructor.
 		registerLiveAgent(chatId, constructed, input.type !== "steers" && input.type !== "continue",
 			input.type === "steers" ? new Set(appends.map((message) => message.id)) : undefined);
-		// Debug recorder run marker (owner, 2026-10-04): correlates the
-		// JSONL event stream with the record's turns; no-op unless
-		// LH_PROVIDER_EVENTS=1.
-		providerEventNote(chatId, "turn", `run start (base: ${agentMessages.length} messages)`);
 		const handle = runPiTurn({
 			agent: constructed,
-			requestCycle,
 			// The coalescing window seam (COMPACTION LAW, 2026-10-09): tests
 			// tighten it via LH_UPDATE_FLUSH_MS; production rides the 100ms
 			// default in ui-stream.
 			...(process.env.LH_UPDATE_FLUSH_MS ? { updateFlushMs: Number(process.env.LH_UPDATE_FLUSH_MS) } : {}),
-			// THE LACAN FIX (2026-10-04): seed the uniquifier with every
-			// tool-call id the record already holds — a provider that resets
-			// ids per response (DeepSeek) then gets fresh unique ids for this
-			// turn's calls at the wire boundary, on the wire, in the record,
-			// and in the next turn's context alike.
-			usedToolCallIds: new Set(collectToolCallIds(merged)),
 			// Stream-level failures are provider/transport internals — masked,
 			// like the SDK defaults. Tool-input validation messages never
 			// route through here: they ride the error-result path and reach the
 			// transcript directly (the retry context the model saw).
 			onError: (error) => {
-				if (conversation.provider === "chatgpt") return chatGPTStreamError(String(error));
-				if (isClaudeProvider(conversation.provider)) {
-					console.error(`[chat ${chatId}] Claude turn error:`, error);
-					return claudeTurnError(error instanceof Error ? error.message : String(error));
-				}
-				if (isSubscriptionProvider(conversation.provider)) return nativeSubscriptionError(conversation.provider, String(error));
-				console.error(`[chat ${chatId}] turn error:`, error);
-				return "An error occurred.";
+				console.error(`[chat ${chatId}] Claude turn error:`, error);
+				const text = claudeTurnError(error instanceof Error ? error.message : String(error));
+				// The submitter attaches after the POST's ack, often after a
+				// turn that failed at once has left the registry: keep the
+				// notice for it, or the failure reaches no screen.
+				rememberTurnFailure(chatId, text);
+				return text;
 			},
 			onSettleError: settlementErrorText,
 			onSettleFailure: (error, reportedErrorText) => {
@@ -566,7 +564,7 @@ export async function handleChatInput(
 				unregisterLiveAgent(chatId);
 				// The canonical save may have succeeded before later bookkeeping
 				// threw. Reconcile against actual durability, never replay input
-				// merely because usage/extraction/other settlement work failed.
+				// merely because usage or other settlement work failed.
 				const persisted = stores.chatStore.getChat(chatId)?.messages ?? [];
 				reconcileUserSteers(chatId, persisted);
 				settleSteers(chatId, persisted, true, constructed);
@@ -575,6 +573,9 @@ export async function handleChatInput(
 				// Wave B: append only messages past the temporary agent prefix.
 				// Retry's saved record still includes its earlier failed attempts.
 				const stamped = persistTurn(stores.chatStore, chatId, persistBaseCount, turnMessages, isAborted);
+				// The record's map to the session moves to what the turn left there.
+				const sessionEnd = constructed.sessionEnd();
+				if (sessionEnd) stores.chatStore.saveSession(chatId, nextChatSession(record.session, sessionEnd, stores.chatStore.getChat(chatId)?.messages ?? stamped));
 				noteSteersDurable(chatId, stores.chatStore.getChat(chatId)?.messages ?? stamped);
 				// usage log append (idempotent per turn id) — the stats bar
 				// refolds this on the client after the turn settles. The
@@ -588,17 +589,6 @@ export async function handleChatInput(
 						model: modelId,
 						steps,
 					});
-				}
-				// GRAPH GATE (settings-storage wave, 2026-09-19): the write channel —
-				// extraction, its auditor — dies with the master switch.
-				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
-				// no extraction, no graph, no coverage (v1: the session itself
-				// is the deliverable).
-				if ((!requestCycle || requestCycle.dispatched) && record.kind !== "practice" && extractionEnabled(effective.graph)) {
-					// Fresh per-turn read of the graph section's chunk budget
-					// (extraction-UX redesign, 2026-09-24): the trigger compares
-					// against it and the pipeline's batches share it.
-					triggerExtraction(stores, extraction, chatId, effective.graph.extractionChunkTokens);
 				}
 				// PARKED DISMISSAL (owner, 2026-10-04): a dismissal that arrived
 				// mid-turn was parked by the dismiss route (202); now that
@@ -633,30 +623,16 @@ export async function handleChatInput(
 				// between-runs window). The next turn's ensureCompacted gate
 				// awaits whatever this leaves running; a lost engine or a
 				// beneath-threshold record is a silent no-op. Skipped under
-				// tests (the extraction precedent — scripted chats are
-				// fixtures; the service itself is pinned directly).
-				if (process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
+				// tests (scripted chats are fixtures; the service itself is
+				// pinned directly).
+				if (process.env.NODE_ENV !== "test")
 					kickCompaction(() => {
-						const fresh = effectiveSettings();
-						const spec = resolveConversationSpec(stores.chatStore.getChat(chatId)?.settings, fresh.models.strong);
-						if (!spec || !connectionBackgroundAllowed(spec.provider)) return null;
-						let kickEngine: PiEngine;
-						try { kickEngine = piEngineForSpec(spec, true); } catch { return null; }
-						const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
+						const kickAccount = effectiveSettings().claude.account;
+						if (!connectionBackgroundAllowed(kickAccount)) return null;
+						let kickEngine: SdkEngine;
+						try { kickEngine = claudeEngine(kickAccount); } catch { return null; }
 						const freshRecord = stores.chatStore.getChat(chatId);
-						if (!freshRecord) return null;
-						return {
-							chatStore: stores.chatStore,
-							engine: kickEngine,
-							canStart: () => connectionBackgroundAllowed(spec.provider),
-							modelId: kickModelId,
-							kind: freshRecord.kind === "practice" ? "practice" : hasProbeDone(freshRecord.messages) ? "teach" : "probe",
-							thresholdTokens: effectiveThresholdTokens(
-								fresh.compaction?.thresholdTokens,
-								catalogContextLimits().get(kickModelId),
-							),
-							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher").length / 4),
-						};
+						return freshRecord ? compactionDeps(chatId, freshRecord, kickEngine, kickAccount) : null;
 					}, chatId);
 			},
 		});
@@ -675,7 +651,6 @@ export async function handleChatInput(
 		// must cost zero permanently-held slots beyond the one live view. The
 		// turn itself is a server-side process (ruling 2026-09-25) — it never
 		// needed this connection, only a view did.
-		if (stagedAutomatic && requestCycle && !(await requestCycle.admission)) return Response.json({ error: "Automatic follow-up remains deferred in its queue." }, { status: 403 });
 		return Response.json({ ok: true });
 	} catch (err) {
 		// The stream never started, so no onFinish will fire — clear the registry

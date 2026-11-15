@@ -7,7 +7,9 @@ import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/comp
 import { renderMermaid } from "@/components/mermaid-render";
 import { MermaidError } from "@/components/mermaid-error";
 import { Hint } from "@/components/ui/hint";
+import { Button } from "@/components/ui/button";
 import { SvgImage } from "@/components/artifacts/svg-image";
+import { FIGURE_ON_DARK } from "@/components/artifacts/figure-on-dark";
 
 /**
  * SESSION-SCOPED OVERLAYS (owner wave, 2026-09-19): the "fullscreen"
@@ -35,6 +37,8 @@ import { SvgImage } from "@/components/artifacts/svg-image";
 export const SessionMermaidContext = createContext<{
 	openMermaid: (chart: string) => void;
 	openFigure: (svg: string, inverted: boolean) => void;
+	/** A photo of his working, large (photos.tsx): its image source. */
+	openPhoto: (src: string) => void;
 } | null>(null);
 
 export function useSessionMermaid() {
@@ -65,6 +69,15 @@ export function chartSize(svg: string): { w: number; h: number } {
 	return { w: 600, h: 400 };
 }
 
+/** The overlay's classes: a translucent surface, quiet controls. */
+const L = {
+	root: "absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm",
+	title: "text-row font-medium text-foreground",
+	sub: "text-row text-muted-foreground",
+	hint: "text-label text-muted-foreground",
+	loading: "flex h-full items-center justify-center gap-2 text-row text-muted-foreground",
+} as const;
+
 /** The diagram focus: the chart at natural size inside a pan/zoom viewport
  *  (the plan popup's fit-floor semantics — fitGraphView/zoomedGraphView in
  *  pan-zoom.ts), Esc/X close. Renders its own copy of the chart (mermaid
@@ -76,14 +89,32 @@ export function chartSize(svg: string): { w: number; h: number } {
 export function MermaidOverlay({
 	chart,
 	svg: rawSvg,
+	photo,
 	inverted = false,
 	onClose,
 }: {
 	chart?: string;
 	svg?: string;
+	/** PHOTO MODE (14 Nov 2026): a photo of his working, by image source,
+	 *  at its natural size in the same pan/zoom shell. */
+	photo?: string;
 	inverted?: boolean;
 	onClose: () => void;
 }) {
+	// The photo's natural size, read once it loads (a raster has no viewBox).
+	const [photoBox, setPhotoBox] = useState<{ w: number; h: number } | null>(null);
+	useEffect(() => {
+		if (photo === undefined) return;
+		let cancelled = false;
+		const img = new Image();
+		img.onload = () => {
+			if (!cancelled) setPhotoBox({ w: img.naturalWidth || 600, h: img.naturalHeight || 400 });
+		};
+		img.src = photo;
+		return () => {
+			cancelled = true;
+		};
+	}, [photo]);
 	// ── chart render (own instance, own ids); figure mode uses the raw svg ──
 	const [svg, setSvg] = useState<string | null>(rawSvg ?? null);
 	const [error, setError] = useState<string | null>(null);
@@ -136,7 +167,8 @@ export function MermaidOverlay({
 		return () => ro.disconnect();
 	}, []);
 
-	const box = useMemo(() => (svg ? chartSize(svg) : { w: 0, h: 0 }), [svg]);
+	const box = useMemo(() => photoBox ?? (svg ? chartSize(svg) : { w: 0, h: 0 }), [svg, photoBox]);
+	const shown = photo !== undefined ? photoBox !== null : Boolean(svg);
 	const fitZoom = useMemo(() => fitZoomFor(box, size), [box, size]);
 
 	const [view, setView] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
@@ -149,11 +181,11 @@ export function MermaidOverlay({
 		if (atFloor) userAdjustedRef.current = false;
 	}, [atFloor]);
 	useEffect(() => {
-		if (userAdjustedRef.current || !size.w || !size.h || !svg) return;
+		if (userAdjustedRef.current || !size.w || !size.h || !shown) return;
 		setView(fitGraphView(box, size, fitZoom));
 		const raf = requestAnimationFrame(() => setSettled(true));
 		return () => cancelAnimationFrame(raf);
-	}, [fitZoom, size, box, svg]);
+	}, [fitZoom, size, box, shown]);
 
 	useEffect(() => {
 		const el = viewportRef.current;
@@ -216,24 +248,25 @@ export function MermaidOverlay({
 			// page's session-area div — below the drag bar, right of the
 			// sidebar. 80% + blur: the transcript ghosts through (owner
 			// decision, 2026-09-19).
-			className="absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm"
+			className={L.root}
 			role="dialog"
 			aria-modal="true"
-			aria-label="Diagram focus"
+			aria-label={photo !== undefined ? "Photo of your working" : "Diagram focus"}
 		>
 			<div className="mb-2 flex items-center gap-2">
-				<span className="text-sm font-medium">Diagram</span>
-				<span className="text-xs text-muted-foreground">from this lesson</span>
+				<span className={L.title}>{photo !== undefined ? "Your working" : "Diagram"}</span>
+				<span className={L.sub}>{photo !== undefined ? "the photo you sent" : "from this lesson"}</span>
 				<Hint label="Close" binding="escape" side="left">
-<button
-					type="button"
+<Button
+					variant="quiet"
+					size="icon-row"
 					onClick={onClose}
 					aria-label="Close"
 					data-testid="mermaid-overlay-close"
-					className="ml-auto rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					className="ml-auto"
 				>
 					<XIcon className="size-4" />
-				</button>
+				</Button>
 </Hint>
 			</div>
 			<div
@@ -251,7 +284,7 @@ export function MermaidOverlay({
 					<div className="flex h-full items-center justify-center p-4">
 						<MermaidError chart={chart ?? ""} error={error} retry={() => setAttempt((a) => a + 1)} />
 					</div>
-				) : svg ? (
+				) : shown ? (
 					<>
 						<div
 							className="absolute top-0 left-0 origin-top-left"
@@ -273,62 +306,68 @@ export function MermaidOverlay({
 							{/* Figures share the card's image boundary and white backing.
 							    Mermaid keeps its inline renderer; globals.css removes
 							    its max-width cap so it fills the natural-size box. */}
-							{rawSvg !== undefined ? (
+							{photo !== undefined ? (
+								// eslint-disable-next-line @next/next/no-img-element -- an in-memory photo; no Next image optimization
+								<img data-lh-overlay-chart src={photo} alt="Your working" className="block h-auto w-full" draggable={false} />
+							) : rawSvg !== undefined ? (
 								<div
 									data-lh-overlay-chart
 									className="bg-white"
-									style={inverted ? { filter: "invert(1) hue-rotate(180deg)" } : undefined}
+									style={inverted ? { filter: FIGURE_ON_DARK } : undefined}
 								>
-									<SvgImage svg={svg} className="block h-auto w-full" />
+									<SvgImage svg={svg ?? ""} className="block h-auto w-full" />
 								</div>
 							) : (
 								<div
 									data-lh-overlay-chart
 									className="[&_svg]:h-auto [&_svg]:w-full"
-									dangerouslySetInnerHTML={{ __html: svg }}
+									dangerouslySetInnerHTML={{ __html: svg ?? "" }}
 								/>
 							)}
 						</div>
 						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
-							<span className="text-xs text-muted-foreground/60">Drag to pan · scroll to zoom</span>
+							<span className={L.hint}>Drag to pan · scroll to zoom</span>
 							<div className="flex gap-1">
 								<Hint label="Zoom out" side="bottom">
-<button
-									type="button"
+<Button
+									variant="quiet"
+									size="icon-row"
 									aria-label="Zoom out"
 									onClick={() => stepZoom(1 / 1.25)}
-									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+									className="pointer-events-auto border bg-popover hover:bg-accent"
 								>
 									<MinusIcon className="size-3.5" />
-								</button>
+								</Button>
 </Hint>
-								<Hint label="Fit diagram to view" side="bottom">
-<button
-									type="button"
-									aria-label="Fit diagram to view"
+								<Hint label={photo !== undefined ? "Fit the photo to the view" : "Fit diagram to view"} side="bottom">
+<Button
+									variant="quiet"
+									size="icon-row"
+									aria-label={photo !== undefined ? "Fit the photo to the view" : "Fit diagram to view"}
 									onClick={fitView}
-									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+									className="pointer-events-auto border bg-popover hover:bg-accent"
 								>
 									<MaximizeIcon className="size-3.5" />
-								</button>
+								</Button>
 </Hint>
 								<Hint label="Zoom in" side="bottom">
-<button
-									type="button"
+<Button
+									variant="quiet"
+									size="icon-row"
 									aria-label="Zoom in"
 									onClick={() => stepZoom(1.25)}
-									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+									className="pointer-events-auto border bg-popover hover:bg-accent"
 								>
 									<PlusIcon className="size-3.5" />
-								</button>
+								</Button>
 </Hint>
 							</div>
 						</div>
 					</>
 				) : (
-					<div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+					<div className={L.loading}>
 						<span className="inline-block size-4 animate-spin rounded-full border border-current border-b-2" />
-						Rendering diagram…
+						{photo !== undefined ? "Opening the photo…" : "Rendering diagram…"}
 					</div>
 				)}
 			</div>

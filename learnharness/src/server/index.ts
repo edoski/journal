@@ -5,18 +5,22 @@
  */
 
 export * from "./chat-handler.ts";
+export { preparePhotos } from "./photos.ts";
 export * from "./events-stream.ts";
 export * from "./chats.ts";
 export * from "./courses.ts";
-export * from "./graph.ts";
-export { NotesImportError } from "../agent/subagents/extraction.ts";
+export { addMaterial, courseContexts, courseMapStatus, startCourseMap } from "./course-map.ts";
+export * from "./study.ts";
+export * from "./calendar.ts";
+export * from "./topic.ts";
+export { lessonPlace } from "./lesson-place.ts";
+export * from "./course-standing.ts";
+export { answerMarks } from "./marks.ts";
 export { convertPdf } from "../agent/subagents/pdf-ops.ts";
 export { joinPages } from "../agent/subagents/pdf-markdown.ts";
-export * from "./commit-positions.ts";
 export * from "./jobs.ts";
 export * from "./stores.ts";
-export { readRenderSettings, writeRenderSettings } from "../store/render-settings.ts";
-// The settings record + prompt overrides (settings-storage wave, 2026-09-19).
+// The settings record (settings-storage wave, 2026-09-19).
 // The *Record aliases keep the app/api/settings routes explicit about which
 // seam they touch (the raw record, not the chat-section convenience view).
 export {
@@ -24,19 +28,7 @@ export {
 	writeSettings as writeSettingsRecord,
 	settingsStore,
 } from "../store/settings.ts";
-export { promptOverrides } from "../store/prompt-overrides.ts";
-export { isValidSegmentPath } from "../core/prompt-segments.ts";
-// The canonical segment discovery/resolution lives in the agent layer
-// (composition is an agent concern); the barrel re-exports it for the
-// routes — server→agent is the lawful direction (chat-handler precedent).
-export { effectivePromptSegments, allSegmentPaths, readPromptOverride } from "../agent/prompt-segments.ts";
 
-// The auth/keys composition (auth-keys wave, 2026-09-19): the
-// env-reflecting store behind GET/PUT/DELETE /api/keys.
-// Importing this module runs the idempotent boot fill-gap — every consumer
-// keeps its plain process.env reads (that seam is the point).
-export * from "./keys.ts";
-export { authStore } from "../store/auth.ts";
 export * from "./settings-body.ts";
 export * from "./turn-liveness.ts";
 export * from "./turn-runs.ts";
@@ -45,6 +37,5 @@ export * from "./compaction.ts";
 export { runPiTurn, piTurnResponse, type PiTurnHandle, type PiTurnSpec } from "./pi/ui-stream.ts";
 export * from "./observability.ts";
 export * from "./model-catalog.ts";
-export { subscriptionControlsResponse, subscriptionBrowserResponse } from "./web-subscription-http.ts";
 export { claudeConnectionResponse } from "./claude-connection-http.ts";
 export { sessionCost } from "./pricing.ts";

@@ -170,21 +170,30 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 
 	it("passes non-409 responses through untouched", async () => {
 		const calls = installFetch({ chatPOST: () => new Response("stream", { status: 200 }) });
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		const res = await m.postInputEvent({ type: "text", text: "hi" });
 		assert.equal(res.status, 200);
 		assert.equal(calls.length, 1, "no polling, single call");
 		assert.deepEqual(JSON.parse(calls[0]!.body!), { chatId: "chat_x", input: { type: "text", text: "hi" } });
 	});
 
-	it("waits out the turn, then re-POSTs the SAME event body (identity retry)", async () => {
+	it("waits for the racing turn to settle, then re-POSTs the SAME event body at once (identity retry)", async () => {
 		const event: ChatInput = { type: "text", text: "my question while the wake turn ran" };
 		const calls = installFetch({
 			chatPOST: (_c, n) => (n === 1 ? new Response("busy", { status: 409 }) : new Response("stream", { status: 200 })),
-			jobsGET: (poll) => poll <= 1, // first poll: still running; second: done
+			jobsGET: () => true, // the racing turn is running when checked
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
-		const res = await m.postInputEvent(event);
+		let settle = () => {};
+		const m = model({
+			turnSettled: () => ({ promise: new Promise<void>((resolve) => (settle = resolve)), cancel: () => {} }),
+		});
+		const pending = m.postInputEvent(event);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		assert.equal(calls.filter((c) => c.url === "/api/chat").length, 1, "no retry while the turn runs");
+		const settledAt = performance.now();
+		settle();
+		const res = await pending;
+		assert.ok(performance.now() - settledAt < 100, "the retry follows the settle, not a poll");
 		assert.equal(res.status, 200);
 		const posts = calls.filter((c) => c.url === "/api/chat");
 		assert.equal(posts.length, 2, "one 409, one retry");
@@ -195,7 +204,7 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 		const calls = installFetch({
 			chatPOST: (_c, n) => (n === 1 ? new Response("busy", { status: 409 }) : new Response("stream", { status: 200 })),
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		assert.equal((await m.postInputEvent({ type: "text", text: "q" })).status, 200);
 		assert.equal(
 			calls.filter((c) => c.url.startsWith("/api/chats/")).length,
@@ -209,7 +218,7 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 		const calls = installFetch({
 			chatPOST: (_c, n) => (n <= 2 ? new Response("busy", { status: 409 }) : new Response("stream", { status: 200 })),
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		assert.equal((await m.postInputEvent(event)).status, 200);
 		const posts = calls.filter((c) => c.url === "/api/chat");
 		assert.equal(posts.length, 3);
@@ -221,11 +230,32 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 			chatPOST: () => new Response("busy", { status: 409 }),
 			jobsGET: () => true,
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		const res = await m.postInputEvent({ type: "text", text: "q" });
 		assert.equal(res.status, 409);
 		const polls = calls.filter((c) => c.url.startsWith("/api/jobs")).length;
-		assert.ok(polls <= 15, `expected bounded polling (~10×10ms), got ${polls}`);
+		assert.equal(polls, 1, "one check, then a wait for the settle, never a poll");
+	});
+});
+
+describe("a continue that finds a turn running", () => {
+	it("attaches to that turn and never posts again, so two windows resume one reply", async () => {
+		// Round 4: after a restart both windows sent continue; the loser waited
+		// out the winner's turn, re-posted, and the tutor ran a second time.
+		const posts: string[] = [];
+		let streamed = 0;
+		const m = model({
+			waitMaxMs: 5_000,
+			fetch: dietFetch({
+				post: () => new Response("busy", { status: 409 }),
+				onPost: (body) => posts.push(body),
+				stream: () => { streamed++; return sseResponse({ type: "turn-settled" }, "[DONE]"); },
+			}),
+		});
+		await m.send({ type: "continue" });
+		assert.equal(posts.length, 1, "one POST, no identity retry");
+		assert.equal(streamed, 1, "it watches the running turn instead");
+		assert.equal(m.getState().error, null, "no busy error for an automatic resume");
 	});
 });
 
@@ -283,9 +313,12 @@ describe("send (one input event, verbatim consumption)", () => {
 		const done = m.send({ type: "text", text: "go" });
 		const settle = () => new Promise((r) => setTimeout(r, 0));
 
+		// The tutor's words stream as send_to_user's argument (plain text never
+		// shows while its message streams).
+		const said = (message: string) => ({ type: "toolCall", id: "said-1", name: "send_to_user", arguments: { message } });
 		push({ type: "message_start", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }] } });
 		for (const text of ["Hel", "Hello", "Hello wor", "Hello world"]) {
-			push(partial([{ type: "thinking", thinking: "hmm" }, { type: "text", text }]));
+			push(partial([{ type: "thinking", thinking: "hmm" }, said(text)]));
 			await settle();
 		}
 		// MID-STREAM: exactly ONE assistant message in the tail — never one
@@ -299,7 +332,7 @@ describe("send (one input event, verbatim consumption)", () => {
 		const idMid = (assistants[0] as { id?: string }).id;
 		assert.match(idMid ?? "", /^c_/, "client-minted slot id");
 
-		push({ type: "message_end", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }, { type: "text", text: "Hello world" }], stopReason: "stop" } });
+		push({ type: "message_end", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }, said("Hello world")], stopReason: "toolUse" } });
 		push({ type: "agent_end", messages: [] });
 		push("[DONE]");
 		await done;
@@ -322,6 +355,17 @@ describe("send (one input event, verbatim consumption)", () => {
 			JSON.stringify({ code: "models_not_configured", missing: ["strong"] }),
 			"the banner carries the raw envelope — the refusal flow JSON-parses it",
 		);
+	});
+
+	it("work on a problem refused at once leaves the transcript as it was, so the box can take it back", async () => {
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ error: "refused", code: "provider_key_missing", provider: "claude" }), { status: 503 })) as typeof globalThis.fetch;
+		const m = model();
+		const before = m.getState().nativeMessages.length;
+		const accepted = await m.send({ type: "thinking", problemCallId: "problem1", text: "rank 2, nullity 3", confidence: "neutral" });
+		assert.equal(accepted, false, "the caller learns it was refused");
+		assert.equal(m.getState().nativeMessages.length, before, "his work is not left in the transcript as if sent");
+		assert.equal(m.getState().status, "error");
 	});
 
 	it("the optimistic answer result attaches to the pending question part at once", async () => {
@@ -731,7 +775,7 @@ describe("truncated stream recovery", () => {
 		assert.equal(posts, 1);
 		assert.equal(streams, 2);
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("reports the approved connection error when the recovery record read fails", async () => {
@@ -744,7 +788,7 @@ describe("truncated stream recovery", () => {
 		} });
 		await m.send({ type: "text", text: "go" });
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("accepts turn-settled when the original turn finished during the disconnection", async () => {
@@ -793,7 +837,7 @@ describe("truncated stream recovery", () => {
 		} });
 		await m.send({ type: "text", text: "go" });
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("preserves malformed-event diagnostics rather than calling them network drops", async () => {
@@ -802,7 +846,7 @@ describe("truncated stream recovery", () => {
 		await m.send({ type: "text", text: "go" });
 		assert.equal(streams, 1);
 		assert.equal(m.status, "error");
-		assert.notEqual(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.notEqual(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 		assert.match(m.getState().error!.message, /JSON|property name/);
 	});
 
@@ -812,7 +856,7 @@ describe("truncated stream recovery", () => {
 		await m.send({ type: "text", text: "go" });
 		assert.equal(streams, 2);
 		assert.equal(m.status, "error");
-		assert.equal(m.getState().error?.message, "The connection dropped before the turn completed.");
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
 	});
 
 	it("a superseded consume cannot recover or overwrite its replacement's state", async () => {
@@ -877,6 +921,55 @@ describe("automatic continuation after recovery failure", () => {
 		const m = model({ initialMessages: answered, fetch: dietFetch({ onPost: () => posts++, stream: () => sseResponse("[DONE]") }) });
 		await m.continueIfOwed(answered);
 		assert.equal(posts, 1);
+	});
+
+	/** Round 6, report 6 major 1: the app restarts while the tutor reads his
+	 *  answer, and the open window's stream drops twice. */
+	function droppedByRestart(bodies: string[]): SessionModel {
+		const partialReply = () => sseResponse({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "partial" }] } });
+		return model({ initialMessages: [question], fetch: async (url, init) => {
+			if (String(url) === "/api/chat") { bodies.push(String(init?.body)); return Response.json({ ok: true }); }
+			if (String(url).endsWith("/stream")) return bodies.length > 1 ? sseResponse("[DONE]") : partialReply();
+			return Response.json({ messages: answered });
+		} });
+	}
+
+	it("a window whose stream the app's restart dropped gets the reply its answer is owed once the app is back", async () => {
+		const bodies: string[] = [];
+		const m = droppedByRestart(bodies);
+		await m.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
+		m.recoverDroppedStream();
+		m.setMessages(answered);
+		await m.continueIfOwed(answered);
+		assert.equal(bodies.length, 2, "the answer, then one continue");
+		assert.equal(JSON.parse(bodies[1]!).input.type, "continue");
+		assert.equal(m.getState().error, null);
+	});
+
+	it("an app that stops just after accepting his answer reads as a dropped connection too, and recovers the same way", async () => {
+		const bodies: string[] = [];
+		const m = model({ initialMessages: [question], fetch: async (url, init) => {
+			if (String(url) === "/api/chat") { bodies.push(String(init?.body)); return Response.json({ ok: true }); }
+			if (bodies.length === 1) throw new TypeError("Failed to fetch");
+			if (String(url).endsWith("/stream")) return sseResponse("[DONE]");
+			return Response.json({ messages: answered });
+		} });
+		await m.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.", "not \"Couldn't reach the app\": the app took his answer");
+		m.recoverDroppedStream();
+		m.setMessages(answered);
+		await m.continueIfOwed(answered);
+		assert.equal(JSON.parse(bodies.at(-1)!).input.type, "continue");
+	});
+
+	it("only a dropped stream recovers so: a failed reply still waits for him", async () => {
+		const bodies: string[] = [];
+		const m = model({ initialMessages: answered, initialError: "The reply could not be saved.", fetch: dietFetch({ onPost: (body) => bodies.push(body), stream: () => sseResponse("[DONE]") }) });
+		m.recoverDroppedStream();
+		await m.continueIfOwed(answered);
+		assert.equal(bodies.length, 0);
+		assert.equal(m.getState().error?.message, "The reply could not be saved.");
 	});
 });
 
@@ -1003,7 +1096,7 @@ describe("answer submission recovery", () => {
 	for (const next of [{ type: "text", text: "a distinct new message" }, { type: "thinking", problemCallId: "problem1", text: "new practice thinking" }] as const) {
 		it(`preserves the existing POST/409-wait path for a new ${next.type} submission after an error`, async () => {
 			const posted: ChatInput[] = [];
-			const m = model({ pollMs: 0, fetch: async (url, init) => {
+			const m = model({ fetch: async (url, init) => {
 				if (String(url) === "/api/chat") {
 					posted.push(JSON.parse(String(init?.body)).input);
 					if (posted.length === 1) throw new TypeError("failed fetch");
@@ -1753,12 +1846,15 @@ describe("newAnswerResult two audiences", () => {
 		const msg = newAnswerResult("call-1", "explain", full);
 		const modelSees = JSON.parse((msg.content as { type: "text"; text: string }[])[0]!.text);
 		assert.deepEqual(modelSees, {
+			question: "call-1",
 			kind: "explain",
 			text: "Mercury",
 			confidence: "guessing",
 			thinking: "guessed",
 		});
 		assert.equal(msg.details, full, "details is the full QuestionAnswerData verbatim");
+		const hint = JSON.parse((newAnswerResult("call-2", "explain", { ...full, hintRequested: true }).content as { type: "text"; text: string }[])[0]!.text);
+		assert.equal("question" in hint, false, "a Hint press is no answer, so it carries no id to record against");
 		assert.equal((msg.details as { questionText?: string }).questionText, "Which planet is closest to the Sun?");
 	});
 });

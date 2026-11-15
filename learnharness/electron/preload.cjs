@@ -17,45 +17,15 @@
  *   publishes it as --lh-zoom so physical-constant lengths (the traffic-
  *   light gutter) can divide by it.
  *
+ *   window.lh.pickFolder() — the system folder picker for Context's Link a
+ *   folder; resolves to the folder's path, or null when cancelled.
+ *
  * Channel names are mirrored in electron/main.cjs — keep them in sync.
  */
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("lh", {
 	platform: process.platform,
-	...(process.argv?.includes("--lh-web-subscriptions") ? {
-		subscriptionTransport: "web",
-		openSubscriptionBrowser: (action) => ipcRenderer.invoke("lh:subscriptions:web-browser", action),
-	} : {}),
-	chatgpt: {
-		status: () => ipcRenderer.invoke("lh:chatgpt:control", { op: "status" }),
-		login: (id) => ipcRenderer.invoke("lh:chatgpt:control", { op: "login", id }),
-		cancel: () => ipcRenderer.invoke("lh:chatgpt:control", { op: "cancel" }),
-		select: (id) => ipcRenderer.invoke("lh:chatgpt:control", { op: "select", id }),
-		disconnect: (id) => ipcRenderer.invoke("lh:chatgpt:control", { op: "disconnect", id }),
-		logout: (id) => ipcRenderer.invoke("lh:chatgpt:control", { op: "logout", id }),
-		consent: (enabled) => ipcRenderer.invoke("lh:chatgpt:control", { op: "consent", enabled }),
-		onChange: (cb) => {
-			const listener = () => cb();
-			ipcRenderer.on("lh:chatgpt:changed", listener);
-			return () => ipcRenderer.removeListener("lh:chatgpt:changed", listener);
-		},
-	},
-	subscriptions: {
-		status: () => ipcRenderer.invoke("lh:subscriptions:control", { op: "status" }),
-		login: (providerId, enabled) => ipcRenderer.invoke("lh:subscriptions:control", { op: "login", providerId, enabled }),
-		cancel: (providerId) => ipcRenderer.invoke("lh:subscriptions:control", { op: "cancel", providerId }),
-		respond: (providerId, attemptId, promptId, value) => ipcRenderer.invoke("lh:subscriptions:control", { op: "respond", providerId, attemptId, promptId, value }),
-		open: (providerId, attemptId, actionId) => ipcRenderer.invoke("lh:subscriptions:control", { op: "open", providerId, attemptId, actionId }),
-		retry: (providerId) => ipcRenderer.invoke("lh:subscriptions:control", { op: "retry", providerId }),
-		disconnect: (providerId) => ipcRenderer.invoke("lh:subscriptions:control", { op: "disconnect", providerId }),
-		consent: (providerId, enabled) => ipcRenderer.invoke("lh:subscriptions:control", { op: "consent", providerId, enabled }),
-		onChange: (cb) => {
-			const listener = () => cb();
-			ipcRenderer.on("lh:subscriptions:changed", listener);
-			return () => ipcRenderer.removeListener("lh:subscriptions:changed", listener);
-		},
-	},
 	expandWindow: () => ipcRenderer.send("lh:expand-window"),
 	onZoom: (cb) => {
 		const listener = (_event, factor) => cb(factor);
@@ -63,4 +33,11 @@ contextBridge.exposeInMainWorld("lh", {
 		return () => ipcRenderer.removeListener("lh:zoom", listener);
 	},
 	getZoom: () => ipcRenderer.invoke("lh:zoom:get"),
+	pickFolder: () => ipcRenderer.invoke("lh:pick-folder"),
+	/** The machine woke from sleep; returns unsubscribe. */
+	onResume: (cb) => {
+		const listener = () => cb();
+		ipcRenderer.on("lh:resume", listener);
+		return () => ipcRenderer.removeListener("lh:resume", listener);
+	},
 });

@@ -39,7 +39,7 @@ import { jobStore } from "../src/store/jobs.ts";
 import { buildAnswer, dismissedAnswer, type QuestionData } from "../src/core/question-core.ts";
 import { danglingQuestionOf, endsInDismissal, needsContinuation, newAnswerResult, newUserMessage } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
-import type { PiEngine } from "../src/agent/models.ts";
+import { fakeEngine, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 
 // Route-level pin (the chat-birth-stamp pattern): the dismiss route's
@@ -50,11 +50,12 @@ const steerRoute = await import("../app/api/chats/[id]/steer/route.ts");
 const streamRoute = await import("../app/api/chats/[id]/stream/route.ts");
 const recordRoute = await import("../app/api/chats/[id]/route.ts");
 import { PATHS } from "../config.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 // The key-presence turn gate (provider-key interlude, 2026-09-25): scripted
 // turns pin openrouter per chat — the gate reads env-first truth, so the
 // key must be present in the test process like any real setup.
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+await signInTestClaude();
 
 const QUESTION_INPUT = {
 	type: "check",
@@ -63,11 +64,11 @@ const QUESTION_INPUT = {
 	correctAnswer: "Mercury — the innermost orbit.",
 };
 
-/** Turn 1: a bit of reasoning, then the explain tool call. Turn 2: plain text.
+/** Turn 1: a bit of reasoning, then the explain tool call. Turn 2: words sent with send_to_user.
  *  Each response factory records the prompt it received (the transcript the
  *  model saw) — the old doStream capture, engine-shaped. */
 function scriptedTeacher(steps: (calls: string[][]) => FauxResponseStep[]): {
-	engine: PiEngine;
+	engine: ScriptedModel;
 	calls: string[][];
 } {
 	const calls: string[][] = [];
@@ -88,8 +89,9 @@ function defaultLesson(calls: string[][]): FauxResponseStep[] {
 		},
 		(context) => {
 			calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
-			return fauxAssistantMessage([fauxText("Right — Mercury it is.")]);
+			return sendToUser("It is also the fastest planet, one orbit every 88 days.", "said-1");
 		},
+		fauxAssistantMessage(""),
 	];
 }
 
@@ -97,8 +99,8 @@ function defaultLesson(calls: string[][]): FauxResponseStep[] {
  *  off the record it is about to run — the factory tests inject. Wave B: the
  *  handler hands the factory the NATIVE build options (the record IS the
  *  agent state — no adapter conversion). */
-function agentFactory(engine: PiEngine): Parameters<typeof handleChatRequest>[1] {
-	return (opts) => createTeacherAgent(undefined, { engine, messages: opts.messages });
+function agentFactory(engine: ScriptedModel): Parameters<typeof handleChatRequest>[1] {
+	return (opts) => createTeacherAgent(undefined, onFake(engine, opts));
 }
 
 /** The free-response answer a client sends (the dock's buildAnswer seam). */
@@ -182,20 +184,21 @@ function waitFor(cond: () => boolean, timeoutMs = 8000, what = "condition"): Pro
 
 /** A teacher whose step 1 blocks on an external gate — a turn held mid-run
  *  so view-cancel / reattach / abort timing is deterministic. */
-function gatedTeacher(gate: Promise<void>): PiEngine {
+function gatedTeacher(gate: Promise<void>): ScriptedModel {
 	const faux = createFauxCore({});
 	faux.setResponses([
 		async () => {
 			await gate;
-			return fauxAssistantMessage([fauxText("Gated reply.")]);
+			return sendToUser("Gated reply.");
 		},
+		fauxAssistantMessage(""),
 	]);
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
 }
 
 /** A teacher that NEVER resolves except on abort (the jobs abortableFactory
  *  pattern): the only way this turn can end is the remote kill. */
-function abortableTeacher(): PiEngine {
+function abortableTeacher(): ScriptedModel {
 	const faux = createFauxCore({});
 	faux.setResponses([
 		((_ctx: unknown, opts: { signal?: AbortSignal } | undefined) =>
@@ -233,13 +236,8 @@ function dismissPost(chatId: string, toolCallId: string, kind: "ask" | "explain"
 	);
 }
 
-/** BYOK turn gate (owner, 2026-09-22): no factory floor — a chat needs a
- *  conversation model before any turn streams. The scripted tests give
- *  each chat a per-chat pin exactly like the setup flow does in
- *  production (the injected faux engine still runs the loop). */
 function createConfiguredChat(title: string) {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 	// nodeId is required on teach quizzes (owner ruling 2026-09-26) — the
 	// scripted lessons quiz against this seeded tree.
 	chatStore.saveTree(chat.id, {
@@ -310,7 +308,7 @@ describe("teacher chat flow (scripted model)", () => {
 		// ── The learner answers: the client grades and posts the ANSWER
 		// EVENT — the answer lands as the call's real tool result. ──
 		const answer = answerFor(QUESTION_INPUT, "Mercury");
-		assert.equal(answer.confidence, "neutral");
+		assert.equal(answer.confidence, undefined, "the meter left alone sends no confidence");
 		await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer }), agentFactory(engine));
 
 		// ── The teacher reacts — the projection groups the reaction into the
@@ -318,15 +316,16 @@ describe("teacher chat flow (scripted model)", () => {
 		// grouping canon: consecutive assistant/toolResult messages bounded
 		// by user messages form one group). ──
 		const saved2 = chatStore.getChat(chat.id)!;
-		// Native: user, assistant, answer toolResult, reaction assistant.
-		assert.equal(saved2.messages.length, 4, "the answer + reaction append natively");
+		// Native: user, assistant, answer toolResult, then the reaction: its
+		// send_to_user call, the call's ack, and the reply that closes the turn.
+		assert.equal(saved2.messages.length, 6, "the answer + reaction append natively");
 		assert.equal((saved2.messages[2] as { role?: string }).role, "toolResult", "the graded answer is the call's tool result");
 		const view2 = projectView(saved2.messages);
 		assert.equal(view2.length, 2, "the reaction continues the same assistant message (one group)");
 		const finalParts = view2[1]!.parts;
 		const textPart = finalParts.find((p) => p.type === "text");
 		assert.ok(textPart && textPart.type === "text", "reaction text appended after the tool part");
-		assert.match((textPart as { text?: string }).text!, /Mercury it is/);
+		assert.match((textPart as { text?: string }).text!, /fastest planet/);
 		// The answered quiz part is still there, now with its output.
 		const answeredQuiz = finalParts.find((p) => p.type === "tool-explain");
 		assert.ok(answeredQuiz && answeredQuiz.type === "tool-explain" && (answeredQuiz as { state?: string }).state === "output-available");
@@ -338,7 +337,7 @@ describe("teacher chat flow (scripted model)", () => {
 		assert.equal(out.text, "Mercury");
 
 		// The model actually received the graded answer as a tool result.
-		assert.equal(calls.length, 2, "model saw exactly two prompts");
+		assert.equal(calls.length, 2, "the two recorded prompts: the opening and the answer");
 		const toolResultSent = calls[1]!.some((c) => c.includes("toolResult") || c.includes("Mercury"));
 		assert.ok(toolResultSent, "continuation prompt carries the tool result to the model");
 
@@ -491,10 +490,11 @@ describe("teacher chat flow (scripted model)", () => {
 				// turn's settle.
 				jobFlippedMidTurn = jobStore.getJob(jobIdMid)?.status;
 				await gate2;
-				return fauxAssistantMessage([fauxText("Folded the marker in.")]);
+				return sendToUser("Folded the marker in.");
 			},
+			fauxAssistantMessage(""),
 		]);
-		const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 
 		// A wake here would be a BUG (delivery must ride the live run) — the
 		// counter keeps an erroneous wake hermetic and assertable.
@@ -639,7 +639,7 @@ describe("teacher chat flow (scripted model)", () => {
 		release();
 		await waitFor(() => !isTurnRunning(chat.id), 8000, "turn settle after view cancel");
 		const saved = chatStore.getChat(chat.id)!;
-		assert.equal(saved.messages.length, 2, "complete turn persisted — not a partial");
+		assert.equal(saved.messages.length, 4, "complete turn persisted — not a partial (user, send_to_user call, its ack, the closing reply)");
 		assert.equal(runningTurn(chat.id), undefined, "handle unregistered at settle");
 	});
 
@@ -820,20 +820,6 @@ describe("chat store", () => {
 		assert.equal(loaded.messages.length, 1);
 		assert.equal(loaded.title, "Store test");
 	});
-
-	it("persist the per-chat model settings (replace-whole, no updatedAt churn)", async () => {
-		const chat = chatStore.createChat("Settings test");
-		createdChats.push(chat.id);
-		const before = chatStore.getChat(chat.id)!.updatedAt;
-		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" }, thinkingLevel: "high" });
-		const saved = chatStore.getChat(chat.id)!;
-		assert.deepEqual(saved.settings, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" }, thinkingLevel: "high" });
-		assert.equal(saved.updatedAt, before, "a picker write is not conversation activity");
-		// replace-whole: a settings-less write clears the override (an empty
-		// object persists — every field absent = config defaults)
-		chatStore.saveSettings(chat.id, {});
-		assert.deepEqual(chatStore.getChat(chat.id)!.settings, {});
-	});
 });
 
 describe("canonical persistence failures", () => {
@@ -914,7 +900,7 @@ describe("canonical persistence failures", () => {
 		chatStore.appendTurnUsage = () => { throw new Error("synthetic usage write failure"); };
 		try {
 			const body = await drainTurn(post(chat.id, { type: "text", text: "go" }), opts => {
-				const agent = createTeacherAgent(undefined, { engine, messages: opts.messages, onUsage: opts.onUsage });
+				const agent = createTeacherAgent(undefined, { ...onFake(engine, opts), onUsage: opts.onUsage });
 				agent.subscribe(event => {
 					if (event.type === "agent_start") assert.equal(steerLiveChat(chat.id, steer), true);
 				});
@@ -978,9 +964,10 @@ describe("mid-turn navigation (turn liveness + write-ahead)", () => {
 
 		await drainRunning(chat.id); // finish → persist the full turn → endTurn
 		const saved2 = chatStore.getChat(chat.id)!;
-		// Native: user, assistant, answer result, reaction — one append-only
-		// history; the projection still renders ONE assistant group.
-		assert.equal(saved2.messages.length, 4, "full turn persisted as usual at finish");
+		// Native: user, assistant, answer result, reaction (send_to_user call,
+		// its ack, the closing reply) — one append-only history; the
+		// projection still renders ONE assistant group.
+		assert.equal(saved2.messages.length, 6, "full turn persisted as usual at finish");
 		assert.equal(projectView(saved2.messages).length, 2, "the projection groups the answered quiz + reaction");
 		assert.equal(isTurnRunning(chat.id), false, "registry cleared at finish");
 	});
@@ -1011,98 +998,6 @@ describe("renameChat (the header's click-to-edit title)", () => {
 		createdChats.push(chat.id);
 		const renamed = chatStore.renameChat(chat.id, "   ");
 		assert.equal(renamed.title, "Untitled session");
-	});
-});
-
-describe("the BYOK turn gate (no factory floor — owner, 2026-09-22)", () => {
-	it("a chat with no model refuses the turn with the 503 envelope — nothing lingers", async () => {
-		const chat = chatStore.createChat("Test: unconfigured chat");
-		createdChats.push(chat.id);
-
-		// The record's strong slot belongs to settings-store.test.ts (the
-		// one-fs-owner policy) — READ the resolved truth, never write it.
-		// Refusal holds when the chain is empty; a record-carried strong
-		// slot legitimately opens the gate (the chain is honest both ways).
-		const expectRefusal = effectiveSettings().models.strong === null;
-
-		const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me the solar system" }), agentFactory(scriptedTeacher(defaultLesson).engine));
-
-		if (expectRefusal) {
-			assert.equal(res.status, 503, "the universal turn gate refuses before beginTurn");
-			const body = (await res.json()) as { error: string; code: string; missing: string[] };
-			assert.equal(body.code, "models_not_configured");
-			assert.deepEqual(body.missing, ["strong"]);
-			assert.match(body.error, /No model configured/);
-		} else {
-			assert.equal(res.status, 200, "the record's strong slot satisfies the conversation chain");
-			await drainRunning(chat.id);
-		}
-
-		// Either way: no phantom liveness, nothing durable from a refused turn.
-		if (expectRefusal) {
-			assert.equal(isTurnRunning(chat.id), false, "the refusal never registers a live turn");
-			const saved = chatStore.getChat(chat.id)!;
-			assert.equal(saved.messages.length, 0, "no write-ahead persist before the gate");
-		}
-	});
-
-	it("a per-chat model alone opens the gate (the setup flow's exact write)", async () => {
-		const chat = createConfiguredChat("Test: per-chat pin only");
-		createdChats.push(chat.id);
-		const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me the solar system" }), agentFactory(scriptedTeacher(defaultLesson).engine));
-		assert.equal(res.status, 200, "chat.settings.model satisfies the chain without any record slot");
-		await drainRunning(chat.id);
-	});
-});
-
-// ─── the key-presence turn gate (provider-key interlude, owner, 2026-09-25) ─
-
-describe("the key-presence turn gate (provider-key interlude, 2026-09-25)", () => {
-	// The gate's truth is env-first (keyValue): in tests process.env is the
-	// WHOLE truth (the throwaway data dir has no auth.json), so each test
-	// pins its provider's env var explicitly and restores it after.
-	it("a pinned provider whose key is gone refuses with 503 provider_key_missing — nothing lingers", async () => {
-		const chat = chatStore.createChat("Test: keyless provider");
-		createdChats.push(chat.id);
-		const saved = process.env.TOGETHER_API_KEY;
-		delete process.env.TOGETHER_API_KEY;
-		try {
-			// The chat's own model override pins the provider — the same
-			// chain the strong slot rides. The gate fires BEFORE the engine
-			// build, so the fake model id never hits the catalog.
-			chatStore.saveSettings(chat.id, { model: { provider: "together", id: "no-such-model" } });
-			const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me something" }), agentFactory(scriptedTeacher(defaultLesson).engine));
-
-			assert.equal(res.status, 503, "the key-presence gate refuses before beginTurn");
-			const body = (await res.json()) as { error: string; code: string; provider: string; slots: string[] };
-			assert.equal(body.code, "provider_key_missing");
-			assert.equal(body.provider, "together", "the envelope names whose key is gone");
-			assert.deepEqual(body.slots, ["strong"], "the conversation tier is the affected slot");
-			assert.equal(body.error, "No Together key is set — add one in Settings → Keys", "the human line names the provider");
-			assert.equal(isTurnRunning(chat.id), false, "the refusal never registers a live turn");
-			assert.equal(chatStore.getChat(chat.id)!.messages.length, 0, "no write-ahead persist before the gate");
-		} finally {
-			if (saved !== undefined) process.env.TOGETHER_API_KEY = saved;
-		}
-	});
-
-	it("an env-present key passes the gate (gate by what would run)", async () => {
-		const chat = chatStore.createChat("Test: env-keyed provider");
-		createdChats.push(chat.id);
-		const saved = process.env.OPENAI_API_KEY;
-		process.env.OPENAI_API_KEY = "test-key-presence-gate";
-		try {
-			// A REAL catalog model: the engine build AFTER the gate must
-			// resolve — the injected agent replaces the loop, not the build.
-			chatStore.saveSettings(chat.id, { model: { provider: "openai", id: "gpt-4" } });
-			const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me something" }), agentFactory(scriptedTeacher(defaultLesson).engine));
-
-			assert.equal(res.status, 200, "the env-shadowed key counts as present — the turn runs");
-			await drainRunning(chat.id);
-		} finally {
-			if (saved !== undefined) process.env.OPENAI_API_KEY = saved;
-			else delete process.env.OPENAI_API_KEY;
-		}
 	});
 });
 
@@ -1179,20 +1074,22 @@ describe("background-turn runner (owner ruling 2026-09-25: every turn is a serve
 		// made memory and replay quadratic in message length (one high-thinking
 		// message = hundreds of MB retained; every reattach re-stringified the
 		// whole history in one blocking stretch). Pins the fix end-to-end: faux
-		// streams a long text as many immediate chunks (microtask pacing — all
+		// streams a long send_to_user message as many immediate chunks (microtask pacing — all
 		// inside one flush window), yet the wire carries exactly ONE
 		// message_update for the run, it is the LATEST snapshot, and the wire
 		// never carries pi's duplicate partial.
 		const long = "quadratic blowup ".repeat(40); // ~40 faux chunks
 		const faux = createFauxCore({});
-		faux.setResponses([fauxAssistantMessage([fauxText(long)])]);
-		const engine: PiEngine = { model: faux.getModel(), streamFn: faux.streamSimple };
+		faux.setResponses([sendToUser(long), fauxAssistantMessage("")]);
+		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 		const chat = createConfiguredChat("Test: compaction law");
 		createdChats.push(chat.id);
 		const body = await drainTurn(post(chat.id, { type: "text", text: "go" }), agentFactory(engine));
 		const events = eventsOf(body);
 		const updates = events.filter((e) => e.type === "message_update");
-		assert.equal(updates.length, 1, "a burst of chunks coalesces to exactly one update on the wire");
+		const perMessage = new Map<unknown, number>();
+		for (const u of updates) perMessage.set(u.message?.responseId, (perMessage.get(u.message?.responseId) ?? 0) + 1);
+		assert.deepEqual([...perMessage.values()], [1, 1], "each message's burst of chunks coalesces to exactly one update on the wire (the long send_to_user, then the reply that closes the turn)");
 		assert.ok(
 			JSON.stringify(updates[0]!.message?.content ?? []).includes(long),
 			"the one update is the LATEST snapshot — the full streamed text",
@@ -1277,7 +1174,7 @@ describe("background-turn runner (owner ruling 2026-09-25: every turn is a serve
 			assert.ok(text.includes("Gated reply."), `chat ${chat.id} view replayed its own turn`);
 			assert.ok(text.endsWith("data: [DONE]\n\n"), `chat ${chat.id} view closed at settle`);
 			await waitFor(() => !isTurnRunning(chat.id), 8000, `chat ${chat.id} settle`);
-			assert.equal(chatStore.getChat(chat.id)!.messages.length, 2, `chat ${chat.id} persisted its full turn`);
+			assert.equal(chatStore.getChat(chat.id)!.messages.length, 4, `chat ${chat.id} persisted its full turn`);
 		}
 	});
 });
@@ -1312,7 +1209,7 @@ it("explain tool call persists as a pending part; the free-text answer reveals t
 	assert.ok(tools.explain && !tools.quiz, "explain is the teacher's only graded tool");
 
 	const factory: Parameters<typeof handleChatRequest>[1] = (opts) =>
-		createTeacherAgent(undefined, { engine, messages: opts.messages, tools });
+		createTeacherAgent(undefined, { ...onFake(engine, opts), tools });
 	await drainTurn(post(chat.id, { type: "text", text: "teach me the solar system" }), factory);
 
 	const saved1 = chatStore.getChat(chat.id)!;
@@ -1349,11 +1246,11 @@ it("explain tool call persists as a pending part; the free-text answer reveals t
 	assert.equal(out.committed, EXPLAIN_INPUT.correctAnswer, "the commitment snapshots into the answer record");
 	assert.equal(out.explanation, undefined, "no explanation remnant — one committed field (owner 2026-09-27)");
 
-	// The model's continuation saw the answer JSON (fork 1: the answer IS
-	// the call's tool result) — his text AND the commitment snapshot ride it.
+	// The model's continuation saw his answer, tagged with the question it
+	// answers, after its own call carrying the committed answer.
 	const seen = calls[1]!.join("\n");
 	assert.match(seen, /It stays near the Sun\./);
-	assert.match(seen, /committed/);
+	assert.match(seen, /<answer tool=\\"explain\\" call=\\"call-1\\">/);
 	assert.match(seen, /small angular separation/);
 	assert.ok(!/"explanation"/.test(seen), "the answer record carries no explanation field");
 	assert.equal(danglingQuestionOf(saved2.messages), null, "no pending question remains");
@@ -1608,12 +1505,13 @@ describe("composer steering: POST /api/chats/[id]/steer", () => {
 			async (context: { messages: unknown[] }) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 				await gate;
-				return fauxAssistantMessage([fauxText("Teaching the solar system…")]);
+				return sendToUser("The solar system has eight planets.");
 			},
 			(context: { messages: unknown[] }) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
-				return fauxAssistantMessage([fauxText("Steered — covering Venus too.")]);
+				return sendToUser("Venus is the second planet from the Sun.");
 			},
+			fauxAssistantMessage(""),
 		]);
 		const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
 
@@ -1637,92 +1535,17 @@ describe("composer steering: POST /api/chats/[id]/steer", () => {
 		assert.match(body, /also cover Venus/, "the drained steer rode the live stream verbatim");
 
 		// ONE turn: the second model call's context contains the steer
-		// BETWEEN the user message and the continuing assistant text.
+		// BETWEEN the first delivery and the continuing reply.
 		assert.equal(calls.length, 2, "still one run — the steer continued it, not a new turn");
 		assert.match(calls[1]!.join("\n"), /also cover Venus/, "the model saw the steer in its context");
 
 		// The record persists the user steer in its true position.
 		const saved = chatStore.getChat(chat.id)!;
 		const roles = saved.messages.map((m) => (m as { role?: string }).role);
-		assert.deepEqual(roles, ["user", "assistant", "user", "assistant"], "text → teaching → STEER → steered reply");
-		const steerMsg = saved.messages[2] as { id?: string; content?: unknown };
+		assert.deepEqual(roles, ["user", "assistant", "toolResult", "user", "assistant", "toolResult", "assistant"], "text → teaching (sent, acked) → STEER → steered reply (sent, acked) → the closing reply");
+		const steerMsg = saved.messages[3] as { id?: string; content?: unknown };
 		assert.equal(steerMsg.id, "steer_live1", "the client-minted id survived to the record");
 		assert.equal(steerMsg.content, "also cover Venus");
 	});
 });
 
-// ─── THE LACAN INCIDENT: per-response tool-call ids (owner fix 2026-10-04) ──
-// DeepSeek (via OpenRouter) returns tool-call ids that reset every response —
-// `call_0` for every turn's single call. Before the uniquifier, the duplicate
-// ids corrupted the fold (the quiz answer overwrote the ask card, the ask
-// question vanished), answer routing, and the shuffle seeds. Now the wire
-// boundary remints colliding ids ONCE — the client, the record, the pending
-// gate, and the next turn's provider context all see unique ids.
-describe("duplicate provider tool-call ids (the Lacan fix)", () => {
-	it("every `call_0` turn keeps its identity: ask answered as ask, explain as explain, ids unique in the record", async () => {
-		// the live shape (the real Lacan session): an ask with NO options
-		const ASK = { question: "What do you want from Lacan?" };
-		const QUIZ2 = { ...QUESTION_INPUT, type: "check" };
-		// BOTH turns name their single call `call_0` — the provider's shape.
-		const { engine } = scriptedTeacher(() => [
-			(context) => {
-				void context;
-				return fauxAssistantMessage(
-					[fauxText("First — a question about your goal."), fauxToolCall("ask_user_question", ASK, { id: "call_0" })],
-					{ stopReason: "toolUse" },
-				);
-			},
-			(context) => {
-				void context;
-				return fauxAssistantMessage(
-					[fauxText("The unconscious, then."), fauxToolCall("explain", QUIZ2, { id: "call_0" })],
-					{ stopReason: "toolUse" },
-				);
-			},
-			() => fauxAssistantMessage([fauxText("Right — and that is where Lacan begins.")]),
-		]);
-
-		const chat = createConfiguredChat("Lacan: duplicate call_0 turns");
-		createdChats.push(chat.id);
-		// Turn 1: the ask question.
-		await drainTurn(post(chat.id, { type: "text", text: "teach me Lacan" }), agentFactory(engine));
-		let saved = chatStore.getChat(chat.id)!;
-		let pending = danglingQuestionOf(saved.messages)!;
-		assert.equal(pending.tool, "ask_user_question");
-		// The client answers with the id IT SAW — the persisted one.
-		const askId = pending.toolCallId;
-		await drainTurn(post(chat.id, { type: "answer", toolCallId: askId, answer: { kind: "ask", questionText: ASK.question, dontKnow: false, answers: [], text: "The theory core", answeredAt: new Date().toISOString() }, }), agentFactory(engine));
-
-		// Turn 2: the quiz — ALSO `call_0` from the provider.
-		saved = chatStore.getChat(chat.id)!;
-		pending = danglingQuestionOf(saved.messages)!;
-		assert.equal(pending.tool, "explain");
-		const quizId = pending.toolCallId;
-		assert.notEqual(quizId, askId, "the uniquifier reminted the colliding id at the wire boundary");
-		assert.match(quizId, /^call_0~\d+$/, "mint scheme: orig~n");
-		await drainTurn(post(chat.id, { type: "answer", toolCallId: quizId, answer: answerFor(QUIZ2, "Mercury") }), agentFactory(engine));
-
-		saved = chatStore.getChat(chat.id)!;
-		// The invariant: CALL ids are unique among themselves (a call and its
-		// own result share one id by design — that pair is the point).
-		const callIds = saved.messages.flatMap(
-			(m) =>
-				m.role === "assistant"
-					? (m.content ?? []).filter((c) => c.type === "toolCall").map((c) => c.id)
-					: [],
-		);
-		assert.equal(new Set(callIds).size, callIds.length, "no duplicate tool-call ids persist");
-		assert.deepEqual(callIds, ["call_0", "call_0~2"], "the provider's two call_0s became distinct ids");
-
-		// The fold is the Lacan heal: the ask card carries the ASK answer,
-		// the quiz card the QUIZ answer — no overwrite, order preserved.
-		const view = projectView(saved.messages);
-		const parts = view.flatMap((v) => v.parts).filter((p) => p.type.startsWith("tool-"));
-		const askPart = parts.find((p) => (p as { toolCallId?: string }).toolCallId === askId) as { state?: string; output?: { kind?: string } };
-		const quizPart = parts.find((p) => (p as { toolCallId?: string }).toolCallId === quizId) as { state?: string; output?: { kind?: string } };
-		assert.equal(askPart?.state, "output-available");
-		assert.equal(askPart?.output?.kind, "ask", "the ask card keeps its own answer");
-		assert.equal(quizPart?.state, "output-available");
-		assert.equal(quizPart?.output?.kind, "explain", "the explain card got ITS answer (the pre-fix bug: it landed on the ask card)");
-	});
-});

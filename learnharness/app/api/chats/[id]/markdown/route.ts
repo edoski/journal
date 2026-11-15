@@ -1,8 +1,7 @@
 /**
  * THE SESSION MARKDOWN EXPORT (owner, release polish 2026-10-06): the
- * user-facing export the session-markdown engine was built for — the
- * same document the extractor reads, minted anchorless (anchors are
- * extraction provenance; a learner's export carries no message ids).
+ * user-facing export the session-markdown engine was built for, minted
+ * anchorless (a learner's export carries no message ids).
  *
  * GET /api/chats/:id/markdown → the whole session as one markdown file
  * (Content-Disposition attachment; filename from the slugified title).
@@ -27,7 +26,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 	const { id } = await ctx.params;
 	const record = getChat(id);
 	if (!record) return Response.json({ error: "Unknown chat" }, { status: 404 });
-	const markdown = sessionMarkdown(record.messages, { title: record.title, anchors: false });
+	const markdown = sessionMarkdown(record.messages, { title: record.title, anchors: false, photos: "embed" });
 	return new Response(markdown, {
 		headers: {
 			"content-type": "text/markdown; charset=utf-8",

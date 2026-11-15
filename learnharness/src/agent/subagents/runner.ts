@@ -1,8 +1,9 @@
-import type { PiEngine } from "../models.ts";
+import type { SdkEngine } from "../models.ts";
 import {
 	accumulateJobUsage,
 	buildSubagentSteer,
 	isSubagentFailure,
+	JOB_TIME_LIMIT_MS,
 	piUsageToStep,
 	type DemoResult,
 	type DemoToolInput,
@@ -23,7 +24,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { ModelRole } from "../../../config.ts";
-import { ROLE_SLOT, modelsNotConfigured, type ModelSlotName, type ProviderKeyMissing } from "../../core/settings.ts";
+import type { ProviderKeyMissing } from "../../core/settings.ts";
 import type { ChatStore, JobStore } from "../../core/ports.ts";
 import { runDemoBuilder } from "./demo-builder.ts";
 import { runPdfReaderAgent } from "./pdf-reader.ts";
@@ -55,10 +56,10 @@ import { runVisualMaker } from "./visual-maker.ts";
  * Undefined in production. (The jobs spawn through the module-level KIND
  * runners, which read these at call time.)
  */
-export const researchModelOverride: { current?: PiEngine } = {};
-export const demoModelOverride: { current?: PiEngine } = {};
-export const visualModelOverride: { current?: PiEngine } = {};
-export const pdfModelOverride: { current?: PiEngine } = {};
+export const researchModelOverride: { current?: SdkEngine } = {};
+export const demoModelOverride: { current?: SdkEngine } = {};
+export const visualModelOverride: { current?: SdkEngine } = {};
+export const pdfModelOverride: { current?: SdkEngine } = {};
 
 /** The dispatch-time tool input (from src/agent/tools/jobs.ts schemas). */
 type JobToolInput = ResearchToolInput | DemoToolInput | VisualToolInput | PdfToolInput;
@@ -72,19 +73,17 @@ export interface JobRunnerDeps {
 	 * on it. Its persisted pending obligation survives process restart.
 	 */
 	deliver: (steer: SteerMessage) => Promise<void>;
-	/** Settings-resolved engine per role (model slots wave, 2026-09-20):
-	 *  the role-override → slot chain, read FRESH per job (the server
-	 *  wiring passes effectiveSettings-based resolution). Test overrides
-	 *  (below) still win. BYOK (owner, 2026-09-22): the chain may end
-	 *  EMPTY → undefined; runJob then refuses the spawn honestly instead
-	 *  of guessing a model. */
-	engineFor?: (role: ModelRole) => PiEngine | undefined;
-	/** Key-presence gate (provider-key interlude, 2026-09-25): given the
-	 *  resolved engine's provider + the kind's slot tier, return the
-	 *  refusal envelope when the provider's key is missing (null = run).
-	 *  Injected because the agent layer may not read the key store; absent
-	 *  in tests that inject engines directly (test engines never owe a key). */
-	providerKeyMissing?: (provider: string, tier: ModelSlotName) => ProviderKeyMissing | null;
+	/** The engine per role, read FRESH per job (the server wiring resolves
+	 *  the settings' Claude account each time). Test overrides (below)
+	 *  still win. */
+	engineFor?: (role: ModelRole) => SdkEngine;
+	/** Connection gate: given the engine's Claude account, the refusal
+	 *  envelope when it is not signed in (null = run). Injected because the
+	 *  agent layer may not read the connection state; absent in tests that
+	 *  inject engines directly (test engines never owe a sign-in). */
+	providerKeyMissing?: (provider: string) => ProviderKeyMissing | null;
+	/** Test seam: per-kind time limits. Production uses JOB_TIME_LIMIT_MS. */
+	timeLimitMs?: Record<JobKind, number>;
 }
 
 export interface JobRunner {
@@ -102,15 +101,12 @@ interface LoopContext {
 	/** Fires when abortJob kills the run; abortSignal is passed into every
 	 * model call so the spend stops mid-call, not at the next loop check. */
 	abortSignal: AbortSignal;
-	/** The job's chat (debug: raw provider-event recording under
-	 * LH_PROVIDER_EVENTS=1 — forwarded into every subagent run). */
-	chatId?: string;
 	/** Fold one model call's usage into the job record (progress write). */
 	onUsage: (step: UsageStepLike) => void;
 }
 
-/** The kind→role table (model slots wave, 2026-09-20): which ModelRole's
- * engine each sub-agent kind runs — the engineFor injection key. */
+/** The kind→role table: which ModelRole each sub-agent kind runs as — the
+ * engineFor injection key. */
 const KIND_ROLE: Record<JobKind, ModelRole> = {
 	research: "researcher",
 	demo: "demoBuilder",
@@ -120,24 +116,22 @@ const KIND_ROLE: Record<JobKind, ModelRole> = {
 
 export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	const { chatStore, jobStore, deliver } = deps;
+	const timeLimits = deps.timeLimitMs ?? JOB_TIME_LIMIT_MS;
 
 	/** Running usage totals per live job (the loop's onUsage folds here,
 	 * then writes through the job store so the poll sees progress). */
 	const usageTotals = new Map<string, JobUsage>();
 
-	function makeLoopContext(jobId: string, engine: PiEngine): LoopContext {
-		const chatId = jobStore.getJob(jobId)?.chatId;
+	function makeLoopContext(jobId: string, engine: SdkEngine, controller: AbortController): LoopContext {
 		// Provider-qualified stamp: the engine's actual model — the only
-		// thing that ran (BYOK: no config-pin fallback stamps exist).
+		// thing that ran.
 		const model = `${engine.model.provider}:${engine.model.id}`;
 		// Real-kill wiring (2026-09 abort semantics): the controller is what
 		// the abort endpoint fires (agent/subagents/aborts.ts registry); the
 		// signal rides into every model call of the loop.
-		const controller = new AbortController();
 		registerJobAbort(jobId, controller);
 		return {
 			abortSignal: controller.signal,
-			chatId,
 			onUsage: (step) => {
 				const next = accumulateJobUsage(usageTotals.get(jobId), model, step);
 				usageTotals.set(jobId, next);
@@ -159,10 +153,9 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	 *  kind-correct by construction; transcript fallbacks are cast after). */
 	/** The engine one job runs on: test override first (the old seam —
 	 *  tests swap scripted engines without touching deps), then the injected
-	 *  settings-resolved engineFor. undefined = the BYOK chain came up
-	 *  empty (owner, 2026-09-22) — runJob refuses below, honestly. */
-	function pickEngine(kind: JobKind): PiEngine | undefined {
-		const testOverride: Record<string, { current?: PiEngine } | undefined> = {
+	 *  engineFor. undefined = nothing was injected — runJob refuses below. */
+	function pickEngine(kind: JobKind): SdkEngine | undefined {
+		const testOverride: Record<string, { current?: SdkEngine } | undefined> = {
 			researcher: researchModelOverride,
 			demoBuilder: demoModelOverride,
 			visualMaker: visualModelOverride,
@@ -173,7 +166,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	const KIND_RUNNERS: Record<
 		JobKind,
-		(jobId: string, engine: PiEngine, input: JobToolInput | undefined, loop: LoopContext) => Promise<void>
+		(jobId: string, engine: SdkEngine, input: JobToolInput | undefined, loop: LoopContext) => Promise<void>
 	> = {
 		research: (jobId, engine, input, loop) => runResearchJob(jobId, engine, input, loop),
 		demo: (jobId, engine, input, loop) => runDemoJob(jobId, engine, input, loop),
@@ -194,66 +187,53 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			jobStore.updateJob(jobId, { status: "error", error: `unknown kind ${job.kind}`, activity: "failed" });
 			return;
 		}
-		const engine = pickEngine(job.kind);
-		// The per-need refusal guards (BYOK 2026-09-22 / provider-key
-		// interlude 2026-09-25): no engine for the kind's tier, or the
-		// resolved engine's provider key gone — both refuse through the SAME
-		// convention as every other failed job: record the honest error (no
-		// status flip: finalizeJob owns the terminal flip after delivery),
-		// then steer the kind's failure shape through finishJob so the wake
-		// pipeline resumes the lesson and the teacher reads the refusal
-		// instead of waiting forever on a job it already dispatched.
-		const refuse = async (reason: string): Promise<void> => {
-			if (stillRunning(jobId)) jobStore.updateJob(jobId, { error: reason });
-			const resolved = resolveInput(job, input) as
-				| ResearchToolInput
-				| DemoToolInput
-				| VisualToolInput
-				| PdfToolInput
-				| undefined;
-			const pdf = resolved as PdfToolInput | undefined;
-			const failure: ResearchResult | DemoResult | VisualResult | PdfResult =
-				job.kind === "research"
-					? { brief: `Research failed: ${reason}`, sources: [] }
-					: job.kind === "demo"
-						? {
-								title: typeof (resolved as DemoToolInput | undefined)?.title === "string" && (resolved as DemoToolInput).title.trim() ? (resolved as DemoToolInput).title : "Interactive demo",
-								html: "",
-								tested: true,
-								notes: `FAILED: ${reason}`,
-							}
-						: job.kind === "visual"
-							? { svg: "", notes: `FAILED: ${reason}` }
-							: {
-									path: typeof pdf?.path === "string" ? pdf.path : "",
-									question: typeof pdf?.question === "string" ? pdf.question : "",
-									brief: `PDF failed: ${reason}`,
-									pagesRead: [],
-									pagesConsulted: [],
-								};
-			await finishJob(jobId, failure);
-		};
-		if (!engine) {
-			const tier = ROLE_SLOT[KIND_ROLE[job.kind]];
-			const envelope = modelsNotConfigured([tier]);
-			console.info(`[job ${jobId}] refused — ${JSON.stringify(envelope)}`);
-			await refuse(`${envelope.error} (missing: ${tier})`);
+		const limitMs = timeLimits[job.kind];
+		const timeoutReason = `took longer than ${describeDuration(limitMs)}`;
+		const remainingMs = Date.parse(job.createdAt) + limitMs - Date.now();
+		// Past its limit already: a respawned orphan whose time ran out while
+		// no process ran it. Running it again would keep the lesson waiting.
+		if (remainingMs <= 0) {
+			console.info(`[job ${jobId}] ${timeoutReason} — failing without a run`);
+			await failJob(job, input, timeoutReason);
 			return;
 		}
-		// Key presence (2026-09-25): the engine exists, but its provider's
-		// key may be gone — refuse the spawn BEFORE the loop, same
-		// convention (the injected check reads the key store; absent in
-		// engine-injecting tests).
-		const keyRefusal =
-			deps.providerKeyMissing?.(engine.model.provider, ROLE_SLOT[KIND_ROLE[job.kind]]) ?? null;
+		// No engine injected, its account signed out, or an account T3 Code
+		// no longer has: each fails the job before the loop, so the tutor
+		// reads why instead of waiting.
+		let engine: SdkEngine | undefined;
+		try {
+			engine = pickEngine(job.kind);
+		} catch (err) {
+			const reason = err instanceof Error ? err.message : String(err);
+			console.info(`[job ${jobId}] refused — ${reason}`);
+			await failJob(job, input, reason);
+			return;
+		}
+		if (!engine) {
+			const reason = `no engine injected for role "${KIND_ROLE[job.kind]}"`;
+			console.info(`[job ${jobId}] refused — ${reason}`);
+			await failJob(job, input, reason);
+			return;
+		}
+		const keyRefusal = deps.providerKeyMissing?.(engine.model.provider) ?? null;
 		if (keyRefusal) {
 			console.info(`[job ${jobId}] refused — ${JSON.stringify(keyRefusal)}`);
-			await refuse(keyRefusal.error);
+			await failJob(job, input, keyRefusal.error);
 			return;
 		}
+		const controller = new AbortController();
+		// The failure is written before the abort, so the unwinding loop finds
+		// the job settled and stays silent, as it does after a learner abort.
+		const deadline = setTimeout(() => {
+			if (!stillRunning(jobId)) return;
+			console.info(`[job ${jobId}] ${timeoutReason}`);
+			void failJob(job, input, timeoutReason);
+			controller.abort();
+		}, remainingMs);
 		try {
-			await run(jobId, engine, input, makeLoopContext(jobId, engine));
+			await run(jobId, engine, input, makeLoopContext(jobId, engine, controller));
 		} finally {
+			clearTimeout(deadline);
 			unregisterJobAbort(jobId);
 			// The last usage write may have been mid-flight when the loop died;
 			// persist what was folded (the abort path patches only status, so
@@ -262,6 +242,14 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			if (usage) jobStore.updateJob(jobId, { usage });
 			usageTotals.delete(jobId);
 		}
+	}
+
+	/** Record why a job failed and steer the kind's failure shape, so the
+	 * tutor learns the outcome instead of waiting on a result that will not
+	 * come. finishJob writes nothing once the job has settled. */
+	async function failJob(job: JobRecord, input: JobToolInput | undefined, reason: string): Promise<void> {
+		if (stillRunning(job.id)) jobStore.updateJob(job.id, { error: reason });
+		await finishJob(job.id, failureResult(job.kind, resolveInput(job, input), reason));
 	}
 
 	/** Dispatch input wins, then the job's saved arguments. Legacy jobs
@@ -330,7 +318,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runResearchJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -367,7 +355,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				engine: model,
 				pdfDir,
 				abortSignal: loop.abortSignal,
-				chatId: loop.chatId,
 				// Money channel: each agent step is one model call — fold its
 				// usage into the record as it completes (progress write).
 				onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
@@ -399,7 +386,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runDemoJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -418,8 +405,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				{
 					engine: model,
 					abortSignal: loop.abortSignal,
-					chatId: loop.chatId,
-					onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
+						onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 					onActivity: (line) => jobStore.updateJob(jobId, { activity: line }),
 				},
 			);
@@ -436,7 +422,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runVisualJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -454,8 +440,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				{
 					engine: model,
 					abortSignal: loop.abortSignal,
-					chatId: loop.chatId,
-					onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
+						onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 					onActivity: (line) => jobStore.updateJob(jobId, { activity: line }),
 				},
 			);
@@ -474,7 +459,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 	async function runPdfJob(
 		jobId: string,
-		model: PiEngine | undefined,
+		model: SdkEngine,
 		passedInput: JobToolInput | undefined,
 		loop: LoopContext,
 	): Promise<void> {
@@ -493,7 +478,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			{
 				engine: model,
 				abortSignal: loop.abortSignal,
-				chatId: loop.chatId,
 				onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 				onActivity: (line) => jobStore.updateJob(jobId, { activity: line }),
 			},
@@ -514,6 +498,34 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 // ─── module-level pure helpers ──────────────────────────────────────────────
 
+/** The kind's failure shape carrying `reason`, the same shape a failed run
+ * produces, so the steer and the UI read it as a failure. */
+function failureResult(
+	kind: JobKind,
+	input: JobToolInput | undefined,
+	reason: string,
+): ResearchResult | DemoResult | VisualResult | PdfResult {
+	if (kind === "research") return { brief: `Research failed: ${reason}`, sources: [] };
+	if (kind === "demo") {
+		const title = (input as DemoToolInput | undefined)?.title;
+		return { title: typeof title === "string" && title.trim() ? title : "Interactive demo", html: "", tested: true, notes: `FAILED: ${reason}` };
+	}
+	if (kind === "visual") return { svg: "", notes: `FAILED: ${reason}` };
+	const pdf = input as PdfToolInput | undefined;
+	return {
+		path: typeof pdf?.path === "string" ? pdf.path : "",
+		question: typeof pdf?.question === "string" ? pdf.question : "",
+		brief: `PDF failed: ${reason}`,
+		pagesRead: [],
+		pagesConsulted: [],
+	};
+}
+
+/** "4 minutes", or seconds below a minute (test-sized limits). */
+function describeDuration(ms: number): string {
+	return ms >= 60_000 ? `${Math.round(ms / 60_000)} minutes` : `${Math.round(ms / 1000)} seconds`;
+}
+
 /** Failure shape (W6 brief): html === "" with "FAILED: …" notes. */
 function isDemoFailure(result: DemoResult): boolean {
 	return typeof result.html !== "string" || result.html.length === 0;
@@ -530,7 +542,7 @@ function isPdfFailure(result: PdfResult): boolean {
 
 /** The activity line shown in the UI: `web_search: "query"` / `web_fetch: host`. */
 function activityLine(toolName: string, input: { query?: string; url?: string } | undefined): string {
-	if (toolName === "web_search") return `web_search: "${input?.query ?? ""}"`;
+	if (toolName === "WebSearch") return `web_search: "${input?.query ?? ""}"`;
 	if (toolName === "web_fetch") return `web_fetch: ${hostOf(input?.url)}`;
 	return toolName;
 }

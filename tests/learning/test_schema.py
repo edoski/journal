@@ -62,8 +62,9 @@ BASE = {
 def test_empty_course_is_canonical_and_validates() -> None:
     record = schema.empty()
     assert record == {
-        "schema": 6,
+        "schema": 7,
         "sources": {},
+        "arcs": {},
         "topics": {},
         "observations": {},
         "knowledge": {},
@@ -502,6 +503,137 @@ def test_corrections_name_earlier_observations() -> None:
         schema.validate_record(stored)
 
 
+def test_an_attempt_records_how_it_was_helped_and_whether_he_gave_up() -> None:
+    record, outcome = apply(
+        course(BASE),
+        {
+            "observations": [
+                attempt("rank", help="Worked example of the same method", shown=True),
+                attempt("rank", text="Stuck", result="incorrect", gave_up=True),
+            ]
+        },
+    )
+    assert outcome.observations == ["o1", "o2"]
+    assert record["observations"]["o1"]["shown"] is True
+    assert record["observations"]["o2"]["gave_up"] is True
+    for observation, fragment in [
+        (attempt("rank", shown=True), "shown marks help"),
+        (attempt("rank", gave_up=True), "gave_up is allowed only with result"),
+        (
+            {"kind": "self_report", "topics": ["rank"], "text": "x", "gave_up": True},
+            "takes no gave_up",
+        ),
+    ]:
+        fails(course(BASE), {"observations": [observation]}, fragment)
+
+
+def test_an_attempt_from_an_earlier_day_stands_as_recorded() -> None:
+    record = apply(
+        course(BASE),
+        {"observations": [attempt("rank", help="Pointed at the first step")]},
+    )[0]
+    tomorrow = date(2026, 10, 11)
+    regrade = attempt("rank", help="none", text="Regraded", corrects=["o1"])
+    with pytest.raises(ValueError) as caught:
+        apply(record, {"observations": [regrade]}, today=tomorrow, now=NEXT_DAY)
+    assert "o1 was recorded on 2026-10-10" in str(caught.value)
+    assert "self_report" in str(caught.value)
+    same_day = apply(record, {"observations": [regrade]}, now=LATER)[0]
+    assert same_day["observations"]["o2"]["corrects"] == ["o1"]
+    report = {"kind": "self_report", "topics": ["rank"], "text": "Had my notes open"}
+    reported = apply(
+        record,
+        {"observations": [{**report, "corrects": ["o1"]}]},
+        today=tomorrow,
+        now=NEXT_DAY,
+    )[0]
+    assert reported["observations"]["o2"]["corrects"] == ["o1"]
+
+
+def remark(*targets: str, **fields: Any) -> dict[str, Any]:
+    return attempt(
+        "rank",
+        text=fields.pop("text", "Worked an exercise"),
+        corrects=list(targets),
+        disputed=fields.pop("disputed", "My answer was right"),
+        ruling=fields.pop("ruling", "The rank is 2 as you said; the mark missed it"),
+        **fields,
+    )
+
+
+def test_a_disputed_mark_is_re_marked_from_any_day() -> None:
+    record = apply(
+        course(BASE), {"observations": [attempt("rank", result="incorrect")]}
+    )[0]
+    tomorrow = date(2026, 10, 11)
+    remarked = apply(
+        record, {"observations": [remark("o1")]}, today=tomorrow, now=NEXT_DAY
+    )[0]
+    stored = remarked["observations"]["o2"]
+    assert stored["corrects"] == ["o1"]
+    assert stored["date"] == "2026-10-10"
+    assert stored["disputed"] == "My answer was right"
+    assert stored["ruling"].startswith("The rank is 2")
+
+
+@pytest.mark.parametrize(
+    ("observation", "fragment"),
+    [
+        (attempt("rank", disputed="It was right"), "disputed needs corrects"),
+        (
+            attempt("rank", corrects=["o1"], disputed="It was right"),
+            "needs both disputed",
+        ),
+        (attempt("rank", corrects=["o1"], ruling="Holds"), "needs both disputed"),
+        (
+            {
+                "kind": "self_report",
+                "topics": ["rank"],
+                "text": "It was right",
+                "corrects": ["o1"],
+                "disputed": "It was right",
+                "ruling": "Holds",
+            },
+            "rides only an attempt",
+        ),
+    ],
+)
+def test_a_re_mark_names_the_dispute_and_its_ruling(
+    observation: dict[str, Any], fragment: str
+) -> None:
+    record = apply(course(BASE), {"observations": [attempt("rank")]})[0]
+    fails(record, {"observations": [observation]}, fragment)
+
+
+def test_a_re_mark_judges_the_mark_that_stands() -> None:
+    record = apply(
+        course(BASE), {"observations": [attempt("rank", result="incorrect")]}
+    )[0]
+    record = apply(record, {"observations": [remark("o1")]}, now=LATER)[0]
+    fails(
+        record,
+        {"observations": [remark("o1", text="Again")]},
+        "o1 was already superseded",
+    )
+    report = {"kind": "self_report", "topics": ["rank"], "text": "Had my notes open"}
+    record = apply(record, {"observations": [report]}, now=LATER)[0]
+    fails(record, {"observations": [remark("o3")]}, "o3 is a self_report")
+    chained = apply(record, {"observations": [remark("o2", text="Again")]}, now=LATER)[
+        0
+    ]
+    assert chained["observations"]["o4"]["corrects"] == ["o2"]
+
+
+def test_forgetting_a_disputed_attempt_keeps_its_re_mark_valid() -> None:
+    record = apply(
+        course(BASE), {"observations": [attempt("rank", result="incorrect")]}
+    )[0]
+    record = apply(record, {"observations": [remark("o1")]}, now=LATER)[0]
+    forgotten = schema.remove(record, ["o1"])
+    assert "corrects" not in forgotten["observations"]["o2"]
+    assert schema.validate_record(forgotten) == forgotten
+
+
 @pytest.mark.parametrize(("minutes", "skipped"), [(5, True), (30, True), (31, False)])
 def test_identical_observations_within_30_minutes_are_skipped(
     minutes: int, skipped: bool
@@ -652,12 +784,12 @@ def test_patch_and_record_shapes_are_explained() -> None:
         "corrects",
     )
     fails(course(BASE), {"topics": []}, "topics must map handles to objects")
-    with pytest.raises(ValueError, match="schema 6"):
-        schema.validate_record({"schema": 5})
+    with pytest.raises(ValueError, match="schema 7, not 6"):
+        schema.validate_record({"schema": 6})
     with pytest.raises(
         ValueError, match='Unknown field "scopes"|course: unknown field "scopes"'
     ):
-        schema.validate_record({"schema": 6, "scopes": {}})
+        schema.validate_record({"schema": 7, "scopes": {}})
 
 
 def test_typed_shapes_list_exactly_the_stored_fields() -> None:
@@ -710,3 +842,156 @@ def test_patches_with_invisible_characters_are_rejected() -> None:
         {"knowledge": {"notation": {"text": "Integrale: ∫ f(x) dx\n\tcon dx in fondo"}}}
     )
     assert record["knowledge"]["notation"]["text"].endswith("in fondo")
+
+
+def test_text_the_learner_reads_is_written_to_them() -> None:
+    fails(
+        schema.empty(),
+        {"topics": {"chain": {"gap": "Drops the inner derivative (o133)"}}},
+        "topics.chain.gap",
+        'names the observation "o133"',
+    )
+    fails(
+        schema.empty(),
+        {"topics": {"rank": {"note": "Repaired 2026-11-08 after the explanation"}}},
+        "topics.rank.note",
+        'holds the date "2026-11-08"',
+    )
+    fails(
+        schema.empty(),
+        {"topics": {"walks": {"gap": "In the longest-path argument he assumes"}}},
+        "topics.walks.gap",
+        'as "he"',
+    )
+    fails(
+        schema.empty(),
+        {"tasks": {"rank": {"title": "Rank", "step": "He needs the matrix first"}}},
+        "tasks.rank.step",
+        'as "He"',
+    )
+    fails(
+        schema.empty(),
+        {"tasks": {"rank": {"title": "Rank", "goal": "The learner states it"}}},
+        "tasks.rank.goal",
+        'as "learner"',
+    )
+    fails(
+        schema.empty(),
+        {"topics": {"rank": {"gap": "You count rows \u2014 not pivots"}}},
+        "topics.rank.gap",
+        "uses a dash as punctuation",
+    )
+    fails(
+        schema.empty(),
+        {"tasks": {"rank": {"title": "Rank", "step": "Part (c) \u2013 the kernel"}}},
+        "tasks.rank.step",
+        "uses a dash as punctuation",
+    )
+    fails(
+        course({"topics": {"rank": {"title": "Rank"}}}),
+        {"observations": [attempt("rank", text="Retest of o56")]},
+        "observations[0].text",
+        'names the observation "o56"',
+    )
+    record = course(
+        {
+            "topics": {"walks": {"title": "Walks", "gap": "You stop one step early"}},
+            "tasks": {
+                "sheet-4": {"title": "Sheet 4", "step": "Find a path of length $o(n)$"}
+            },
+        }
+    )
+    assert record["topics"]["walks"]["gap"] == "You stop one step early"
+    named = course(
+        {
+            "topics": {
+                "cs": {
+                    "title": "Cauchy\u2013Schwarz \u2014 the inequality",
+                    "note": "You apply Cauchy\u2013Schwarz on exercises 1\u20135",
+                }
+            }
+        }
+    )
+    assert (
+        named["topics"]["cs"]["note"]
+        == "You apply Cauchy\u2013Schwarz on exercises 1\u20135"
+    )
+    asked = apply(
+        record, {"observations": [attempt("walks", text="He flips a coin twice")]}
+    )[0]
+    assert asked["observations"]["o1"]["text"] == "He flips a coin twice"
+    assert course({"tasks": {"t": {"title": "T", "help": "o3, 2026-11-08, he"}}})
+
+
+def test_a_ruling_shows_on_his_answer_so_it_is_written_to_him() -> None:
+    record = course(
+        {"topics": {"rank": {"title": "Rank"}}, "observations": [attempt("rank")]}
+    )
+    remark = attempt(
+        "rank", corrects=["o1"], disputed="My answer was right", result="incorrect"
+    )
+    fails(
+        record,
+        {
+            "observations": [
+                {**remark, "ruling": "His answer said guessing, which he didn't give"}
+            ]
+        },
+        "observations[0].ruling",
+        'as "His"',
+    )
+    fails(
+        record,
+        {"observations": [{**remark, "ruling": "The mark of o1 stands"}]},
+        "observations[0].ruling",
+        'names the observation "o1"',
+    )
+    saved = apply(
+        record,
+        {
+            "observations": [
+                {**remark, "ruling": "You wrote guessing, so the mark stands"}
+            ]
+        },
+    )[0]
+    assert (
+        saved["observations"]["o2"]["ruling"]
+        == "You wrote guessing, so the mark stands"
+    )
+
+
+def test_only_an_attempt_can_be_a_prediction() -> None:
+    record = course({"topics": {"rank": {"title": "Rank"}}})
+    fails(
+        record,
+        {
+            "observations": [
+                {
+                    "kind": "exam",
+                    "topics": ["rank"],
+                    "text": "Q1",
+                    "result": "correct",
+                    "predicted": True,
+                }
+            ]
+        },
+        "observations[0].predicted",
+    )
+    fails(
+        record,
+        {
+            "observations": [
+                {
+                    "kind": "self_report",
+                    "topics": ["rank"],
+                    "text": "I get it",
+                    "predicted": True,
+                }
+            ]
+        },
+        "takes no predicted",
+    )
+    saved = apply(
+        record, {"observations": [attempt("rank", result="incorrect", predicted=True)]}
+    )[0]
+    assert saved["observations"]["o1"]["predicted"] is True

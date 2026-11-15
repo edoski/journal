@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* FullCalendar's structural styles (components/ui/event-calendar-views.tsx),
+   in the base layer so its utilities win over them. */
+@import "@fullcalendar/react/skeleton.css" layer(base);
 
 @custom-variant dark (&:is(.dark *));
 
@@ -21,107 +24,116 @@
    DID (:focus-visible re-evaluates on key input — a clicked sidebar
    session lit up when the quiz's ←/→ were pressed). Surfaces carry their
    own hover/active/selected affordances; the dock's keyboard walk uses
-   its own ring utilities, unaffected by an outline reset. */
-*:focus,
-*:focus-visible {
-	outline: none;
+   its own ring utilities, unaffected by an outline reset.
+   In the base layer (keyboard reach, 13 Nov 2026), so it silences only the
+   browser's own outline: unlayered, it also beat every focus-visible:outline
+   utility, and the calendar's day numbers and the maps' nodes showed no
+   ring when the arrows reached them. */
+@layer base {
+	*:focus,
+	*:focus-visible {
+		outline: none;
+	}
 }
 
-/* Palette (owner's hexes): main #141414, raised #1C1C1C, edges #434343.
-   Mono chrome = JetBrains Mono; prose = Source Sans 3; titles = CMU Serif. */
+/* Tailwind's outline-none sets the outline style to none for every later
+   outline utility too, so a target that pairs it with a focus-visible:outline
+   ring (the maps' nodes) drew nothing when the arrows reached it. On the
+   page, a keyboard focus gives such a ring its solid style back. */
+main [class*="focus-visible:outline-"]:not([class*="focus-visible:outline-none"]):not([class*="focus-visible:outline-hidden"]):focus-visible {
+	outline-style: solid;
+}
+
+/* The design tokens (polish pass, 9 Nov 2026): SF Pro everywhere, dark only,
+   one accent. Sources: research/agent-apps.md (T3 Code, Codex, Claude
+   desktop tokens), Apple HIG. AppearanceProvider writes the reading size and
+   the emphasis inks inline on <html> (components/settings/appearance.tsx). */
 :root {
 	color-scheme: dark;
 	--radius: 8px;
-	--background: #141414;
-	--foreground: #e6e6e6;
-	--card: #1c1c1c;
-	--card-foreground: #e6e6e6;
-	--popover: #1c1c1c;
-	--popover-foreground: #e6e6e6;
-	--primary: #e6e6e6;
-	--primary-foreground: #141414;
-	--secondary: #1c1c1c;
-	--secondary-foreground: #e6e6e6;
-	--muted: #1c1c1c;
-	--muted-foreground: #8d8d8d;
-	--accent: #2a2a2a;
-	--accent-foreground: #e6e6e6;
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: #434343;
-	--input: #434343;
-	--ring: #8d8d8d;
-	/* Emphasis inks default to the REGULAR TEXT COLOR (owner ruling,
-	   appearance wave 2026-09-26 — the old #ee928c/#6fa9d6 factory
-	   emphasis colors are gone). Explicit overrides land via the
-	   appearance settings vars. */
+	/* Emphasis inks default to the regular text colour; the appearance
+	   settings override them. */
 	--lh-ink-strong: var(--foreground);
 	--lh-ink-italic: var(--foreground);
-	/* THE READING SIZE = the ladder's 16px rung (--text-lg). Can't be
-	   var()-linked: @theme inline inlines literals into utilities without
-	   emitting runtime vars — so this is the one documented duplication:
-	   change one, change both. (owner, typography round 4: snapped from
-	   the reskin's hand-tuned 16.5 to the ladder's 16.) */
-	--lh-prose-size: 16px;
-	--lh-prose-leading: 1.5;
-	/* Markdown heading weight (appearance settings; 900 = the Black cut). */
-	--lh-heading-weight: 900;
-}
 
-/* The app is always dark (<html class="dark">); mirror the same values so
-   the block stays coherent under Tailwind's variant. */
-.dark {
-	--background: #141414;
-	--foreground: #e6e6e6;
-	--card: #1c1c1c;
-	--card-foreground: #e6e6e6;
+	/* Type: the system font (SF Pro on macOS) for chrome and prose alike. */
+	--lh-font-sans: -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
+	--lh-font-ui: var(--lh-font-sans);
+	--lh-font-prose: var(--lh-font-sans);
+	--lh-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+	--font-title: var(--lh-font-sans);
+	--lh-title-weight: 600;
+	--lh-strong-weight: 600;
+	--lh-heading-weight: 600;
+	--lh-prose-size: 16px;
+	--lh-prose-leading: calc(26 / 16);
+	/* The old ladder snapped onto the Proposed scale, so screens not yet
+	   rebuilt read on it: 11 caption, 13 rows, 14 controls, 16 prose,
+	   20 headings, 30 display. */
+	--lh-text-xs: 11px;
+	--lh-text-xs-leading: calc(14 / 11);
+	--lh-text-sm: 13px;
+	--lh-text-sm-leading: calc(18 / 13);
+	--lh-text-base: 14px;
+	--lh-text-base-leading: calc(20 / 14);
+	--lh-text-lg: 16px;
+	--lh-text-lg-leading: 1.5;
+	--lh-text-xl: 20px;
+	--lh-text-xl-leading: calc(26 / 20);
+	--lh-text-2xl: 20px;
+	--lh-text-2xl-leading: calc(26 / 20);
+	--lh-text-3xl: 30px;
+	--lh-text-3xl-leading: calc(36 / 30);
+
+	/* Colour: one neutral ramp, edges and fills as white alpha (T3, Codex),
+	   one accent (blue, T3's hue) for the primary action, focus and links.
+	   The shadcn surface names (secondary, muted, accent) stay opaque: older
+	   screens paint tooltips and menus with them. New rows use the alpha
+	   fill-hover and fill-selected. */
+	--background: #121212;
+	--foreground: #ededed;
+	--card: #1a1a1a;
+	--card-foreground: #ededed;
 	--popover: #1c1c1c;
-	--popover-foreground: #e6e6e6;
-	--primary: #e6e6e6;
-	--primary-foreground: #141414;
+	--popover-foreground: #ededed;
+	/* 0.56, not 0.58: white 13px labels on it need 4.5:1 (4.83 here; 4.43 at 0.58). */
+	--primary: oklch(0.56 0.2 262);
+	--primary-foreground: #ffffff;
 	--secondary: #1c1c1c;
-	--secondary-foreground: #e6e6e6;
-	--muted: #1c1c1c;
-	--muted-foreground: #8d8d8d;
-	--accent: #2a2a2a;
-	--accent-foreground: #e6e6e6;
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: #434343;
-	--input: #434343;
-	--ring: #8d8d8d;
-	/* Same emphasis ruling as the block above: unset = text color. */
-	--lh-ink-strong: var(--foreground);
-	--lh-ink-italic: var(--foreground);
-	/* THE READING SIZE = the ladder's 16px rung (--text-lg). Can't be
-	   var()-linked: @theme inline inlines literals into utilities without
-	   emitting runtime vars — so this is the one documented duplication:
-	   change one, change both. (owner, typography round 4: snapped from
-	   the reskin's hand-tuned 16.5 to the ladder's 16.) */
-	--lh-prose-size: 16px;
-	--lh-prose-leading: 1.5;
-	/* Markdown heading weight (appearance settings; 900 = the Black cut). */
-	--lh-heading-weight: 900;
-}
+	--secondary-foreground: #ededed;
+	--muted: #1a1a1a;
+	--muted-foreground: #a1a1a1;
+	--accent: #232323;
+	--accent-foreground: #ededed;
+	--destructive: var(--lh-danger);
+	--border: rgb(255 255 255 / 0.08);
+	--input: rgb(255 255 255 / 0.11);
+	--ring: oklch(0.68 0.16 258);
+	--lh-link: oklch(0.74 0.13 255);
+	--lh-fill-hover: rgb(255 255 255 / 0.04);
+	--lh-fill-selected: rgb(255 255 255 / 0.07);
+	--lh-danger: oklch(0.7 0.19 22);
+	--lh-success: oklch(0.76 0.15 155);
+	--lh-warning: oklch(0.82 0.15 80);
 
-/* CMU Serif bold (titles) — bundled local file, no CDN dependency. */
-@font-face {
-	font-family: "lh-cmu";
-	src: url("/fonts/cmunbx.ttf") format("truetype");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+	/* Shape: 8 controls and rows, 12 cards, docks and menus, 20 the composer. */
+	--lh-radius-sm: 8px;
+	--lh-radius-md: 8px;
+	--lh-radius-lg: 12px;
+	--lh-radius-xl: 12px;
+	--lh-radius-2xl: 20px;
+
+	/* Motion: 150ms on colour and opacity, T3's standard easing. */
+	--default-transition-duration: 150ms;
+	--default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @theme inline {
-	/* Fonts: chrome = JetBrains Mono, prose = Source Sans 3, titles = CMU
-	   Serif bold. The JetBrains/SourceSans variables attach in app/layout.tsx.
-	   (owner, typography round) The Tailwind defaults are ALIASED to the app
-	   fonts: `font-mono`/`font-sans` utilities would otherwise fall to the
-	   SYSTEM stacks — a fourth font the app never chose — and streamdown's
-	   code-block chrome + mermaid-error + demo-card all use them. */
-	--font-ui: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
-	--font-prose: var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
-	--font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
-	--font-sans: var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
+	/* Fonts, type, radii and colours read the :root tokens above. */
+	--font-ui: var(--lh-font-ui);
+	--font-prose: var(--lh-font-prose);
+	--font-mono: var(--lh-font-mono);
+	--font-sans: var(--lh-font-sans);
 	/* The modular type ladder — each size carries its own line-height.
 	   Component sizes must pull from this ladder. (owner, typography
 	   round 4: the 10px rung is merged into 11 — one pixel apart was a
@@ -129,31 +141,45 @@
 	   legibility floor; quiet labels get their quiet from color +
 	   tracking, not a notch of size. Reading prose = the 16px rung via
 	   --lh-prose-size.) */
-	/* --font-title lives in the NON-inline @theme below: inline tokens get
-	   their literal values baked into the utilities (.font-title{font-family:
-	   lh-cmu,serif}), which made the appearance "session names in serif"
-	   toggle write a runtime --font-title no consumer ever read (owner, fix
-	   wave: toggle looked dead). Non-inline emits :root { --font-title: … }
-	   and the utility reads var(--font-title) — appearance overrides win. */
-	--text-xs: 11px;
-	--text-xs--line-height: 1.4;
-	--text-sm: 12.5px;
-	--text-sm--line-height: 1.4;
-	--text-base: 14px;
-	--text-base--line-height: 1.45;
-	--text-lg: 16px;
-	--text-lg--line-height: 1.45;
-	--text-xl: 20px;
-	--text-xl--line-height: 1.4;
-	--text-2xl: 25px;
-	--text-2xl--line-height: 1.3;
-	--text-3xl: 32px;
-	--text-3xl--line-height: 1.25;
+	--text-xs: var(--lh-text-xs);
+	--text-xs--line-height: var(--lh-text-xs-leading);
+	--text-sm: var(--lh-text-sm);
+	--text-sm--line-height: var(--lh-text-sm-leading);
+	--text-base: var(--lh-text-base);
+	--text-base--line-height: var(--lh-text-base-leading);
+	--text-lg: var(--lh-text-lg);
+	--text-lg--line-height: var(--lh-text-lg-leading);
+	--text-xl: var(--lh-text-xl);
+	--text-xl--line-height: var(--lh-text-xl-leading);
+	--text-2xl: var(--lh-text-2xl);
+	--text-2xl--line-height: var(--lh-text-2xl-leading);
+	--text-3xl: var(--lh-text-3xl);
+	--text-3xl--line-height: var(--lh-text-3xl-leading);
+	/* The Proposed scale by role (T3 Code and Apple, agent-apps.md): one
+	   name per job, the same in both designs; only Proposed uses them. */
+	--text-caption: 11px;
+	--text-caption--line-height: calc(14 / 11);
+	--text-label: 12px;
+	--text-label--line-height: calc(16 / 12);
+	--text-row: 13px;
+	--text-row--line-height: calc(18 / 13);
+	--text-control: 14px;
+	--text-control--line-height: calc(20 / 14);
+	--text-prose: 16px;
+	--text-prose--line-height: calc(26 / 16);
+	--text-subheading: 18px;
+	--text-subheading--line-height: calc(24 / 18);
+	--text-heading: 20px;
+	--text-heading--line-height: calc(26 / 20);
+	--text-display: 30px;
+	--text-display--line-height: calc(36 / 30);
+	--text-display--letter-spacing: -0.025em;
 	/* Radii ladder — 4/8/12/16 multiples of the 4px base. */
-	--radius-sm: 4px;
-	--radius-md: 8px;
-	--radius-lg: 12px;
-	--radius-xl: 16px;
+	--radius-sm: var(--lh-radius-sm);
+	--radius-md: var(--lh-radius-md);
+	--radius-lg: var(--lh-radius-lg);
+	--radius-xl: var(--lh-radius-xl);
+	--radius-2xl: var(--lh-radius-2xl);
 	--radius: 8px;
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
@@ -173,6 +199,13 @@
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	/* Proposed-only colours (defined in the Proposed block; Current uses none). */
+	--color-link: var(--lh-link);
+	--color-danger: var(--lh-danger);
+	--color-success: var(--lh-success);
+	--color-warning: var(--lh-warning);
+	--color-fill-hover: var(--lh-fill-hover);
+	--color-fill-selected: var(--lh-fill-selected);
 }
 
 * {
@@ -186,7 +219,7 @@ body {
 }
 
 /* Teaching prose (the markdown renderer's container gets .lh-prose):
-   Source Sans 3 with the size/leading tokens; emphasis color bound to
+   the prose font with the size/leading tokens; emphasis color bound to
    the settings-ready tokens. */
 .lh-prose {
 	font-family: var(--font-prose);
@@ -194,19 +227,14 @@ body {
 	line-height: var(--lh-prose-leading);
 }
 
-/* Session-name weight (owner, fix wave round 3): with the serif toggle
-   OFF, --font-title resolves to the prose font — Source Sans 3 is loaded
-   as a VARIABLE font, and without an explicit weight the titles render at
-   400, a whisper next to CMU's bold-only face. Request 900: the variable
-   font takes it, and CMU (a single 700 face) snaps to its nearest
-   available weight — the same rendering it already had. */
+/* Titles draw at the title weight token. */
 .font-title {
-	font-weight: 900;
+	font-weight: var(--lh-title-weight);
 }
 
 .lh-prose :where(strong, b) {
 	color: var(--lh-ink-strong);
-	font-weight: 700;
+	font-weight: var(--lh-strong-weight);
 }
 
 .lh-prose :where(em, i) {
@@ -223,14 +251,10 @@ body {
 	padding-left: 1.5rem;
 }
 
-/* Markdown headings render at the font's BLACK weight (owner ask,
-   2026-09-19) — 900, not streamdown's font-semibold 600. The variable
-   Source Sans 3 axis spans 200–900 (next/font loads the full range), so
-   900 draws the real Black cut. Unlayered CSS beats the utility layer;
-   :where keeps specificity zero. Chrome titles (CMU Serif) don't live
-   under .lh-prose and stay untouched. */
+/* Markdown headings take the heading weight token. Unlayered CSS beats the
+   utility layer; :where keeps specificity zero. */
 .lh-prose :where(h1, h2, h3, h4, h5, h6) {
-	font-weight: var(--lh-heading-weight, 900);
+	font-weight: var(--lh-heading-weight);
 }
 
 /* lh-input (owner, typography round 2): lh-prose's 1.5 READING leading
@@ -246,47 +270,32 @@ body {
 	line-height: 1.25;
 }
 
-/* Thin dark native scrollbar (app-wide): dark thumb, transparent track. */
-* {
-	scrollbar-width: thin;
-	scrollbar-color: var(--color-border) transparent;
-}
-
-::-webkit-scrollbar {
-	width: 8px;
-	height: 8px;
-}
-
-::-webkit-scrollbar-track {
-	background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-	background: var(--color-border);
-	border-radius: 8px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-	background: var(--color-muted-foreground);
-}
-
-/* Dock variant swap — quick fade/rise on content change; the shell's HEIGHT
-   morph is separate (WAAPI in DockOverlay). Re-applied via class toggling, no
-   remount, so collapsed-question state survives. */
-@keyframes dock-variant-in {
-	from {
-		opacity: 0;
-		transform: translateY(6px);
+/* Thin dark native scrollbar (app-wide): dark thumb, transparent track.
+   In the base layer, so a utility such as `[scrollbar-width:none]` on a
+   scroll box that draws no bar wins over it; unlayered, it beat them all. */
+@layer base {
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--color-border) transparent;
 	}
 
-	to {
-		opacity: 1;
-		transform: translateY(0);
+	::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
 	}
-}
 
-.dock-variant {
-	animation: dock-variant-in 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: var(--color-border);
+		border-radius: 8px;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-muted-foreground);
+	}
 }
 
 /* ============================================================
@@ -312,6 +321,16 @@ body {
 	max-width: 100% !important;
 	height: auto !important;
 }
+
+/* The app's one maths size (spec: components/ui/math-text.md). KaTeX's own
+   sheet sets 1.21em, which matches a serif's x-height; beside SF Pro its
+   capitals and digits stood 17% taller than the words (round 5). Matching
+   SF Pro's x-height would take 1.19em and its capitals 1.03em (KaTeX_Math x
+   0.442, KaTeX_Main caps 0.683, SF Pro 0.526 and 0.704, measured per em);
+   1.1em splits the two mismatches evenly. Unlayered and after KaTeX's sheet,
+   so it wins: a Tailwind utility on a wrapper lives in a cascade layer and
+   never could. Tested in tests/katex-size.test.ts. */
+.katex { font-size: 1.1em; }
 
 /* Display math: long equations scroll instead of overflowing the column. */
 .katex-display {
@@ -358,11 +377,13 @@ body {
 [data-streamdown="table"] {
 	border: 1px solid var(--border);
 	/* Tables HUG their contents (owner, callout round 2026-10-07): no more
-	   full-width stretch with dead space. max-content sizes to the cells
-	   (width:auto would still stretch — the classic table trap). No
-	   max-width cap: a max-width would squish-wrap wide tables instead of
-	   letting the md-blocks overflow-x scroller carry them. */
-	width: max-content;
+	   full-width stretch with dead space. fit-content sizes to the cells
+	   while they fit the column, and past that wraps them to the column's
+	   width (round 3: a three-column table ran 894px into a 720px column
+	   behind a hidden scrollbar). Only a table whose narrowest layout is
+	   still wider scrolls, in the md-blocks scroller. */
+	width: fit-content;
+	max-width: 100%;
 	/* Tables run at the SESSION prose size (owner note, 2026-09-19: they
 	   visibly lagged the 16px chat text at streamdown's 12.5px text-sm).
 	   Unlayered CSS beats the cells' own utility-layer text-sm, and the
@@ -371,6 +392,9 @@ body {
 }
 [data-streamdown="table"] :where(th, td) {
 	font-size: inherit;
+	/* Streamdown pins header cells to one line; a wide header wraps like
+	   the rest, so the table can fit its column. */
+	white-space: normal;
 }
 /* Column separators: a hairline left rule on every cell but the first in
    its row (owner ask, 2026-09-19) — border-collapse merges it with the row
@@ -464,30 +488,6 @@ body {
 	}
 }
 
-/* Graph chrome fade-in (empty-graph chrome wave, owner 2026-09-25): the
-   search + settings controls appear ONCE, as the first nodes land —
-   Import Notes always renders (the empty graph's entry point), the other
-   two mount only when the snapshot has nodes. Same understated register
-   as settings-pop (a plain fade); reduced-motion appears instantly. */
-@keyframes chrome-fade-in {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
-}
-
-.graph-chrome-fade-in {
-	animation: chrome-fade-in 200ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.graph-chrome-fade-in {
-		animation: none;
-	}
-}
-
 /* ─────────────────────────────────────────────────────────────────────────
    Electron merged chrome (owner, 2026-09-17). The system title bar is
    hidden (macOS hiddenInset; Windows/Linux hidden + native controls
@@ -495,8 +495,8 @@ body {
    Everything here is inert in the plain browser — it keys off <html class="lh-electron">, which
    SidebarProvider sets after mount when it detects the Electron shell.
 
-   - .lh-drag        window-drag region — on a dedicated mask div in
-                       home.tsx placed FIRST in the page DOM (the mask
+   - .lh-drag        window-drag region — on a dedicated mask div
+                       placed FIRST in the page DOM (the mask
                        resolves by DOM order, not z-index: no-drag subtracts
                        only regions added earlier in the tree)
    - .lh-no-drag     carve-out for interactive elements inside a drag band
@@ -505,8 +505,11 @@ body {
                        clickable non-natives only)
    - .lh-lights-gutter  the sidebar LH band's traffic-light gutter: lights
                        end at x≈68, the wordmark starts at 80px (5rem)
-   - .lh-closed-toggle  same gutter for the sidebar toggle when the sidebar
-                       is closed — the lights are static, the toggle moves
+   - .lh-lights-band  the Proposed sidebar's top band: only where the
+                       lights sit over it (the Mac app), 52px; elsewhere
+                       none, so the sidebar opens on its Home row
+   - .lh-rail        the folded sidebar's rail: wide enough in the Mac app
+                       that the page beside it starts clear of the lights
    ───────────────────────────────────────────────────────────────────────── */
 .lh-electron .lh-drag {
 	-webkit-app-region: drag;
@@ -539,8 +542,30 @@ body {
 .lh-electron[data-lh-platform="darwin"] .lh-lights-gutter {
 	padding-left: calc(92px / var(--lh-zoom));
 }
-.lh-electron[data-lh-platform="darwin"] .lh-closed-toggle {
-	margin-left: calc(92px / var(--lh-zoom));
+.lh-lights-band {
+	display: none;
+}
+.lh-electron[data-lh-platform="darwin"] .lh-lights-band {
+	display: block;
+	height: calc(52px / var(--lh-zoom));
+}
+.lh-electron[data-lh-platform="darwin"] .lh-rail {
+	width: calc(92px / var(--lh-zoom));
+}
+/* The rail's open button sits in a head as tall as a page's top bar
+   (52px), its rule on the head's bottom edge, level with the top bar's
+   bottom line. In the Mac app the lights' band already fills those 52px
+   above the head, so the rule moves to the head's top edge, the band's
+   bottom: the same line. */
+.lh-rail-head {
+	height: 52px;
+}
+.lh-rail-rule {
+	bottom: 0;
+}
+.lh-electron[data-lh-platform="darwin"] .lh-rail-rule {
+	top: -1px;
+	bottom: auto;
 }
 
 /* Windows/Linux Window Controls Overlay: Chromium publishes the usable
@@ -555,23 +580,18 @@ body {
 .lh-electron .lh-wco-gutter {
 	padding-right: calc(0.75rem + var(--lh-wco-right, 0px));
 }
-.lh-electron .lh-wco-floating {
-	right: calc(0.5rem + var(--lh-wco-right, 0px));
-	max-width: max(0px, calc(100% - 5.5rem - var(--lh-wco-right, 0px)));
-}
 
-/* --font-title deliberately NOT @theme inline (see comment above): the
-   session-name-serif toggle overrides this var at runtime, so the
-   .font-title utility must read it through var(), not carry a baked copy. */
+/* --font-title is a non-inline @theme token so the .font-title utility
+   reads var(--font-title), which :root sets. */
 @theme {
-	--font-title: "lh-cmu", serif;
+	--font-title: var(--lh-font-sans);
 }
 
 /* Card enter (owner round, 2026-10-05): the transcript cards' one-shot
    mount — a subtle fade + 4px rise, the app's motion register (150ms,
-   dock-variant/settings-pop taste). Nothing on update, nothing on
-   unmount. Applied by the unified ThinkingBlock and the practice
-   cards; honors reduced-motion by appearing. */
+   settings-pop taste). Nothing on update, nothing on
+   unmount. Applied by the topic page's step cards; honors
+   reduced-motion by appearing. */
 @keyframes lh-card-enter {
 	from {
 		opacity: 0;
@@ -593,6 +613,42 @@ body {
 	}
 }
 
+/* The card a row on the left points at, so he sees at once which it is
+   (Edo, 14 Nov 2026): a hairline ring and a soft glow in the accent, held
+   while he points. It blooms in once over 1.6s, brighter for the first
+   second, then settles; no loop. On the course page the map marks the
+   card (topic-map.md); on the topic page the step the shown lesson
+   stopped on answers its row being pointed at or focused (hybrid.md).
+   Unlayered, so it wins over the card's own ring and hover border. */
+.lh-card-mark,
+[data-slot="topic-panes"]:has([data-shown]:hover, [data-shown]:focus-within) [data-slot="topic-step"][aria-current="step"] {
+	border-color: var(--ring);
+	box-shadow:
+		0 0 0 1px color-mix(in oklab, var(--ring) 60%, transparent),
+		0 0 16px 2px color-mix(in oklab, var(--ring) 24%, transparent);
+}
+
+@keyframes lh-card-mark {
+	from {
+		box-shadow:
+			0 0 0 0 transparent,
+			0 0 0 0 transparent;
+	}
+	18%,
+	60% {
+		box-shadow:
+			0 0 0 2px color-mix(in oklab, var(--ring) 85%, transparent),
+			0 0 28px 6px color-mix(in oklab, var(--ring) 40%, transparent);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lh-card-mark,
+	[data-slot="topic-panes"]:has([data-shown]:hover, [data-shown]:focus-within) [data-slot="topic-step"][aria-current="step"] {
+		animation: lh-card-mark 1600ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+}
+
 /* Source-message arrival: a brief, static theme-colored spotlight. */
 .lh-source-passage {
 	scroll-margin-top: 1rem;
@@ -601,4 +657,112 @@ body {
 	background-color: var(--accent);
 	outline: 1px solid var(--border);
 	border-radius: 0.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--default-transition-duration: 0s;
+	}
+}
+
+/* The lesson's markdown (phase 3). Streamdown draws the elements, so their
+   type lives here with the other .lh-prose rules: T3 Code's scale (headings
+   20/18/16 at 600, leading 1.3, 20 above and 8 below; paragraphs .65rem
+   apart; lists on a 1.25rem gutter), SF Mono code (inline .85em on a 10%
+   fill, blocks 13px at radius 8), quotes and callouts on the same
+   tokens. Tables keep the prose size (owner, 2026-09-19) and KaTeX keeps
+   its own scale relative to the text. Sources: research/agent-apps.md. */
+.lh-prose :where(h1, h2, h3, h4, h5, h6) {
+	line-height: 1.3;
+	margin-top: 20px;
+	margin-bottom: 8px;
+}
+.lh-prose :where(h1) {
+	font-size: 20px;
+}
+.lh-prose :where(h2) {
+	font-size: 18px;
+}
+.lh-prose :where(h3, h4, h5, h6) {
+	font-size: 16px;
+}
+.lh-prose :where(p) {
+	margin-block: 0.65rem;
+}
+.lh-prose > :where(:first-child) {
+	margin-top: 0;
+}
+.lh-prose > :where(:last-child) {
+	margin-bottom: 0;
+}
+.lh-prose :where(ul, ol) {
+	padding-left: 1.25rem;
+	margin-block: 0.65rem;
+}
+.lh-prose :where(li) {
+	padding-block: 0;
+}
+.lh-prose :where(li + li) {
+	margin-top: 0.25rem;
+}
+[data-streamdown="inline-code"] {
+	border: 0;
+	border-radius: 4px;
+	padding: 0.1em 0.3em;
+	font-size: 0.85em;
+	background: color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+[data-streamdown="code-block"] {
+	border-radius: 8px;
+	padding: 0;
+	background: color-mix(in oklab, var(--background) 70%, black);
+}
+[data-streamdown="code-block-body"] {
+	padding: 0.8rem 0.9rem;
+	font-size: 13px;
+	line-height: 1.55;
+}
+[data-streamdown="code-block-body"] :where(pre, code) {
+	font-size: inherit;
+}
+[data-streamdown="blockquote"] {
+	border-left-width: 2px;
+	border-color: var(--border);
+	font-style: normal;
+}
+[data-testid="md-callout"] {
+	border-color: var(--border);
+	border-radius: 12px;
+	background: var(--card);
+}
+[data-streamdown="table"] :where(th) {
+	font-weight: 600;
+}
+
+/* Mermaid in the lesson: nodes on the card surface with a quiet
+   edge and radius 8, lines and arrowheads in muted ink. Mermaid inlines an
+   id-scoped stylesheet in each svg, hence !important. */
+[data-streamdown="mermaid"] svg :is(.node rect, .node polygon, .node circle, .node ellipse, .node path) {
+	fill: var(--card) !important;
+	stroke: color-mix(in oklab, var(--foreground) 22%, transparent) !important;
+	stroke-width: 1px !important;
+}
+[data-streamdown="mermaid"] svg .node rect {
+	rx: 8px;
+	ry: 8px;
+}
+[data-streamdown="mermaid"] svg :is(.flowchart-link, .edgePath .path, .relation, .messageLine0, .messageLine1) {
+	stroke: var(--muted-foreground) !important;
+}
+[data-streamdown="mermaid"] svg :is(marker path, .marker, .arrowheadPath) {
+	fill: var(--muted-foreground) !important;
+	stroke: var(--muted-foreground) !important;
+}
+[data-streamdown="mermaid"] svg :is(.nodeLabel, .edgeLabel, .label) {
+	color: var(--foreground) !important;
+	fill: var(--foreground) !important;
+}
+[data-streamdown="mermaid"] svg .edgeLabel :is(rect, p, span) {
+	background-color: var(--background) !important;
+	fill: var(--background) !important;
 }

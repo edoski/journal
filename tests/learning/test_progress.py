@@ -5,6 +5,18 @@ import pytest
 
 from learning import progress, schema
 
+# The final review these tests were written for; a save derives it from his
+# pace (capacity.final_review_days), which other tests cover.
+LEAD = 6
+
+
+def planned(record: dict[str, Any]) -> dict[str, Any]:
+    """The record read with the final review these tests were written for."""
+    when = record.get("exam", {}).get("date")
+    start = date.fromisoformat(when) - timedelta(days=LEAD) if when else None
+    return progress.with_final_review(record, start)
+
+
 TODAY = date(2026, 10, 10)
 NOW = "2026-10-10T09:00:00+00:00"
 
@@ -44,7 +56,7 @@ def save(
 ) -> tuple[dict[str, Any], progress.Scheduled]:
     now = f"{today.isoformat()}T09:00:00+00:00"
     patched, outcome = schema.apply_patch(record, patch, today=today, now=now)
-    return progress.schedule(patched, outcome, today)
+    return progress.schedule(planned(patched), outcome, today)
 
 
 def level(observations: list[dict[str, Any]], **topic: Any) -> str:
@@ -66,7 +78,7 @@ def level(observations: list[dict[str, Any]], **topic: Any) -> str:
         ([attempt("rank", "correct", "Hinted at row 3")], {}, "assisted"),
         ([attempt("rank", "incorrect"), attempt("rank")], {}, "assisted"),
         (
-            [attempt("rank", offset=-5), attempt("rank", offset=-3), attempt("rank")],
+            [attempt("rank", offset=-5), attempt("rank", offset=-4), attempt("rank")],
             {},
             "retained",
         ),
@@ -84,6 +96,15 @@ def level(observations: list[dict[str, Any]], **topic: Any) -> str:
         ([attempt("rank", transfer=True)], {}, "assisted"),
         (
             [attempt("rank", offset=-1), attempt("rank", transfer=True)],
+            {},
+            "independent",
+        ),
+        (
+            [
+                attempt("rank", offset=-3),
+                attempt("rank", offset=-1),
+                attempt("rank", transfer=True),
+            ],
             {},
             "transferred",
         ),
@@ -171,6 +192,117 @@ def test_a_judgement_older_than_the_latest_evidence_is_stale() -> None:
     assert "stale" not in progress.standing(fresh, "rank")
 
 
+def test_a_mistake_answered_right_since_is_repaired_until_a_later_check() -> None:
+    gap = {"gap": "Writes det as ad + bc"}
+    slip = attempt("rank", "incorrect", sure="confident", offset=0)
+    fixed = attempt("rank", help="Reminded him det is ad - bc", offset=0)
+    repaired = progress.standing(course([slip, fixed], **gap), "rank")
+    assert repaired["repaired"] is True
+    assert repaired["confident_errors"] == 1
+    assert "repaired" not in progress.standing(course([fixed, slip], **gap), "rank")
+    assert "repaired" not in progress.standing(course([fixed]), "rank")
+    diagnosed_after = course([attempt("rank", offset=-1)], **gap)
+    assert "repaired" not in progress.standing(diagnosed_after, "rank")
+    lapse = course(
+        [
+            attempt("rank", offset=-8),
+            attempt("rank", "incorrect", offset=0),
+            attempt("rank", "correct", "Pointed at the pivots", offset=0),
+        ],
+        introduced=day(-9),
+    )
+    standing = progress.standing(lapse, "rank")
+    assert (standing["lapsed"], standing["repaired"]) == (True, True)
+
+
+def test_a_repair_only_with_help_says_so_and_one_on_his_own_does_not() -> None:
+    gap = {"gap": "Writes det as ad + bc"}
+    slip = attempt("rank", "incorrect", offset=0)
+    helped = attempt("rank", help="Reminded him det is ad - bc", offset=0)
+    own = attempt("rank", offset=0)
+    with_help = progress.standing(course([slip, helped], **gap), "rank")
+    assert with_help["repaired"] is True and with_help["repaired_with_help"] is True
+    on_his_own = progress.standing(course([slip, helped, own], **gap), "rank")
+    assert on_his_own["repaired"] is True and "repaired_with_help" not in on_his_own
+
+
+@pytest.mark.parametrize(
+    ("observations", "right"),
+    [
+        ([attempt("rank")], "unaided"),
+        ([attempt("rank", "partial"), attempt("rank", help="A hint")], "helped"),
+        ([attempt("rank", sure="guess")], "guess"),
+        ([attempt("rank", uncertain="Maybe read from notes")], "uncertain"),
+        ([attempt("rank", "partial")], "partial"),
+        ([attempt("rank"), attempt("rank", "partial")], "partial"),
+        (
+            [
+                attempt("rank"),
+                attempt("rank", "partial"),
+                attempt("rank", sure="guess"),
+            ],
+            "guess",
+        ),
+    ],
+)
+def test_a_topic_not_yet_solid_says_how_it_was_answered_since_its_last_slip(
+    observations: list[dict[str, Any]], right: str
+) -> None:
+    standing = progress.standing(course(observations, introduced=day(0)), "rank")
+    assert (standing["level"], standing["right"]) == ("assisted", right)
+
+
+def test_a_newest_answer_that_was_wrong_says_no_right_answer() -> None:
+    record = course(
+        [attempt("rank"), attempt("rank", "partial"), attempt("rank", "incorrect")],
+        introduced=day(0),
+    )
+    assert "right" not in progress.standing(record, "rank")
+
+
+def test_right_answers_after_a_review_day_slip_are_said_at_attempted() -> None:
+    record = course(
+        [
+            attempt("rank", "incorrect", offset=-2),
+            attempt("rank", "incorrect", sure="confident"),
+            attempt("rank", help="Pointed at the columns"),
+            attempt("rank"),
+        ],
+        introduced=day(-2),
+    )
+    standing = progress.standing(record, "rank")
+    assert (standing["level"], standing["right"]) == ("attempted", "unaided")
+    wrong = course(
+        [attempt("rank", "incorrect", offset=-2), attempt("rank", "incorrect")],
+        introduced=day(-2),
+    )
+    assert "right" not in progress.standing(wrong, "rank")
+
+
+def test_only_a_topic_not_yet_solid_says_how_it_was_answered() -> None:
+    solid = course([attempt("rank", offset=-1)], introduced=day(-3))
+    assert progress.standing(solid, "rank")["level"] == "independent"
+    assert "right" not in progress.standing(solid, "rank")
+
+
+def test_a_partial_answer_after_the_repair_leaves_it_repaired() -> None:
+    gap = {"gap": "Takes lambda off one diagonal entry only"}
+    slip = attempt("rank", "incorrect", sure="confident")
+    fixed = attempt("rank", help="Showed the setup again", sure="confident")
+    recall = attempt("rank", "partial", help="none")
+    standing = progress.standing(course([slip, fixed, recall], **gap), "rank")
+    assert standing["repaired"] is True
+    assert "repaired" not in progress.standing(
+        course([fixed, attempt("rank", "partial")], **gap), "rank"
+    )
+    assert "repaired" not in progress.standing(
+        course([slip, fixed, attempt("rank", "incorrect")], **gap), "rank"
+    )
+    assert progress.standing(
+        course([attempt("rank", "partial"), fixed], **gap), "rank"
+    )["repaired"]
+
+
 @pytest.mark.parametrize(
     ("verdict", "streak", "expected"),
     [
@@ -205,19 +337,100 @@ def test_grades(observation: dict[str, Any], expected: str) -> None:
     assert progress.grade(observation) == expected
 
 
-def test_exam_pulls_reviews_in_but_never_before_the_attempt() -> None:
+def exam(day_: date, lead: int = 6) -> progress.Exam:
+    return progress.Exam(day_, day_ - timedelta(days=lead))
+
+
+def test_an_exam_caps_reviews_at_its_final_review() -> None:
     base = date(2026, 10, 10)
     assert progress.review_day(base, 16, None) == date(2026, 10, 26)
-    assert progress.review_day(base, 16, date(2026, 10, 20)) == date(2026, 10, 13)
-    assert progress.review_day(base, 2, date(2026, 10, 30)) == date(2026, 10, 12)
-    assert progress.review_day(base, 3, date(2026, 10, 12)) == date(2026, 10, 11)
-    assert progress.review_day(base, 3, date(2026, 10, 1)) == date(2026, 10, 13)
+    assert progress.review_day(base, 16, exam(date(2026, 10, 20))) == date(2026, 10, 14)
+    assert progress.review_day(base, 2, exam(date(2026, 10, 30))) == date(2026, 10, 12)
+    assert progress.review_day(base, 3, exam(date(2026, 10, 1))) == date(2026, 10, 13)
 
 
 @pytest.mark.parametrize("days", [1, 2, 3, 160])
-def test_an_exam_tomorrow_puts_the_review_on_the_exam_day(days: int) -> None:
+def test_after_the_final_review_the_next_review_is_after_the_exam(days: int) -> None:
     base = date(2026, 10, 10)
-    assert progress.review_day(base, days, date(2026, 10, 11)) == date(2026, 10, 11)
+    soon = exam(date(2026, 10, 11))
+    expected = progress.review_day(base, days, soon)
+    assert expected == base + timedelta(days=days)
+    after = max(expected, date(2026, 10, 12))
+    assert progress.kept(base, expected, soon) == after
+    assert progress.kept(base, expected, soon, solid=True) == after
+    assert progress.kept(base, expected, exam(date(2026, 10, 1))) == expected
+
+
+def test_a_miss_after_the_final_review_is_relearned_then_settles() -> None:
+    record = schema.apply_patch(
+        course(introduced=day(-20)),
+        {"exam": {"date": day(5)}},
+        today=TODAY,
+        now=NOW,
+    )[0]
+    record, scheduled = save(record, {"observations": [attempt("rank", "incorrect")]})
+    assert scheduled.reviews == {"rank": {"due": day(1), "by": "engine"}}
+    later = TODAY + timedelta(days=1)
+    record, scheduled = save(
+        record, {"observations": [attempt("rank", offset=1)]}, later
+    )
+    assert record["topics"]["rank"]["review"]["due"] == day(6)
+    assert scheduled.notes == [f"rank: next review {day(6)}, after the exam"]
+
+
+def test_after_the_exam_reviews_go_on_at_their_dates() -> None:
+    record = course(introduced=day(-30), review={"due": day(-1)})
+    record = schema.apply_patch(
+        record, {"exam": {"date": day(-2)}}, today=TODAY, now=NOW
+    )[0]
+    assert [item["topic"] for item in progress.due(planned(record), TODAY)] == ["rank"]
+    record, _ = save(record, {"exam": {"date": day(30)}})
+    assert [item["topic"] for item in progress.due(record, TODAY)] == ["rank"]
+
+
+def test_setting_an_exam_pulls_every_engine_date_before_it() -> None:
+    record = course(introduced=day(-27))
+    for offset in (-26, -23, -16, 0):
+        record, _ = save(
+            record,
+            {"observations": [attempt("rank", offset=offset)]},
+            TODAY + timedelta(days=offset),
+        )
+    assert record["topics"]["rank"]["review"]["due"] == day(35)
+    moved, scheduled = save(record, {"exam": {"date": day(20)}})
+    assert moved["topics"]["rank"]["review"] == {"due": day(14), "by": "engine"}
+    assert scheduled.notes == [f"rank: review moved to {day(14)}, after the exam moved"]
+    back, _ = save(moved, {"exam": None})
+    assert back["topics"]["rank"]["review"] == record["topics"]["rank"]["review"]
+    again, scheduled = save(moved, {"exam": {"date": day(20)}})
+    assert again == moved and scheduled.reviews == {}
+
+
+def test_a_tutor_date_after_a_moved_exam_goes_to_the_engine() -> None:
+    record = course(introduced=day(-3), review={"due": day(30)})
+    record, _ = save(record, {"exam": {"date": day(40)}})
+    assert record["topics"]["rank"]["review"]["by"] == "tutor"
+    record, scheduled = save(record, {"exam": {"date": day(20)}})
+    assert record["topics"]["rank"]["review"] == {"due": day(-2), "by": "engine"}
+
+
+def test_the_final_review_lead_is_a_course_preference() -> None:
+    record = course(introduced=day(-40))
+    record, _ = save(record, {"exam": {"date": day(20)}})
+    record, _ = save(record, {"observations": [attempt("rank", offset=0)]})
+    record, _ = save(
+        record,
+        {"observations": [attempt("rank", offset=3)]},
+        TODAY + timedelta(days=3),
+    )
+    assert record["topics"]["rank"]["review"]["due"] == day(10)
+    record, scheduled = save(record, {"preferences": {"final_review_days": "14"}})
+    assert record["topics"]["rank"]["review"]["due"] == day(6)
+    assert scheduled.notes == [f"rank: review moved to {day(6)}, after the exam moved"]
+    with pytest.raises(ValueError, match="belongs to one course"):
+        schema.check_patch({"global_preferences": {"final_review_days": "5"}})
+    with pytest.raises(ValueError, match="whole number from 1 to 14"):
+        schema.check_patch({"preferences": {"final_review_days": "a week"}})
 
 
 def test_new_attempts_climb_the_ladder_and_keep_the_prompt() -> None:
@@ -357,9 +570,9 @@ def test_path_order_is_topological_with_order_then_handle_ties() -> None:
     assert progress.path_order(path_course(["eigen", "basis", "systems"])) == [
         "basis",
         "systems",
-        "aside",
         "rank",
         "eigen",
+        "aside",
     ]
 
 
@@ -397,3 +610,25 @@ def test_due_puts_prerequisites_first_and_upcoming_sorts_by_day() -> None:
     assert due[0]["overdue"] == 0
     assert progress.upcoming(record, TODAY, 7) == [{"topic": "basis", "due": day(1)}]
     assert len(progress.upcoming(record, TODAY, 9)) == 2
+
+
+def test_moving_the_exam_later_never_uncounts_a_review() -> None:
+    record, _ = save(course(introduced=day(-1)), {"exam": {"date": day(20)}})
+    when = TODAY
+    while (due := record["topics"]["rank"].get("review", {}).get("due")) and (
+        due < day(19)
+    ):
+        when = date.fromisoformat(due)
+        record, _ = save(
+            record,
+            {"observations": [attempt("rank", offset=(when - TODAY).days)]},
+            when,
+        )
+    counted = progress.replays(record)["rank"].verdicts
+    assert counted[-1] == (day(14), "solid")
+    moved, _ = save(record, {"exam": {"date": day(60)}}, when)
+    assert progress.replays(moved)["rank"].verdicts == counted
+    assert all(
+        moved["observations"][key]["due_topics"] == ["rank"]
+        for key in moved["observations"]
+    )

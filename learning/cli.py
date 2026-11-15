@@ -50,13 +50,27 @@ def _directories(workspace: Workspace) -> dict[str, Any]:
 
 
 def resume(args: argparse.Namespace) -> dict[str, Any]:
-    return retrieval.resume(_workspace(args), task=args.task)
+    return retrieval.resume(_workspace(args), task=args.task, here=args.here)
 
 
 def show(args: argparse.Namespace) -> dict[str, Any]:
     return retrieval.show(
         _workspace(args), args.handles, limit=args.limit, all=args.all
     )
+
+
+def course_map(args: argparse.Namespace) -> dict[str, Any]:
+    return retrieval.course_map(_workspace(args), here=args.here)
+
+
+def course_arcs(args: argparse.Namespace) -> dict[str, Any]:
+    return retrieval.course_arcs(
+        _workspace(args), here=args.here, lessons=args.open, report=args.report
+    )
+
+
+def course_standing(args: argparse.Namespace) -> dict[str, Any]:
+    return retrieval.course_standing(_workspace(args))
 
 
 def search(args: argparse.Namespace) -> dict[str, Any]:
@@ -78,7 +92,28 @@ def plan(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def save(args: argparse.Namespace) -> dict[str, Any]:
-    return records.save(_workspace(args), _stdin_json())
+    workspace = _workspace(args)
+    if args.check:
+        return records.save(workspace, _stdin_json(), check=True)
+    return retrieval.dated(workspace, records.save(workspace, _stdin_json()))
+
+
+def migrate(args: argparse.Namespace) -> dict[str, Any]:
+    """The one way a record changes schema; nothing else imports ``migrate``."""
+    from pathlib import Path
+
+    from learning import migrate as migration
+
+    if args.restore is not None:
+        if args.all or args.to is not None:
+            raise ValueError(
+                "migrate --restore puts a backup back; give it no --all or --to"
+            )
+        return migration.restore(Path(args.restore))
+    if args.all == (args.workspace is not None):
+        raise ValueError("migrate needs one of --all or --workspace DIR")
+    workspace = None if args.all else _workspace(args)
+    return migration.migrate(workspace, to=args.to)
 
 
 def _taken(record: dict[str, Any]) -> set[str]:
@@ -166,9 +201,32 @@ def _positive(value: str) -> int:
     return number
 
 
+def _add_here(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--here",
+        metavar="TOPIC",
+        help="The topic of a lesson in progress; default: path.current",
+    )
+
+
 def _build_resume(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--task", help="Task to resume; default: focus, else the only task"
+    )
+    _add_here(parser)
+
+
+def _build_arcs(parser: argparse.ArgumentParser) -> None:
+    _add_here(parser)
+    parser.add_argument(
+        "--open",
+        nargs="+",
+        default=[],
+        metavar="TOPIC",
+        help="The topics of every open lesson; they count as studied",
+    )
+    parser.add_argument(
+        "--report", action="store_true", help="Add the rubric's computable checks"
     )
 
 
@@ -206,6 +264,26 @@ def _build_plan(parser: argparse.ArgumentParser) -> None:
 
 def _build_save(parser: argparse.ArgumentParser) -> None:
     parser.description = "Apply one JSON patch read from stdin; prints the receipt."
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Run every step of the save and write nothing",
+    )
+
+
+def _build_migrate(parser: argparse.ArgumentParser) -> None:
+    parser.description = (
+        "Move course records to this engine's schema, or back with --to, after "
+        "a backup of each; or put a backup back with --restore."
+    )
+    parser.add_argument("--all", action="store_true", help="Every registered course")
+    parser.add_argument(
+        "--workspace", default=argparse.SUPPRESS, help="One course's directory"
+    )
+    parser.add_argument("--to", type=int, help="The schema to move to")
+    parser.add_argument(
+        "--restore", metavar="BACKUP", help="A backup folder to put back"
+    )
 
 
 def _build_sources(parser: argparse.ArgumentParser) -> None:
@@ -263,6 +341,24 @@ COMMANDS: tuple[Command, ...] = (
         _build_show,
     ),
     Command(
+        "map",
+        "Every topic with its edges, level, review and weak verdict",
+        course_map,
+        _add_here,
+    ),
+    Command(
+        "arcs",
+        "Every arc with its topics and standing, and where the learner stands",
+        course_arcs,
+        _build_arcs,
+    ),
+    Command(
+        "standing",
+        "Exam readiness by part and each topic's open mistakes",
+        course_standing,
+        _build_nothing,
+    ),
+    Command(
         "search",
         "Lexical discovery in this course or every course",
         search,
@@ -279,6 +375,12 @@ COMMANDS: tuple[Command, ...] = (
         "Apply a JSON patch from stdin and print the receipt",
         save,
         _build_save,
+    ),
+    Command(
+        "migrate",
+        "Move course records between schemas, with a backup",
+        migrate,
+        _build_migrate,
     ),
     Command(
         "sources",

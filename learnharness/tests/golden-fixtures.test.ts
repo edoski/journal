@@ -7,13 +7,13 @@
  *
  *   1. every record parses and passes the contract folds the app itself
  *      runs (phases, pending questions/problems, plan tree, summaries);
- *   2. the LLM wire flattening (toLlmMessages) turns each full record into
- *      a legal provider message list — the strongest property a record has;
- *   3. the graph derivation builds from the real ledgers end-to-end;
- *   4. marker COVERAGE: every custom-marker kind of the current contract
+ *   2. the model's face (sdkInputBlocks) reads each full record: every
+ *      message is model output the session holds or becomes input blocks,
+ *      and nothing throws;
+ *   3. marker COVERAGE: every custom-marker kind of the current contract
  *      appears in real data here (a new marker without a fixture update
  *      fails this suite);
- *   5. reads are READ-ONLY: after everything above, the copy is
+ *   4. reads are READ-ONLY: after everything above, the copy is
  *      byte-identical to the fixture source.
  *
  * THE FIXTURE LAW: an intentional format change updates the fixtures in the
@@ -36,15 +36,12 @@ fs.cpSync(GOLDEN, TMP, { recursive: true });
 process.env.LH_DATA_DIR = TMP;
 
 const { chatStore } = await import("../src/store/chats.ts");
-const { graphStore } = await import("../src/store/graph.ts");
 const { jobStore } = await import("../src/store/jobs.ts");
 const { settingsStore } = await import("../src/store/settings.ts");
-const { readRenderSettings } = await import("../src/store/render-settings.ts");
-const { getGraph, deriveView } = await import("../src/core/graph.ts");
-const { sanitizeRenderSettings } = await import("../src/core/render-settings.ts");
-const { toLlmMessages } = await import("../src/core/native-messages.ts");
+const { sdkInputBlocks } = await import("../src/core/sdk-session.ts");
+const { QUESTION_TOOLS } = await import("../src/core/pending.ts");
 const { phaseAt3Lh } = await import("../src/core/phases.ts");
-const { danglingQuestionOf, activeProblemOf } = await import("../src/core/native-messages.ts");
+const { danglingQuestionOf, activeProblemOf, isUiOnlyMarker } = await import("../src/core/native-messages.ts");
 
 const TEACH = "chat_mv27rrra_feff23b6";
 const PRACTICE = "chat_mv293wv5_10656952";
@@ -84,29 +81,22 @@ test("chats: both fixture records parse through the production read path", () =>
 	}
 });
 
-test("chats: the LLM wire flattening turns each full record into a legal provider message list", () => {
+test("chats: every record message is model output the session holds or becomes input blocks", () => {
 	for (const id of [TEACH, PRACTICE]) {
 		const r = chatStore.getChat(id)!;
-		const wire = toLlmMessages(r.messages as never);
-		assert.ok(wire.length > 0);
-		for (const m of wire) {
-			assert.ok(["system", "user", "assistant", "toolResult"].includes(m.role), `legal role ${m.role} in ${id}`);
-			// every toolResult answers a call that appeared BEFORE it
-			if (m.role === "toolResult") {
-				const t = m as { toolCallId: string };
-				assert.ok(
-					wire.some((w) => w.role === "assistant" && JSON.stringify(w).includes(t.toolCallId)),
-					`toolResult ${t.toolCallId} has its calling assistant message`,
-				);
-			}
+		const blocks = sdkInputBlocks(r.messages);
+		assert.ok(blocks.length > 0, `${id} owes the model input when sent whole`);
+		for (const b of blocks) {
+			if (b.type === "text") assert.ok(b.text.length > 0, `no empty text block in ${id}`);
+			else assert.ok(b.source.data.length > 0 && b.source.media_type.startsWith("image/"), `a well-formed image block in ${id}`);
 		}
-		// no assistant toolCall left unanswered (the dangling-call synthesis covers aborts)
-		const answered = new Set(wire.filter((w) => w.role === "toolResult").map((w) => (w as { toolCallId: string }).toolCallId));
-		for (const m of wire) {
-			if (m.role !== "assistant") continue;
-			for (const b of (m as { content: Array<{ type: string; id?: string }> }).content) {
-				if (b.type === "toolCall" && b.id) assert.ok(answered.has(b.id), `call ${b.id} is answered on the wire`);
-			}
+		for (const m of r.messages) {
+			const own = sdkInputBlocks([m]);
+			const input = m.role === "user"
+				|| (m.role === "custom" && !isUiOnlyMarker(m) && m.customType !== "compaction" && Boolean((m as { content?: string }).content))
+				|| (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName));
+			if (input) assert.ok(own.length > 0, `${m.role} ${m.id} in ${id} reaches the model`);
+			else assert.equal(own.length, 0, `${m.role} ${m.id} in ${id} is held by the session, never re-sent`);
 		}
 	}
 });
@@ -159,41 +149,6 @@ test("tools: the core tool surface appears in real fixture data", () => {
 	}
 });
 
-// ── the graph: ledgers through the full derivation ──────────────────────────
-
-test("graph: the real ledgers parse through their shape guards", () => {
-	assert.ok(graphStore.readNodes().length >= 250, "nodes parse");
-	assert.ok(graphStore.readChains().length >= 150, "chains parse");
-	assert.ok(graphStore.readCheckpoints().length >= 5, "session checkpoints parse");
-	assert.ok(graphStore.readCoverage().length >= 90, "coverage entries parse");
-	assert.ok(graphStore.readSources().length >= 1, "imported-notes sources parse");
-});
-
-test("graph: getGraph + deriveView build the snapshot end-to-end", () => {
-	const derived = getGraph(graphStore);
-	assert.ok(derived.nodes.length >= 250, "merged nodes");
-assert.ok(derived.chains.length >= 150, "chains survive derivation");
-	const view = deriveView(derived);
-	assert.ok(view.nodes.length >= 250, "the view carries every proposition");
-	// chains are the stored truth; the view renders each as an implication
-	// node with premise→implication→conclusion arrows (the derived image),
-	// and contracts each to direct premise→conclusion LOGICAL edges.
-	assert.ok(view.impLinks.length >= 90, "every unique chain renders into the view (lines merged by premises+conclusion)");
-	assert.ok(view.edges.length >= view.impLinks.length, "premise/conclusion arrows drawn");
-	assert.ok(view.logicalEdges.length > 0, "logical edge contraction runs");
-});
-
-test("graph: render-settings sanitize and positions parse", () => {
-	const raw = readRenderSettings();
-	assert.ok(raw, "render-settings.json reads");
-	const clean = sanitizeRenderSettings(raw);
-	assert.ok(clean.nodeSize > 0 && typeof clean.labelZoom === "number", "sanitizes to concrete knobs");
-	const positionsFile = JSON.parse(fs.readFileSync(path.join(TMP, "graph", "positions.json"), "utf8")) as {
-		positions: Record<string, unknown>;
-	};
-	assert.ok(Object.keys(positionsFile.positions).length >= 300, "positions parse");
-});
-
 // ── jobs + settings ─────────────────────────────────────────────────────────
 
 test("jobs: the kind × status matrix parses through the job store", () => {
@@ -216,7 +171,7 @@ test("settings: the stamped record parses", () => {
 	const s = settingsStore.readSettings();
 	assert.ok(s, "settings record reads");
 	assert.equal(s!.version, 1, "settings carry their version stamp");
-	assert.ok(s!.models && typeof s!.models === "object", "model slots present");
+	assert.equal("models" in s!, false, "the model slots from before one model ran everything are dropped on read");
 });
 
 // ── read-only: readers never write ──────────────────────────────────────────

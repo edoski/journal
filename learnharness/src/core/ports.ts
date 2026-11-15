@@ -9,33 +9,32 @@
  * adapters may import core; core NEVER imports an adapter.
  */
 
+import type { ChatSession } from "./sdk-session.ts";
+import type { ArcPassLedger } from "./arc-pass.ts";
+import type { CourseMapLedger } from "./course-map-build.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type {
 	ChatRecord,
-	ChatSettings,
 	ChatSummary,
-	GraphChain,
-	GraphNode,
+	DigestLedger,
 	JobKind,
 	JobRecord,
-	ExtractionRunUsage,
 	PlanTree,
-	Position,
-	CoverageEntry,
-	SessionCheckpoint,
+	SessionGoal,
 	TurnUsage,
-	NotesSource,
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
-import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb } from "./contracts/course.ts";
+import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb, NewCourseRecord, UnreadableCourse } from "./contracts/course.ts";
+import type { CourseMap } from "./contracts/course-map.ts";
 
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
 
 export interface ChatStore {
-	/** Create a session record; kind "practice" marks a practice session
-	 *  (absent = teach, the default); `course` links the session to one
-	 *  registered course for its whole life. */
-	createChat(title: string, kind?: "practice", course?: CourseLink): ChatRecord;
+	/** Create a session record; `course` links the session to one
+	 *  registered course for its whole life. A session's mode lives in its
+	 *  transcript (a session-mode marker, then the agents' handoffs).
+	 *  `arcCheck` is the arc a Check it session checks. */
+	createChat(title: string, course?: CourseLink, topics?: readonly string[], arcCheck?: string): ChatRecord;
 	/** The full record, or null if unknown id / corrupt file. */
 	getChat(id: string): ChatRecord | null;
 	/** All sessions, newest activity first (the sidebar's list view). */
@@ -45,91 +44,33 @@ export interface ChatStore {
 	saveMessages(id: string, messages: LhMessage[]): void;
 	/** Persist the session plan tree (plan tools call this in execute). */
 	saveTree(id: string, tree: PlanTree): void;
+	/** Persist the record's map to its Claude Code session. Silent, like saveTree. */
+	saveSession(id: string, session: ChatSession): void;
 	/** Append one usage entry to the record's turn log (the money channel,
 	 * 2026-09): idempotent per turn id — each request carries its own, so
 	 * a turn persisted twice appends once while continuation turns (which
 	 * share a response message id) each keep their usage. */
 	appendTurnUsage(id: string, entry: TurnUsage): void;
-	/** Append one extraction-run usage entry — idempotent per startedAt. */
-	appendExtractionUsage(id: string, entry: ExtractionRunUsage): void;
-	/** Persist the per-chat model/thinking settings (the model control).
-	 *  Replace-whole: the picker sends the complete settings object. */
-	saveSettings(id: string, settings: ChatSettings): void;
+	/** Replace the lesson digest's ledger. Silent, like the usage logs, and
+	 *  never conversation activity: updatedAt stays put. */
+	saveDigestLedger(id: string, ledger: DigestLedger): void;
 	/** Link the session to a registered course (the banner on a session
-	 *  that has none, or whose course is gone). Silent, like saveSettings. */
+	 *  that has none, or whose course is gone). Silent, like saveTree. */
 	linkCourse(id: string, course: CourseLink): void;
 	/** Rename a session (the header's click-to-edit title, 2026-09-17).
-	 * Like saveSettings: a rename is NOT conversation activity — updatedAt
+	 * Like saveTree: a rename is NOT conversation activity — updatedAt
 	 * stays put, so sidebar order never churns on a rename. */
 	renameChat(id: string, title: string): ChatRecord;
+	/** Name a session, once: its first turn's name or its first plan's
+	 *  goal. A session started on no topic takes the goal's topic as its own
+	 *  while it has none and, unless the learner renamed it or it was named
+	 *  already, the goal's title. A no-op for a session started on a topic.
+	 *  Announced like a rename; never conversation activity. */
+	nameSession(id: string, goal: SessionGoal): void;
 	/** Delete the session record entirely (session-deletion wave 6, owner
-	 *  2026-09-22). False when the id is unknown. The graph-ledger purge and
-	 *  job cleanup are the caller's choreography (core/graph-deletion.ts +
-	 *  the DELETE route), not the store's. */
+	 *  2026-09-22). False when the id is unknown. Job cleanup is the
+	 *  caller's choreography (server/chats.ts), not the store's. */
 	deleteChat(id: string): boolean;
-}
-
-// ─── GraphStore — the append-only evidence ledgers (data/graph) ──────────────
-// Chains are the stored truth (owner, 2026-09-30): nodes + reasoning
-// chains; edges are a DERIVED view (core/graph.ts) and never touch this
-// seam. Reads return the raw append-order lines; merging chain assertions
-// by (premises, conclusion) is DERIVED in core/graph.ts — the store never
-// decides. The extraction pipeline is the sole writer; this read surface
-// stays.
-
-export interface GraphStore {
-	/** Append one GraphNode (ids are unique — no merging needed). */
-	appendNode(node: GraphNode): void;
-	/** Raw node lines in append order. */
-	readNodes(): GraphNode[];
-
-	/** Append one chain ASSERTION (a second session asserting the same
-	 *  (premises, conclusion) appends another line; readers merge). */
-	appendChain(assertion: GraphChain): void;
-	readChains(): GraphChain[];
-
-	/** Append one emission checkpoint. */
-	appendCheckpoint(checkpoint: SessionCheckpoint): void;
-	readCheckpoints(): SessionCheckpoint[];
-	/** Message-granular extraction coverage (vision-extraction-coverage.md):
-	 *  append-only; one line per covered message. The chat-extraction
-	 *  checkpoint — "uncovered" is derived from these, never tracked. */
-	appendCoverage(entry: CoverageEntry): void;
-	readCoverage(): CoverageEntry[];
-
-	/** Append one cluster-naming run's usage (graph-global money channel) —
-	 *  idempotent per startedAt. */
-
-	/** Upsert one imported-notes source record (config.SOURCES_FILE — a
-	 *  JSON map, not a ledger; an upsert keeps the existing usage log). */
-	upsertSource(source: NotesSource): void;
-	/** Every notes source record, by id order-insensitive. */
-	readSources(): NotesSource[];
-	/** Append one run's usage to a source record — idempotent per
-	 *  startedAt, mirroring ChatRecord.extractions. */
-	appendSourceUsage(id: string, entry: ExtractionRunUsage): void;
-
-	/** The layout ledger (config.POSITIONS_FILE): nodeId → resting {x,y}.
-	 *  WRITTEN ONLY by the incremental settle after a merge (core/layout.ts
-	 *  settleGraphLayout) — read-only for everything else. */
-	readPositions(): Record<string, Position>;
-	/** Replace the whole ledger (the settle is a full-graph computation). */
-	writePositions(positions: Record<string, Position>): void;
-
-	/** THE DESTRUCTIVE SEAM (session-deletion wave 6, owner 2026-09-22 —
-	 *  the first non-append operation on these ledgers): atomically
-	 *  replace the full contents of any subset of the six rewritable
-	 *  ledgers. Each provided array is written to a temp file and renamed
-	 *  over the ledger (crash-safe: a torn write never replaces the
-	 *  original); absent keys leave their ledger untouched. The pure
-	 *  computation is core/graph-deletion.ts — the store only makes the
-	 *  replacement atomic. */
-	rewriteLedgers(next: {
-		nodes?: GraphNode[];
-		chains?: GraphChain[];
-		coverage?: CoverageEntry[];
-		checkpoints?: SessionCheckpoint[];
-	}): void;
 }
 
 // ─── JobStore — background sub-agent jobs (data/jobs) ─────────────────────────
@@ -182,50 +123,32 @@ export interface SettingsStore {
 	writeSettings(settings: UserSettings): void;
 }
 
-// ─── PromptOverrideStore — per-segment system-prompt overrides (2026-09-19) ──
+// ─── CourseMapLedgers — what the course map builder already read ────────────
 
-/**
- * User text overriding ONE source prompt segment (the shared base or one
- * numeric fragment), stored at the data-dir seam mirroring the source
- * layout (config.PROMPTS_OVERRIDE_DIR). File presence is NOT the override:
- * the settings record's agent.prompts switch is the explicit on/off, so a
- * user can keep a customized file on disk while running the source default.
- * The segment LIST is always derived from source at runtime — see the
- * adapter (src/store/prompt-overrides.ts) for the loader rules.
- */
-export interface PromptOverrideStore {
-	/** Every override path currently on disk ("system-prompt.md",
-	 *  "teacher/20-teaching.md", ...), POSIX-relative, sorted. */
-	listOverrides(): string[];
-	/** The override text, or null when the path has no file. */
-	readOverride(segmentPath: string): string | null;
-	/** Persist override text for a segment path (creates parents). */
-	writeOverride(segmentPath: string, text: string): void;
-	/** Remove the override file, if present (switches are untouched — an
-	 *  on-switch with no file composes the source default, inert). */
-	deleteOverride(segmentPath: string): void;
+/** The course map builder's ledger, one per course workspace (app data:
+ *  the engine's record holds the map, this only what was read). */
+export interface CourseMapLedgers {
+	get(workspace: string): CourseMapLedger | undefined;
+	/** Replace one course's ledger. */
+	save(workspace: string, ledger: CourseMapLedger): void;
+	/** Every course that has a ledger. */
+	workspaces(): string[];
+	/** Drop a deleted course's ledger, so a course made again in its folder
+	 *  has its material read afresh. */
+	forget(workspace: string): void;
 }
 
-// ─── AuthStore — BYOK provider keys (auth-keys wave, 2026-09-19) ────────────
+// ─── ArcPassLedgers — where each course stands with the grouping pass ───────
 
-/**
- * The long-standing flat {VAR: value} auth.json map (config.AUTH_FILE) —
- * the same file the Electron app has always hand-edited, now first-class
- * server-managed. Values are opaque strings: shape validation is a
- * server-band concern (core/auth-keys.ts validateKeyShape — the store
- * persists what it is given); env precedence is a server-band concern
- * too (src/server/keys.ts). Unknown vars ride along verbatim.
- */
-export interface AuthStore {
-	/** The whole map — absent or corrupt file = {} ("no keys yet", the
-	 *  documented first-boot state). Never throws. */
-	authVars(): Record<string, string>;
-	/** Set one VAR (atomic write, mode 0600 always, other vars preserved). */
-	setAuthVar(name: string, value: string): void;
-	/** Remove one VAR if present (absent = no-op, still a silent success). */
-	deleteAuthVar(name: string): void;
+/** The grouping pass's ledger, one per course workspace: whether a live run
+ *  may form its arcs, and what the last run found. A course without one
+ *  never gets a live run. */
+export interface ArcPassLedgers {
+	get(workspace: string): ArcPassLedger | undefined;
+	save(workspace: string, ledger: ArcPassLedger): void;
+	workspaces(): string[];
+	forget(workspace: string): void;
 }
-
 
 // ─── CourseRecords — the learning engine's course records ───────────────────
 
@@ -236,12 +159,22 @@ export interface AuthStore {
  * back as a CourseResult or an unavailable listing.
  */
 export interface CourseRecords {
-	/** Every registered course, for the chooser. */
-	list(): Promise<{ available: true; courses: CourseSummary[] } | Extract<CourseListing, { available: false }>>;
+	/** Every registered course, for the chooser, and those it could not read. */
+	list(): Promise<
+		{ available: true; courses: CourseSummary[]; unreadable: UnreadableCourse[] } | Extract<CourseListing, { available: false }>
+	>;
 	/** Run one verb against one course workspace. */
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
-	/** Make an existing empty directory a titled, registered course: the
-	 *  engine's `init` there, then a save of the title. `workspace` is the
-	 *  directory as the engine registered it. */
-	create(directory: string, title: string): Promise<{ ok: true; workspace: string } | Extract<CourseResult, { ok: false }>>;
+	/** Whether the course was deleted: its folder is a course whose record
+	 *  the engine forgot. A save there would bring the course back as an
+	 *  untitled ghost. Absent where nothing keeps records on disk. */
+	forgotten?(workspace: string): boolean;
+	/** The course map: the engine's read-only `map` verb, parsed. `here`
+	 *  is the topic of the lesson in progress, which the engine cannot see:
+	 *  its `currentArc` then names that topic's arc. */
+	map(workspace: string, here?: string | null): Promise<{ ok: true; map: CourseMap } | Extract<CourseResult, { ok: false }>>;
+	/** Make an existing directory a titled, registered course: the engine's
+	 *  `init` there, then one save of the title and the exam day. `workspace`
+	 *  is the directory as the engine registered it. */
+	create(directory: string, course: NewCourseRecord): Promise<{ ok: true; workspace: string } | Extract<CourseResult, { ok: false }>>;
 }

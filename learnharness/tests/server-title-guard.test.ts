@@ -124,11 +124,11 @@ describe("backend-only preload wiring and packaging", () => {
 			assert.equal(launch.options.env.ELECTRON_RUN_AS_NODE, "1");
 			assert.equal(launch.options.env.LH_DESKTOP_SERVER, "1");
 			assert.equal(launch.options.env.LH_DATA_DIR, path.join("/fixture/user-data", "data"));
-			assert.equal(launch.options.env.LH_AUTH_FILE, path.join("/fixture/user-data", "auth.json"));
+			assert.equal(launch.options.env.LH_AUTH_FILE, undefined, "no API-key store reaches the server");
 			assert.equal(launch.options.env.PORT, "54321");
 			assert.equal(launch.options.env.HOSTNAME, "127.0.0.1");
 			assert.equal(launch.options.env.FIXTURE, "kept");
-			assert.deepEqual(launch.options.stdio, ["ignore", "pipe", "pipe", "ipc"]);
+			assert.deepEqual(launch.options.stdio, ["ignore", "pipe", "pipe"]);
 		});
 	}
 

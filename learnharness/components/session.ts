@@ -15,8 +15,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
-import type { ChatInput, LhMessage, QuestionAnswerData } from "@/src/core";
+import type { ChatInput, LhMessage, Photo, QuestionAnswerData } from "@/src/core";
 import { SessionModel, type SessionState } from "@/components/session-core";
+import { useNotifyHub } from "@/components/server-events";
 
 export interface UseChatSessionOptions {
 	chatId: string;
@@ -49,6 +50,22 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 			model.onChange = undefined;
 		};
 	}, [model, bump]);
+
+	// The 409 retry waits for this chat's next turn-settled on the channel.
+	const hub = useNotifyHub();
+	useEffect(() => {
+		model.setTurnSettled(
+			hub
+				? () => {
+						let off = () => {};
+						const promise = new Promise<void>((resolve) => {
+							off = hub.subscribe("turn-settled", (p) => p.chatId === chatId && resolve());
+						});
+						return { promise, cancel: off };
+					}
+				: undefined,
+		);
+	}, [hub, model, chatId]);
 
 	// Reattach on mount (StrictMode-safe: a newer resume cancels the older).
 	// ATTACH-FIRST (owner, reattach round 2026-10-02): the page render just
@@ -104,14 +121,14 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 
 	const send = useCallback((input: ChatInput, onAccepted?: () => void) => model.send(input, onAccepted), [model]);
 	const continueIfOwed = useCallback((record: readonly LhMessage[]) => void model.continueIfOwed(record), [model]);
-	const steer = useCallback((text: string) => void model.steer(text), [model]);
+	const steer = useCallback((text: string, photos?: Photo[]) => model.steer(text, photos), [model]);
 	const submitAnswer = useCallback(
-		(tool: string, toolCallId: string, output: QuestionAnswerData, questionKey?: string) =>
-			void model.submitAnswer(tool, toolCallId, output, questionKey),
+		(tool: string, toolCallId: string, output: QuestionAnswerData, questionKey?: string, photos?: Photo[]) =>
+			void model.submitAnswer(tool, toolCallId, output, questionKey, photos),
 		[model],
 	);
 	const dismissQuestion = useCallback(
-		(toolCallId: string, answer: QuestionAnswerData, questionKey?: string) => void model.dismissQuestion(toolCallId, answer, questionKey),
+		(toolCallId: string, answer: QuestionAnswerData, questionKey?: string) => model.dismissQuestion(toolCallId, answer, questionKey),
 		[model],
 	);
 	const dismissProblem = useCallback(
@@ -124,6 +141,7 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 	const adoptRecord = useCallback((record: LhMessage[]) => model.adoptRecord(record), [model]);
 	const stop = useCallback(() => model.stop(), [model]);
 	const clearError = useCallback(() => model.clearError(), [model]);
+	const recoverDroppedStream = useCallback(() => model.recoverDroppedStream(), [model]);
 	const resumeStream = useCallback(() => void model.resumeStream(), [model]);
 
 	return {
@@ -146,6 +164,7 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 		adoptRecord,
 		stop,
 		clearError,
+		recoverDroppedStream,
 		resumeStream,
 		setReattachSettled,
 	};

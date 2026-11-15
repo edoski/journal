@@ -1,4 +1,4 @@
-"""The course record (schema 6): field sets, handles, validation and the patch rule.
+"""The course record (schema 7): field sets, handles, validation and the patch rule.
 
 ``validate_record`` checks a whole stored record and returns its canonical form.
 ``check_patch`` validates the shape of one ``save`` patch before any lock is
@@ -9,6 +9,7 @@ the fix and, for unknown fields or handles, the closest known ones.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -18,9 +19,9 @@ import re
 from typing import Any, TypedDict
 import unicodedata
 
-from learning import preferences
+from learning import arc_rules, clock, preferences
 
-SCHEMA = 6
+SCHEMA = 7
 HANDLE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
 OBSERVATION_ID = re.compile(r"o[1-9][0-9]*")
 RESERVED = re.compile(r"o[0-9]+")
@@ -37,9 +38,10 @@ HANDLE_RULE = (
     "letter or digit"
 )
 
-# Topics, knowledge, tasks and sources share one handle namespace.
+# Arcs, topics, knowledge, tasks and sources share one handle namespace.
 NAMESPACE = {
     "sources": "source",
+    "arcs": "arc",
     "topics": "topic",
     "knowledge": "knowledge entry",
     "tasks": "task",
@@ -51,12 +53,14 @@ RECORD_FIELDS = (
     "exam",
     "journal",
     "sources",
+    "arcs",
     "topics",
     "observations",
     "knowledge",
     "tasks",
     "focus",
     "path",
+    "arc_log",
     "preferences",
     "next_observation",
     "revision",
@@ -68,12 +72,14 @@ PATCH_FIELDS = (
     "exam",
     "journal",
     "sources",
+    "arcs",
     "topics",
     "observations",
     "knowledge",
     "tasks",
     "focus",
     "path",
+    "arc_change",
     "preferences",
     "global_preferences",
 )
@@ -84,6 +90,7 @@ HELPER_FIELDS = frozenset(
         "updated_at",
         "next_observation",
         "recorded",
+        "due_topics",
         "judged",
         "updated",
         "created",
@@ -111,6 +118,10 @@ _REVIEW = "review"
 _BY = "by"
 _STAMP = "stamp"
 _POINTS = "points"
+_ARC_EVENT = "arc_event"
+_EDGES = "edges"
+_EDGE_CHANGE = "edge_change"
+_ENTRY = "entry"
 MAX_POINTS = 5
 POINT_CHARS = 200
 
@@ -123,10 +134,14 @@ FIELDS: dict[str, dict[str, str]] = {
         "constraints": _TEXTS,
         "unknowns": _TEXTS,
         "refs": _REFS,
+        "arcs": _HANDLES,
+        "leaves_out": _HANDLES,
     },
     "source": {"path": _TEXT, "title": _TEXT},
+    "arc": {"title": _TEXT, "question": _TEXT, "purpose": _TEXT, "refs": _REFS},
     "topic": {
         "title": _TEXT,
+        "arc": _HANDLE,
         "needs": _HANDLES,
         "contrasts": _HANDLES,
         "refs": _REFS,
@@ -135,6 +150,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "gap": _TEXT,
         "note": _TEXT,
         "review": _REVIEW,
+        "excluded": _TEXT,
     },
     "review": {"due": _DAY, "prompt": _TEXT, "points": _POINTS},
     "observation": {
@@ -147,11 +163,17 @@ FIELDS: dict[str, dict[str, str]] = {
         "sure": _SURE,
         "chose": _HANDLE,
         "transfer": _FLAG,
+        "shown": _FLAG,
+        "gave_up": _FLAG,
+        "predicted": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
         "refs": _REFS,
         "corrects": _IDS,
+        "disputed": _TEXT,
+        "ruling": _TEXT,
         "uncertain": _TEXT,
+        "checkpoint": _HANDLE,
     },
     "knowledge": {
         "text": _TEXT,
@@ -170,13 +192,38 @@ FIELDS: dict[str, dict[str, str]] = {
         "help": _TEXT,
         "note": _TEXT,
     },
-    "path": {"current": _HANDLE, "order": _HANDLES, "basis": _TEXT},
+    "path": {"current": _HANDLE, "order": _HANDLES, "basis": _TEXT, "arcs": _HANDLES},
     "ref": {"source": _HANDLE, "locator": _TEXT},
+    "arc_event": {
+        "day": _DAY,
+        "kind": _ARC_EVENT,
+        "arc": _HANDLE,
+        "topic": _HANDLE,
+        "from": _TEXT,
+        "to": _TEXT,
+        "edges": _EDGES,
+        "edges_entry": _ENTRY,
+        "reason": _TEXT,
+        "asked": _TEXT,
+    },
+    "arc_edge": {
+        "topic": _HANDLE,
+        "need": _HANDLE,
+        "change": _EDGE_CHANGE,
+        "reason": _TEXT,
+    },
+    "arc_change": {
+        "reason": _TEXT,
+        "asked": _TEXT,
+        "edges": _EDGES,
+        "edges_entry": _ENTRY,
+    },
 }
 HELPERS: dict[str, dict[str, str]] = {
+    "exam": {"final_review": _DAY},
     "topic": {"judged": _DAY},
     "review": {"by": _BY},
-    "observation": {"recorded": _STAMP},
+    "observation": {"recorded": _STAMP, "due_topics": _HANDLES},
     "knowledge": {"updated": _DAY},
     "task": {"created": _DAY, "updated": _DAY},
 }
@@ -185,6 +232,9 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "observation": ("kind", "topics", "text", "date", "recorded"),
     "knowledge": ("text",),
     "ref": ("source",),
+    "arc_event": ("day", "kind", "reason"),
+    "arc_edge": ("topic", "need", "change", "reason"),
+    "arc_change": ("reason",),
 }
 _REVIEW_PATCH = {
     "due": _DAY,
@@ -194,6 +244,7 @@ _REVIEW_PATCH = {
 }
 _MAP_KINDS = {
     "sources": "source",
+    "arcs": "arc",
     "topics": "topic",
     "knowledge": "knowledge",
     "tasks": "task",
@@ -220,8 +271,44 @@ class Review(TypedDict, total=False):
     by: str
 
 
+class Arc(TypedDict, total=False):
+    title: str
+    question: str
+    purpose: str
+    refs: list[Reference]
+
+
+class ArcEdge(TypedDict):
+    """One prerequisite an ``edges`` event logs as added or dropped."""
+
+    topic: str
+    need: str
+    change: str
+    reason: str
+
+
+# "from" is a keyword, so the shape is declared functionally.
+ArcEvent = TypedDict(
+    "ArcEvent",
+    {
+        "day": str,
+        "kind": str,
+        "arc": str,
+        "topic": str,
+        "from": str,
+        "to": str,
+        "edges": list[ArcEdge],
+        "edges_entry": int,
+        "reason": str,
+        "asked": str,
+    },
+    total=False,
+)
+
+
 class Topic(TypedDict, total=False):
     title: str
+    arc: str
     needs: list[str]
     contrasts: list[str]
     refs: list[Reference]
@@ -231,6 +318,7 @@ class Topic(TypedDict, total=False):
     note: str
     judged: str
     review: Review
+    excluded: str
 
 
 class Observation(TypedDict, total=False):
@@ -243,12 +331,19 @@ class Observation(TypedDict, total=False):
     sure: str
     chose: str
     transfer: bool
+    shown: bool
+    gave_up: bool
+    predicted: bool
     date: str
     task: str
     refs: list[Reference]
     corrects: list[str]
+    disputed: str
+    ruling: str
     uncertain: str
+    checkpoint: str
     recorded: str
+    due_topics: list[str]
 
 
 class Knowledge(TypedDict, total=False):
@@ -275,23 +370,29 @@ class Task(TypedDict, total=False):
 
 class Exam(TypedDict, total=False):
     date: str
+    final_review: str
     format: str
     coverage: str
     criteria: list[str]
     constraints: list[str]
     unknowns: list[str]
     refs: list[Reference]
+    arcs: list[str]
+    leaves_out: list[str]
 
 
 class CoursePath(TypedDict, total=False):
     current: str
     order: list[str]
     basis: str
+    arcs: list[str]
 
 
 SHAPES: dict[str, type] = {
     "exam": Exam,
     "source": Source,
+    "arc": Arc,
+    "arc_event": ArcEvent,
     "topic": Topic,
     "review": Review,
     "observation": Observation,
@@ -308,10 +409,17 @@ class PatchResult:
 
     observations: list[str] = field(default_factory=list)
     duplicates: list[str] = field(default_factory=list)
+    # The id each observation of the patch has, in the patch's order: the new
+    # one, or the stored one it repeated. A host pairs an entry with what it
+    # answers by its place in the patch.
+    saved: list[str] = field(default_factory=list)
     tutor_reviews: list[str] = field(default_factory=list)
     introduced: list[str] = field(default_factory=list)
     judged: list[str] = field(default_factory=list)
     global_preferences: dict[str, str | None] | None = None
+    exam_moved: bool = False
+    questions_moved: bool = False
+    pruned: dict[str, str] = field(default_factory=dict)
 
 
 # --- messages ---------------------------------------------------------------
@@ -478,6 +586,33 @@ def _flag(value: Any, path: str, patch: bool) -> bool | None:
     return True if value else None
 
 
+def _edges(value: Any, path: str, patch: bool) -> list[dict[str, Any]]:
+    items = _list(
+        value,
+        path,
+        'objects like {"topic": "chain-rule", "need": "derivative", '
+        '"change": "add", "reason": "…"}',
+    )
+    if not items:
+        raise ValueError(f"{path} must list at least one edge")
+    found: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        edge = entry("arc_edge", item, f"{path}[{index}]")
+        if any((e["topic"], e["need"]) == (edge["topic"], edge["need"]) for e in found):
+            raise ValueError(
+                f'{path}[{index}]: "{edge["topic"]}" needs "{edge["need"]}" is '
+                "listed twice; list each edge once"
+            )
+        found.append(edge)
+    return found
+
+
+def _entry(value: Any, path: str, patch: bool) -> int:
+    if type(value) is int and value >= 0:
+        return value
+    raise ValueError(f"{path} must be the index of an arc_log entry, not {value!r}")
+
+
 def _choice(choices: tuple[str, ...]) -> Callable[[Any, str, bool], str]:
     def check(value: Any, path: str, patch: bool) -> str:
         if isinstance(value, str) and value in choices:
@@ -556,6 +691,10 @@ _RULES: dict[str, Callable[[Any, str, bool], Any]] = {
     _BY: _choice(REVIEWERS),
     _STAMP: _stamp,
     _POINTS: _points,
+    _ARC_EVENT: _choice(arc_rules.ARC_EVENTS),
+    _EDGES: _edges,
+    _EDGE_CHANGE: _choice(arc_rules.EDGE_CHANGES),
+    _ENTRY: _entry,
     "in_days": _in_days,
 }
 
@@ -605,7 +744,71 @@ def entry(
         for name in REQUIRED.get(kind, ()):
             if name not in result:
                 raise ValueError(f'{path} needs "{name}"')
+    else:
+        _learner_reads(kind, result, path)
     return result
+
+
+# --- what the learner reads -------------------------------------------------
+
+# The recorded texts the learner reads in their study app, days later
+# (records.md, "What the learner reads"), and of those the ones written to the
+# learner: a topic's title names an idea and an attempt's text is the question
+# as asked, so a person in a word problem may be "he". A re-mark's ruling shows
+# on the answer it re-marks, so it speaks to the learner too.
+LEARNER_READS: dict[str, tuple[str, ...]] = {
+    "arc": ("title",),
+    "topic": ("title", "gap", "note"),
+    "task": ("title", "goal", "step"),
+    "observation": ("text", "ruling"),
+}
+WRITTEN_TO_LEARNER: dict[str, tuple[str, ...]] = {
+    "topic": ("gap", "note"),
+    "task": ("title", "goal", "step"),
+    "observation": ("ruling",),
+}
+_SHOWN_ID = re.compile(r"\bo[0-9]+\b")
+_SHOWN_DAY = re.compile(r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b")
+_THIRD_PERSON = re.compile(
+    r"\b(?:he|him|his|himself|she|her|hers|herself|learners?|the\s+students?)\b",
+    re.IGNORECASE,
+)
+# A dash used as punctuation: any em dash, or an en dash with space on both
+# sides. A name or a range keeps its unspaced en dash (Cauchy–Schwarz, 1–5).
+_PROSE_DASH = re.compile(r"\u2014|\s\u2013\s")
+
+
+def _learner_reads(kind: str, item: dict[str, Any], path: str) -> None:
+    """Refuse ids, dates, third-person words and prose dashes the learner reads."""
+    for name in LEARNER_READS.get(kind, ()):
+        text = item.get(name)
+        if not isinstance(text, str):
+            continue
+        where = f"{path}.{name}"
+        reads = "the learner reads it in their study app"
+        if found := _SHOWN_ID.search(text):
+            raise ValueError(
+                f'{where} names the observation "{found[0]}", but {reads}, where '
+                "ids mean nothing: say what happened instead and save again"
+            )
+        if found := _SHOWN_DAY.search(text):
+            raise ValueError(
+                f'{where} holds the date "{found[0]}", but {reads}, which dates '
+                'every entry itself: leave the date out, or say "the same day" '
+                'or "after the hint", and save again'
+            )
+        if name in WRITTEN_TO_LEARNER.get(kind, ()) and (
+            found := _THIRD_PERSON.search(text)
+        ):
+            raise ValueError(
+                f'{where} speaks of the learner as "{found[0]}", but {reads}: '
+                'write it to them, as "you", and save again'
+            )
+        if name in WRITTEN_TO_LEARNER.get(kind, ()) and _PROSE_DASH.search(text):
+            raise ValueError(
+                f"{where} uses a dash as punctuation, but {reads}, in plain "
+                "sentences: end the sentence there or use a comma, and save again"
+            )
 
 
 def _review_patch(value: Any, path: str) -> dict[str, Any]:
@@ -632,6 +835,124 @@ def unaided(observation: dict[str, Any]) -> bool:
     return observation.get("kind") == "exam" or observation.get("help") == UNAIDED
 
 
+SCHEDULING_KINDS = frozenset({"attempt", "exam"})
+
+
+def counts(observation: dict[str, Any]) -> bool:
+    """An answer that counts for levels and reviews: an attempt or an exam,
+    except a prediction made before its step was taught (``predicted``).
+    Before the teaching a wrong guess is expected, so it says nothing about
+    what is held, and a right one is not yet recall of what was taught; it
+    stays in the history as what happened."""
+    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
+
+
+def _predictions_alone(
+    record: dict[str, Any], topic: str, keys: Collection[str] | None = None
+) -> list[str]:
+    """A topic's predictions when they are all its answers that stand, among
+    ``keys`` when given (a save's new ones); empty once one of them counts,
+    or when it has none."""
+    superseded = {
+        target
+        for item in record["observations"].values()
+        for target in item.get("corrects", ())
+    }
+    found = []
+    for key, item in record["observations"].items():
+        if key in superseded or topic not in item["topics"]:
+            continue
+        if keys is not None and key not in keys:
+            continue
+        if counts(item):
+            return []
+        if item.get("predicted"):
+            found.append(key)
+    return found
+
+
+def _shows_a_miss(observation: dict[str, Any]) -> bool:
+    """Evidence a gap may rest on: a counted answer not right on his own and
+    sure (incorrect, partial, helped, uncertain or a guess), or his own
+    statement of what he does not get."""
+    if observation["kind"] == "self_report":
+        return True
+    return counts(observation) and not (
+        observation["result"] == "correct"
+        and unaided(observation)
+        and "uncertain" not in observation
+        and observation.get("sure") != "guess"
+    )
+
+
+def _miss_only_predicted(
+    after: dict[str, Any], topic: str, keys: Collection[str]
+) -> bool:
+    """Whether this save's only miss on ``topic`` (among its new ``keys``) is
+    a prediction's: its counted answers on it were all right, so a gap it
+    sets could only name what the prediction got wrong."""
+    new = [
+        after["observations"][key]
+        for key in keys
+        if key in after["observations"]
+        and topic in after["observations"][key]["topics"]
+    ]
+    predicted = any(
+        item.get("predicted") and item.get("result") != "correct" for item in new
+    )
+    answered = any(counts(item) for item in new)
+    return predicted and answered and not any(_shows_a_miss(item) for item in new)
+
+
+def _check_predictions(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    changes: dict[str, Any],
+    outcome: PatchResult,
+) -> None:
+    """Refuse a patch that treats a prediction as evidence: a topic whose
+    only answers are predictions is not taught, mistaken or due, so the patch
+    may not introduce it, give it a gap, date its review or move the path
+    onto it, nor may a save whose only new answers on a topic are
+    predictions; nor may a save set a gap whose only miss on the topic is a
+    prediction's. Teaching with no question asked is still introduced."""
+    claims: dict[str, list[str]] = defaultdict(list)
+    for key in outcome.introduced:
+        claims[key].append(f"topics.{key}.introduced")
+    for key, change in (changes.get("topics") or {}).items():
+        gap = (change or {}).get("gap")
+        if gap is not None and gap != before["topics"].get(key, {}).get("gap"):
+            claims[key].append(f"topics.{key}.gap")
+            if _miss_only_predicted(after, key, outcome.observations):
+                raise ValueError(
+                    f"topics.{key}.gap: the only miss on {key} in this save is a "
+                    "prediction, made before its step was taught, and a gap names "
+                    "a mistake an answer that counts showed, never a prediction's "
+                    "expected miss. Leave the gap as it was, or set it in a save "
+                    f"with the answer on {key} that counts and shows it"
+                )
+    for key in outcome.tutor_reviews:
+        claims[key].append(f"topics.{key}.review")
+    current = (changes.get("path") or {}).get("current")
+    if current and current != before.get("path", {}).get("current"):
+        claims[current].append("path.current")
+    for topic, fields in claims.items():
+        stored = _predictions_alone(after, topic)
+        which = f"{topic}'s only answers are predictions ({', '.join(stored)})"
+        if not stored and _predictions_alone(after, topic, outcome.observations):
+            which = f"the only answers on {topic} in this save are predictions"
+        elif not stored:
+            continue
+        raise ValueError(
+            f"{', '.join(fields)}: {which}, made before its step was taught, and "
+            "a prediction never counts: it does not teach a topic, show a "
+            "mistake, date its review or move the path onto it. Leave "
+            f"{'them' if len(fields) > 1 else 'it'} out until an answer on "
+            f"{topic} that counts is saved (a check or a recall after the "
+            "teaching), in this save or a later one"
+        )
+
+
 def _observation_rules(observation: dict[str, Any], path: str) -> None:
     kind = observation["kind"]
     if kind == "attempt":
@@ -652,10 +973,24 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 f"{path}.help: exams count as unaided; omit help, or record a "
                 "helped attempt with kind attempt"
             )
+        if "predicted" in observation:
+            raise ValueError(
+                f"{path}.predicted marks a prediction made in a session before "
+                "its step was taught; an exam is never one"
+            )
     else:
         given = [
             name
-            for name in ("result", "help", "sure", "transfer", "chose")
+            for name in (
+                "result",
+                "help",
+                "sure",
+                "transfer",
+                "chose",
+                "shown",
+                "gave_up",
+                "predicted",
+            )
             if name in observation
         ]
         if given:
@@ -665,6 +1000,30 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
             )
     if observation.get("transfer") and observation.get("result") != "correct":
         raise ValueError(f'{path}.transfer is allowed only with result "correct"')
+    if observation.get("shown") and unaided(observation):
+        raise ValueError(
+            f"{path}.shown marks help that showed the method or the answer before "
+            'the attempt, so it needs that help named, not help "none"'
+        )
+    if observation.get("gave_up") and observation.get("result") != "incorrect":
+        raise ValueError(f'{path}.gave_up is allowed only with result "incorrect"')
+    if "disputed" in observation or "ruling" in observation:
+        if kind != "attempt":
+            raise ValueError(
+                f"{path}.disputed marks an attempt re-marked after the learner "
+                "disputed its mark; it rides only an attempt"
+            )
+        if "disputed" not in observation or "ruling" not in observation:
+            raise ValueError(
+                f"{path}: a re-marked attempt needs both disputed (what the "
+                "learner said was wrong with the mark) and ruling (why the mark "
+                "now stands as it does, in one or two lines)"
+            )
+    if "checkpoint" in observation and kind != "attempt":
+        raise ValueError(
+            f"{path}.checkpoint tags an item of an arc's check, which is an "
+            "attempt; leave it out"
+        )
     if "chose" in observation:
         if observation.get("result") == "correct":
             raise ValueError(
@@ -698,6 +1057,11 @@ def _new_observation(value: Any, path: str) -> dict[str, Any]:
     for name in ("topics", "text"):
         if name not in result:
             raise ValueError(f'{path} needs "{name}"')
+    if "disputed" in result and not result.get("corrects"):
+        raise ValueError(
+            f"{path}.disputed needs corrects naming the attempt whose mark was "
+            'disputed, e.g. "corrects": ["o12"]'
+        )
     _observation_rules(result, path)
     return result
 
@@ -755,6 +1119,8 @@ def _check_namespace(record: dict[str, Any]) -> None:
 def _check_links(record: dict[str, Any]) -> None:
     topics, sources, tasks = record["topics"], record["sources"], record["tasks"]
     _check_refs(record.get("exam", {}), "exam", sources)
+    for key, arc in record["arcs"].items():
+        _check_refs(arc, f"arcs.{key}", sources)
     for key, topic in topics.items():
         path = f"topics.{key}"
         for name in ("needs", "contrasts"):
@@ -813,8 +1179,32 @@ def empty() -> dict[str, Any]:
     return validate_record({"schema": SCHEMA})
 
 
-def validate_record(record: Any) -> dict[str, Any]:
-    """Check a whole stored course record and return its canonical form."""
+def _arc_log(value: Any) -> list[dict[str, Any]]:
+    """The log's events; an ``edges`` event lists its edges, and an
+    ``edges_entry`` names an earlier ``edges`` event."""
+    log: list[dict[str, Any]] = []
+    for index, item in enumerate(_list(value, "arc_log", "arc events")):
+        path = f"arc_log[{index}]"
+        event = entry("arc_event", item, path)
+        if (event["kind"] == "edges") != ("edges" in event):
+            raise ValueError(
+                f"{path}: an edges event lists its edges, and only an edges event does"
+            )
+        if "edges_entry" in event:
+            arc_rules.check_edges_entry(
+                log, event["edges_entry"], f"{path}.edges_entry"
+            )
+        log.append(event)
+    return log
+
+
+def validate_record(record: Any, *, placing: bool = False) -> dict[str, Any]:
+    """Check a whole stored course record and return its canonical form.
+
+    ``placing`` is a save's record before the engine places its new topics
+    in arcs (``arcs.settle``), which then runs the arc rules that read
+    placement (``arc_rules.check_placed``); every other rule holds.
+    """
     if not isinstance(record, dict):
         raise ValueError("the course record must be a JSON object")
     if record.get("schema") != SCHEMA or type(record.get("schema")) is not int:
@@ -832,7 +1222,7 @@ def validate_record(record: Any) -> dict[str, Any]:
         result["exam"] = exam
     if "journal" in record:
         result["journal"] = _text(record["journal"], "journal", False)
-    for name, kind in (("sources", "source"), ("topics", "topic")):
+    for name, kind in (("sources", "source"), ("arcs", "arc"), ("topics", "topic")):
         result[name] = {
             _key(key, name): entry(kind, value, f"{name}.{key}")
             for key, value in _map(record.get(name, {}), name).items()
@@ -852,6 +1242,8 @@ def validate_record(record: Any) -> dict[str, Any]:
         result["focus"] = _handle(record["focus"], "focus", False)
     if "path" in record and (course_path := entry("path", record["path"], "path")):
         result["path"] = course_path
+    if log := _arc_log(record.get("arc_log", [])):
+        result["arc_log"] = log
     result["preferences"] = _preferences(record.get("preferences", {}))
     last = max(map(number, observations), default=0)
     sequence = record.get("next_observation", last + 1)
@@ -869,12 +1261,13 @@ def validate_record(record: Any) -> dict[str, Any]:
     _check_namespace(result)
     _check_links(result)
     _check_acyclic(result["topics"])
+    arc_rules.check(result, placing=placing)
     return result
 
 
 # --- handle lookup ----------------------------------------------------------
 
-LOOKUP = ("topics", "observations", "knowledge", "tasks", "sources")
+LOOKUP = ("topics", "observations", "knowledge", "tasks", "sources", "arcs")
 
 
 def _span(record: dict[str, Any]) -> str:
@@ -892,7 +1285,7 @@ def locate(record: dict[str, Any], handle: str) -> str:
     known = [key for name in NAMESPACE for key in record[name]]
     raise ValueError(
         f'unknown handle "{handle}"{did_you_mean(str(handle), known)}; handles name '
-        "topics, knowledge entries, tasks, sources and observations (o12)"
+        "topics, knowledge entries, tasks, sources, arcs and observations (o12)"
     )
 
 
@@ -924,6 +1317,9 @@ def _strip_topics(record: dict[str, Any], removed: Collection[str]) -> None:
             key: _without(item, field_name, removed)
             for key, item in record[name].items()
         }
+    if "leaves_out" in record.get("exam", {}):
+        exam = _without(record["exam"], "leaves_out", removed)
+        record["exam"] = exam
     if "path" in record:
         path = _without(record["path"], "order", removed)
         if path.get("current") in removed:
@@ -939,7 +1335,7 @@ def _citations(record: dict[str, Any], sources: Collection[str]) -> list[str]:
     paths = []
     if any(ref["source"] in cited for ref in _refs_in(record.get("exam", {}))):
         paths.append("exam")
-    for name in ("topics", "observations", "knowledge", "tasks"):
+    for name in ("arcs", "topics", "observations", "knowledge", "tasks"):
         for key, item in record[name].items():
             if any(ref["source"] in cited for ref in _refs_in(item)):
                 paths.append(key if name == "observations" else f"{name}.{key}")
@@ -961,6 +1357,24 @@ def _shallow(record: dict[str, Any]) -> dict[str, Any]:
     for name in (*NAMESPACE, "observations", "preferences"):
         result[name] = dict(record[name])
     return result
+
+
+def _held_arcs(record: dict[str, Any], arcs: Collection[str], what: str) -> None:
+    """Refuse to remove an arc that still holds topics."""
+    for arc in sorted(arcs):
+        if held := arc_rules.members(record, arc):
+            raise ValueError(
+                f"{what.format(arc=arc)}: topics {', '.join(held[:12])} are in it; "
+                "move them to another arc first, or keep the arc"
+            )
+
+
+def _log_removed(record: dict[str, Any], dropped: dict[str, str], day: str) -> None:
+    if dropped:
+        record["arc_log"] = [
+            *record.get("arc_log", ()),
+            *arc_rules.removals(dropped, day),
+        ]
 
 
 def remove(record: dict[str, Any], handles: list[str]) -> dict[str, Any]:
@@ -988,6 +1402,12 @@ def remove(record: dict[str, Any], handles: list[str]) -> dict[str, Any]:
         for key in removed:
             del result[name][key]
     _strip_topics(result, topics)
+    _held_arcs(result, by_map["arcs"], "forget {arc}")
+    arc_rules.drop(result, by_map["arcs"])
+    dropped = dict.fromkeys(sorted(by_map["arcs"]), "forgotten")
+    if topics:
+        dropped.update(arc_rules.prune(result))
+    _log_removed(result, dropped, clock.today().isoformat())
     if observations:
         result["observations"] = {
             key: _without(item, "corrects", observations)
@@ -1071,6 +1491,8 @@ def check_patch(patch: Any) -> dict[str, Any]:
             )
         elif name in NAMESPACE:
             result[name] = _entries(name, _MAP_KINDS[name], value)
+        elif name == "arc_change":
+            result[name] = entry("arc_change", value, name)
         elif name == "observations":
             if not isinstance(value, list):
                 raise ValueError(
@@ -1083,6 +1505,7 @@ def check_patch(patch: Any) -> dict[str, Any]:
             ]
         else:
             result[name] = preferences.validate(value, name)
+            preferences.check_engine(result[name], name)
     return result
 
 
@@ -1220,7 +1643,7 @@ def _merge_maps(
                 _collision(name, key, record)
             if name == "topics":
                 item = _patched_topic(key, old, change, today, outcome)
-            elif name == "sources":
+            elif name in ("sources", "arcs"):
                 item = _merged(old, change)
             else:
                 item = _stamped(name, old, change, today.isoformat())
@@ -1247,13 +1670,78 @@ def _check_new(
         raise _missing_topic(item["chose"], f"{path}.chose", record["topics"])
     if "task" in item and item["task"] not in tasks:
         raise _missing_task(item["task"], f"{path}.task", tasks)
+    if "checkpoint" in item:
+        _check_checkpoint(item, f"{path}.checkpoint", record)
+    superseded = {
+        target
+        for stored in record["observations"].values()
+        for target in stored.get("corrects", ())
+    }
     for target in item.get("corrects", []):
         if target not in record["observations"]:
             raise ValueError(
                 f"{path}.corrects: {target!r} is not a recorded observation; "
                 f"{_span(record)}"
             )
+        if "disputed" in item:
+            _check_disputed(record["observations"][target], target, path, superseded)
+            continue
+        recorded = clock.local_day(record["observations"][target]["recorded"])
+        if item["kind"] != "self_report" and recorded < today:
+            raise ValueError(
+                f"{path}.corrects: {target} was recorded on {recorded.isoformat()}, "
+                "and an attempt from an earlier day stands as it was recorded: never "
+                "regrade it from a transcript. When the learner says it was wrong, "
+                "record their words as a self_report that corrects it; when they "
+                "dispute its mark, re-judge it and record the re-marked attempt "
+                "with disputed and ruling"
+            )
     _check_refs(item, path, record["sources"])
+
+
+def _check_checkpoint(item: dict[str, Any], path: str, record: dict[str, Any]) -> None:
+    """A check item names an arc that holds one of its topics, in a course
+    that takes questions."""
+    arc, arcs = item["checkpoint"], record["arcs"]
+    if record["preferences"].get(preferences.QUESTIONS) == "none":
+        raise ValueError(
+            f'{path}: this course takes no questions (preferences.questions is "none"),'
+            " so it has no arc check; leave checkpoint out"
+        )
+    if arc not in arcs:
+        known = ", ".join(arc_rules.order(record)) or "none"
+        raise ValueError(
+            f'{path}: no arc "{arc}"{did_you_mean(arc, arcs)}; the arcs are {known}'
+        )
+    if not any(record["topics"][topic].get("arc") == arc for topic in item["topics"]):
+        raise ValueError(
+            f'{path}: "{arc}" holds none of {", ".join(item["topics"])}; tag a check '
+            "item with the arc it checks"
+        )
+
+
+def _check_disputed(
+    target: dict[str, Any], key: str, path: str, superseded: Collection[str]
+) -> None:
+    """A disputed mark is re-judged on the attempt that stands, from any day:
+    the question and the learner's response are in the record."""
+    if target["kind"] == "self_report":
+        raise ValueError(
+            f"{path}.corrects: {key} is a self_report, which has no mark to dispute"
+        )
+    if key in superseded:
+        raise ValueError(
+            f"{path}.corrects: {key} was already superseded; re-mark the "
+            "observation that corrects it, the mark that stands"
+        )
+
+
+def _sure_as_given(item: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
+    """A re-mark keeps the confidence the learner gave the answer it re-marks:
+    a dispute re-judges the mark, and the confidence was his, never the
+    tutor's to set."""
+    kept = {name: value for name, value in item.items() if name != "sure"}
+    return {**kept, "sure": target["sure"]} if "sure" in target else kept
 
 
 def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> str:
@@ -1264,7 +1752,11 @@ def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> s
 
 
 def _content(observation: dict[str, Any]) -> dict[str, Any]:
-    return {name: value for name, value in observation.items() if name != "recorded"}
+    return {
+        name: value
+        for name, value in observation.items()
+        if name not in ("recorded", "due_topics")
+    }
 
 
 def _append_observations(
@@ -1282,6 +1774,8 @@ def _append_observations(
         item = {**addition}
         item.setdefault("date", _default_day(item, record, today))
         _check_new(item, path, record, tasks, today)
+        if "disputed" in item:
+            item = _sure_as_given(item, record["observations"][item["corrects"][0]])
         duplicate = next(
             (
                 key
@@ -1294,12 +1788,26 @@ def _append_observations(
         )
         if duplicate is not None:
             outcome.duplicates.append(duplicate)
+            outcome.saved.append(duplicate)
             continue
         key = f"o{sequence}"
         sequence += 1
         record["observations"][key] = {**item, "recorded": now}
         outcome.observations.append(key)
+        outcome.saved.append(key)
     record["next_observation"] = sequence
+
+
+def _exam_plan(record: dict[str, Any]) -> tuple[Any, ...]:
+    """What review dates hang on: the exam day, the course's final-review
+    lead and the exam's scope."""
+    exam = record.get("exam", {})
+    return (
+        exam.get("date"),
+        record.get("preferences", {}).get(preferences.FINAL_REVIEW_DAYS),
+        exam.get("arcs"),
+        exam.get("leaves_out"),
+    )
 
 
 def apply_patch(
@@ -1308,9 +1816,13 @@ def apply_patch(
     """Apply one ``save`` patch to a validated record; pure.
 
     Returns the validated new record and what the patch did. ``global_preferences``
-    is validated and handed back in the result for the caller to write.
+    is validated and handed back in the result for the caller to write. New
+    topics of a course with arcs come back unplaced, and removed topics' empty
+    arcs dropped (``outcome.pruned``) but not yet logged: ``arcs.settle``
+    places and logs them in the same save.
     """
     changes = check_patch(patch)
+    arc_rules.check_arcless_patch(record, changes)
     outcome = PatchResult(global_preferences=changes.pop("global_preferences", None))
     result = _shallow(record)
     removals = _removals(record, changes)
@@ -1346,11 +1858,20 @@ def apply_patch(
                 if changes[name] is None
                 else _merged(result.get(name), changes[name])
             )
+            if merged and name == "exam" and "arcs" in changes[name]:
+                merged = _merged(
+                    merged, {"leaves_out": changes[name].get("leaves_out")}
+                )
             if merged:
                 result[name] = merged
             else:
                 result.pop(name, None)
     _merge_maps(result, changes, today, outcome)
+    _held_arcs(result, removals["arcs"], "arcs.{arc}")
+    arc_rules.drop(result, removals["arcs"])
+    if removed:
+        outcome.pruned = arc_rules.prune(result)
+    arc_rules.check_exam_patch(record, result, changes.get("exam"))
     if "focus" not in changes and result.get("focus") not in result["tasks"]:
         result.pop("focus", None)
     if "preferences" in changes:
@@ -1369,4 +1890,9 @@ def apply_patch(
             f"{', '.join(citing[:12])} cite it; change those refs first, or keep "
             "the source"
         )
-    return validate_record(result), outcome
+    _check_predictions(record, result, changes, outcome)
+    outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
+    outcome.questions_moved = record["preferences"].get(
+        preferences.QUESTIONS
+    ) != result["preferences"].get(preferences.QUESTIONS)
+    return validate_record(result, placing=True), outcome

@@ -1,0 +1,102 @@
+import React, { act } from "react";
+(globalThis as Record<string, unknown>).React = React;
+
+import { dom } from "./helpers/radix-dom.ts";
+import assert from "node:assert/strict";
+import { afterEach, describe, it } from "node:test";
+import { createRoot, type Root } from "react-dom/client";
+import { Dialog } from "../components/ui/dialog.tsx";
+import { AlertDialog } from "../components/ui/alert-dialog.tsx";
+import { NewCourseBody } from "../components/course-picker.tsx";
+import { AbortTurnBody } from "../components/abort-turn-dialog.tsx";
+import { DeleteSessionBody } from "../components/delete-session-dialog.tsx";
+
+// The dialogs on Radix Dialog and AlertDialog: what each says and
+// offers, and that Esc closes the dialog without reaching the turn.
+let root: Root | null = null;
+let host: HTMLDivElement | null = null;
+
+afterEach(async () => {
+	await act(async () => { root?.unmount(); });
+	root = null;
+	host?.remove();
+	host = null;
+});
+
+async function mount(node: React.ReactElement) {
+	host = document.createElement("div");
+	document.body.appendChild(host);
+	root = createRoot(host);
+	await act(async () => { root!.render(node); });
+}
+
+const $ = (selector: string) => document.querySelector<HTMLElement>(selector);
+
+async function escapeReachesWindow(): Promise<boolean> {
+	let reached = false;
+	const onWindow = (e: Event) => { if ((e as KeyboardEvent).key === "Escape") reached = true; };
+	window.addEventListener("keydown", onWindow);
+	await act(async () => {
+		const key = new dom.window.Event("keydown", { bubbles: true, cancelable: true });
+		Object.assign(key, { key: "Escape" });
+		(document.activeElement ?? document.body).dispatchEvent(key);
+	});
+	window.removeEventListener("keydown", onWindow);
+	return reached;
+}
+
+describe("dialogs keep their actions", () => {
+	it("New course: a dialog with a title field, the exam day and material, Cancel, and Create disabled until there is a title", async () => {
+		const closes: boolean[] = [];
+		await mount(
+			<Dialog open onOpenChange={(open) => closes.push(open)}>
+				<NewCourseBody roots={["/study/courses"]} onClose={() => {}} onCreated={() => {}} />
+			</Dialog>,
+		);
+		const dialog = $('[data-testid="new-course-dialog"]');
+		assert.equal(dialog?.getAttribute("role"), "dialog");
+		assert.equal(dialog?.querySelector('[data-slot="dialog-title"]')?.textContent, "New course");
+		assert.ok($('[data-testid="new-course-title"]'));
+		assert.ok($('[data-testid="new-course-exam"]'));
+		assert.ok($('[data-testid="new-course-material"]'));
+		assert.equal($('[data-testid="new-course-create"]')?.hasAttribute("disabled"), true);
+		assert.ok([...document.querySelectorAll("button")].some((b) => b.textContent === "Cancel"));
+		assert.equal(await escapeReachesWindow(), false, "Esc closes the dialog and stops there");
+		assert.deepEqual(closes, [false]);
+	});
+
+	it("abort: an alert dialog with the question's own words and action, Cancel first", async () => {
+		await mount(
+			<AlertDialog open>
+				<AbortTurnBody mode="problem" busy onClose={() => {}} onConfirm={() => {}} />
+			</AlertDialog>,
+		);
+		assert.equal($('[data-testid="abort-turn-dialog"]')?.getAttribute("role"), "alertdialog");
+		assert.equal($('[data-testid="abort-turn-title"]')?.textContent, "Skip this problem?");
+		assert.match($('[data-testid="abort-turn-line"]')?.textContent ?? "", /The tutor's reply stops too\./);
+		const footer = [...document.querySelectorAll('[data-slot="alert-dialog-footer"] button')].map((b) => b.textContent);
+		assert.deepEqual(footer, ["Cancel", "Skip"]);
+	});
+
+	it("delete lesson: plain words with the lesson named, no engine talk or traces checkbox, and a plain retry on failure", async () => {
+		await mount(
+			<AlertDialog open>
+				<DeleteSessionBody
+					chat={{ id: "c1", title: "Rank practice" }}
+					busy={false}
+					failure={{ code: "jobs_running", error: "Background jobs are still running in this session — try again when they finish" }}
+					onClose={() => {}}
+					onRun={() => {}}
+				/>
+			</AlertDialog>,
+		);
+		assert.equal($('[data-slot="alert-dialog-title"]')?.textContent, "Delete this lesson?");
+		const name = $('[data-testid="session-name-code"]');
+		assert.equal(name?.tagName, "P", "not a code element");
+		assert.equal(name?.textContent, "Rank practice");
+		const dialog = $('[data-testid="delete-session-dialog"]')!.textContent ?? "";
+		assert.doesNotMatch(dialog, /graph|extraction|background job|session/i);
+		assert.equal($('[data-testid="delete-traces-checkbox"]'), null);
+		assert.match($('[data-testid="delete-failure"]')?.textContent ?? "", /^The tutor is still working in this lesson\. Delete it once that ends\. Try again$/);
+	});
+});

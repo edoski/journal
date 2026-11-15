@@ -1,18 +1,14 @@
 /**
- * The shared session-markdown engine (core/session-markdown.ts, owner ruling
- * 2026-09-27): ONE renderer for the extractor's source view and the future
- * user-facing session export — id-anchored speaker blocks, readable
- * quiz/recall/question blocks, one-line notes for other tools. Pinned here:
- * block shapes, anchor handling (on/off), title header, empty-message
- * skipping, and content parity with the coverage line builder.
+ * The session-markdown engine (core/session-markdown.ts): the session
+ * export — id-anchored speaker blocks, readable quiz/recall/question
+ * blocks, one-line notes for other tools. Pinned here: block shapes,
+ * anchor handling (on/off), title header and empty-message skipping.
  */
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { messageMarkdown, sessionMarkdown } from "../src/core/session-markdown.ts";
-import { messageViewLines } from "../src/core/coverage.ts";
-import { coverageSlots } from "../src/core/coverage.ts";
 
 function user(id: string, text: string): LhMessage {
 	return { id, role: "user", content: text, timestamp: Date.now() } as never;
@@ -197,24 +193,4 @@ describe("sessionMarkdown", () => {
 		assert.equal(md, "### Learner · u1\n\ngo");
 	});
 
-	it("the seam split (owner, 2026-09-28): teacher prose renders in BOTH; the rest renders ONLY here", () => {
-		// The extraction view became TEACHER-PROSE-ONLY: its line builder
-		// yields lines for teacher text alone. This engine keeps the FULL
-		// session format for the future user-facing export — so parity now
-		// holds exactly for teacher prose, and everything else (learner,
-		// quiz, tool results) is markdown-only.
-		const messages: LhMessage[] = [
-			user("u1", "teach me"),
-			teacher("a1", "The chain rule multiplies local rates."),
-			result("r1", "q1", "quiz", { questionText: "Q?", correct: true, dontKnow: false }),
-			result("r2", "j1", "research", { brief: "b" }),
-			result("r3", "j2", "research", {}, true),
-		];
-		for (const message of messages) {
-			const isTeacher = (message as { role?: string }).role === "assistant";
-			const hasLines = messageViewLines(message, message.id).length > 0;
-			const hasMarkdown = messageMarkdown(message, message.id) !== null;
-			assert.equal(hasLines, isTeacher && hasMarkdown, `view lines follow teacher prose for ${message.id}`);
-		}
-	});
 });

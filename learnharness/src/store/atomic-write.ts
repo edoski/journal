@@ -8,7 +8,7 @@
  * Windows compatibility fallback; previously atomic writers do not.
  *
  *   writeFileAtomicSync(file, JSON.stringify(record, null, "\t"));
- *   writeFileAtomicSync(AUTH_FILE, text, { mode: 0o600 }); // secrets
+ *   writeFileAtomicSync(file, text, { mode: 0o600 }); // secrets
  *   removeLeftoverTemps(file); // after deleting `file`
  *
  * Limits:

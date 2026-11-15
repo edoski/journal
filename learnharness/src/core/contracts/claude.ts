@@ -29,16 +29,22 @@ export interface ClaudeAccount { providerId: string; label: string; email: strin
 /** The weekly window as Claude Code last reported it. resetsAt is Unix seconds. */
 export interface ClaudeUsage { percentLeft: number; resetsAt: number | null; limited: boolean; checkedAt: number }
 
-export interface ClaudeAccountStatus { account: ClaudeAccount; connection: ClaudeConnection; usage: ClaudeUsage | null }
+/** modelMissing: the account's last call found CLAUDE_MODEL unavailable on its plan or Claude Code version. */
+export interface ClaudeAccountStatus { account: ClaudeAccount; connection: ClaudeConnection; usage: ClaudeUsage | null; modelMissing: boolean }
 
-/** Only Opus 5.5 is offered, by the owner's choice: every role runs on it. */
-export const CLAUDE_MODEL_IDS = ["claude-opus-5-5"] as const;
-export type ClaudeModelId = (typeof CLAUDE_MODEL_IDS)[number];
-
-/** What "Use for all roles" writes to every model slot. */
-export const CLAUDE_ROLE_DEFAULT = { id: "claude-opus-5-5", thinkingLevel: "high" } as const satisfies { id: ClaudeModelId; thinkingLevel: string };
+/** The one model every agent runs, at high effort, by the owner's ruling
+ * (2026-11-14): there is no model or thinking choice anywhere. */
+export const CLAUDE_MODEL = { id: "claude-opus-5-5", name: "Claude Opus 5.5", thinkingLevel: "high" } as const;
 
 export const CLAUDE_USAGE_URL = "https://claude.ai/settings/usage";
+
+/** An account whose sign-in can't be read (T3 Code holds no token for it):
+ *  plain words, no account letter or file (round 7). */
+export const CLAUDE_ACCOUNT_SIGNED_OUT = "Claude isn't signed in on this account.";
+
+/** How a failed turn's text starts when Claude was signed out: the lesson
+ *  reads every one as signed out, with Sign in and Retry beside it. */
+export const CLAUDE_SIGNED_OUT_STARTS = [CLAUDE_ACCOUNT_SIGNED_OUT, "Claude Code is not signed in"] as const;
 
 /** The lead of the curated plan-limit failure; the matcher below is the only way to detect it. */
 export const CLAUDE_LIMIT_TEXT = "Your Claude plan's usage limit is reached.";

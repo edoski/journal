@@ -4,9 +4,9 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
-import { CLAUDE_LABEL, CLAUDE_NOTICE, ClaudeConnectionRow, claudeResetLabel, claudeRoleModels } from "../components/settings/claude-connection.tsx";
+import { CLAUDE_LABEL, CLAUDE_MODEL_MISSING_LINE, CLAUDE_NOTICE, ClaudeConnectionRow, claudeResetLabel } from "../components/settings/claude-connection.tsx";
 import { onSettingsSaved, type SettingsSection } from "../components/settings-signal.ts";
-import type { ClaudeAccountStatus, ClaudeConnection, ModelCatalogResponse } from "../src/core/index.ts";
+import type { ClaudeAccountStatus, ClaudeConnection, ModelStatus } from "../src/core/index.ts";
 
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true });
@@ -14,23 +14,19 @@ const originalFetch = globalThis.fetch;
 let root: Root | undefined, host: HTMLDivElement | undefined, stopSignals: (() => void) | undefined;
 
 const RESET = 1_800_000_000;
-const pin = (provider: string, id: string) => ({ model: { provider, id } });
-function catalog(slotProvider: string): ModelCatalogResponse {
-	const slot = pin(slotProvider, slotProvider === "openrouter" ? "vendor/model" : "claude-opus-5-5");
-	return { models: [], defaults: null, rolePins: { researcher: null, demoBuilder: null, visualMaker: null, extractor: null, auditor: null }, slots: { strong: slot, cheap: slot, vision: slot }, providers: [] };
-}
-const account = (providerId: string, label: string, connection: ClaudeConnection, usage: ClaudeAccountStatus["usage"] = null, email: string | null = null, auth: "token" | "profile" | "default" = "token"): ClaudeAccountStatus => ({ account: { providerId, label, email, auth }, connection, usage });
+const status = (account: string): ModelStatus => ({ account, connected: true, contextWindow: 1_000_000 });
+const account = (providerId: string, label: string, connection: ClaudeConnection, usage: ClaudeAccountStatus["usage"] = null, email: string | null = null, auth: "token" | "profile" | "default" = "token", modelMissing = false): ClaudeAccountStatus => ({ account: { providerId, label, email, auth }, connection, usage, modelMissing });
 const connected: ClaudeConnection = { state: "connected", email: null, plan: null };
 
 function install(rounds: ClaudeAccountStatus[][]) {
 	const calls: { path: string; method: string; body?: unknown }[] = [];
-	let slotProvider = "openrouter";
+	let current = "claude-subscription";
 	globalThis.fetch = async (input, init) => {
 		const path = String(input), method = init?.method ?? "GET";
 		calls.push({ path, method, ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}) });
 		if (path.startsWith("/api/subscriptions/claude")) return Response.json({ accounts: rounds.length > 1 ? rounds.shift() : rounds[0] });
-		if (path === "/api/models") return Response.json(catalog(slotProvider));
-		if (path === "/api/settings/models" && method === "PUT") { slotProvider = (JSON.parse(String(init!.body)) as { strong: { model: { provider: string } } }).strong.model.provider; return Response.json({ settings: { version: 1, models: JSON.parse(String(init!.body)) } }); }
+		if (path === "/api/models") return Response.json(status(current));
+		if (path === "/api/settings/claude" && method === "PUT") { current = (JSON.parse(String(init!.body)) as { account: string }).account; return Response.json({ settings: { version: 1, claude: { account: current } } }); }
 		return new Response("not found", { status: 404 });
 	};
 	const signals: SettingsSection[] = [];
@@ -52,7 +48,7 @@ test("each non-connected state says what to do, with one Refresh and no sign-in 
 	const cases: [ClaudeAccountStatus, RegExp][] = [
 		[account("claude-subscription", "Claude Code", { state: "missing" }, null, null, "default"), /Claude Code is not installed/],
 		[account("claude-subscription", "Claude Code", { state: "signed-out" }, null, null, "default"), /Run `claude` in a terminal and sign in with your Claude account, then press Refresh/],
-		[account("claude-subscription-work", "Work", { state: "signed-out" }), /did not accept T3 Code's setup token for this account\. Renew it in T3 Code/],
+		[account("claude-subscription-work", "Work", { state: "signed-out" }), /This account isn't signed in\. Sign in to it again in T3 Code, then press Refresh/],
 		[account("claude-subscription", "Claude Code", { state: "not-subscription", authMethod: "api_key" }, null, null, "default"), /signed in with an API key, which would not use your Claude plan\. Run `claude`, then `\/login`/],
 		[account("claude-subscription", "Claude Code", { state: "error", message: "Claude Code could not report its sign-in status." }, null, null, "default"), /could not report its sign-in status/],
 	];
@@ -67,34 +63,46 @@ test("each non-connected state says what to do, with one Refresh and no sign-in 
 	}
 });
 
-test("one row per account with its email and weekly usage; Use for all roles writes that account to the three slots, then hides on it", async () => {
+test("one row per account with its email and weekly usage; Use this account switches every agent to it, and In use follows", async () => {
 	const { calls, signals } = install([[
 		account("claude-subscription", "Main", { state: "connected", email: "learner@example.com", plan: "max" }, { percentLeft: 62, resetsAt: RESET, limited: false, checkedAt: 1 }, null, "default"),
 		account("claude-subscription-work", "Work", connected, { percentLeft: 0, resetsAt: RESET, limited: true, checkedAt: 1 }, "work@example.com"),
 		account("claude-subscription-spare", "Spare", { state: "signed-out" }, null),
 	]]);
 	await mount();
-	assert.deepEqual(rows().map((r) => r.querySelector("span")!.textContent), ["Claude · Main", "Claude · Work", "Claude · Spare"]);
-	assert.equal(text(row("claude-subscription"), "claude-connection-state"), "Signed in as learner@example.com · Max plan via Claude Code");
-	assert.equal(text(row("claude-subscription-work"), "claude-connection-state"), "Signed in as work@example.com via Claude Code", "a token account's email comes from its config dir");
-	assert.equal(text(row("claude-subscription"), "claude-usage"), `62% left this week · resets ${claudeResetLabel(RESET)}`);
-	assert.equal(text(row("claude-subscription-work"), "claude-usage"), `limit reached · resets ${claudeResetLabel(RESET)}`);
+	assert.deepEqual(rows().map((r) => text(r, "claude-account-name")), ["learner@example.com", "work@example.com", "Spare"], "named by email, a token account's from its config dir; T3 Code's name only without one");
+	assert.equal(text(row("claude-subscription"), "claude-connection-state"), "Signed in through Claude Code on the Max plan");
+	assert.equal(text(row("claude-subscription-work"), "claude-connection-state"), "Signed in through Claude Code");
+	assert.equal(text(row("claude-subscription"), "claude-usage"), `About half left this week, resets ${claudeResetLabel(RESET)}`);
+	assert.equal(text(row("claude-subscription-work"), "claude-usage"), `At its limit until ${claudeResetLabel(RESET)}`);
+	assert.doesNotMatch(document.body.textContent!, /%|\d+ left/, "no percentages or counts");
 	assert.equal(text(row("claude-subscription-spare"), "claude-usage"), null);
-	assert.equal(row("claude-subscription-spare").querySelector('[data-testid="claude-use-all"]'), null, "a signed-out account offers no switch");
+	assert.equal(text(row("claude-subscription"), "claude-in-use"), "In use");
+	assert.equal(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), null, "the account in use offers no switch");
+	assert.equal(row("claude-subscription-spare").querySelector('[data-testid="claude-use-account"]'), null, "a signed-out account offers no switch");
 
-	await click(row("claude-subscription-work").querySelector('[data-testid="claude-use-all"]'));
+	await click(row("claude-subscription-work").querySelector('[data-testid="claude-use-account"]'));
 	const put = calls.find((c) => c.method === "PUT");
-	assert.equal(put?.path, "/api/settings/models");
-	const opusHigh = { ...pin("claude-subscription-work", "claude-opus-5-5"), thinkingLevel: "high" };
-	assert.deepEqual(put?.body, { strong: opusHigh, cheap: opusHigh, vision: opusHigh });
-	assert.deepEqual(put?.body, claudeRoleModels("claude-subscription-work"));
-	assert(signals.includes("models"), "model menus re-read after the write");
+	assert.equal(put?.path, "/api/settings/claude");
+	assert.deepEqual(put?.body, { account: "claude-subscription-work" });
+	assert(signals.includes("claude"), "readers re-read after the switch");
 	await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-	assert.equal(row("claude-subscription-work").querySelector('[data-testid="claude-use-all"]'), null, "hidden on the account that holds every slot");
-	assert(row("claude-subscription").querySelector('[data-testid="claude-use-all"]'), "still offered on the other account");
+	assert.equal(text(row("claude-subscription-work"), "claude-in-use"), "In use");
+	assert(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), "the other account is offered now");
 });
 
-test("Refresh forces a fresh check of every account and tells model menus the connections changed", async () => {
+test("an account whose plan lacks the model says so in one line", async () => {
+	install([[
+		account("claude-subscription", "Main", connected, null, null, "default", true),
+		account("claude-subscription-work", "Work", connected),
+	]]);
+	await mount();
+	assert.equal(text(row("claude-subscription"), "claude-model-missing"), CLAUDE_MODEL_MISSING_LINE);
+	assert.match(CLAUDE_MODEL_MISSING_LINE, /^Claude Opus 5\.5 is not available on this account's plan/);
+	assert.equal(text(row("claude-subscription-work"), "claude-model-missing"), null);
+});
+
+test("Refresh forces a fresh check of every account and tells readers the connections changed", async () => {
 	const { calls, signals } = install([
 		[account("claude-subscription", "Claude Code", { state: "signed-out" }, null, null, "default")],
 		[account("claude-subscription", "Claude Code", { state: "connected", email: null, plan: "pro" }, null, null, "default")],
@@ -103,6 +111,40 @@ test("Refresh forces a fresh check of every account and tells model menus the co
 	assert.deepEqual(calls.filter((c) => c.path.startsWith("/api/subscriptions/claude")).map((c) => c.path), ["/api/subscriptions/claude"]);
 	await click(document.querySelector('[data-testid="claude-refresh"]'));
 	assert(calls.some((c) => c.path === "/api/subscriptions/claude?refresh=1"));
-	assert.equal(text(rows()[0], "claude-connection-state"), "Signed in · Pro plan via Claude Code");
+	assert.equal(text(rows()[0], "claude-connection-state"), "Signed in through Claude Code on the Pro plan");
 	assert(signals.includes("keys"));
+});
+
+test("usage reads in words from plenty to nothing, with the day it resets", async () => {
+	const usage = (percentLeft: number) => ({ percentLeft, resetsAt: RESET, limited: false, checkedAt: 1 });
+	install([[
+		account("claude-subscription", "Main", connected, usage(93), "a@example.com", "default"),
+		account("claude-subscription-b", "B", connected, usage(13), "b@example.com"),
+		account("claude-subscription-c", "C", connected, usage(0), "c@example.com"),
+	]]);
+	await mount();
+	assert.deepEqual(rows().map((r) => text(r, "claude-usage")), [
+		`Plenty left this week, resets ${claudeResetLabel(RESET)}`,
+		`Little left this week, resets ${claudeResetLabel(RESET)}`,
+		`Nothing left this week, resets ${claudeResetLabel(RESET)}`,
+	]);
+	assert.match(claudeResetLabel(RESET), /^[A-Z][a-z]+day \d\d:\d\d$/, "the reset names its whole day");
+});
+
+test("two accounts on one email keep their names apart with T3 Code's name for each", async () => {
+	install([[
+		account("claude-subscription", "E", connected, null, "edo@example.com"),
+		account("claude-subscription-f", "F", connected, null, "edo@example.com"),
+		account("claude-subscription-a", "A", connected, null, "amir@example.com"),
+	]]);
+	await mount();
+	assert.deepEqual(rows().map((r) => text(r, "claude-account-name")), ["edo@example.com, named E in T3 Code", "edo@example.com, named F in T3 Code", "amir@example.com"]);
+});
+
+test("the note about the plan is a row of its own after the last account", async () => {
+	install([[account("claude-subscription", "Main", connected, null, "a@example.com", "default")]]);
+	await mount();
+	const parts = [...host!.children];
+	assert.deepEqual(parts.map((el) => el.getAttribute("data-testid")), ["claude-connection", "claude-account", "claude-notice"], "the header, each account and the note are sibling rows the group parts with hairlines");
+	assert.equal(parts.at(-1)!.textContent, CLAUDE_NOTICE);
 });

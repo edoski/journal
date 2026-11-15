@@ -2,7 +2,7 @@
  * THE QUEUED-STEER INDICATOR (owner spec 2026-10-03): steers sent but not
  * yet drained render as quiet one-liners ABOVE the composer shell —
  * right-aligned to where the shell's corner rounding starts, truncated
- * with an ellipsis, no background, no container, roughly half opacity.
+ * with an ellipsis, no background, no container, in muted ink.
  * Visible but very quiet; layout tunable later.
  *
  * A line dies the moment its card lands in the transcript: the drain's
@@ -11,6 +11,8 @@
  * against the message ids. A steer parked server-side (stranded behind a
  * question) keeps its line — an honest "waiting for the next run".
  */
+import { Hint } from "@/components/ui/hint";
+
 export interface QueuedSteerLine {
 	id: string;
 	text: string;
@@ -23,13 +25,9 @@ export function QueuedSteersBody({ steers }: { steers: QueuedSteerLine[] }) {
 	return (
 		<div className="flex flex-col items-end gap-0.5 pb-1 pr-4" data-testid="queued-steers">
 			{steers.map((s) => (
-				<span
-					key={s.id}
-					title={s.text}
-					className="block max-w-[240px] truncate font-ui text-[11px] text-muted-foreground/60"
-				>
-					{s.text}
-				</span>
+				<Hint key={s.id} label={s.text} side="left">
+					<span className="block max-w-[240px] truncate text-label text-muted-foreground">{s.text}</span>
+				</Hint>
 			))}
 		</div>
 	);

@@ -22,7 +22,7 @@
  *      keyboard (the arrow-walked menus; Tab is dead app-wide, so this
  *      only happens inside overlays);
  *   2. buttons inside an OPEN OVERLAY — menus walk focus with arrows and
- *      Enter activates the walked button natively (menu-shell's contract),
+ *      Enter activates the walked button natively (the Radix menus' contract),
  *      dialogs are their own surfaced layer (the ONE-ESC LAW's layers).
  * The pointer-clicked transcript button fails both tests → Enter is ours
  * (preventDefault also suppresses the browser's default activation, so
@@ -63,6 +63,8 @@ export function useEnterSubmits(submit: () => void): void {
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Enter") return;
+			// A surface already acted on this Enter (the dock's row machine).
+			if (e.defaultPrevented) return;
 			if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
 			if (isTypingSurface(e)) return;
 			const target = e.target as HTMLElement | null;

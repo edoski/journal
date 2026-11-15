@@ -1,4 +1,4 @@
-"""Read projections of the course: resume (the session opener), show and search.
+"""Read projections of the course: resume (the session opener), show, map and search.
 
 Every projection carries whole stored items, never clipped ones; budgets decide
 which items fit. Keys with no content are omitted, so absent means "none".
@@ -9,19 +9,30 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Iterator
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
+from pathlib import Path
 import re
 from typing import Any
 import unicodedata
 
-from learning import clock, packing, progress, records, schema
-from learning import workspace as workspaces
+from learning import (
+    agenda,
+    arc_rules,
+    arcs,
+    capacity,
+    clock,
+    packing,
+    progress,
+    records,
+    schema,
+)
 from learning.workspace import Workspace
 
 EVIDENCE_BYTES = 6144
 KNOWLEDGE_BYTES = 3072
 DUE_LIMIT = progress.DUE_LIMIT
 WEAK_LIMIT = 6
+WEAK_FLAGS = ("relearn", "lapsed", "stale", "choice_errors", "confident_errors")
 TASK_OBSERVATIONS = 5
 TOPIC_OBSERVATIONS = 3
 OMITTED_LIMIT = 12
@@ -36,7 +47,7 @@ EXCERPT_CHARS = 160
 EXCERPT_LEAD = 40
 STEM_KEEP = 4
 STEM_ENDINGS = frozenset("saeiou")
-SEARCH_KINDS = ("topic", "knowledge", "task", "source", "observation")
+SEARCH_KINDS = ("topic", "arc", "knowledge", "task", "source", "observation")
 ITEM_KINDS = {"knowledge": "knowledge", "tasks": "task", "sources": "source"}
 _WORD = re.compile(r"[^\W_]+")
 
@@ -59,6 +70,22 @@ def last_activity(record: dict[str, Any], today: date) -> dict[str, Any] | None:
     if "updated_at" not in record:
         return None
     day = clock.local_day(record["updated_at"])
+    return {"date": day.isoformat(), "days_ago": (today - day).days}
+
+
+def last_studied(record: dict[str, Any], today: date) -> dict[str, Any] | None:
+    """The latest day the record shows study on, an observation's or a topic's
+    introduction, and how long ago it was; a save that records neither (a new
+    course, a renamed topic) does not move it."""
+    days = [item["date"] for item in record["observations"].values()]
+    days += [
+        str(topic["introduced"])
+        for topic in record["topics"].values()
+        if "introduced" in topic
+    ]
+    if not days:
+        return None
+    day = date.fromisoformat(max(days))
     return {"date": day.isoformat(), "days_ago": (today - day).days}
 
 
@@ -94,6 +121,8 @@ def exam(record: dict[str, Any], today: date) -> dict[str, Any] | None:
     if "exam" not in record:
         return None
     result = dict(record["exam"])
+    if "arcs" in result:
+        result["arc_titles"] = [record["arcs"][arc]["title"] for arc in result["arcs"]]
     if "date" in result:
         result["days_left"] = (date.fromisoformat(result["date"]) - today).days
     return result
@@ -241,6 +270,10 @@ def _brief(item: dict[str, Any], shown: Collection[str]) -> dict[str, Any]:
     return {name: value for name, value in item.items() if name not in TOPIC_DETAIL}
 
 
+def _is_weak(topic: dict[str, Any], standing: dict[str, Any]) -> bool:
+    return "gap" in topic or any(flag in standing for flag in WEAK_FLAGS)
+
+
 def _weak(
     record: dict[str, Any],
     levels: dict[str, dict[str, Any]],
@@ -250,13 +283,12 @@ def _weak(
     weak = []
     for key in order:
         topic, standing = record["topics"][key], levels[key]
-        flags = ("lapsed", "stale", "choice_errors", "confident_errors")
-        if not ("gap" in topic or any(flag in standing for flag in flags)):
+        if not _is_weak(topic, standing):
             continue
         item = {"topic": key, "level": standing["level"]}
         if "gap" in topic:
             item["gap"] = topic["gap"]
-        for flag in (*flags, "last"):
+        for flag in (*WEAK_FLAGS, "repaired", "repaired_with_help", "last"):
             if flag in standing:
                 item[flag] = standing[flag]
         weak.append(_brief(item, shown))
@@ -293,6 +325,42 @@ def _oldest_unlisted(due: list[dict[str, Any]]) -> dict[str, Any] | None:
     return {"topic": oldest["topic"], "overdue": oldest["overdue"]}
 
 
+def dated_topic(
+    topic: dict[str, Any], key: str, planned: agenda.When
+) -> dict[str, Any]:
+    """A stored topic with the plan's day beside memory's: its review's
+    ``planned`` day, or the day the plan ``starts`` it while untaught."""
+    review = topic.get("review", {})
+    if "due" in review:
+        day = planned.review(key, review["due"])
+        return {**topic, "review": {**review, "planned": day}}
+    starts = planned.starts.get(key)
+    return {**topic, "starts": starts.isoformat()} if starts else topic
+
+
+def tonight(
+    due: list[dict[str, Any]], planned: agenda.When
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Of the reviews memory asks for, those the plan puts today, and the
+    others with the later day it puts each on, soonest first."""
+    today = [item for item in due if planned.tonight(item["topic"])]
+    later = sorted(
+        (
+            {"topic": item["topic"], "planned": day.isoformat()}
+            for item in due
+            if item not in today and (day := planned.reviews.get(item["topic"]))
+        ),
+        key=lambda item: item["planned"],
+    )
+    return today, later
+
+
+def _arc_of(record: dict[str, Any], topic: str) -> list[str]:
+    """The topic's arc, as a list to splice: empty in a course without arcs."""
+    arc = record["topics"][topic].get("arc")
+    return [] if arc is None else [arc]
+
+
 def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
     return compact(
         {
@@ -304,8 +372,59 @@ def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
     )
 
 
-def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
-    """The session opener: where the learner is and what to do next."""
+def _arc_brief(
+    record: dict[str, Any],
+    levels: dict[str, dict[str, Any]],
+    order: list[str],
+    here: str | None,
+) -> dict[str, Any]:
+    """The arc blocks of the session opener: the current arc with its
+    question, purpose and entry (``first`` while none of its topics is
+    introduced, whatever was attempted before teaching), each ready arc's
+    check (``arcs_ready``), and the arc notes."""
+    if not record["arcs"]:
+        return {}
+    found = arcs.standing(record, levels, here)
+    now = arcs.current(record, here)
+    assert now is not None
+
+    def told(arc: str, *names: str) -> dict[str, Any]:
+        return {"arc": arc, **{name: record["arcs"][arc][name] for name in names}}
+
+    def check(arc: str) -> dict[str, Any]:
+        keys = arcs.live_topics(record, arc, order)
+        return {
+            **told(arc, "title", "question"),
+            "topics": keys,
+            "pairs": arcs.pairs(record, arc, keys),
+        }
+
+    ready = [check(arc) for arc, item in found.items() if item["state"] == "ready"]
+    return {
+        "arcs": [
+            [arc, arc_rules.title(record, arc), standing["state"]]
+            for arc, standing in found.items()
+            if not standing["hidden"]
+        ],
+        "arc": {
+            **told(now, "title", "question", "purpose"),
+            "state": found[now]["state"],
+            "entry": found[now]["entry"],
+            "first": not any(
+                "introduced" in record["topics"][key]
+                for key in arcs.live_topics(record, now, order)
+            ),
+        },
+        "arcs_ready": ready or None,
+        "arc_notes": arcs.notes(record) or None,
+    }
+
+
+def resume(
+    workspace: Workspace, task: str | None = None, here: str | None = None
+) -> dict[str, Any]:
+    """The session opener: where the learner is and what to do next. ``here``
+    is the topic of a lesson in progress, which only the app sees."""
     record = records.load(workspace)
     today = clock.today()
     levels = progress.standings(record)
@@ -314,12 +433,19 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
     active = _active_topics(record, chosen, order)
     evidence, left_out = _evidence(record, key, active)
     knowledge, knowledge_omitted, knowledge_index = _knowledge(record, active)
-    due = progress.due(record, today, levels=levels, order=order)
+    planned = when(workspace, record, today)
+    due, later = tonight(
+        progress.due(record, today, levels=levels, order=order), planned
+    )
     topics = {
-        topic: {**record["topics"][topic], "standing": levels[topic]}
+        topic: {
+            **dated_topic(record["topics"][topic], topic, planned),
+            "standing": levels[topic],
+        }
         for topic in active
     }
     path = record.get("path", {})
+    arc_brief = _arc_brief(record, levels, order, here)
     cited: list[dict[str, Any]] = [
         record.get("exam", {}),
         chosen,
@@ -337,15 +463,33 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
         "due": [_brief(item, topics) for item in due[:DUE_LIMIT]],
         "due_more": max(0, len(due) - DUE_LIMIT) or None,
         "due_oldest": _oldest_unlisted(due),
+        "due_later": later[:DUE_LIMIT] or None,
+        "due_later_more": max(0, len(later) - DUE_LIMIT) or None,
+        "starts": {
+            topic: day.isoformat()
+            for topic, day in sorted(planned.starts.items(), key=lambda item: item[1])
+        }
+        or None,
+        "starts_why": dict(planned.why) or None,
+        "does_not_fit": planned.does_not_fit or None,
         "path": compact(
             {
                 "current": path.get("current"),
                 "basis": path.get("basis"),
-                "topics": [[topic, levels[topic]["level"]] for topic in order],
+                "arcs": arc_brief.get("arcs"),
+                "topics": [
+                    [topic, levels[topic]["level"], *_arc_of(record, topic)]
+                    for topic in order
+                ],
+                "excluded": sorted(progress.excluded(record)) or None,
             }
         )
-        if order
+        if record["topics"]
         else None,
+        "path_health": progress.path_health(record) or None,
+        "arc": arc_brief.get("arc"),
+        "arcs_ready": arc_brief.get("arcs_ready"),
+        "arc_notes": arc_brief.get("arc_notes"),
         "weak": _weak(record, levels, order, topics),
         "task": {"key": key, **chosen} if key else None,
         "tasks": _other_tasks(record, key),
@@ -366,12 +510,18 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
 
 
 def _topic_item(
-    record: dict[str, Any], key: str, standing: dict[str, Any], ids: list[str]
+    record: dict[str, Any],
+    key: str,
+    standing: dict[str, Any],
+    ids: list[str],
+    planned: agenda.When,
+    moved: dict[str, Any] | None,
 ) -> dict[str, Any]:
     return compact(
         {
             "kind": "topic",
-            **record["topics"][key],
+            **dated_topic(record["topics"][key], key, planned),
+            "moved": moved,
             "standing": standing,
             "observations": ids,
             "tasks": [
@@ -385,6 +535,56 @@ def _topic_item(
                 if key in entry.get("topics", ())
             ],
         }
+    )
+
+
+def _graded(item: dict[str, Any]) -> dict[str, Any]:
+    """An observation with its ``grade`` when it is scored, so a reader shows
+    how each answer counted without judging it again."""
+    if item["kind"] not in schema.SCHEDULING_KINDS:
+        return item
+    return {**item, "grade": progress.grade(item)}
+
+
+def _arc_topics(
+    record: dict[str, Any], arc: str, order: list[str], every: list[str]
+) -> dict[str, list[str]]:
+    """The arc's ``topics``, the live ones its standing reads, and its
+    ``excluded`` ones, each in path order (``order`` and ``every``, the path
+    without and with excluded topics)."""
+    live = set(order)
+    return {
+        "topics": arcs.live_topics(record, arc, order),
+        "excluded": [
+            key
+            for key in every
+            if key not in live and record["topics"][key].get("arc") == arc
+        ],
+    }
+
+
+def _arc_item(
+    record: dict[str, Any], arc: str, standing: arcs.Standing
+) -> dict[str, Any]:
+    """An arc with its topics (``_arc_topics``), its standing and the log
+    events that name it."""
+    log = [
+        event
+        for event in record.get("arc_log", ())
+        if event["kind"] == "formed"
+        or arc in (event.get("arc"), event.get("from"), event.get("to"))
+    ]
+    order = progress.path_order(record)
+    every = progress.path_order(record, everything=True)
+    return compact(
+        {
+            "kind": "arc",
+            **record["arcs"][arc],
+            **_arc_topics(record, arc, order, every),
+            "standing": standing,
+            "log": log,
+        },
+        keep=("topics",),
     )
 
 
@@ -403,14 +603,19 @@ def show(
         }
     if not handles:
         raise ValueError(
-            "show needs handles (topics, observations such as o12, knowledge, "
-            "tasks or sources), or --all"
+            "show needs handles (topics, arcs, observations such as o12, "
+            "knowledge, tasks or sources), or --all"
         )
     if type(limit) is not int or limit < 1:
         raise ValueError("--limit must be a positive number of observations")
     located = {handle: schema.locate(record, handle) for handle in handles}
     observations = record["observations"]
-    levels = progress.standings(record) if "topics" in located.values() else {}
+    wanted = set(located.values())
+    levels = progress.standings(record) if wanted & {"topics", "arcs"} else {}
+    today = clock.today()
+    planned = when(workspace, record, today) if "topics" in wanted else None
+    moves = moved(workspace, record, planned, today) if planned else {}
+    standings = arcs.standing(record, levels) if "arcs" in wanted else {}
     newest = _newest(observations) if levels else []
     corrected_by: dict[str, list[str]] = defaultdict(list)
     for key, item in observations.items():
@@ -422,17 +627,23 @@ def show(
     for handle, where in located.items():
         if where == "topics":
             ids = [key for key in newest if handle in observations[key]["topics"]]
-            items[handle] = _topic_item(record, handle, levels[handle], ids)
+            assert planned is not None
+            items[handle] = _topic_item(
+                record, handle, levels[handle], ids, planned, moves.get(handle)
+            )
             shown.update(dict.fromkeys(ids[:limit]))
             related.update(ids)
+        elif where == "arcs":
+            items[handle] = _arc_item(record, handle, standings[handle])
         elif where == "observations":
+            item = observations[handle]
             items[handle] = compact(
-                {**observations[handle], "corrected_by": corrected_by.get(handle)}
+                {**_graded(item), "corrected_by": corrected_by.get(handle)}
             )
         else:
             items[handle] = {"kind": ITEM_KINDS[where], **record[where][handle]}
     evidence = {
-        key: observations[key]
+        key: _graded(observations[key])
         for key in _newest({key: observations[key] for key in shown})
         if key not in items
     }
@@ -443,6 +654,386 @@ def show(
         "sources": _sources(record, [*items.values(), *evidence.values()]),
     }
     return compact(result)
+
+
+# --- map --------------------------------------------------------------------
+
+
+def _runup(
+    record: dict[str, Any], countdown: dict[str, Any], planned: agenda.When
+) -> dict[str, Any]:
+    """The exam and its run-up: when the final review starts, the path topics
+    the plan cannot start before it (``does_not_fit``), the taught ones its
+    final review has no room for (``unreviewed``), and why the plan leaves
+    each of those out (``reasons``, ``agenda.Reason``); with a scope, its
+    ``arcs``, the topics it ``leaves_out``, and the untaught
+    earlier topics it ``needed`` started first (``progress.exam_topics``),
+    in path order."""
+    plan = progress.exam_plan(record)
+    examined = arc_rules.examined(record)
+    needed: list[str] = []
+    if examined is not None:
+        scope = progress.exam_topics(record, arcs.untaught(record)) or frozenset()
+        needed = [key for key in progress.path_order(record) if key in scope - examined]
+    return compact(
+        {
+            "date": countdown["date"],
+            "days_left": countdown["days_left"],
+            "arcs": countdown.get("arcs"),
+            "leaves_out": countdown.get("leaves_out"),
+            "needed": needed or None,
+            "final_review": plan.final.isoformat() if plan else None,
+            "does_not_fit": planned.does_not_fit,
+            "unreviewed": planned.unreviewed,
+            "reasons": dict(planned.reasons),
+        },
+        keep=("date", "days_left"),
+    )
+
+
+def _held(
+    key: str, planned: agenda.When, overdue: dict[str, int], stored: str | None
+) -> dict[str, Any]:
+    """Why a review the plan put past memory's day waits: ``held``, with
+    ``held_for`` the course whose final review came first, and ``due``,
+    memory's day."""
+    if stored is None or key not in planned.held or key in overdue:
+        return {}
+    return {"held": True, "held_for": planned.held[key], "due": stored}
+
+
+def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
+    """Every topic with its edges, level, review and weak verdict, in path order.
+
+    The whole course at once and nothing capped, with no observation text: the
+    projection a map of the course draws from. ``review`` is the day the daily
+    plan puts the topic's next review (``when``), ``overdue`` is present
+    exactly when that day is today, ``held`` when the plan put it later than
+    memory asks because full days left it out (``held_for`` names the course
+    whose final review came first, ``due`` is memory's day), ``moved`` when
+    that day, or its start, is not the day the plan gave it as yesterday
+    ended (``moved``: ``from`` that day, ``by`` why), and ``starts``
+    is the day it starts an untaught topic, ``starts_after`` the courses
+    whose new topics take the days before that start, and ``starts_why``
+    why it comes then in the material (``agenda.Why``). ``exam`` carries the
+    run-up: the final review's first day, the topics that do not fit before
+    the exam and those its final review has no room for. ``right``, on a
+    topic not yet solid (``attempted`` or ``assisted``), is how he answered
+    it since his newest counted answer that was not right (``unaided``,
+    ``helped``, ``guess``, ``uncertain``), ``partial`` when that newest
+    answer was partly right, and absent when it was wrong. ``mistake`` marks a
+    topic with a counted answer not right since his latest right answer,
+    with help or not (``progress.open_mistakes``): a ``gap`` without one is
+    what is left to check, never a mistake.
+
+    In a course with arcs, each topic names its ``arc``, ``arcs`` holds each
+    arc's title and standing in study order, and ``current_arc`` is the arc
+    of "You are here": ``here``, the topic of a lesson in progress, else
+    ``path.current``.
+    """
+    record = records.load(workspace)
+    today = clock.today()
+    levels = progress.standings(record)
+    wrong = progress.open_mistakes(record)
+    order = progress.path_order(record, everything=True)
+    planned = when(workspace, record, today)
+    moves = moved(workspace, record, planned, today)
+    overdue = {
+        item["topic"]: item["overdue"]
+        for item in progress.due(record, today, levels=levels)
+        if planned.tonight(item["topic"])
+    }
+    partners = progress.contrasts(record, everything=True)
+    tasks = record["tasks"]
+    topics = []
+    for key in order:
+        topic, standing = record["topics"][key], levels[key]
+        stored = topic.get("review", {}).get("due")
+        starts = planned.starts.get(key)
+        entry = {
+            "topic": key,
+            "title": topic.get("title"),
+            "arc": topic.get("arc"),
+            "needs": topic.get("needs", []),
+            "contrasts": partners[key],
+            "level": standing["level"],
+            "introduced": topic.get("introduced"),
+            "review": planned.review(key, stored),
+            "overdue": overdue.get(key),
+            **_held(key, planned, overdue, stored),
+            "moved": moves.get(key),
+            "starts": starts.isoformat() if starts else None,
+            "starts_after": planned.starts_after.get(key) if starts else None,
+            "starts_why": planned.why.get(key) if starts else None,
+            "weak": _is_weak(topic, standing),
+            "right": standing.get("right"),
+            "gap": topic.get("gap"),
+            "mistake": True if key in wrong else None,
+            "excluded": topic.get("excluded"),
+            **{
+                flag: standing[flag]
+                for flag in (*WEAK_FLAGS, "repaired", "repaired_with_help")
+                if flag in standing
+            },
+            "tasks": [
+                name for name, task in tasks.items() if key in task.get("topics", ())
+            ],
+        }
+        topics.append(compact(entry, keep=("needs", "contrasts", "tasks", "weak")))
+    countdown = exam(record, today)
+    return compact(
+        {
+            "today": today.isoformat(),
+            "revision": record.get("revision", 0),
+            "title": record.get("title"),
+            "exam": _runup(record, countdown, planned)
+            if countdown and "date" in countdown
+            else None,
+            "current": record.get("path", {}).get("current"),
+            "current_arc": arcs.current(record, here),
+            "arcs": arcs.map_block(record, levels, here),
+            "focus": record.get("focus"),
+            "tasks": [
+                compact(
+                    {
+                        "key": key,
+                        "title": task.get("title"),
+                        "step": task.get("step"),
+                        "updated": task.get("updated"),
+                    }
+                )
+                for key, task in tasks.items()
+            ],
+            "topics": topics,
+        },
+        keep=("topics",),
+    )
+
+
+def course_arcs(
+    workspace: Workspace,
+    here: str | None = None,
+    lessons: Collection[str] = (),
+    report: bool = False,
+) -> dict[str, Any]:
+    """Every arc with its question, purpose, refs, topics and standing, the
+    arc log, and where the learner stands: the topics he has ``studied``,
+    the arcs ``held`` (only his words re-cut them) and the ``current_arc``.
+    ``here`` is the topic of a lesson in progress and ``lessons`` the topics
+    of every open lesson, which only the app sees. ``report`` adds the
+    rubric's computable checks."""
+    record = records.load(workspace)
+    levels = progress.standings(record)
+    found = arcs.standing(record, levels, here)
+    held = arcs.held(record, here, lessons)
+    studied = arcs.studied(record, lessons)
+    order = progress.path_order(record)
+    every = progress.path_order(record, everything=True)
+    listed = [
+        compact(
+            {
+                "arc": arc,
+                **record["arcs"][arc],
+                **_arc_topics(record, arc, order, every),
+                **standing,
+            },
+            keep=("topics", "entry"),
+        )
+        for arc, standing in found.items()
+    ]
+    return compact(
+        {
+            "current_arc": arcs.current(record, here),
+            "studied": [key for key in every if key in studied],
+            "held": [arc for arc in arc_rules.order(record) if arc in held],
+            "arcs": listed,
+            "arc_log": record.get("arc_log"),
+            "report": arcs.report(record, held) if report and record["arcs"] else None,
+        },
+        keep=("studied", "held", "arcs"),
+    )
+
+
+# --- standing ---------------------------------------------------------------
+
+
+def _ready_part(
+    record: dict[str, Any],
+    keys: list[str],
+    levels: dict[str, dict[str, Any]],
+    behind: set[str],
+    misfits: set[str],
+) -> dict[str, list[str]]:
+    """One part's topics sorted for the exam (``course_standing``). A topic
+    the map calls weak is never solid, so the page never says "solid for the
+    exam" beside a slip the sidebar shows."""
+    part: dict[str, list[str]] = {
+        "solid": [],
+        "not_yet": [],
+        "to_start": [],
+        "wont_fit": [],
+    }
+    for key in keys:
+        if key in misfits:
+            part["wont_fit"].append(key)
+        elif levels[key]["level"] == "new":
+            part["to_start"].append(key)
+        elif (
+            agenda.solid(levels[key])
+            and key not in behind
+            and not _is_weak(record["topics"][key], levels[key])
+        ):
+            part["solid"].append(key)
+        else:
+            part["not_yet"].append(key)
+    return part
+
+
+def _readiness(
+    record: dict[str, Any],
+    today: date,
+    levels: dict[str, dict[str, Any]],
+    planned: agenda.When,
+) -> dict[str, Any] | None:
+    """The exam's parts and where each topic stands for it; None without an
+    exam ahead."""
+    countdown = exam(record, today)
+    if not countdown or "date" not in countdown or countdown["days_left"] < 0:
+        return None
+    examined = arc_rules.examined(record)
+    order = [
+        key
+        for key in progress.path_order(record)
+        if examined is None or key in examined
+    ]
+    behind = progress.unready(record, today)
+    misfits = set(planned.does_not_fit)
+    parts: list[dict[str, Any]]
+    if record["arcs"]:
+        parts = [
+            {
+                "arc": arc,
+                "title": arc_rules.title(record, arc),
+                **_ready_part(record, keys, levels, behind, misfits),
+            }
+            for arc in arc_rules.live(record)
+            if (keys := arcs.live_topics(record, arc, order))
+        ]
+    else:
+        parts = [_ready_part(record, order, levels, behind, misfits)]
+    return {
+        "date": countdown["date"],
+        "days_left": countdown["days_left"],
+        "parts": [compact(part, keep=("arc",)) for part in parts],
+    }
+
+
+def _mistake(record: dict[str, Any], key: str, item: dict[str, Any]) -> dict[str, Any]:
+    """One answer that was not right, as ``course_standing`` lists it."""
+    task = record["tasks"].get(item.get("task", ""), {})
+    sources = record["sources"]
+    return compact(
+        {
+            "id": key,
+            "date": item["date"],
+            "text": item["text"],
+            "response": item.get("response"),
+            "result": item["result"],
+            "helped": not schema.unaided(item),
+            "confident": item.get("sure") == "confident" or None,
+            "gave_up": item.get("gave_up"),
+            "chose": item.get("chose"),
+            "task": task.get("title", item.get("task")),
+            "where": [
+                compact(
+                    {
+                        "source": sources.get(ref["source"], {}).get(
+                            "title", ref["source"]
+                        ),
+                        "locator": ref.get("locator"),
+                    }
+                )
+                for ref in item.get("refs", ())
+            ],
+        }
+    )
+
+
+def _mistakes(
+    record: dict[str, Any], levels: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Every topic with a mistake still open, the newest first: a counted
+    answer not right since his latest right answer, with help or not. A gap
+    with no such answer is what is left to check, not a mistake."""
+    wrong = progress.open_mistakes(record)
+    rank = {key: at for at, key in enumerate(progress.path_order(record))}
+    found = []
+    for key in rank:
+        topic, standing = record["topics"][key], levels[key]
+        answers = wrong.get(key, [])
+        if not answers:
+            continue
+        fixed = standing.get("repaired") and not standing.get("repaired_with_help")
+        gap = topic.get("gap") if not fixed else None
+        judged = topic.get("judged") if gap else None
+        latest = max(
+            [item["date"] for _, item in answers] + ([judged] if judged else []),
+            default=None,
+        )
+        found.append(
+            compact(
+                {
+                    "topic": key,
+                    "title": topic.get("title"),
+                    "arc": topic.get("arc"),
+                    "gap": gap,
+                    "judged": judged,
+                    "latest": latest,
+                    "answers": [_mistake(record, at, item) for at, item in answers],
+                },
+                keep=("answers",),
+            )
+        )
+    found.sort(key=lambda entry: entry.get("latest", ""), reverse=True)
+    return found
+
+
+def course_standing(workspace: Workspace) -> dict[str, Any]:
+    """Where the learner stands for the exam and what is left to fix,
+    derived on every read and never stored.
+
+    ``readiness`` (absent without an exam ahead) holds the exam's ``date``,
+    ``days_left`` and its ``parts`` in study order: each arc it examines,
+    or the whole course as one part in a course without arcs. Each part
+    sorts the topics the exam examines, in path order, into ``solid``
+    (resting on an unaided answer, not weak on the map, and
+    inside the run-up solid in the last 14 days: ``progress.unready``),
+    ``not_yet`` (taught and not solid), ``to_start`` (untaught, and the
+    daily plan starts it before the exam) and ``wont_fit`` (untaught, and
+    the plan has no room for it before the exam: ``does_not_fit``).
+
+    ``mistakes`` lists every topic with a mistake still open, the newest
+    first: its ``gap`` (the tutor's diagnosis, until he answers it right on
+    his own after the day it was ``judged``) and its ``answers`` that were
+    not right since his latest right answer, with help or not
+    (``progress.open_mistakes``), newest first, each with the tutor's
+    ``text``, his ``response``, the ``task`` and the places in his material
+    (``where``) it was on, whether it had help (``helped``), whether he was
+    sure of it (``confident``), and the method he reached for in its place
+    (``chose``). ``latest`` is the day of its newest mistake.
+    """
+    record = records.load(workspace)
+    today = clock.today()
+    levels = progress.standings(record)
+    planned = when(workspace, record, today)
+    return compact(
+        {
+            "today": today.isoformat(),
+            "readiness": _readiness(record, today, levels, planned),
+            "mistakes": _mistakes(record, levels),
+        },
+        keep=("mistakes",),
+    )
 
 
 # --- search -----------------------------------------------------------------
@@ -544,6 +1135,10 @@ def _documents(record: dict[str, Any]) -> Iterator[_Document]:
         texts = _values(topic, ("title", "aliases", "gap", "note"))
         texts += _values(topic.get("review", {}), ("prompt",))
         yield _Document("topic", key, topic.get("title"), (*texts, key))
+    for key in arc_rules.order(record):
+        arc = record["arcs"][key]
+        texts = _values(arc, ("title", "question"))
+        yield _Document("arc", key, arc["title"], (*texts, key))
     for key in sorted(record["knowledge"]):
         entry = record["knowledge"][key]
         texts = _values(entry, ("text", "aliases", "uncertain"))
@@ -599,21 +1194,116 @@ def _hits(
         yield rank, hit
 
 
-def every_course(workspace: Workspace | None) -> list[Workspace]:
-    """Registered workspaces with a course, plus the selected one, by directory.
+def _readable(workspace: Workspace) -> dict[str, dict[str, Any]]:
+    """Every course's stored record, by directory; a course whose record
+    cannot be read is left out of the others' plan, as ``plan`` leaves it
+    out."""
+    readable: dict[str, dict[str, Any]] = {}
+    for target in records.courses(workspace):
+        try:
+            readable[str(target.directory)] = records.read(target)
+        except (ValueError, OSError):
+            continue
+    return readable
 
-    A selected workspace outside the registry, such as a private session over
-    registered material, stands in for the workspaces that study that material.
-    """
-    chosen = {str(item.directory): item for item in workspaces.registered()}
-    if workspace is not None and str(workspace.directory) not in chosen:
-        chosen = {
-            key: item
-            for key, item in chosen.items()
-            if item.sources != workspace.sources
-        }
-        chosen[str(workspace.directory)] = workspace
-    return [chosen[key] for key in sorted(chosen) if chosen[key].record.is_file()]
+
+def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
+    """When the daily plan, made with every course (``agenda``), next puts
+    each of this course's topics: the one day each review and new topic has,
+    whichever verb reads it. ``record`` is this course read with the plan
+    (``records.load``)."""
+    name = str(workspace.directory)
+    readable = capacity.final_reviews({**_readable(workspace), name: record}, today)
+    week = capacity.of(readable.values(), today)
+    together = agenda.plan(readable, today, agenda.MAX_DAYS, week)
+    return together.when(name, today, bool(week.study_weekdays))
+
+
+def _began(
+    stored: dict[str, dict[str, Any]], name: str, day: date, today: date, last: date
+) -> agenda.When:
+    """This course's days in the plan made on ``day`` from every course's
+    record as ``today`` began (``agenda.morning``), through ``last``."""
+    read = capacity.final_reviews(stored, day)
+    began = {key: agenda.morning(record, today) for key, record in read.items()}
+    week = capacity.of(began.values(), day)
+    days = (last - day).days + 1
+    return agenda.plan(began, day, days, week).when(name, day, True)
+
+
+def moved(
+    workspace: Workspace, record: dict[str, Any], planned: agenda.When, today: date
+) -> dict[str, dict[str, Any]]:
+    """Each topic whose next day differs from the day the plan gave it as
+    yesterday ended, the day he was last told, with why it moved. Only his
+    study moves a day: ``study``, today's answers or starts in ``courses``
+    (a topic he answered or started today has its own new day and is not
+    listed); ``missed``, yesterday went by with no study; ``left``,
+    yesterday ended with planned work not done. Nothing is stored: the
+    plan as yesterday ended is made again from the records without today's
+    work. ``record`` is this course read with the plan."""
+    name = str(workspace.directory)
+    now = {
+        **{("review", key): day for key, day in planned.reviews.items()},
+        **{("starts", key): day for key, day in planned.starts.items()},
+    }
+    if not now:
+        return {}
+    stored = {**_readable(workspace), name: records.read(workspace)}
+    mine = agenda.touched(record, today)
+    yesterday = today - timedelta(days=1)
+    last = max(now.values())
+    told = _began(stored, name, yesterday, today, last)
+
+    def told_on(when: agenda.When, kind: str, key: str) -> date | None:
+        return (when.reviews if kind == "review" else when.starts).get(key)
+
+    changed = {
+        (kind, key): day
+        for (kind, key), day in now.items()
+        if key not in mine
+        and (was := told_on(told, kind, key)) is not None
+        and today <= was != day
+    }
+    if not changed:
+        return {}
+    studied = {
+        key: str(course.get("title") or Path(key).name)
+        for key, course in stored.items()
+        if agenda.touched(course, today)
+    }
+    began = _began(stored, name, today, today, last) if studied else told
+    day = yesterday.isoformat()
+    went = any(
+        any(item["date"] == day for item in course["observations"].values())
+        or any(topic.get("introduced") == day for topic in course["topics"].values())
+        for course in stored.values()
+    )
+    result: dict[str, dict[str, Any]] = {}
+    for kind, key in changed:
+        was = told_on(told, kind, key)
+        assert was is not None
+        if studied and told_on(began, kind, key) == was:
+            why: dict[str, Any] = {"by": "study", "courses": sorted(studied.values())}
+        else:
+            why = {"by": "left" if went else "missed"}
+        result[key] = {"from": was.isoformat(), **why}
+    return result
+
+
+def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:
+    """A save's receipt with each review it set on the day the daily plan
+    puts it (``planned``), and ``due_count`` as the reviews the plan puts
+    today: the days the learner is told are the days every view shows."""
+    record = records.load(workspace)
+    today = clock.today()
+    planned = when(workspace, record, today)
+    reviews = {
+        topic: {**review, "planned": planned.review(topic, review["due"])}
+        for topic, review in receipt["reviews"].items()
+    }
+    due, _ = tonight(progress.due(record, today), planned)
+    return {**receipt, "reviews": reviews, "due_count": len(due)}
 
 
 def _searched(
@@ -621,11 +1311,11 @@ def _searched(
 ) -> Iterator[tuple[Workspace, dict[str, Any] | None, str | None]]:
     if not everywhere:
         assert workspace is not None
-        yield workspace, records.load(workspace), None
+        yield workspace, records.read(workspace), None
         return
-    for candidate in every_course(workspace):
+    for candidate in records.courses(workspace):
         try:
-            yield candidate, records.load(candidate), None
+            yield candidate, records.read(candidate), None
         except (ValueError, OSError) as error:
             yield candidate, None, str(error)
 

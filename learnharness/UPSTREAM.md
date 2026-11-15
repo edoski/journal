@@ -50,6 +50,7 @@ git cherry-pick -x -X subtree=learnharness <commit>                          # o
 - **File-path chips and the composer paperclip.** The course folder already gives the tutor its files.
 - **Showing and annotating the learner's own images.** A new instrument outside the current loop.
 - **Source folders, drag, dimming, chains keyboard navigation and Find.** Graph-browsing instruments the loop does not use.
+- **The knowledge graph and everything on it** (extraction, the graph view, notes import and its folders, imported-source deletion, chains): this fork deleted its graph engine on 14 Nov 2026; a finished lesson's digest saves to the course record instead. The notes-folder import (`37ec6efe`, `7529a9bb`, the import half of `b85440ee`, `c48e630a`, `9cdfb864`) and source deletion (`ee4e05b1`, `039cab6d`, `6ed6f991`), once deferred until a per-course graph, are skipped with it.
 - **Practice prompt overrides in Settings.** They would fork the single doctrine in `learning/skills/tutor/references/`.
 - **Pi cache-retention preferences.** They never reach the Claude CLI, which controls caching itself.
 - **Non-Latin keyboard shortcut normalization and update-banner dismissal.** No updater here; the owner's layout reports ASCII.
@@ -59,8 +60,3 @@ git cherry-pick -x -X subtree=learnharness <commit>                          # o
 
 - **Narration delivery guard** (`e6cbc3eb`, `86185a40`): not needed. On 8 Nov 2026 a teaching session on Claude account F (probe, planning, two teach turns) streamed 11 signature-only thinking blocks; none had a signature naming narration, and every teach turn delivered its prose through `send_to_user` before the question. Reopen if a recorded teach turn shows a thinking block whose decoded signature head contains `narration`, or a question arrives without its explanation. `86185a40` also removes `send_to_user` from the practice agent; that half is declined too, because practice delivers its closing words through `send_to_user` (seen live on 8 Nov 2026) and upstream removed it only as part of the guard.
 - **Session-reported context window** (`074ba7af`): not needed. On 8 Nov 2026 Claude Code's `get_context_usage` reported `maxTokens` 1,000,000 for `claude-opus-5-5` on account F, before and after a model turn, equal to the catalog. Reopen if it reports another value.
-
-## Deferred until the per-course graph
-
-- **Import a course's notes folder**: `37ec6efe` (without its parallel-subagents setting), `7529a9bb`, the import half of `b85440ee`, `c48e630a`, `9cdfb864`. Imports should land in the course's graph and tag statements with its topics.
-- **Delete an imported source**: `ee4e05b1`, `039cab6d`, without the source-folder UI. They edit the source-organization store from `b85440ee`, which this fork does not have, so adapt them onto the graph's own sources map, or take that store's minimal part with `6ed6f991` (its crash-leftover cleanup). Bring back the source-deletion cases of `store-writes-atomic` and `store-delete-leftovers` with it (dropped in #15).

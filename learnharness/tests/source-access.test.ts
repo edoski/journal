@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { after, describe, it } from "node:test";
 import { createCanvas } from "@napi-rs/canvas";
 import { createFauxCore } from "@earendil-works/pi-ai";
+import { fakeEngine } from "./helpers/fake-sdk.ts";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ChatStore, JobStore } from "../src/core/ports.ts";
 
@@ -13,10 +14,11 @@ import type { ChatStore, JobStore } from "../src/core/ports.ts";
 // Never read or modify the developer's actual home, keys or learning data.
 const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "lh-source-access-")));
 const home = path.join(root, "home");
-const auth = path.join(root, "private", "custom-keys.json");
+const credentials = path.join(root, "private");
+const auth = path.join(credentials, "auth.json");
 const data = path.join(root, "private", "data");
-const previous = Object.fromEntries(["HOME", "USERPROFILE", "LH_AUTH_FILE", "LH_DATA_DIR"].map((key) => [key, process.env[key]]));
-Object.assign(process.env, { HOME: home, USERPROFILE: home, LH_AUTH_FILE: auth, LH_DATA_DIR: data });
+const previous = Object.fromEntries(["HOME", "USERPROFILE", "LH_CREDENTIALS_DIR", "LH_DATA_DIR"].map((key) => [key, process.env[key]]));
+Object.assign(process.env, { HOME: home, USERPROFILE: home, LH_CREDENTIALS_DIR: credentials, LH_DATA_DIR: data });
 after(async () => {
 	for (const [key, value] of Object.entries(previous)) {
 		if (value === undefined) delete process.env[key]; else process.env[key] = value;
@@ -42,19 +44,14 @@ await write("home/.claudette/ok.md", "ordinary lookalike notes\n");
 await write("home/.ssh/id_ed25519");
 await write("transcripts/projects/session.jsonl");
 await write("keyfiles/chatgpt-credentials.json");
-await write("keyfiles/github-copilot-credentials.json");
-await write("keyfiles/xai-credentials.json");
-await write("keyfiles/.auth.json.tmp-123");
 const uuid = "12345678-1234-4123-8123-123456789abc";
-const authTemp = await write(`keyfiles/custom-keys.json.tmp-${uuid}`);
-for (const name of ["chatgpt", "github-copilot", "xai"]) await write(`keyfiles/${name}-credentials.json.${uuid}.tmp`);
+await write(`keyfiles/chatgpt-credentials.json.${uuid}.tmp`);
 const targetKey = await write("relocated-token");
 await link(path.join(root, "keyfiles"), path.join(root, "private"), true);
 await link(targetKey, auth);
 await link(path.join(root, "transcripts"), path.join(home, ".claude"), true);
 await link(path.join(home, ".ssh"), path.join(home, "notes", "keys"), true);
 await link(targetKey, path.join(home, "notes", "key-alias"));
-await link(authTemp, path.join(home, "notes", "key-temp-alias"));
 await link(home, path.join(root, "home-alias"), true);
 await link(home, path.join(root, "home-alias-2"), true);
 await write("keyfiles/data/chats/session.json", "synthetic learning conversation\n");
@@ -72,6 +69,8 @@ const { createLsTool, lsTool } = await import("../src/agent/tools/ls.ts");
 const { createFindTool, findTool } = await import("../src/agent/tools/find.ts");
 const { createGrepTool, grepTool } = await import("../src/agent/tools/grep.ts");
 const { runPdfReaderAgent } = await import("../src/agent/subagents/pdf-reader.ts");
+/** A denied source fails before any model call: this engine refuses one. */
+const noModel = fakeEngine({ model: createFauxCore({}).getModel(), streamFn: () => { throw new Error("must not call model"); } });
 const { createProberTools, createTeacherTools } = await import("../src/agent/tools.ts");
 const { practiceTools } = await import("../src/agent/tools/practice.ts");
 
@@ -85,14 +84,12 @@ const denied = /Access denied: .* is a protected location/;
 describe("source access: configured credentials only", () => {
 	const protectedFiles = [
 		auth, targetKey, path.join(home, "notes", "key-alias"),
-		authTemp, `${auth}.tmp-${uuid}`, path.join(home, "notes", "key-temp-alias"),
-		...(["chatgpt", "github-copilot", "xai"].flatMap((name) => [
+		...(["chatgpt"].flatMap((name) => [
 			path.join(root, "private", `${name}-credentials.json`),
 			path.join(root, "keyfiles", `${name}-credentials.json`),
 			path.join(root, "private", `${name}-credentials.json.${uuid}.tmp`),
 			path.join(root, "keyfiles", `${name}-credentials.json.${uuid}.tmp`),
 		])),
-		path.join(root, "private", ".auth.json.tmp-123"), path.join(root, "keyfiles", ".auth.json.tmp-123"),
 	];
 	for (const file of protectedFiles) {
 		it(`refuses read and direct grep of ${path.relative(root, file)}`, async () => {
@@ -114,18 +111,17 @@ describe("source access: configured credentials only", () => {
 		assert.equal(await text(grepTool, { path: root, pattern: "LH_SYNTHETIC_SECRET_MARKER" }), "No matches found");
 		const found = await text(findTool, { path: root, pattern: "*" });
 		assert.match(found, /data\/chats\/session\.json/);
-		assert.doesNotMatch(found, /relocated-token|credentials\.json|\.auth\.json\.tmp|transcripts\/|id_ed25519|elsewhere\/\.env/i);
-		assert.ok(!found.split("\n").includes(`keyfiles/custom-keys.json.tmp-${uuid}`));
+		assert.doesNotMatch(found, /relocated-token|credentials\.json|auth\.json|transcripts\/|id_ed25519|elsewhere\/\.env/i);
 	});
 
-	it("matches the configured auth basename literally, not arbitrary temp files", () => {
-		const configured = path.join(root, "synthetic", "keys.[custom]+.json");
-		assert.equal(isSensitivePath(`${configured}.tmp-${uuid}`, home, configured), true);
+	it("matches the ChatGPT sign-in's own temp files, not arbitrary temp files", () => {
+		const directory = path.join(root, "synthetic");
+		assert.equal(isSensitivePath(path.join(directory, `chatgpt-credentials.json.${uuid}.tmp`), home, directory), true);
 		for (const file of [
-			`${configured}.tmp-${uuid}.backup`, `${configured}.tmp-not-a-uuid`,
-			path.join(path.dirname(configured), `keys.custom.json.tmp-${uuid}`),
-			path.join(root, "synthetic-sibling", `${path.basename(configured)}.tmp-${uuid}`),
-		]) assert.equal(isSensitivePath(file, home, configured), false, file);
+			path.join(directory, `chatgpt-credentials.json.${uuid}.tmp.backup`), path.join(directory, "chatgpt-credentials.json.not-a-uuid.tmp"),
+			path.join(directory, `keys.json.tmp-${uuid}`),
+			path.join(root, "synthetic-sibling", `chatgpt-credentials.json.${uuid}.tmp`),
+		]) assert.equal(isSensitivePath(file, home, directory), false, file);
 	});
 
 	it("does not confuse an allowed credential-directory sibling with the credential directory", () => {
@@ -241,7 +237,7 @@ describe("source access: canonical roots and all tool paths", () => {
 	it("PDF denial is a structured upfront failure before parsing, rendering or model calls", async () => {
 		const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
 		let modelCalls = 0;
-		const engine = { model: faux.getModel(), streamFn: (() => { modelCalls++; throw new Error("must not call model"); }) as typeof faux.streamSimple };
+		const engine = fakeEngine({ model: faux.getModel(), streamFn: (() => { modelCalls++; throw new Error("must not call model"); }) as typeof faux.streamSimple });
 		for (const file of [auth, path.join(home, ".ssh", "id_ed25519"), path.join(root, "transcripts", "projects", "session.jsonl")]) {
 			const result = await runPdfReaderAgent({ path: file, question: "synthetic" }, { engine });
 			assert.match(result.brief, /^PDF failed: Access denied:/);
@@ -303,7 +299,7 @@ describe("source access: case-sensitive home-location variants", () => {
 				await assert.rejects(findTool.execute!("case-root", { path: folder, pattern: "*" }), denied);
 				await assert.rejects(grepTool.execute!("case-root", { path: folder, pattern: "CASE_VARIANT_SECRET" }), denied);
 				await assert.rejects(walkFiles(folder, () => assert.fail("protected target must not be visited")), denied);
-				const pdf = await runPdfReaderAgent({ path: path.join(folder, "key"), question: "synthetic" });
+				const pdf = await runPdfReaderAgent({ path: path.join(folder, "key"), question: "synthetic" }, { engine: noModel });
 				assert.match(pdf.brief, /^PDF failed: Access denied:/);
 			}
 			assert.equal(await text(grepTool, { path: root, pattern: "CASE_VARIANT_SECRET" }), "No matches found");
@@ -331,12 +327,9 @@ describe("source access: credential case aliases on the fixture filesystem", () 
 		if (!await caseAliasesAvailable()) return t.skip("fixture filesystem is case-sensitive");
 		const aliases = [
 			path.join(root, "keyfiles", "CHATGPT-CREDENTIALS.JSON"),
-			path.join(root, "KEYFILES", "github-copilot-credentials.json"),
-			path.join(root, "KEYFILES", "XAI-CREDENTIALS.JSON"),
 			path.join(root, "RELOCATED-TOKEN"),
-			path.join(root, "KEYFILES", ".auth.json.tmp-123"),
+			path.join(root, "KEYFILES", "AUTH.JSON"),
 			path.join(root, "KEYFILES", `chatgpt-credentials.json.${uuid}.tmp`),
-			path.join(root, "KEYFILES", `CUSTOM-KEYS.JSON.tmp-${uuid}`),
 		];
 		for (const alias of aliases) {
 			if (process.platform === "darwin") {
@@ -345,7 +338,7 @@ describe("source access: credential case aliases on the fixture filesystem", () 
 			}
 			await assert.rejects(readTool.execute!("case-alias", { path: alias }), denied);
 			await assert.rejects(grepTool.execute!("case-alias", { path: alias, pattern: "LH_SYNTHETIC_SECRET_MARKER" }), denied);
-			const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" });
+			const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" }, { engine: noModel });
 			assert.match(pdf.brief, /^PDF failed: Access denied:/);
 		}
 		assert.equal(await text(grepTool, { path: path.join(root, "KEYFILES"), pattern: "LH_SYNTHETIC_SECRET_MARKER" }), "No matches found");
@@ -354,15 +347,15 @@ describe("source access: credential case aliases on the fixture filesystem", () 
 		assert.match(found, /data\/chats\/session\.json/);
 	});
 
-	it("protects a non-symlink configured AUTH_FILE regardless of filename or parent-directory case", async (t) => {
+	it("protects a non-symlink retired auth.json regardless of filename or parent-directory case", async (t) => {
 		if (!await caseAliasesAvailable()) return t.skip("fixture filesystem is case-sensitive");
 		await fs.unlink(auth);
 		await fs.writeFile(auth, "LH_SYNTHETIC_SECRET_MARKER\n");
 		try {
-			for (const alias of [path.join(root, "keyfiles", "CUSTOM-KEYS.JSON"), path.join(root, "KEYFILES", "custom-keys.json")]) {
+			for (const alias of [path.join(root, "keyfiles", "AUTH.JSON"), path.join(root, "KEYFILES", "auth.json")]) {
 				await assert.rejects(readTool.execute!("case-auth", { path: alias }), denied);
 				await assert.rejects(grepTool.execute!("case-auth", { path: alias, pattern: "LH_SYNTHETIC_SECRET_MARKER" }), denied);
-				const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" });
+				const pdf = await runPdfReaderAgent({ path: alias, question: "synthetic" }, { engine: noModel });
 				assert.match(pdf.brief, /^PDF failed: Access denied:/);
 			}
 		} finally {
@@ -386,14 +379,14 @@ describe("source access: path spelling", () => {
 
 	it("Windows drive/UNC namespaces and credential/dotenv streams cannot bypass matching", { skip: process.platform !== "win32" }, () => {
 		for (const winHome of ["C:\\Users\\Learner", "\\\\server\\share\\Learner"]) {
-			const winAuth = path.join(winHome, "app", "auth.json");
+			const winDir = path.join(winHome, "app");
+			const winAuth = path.join(winDir, "auth.json");
 			const prefix = winHome.startsWith("\\\\") ? `\\\\?\\UNC\\${winHome.slice(2)}` : `\\\\?\\${winHome}`;
-			assert.equal(isSensitivePath(path.join(prefix, ".ssh", "key"), winHome, winAuth), true);
-			assert.equal(isSensitivePath(`${winAuth}:stream`, winHome, winAuth), true);
-			assert.equal(isSensitivePath(`${winAuth}.tmp-${uuid}:stream`, winHome, winAuth), true);
-			assert.equal(isSensitivePath(path.join(prefix, "app", `auth.json.tmp-${uuid}`), winHome, winAuth), true);
-			assert.equal(isSensitivePath(path.join(winHome, "notes", ".env:stream"), winHome, winAuth), true);
-			assert.equal(isSensitivePath(path.join(winHome, ".sship", "key"), winHome, winAuth), false);
+			assert.equal(isSensitivePath(path.join(prefix, ".ssh", "key"), winHome, winDir), true);
+			assert.equal(isSensitivePath(`${winAuth}:stream`, winHome, winDir), true);
+			assert.equal(isSensitivePath(path.join(prefix, "app", `chatgpt-credentials.json.${uuid}.tmp`), winHome, winDir), true);
+			assert.equal(isSensitivePath(path.join(winHome, "notes", ".env:stream"), winHome, winDir), true);
+			assert.equal(isSensitivePath(path.join(winHome, ".sship", "key"), winHome, winDir), false);
 		}
 	});
 });

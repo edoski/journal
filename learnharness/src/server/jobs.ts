@@ -32,7 +32,7 @@
  *          dangling question — an unanswered client-side tool call breaks
  *          provider conversion), then fire ONE server-side wake turn
  *          carrying EVERY queued marker as its input appends (write-ahead
- *          persist, liveness, extraction — one code path, the same
+ *          persist, liveness — one code path, the same
  *          composition as a client request). A 409 means a client turn
  *          raced in — re-queue and retry with backoff. Idempotent per
  *          jobId (steerDelivered): a crashed wake or a duplicate deliver
@@ -66,13 +66,14 @@ import {
 	type SteerMessage,
 } from "../core/contracts.ts";
 import type { TurnInput } from "../core/input-events.ts";
-import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, type LhMessage } from "../core/native-messages.ts";
+import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, nativeInputCause, probeDoneResultIds, type LhMessage } from "../core/native-messages.ts";
+import { closedTonight } from "../core/session-end.ts";
 import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores, effectiveSettings } from "./stores.ts";
-import { resolveConversationSpec } from "../core/settings-resolution.ts";
-import { connectionBackgroundAllowed, isSubscriptionProvider, onSubscriptionChange } from "../agent/subscription-connections.ts";
+import { connectionBackgroundAllowed } from "../agent/subscription-connections.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
-import type { Agent } from "@earendil-works/pi-agent-core";
+import { subscribe, type ServerEventType } from "../core/events.ts";
+import type { SdkAgent as Agent } from "../agent/sdk/agent.ts";
 
 /** Fires one server-side teacher turn: (chatId, input) → HTTP-ish status.
  *  Wave C: the input is the IDLE WAKE — every queued marker as the turn's
@@ -121,10 +122,6 @@ interface WakeState {
 	liveAgents: Map<string, Agent>;
 	/** Chats whose pump loop is currently active (serialization per chat). */
 	pumping: Set<string>;
-	/** Throttle bookkeeping for the stale-job sweep. */
-	lastSweepAt: number;
-	stopConnectionWatch?: () => void;
-	automaticDeferred: WeakSet<Agent>;
 }
 
 interface LhWakeGlobal {
@@ -133,7 +130,7 @@ interface LhWakeGlobal {
 
 function state(): WakeState {
 	const g = globalThis as typeof globalThis & LhWakeGlobal;
-	return (g.__lhWakePipeline ??= { queues: new Map(), liveAgents: new Map(), userSteers: new Map(), pumping: new Set(), lastSweepAt: 0, automaticDeferred: new WeakSet() });
+	return (g.__lhWakePipeline ??= { queues: new Map(), liveAgents: new Map(), userSteers: new Map(), pumping: new Set() });
 }
 
 /** chat-handler wires this at module init: its adapter around handleChatRequest. */
@@ -146,27 +143,24 @@ export function setJobRespawn(respawn: JobRespawn): void {
 	state().respawn = respawn;
 }
 
-const POLL_MS = 400;
-/** After the gates open, wait a beat before firing — a client that just
- *  answered a question is about to send its continuation; don't 409 it.
- *
- *  Evidence for 750: the race window is exactly the learner's answer→POST
- *  flight — sendAutomaticallyWhen dispatches synchronously on addToolOutput,
- *  the answer hits the record only at the write-ahead persist, and beginTurn
- *  flips the turn registry immediately after, all before the grace can fire
- *  (measured localhost RTT ~10ms; typical LAN/production RTT <300ms). 750ms
- *  is 2.5× the worst realistic flight. A miss self-heals: the pump rechecks
- *  the gates after the grace AND the wake pipeline retries 409s with a
- *  backoff ramp — and since the transport's merge-retry (chat-transport.ts)
- *  made client 409s non-fatal, even a pathological RTT degrades gracefully.
- *  (Was 1500 — pure guess; 750 claws back 750ms of post-answer delivery
- *  latency without weakening the guard.) */
-const GRACE_MS = 750;
-/** 409 backoff: capped ramp so a busy client can't spin the pump. */
-const RETRY_BACKOFF_MS = [500, 1000, 2000, 5000] as const;
-
-function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+/** A promise for the chat's next event of the given types (`chats-changed`
+ *  counts for every chat: a deletion), subscribed when called so a check
+ *  made right after it cannot miss the event; `cancel` drops it. */
+function nextChatEvent(chatId: string, types: readonly ServerEventType[]): { promise: Promise<void>; cancel: () => void } {
+	let cancel = () => {};
+	const promise = new Promise<void>((resolve) => {
+		const off = subscribe((event) => {
+			if (!types.includes(event.type)) return;
+			if ("chatId" in event && event.chatId !== undefined && event.chatId !== chatId) return;
+			off();
+			resolve();
+		});
+		cancel = () => {
+			off();
+			resolve();
+		};
+	});
+	return { promise, cancel };
 }
 
 /** The job a steer belongs to, if it is a job steer (result/abort);
@@ -184,7 +178,7 @@ export function noteSteersDurable(chatId: string, persisted: readonly LhMessage[
 		if (message.role === "custom") finalizeSteer(message);
 	}
 	for (const entry of [...(state().queues.get(chatId) ?? [])]) {
-		if (persisted.some((message) => message.id === entry.steer.id)) completeEntry(chatId, entry);
+		if (persisted.some((message) => message.id === entry.steer.id) || handoffOvertaken(entry.steer, persisted)) completeEntry(chatId, entry);
 	}
 }
 
@@ -241,6 +235,17 @@ function queueSteer(chatId: string, steer: SteerMessage): QueuedSteer {
 	return entry;
 }
 
+/** The provider the chat's latest reply ran on: once its live agent is gone,
+ *  that is whose background consent a wake would spend. */
+function lastProvider(chatId: string): string | undefined {
+	const messages = stores.chatStore.getChat(chatId)?.messages ?? [];
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const message = messages[i] as { role?: string; provider?: string };
+		if (message.role === "assistant" && message.provider) return message.provider;
+	}
+	return undefined;
+}
+
 /** Hand every eligible pending marker to a live agent's steering queue
  *  (idempotent per agent via handedTo). Called from BOTH the pump's live
  *  path and registerLiveAgent — a parked marker (stranded behind a quiz)
@@ -250,9 +255,28 @@ function queueSteer(chatId: string, steer: SteerMessage): QueuedSteer {
  *  run's FIRST LLM call (the native equivalent of the old continuation
  *  coalescing). */
 export function automaticFollowUpAllowed(chatId: string, agent?: Agent): boolean {
-	if (agent && state().automaticDeferred.has(agent)) return false;
-	const provider = agent?.state?.model?.provider ?? resolveConversationSpec(stores.chatStore.getChat(chatId)?.settings, effectiveSettings().models.strong)?.provider;
+	const provider = agent?.state?.model?.provider ?? lastProvider(chatId) ?? effectiveSettings().claude.account;
 	return connectionBackgroundAllowed(provider);
+}
+
+/** Handoffs start the next agent's run (owner ruling: never ride the
+ *  live run of the agent handing off). Their details carry the chat. */
+const HANDOFF_STEERS: readonly string[] = ["probe-handoff", "mode-handoff"];
+const isHandoff = (steer: SteerMessage): boolean => HANDOFF_STEERS.includes(steer.customType);
+
+/** A handoff only starts the next agent's run, and any input of his after
+ *  its seam (the concluded probe, or the handoff call's result) already
+ *  ran that agent. Delivered later, it would start the lesson again, after
+ *  his Done for today included (round 6, report 8 B1). Pure. */
+function handoffOvertaken(steer: SteerMessage, record: readonly LhMessage[]): boolean {
+	if (!isHandoff(steer)) return false;
+	const concluded = steer.customType === "probe-handoff" ? probeDoneResultIds(record) : null;
+	const seam = record.findIndex((m) => m.role === "toolResult" && (concluded ? concluded.has(m.id) : `steer_mode_${m.toolCallId}` === steer.id));
+	if (seam < 0) return false;
+	for (let i = seam + 1; i < record.length; i++) {
+		if (nativeInputCause(record[i]!, record.slice(0, i)) === "learner") return true;
+	}
+	return false;
 }
 
 function handOffEligible(chatId: string, agent: Agent): void {
@@ -260,9 +284,11 @@ function handOffEligible(chatId: string, agent: Agent): void {
 	// Keep automatic results in their owning registry. Never mix them into a
 	// foreground batch without express account consent. Learner steers below
 	// remain deliverable, including the first poll of an answer run.
-	if (automaticFollowUpAllowed(chatId, agent) && queue && queue.length > 0) {
+	// A lesson closed for today takes nothing automatic: it waits for him.
+	const closed = closedTonight((agent.state?.messages ?? []) as LhMessage[]);
+	if (!closed && automaticFollowUpAllowed(chatId, agent) && queue && queue.length > 0) {
 		for (const entry of queue) {
-			if (!entry.waking && !entry.deferred && entry.handedTo !== agent && entry.steer.customType !== "probe-handoff") {
+			if (!entry.waking && !entry.deferred && entry.handedTo !== agent && !isHandoff(entry.steer)) {
 				agent.steer(entry.steer);
 				entry.handedTo = agent;
 			}
@@ -343,23 +369,7 @@ export function reconcileUserSteers(chatId: string, persisted: readonly LhMessag
 /** Clear the live agent at settlement — MUST run before settleSteers so the
  *  reconciliation's re-pump can never hand a marker to the dying agent. */
 export function unregisterLiveAgent(chatId: string): void {
-	const agent = state().liveAgents.get(chatId);
-	if (agent) state().automaticDeferred.delete(agent);
 	state().liveAgents.delete(chatId);
-}
-
-/** Restore exact registry objects after native drain but before dispatch.
- * The vehicle is disposable; result ownership/promises are not. */
-export function restoreUncommittedAutomatic(chatId: string, agent: Agent, automaticIds: ReadonlySet<string>, retainedIds: ReadonlySet<string>): void {
-	const s = state();
-	s.automaticDeferred.add(agent);
-	for (const entry of s.queues.get(chatId) ?? []) {
-		if (entry.handedTo === agent && automaticIds.has(entry.steer.id)) entry.handedTo = undefined;
-	}
-	agent.clearSteeringQueue();
-	for (const entry of s.userSteers.get(chatId) ?? []) {
-		if (!retainedIds.has(entry.message.id)) { agent.steer(entry.message); entry.handedTo = agent; }
-	}
 }
 
 /** TURN SETTLEMENT RECONCILIATION (Wave C): the handler calls this AFTER
@@ -449,9 +459,9 @@ export function abortJob(jobId: string): AbortOutcome {
 }
 
 function chatIdOf(steer: SteerMessage): string {
-	// The probe handoff carries its chat directly in the marker details (the
-	// job record would say it too, but the details are the cheap path).
-	if (steer.customType === "probe-handoff") {
+	// A handoff carries its chat directly in the marker details (the job
+	// record would say it too, but the details are the cheap path).
+	if (isHandoff(steer)) {
 		return (steer.details as { chatId: string }).chatId;
 	}
 	// The chat is resolvable from the job record; the steer's details
@@ -478,7 +488,7 @@ async function pump(chatId: string): Promise<void> {
 	s.pumping.add(chatId);
 	let parked = false;
 	try {
-		for (let attempt = 0; ; ) {
+		for (;;) {
 			const queue = s.queues.get(chatId);
 			if (!queue || queue.length === 0) {
 				s.queues.delete(chatId);
@@ -513,17 +523,14 @@ async function pump(chatId: string): Promise<void> {
 			if (live && isTurnRunning(chatId)) {
 				handOffEligible(chatId, live);
 				const handable = stillPending.filter((e) => e.handedTo === live);
-				// probe-handoffs never ride a live run (owner ruling: the
-				// handoff must START the teacher's run) — if any remain
-				// pending, wait the run out and loop to the wake below.
-				const handoffWaits = stillPending.some(
-					(e) => e.steer.customType === "probe-handoff",
-				);
+				// Handoffs never ride a live run (owner ruling: the handoff
+				// must START the next agent's run) — if any remain pending,
+				// wait the run out and loop to the wake below.
+				const handoffWaits = stillPending.some((e) => isHandoff(e.steer));
 				if (handable.length > 0 && !handoffWaits) {
 					return; // the run delivers; settleSteers re-pumps the rest
 				}
 				if (handable.length > 0) {
-					await delay(POLL_MS);
 					await waitForIdle(chatId);
 					continue;
 				}
@@ -566,7 +573,9 @@ async function pump(chatId: string): Promise<void> {
 			// derived from the tail, so any user message un-holds by construction.
 			// An interrupted question-recovery request also waits for explicit
 			// input; a queued job must not restart its replacement turn.
-			if (endsInDismissal(fresh.messages) || endsInQuestionRecovery(fresh.messages) || !automaticFollowUpAllowed(chatId)) {
+			// A lesson closed for today (his Done for today, or the tutor's own
+			// close) likewise waits for his next message.
+			if (endsInDismissal(fresh.messages) || endsInQuestionRecovery(fresh.messages) || closedTonight(fresh.messages) || !automaticFollowUpAllowed(chatId)) {
 				parked = true;
 				return;
 			}
@@ -589,10 +598,9 @@ async function pump(chatId: string): Promise<void> {
 			if (status === 403 || status === 409) {
 				for (const entry of owned) { entry.waking = false; entry.wakeAgent = undefined; }
 				if (status === 403) { parked = true; return; }
-				await delay(RETRY_BACKOFF_MS[Math.min(attempt++, RETRY_BACKOFF_MS.length - 1)]!);
+				// A turn raced in: the next pass waits for it to settle.
 				continue;
 			}
-			attempt = 0;
 			for (const entry of owned) {
 				if (status === 200 && !jobIdOf(entry.steer)) {
 					// Preserve the non-job probe handoff's acceptance semantics.
@@ -614,26 +622,6 @@ async function pump(chatId: string): Promise<void> {
 		if (!parked && automaticFollowUpAllowed(chatId, state().liveAgents.get(chatId)) && q.some((e) => e.handedTo === undefined && !e.waking && !e.deferred)) void pump(chatId);
 	}
 }
-
-// Connection changes are the only wake for consent-deferred automatic work.
-// No retry timer, inference, or API-key fallback is started while consent is off.
-state().stopConnectionWatch?.();
-state().stopConnectionWatch = onSubscriptionChange(() => {
-	const s = state();
-	for (const [chatId, agent] of s.liveAgents) {
-		if (!isSubscriptionProvider(agent.state?.model?.provider) || automaticFollowUpAllowed(chatId, agent)) continue;
-		const consumed = new Set(agent.state.messages.map((m) => (m as { id?: string }).id));
-		const pending = (s.queues.get(chatId) ?? []).filter((entry) => entry.handedTo === agent && !consumed.has(entry.steer.id));
-		if (pending.length === 0) continue;
-		agent.clearSteeringQueue();
-		for (const entry of pending) entry.handedTo = undefined;
-		for (const entry of s.userSteers.get(chatId) ?? []) if (!consumed.has(entry.message.id)) entry.handedTo = undefined;
-		handOffEligible(chatId, agent); // only unconsumed learner input; never replay consumed steers
-	}
-	for (const chatId of s.queues.keys()) {
-		if (automaticFollowUpAllowed(chatId, s.liveAgents.get(chatId))) void pump(chatId);
-	}
-});
 
 function deferOrReject(chatId: string, entry: QueuedSteer, error: Error): void {
 	entry.waking = false;
@@ -690,54 +678,44 @@ function restorePendingDeliveries(chatId: string): void {
 /**
  * Wait until the chat can take a wake turn: no turn in flight AND no
  * unanswered question call (the record's dangling question — the answer
- * arrives as its tool result, and no turn may run in the window). Poll;
- * the learner may take arbitrarily long to answer, and that is correct —
- * the steer fires right after their answer turn completes.
+ * arrives as its tool result, and no turn may run in the window). Only a
+ * turn settling or a turn-less record write (a partial answer, a
+ * dismissal) opens the gates, so each check waits for the next of those.
+ * The learner may take arbitrarily long to answer, and that is correct —
+ * the steer fires right after their answer turn completes. No grace: while
+ * an answer is in flight the record still holds its question, so the gate
+ * stays shut until the answer's own turn settles.
  */
 async function waitForIdle(chatId: string): Promise<void> {
 	for (;;) {
+		const changed = nextChatEvent(chatId, ["turn-settled", "record-changed", "chats-changed"]);
 		const record = stores.chatStore.getChat(chatId);
-		if (!record || !(state().queues.get(chatId) ?? []).some((entry) => !entry.waking && !entry.deferred && !entry.handedTo)) return;
-		const blocked = isTurnRunning(chatId) || hasUnresolvedQuestion(record.messages);
-		if (!blocked) {
-			await delay(GRACE_MS);
-			const recheck = stores.chatStore.getChat(chatId);
-			if (
-				!isTurnRunning(chatId) &&
-				recheck &&
-				!hasUnresolvedQuestion(recheck.messages)
-			) {
-				return;
-			}
+		const waiting = (state().queues.get(chatId) ?? []).some((entry) => !entry.waking && !entry.deferred && !entry.handedTo);
+		if (!record || !waiting || !(isTurnRunning(chatId) || hasUnresolvedQuestion(record.messages))) {
+			changed.cancel();
+			return;
 		}
-		await delay(POLL_MS);
+		await changed.promise;
 	}
 }
 
 // ─── crash recovery ──────────────────────────────────────────────────────────
 
-const SWEEP_THROTTLE_MS = 30_000;
-
 /**
- * Lazy sweep (called off the /api/jobs poll, throttled), LIVENESS-GATED
- * (accuracy wave, 2026-09-19): a "running" record without a live loop
- * registration (subagents/aborts.ts) is an orphan of a process death —
- * re-deliver its stored result (idempotently) or re-spawn the loop, at
- * once (the old 15-minute age heuristic waited on ghosts AND re-ran
- * hung-but-alive loops beside themselves — the figure-maker incident,
- * 2026-09-18). A record WITH a live registration is provably executing
- * in THIS process — never touched, however old: a hung first model call
- * stays honestly running until END kills it. Terminal workers with known
- * pending delivery are restored independently; old terminal records without
- * delivery metadata are never inferred to owe a delivery.
+ * Crash recovery, run once at server start (instrumentation.ts), after the
+ * Claude sign-in check that respawns gate on: a process death is noticed
+ * only by the next process. LIVENESS-GATED (accuracy wave, 2026-09-19): a
+ * "running" record without a live loop registration (subagents/aborts.ts)
+ * is an orphan of a process death — re-deliver its stored result
+ * (idempotently) or re-spawn the loop, at once. A record WITH a live
+ * registration is provably executing in THIS process — never touched,
+ * however old: a hung first model call stays honestly running until END
+ * kills it. Terminal workers with known pending delivery are restored
+ * independently; old terminal records without delivery metadata are never
+ * inferred to owe a delivery.
  */
-/** Re-run a job's sub-agent loop — exposed for the sweep's tests (the
- *  /api/jobs poll is its only production caller, disabled under NODE_ENV=test). */
 export function recoverStaleJobs(): void {
 	const s = state();
-	const now = Date.now();
-	if (now - s.lastSweepAt < SWEEP_THROTTLE_MS) return;
-	s.lastSweepAt = now;
 	try {
 		for (const chat of stores.chatStore.listChats()) {
 			for (const job of stores.jobStore.listJobs(chat.id)) {
@@ -761,8 +739,7 @@ export function recoverStaleJobs(): void {
 	}
 }
 
-/** The /api/jobs entry: job list for the client poll (+ lazy recovery). */
+/** The /api/jobs entry: a chat's job list. */
 export function listJobs(chatId: string): JobRecord[] {
-	if (process.env.NODE_ENV !== "test") recoverStaleJobs();
 	return stores.jobStore.listJobs(chatId);
 }

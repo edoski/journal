@@ -34,7 +34,7 @@ background worker.
 
 ## Learning
 
-One workspace studies one course; its record is `.study/course.json` (schema 6).
+One workspace studies one course; its record is `.study/course.json` (schema 7).
 `learning/schema.py` declares the record shapes, the handle namespace shared by
 topics, knowledge, tasks and sources, whole-record validation and the single patch
 rule (maps merge by handle, entries by field, `null` removes, lists replace,
@@ -50,12 +50,16 @@ budget; it also forgets exact items. Consumers read validated
 
 `retrieval.py` builds `resume` (the session opener: time, due reviews, the path
 with levels, weak topics, the open task, evidence and knowledge within byte
-budgets), `show` (whole items) and `search` (accent-insensitive lexical
+budgets), `show` (whole items), `map` (every topic with its edges, level,
+review and weak verdict, uncapped and without evidence text) and `search` (accent-insensitive lexical
 discovery with light stemming) on the one packer in `packing.py`. Whole items are
 kept or omitted, never clipped, and omissions are reported. `planning.py` joins
 reviews and open work across registered workspaces with Journal effort, the week
-in review (replayed from the window start) and, near an exam, the run-up pace
-from the Journal schedule.
+in review (replayed from the window start), the daily plan and, near an exam, the
+run-up pace from the Journal schedule. `agenda.py` owns the daily plan: a pure
+projection from today, within the learner's `daily_topics`, of which reviews and
+which new topics each day takes, paced to the exam and assuming each planned
+review succeeds; it stores nothing, so the app and the tutor read the same plan.
 
 `cli.py` is a command table: one small handler per verb with its mutation policy
 declared beside it; `__main__.py` parses, selects the workspace and dispatches.
