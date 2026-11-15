@@ -206,14 +206,14 @@ describe("the course head", () => {
 	};
 
 	it("names the arc he is in first on its quiet row, and nothing for a course the page shows without arcs", () => {
-		const head = render(<CourseHead view={viewOf(ARCS)} busy={false} onContinue={noop} />);
+		const head = render(<CourseHead view={viewOf(ARCS)} standing={null} busy={false} onContinue={noop} />);
 		const standing = head.querySelector('[data-slot="page-standing"]')!;
 		assert.equal(text(standing.firstElementChild), "Linear systems");
 		assert.equal(standing.firstElementChild?.getAttribute("data-slot"), "course-arc-here");
 		const pill = standing.firstElementChild!.querySelector('[data-slot="arc-pill"]')!;
 		assert.ok(pill, "the arc is a pill, never text beside the facts");
 		assert.equal(pill.getAttribute("href"), `${courseHref(ARCS.map.workspace)}?arc=systems`, "it shows that arc on the page");
-		for (const c of [noArcs, oneArc]) assert.equal(render(<CourseHead view={viewOf(c)} busy={false} onContinue={noop} />).querySelector('[data-slot="course-arc-here"]'), null);
+		for (const c of [noArcs, oneArc]) assert.equal(render(<CourseHead view={viewOf(c)} standing={null} busy={false} onContinue={noop} />).querySelector('[data-slot="course-arc-here"]'), null);
 	});
 });
 

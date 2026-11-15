@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { MathText, mathPieces } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +46,31 @@ export function mathPrefix(units: readonly string[], count: number): string {
 	return count >= units.length ? units.join("") : `${units.slice(0, count).join("").trimEnd()}…`;
 }
 
+/** The fit's search over how many pieces to show: `fits` pieces are known
+ *  to fit (one always shows), `over` pieces are known not to, and `shown`
+ *  are on screen to be measured next. */
+export interface LineFit {
+	shown: number;
+	fits: number;
+	over: number;
+}
+
+/** A fit that starts from the whole label. Pure. */
+export function wholeFit(count: number): LineFit {
+	return { shown: count, fits: 1, over: count + 1 };
+}
+
+/** The next count to measure, halving what is still unknown, so a label of
+ *  n pieces settles in about log2(n) renders, however many it drops (round
+ *  8: dropping one piece a render passed React's 50 nested updates on a
+ *  66-word gap). `shown` stays the same only once it is the longest that
+ *  fits. Pure. */
+export function nextFit(fit: LineFit, fitting: boolean): LineFit {
+	const fits = fitting ? fit.shown : fit.fits;
+	const over = fitting ? fit.over : fit.shown;
+	return { shown: over - fits <= 1 ? fits : Math.floor((fits + over) / 2), fits, over };
+}
+
 /**
  * A one-line label that may hold TeX (`MathText`) and, when it is too wide
  * for its box, ends on the last whole word or whole formula that fits,
@@ -56,33 +81,30 @@ export function mathPrefix(units: readonly string[], count: number): string {
  */
 export function MathLine({ children, className, ...props }: { children: string } & Omit<React.HTMLAttributes<HTMLSpanElement>, "children">) {
 	const units = useMemo(() => mathUnits(children), [children]);
-	const [shown, setShown] = useState(units.length);
+	const [fit, setFit] = useState(() => wholeFit(units.length));
 	const whole = useRef(units.length);
 	whole.current = units.length;
 	// A new label starts from the whole of it again.
 	const [was, setWas] = useState(units);
 	if (was !== units) {
 		setWas(units);
-		setShown(units.length);
+		setFit(wholeFit(units.length));
 	}
 	const box = useRef<HTMLSpanElement>(null);
-	// Renders again even when the whole label is already shown, so a refit measures anew.
-	const [, measureAgain] = useReducer((n: number) => n + 1, 0);
 
-	// Drop a piece at a time until the line fits.
+	// Measure what is shown and move to the next count until it settles.
 	useLayoutEffect(() => {
 		const el = box.current;
-		if (el && shown > 1 && el.scrollWidth > el.clientWidth + 0.5) setShown(shown - 1);
+		if (!el) return;
+		const next = nextFit(fit, el.scrollWidth <= el.clientWidth + 0.5);
+		if (next.shown !== fit.shown) setFit(next);
 	});
 	// A change of the box's width, or the fonts loading, fits the line again from the whole label.
 	useLayoutEffect(() => {
 		const el = box.current;
 		if (!el) return;
 		let width = el.clientWidth;
-		const refit = () => {
-			setShown(whole.current);
-			measureAgain();
-		};
+		const refit = () => setFit(wholeFit(whole.current));
 		const observer = new ResizeObserver(() => {
 			if (el.clientWidth === width) return;
 			width = el.clientWidth;
@@ -99,7 +121,7 @@ export function MathLine({ children, className, ...props }: { children: string }
 
 	return (
 		<span ref={box} className={cn("block truncate", className)} {...props}>
-			<MathText>{mathPrefix(units, shown)}</MathText>
+			<MathText>{mathPrefix(units, fit.shown)}</MathText>
 		</span>
 	);
 }

@@ -86,7 +86,7 @@ function viewOf(c: StudyCourse, chats: ChatListItem[] = []) {
 
 describe("the course head", () => {
 	it("keeps the title and the press, puts Context in place of Add material, drops progress words and lines repeating the rows, and Studied opens the last session", () => {
-		const document = render(<CourseHead view={viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")])} busy={false} onContinue={() => {}} />);
+		const document = render(<CourseHead view={viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")])} standing={null} busy={false} onContinue={() => {}} />);
 		const text = document.body.textContent ?? "";
 		assert.equal(document.querySelector("[data-slot=course-title]")?.textContent, "Probability");
 		assert.ok(document.querySelector("[data-slot=course-action]"));
@@ -104,7 +104,7 @@ describe("a lesson that could not start", () => {
 		const head = (error: string | null) =>
 			render(
 				<CourseLessonError value={error}>
-					<CourseHead view={viewOf(course())} busy={false} onContinue={() => {}} />
+					<CourseHead view={viewOf(course())} standing={null} busy={false} onContinue={() => {}} />
 				</CourseLessonError>,
 			);
 		assert.equal(head(null).querySelector('[role="alert"]'), null);
@@ -125,7 +125,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.equal(examGaps(course({ exam: { date: "2026-11-01", daysLeft: -7, unreviewed: [h("binomial")] } }).map), null, "once the exam has passed");
 	});
 
-	const gapLine = (c: StudyCourse) => render(<CourseHead view={viewOf(c)} busy={false} onContinue={() => {}} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
+	const gapLine = (c: StudyCourse) => render(<CourseHead view={viewOf(c)} standing={null} busy={false} onContinue={() => {}} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
 
 	it("says why under the head's first line, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
 		const one = gapLine(gapped(["variance"], [], { variance: "full" }))!;
