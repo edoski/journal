@@ -24,7 +24,7 @@ import type { CourseMapLedgers } from "../src/core/ports.ts";
 import type { CourseMapLedger, MapSubmit } from "../src/core/course-map-build.ts";
 import { citedSources, contextOf, freeHandle, webAddress } from "../src/core/course-context.ts";
 import { projectCourseBrief } from "../src/core/course-brief.ts";
-import { createCourseContexts, folderMaterial, watchLinkedFolders } from "../src/server/course-context.ts";
+import { createCourseContexts, watchLinkedFolders } from "../src/server/course-context.ts";
 
 describe("context from the record", () => {
 	const record = {
@@ -171,6 +171,20 @@ describe("context on the real engine", { skip: !realEngine && "learning engine n
 		assert.equal((await contexts().linkFolder(dir, path.join(TMP, "nowhere"))).ok, false);
 	});
 
+	it("a linked folder is listed by the engine's own scan, so what its git tree ignores is never registered", async () => {
+		const dir = course("link-git");
+		const folder = path.join(REAL_TMP, "repo-notes");
+		fs.mkdirSync(path.join(folder, "build"), { recursive: true });
+		execFileSync("git", ["init", "-q", folder]);
+		fs.writeFileSync(path.join(folder, ".gitignore"), "build/\n");
+		fs.writeFileSync(path.join(folder, "notes.md"), "# Notes\n");
+		fs.writeFileSync(path.join(folder, "build", "notes.md"), "# A build copy\n");
+		assert.ok((await contexts().linkFolder(dir, folder)).ok);
+		const paths = Object.values(record(dir).sources as Record<string, { path: string }>).map((s) => s.path);
+		assert.ok(paths.includes(path.join(folder, "notes.md")));
+		assert.ok(!paths.includes(path.join(folder, "build", "notes.md")), "git's ignored build copy is left out, as the course folder's own scan leaves it");
+	});
+
 	it("a website is registered under its site's name; a typed address reads as https", async () => {
 		const dir = course("website");
 		const added = await contexts().addWebsite(dir, "probabilitycourse.com/chapter1");
@@ -251,15 +265,3 @@ describe("context on the real engine", { skip: !realEngine && "learning engine n
 	});
 });
 
-describe("a folder's material", () => {
-	it("lists readable files under the folder by path, skipping hidden ones and dependency trees", () => {
-		const folder = path.join(TMP, "listing");
-		fs.mkdirSync(path.join(folder, "node_modules", "x"), { recursive: true });
-		fs.mkdirSync(path.join(folder, "b"), { recursive: true });
-		fs.writeFileSync(path.join(folder, "node_modules", "x", "README.md"), "");
-		fs.writeFileSync(path.join(folder, "b", "two.pdf"), "");
-		fs.writeFileSync(path.join(folder, "a.tex"), "");
-		fs.writeFileSync(path.join(folder, "a.png"), "");
-		assert.deepEqual(folderMaterial(folder), [path.join(folder, "a.tex"), path.join(folder, "b", "two.pdf")]);
-	});
-});

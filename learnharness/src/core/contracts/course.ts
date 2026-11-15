@@ -105,8 +105,9 @@ export type CourseVerb =
 	/** Register files as the course's material; paths are relative to the
 	 *  course folder. */
 	| { verb: "sources"; add: readonly string[] }
-	/** List the course folder's material and where that folder is. */
-	| { verb: "sources"; scan: true }
+	/** List the course folder's material and where that folder is, or with
+	 *  a path that of a folder linked to the course, by the engine's rules. */
+	| { verb: "sources"; scan: true | string }
 	/** Delete the whole course record; the folder and its files stay. */
 	| { verb: "forget-course" };
 

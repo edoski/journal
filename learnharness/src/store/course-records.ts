@@ -90,7 +90,7 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 		case "standing":
 			return { args: ["standing"], stdin: "" };
 		case "sources":
-			return { args: "scan" in verb ? ["sources", "--scan"] : ["sources", "--add", ...verb.add], stdin: "" };
+			return { args: "scan" in verb ? ["sources", verb.scan === true ? "--scan" : `--scan=${verb.scan}`] : ["sources", "--add", ...verb.add], stdin: "" };
 		case "forget-course":
 			return { args: ["forget", "--course"], stdin: "" };
 	}

@@ -31,7 +31,7 @@ python -m learning.install --study-root DIR                      # offer the MCP
 | `plan [--all] [--days N]` | the reviews the daily plan puts today and on the days after, open work, exam countdown, Journal study time, the last 7 days (`week`), the daily plan for the next N days (`plan`: each day's reviews and new topics, and why each new topic comes then (`why`), every course planned together: everything owed until the learner has shown a limit on that weekday, in `capacity`) and, within 21 days of an exam, the run-up (`runup`) |
 | `save [--check]` | apply a JSON patch from stdin; returns observation ids, review dates, level changes, notes and the arc each new topic joined (`arcs_placed`); `--check` runs the same steps and writes nothing |
 | `migrate --all` / `--workspace DIR` [`--to 6`] / `--restore BACKUP` | move course records from schema 6 to 7, or back with `--to 6`, each after a byte-for-byte backup under `backups/` in the learning support folder; `--restore` puts a backup back. Run only by hand at a schema change: no load, save or host start migrates |
-| `sources --scan` / `--add PATH...` | find and register course material |
+| `sources --scan [DIR]` / `--add PATH...` | find and register course material; with `DIR`, list a folder linked to the course by the same rules |
 | `forget HANDLE...` / `--course` | remove exactly what the learner asked to forget |
 | `note --title T` | write a Markdown note from stdin to `study-notes/` |
 | `init`, `link`, `unlink`, `readiness` | workspace lifecycle and host checks |
