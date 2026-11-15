@@ -182,6 +182,31 @@ describe("sessionMarkdown — the practice join (owner-approved, 2026-10-06)", (
 	});
 });
 
+describe("predictions and Show me read back as what they were (round 8, 1 D2)", () => {
+	it("an explain asked as a prediction reads Prediction, never counted and never a gap; a check stays a Recall check", () => {
+		const md = sessionMarkdown(
+			[
+				callMsg("a1", "p1", "explain", { question: "Which lines does A keep?", type: "predict" }),
+				result("r1", "p1", "explain", { questionText: "Which lines does A keep?", text: "the axes" }),
+				callMsg("a2", "c1", "explain", { question: "Find the eigenvalues.", type: "check" }),
+				result("r2", "c1", "explain", { questionText: "Find the eigenvalues.", text: "2 and 5" }),
+			],
+			{ anchors: false },
+		);
+		assert.match(md, /### Prediction\n\n\*\*Q:\*\* Which lines does A keep\?\n\nAsked before the teaching: a prediction never counts, and its miss is never a gap\./);
+		assert.match(md, /### Recall check\n\n\*\*Q:\*\* Find the eigenvalues\./);
+		assert.equal(md.match(/never counts/g)?.length, 1);
+	});
+
+	it("a Show me answer says he gave up and saw the answer", () => {
+		const md = sessionMarkdown(
+			[callMsg("a1", "s1", "explain", { question: "Which vectors does S keep?", type: "check" }), result("r1", "s1", "explain", { questionText: "Which vectors does S keep?", text: "S - I = 0 1 0 0, so", showMe: true })],
+			{ anchors: false },
+		);
+		assert.match(md, /The learner pressed Show me: he gave up on it and was shown the answer\./);
+	});
+});
+
 describe("sessionMarkdown", () => {
 	it("assembles blocks in order under the title header, skipping nothings", () => {
 		const md = sessionMarkdown([user("u1", "go"), teacher("a1", "First."), user("u2", "  ")], { title: "My session" });

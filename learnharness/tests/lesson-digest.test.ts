@@ -21,7 +21,7 @@ const { chatStore } = await import("../src/store/chats.ts");
 const { emit, subscribe } = await import("../src/core/events.ts");
 const { newSessionModeMessage, newUserMessage } = await import("../src/core/native-messages.ts");
 const { digestArcs, digestChanges, digestProblems, digestWindow, knowledgeHandle, placedIn } = await import("../src/core/lesson-digest.ts");
-const { createLessonDigest } = await import("../src/agent/subagents/lesson-digest.ts");
+const { createLessonDigest, DIGEST_INSTRUCTIONS } = await import("../src/agent/subagents/lesson-digest.ts");
 const { backgroundRuns } = await import("../src/agent/subagents/background-runs.ts");
 const { onLessonEvents, resumeCutDigests } = await import("../src/server/lesson-finish.ts");
 type LhMessage = import("../src/core/native-messages.ts").LhMessage;
@@ -180,6 +180,12 @@ function submitEngine(input: unknown | ((prompt: string) => unknown), onCall?: (
 	faux.setResponses(Array.from({ length: 8 }, () => answer));
 	return fakeEngine({ model: faux.getModel(), streamFn: faux.streamSimple });
 }
+
+describe("the digest and predictions (round 8, 1 D2)", () => {
+	it("is told a prediction's miss is never a gap, and reads each prediction as one", () => {
+		assert.match(DIGEST_INSTRUCTIONS, /Never write what a prediction got wrong as a `gap`, on its topic or any other/);
+	});
+});
 
 describe("the digest's patch", () => {
 	const view = {

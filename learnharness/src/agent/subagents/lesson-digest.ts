@@ -91,6 +91,7 @@ Rules:
 - Judge from the whole lesson, to its end. A later answer that went wrong outweighs an earlier one that went right: never call a step smooth when a later turn showed a gap in it.
 - Every topic and knowledge entry names its \`step\`: a plan step the lesson reached (marked current or visited under "The lesson's plan"), or "${WARM_UP}" for the part before the plan. Record nothing about a step the lesson did not reach, even when the plan or the tutor described it in advance.
 - Graded answers are already recorded. Never restate an attempt; judge from the learner's questions, confusions, explanations and self-corrections.
+- A prediction (a \`Prediction\` in the lesson, saved with \`predicted\`) is a guess before the teaching: a wrong one is expected. Never write what a prediction got wrong as a \`gap\`, on its topic or any other, not even beside a later miss.
 - Leave out what the saves made during the lesson already hold, and anything the lesson did not show.
 - Write to the learner, in plain words they understand days later: "you", never "he" or "the learner"; no dates or ids; math in $…$.
 - When nothing is worth recording, submit empty lists.`;
