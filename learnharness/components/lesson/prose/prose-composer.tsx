@@ -7,6 +7,7 @@ import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Hint } from "@/components/ui/hint";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEnterSubmits } from "@/components/enter-submits";
+import { ShowMeConfirm } from "@/components/abort-turn-dialog";
 import { stepConfidence } from "@/components/confidence-choice";
 import { usePhotoDraft, sentPhotos } from "@/components/photos";
 import { ComposerIcon, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
@@ -252,8 +253,18 @@ function AnswerComposer({
 		forgetBox();
 		onSubmitAnswer(proseHintRequest(spec, text));
 	};
+	// Show me gives the check or problem up, so it asks first: once the
+	// answer is on screen nothing can take the give-up back (round 8).
+	const [confirmShow, setConfirmShow] = useState<"question" | "problem" | null>(null);
 	// Show me on a check: he gives up, his words going with it as his work.
 	const showMe = () => {
+		if (!spec?.showsAnswer || waiting) return;
+		setConfirmShow("question");
+	};
+	const shown = () => {
+		const what = confirmShow;
+		setConfirmShow(null);
+		if (what === "problem") return onRequest("show", text.trim());
 		if (!spec?.showsAnswer || waiting) return;
 		forgetBox();
 		onSubmitAnswer(proseShowMeRequest(spec, text));
@@ -261,6 +272,7 @@ function AnswerComposer({
 	// A request on a problem carries the work so far and leaves it in the field.
 	const request = (kind: PracticeRequest) => {
 		if (waiting) return;
+		if (kind === "show") return setConfirmShow("problem");
 		onRequest(kind, text.trim());
 	};
 	const actRef = useRef({ hint, showMe, request });
@@ -323,20 +335,23 @@ function AnswerComposer({
 	);
 	const placeholder = problem ? "Work here, think out loud." : spec ? prosePlaceholder(spec, open.kind === "question" ? open.input : null, selection.selected.size > 0) : undefined;
 	return (
-		<LessonComposer
-			busy={busy}
-			value={text}
-			onChange={setText}
-			onSend={submit}
-			onStop={message.onStop}
-			canSend={ready}
-			placeholder={placeholder}
-			leading={leading}
-			toolbar={toolbar}
-			answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
-			head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
-			photos={textMode ? photos : undefined}
-		/>
+		<>
+			<LessonComposer
+				busy={busy}
+					value={text}
+				onChange={setText}
+				onSend={submit}
+				onStop={message.onStop}
+				canSend={ready}
+				placeholder={placeholder}
+				leading={leading}
+				toolbar={toolbar}
+				answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
+				head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
+				photos={textMode ? photos : undefined}
+			/>
+			{confirmShow && typeof document !== "undefined" && <ShowMeConfirm what={confirmShow} onClose={() => setConfirmShow(null)} onConfirm={shown} />}
+		</>
 	);
 }
 

@@ -10,7 +10,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { STOP_WORDS } from "@/components/study-words";
+import { SHOW_WORDS, STOP_WORDS } from "@/components/study-words";
 
 /**
  * The ESC-abort guard (owner, 2026-10-02): the global Esc → abort chain
@@ -71,6 +71,27 @@ export function AbortTurnBody({
 				<AlertDialogFooter className="pt-2">
 					<AlertDialogCancel data-testid="abort-turn-cancel">Cancel</AlertDialogCancel>
 					<Button variant="destructive" data-testid="abort-turn-confirm" onClick={onConfirm}>
+						{copy.action}
+					</Button>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
+	);
+}
+
+/** Show me's confirm, in the same anatomy: Cancel, and Show me. */
+export function ShowMeConfirm({ what, onClose, onConfirm }: { what: keyof typeof SHOW_WORDS; onClose: () => void; onConfirm: () => void }) {
+	const copy = SHOW_WORDS[what];
+	return (
+		<AlertDialog open onOpenChange={(open) => !open && onClose()}>
+			<AlertDialogContent data-testid="show-me-dialog" className="max-w-sm">
+				<AlertDialogHeader>
+					<AlertDialogTitle>{copy.title}</AlertDialogTitle>
+					<AlertDialogDescription>{copy.line}</AlertDialogDescription>
+				</AlertDialogHeader>
+				<AlertDialogFooter className="pt-2">
+					<AlertDialogCancel data-testid="show-me-cancel">Cancel</AlertDialogCancel>
+					<Button data-testid="show-me-confirm" onClick={onConfirm}>
 						{copy.action}
 					</Button>
 				</AlertDialogFooter>
