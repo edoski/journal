@@ -220,13 +220,19 @@ export class SdkAgent {
 
 		const webSearch = this.config.webSearch === true;
 		const instructions = this.config.compactionInstructions;
+		// Claude Code's summary of a compaction, read by its PostCompact hook,
+		// which runs before the compact boundary reaches the stream.
+		let summary: string | undefined;
 		const options: Options = {
 			...launch.options,
 			systemPrompt: { type: "custom", prompt: this.config.systemPrompt, snapshot: false },
 			tools: webSearch ? ["WebSearch"] : [],
 			allowedTools: [`mcp__${SDK_TOOL_SERVER}`, ...(webSearch ? ["WebSearch"] : [])],
 			mcpServers: { [SDK_TOOL_SERVER]: server },
-			...(instructions ? { hooks: { PreCompact: [{ hooks: [async () => ({ systemMessage: instructions(this.state.messages as LhMessage[]) })] }] } } : {}),
+			hooks: {
+				...(instructions ? { PreCompact: [{ hooks: [async () => ({ systemMessage: instructions(this.state.messages as LhMessage[]) })] }] } : {}),
+				PostCompact: [{ hooks: [async (input) => { if (input.hook_event_name === "PostCompact") summary = input.compact_summary; return {}; }] }],
+			},
 			abortController: this.controller,
 			...(this.config.ephemeral ? { persistSession: false, maxTurns: this.config.ephemeral.maxTurns } : {}),
 			...(resume.resume ? { resume: resume.resume } : {}),
@@ -241,7 +247,6 @@ export class SdkAgent {
 		let rateLimit: ClaudeRateLimit | undefined;
 		let errorCode: string | undefined;
 		let errorStatus: number | undefined;
-		let compaction: { tokensBefore: number } | undefined;
 		let outcome = "failed" as "success" | "failed";
 		const provider = this.state.model.provider;
 
@@ -296,8 +301,9 @@ export class SdkAgent {
 						if (message.apiKeySource !== "none") { this.fail(CLAUDE_API_KEY_REFUSAL); return false; }
 						if (!message.mcp_servers.some((s) => s.name === SDK_TOOL_SERVER && s.status === "connected")) { this.fail(CLAUDE_TOOLS_MISSING); return false; }
 					} else if (message.subtype === "compact_boundary") {
-						compaction = { tokensBefore: message.compact_metadata.pre_tokens };
 						anchor = uuid ?? anchor;
+						if (summary !== undefined) this.append(newCompactionMarker(compactSummary(summary), { firstKeptMessageId: "", tokensBefore: message.compact_metadata.pre_tokens, model: `${provider}:${CLAUDE_MODEL.id}`, at: new Date().toISOString() }) as AgentMessage);
+						summary = undefined;
 					}
 					return true;
 				}
@@ -328,12 +334,6 @@ export class SdkAgent {
 					if ((message as { isReplay?: boolean }).isReplay) {
 						const steer = uuid ? this.inFlight.get(uuid) : undefined;
 						if (steer) { this.inFlight.delete(uuid!); this.append(steer.message); }
-						return true;
-					}
-					if ((message as { isSynthetic?: boolean }).isSynthetic && compaction) {
-						const text = typeof message.message.content === "string" ? message.message.content : "";
-						this.append(newCompactionMarker(compactSummary(text), { firstKeptMessageId: "", tokensBefore: compaction.tokensBefore, model: `${provider}:${CLAUDE_MODEL.id}`, at: new Date().toISOString() }) as AgentMessage);
-						compaction = undefined;
 						return true;
 					}
 					const content = message.message.content;
@@ -420,10 +420,9 @@ export class SdkAgent {
 	}
 }
 
-/** The summary Claude Code writes when it compacts, without its framing. */
-export function compactSummary(text: string): string {
-	const start = text.indexOf("Summary:");
-	const body = start >= 0 ? text.slice(start + "Summary:".length) : text;
-	const tail = body.search(/\n(If you need specific details from before compaction|Continue the conversation from where it left off)/);
-	return (tail >= 0 ? body.slice(0, tail) : body).trim();
+/** The summary of Claude Code's compaction (PostCompact's `compact_summary`)
+ *  without the analysis the model drafts before it. */
+export function compactSummary(raw: string): string {
+	const summary = /<summary>([\s\S]*?)<\/summary>/.exec(raw);
+	return (summary ? summary[1]! : raw.replace(/<analysis>[\s\S]*?<\/analysis>/, "")).trim();
 }

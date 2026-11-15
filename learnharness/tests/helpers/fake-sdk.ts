@@ -195,7 +195,8 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 				yield { type: "system", subtype: "compact_boundary", compact_metadata: { trigger: "auto", pre_tokens: 123_000 }, session_id: id, uuid: randomUUID() } as unknown as SDKMessage;
 				const uuid = randomUUID();
 				const text = `This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.\n\nSummary:\n${summary}\n\nIf you need specific details from before compaction, read the full transcript at: ${base.transcript_path}`;
-				yield { type: "user", isSynthetic: true, message: { role: "user", content: text }, parent_tool_use_id: null, session_id: id, uuid } as unknown as SDKMessage;
+				// Claude Code's automatic compaction sends its summary message as blocks (2.1.319).
+				yield { type: "user", isSynthetic: true, message: { role: "user", content: [{ type: "text", text }] }, parent_tool_use_id: null, session_id: id, uuid } as unknown as SDKMessage;
 				history = [{ uuid, message: { role: "user", content: [{ type: "text", text }], timestamp: Date.now() } }, ...history.slice(-1)];
 			}
 			let requests = 0;
