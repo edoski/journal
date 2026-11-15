@@ -59,41 +59,27 @@ function serverEntry() {
 // (pdfjs+Skia, resvg — no browser); DEMOS execute JS and need one. The
 // app's own Chromium serves that via this helper — the server spawns
 //   <this binary> --browser-service
-// and connects over CDP (system Chrome stays the fallback). Handshake:
-// the helper prints "BROWSER_SERVICE_CDP <port>" on stdout once the CDP
-// endpoint listens. Lifetime: parent IPC disconnect/death = quit.
+// and connects over CDP (system Chrome stays the fallback). Chromium picks
+// the port and prints "DevTools listening on ws://…" on stderr, which the
+// server reads. Lifetime: parent IPC disconnect/death = quit.
 // MUST run before the single-instance lock — a helper is a second
 // instance of this very binary, and before the LH_DEV_URL redirect — the
 // helper owns no user data at all.
 if (process.argv.includes("--browser-service")) {
-	const { waitForBrowserService } = require("./browser-service-readiness.cjs");
-	// Own the helper's entire startup lifetime, including the readiness wait.
-	const lifetime = new AbortController();
-	const parentClosed = () => {
-		lifetime.abort(new Error("browser-service parent IPC disconnected"));
-		app.quit();
-	};
 	(async () => {
 		try {
-			// Full Windows Electron replaces stdin with synthetic EOF. Use the
-			// real Node IPC channel, and refuse to start an unowned helper.
+			// Refuse to start a helper no parent owns.
 			if (!process.channel || !process.connected) throw new Error("browser-service requires connected parent IPC");
-			process.once("disconnect", parentClosed);
+			process.once("disconnect", () => app.quit());
 			app.dock?.hide();
-			const port = await freePort();
 			// Must land before app-ready for Chromium to pick it up.
-			app.commandLine.appendSwitch("remote-debugging-port", String(port));
+			app.commandLine.appendSwitch("remote-debugging-port", "0");
 			await app.whenReady();
-			// A hidden window keeps the app lifecycle ordinary on every
-			// platform (no window-all-closed handler is installed here).
+			// The page target CDP clients drive; hidden, and no
+			// window-all-closed handler is installed here.
 			const win = new BrowserWindow({ show: false });
 			await win.loadURL("about:blank");
-			// Window load is not a DevTools HTTP readiness barrier. Confirm the
-			// endpoint before both production and smoke clients see the handshake.
-			await waitForBrowserService(port, { signal: lifetime.signal });
-			if (!lifetime.signal.aborted) console.log(`BROWSER_SERVICE_CDP ${port}`);
 		} catch (err) {
-			if (lifetime.signal.aborted) return; // Parent disconnect is normal.
 			console.error("browser-service failed:", err);
 			app.exit(1);
 		}
