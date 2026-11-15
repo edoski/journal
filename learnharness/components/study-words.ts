@@ -393,6 +393,22 @@ export function examGapPickWords(starts: boolean, title: string): string {
 	return `${starts ? EXAM_GAP_WORDS.startTopic : EXAM_GAP_WORDS.reviewTopic} ${title} today`;
 }
 
+/** The taught topics the final review leaves out, a line per reason,
+ *  under the calendar's "Final review" line: "No room in it for Kernel",
+ *  "Poisson starts too close to the exam for a review", "No study day left
+ *  in it for Geometric". Each reason in the head's words (`examGapWhyWords`),
+ *  so the two never disagree (round 9: "No room in it for Poisson" beside
+ *  the head's "starts too close to the exam"). Pure. */
+export function finalReviewGapWords(topics: readonly ExamGapTopic[]): string[] {
+	const by = (reason: ExamGapReason) => topics.filter((t) => (t.reason ?? "full") === reason).map((t) => t.title);
+	const [full, late, noDay] = [by("full"), by("too_late"), by("no_study_day")];
+	return [
+		...(full.length > 0 ? [`No room in it for ${listWords(full)}`] : []),
+		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
+		...(noDay.length > 0 ? [`No study day left in it for ${listWords(noDay)}`] : []),
+	];
+}
+
 /** The taught topics the final review has no room for, standing alone
  *  (the calendar's "No room in it for" reads under its final review). */
 export function finalReviewMissWords(titles: readonly string[]): string {

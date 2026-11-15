@@ -1,7 +1,7 @@
 import { isReviewSession, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords } from "@/components/study-words";
+import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 
@@ -33,7 +33,7 @@ export type CalendarEntry =
 			road: readonly RoadWeek[];
 			finalReview: string | null;
 			doesNotFit: readonly string[];
-			unreviewed: readonly string[];
+			unreviewed: readonly ExamGapTopic[];
 			allStarted: boolean;
 			next: NextMove | null;
 	  }
@@ -108,12 +108,12 @@ function weekOf(day: string): string {
 }
 
 /** The road to an exam: the daily plan's new topics before it, a line per
- *  week. Pure. */
-export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (handle: TopicHandle) => string): RoadWeek[] {
+ *  week, a week split at the final review's start (`roadLines`). Pure. */
+export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (handle: TopicHandle) => string, finalReview: string | null = null): RoadWeek[] {
 	const weeks: { key: string; from: string; to: string; titles: string[] }[] = [];
 	for (const day of planned) {
 		if (day.new.length === 0 || day.date >= exam) continue;
-		const key = weekOf(day.date);
+		const key = `${weekOf(day.date)}${finalReview !== null && day.date >= finalReview ? ":final" : ""}`;
 		const last = weeks.at(-1);
 		if (last?.key === key) {
 			last.to = day.date;
@@ -121,6 +121,22 @@ export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (h
 		} else weeks.push({ key, from: day.date, to: day.date, titles: day.new.map(titleOf) });
 	}
 	return weeks.map(({ from, to, titles }) => ({ from, to, titles }));
+}
+
+/** One line of the road to an exam: a week of new topics, or the final
+ *  review's start. */
+export type RoadLine = { kind: "week"; week: RoadWeek } | { kind: "final"; day: string };
+
+/** The road's lines by date: the final review before the first week that
+ *  starts on or after its day (`roadOf` splits a week at it), so a start
+ *  inside it never reads above it (round 9: "17 Nov Variance" above "Final
+ *  review from 13 Nov", "18 Nov Poisson" above "Final review now"). Pure. */
+export function roadLines(road: readonly RoadWeek[], finalReview: string | null): RoadLine[] {
+	const weeks = road.map((week): RoadLine => ({ kind: "week", week }));
+	if (finalReview === null) return weeks;
+	const at = road.findIndex((week) => week.from >= finalReview);
+	const index = at < 0 ? weeks.length : at;
+	return [...weeks.slice(0, index), { kind: "final", day: finalReview }, ...weeks.slice(index)];
 }
 
 /** The day memory asked for a review: the engine dates a due review on
@@ -295,11 +311,15 @@ export function calendarEntries({
 		const course = { workspace: map.workspace, title: map.title };
 		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 		if (map.exam) {
-			const road = roadOf(planned, map.exam.date, titleOf);
+			const road = roadOf(planned, map.exam.date, titleOf, finalReview);
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
 			const step = nextStepOf(studied);
 			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), move: courseMove(studied, chats) } : null;
-			const unreviewed = (map.exam.unreviewed ?? []).map(titleOf);
+			const reasons = map.exam.reasons ?? {};
+			const unreviewed = (map.exam.unreviewed ?? []).map((h): ExamGapTopic => {
+				const reason = reasons[h];
+				return reason ? { title: titleOf(h), reason } : { title: titleOf(h) };
+			});
 			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
@@ -424,11 +444,6 @@ export function finalReviewWords(day: string | null, today: string): string | nu
 /** "A, B and C". */
 function listWords(items: readonly string[]): string {
 	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-}
-
-/** The taught topics the final review has no room for, named. */
-export function unreviewedWords(titles: readonly string[]): string | null {
-	return titles.length > 0 ? `No room in it for ${listWords(titles)}` : null;
 }
 
 /** The topics the plan has no room to start before the exam, named. */
