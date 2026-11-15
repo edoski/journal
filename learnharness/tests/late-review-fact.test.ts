@@ -22,14 +22,14 @@ describe("a late review", () => {
 	it("is the card's line, in the list's words", () => {
 		const c = course({ kind: "scheduled", date: "2026-11-20", held: { since: "2026-11-06", exam: null } });
 		const said = sidebarSays([c], [], c.map.workspace).get("cramer" as TopicHandle);
-		assert.equal(said?.fact?.words, "Due since 6 Nov");
-		assert.equal(cardLine(said)?.words, "Due since 6 Nov", "the map says what the list says");
+		assert.equal(said?.fact?.words, "Due since 6 Nov, back 20 Nov");
+		assert.equal(cardLine(said)?.words, "Due since 6 Nov, back 20 Nov", "the map says what the list says, with the day it comes back (round 8)");
 	});
 
 	it("leaves a review dated ahead off the card, which says where he stands", () => {
 		const c = course({ kind: "scheduled", date: "2026-11-20" });
 		const said = sidebarSays([c], [], c.map.workspace).get("cramer" as TopicHandle);
-		assert.match(said?.fact?.words ?? "", /^Back in/);
+		assert.match(said?.fact?.words ?? "", /^Back /);
 		assert.equal(cardLine(said), null);
 	});
 });

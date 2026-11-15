@@ -197,7 +197,7 @@ describe("a settled question", () => {
 });
 
 describe("question context renders as markdown everywhere (owner, 2026-10-12)", () => {
-	it("an open question: ask option descriptions render LaTeX, not plain text", () => {
+	it("an open question: ask options draw their labels alone, no description under them (round 8: the goal question's helper lines)", () => {
 		const html = renderToStaticMarkup(<ProseQuestion
 			tool="ask_user_question"
 			toolCallId="d1"
@@ -210,14 +210,11 @@ describe("question context renders as markdown everywhere (owner, 2026-10-12)", 
 				],
 			}}
 		/>);
-		// The description rides the same MessageResponse path as the label:
-		// KaTeX spans render inside the option subtext.
-		const katexCount = (html.match(/class="katex"/g) ?? []).length;
-		assert.ok(katexCount >= 2, `option description math renders (got ${katexCount})`);
-		assert.ok(!html.includes("$\\text"), "raw dollar delimiters do not leak as visible text");
+		assert.match(html, /Pencil/);
+		assert.doesNotMatch(html, /graphite|classic/, "the description never renders");
 	});
 
-	it("a settled ask keeps its option descriptions, and a recorded details line stays off the screen", () => {
+	it("a settled ask draws no option descriptions, and a recorded details line stays off the screen", () => {
 		const input = {
 			question: "Which destination?",
 			details: "A guess with a reason is worth more than a computed answer here.",
@@ -236,8 +233,8 @@ describe("question context renders as markdown everywhere (owner, 2026-10-12)", 
 		};
 		const answer = buildAnswer(qd, { values: ["Classical"] });
 		const html = renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="d2" input={input} output={answer} open={false} />);
-		assert.match(html, /Entropy/, "the option description text is present");
-		assert.ok((html.match(/class="katex"/g) ?? []).length >= 1, "description math renders");
+		assert.match(html, /Classical/);
+		assert.doesNotMatch(html, /Entropy/, "the option description never renders");
 		assert.doesNotMatch(html, /A guess with a reason/, "an old record's helper line never renders");
 		const open = renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="d2" input={input} open />);
 		assert.doesNotMatch(open, /A guess with a reason/, "nor under an open question");

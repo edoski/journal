@@ -14,7 +14,7 @@ One of Today's lines as a sidebar card (`unit-inbox.md`, "Today on top"). `now-c
 
 ## The course card
 
-A course's line with no topic to lead with (an open task that holds no topic of the map, on a course with no current topic): line 1 is its course's mark and name and the line's reason ("Left off today"); line 2 the line's name ("Continue Past exam paper 2024"); the action is the line's Home word, as on a topic card. A click opens the course's page. `data-sidebar-row` is `course:<workspace>`.
+A course's line with no topic to lead with (an open task that holds no topic of the map, on a course with no current topic): line 1 is its course's mark and name and the line's reason ("Left off today"); line 2 the line's name ("Continue Past exam paper 2024"); the action is the line's Home word, as on a topic card. A click takes the line up as Home's line does (`courseCardMove`, `courseMove`): it opens the session that holds the step, else starts the lesson on it; never the course page (round 8: "Continue Problem sheet 4" opened the course page). `data-sidebar-row` is `course:<workspace>`.
 
 ## The session card
 

@@ -42,7 +42,7 @@ const askOptionProps = {
 		}),
 	),
 	description: Type.Optional(
-		Type.String({ description: "Optional extra detail shown below the option" }),
+		Type.String({ description: "Never shown to him: the label alone says what the option is." }),
 	),
 };
 

@@ -65,7 +65,7 @@ describe("NowCard", () => {
 		assert.equal(doc.querySelector('[data-slot="row-action"]'), null);
 	});
 
-	it("draws a course line with no topic to lead with as its course's card, under Home's name, opening the course page, with Home's action", () => {
+	it("draws a course line with no topic to lead with as its course's card, under Home's name, taking up the work as Home's line does, with Home's action", () => {
 		const exam: StudyCourse = {
 			map: map({ workspace: "/s/exam", title: "Exam prep", tasks: [{ key: "paper", title: "Past paper 2024", step: "Question 3", updated: TODAY }], focus: "paper" }),
 			unready: null,
@@ -77,7 +77,8 @@ describe("NowCard", () => {
 		assert.equal(line!.lead, null, "the task holds no topic");
 		const doc = render(<NowCard line={line!} unit={null} active={false} />);
 		const link = doc.querySelector('[data-testid="unit-row"]')!;
-		assert.equal(link.getAttribute("href"), courseHref("/s/exam"));
+		assert.notEqual(link.getAttribute("href"), courseHref("/s/exam"), "never the course page (round 8, 2 m9)");
+		assert.equal(link.tagName, "BUTTON");
 		assert.equal(link.getAttribute("data-sidebar-row"), "course:/s/exam");
 		assert.match(link.textContent ?? "", /Exam prep.*Left off today.*Continue Past paper 2024/);
 		assert.equal(doc.querySelector('[data-slot="row-action"]')?.textContent, "Continue");

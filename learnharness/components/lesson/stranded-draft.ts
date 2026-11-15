@@ -42,10 +42,11 @@ export function overtakenDraft(before: string | null, after: string | null, draf
 
 const rescueScope = (chatId: string) => `${chatId}:rescued`;
 
-/** Notes the words just rescued into the lesson's message box, kept with
- *  the box so a reload remembers which words they were. */
-export function keepRescue(chatId: string, words: string): void {
-	keepWords(rescueScope(chatId), { text: words });
+/** Notes the words just rescued into the lesson's message box, and the
+ *  dock they were rescued from, kept with the box so a reload remembers
+ *  which words they were. */
+export function keepRescue(chatId: string, words: string, from: string | null = null): void {
+	keepWords(rescueScope(chatId), { text: words, ...(from ? { from } : {}) });
 }
 
 /** Forgets the rescue: he sent, emptied or rewrote the box. */
@@ -58,4 +59,34 @@ export function forgetRescue(chatId: string): void {
 export function holdsRescue(chatId: string, box: string): boolean {
 	const rescued = keptWords(rescueScope(chatId))?.text;
 	return !!rescued && box.trim().endsWith(rescued);
+}
+
+/** Whether the box holds the rescued words and nothing else of his. */
+function onlyRescue(chatId: string, box: string): boolean {
+	const rescued = keptWords(rescueScope(chatId))?.text;
+	return !!rescued && box.trim() === rescued.trim();
+}
+
+/** The message box with newly rescued words: they replace an older rescue
+ *  he left untouched, and follow words of his own (round 8: two rescues
+ *  merged into one block). Pure but for reading the kept rescue. */
+export function rescuedBox(chatId: string, box: string, words: string): string {
+	if (!box.trim() || onlyRescue(chatId, box)) return words;
+	return `${box.trim()}\n\n${words}`;
+}
+
+/** A rescue dies with its own question (round 8: it stayed in the box
+ *  through later questions and came back during a hint with a live Send):
+ *  once a question after the one it was rescued from closes, an untouched
+ *  rescue leaves the box. The box's new words (empty), or null when it
+ *  stays as it is. Forgets the rescue when it leaves. */
+export function boxAfterClose(chatId: string, box: string, closing: string | null): string | null {
+	const rescue = keptWords(rescueScope(chatId));
+	if (!rescue?.text || closing === null || closing === rescue.from) return null;
+	if (!onlyRescue(chatId, box)) {
+		if (!holdsRescue(chatId, box)) forgetRescue(chatId);
+		return null;
+	}
+	forgetRescue(chatId);
+	return "";
 }

@@ -76,9 +76,9 @@ const STANDINGS: Record<string, Partial<CourseMapTopic>> = {
 	basis: { title: "Basis and dimension", level: "independent", review: due(0), tasks: ["sheet-4"] },
 	matmul: { title: "Matrix multiplication", level: "independent", weak: true, review: due(2), signals: { ...QUIET, lapsed: true, mistake: true } },
 	elimination: { title: "Gaussian elimination", level: "assisted", weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 }, mistake: true } },
-	rank: { title: "Rank", level: "assisted", weak: true, review: due(3), signals: { ...QUIET, stale: true } },
+	rank: { title: "Rank", level: "assisted", right: "helped", weak: true, review: due(3), signals: { ...QUIET, stale: true } },
 	kernel: { title: "Kernel", level: "attempted", weak: true, signals: { ...QUIET, confidentErrors: 2, mistake: true } },
-	determinant: { title: "Determinants", level: "assisted", review: due(4) },
+	determinant: { title: "Determinants", level: "assisted", right: "helped", review: due(4) },
 	cramer: { title: "Cramer's rule", level: "introduced", review: due(2) },
 };
 const TOPICS = Object.keys(NEEDS).map((handle) => topic(handle, STANDINGS[handle]));
@@ -127,7 +127,7 @@ describe("where he stands on a topic", () => {
 	});
 
 	it("takes a quarter off a topic he could do on his own that the engine now calls weak, says what the pie shows, and marks every weak topic", () => {
-		assert.deepEqual(standingOf(byHandle("matmul")), { fill: 0.75, slipping: true, words: "Right with help" }, "a 3/4 pie never says On your own");
+		assert.deepEqual(standingOf(byHandle("matmul")), { fill: 0.75, slipping: true, words: "Not right last time" }, "a 3/4 pie never says On your own, nor help while a wrong answer is open (round 8)");
 		assert.deepEqual(standingOf(byHandle("rank")), { fill: 0.75, slipping: true, words: "Right with help" });
 		assert.equal(standingOf(byHandle("determinant")).slipping, false);
 	});

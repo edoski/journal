@@ -96,9 +96,28 @@ describe("a question asked again after a hint", () => {
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, skipped)] }, { parts: [hint, ask("q2", check)] }])], [], "a skip is not set aside");
 	});
 
-	it("draws a rephrasing, and a question that follows an answer", () => {
+	it("is drawn once when reworded too: a re-ask is the same question (round 8: the question printed twice after a hint and after an Ask)", () => {
 		const reworded = { ...check, question: "Along which line does $A$ stretch vectors?" };
-		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), ask("q2", reworded)] }])], []);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), ask("q2", reworded)] }])], ["q2"]);
+		const aside = dismissedAnswer("explain", check.question, "asked");
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, aside)] }, { parts: [hint, ask("q2", reworded)] }])], ["q2"]);
+	});
+
+	it("draws a different question after a hint in full: another step, or another form", () => {
+		const onStep = { ...check, nodeId: "stretch" };
+		const otherStep = { ...check, nodeId: "det", question: "What is $\\det A$?" };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", onStep, hinted), hint, ask("q2", otherStep)] }])], []);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", onStep, hinted), hint, ask("q2", { ...onStep, question: "Which line does $A$ stretch?" })] }])], ["q2"]);
+		const picks = { ...check, options: [{ label: "Along (1,1)" }, { label: "Along (1,-1)" }] };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), hint, ask("q2", picks)] }])], []);
+	});
+
+	it("skips a re-ask the guard refused: the call after it is the one he reads (round 8, this fix's live run)", () => {
+		const refused = { type: "tool-explain", toolCallId: "q2", state: "output-error", input: check };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), hint, refused, ask("q3", check)] }])], ["q3"]);
+	});
+
+	it("draws a question that follows an answer", () => {
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], []);
 	});
 });

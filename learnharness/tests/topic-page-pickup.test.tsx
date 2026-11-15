@@ -25,6 +25,8 @@ import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
 import { mapLessonAtFirst } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
+import { cardLine } from "../components/course-map/topic-map/topic-standing.ts";
+import { trailDays, TRY_WORDS } from "../components/unit-inbox/topic-page/trail/trail-facts.ts";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
 const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), "utf-8"));
@@ -97,10 +99,12 @@ function order(document: Document): string[] {
 }
 
 describe("Now", () => {
-	it("says nothing is planned today, not Nothing due, on a review the plan holds past its due day (round 4)", () => {
+	it("says since when a review the plan holds past its due day is due, as the sidebar says it, never Nothing due (round 4) or Nothing planned today (round 8, 1 D11)", () => {
 		const held = topic("binomial", { title: "Binomial distribution", level: "assisted", introduced: "2026-11-05", review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-06" } } });
 		const { now, scheduled } = pickupSections(factsOf(held));
-		assert.equal(now.words, "Nothing planned today");
+		assert.equal(now.words, "Due since 6 Nov, back 10 Nov", "with the day the plan brings it back, as the sidebar says it");
+		const today = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-08" } } });
+		assert.equal(pickupSections(factsOf(today)).now.words, "Due today");
 		assert.equal(scheduled?.kind, "review");
 		const ahead = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-09" } } });
 		assert.equal(pickupSections(factsOf(ahead)).now.words, "Nothing due", "a review memory asks for later is not due yet");
@@ -199,7 +203,7 @@ describe("a topic not started", () => {
 		assert.deepEqual(
 			why?.builds.map((b) => [b.topic.handle, b.standing.words]),
 			[
-				["rank", "Right with help"],
+				["rank", "Not right last time"],
 				["kernel", "Tried, not right yet"],
 			],
 		);
@@ -210,8 +214,16 @@ describe("a topic not started", () => {
 		assert.deepEqual(
 			rows.map((r) => [r.getAttribute("href"), r.querySelector('[data-slot="pickup-builds-on-standing"]')!.textContent]),
 			[
-				["/unit/L3N0dWR5L2xpbmFsZw/rank", "Right with help"],
-				["/unit/L3N0dWR5L2xpbmFsZw/kernel", "Tried, not right yet"],
+				["/unit/L3N0dWR5L2xpbmFsZw/rank", "Unfinished"],
+				["/unit/L3N0dWR5L2xpbmFsZw/kernel", "Sure, but wrong"],
+			],
+			"each says what its card on the map beside it says (round 8, 3 m12)",
+		);
+		assert.deepEqual(
+			why?.builds.map((b) => [b.topic.handle, b.words, cardLine(facts.said.get(b.topic.handle))?.words]),
+			[
+				["rank", "Unfinished", "Unfinished"],
+				["kernel", "Sure, but wrong", "Sure, but wrong"],
 			],
 		);
 		assert.equal(document.querySelector('[data-slot="pickup-material"]')!.textContent, "Section 4.7Blitzstein and Hwang");
@@ -373,5 +385,19 @@ describe("the history's gutter (Edo, 14 Nov 2026: Now's rule on the Now label, e
 				assert.equal(right ? px(right[1]!) : 0, 12, `${kindOf(row)}: right bleed`);
 			}
 		}
+	});
+});
+
+describe("Earlier's repeated question (round 8, 2 m11)", () => {
+	const attempt = (id: string, text: string, recorded: string) => ({ id, text, recorded, date: TODAY, session: null, topics: ["kernel"], result: "correct", grade: "solid", helped: false, predicted: false, gaveUp: false, uncertain: false, sure: null }) as never;
+	it("prints a practice problem's statement once: its older tries read First try and Then", () => {
+		const statement = "The three columns of a 5 by 3 matrix M are linearly independent. What is the dimension of its kernel?";
+		const rows = trailDays([], [attempt("o36", statement, "2026-11-08T10:03:00Z"), attempt("o35", statement, "2026-11-08T10:02:00Z"), attempt("o34", "Find the rank of C", "2026-11-08T10:01:00Z")], TODAY)[0]!.rows;
+		assert.deepEqual(
+			rows.map((row) => (row.kind === "attempt" ? row.title ?? row.attempt.text : null)),
+			[statement, TRY_WORDS.first, "Find the rank of C"],
+		);
+		const three = trailDays([], [attempt("o3", statement, "2026-11-08T10:03:00Z"), attempt("o2", statement, "2026-11-08T10:02:00Z"), attempt("o1", statement, "2026-11-08T10:01:00Z")], TODAY)[0]!.rows;
+		assert.deepEqual(three.map((row) => (row.kind === "attempt" ? row.title ?? null : null)), [null, TRY_WORDS.then, TRY_WORDS.first]);
 	});
 });

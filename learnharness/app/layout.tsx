@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import "katex/dist/katex.min.css";
 import "@xyflow/react/dist/base.css";
 import "./globals.css";
+import { cookies } from "next/headers";
 import { AppShell, SidebarProvider } from "@/components/sidebar";
+import { SIDEBAR_OPEN_COOKIE, SIDEBAR_WIDTH_COOKIE, sidebarFirstFrame } from "@/components/sidebar-cookies";
 import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
@@ -12,7 +14,11 @@ export const metadata: Metadata = {
 	description: "A teacher agent with a memory — lessons, practice, and a course record of what you know.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+	// The sidebar's open state and width, as the learner left them, so the
+	// first frame is the settled layout and nothing slides in on load.
+	const jar = await cookies();
+	const sidebar = sidebarFirstFrame(jar.get(SIDEBAR_OPEN_COOKIE)?.value, jar.get(SIDEBAR_WIDTH_COOKIE)?.value);
 	return (
 		<html lang="en" className="dark">
 			<body className="min-h-dvh antialiased">
@@ -20,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				 and pages all subscribe as the polls retire (push S3, 2026-10-02). */}
 			<ServerEventsProvider>
 				<AppearanceProvider>
-					<SidebarProvider>
+					<SidebarProvider initial={sidebar}>
 						<ActivityProvider>
 							<AppShell>{children}</AppShell>
 						</ActivityProvider>

@@ -1,4 +1,4 @@
-import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
+import { isReviewSession, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -171,12 +171,28 @@ export type TodayRow =
 	| { kind: "course"; course: StudyCourse; step: NextStep };
 
 /** Whether a session works on a course's next step: it holds the open task,
- *  or it was started on, or worked on, every topic the step takes up. */
+ *  or it was started on, or worked on, every topic the step takes up. A
+ *  review is worked on only by a review of those topics: a lesson left on a
+ *  topic due today is not its review (round 8: the promised Eigen review
+ *  showed on Home only as its unfinished lesson, which the row opened). */
 function covers(chat: ChatListItem, step: NextStep): boolean {
 	if (step.kind === "none") return true;
 	if (step.kind === "task" && chat.tasks?.some((key) => key === step.key)) return true;
+	if (step.kind === "review" && !isReviewSession(chat)) return false;
 	const topics = new Set(chat.topics ?? []);
 	return step.topics.every((h) => topics.has(h));
+}
+
+/** Whether a lesson left for next time gives its line to its topic's review
+ *  today: every topic it belongs to is in its course's review today, so the
+ *  review leads, one line per topic, and the lesson's line comes back once
+ *  the review is done; the sidebar's shelves and the topic page still hold
+ *  the lesson. A lesson waiting on him keeps its line. Pure. */
+function yieldsToReview(chat: ChatListItem, course: StudyCourse | null): boolean {
+	if (!course || sessionState(chat) !== "left" || isReviewSession(chat)) return false;
+	const own = chat.ownTopics ?? [];
+	const reviewing = new Set<string>(todaysReview(course).map((t) => t.handle));
+	return own.length > 0 && own.every((h) => reviewing.has(h));
 }
 
 /** The learner's own calendar day of a session's last turn. Pure. */
@@ -191,8 +207,10 @@ const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
  * session shown, or one he ended today, already works on it. A session he ended with Done for today has
  * no line until tomorrow: he said he is done with it for today, and Home's
  * Studied today names it (round 4: the finished lesson stayed the first
- * row). A session stays on its line while the tutor writes. An older
- * session to pick up stays in the sidebar. Pure.
+ * row). A lesson left for next time whose topics are all in today's review
+ * gives its line to that review (`yieldsToReview`). A session stays on its
+ * line while the tutor writes. An older session to pick up stays in the
+ * sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
@@ -200,8 +218,10 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const recent = open.filter((c) => !leftToday(c) && (sessionState(c) === "left" || lastDay(c) >= since));
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
-	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
-	const working = open.filter((c) => recent.includes(c) || leftToday(c));
+	const courseOf = (chat: ChatListItem) => (chat.course && byWorkspace.get(chat.course.workspace)) ?? null;
+	const shown = recent.filter((chat) => !yieldsToReview(chat, courseOf(chat)));
+	const sessions: TodayRow[] = shown.map((chat) => ({ kind: "session", chat, course: courseOf(chat) }));
+	const working = open.filter((c) => shown.includes(c) || leftToday(c));
 	const rest = ordered
 		.flatMap((course): (TodayRow & { kind: "course" })[] =>
 			todaySteps(course)

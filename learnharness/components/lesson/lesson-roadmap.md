@@ -4,7 +4,7 @@ Where this lesson is, in the top bar (`lesson-roadmap.tsx`, facts in `roadmap-fa
 
 ## The strip (the trigger)
 
-A quiet 32px button (`data-slot="lesson-roadmap-trigger"`, `data-testid="roadmap"`), at most 352px: one mark per plan step in teaching order (`data-slot="roadmap-strip"`, 4px apart), then the step he is on at 13/18 muted, truncating, math typeset.
+A quiet 32px button (`data-slot="lesson-roadmap-trigger"`, `data-testid="roadmap"`), as wide as its words, giving way only when the bar is full, in proportion with the crumbs (round 8: "The counting factor for large slot numb…" cut at a fixed 352px with room to spare): one mark per plan step in teaching order (`data-slot="roadmap-strip"`, 4px apart), then the step he is on at 13/18 muted, truncating, math typeset.
 
 | Mark | Step |
 |---|---|
@@ -36,3 +36,5 @@ The steps and statuses come from the transcript, live (`latestTree`, `derivePlan
 ## Sources
 
 Linear's and GitHub's breadcrumb with a disclosure, Apple's step indicators; the plan list's marks (topic page, `steps/step-node.tsx`); Edo's ruling above.
+
+The panel opens with focus on Now, the step he is on (else the last step taught before it), never the first done step (round 8).

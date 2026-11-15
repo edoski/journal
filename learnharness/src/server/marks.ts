@@ -35,7 +35,7 @@ export async function answerMarks(chatId: string): Promise<{ status: 200 | 404; 
 	const chat = stores.chatStore.getChat(chatId);
 	if (!chat) return { status: 404, body: { ok: false, error: "Not found" } };
 	const workspace = chat.course?.workspace;
-	const links = markLinks(chat.messages);
+	const links = markLinks(chat);
 	const linked = [...new Set(Object.values(links).flat())];
 	if (!workspace || linked.length === 0) return { status: 200, body: { ok: true, marks: {} } };
 	const observations = await shown(workspace, linked);

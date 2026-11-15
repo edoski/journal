@@ -22,3 +22,5 @@ macOS's Continuity Camera ("Take Photo", "Scan Documents") is not offered: Elect
 | sent | `data-testid="sent-photos"` | on his message, the answered card and the practice card: 96px square thumbnails; a click opens the session overlay's photo mode (pan, zoom, Esc closes) |
 
 The browser draws each photo upright on white, its long edge at most 2000px, as JPEG, before it is sent; the server reads its real type and resizes again under the model's inline limit. Four photos at most go with one answer.
+
+A HEIC photo (an iPhone photo AirDropped or exported) is taken too: the browser cannot open it, so the box sends it to `/api/photos/heic`, where macOS's `sips` turns it into JPEG, then resizes it like any other photo (round 8). Away from a Mac it is refused in the usual words.

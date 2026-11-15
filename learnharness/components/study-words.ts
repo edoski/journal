@@ -38,13 +38,28 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  since his newest answer that was not right (the engine's `right`), so
  *  an unaided or a partial answer never reads "Right with help", and right
  *  answers after a review day's wrong first try never read "Tried, not
- *  right yet" (round 7). `attempted` with no right answer since keeps its
- *  pie's words; a weak topic he could do on his own keeps its 3/4 pie's
- *  words. Pure. */
-export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right">): string {
-	if (topic.level === "assisted") return RIGHT_WORDS[topic.right ?? "helped"];
-	return topic.level === "attempted" && topic.right ? RIGHT_WORDS[topic.right] : STANDING_WORDS[fill];
+ *  right yet" (round 7). With no right answer since that wrong one (no
+ *  `right`), it says so: "Not right last time", never "Right with help"
+ *  (round 8: Eigen read "Right with help" after a Show me). Right on his
+ *  own drops "check another day" once that day has come, beside the review
+ *  due (round 8). `attempted` with no right answer since keeps its pie's
+ *  words; a weak topic he could do on his own keeps its 3/4 pie's words,
+ *  but says "Not right last time" while a wrong answer is open. Pure. */
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals">>): string {
+	const learning = topic.level === "assisted" || topic.level === "attempted";
+	if (learning && topic.right) return topic.right === "unaided" && topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS[topic.right];
+	// No right answer since his newest wrong one: on a topic still being
+	// learned, or one he could do on his own whose wrong answer is open.
+	if (topic.level === "assisted" || (fill === 0.75 && topic.signals?.mistake)) return WRONG_LAST_WORDS;
+	return STANDING_WORDS[fill];
 }
+
+/** A topic whose newest answer that counts was not right, and none right
+ *  since. */
+const WRONG_LAST_WORDS = "Not right last time";
+
+/** Right on his own, on the day its check has come. */
+const RIGHT_ON_YOUR_OWN = "Right on your own";
 
 /** A slip's words for each of the engine's signals but a mixed-up method,
  *  which names the method (`slipWords`). */
@@ -52,7 +67,7 @@ export const SLIP_WORDS = {
 	repaired: "Fixed, check again later",
 	// Not "Missed": beside an overdue review he read that as a review he
 	// skipped (round 3). A lapse is an answer that was not right.
-	lapsed: "Not right last time",
+	lapsed: WRONG_LAST_WORDS,
 	gap: "Mistake to fix",
 	// A gap with no wrong answer open: two right answers with help left
 	// "still to check on your own" (round 6), never a mistake he made.
@@ -90,6 +105,7 @@ export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) =
  *  check on another day (round 7). */
 export const SLIP_SAID_BY: Readonly<Partial<Record<SlipKey, string>>> = {
 	repaired: RIGHT_WORDS.unaided,
+	lapsed: WRONG_LAST_WORDS,
 };
 
 /** The slip's words alone (`slipMark`). */
@@ -155,10 +171,16 @@ export function leftOffWords(days: number | null): string {
 	return `Left off ${days}d ago`;
 }
 
-/** A review the engine has dated ahead, some days away: "Back in 5d",
- *  "Back in 21d". */
-export function returnWords(days: number): string {
-	return `Back in ${days}d`;
+/** A review the engine has dated ahead, by its day, never a count of
+ *  days (round 8: "Back in 2d" where the tutor said Tuesday 10 November):
+ *  "Back Tue 10 Nov". */
+export function returnWords(day: string): string {
+	return `Back ${weekdayWords(day)}`;
+}
+
+/** "Tue 10 Nov". */
+export function weekdayWords(day: string): string {
+	return SHORT_WEEKDAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
 }
 
 /** Some days ago in a trailing column: "Today", "Yesterday", "3d ago",
@@ -167,6 +189,14 @@ export function agoWords(days: number): string {
 	if (days <= 0) return "Today";
 	if (days === 1) return "Yesterday";
 	return `${days}d ago`;
+}
+
+/** Home's clock beside a course or a session, labelled so it never reads
+ *  as the line's reason: "Studied today", "Studied yesterday", "Studied 7d
+ *  ago" (round 8: "7d ago" above "Planned today" read as a contradiction).
+ *  The short days are `agoWords`'. */
+export function studiedAgoWords(days: number): string {
+	return days <= 1 ? studiedDaysWords(days) : `Studied ${agoWords(days)}`;
 }
 
 /** When he last studied something, as a phrase: "Studied today",
@@ -184,7 +214,7 @@ export const FIRST_LESSON = "First lesson";
 
 const SHORT_DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 /** "1 Oct". */
-const shortDay = (day: string) => SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
+export const shortDay = (day: string) => SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
 
 /** Why a review waits past the day memory asks for it (the engine's
  *  `held`): another course's final review came first, or the days before
@@ -211,23 +241,25 @@ const MOVED_BY = {
 
 /** A day that moved, from when: one he was told ("Moved from 10 Nov after
  *  your Probability study today", round 7: a told day moved in silence),
- *  else a review the plan moved past the day memory asked for it, "Due
- *  since 1 Oct" once that day has passed, else "Moved from 9 Nov" (round
- *  5); null for a day that did neither. */
+ *  else a review the plan holds past a day memory asked for that has
+ *  passed, "Due since 1 Oct"; null otherwise. Memory's day still ahead was
+ *  never a day he was told, so nothing moved "from" it (round 8: "Moved
+ *  from 11 Nov" named a day he never heard). */
 export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
 	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses) : MOVED_BY[told.by]}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
-	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : `Moved from ${shortDay(review.held.since)}`;
+	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
 }
 
 /** A review that is due: "Due today", "3d overdue"; one the plan holds
- *  past a day memory asked for already says since when, "Due since 1 Oct",
- *  so a review weeks late never reads as spacing; any other dated review
- *  "Back in 5d". `today` is the engine's day. */
+ *  past a day memory asked for already says since when, so a review weeks
+ *  late never reads as spacing, and the day the plan brings it back, "Due
+ *  since 1 Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
+ *  any other dated review "Back in 5d". `today` is the engine's day. */
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
 	if (review.kind === "due") return overdueWords(review.overdue);
-	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}`;
-	return returnWords(Math.max(1, daysBetween(today, review.date)));
+	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}, back ${shortDay(review.date)}`;
+	return returnWords(review.date);
 }
 
 /** "A", "A and B", "A, B and C". */
@@ -298,42 +330,73 @@ export const ARC_EXAM_WORDS = {
 export const EXAM_GAP_WORDS = {
 	start: "Start it today",
 	review: "Review it today",
-	startOne: "Start one today",
+	/** The menu of the other topics he can take up today, beside the pick. */
+	another: "Or another",
 	ask: "Ask the tutor",
 	/** Each topic in Start one today's menu: "Start Variance", "Review Rank". */
 	startTopic: "Start",
 	reviewTopic: "Review",
 } as const;
 
-/** Each engine reason (`ExamGapReason`) a topic is left out, in his
- *  words: for a topic with no room to start (`start`), and for a taught
- *  one the final review has no room for (`review`). */
-export const EXAM_GAP_WHY: {
-	start: Readonly<Partial<Record<ExamGapReason, string>>>;
-	review: Readonly<Partial<Record<ExamGapReason, string>>>;
-} = {
-	start: {
-		no_study_day: "No study day is left before the exam",
-		not_ready: "What comes first won’t be solid before the exam",
-		full: "Every study day before the exam is full at your pace",
-	},
-	review: {
-		no_study_day: "No study day is left in the final review",
-		too_late: "Starts too close to the exam for a review",
-		full: "Every day of the final review is full at your pace",
-	},
-};
+/** A topic the exam's plan leaves out, by title, with the engine's reason
+ *  (`exam.reasons`); a topic with no reason reads as `full`. */
+export interface ExamGapTopic {
+	title: string;
+	reason?: ExamGapReason;
+}
+
+/** "it" or "they" for some topics' clause, by their number. */
+const startsWord = (titles: readonly string[]) => (titles.length === 1 ? "starts" : "start");
+
+/**
+ * Why the exam's plan leaves topics out, in at most two sentences (round 8:
+ * five sentences, "full at your pace" twice, and "Starts too close to the
+ * exam for a review" naming no topic): one for the topics with no room to
+ * start (`start`), which the head's first line already names, and one for
+ * the taught topics the final review has no room for (`review`), each
+ * reason said once. A clause names its topics when the first line does not
+ * (the review's topics under a first line about starts), or when its list
+ * has more than one reason; a topic that starts too late is always named.
+ * Your pace is said once: a final review full at your pace is the same
+ * cause as study days full at your pace. Null with nothing left out. Pure.
+ */
+export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly ExamGapTopic[]): string | null {
+	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => (t.reason ?? "full") === reason).map((t) => t.title);
+	const reasons = (topics: readonly ExamGapTopic[]) => new Set(topics.map((t) => t.reason ?? "full")).size;
+	const sentence = (clauses: readonly string[]) => (clauses.length > 0 ? `${clauses.join(", and ").replace(/^./, (c) => c.toUpperCase())}.` : null);
+	const name = start.length > 1 && reasons(start) > 1;
+	const startFull = by(start, "full");
+	const notReady = by(start, "not_ready");
+	const first = sentence([
+		...(by(start, "no_study_day").length > 0 ? ["no study day is left before the exam"] : []),
+		...(startFull.length > 0 ? ["your pace fills every study day before the exam"] : []),
+		...(notReady.length > 0 ? [name ? `what ${listWords(notReady)} ${notReady.length === 1 ? "needs" : "need"} won’t be solid in time` : "what comes first won’t be solid in time"] : []),
+	]);
+	const paceSaid = startFull.length > 0;
+	const named = start.length > 0 || reasons(review) > 1;
+	const full = by(review, "full");
+	const noDay = by(review, "no_study_day");
+	const late = by(review, "too_late");
+	const second = sentence([
+		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${listWords(noDay)}` : "no study day is left in the final review"] : []),
+		...(full.length > 0 ? [named ? `the final review has no room for ${listWords(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
+		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
+	]);
+	const both = [first, second].filter((s): s is string => s !== null);
+	return both.length > 0 ? both.join(" ") : null;
+}
+
+/** The pick among the topics he can take up today, as its press says it:
+ *  "Start Expectation and linearity today", "Review Binomial distribution
+ *  today". */
+export function examGapPickWords(starts: boolean, title: string): string {
+	return `${starts ? EXAM_GAP_WORDS.startTopic : EXAM_GAP_WORDS.reviewTopic} ${title} today`;
+}
 
 /** The taught topics the final review has no room for, standing alone
  *  (the calendar's "No room in it for" reads under its final review). */
 export function finalReviewMissWords(titles: readonly string[]): string {
 	return `No room in the final review for ${listWords(titles)}`;
-}
-
-/** The same, when the head's first line already names a topic with no
- *  room to start. */
-export function examGapEitherWords(titles: readonly string[]): string {
-	return `${finalReviewMissWords(titles)} either`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */
@@ -511,6 +574,14 @@ export const MARK_WORDS = {
 	youThink: "You think",
 } as const;
 
+/** His dispute's stamp in the transcript: "You disputed the mark", then
+ *  what he picked, the mark and how it should count, "You think: Right,
+ *  On your own". One rule for the lesson's row and practice's bubble
+ *  (round 8: practice's stamp dropped a help pick). Pure. */
+export function disputeStampWords(dispute: { proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
+	const picked = [dispute.proposed && MARK_WORDS.result[dispute.proposed], dispute.proposedHow && MARK_HOW_WORDS[dispute.proposedHow]].filter(Boolean);
+	return picked.length > 0 ? `${MARK_WORDS.youDisputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : MARK_WORDS.youDisputed;
+}
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
  *  `stopped` when the kind is unknown. */
@@ -532,10 +603,18 @@ export const STOP_WORDS = {
 	alsoStops: "The tutor's reply stops too.",
 } as const;
 
+/** Show me's confirm: it gives the question or problem up, which no undo
+ *  can take back once the answer is on screen (round 8: Show me gave up
+ *  at once, with no confirm). */
+export const SHOW_WORDS = {
+	question: { title: "Show the answer?", line: "This question counts as given up.", action: "Show me" },
+	problem: { title: "Show the solution?", line: "This problem counts as given up.", action: "Show me" },
+} as const;
+
 /** What stops a course's record being read, after
  *  `LESSON_WORDS.unreadableCourse`, in a student's words. */
 export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {
-	denied: "The app isn't allowed to open its files.",
+	denied: "macOS won't let the app open its files: Get Info on the course folder in Finder shows who can read it.",
 	damaged: "Its file is damaged.",
 	unreadable: "Its file can't be opened.",
 };

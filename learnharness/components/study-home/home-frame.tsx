@@ -6,7 +6,7 @@ import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
-import { doneToday } from "@/components/study-home/day-record";
+import { doneToday, nearExam, type NearExam } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
 import { courseMove, todayCourses, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
@@ -26,6 +26,8 @@ export interface HomeReady {
 	chats: readonly ChatListItem[];
 	/** What he finished today, by title, oldest first (`doneToday`). */
 	done: readonly string[];
+	/** The nearest exam in the coming week, which the heading names (`nearExam`). */
+	exam: NearExam | null;
 	busy: boolean;
 	/** Take up a course line's step, else the course's next (`courseMove`). */
 	onContinue: (workspace: string, step?: NextStep) => void;
@@ -114,6 +116,7 @@ function HomeBody({
 						courses: todayCourses(rows, state.courses),
 						chats: state.chats,
 						done: doneToday(state.chats, new Date()),
+						exam: nearExam(state.courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
 						busy,
 						onContinue: (workspace, step) => {
 							const course = state.courses.find((c) => c.map.workspace === workspace);

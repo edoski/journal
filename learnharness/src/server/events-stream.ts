@@ -24,7 +24,7 @@
  * The closure shape (teardown assigned in start, called in cancel) is the
  * ui-stream subscribe() pattern.
  */
-import { subscribe, type ServerEvent } from "../core/events.ts";
+import { EVENTS_RETRY_MS, subscribe, type ServerEvent } from "../core/events.ts";
 
 /** One window's subscription as an SSE Response. */
 export function eventsResponse(): Response {
@@ -61,6 +61,10 @@ export function eventsResponse(): Response {
 				const { type, ...payload } = event;
 				frame(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`);
 			});
+			// The reconnect wait EventSource uses, the same one the window
+			// waits before opening a channel it gave up on
+			// (core/events.ts EVENTS_RETRY_MS).
+			frame(`retry: ${EVENTS_RETRY_MS}\n\n`);
 			heartbeat = setInterval(() => frame(": ping\n\n"), 25_000);
 
 			teardown = stop;

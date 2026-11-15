@@ -17,3 +17,13 @@ export function showsWorking(messages: readonly LhViewMessage[], busy: boolean):
 	if (part.type === "text") return !part.text?.trim();
 	return !(part.type.startsWith("tool-") && part.state === "input-streaming");
 }
+
+/** The one line under the transcript while he waits: "Compacting the
+ *  conversation…" only while something of his waits on the compaction
+ *  (a turn is running or held for it), else "Thinking…" while a turn runs
+ *  (`showsWorking`); nothing while the lesson waits on him (round 8: the
+ *  compaction line sat under a question waiting on him). Pure. */
+export function waitingLine(messages: readonly LhViewMessage[], { busy, compacting }: { busy: boolean; compacting: boolean }): "compacting" | "thinking" | null {
+	if (compacting && busy) return "compacting";
+	return showsWorking(messages, busy) ? "thinking" : null;
+}

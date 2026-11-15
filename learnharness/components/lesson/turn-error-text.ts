@@ -99,3 +99,16 @@ export function turnErrorText(message: string): TurnErrorText {
 	if (isWritten(text)) return { kind: "written", sentence: text, details: null };
 	return { kind: "failed", sentence: "The reply failed.", details: text === "" ? null : text };
 }
+
+/** Whether the line for a send refused because Claude was signed out has
+ *  outlived its cause (round 8: it stayed red after he signed in and
+ *  pressed Refresh). It waits for the account to read signed out at least
+ *  once while the line shows (`seenSignedOut`, a status read just before
+ *  the refusal can still say connected), then clears the moment it reads
+ *  connected. Pure. */
+export function refusalWatch(seenSignedOut: boolean, refusal: boolean, connected: boolean | undefined): { seenSignedOut: boolean; clear: boolean } {
+	if (!refusal) return { seenSignedOut: false, clear: false };
+	if (connected === false) return { seenSignedOut: true, clear: false };
+	if (connected === true && seenSignedOut) return { seenSignedOut: false, clear: true };
+	return { seenSignedOut, clear: false };
+}

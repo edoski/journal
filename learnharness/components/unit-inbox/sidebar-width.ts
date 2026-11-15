@@ -1,16 +1,21 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
+import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_WIDTH_COOKIE, sidebarCookie } from "@/components/sidebar-cookies";
 
 /** T3 Code's numbers (`threadSidebarWidth.ts`): 16rem by default, 13rem at
  *  least, and the page beside it keeps 40rem. */
-export const SIDEBAR_DEFAULT_WIDTH = 256;
+export { SIDEBAR_DEFAULT_WIDTH };
 export const SIDEBAR_MIN_WIDTH = 208;
 export const MAIN_MIN_WIDTH = 640;
 /** One arrow press on the handle moves the edge this far. */
 export const SIDEBAR_KEY_STEP = 16;
 
 const STORAGE_KEY = "lh:sidebar-width";
+
+/** The width the server drew the page with (the cookie's), which
+ *  hydration must draw too. */
+export const ServerSidebarWidth = createContext(SIDEBAR_DEFAULT_WIDTH);
 
 /** The widest the sidebar may be in a window this wide: the page keeps
  *  640px, and the sidebar never goes under its minimum. Pure. */
@@ -51,19 +56,20 @@ function readWidth(): number {
 	return clampSidebarWidth(parseSidebarWidth(stored), window.innerWidth);
 }
 
-const readDefault = () => SIDEBAR_DEFAULT_WIDTH;
-
 /** Keeps a width the learner chose (null forgets it, back to the default). */
 export function storeSidebarWidth(width: number | null): void {
 	try {
 		if (width === null) localStorage.removeItem(STORAGE_KEY);
 		else localStorage.setItem(STORAGE_KEY, String(Math.round(width)));
+		document.cookie = width === null ? `${SIDEBAR_WIDTH_COOKIE}=; Path=/; Max-Age=0` : sidebarCookie(SIDEBAR_WIDTH_COOKIE, String(Math.round(width)));
 	} catch {}
 	for (const onChange of listeners) onChange();
 }
 
 /** The Proposed sidebar's width: the one the learner dragged to, kept
- *  across reloads, inside the bounds of the window as it is now. */
+ *  across reloads, inside the bounds of the window as it is now. Hydration
+ *  draws the server's (the cookie's) width, so nothing moves on load. */
 export function useSidebarWidth(): number {
-	return useSyncExternalStore(subscribe, readWidth, readDefault);
+	const server = useContext(ServerSidebarWidth);
+	return useSyncExternalStore(subscribe, readWidth, () => server);
 }

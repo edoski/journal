@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
-import type { ArcHandle, TopicHandle } from "@/src/core";
+import type { ArcHandle, CourseStanding, TopicHandle } from "@/src/core";
 import { TOPIC_NODE_SIZE, layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
 import { arcView } from "@/components/course-map/topic-map/arc-view";
 import { ArcStrip } from "@/components/course-map/arc-strip";
@@ -30,11 +30,11 @@ import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Poin
  * Above its arcs, where he picks up and what comes next (`WhatNextRows`).
  */
 export function SplitCourse({ workspace }: { workspace: string }) {
-	return <CourseFrame workspace={workspace}>{({ view, busy, onContinue }) => <SplitBody view={view} busy={busy} onContinue={onContinue} />}</CourseFrame>;
+	return <CourseFrame workspace={workspace}>{({ view, standing, busy, onContinue }) => <SplitBody view={view} standing={standing} busy={busy} onContinue={onContinue} />}</CourseFrame>;
 }
 
 /** The page under its head. */
-function SplitBody({ view, busy, onContinue }: { view: CourseView; busy: boolean; onContinue: (workspace: string) => void }) {
+function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; standing: CourseStanding | null; busy: boolean; onContinue: (workspace: string) => void }) {
 	const { map } = view.course;
 	const { arcs } = view;
 	const [pointed, setPointed] = useState<Pointed | null>(null);
@@ -108,7 +108,7 @@ function SplitBody({ view, busy, onContinue }: { view: CourseView; busy: boolean
 	return (
 		<PageFrame className="h-full">
 			<div ref={headerBox} className="contents" onKeyDown={onHeaderKeyDown}>
-				<CourseHead view={view} busy={busy} onContinue={onContinue} />
+				<CourseHead view={view} standing={standing} busy={busy} onContinue={onContinue} />
 			</div>
 			{map.topics.length === 0 ? (
 				<p data-slot="course-notice" className="flex min-h-8 items-center text-row text-muted-foreground">

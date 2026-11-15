@@ -2,7 +2,7 @@ import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-fact
 import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import type { TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { FIRST_LESSON, LESSON_WORDS, TUTOR_WRITING, overdueWords, startsAfterWords } from "@/components/study-words";
+import { FIRST_LESSON, LESSON_WORDS, TUTOR_WRITING, overdueWords, reviewWords, startsAfterWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -75,14 +75,16 @@ export function plannedWords(facts: TopicFacts): string | null {
 
 /** Now's words on a topic with nothing to take up today: nothing is due,
  *  or, for a review memory asked for already that the plan holds for a
- *  later day, nothing is planned today, since Scheduled says since when it
- *  was due (round 4: "Nothing due" sat above "Due since 6 Nov"). */
+ *  later day, since when it is due, as the sidebar and the map's card say
+ *  it (round 4: "Nothing due" sat above "Due since 6 Nov"; round 8:
+ *  "Nothing planned today" beside the sidebar's "Due since 13 Nov"). */
 export const NOTHING_DUE = "Nothing due";
-export const NOTHING_TODAY = "Nothing planned today";
 
-/** A review the plan holds past the day memory asked for it. */
-function heldPastDue(review: TopicFacts["topic"]["review"], today: string): boolean {
-	return review?.kind === "scheduled" && !!review.held && review.held.since <= today;
+/** Since when a review the plan holds past the day memory asked for it
+ *  is due ("Due since 6 Nov", "Due today"); null for any other. */
+function heldPastDue(review: TopicFacts["topic"]["review"], today: string): string | null {
+	if (review?.kind !== "scheduled" || !review.held || review.held.since > today) return null;
+	return review.held.since < today ? reviewWords(review, today) : overdueWords(0);
 }
 
 /** The step a lesson stopped on, when its tutor planned. */
@@ -129,7 +131,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 		case "start":
 			return { ...base, icon: "standing", words: FIRST_LESSON, note: plannedWords(facts), why: facts.startsWhy };
 		case "study":
-			return { ...base, icon: "review", words: heldPastDue(facts.topic.review, facts.today) ? NOTHING_TODAY : NOTHING_DUE };
+			return { ...base, icon: "review", words: heldPastDue(facts.topic.review, facts.today) ?? NOTHING_DUE };
 	}
 }
 

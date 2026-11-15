@@ -187,17 +187,17 @@ describe("the open tasks that hold a topic", () => {
 describe("where he stands, in the app's one wording", () => {
 	it("says every seeded head line word for word", () => {
 		const lines: [CourseMapTopic, string][] = [
-			[TOPICS.rank, "Right with help. Mistake to fix. 3d overdue"],
-			[TOPICS.matmul, "Right with help. Not right last time. 2d overdue"],
+			[TOPICS.rank, "Not right last time. Mistake to fix. 3d overdue"],
+			[TOPICS.matmul, "Not right last time. 2d overdue"],
 			[TOPICS.span, "On your own. 10d overdue"],
-			[TOPICS.vectors, "On your own. Back in 5d"],
+			[TOPICS.vectors, "On your own. Back Fri 13 Nov"],
 			[TOPICS.cramer, "Taught, not tried. 2d overdue"],
-			[TOPICS.riemann, "Right with help. Not right last time. Due today"],
-			[TOPICS.elimination, "Right with help. Mixed up with Cramer's rule. 2d overdue"],
+			[TOPICS.riemann, "Not right last time. Due today"],
+			[TOPICS.elimination, "Not right last time. Mixed up with Cramer's rule. 2d overdue"],
 			[TOPICS.kernel, "Tried, not right yet. Sure, but wrong. 1d overdue"],
 			[TOPICS.basis, "On your own. 9d overdue"],
-			[TOPICS.independence, "Right with help. Mistake to fix. 16d overdue"],
-			[TOPICS.chain, "Right with help. Not right last time. 30d overdue"],
+			[TOPICS.independence, "Not right last time. Mistake to fix. 16d overdue"],
+			[TOPICS.chain, "Not right last time. 30d overdue"],
 			[TOPICS.eigen, "Not started"],
 		];
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
@@ -205,10 +205,11 @@ describe("where he stands, in the app's one wording", () => {
 	});
 
 	it("gives why it needs him and its review as marks of their own kind", () => {
-		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [
-			{ kind: "slip", words: "Not right last time", slip: "lapsed" },
+		assert.deepEqual(headMarks(TOPICS.elimination, titleOf, TODAY), [
+			{ kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" },
 			{ kind: "review", words: "2d overdue" },
 		]);
+		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [{ kind: "review", words: "2d overdue" }], "the standing already says Not right last time (round 8)");
 		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);
 	});
 
@@ -229,7 +230,7 @@ describe("where he stands, in the app's one wording", () => {
 	it("says a topic still being learned is due, as its action does, and dates a later review", () => {
 		assert.deepEqual(headMarks(TOPICS.determinant, titleOf, TODAY), [{ kind: "review", words: "4d overdue" }]);
 		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: null }, titleOf, TODAY), []);
-		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: { kind: "scheduled", date: "2026-11-09" } }, titleOf, TODAY), [{ kind: "review", words: "Back in 1d" }]);
+		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: { kind: "scheduled", date: "2026-11-09" } }, titleOf, TODAY), [{ kind: "review", words: "Back Mon 9 Nov" }]);
 	});
 });
 
@@ -348,9 +349,9 @@ describe("when a topic comes up", () => {
 		assert.equal(factsOf(start).starts?.waits, "Moved from 14 Nov, yesterday's plan was not finished");
 	});
 
-	it("says from when a review moved past the day memory asked for it, and why", () => {
+	it("says why a review waits past the day memory asked for it, and since when once that day has passed", () => {
 		const moved = topic("series", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-22", held: { exam: null, since: "2026-11-09" } } });
-		assert.equal(factsOf(moved).waits, "Moved from 9 Nov, earlier days are full");
+		assert.equal(factsOf(moved).waits, "Earlier days are full", "memory's day still ahead was never told him (round 8)");
 		const late = topic("series", { level: "independent", introduced: "2026-09-01", review: { kind: "scheduled", date: "2026-11-13", held: { exam: "Probability", since: "2026-10-02" } } });
 		assert.equal(factsOf(late).waits, "Due since 2 Oct, waits for your Probability exam");
 	});

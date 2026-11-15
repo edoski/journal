@@ -25,6 +25,6 @@ describe("a lesson in an unreadable course", () => {
 	});
 
 	it("says it in Home's words for that course", () => {
-		assert.equal(unreadableLine("denied"), "Couldn't read this course's record. The app isn't allowed to open its files.");
+		assert.equal(unreadableLine("denied"), "Couldn't read this course's record. macOS won't let the app open its files: Get Info on the course folder in Finder shows who can read it.");
 	});
 });

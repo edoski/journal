@@ -51,7 +51,7 @@ Above the arcs, at most two rows in Today's row style (`what-next.tsx`, `whatNex
 
 | State | Shows |
 |---|---|
-| loading | the header's skeleton, the page head's rows at their heights (the empty line above the title included, `../page-frame/page-frame.md`), so nothing moves when the course arrives |
+| loading | the header's skeleton until both the course and where he stands for the exam (`use-course-standing.ts`) are read, the page head's rows at their heights (the empty line above the title included, `../page-frame/page-frame.md`), so nothing moves when the course arrives |
 | engine not answering | "The study engine is not answering, so this course can't show right now." |
 | read failed | "Couldn't read this course." and Try again (Home's words) |
 | a record the engine could not read | Home's line for it ("Couldn't read this course's record." and why) and Try again |

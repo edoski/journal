@@ -163,15 +163,16 @@ function overdueDays(review: CourseMapTopic["review"], today: string): number | 
 }
 
 /** Beside a topic's next review: how overdue one due today is, or, for
- *  one the plan holds later (the engine's `held`), memory's day, "due
- *  since" once it passed and "moved from" while ahead, the words every
- *  view shows, and what held it: the exam whose final review came first,
- *  or full days. */
+ *  one the plan holds later (the engine's `held`), what held it: the exam
+ *  whose final review came first, or full days, after "due since" memory's
+ *  day once it has passed, the words every view shows. Memory's day still
+ *  ahead was never told him, so it is not named: the tutor would say the
+ *  review "moved from" a day he never heard (round 8). */
 function reviewNote(review: NonNullable<CourseMapTopic["review"]>, today: string): string | null {
 	if (review.kind === "due") return review.overdue > 0 ? daysOverdue(review.overdue) : null;
 	if (!review.held) return null;
-	const since = `${review.held.since < today ? "due since" : "moved from"} ${shortDay(review.held.since)}`;
-	return `${since}, ${review.held.exam ? `waits for your ${review.held.exam} exam` : "earlier days are full"}`;
+	const why = review.held.exam ? `waits for your ${review.held.exam} exam` : "earlier days are full";
+	return review.held.since < today ? `due since ${shortDay(review.held.since)}, ${why}` : why;
 }
 
 /** A day he was told that moved (`TopicMoved`), from which day and what
@@ -336,6 +337,11 @@ export function projectCourseBrief(
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
 	if (topics.length > 0) lines.push(`Path${str(path.current) ? `, current ${path.current}` : ""}: ${topics.join(", ")}`);
+	// The level word "new" read as "not planned yet" (round 8: "they're the
+	// only ones you haven't started" named two of four untaught topics), so
+	// the untaught ones are named in plain words too.
+	const untaught = list(path.topics).flatMap((t) => (Array.isArray(t) && t[1] === "new" ? [String(t[0])] : []));
+	if (untaught.length > 0) lines.push(`Not started yet (never taught, whatever their planned day): ${untaught.join(", ")}`);
 	const excluded = handles(path.excluded);
 	if (excluded.length > 0) lines.push(`Left out of the course: ${excluded.join(", ")}`);
 	const health = pathHealthLine(r.path_health);

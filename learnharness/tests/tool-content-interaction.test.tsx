@@ -62,23 +62,15 @@ test("the confidence he picks rides the free-response answer; Neutral, the meter
 	assert.equal(proseAnswer(spec, emptyDockSelection(), "My reasoning.", "guessing").confidence, "guessing");
 });
 
-test("the committed-answer reveal keeps its paragraphs apart", async () => {
+test("an answered check never draws the committed answer: the tutor's reply is the one voice he reads (round 8)", async () => {
 	const committed = String.raw`First paragraph.\n\nSecond paragraph with $\\nabla f$ and $\nu$.`;
 	const answer: QuestionAnswerData = { kind: "explain", questionText: "Explain the gradient.", answers: [], text: "Synthetic answer", committed, answeredAt: "2026-10-26T00:00:00.000Z" };
 	const input = { question: answer.questionText, correctAnswer: committed };
-	const before = structuredClone(answer);
 	const host = document.createElement("div"); document.body.append(host);
 	const root = createRoot(host);
 	try {
 		await act(async () => root.render(<ProseQuestion tool="explain" toolCallId="reveal" input={input} output={answer} open={false} />));
-		const heading = host.querySelector<HTMLButtonElement>('[data-testid="prose-disclosure"]')!;
-		assert.match(heading.textContent!, /The answer/, "the reveal is labelled");
-		await act(async () => heading.click());
-		const paragraphs = [...heading.closest('[data-slot="prose-disclosure"]')!.querySelectorAll("p")].map(p => p.textContent);
-		assert.equal(paragraphs.length, 2, "both committed-answer paragraphs stay paragraphs");
-		assert.equal(paragraphs[0], "First paragraph.");
-		assert.match(paragraphs[1]!, /^Second paragraph with/);
-		assert.equal(host.querySelectorAll(".katex-error").length, 0);
-		assert.deepEqual(answer, before);
+		assert.equal(host.querySelector('[data-testid="prose-disclosure"]'), null);
+		assert.doesNotMatch(host.textContent ?? "", /First paragraph|The answer/);
 	} finally { await act(async () => root.unmount()); host.remove(); }
 });

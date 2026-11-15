@@ -20,6 +20,7 @@ import {
 } from "./native-messages.ts";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { photosOf, photoSrc, type Photo } from "./photos.ts";
+import { normalizeQuestionType } from "./question-core.ts";
 
 /** How photos of his working render: `embed` puts each image in the file
  *  (the export), `note` says one is there (the lesson digest, whose
@@ -87,9 +88,14 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		| undefined;
 
 	if (result.toolName === "explain" || result.toolName === "recall") {
-		const heading = result.toolName === "recall" ? "Recall" : "Recall check"; // explain — the teach free-recall name
+		// A prediction says so wherever the lesson is read back: the digest
+		// once wrote one's miss as the topic's gap (round 8, 1 D2).
+		const predicted = result.toolName === "explain" && normalizeQuestionType(ctx?.calls.get(result.toolCallId)?.args?.type) === "predict";
+		const heading = result.toolName === "recall" ? "Recall" : predicted ? "Prediction" : "Recall check"; // explain — the teach free-recall name
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
+		if (predicted) body.push("Asked before the teaching: a prediction never counts, and its miss is never a gap.");
+		if ((result.details as { showMe?: unknown } | undefined)?.showMe === true) body.push("The learner pressed Show me: he gave up on it and was shown the answer.");
 		if (out?.dismissed === true && out.reason === "tonight") body.push("The learner stopped for today before answering; the answer was not shown.");
 		else if (out?.dismissed === true && out.reason === "asked") body.push("The learner asked something before answering; the check was asked again.");
 		else if (out?.dismissed === true) body.push("The learner skipped this check.");

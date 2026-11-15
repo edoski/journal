@@ -5,7 +5,9 @@ import Link from "next/link";
 import { ChevronRightIcon } from "lucide-react";
 import { MathText } from "@/components/ui/math-text";
 
-const CRUMB = "min-w-0 max-w-40 shrink-[2] truncate text-control text-muted-foreground";
+/** A crumb takes the room its words need and gives way first when the bar
+ *  is full (round 8: "Rank and the column s…" with half the bar free). */
+const CRUMB = "min-w-0 shrink-[2] truncate text-control text-muted-foreground";
 const CRUMB_LINK = `lh-no-drag ${CRUMB} rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none`;
 
 /** The lesson's top bar contents (spec: lesson-top-bar.md), rendered inside
@@ -21,6 +23,8 @@ export function LessonTopBar({
 	roadmap,
 	tonight,
 }: {
+	/** The rename button or its input; null when the topic crumb already
+	 *  reads as the title, which then ends the trail as a link. */
 	title: ReactNode;
 	course?: string;
 	/** The course's page, which the crumb links to. */
@@ -58,16 +62,16 @@ export function LessonTopBar({
 			),
 		});
 	}
+	const trail = title ? [...crumbs, { key: "title", node: title }] : crumbs;
 	return (
 		<>
-			<div className="flex min-w-0 flex-1 items-center gap-1.5">
-				{crumbs.map((c) => (
+			<div data-slot="lesson-trail" className="flex min-w-0 grow items-center gap-1.5">
+				{trail.map((c, i) => (
 					<Fragment key={c.key}>
+						{i > 0 && <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/60" />}
 						{c.node}
-						<ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/60" />
 					</Fragment>
 				))}
-				{title}
 			</div>
 			{roadmap}
 			{tonight}
@@ -75,8 +79,11 @@ export function LessonTopBar({
 	);
 }
 
-/** The topic crumb shows only when its words differ from the title's:
- *  a lesson named after its topic would say the same thing twice. */
+/** Whether the title reads differently from the topic crumb. When it reads
+ *  the same, the topic crumb ends the trail, a link to the topic's page,
+ *  and the title is not drawn a second time (round 8: a lesson named after
+ *  its topic ended on plain text, with no way to its topic's page); F2
+ *  still renames it. */
 export function topicCrumbShown(topicTitle: string, title: string): boolean {
 	const norm = (s: string) => s.trim().toLowerCase();
 	return norm(topicTitle) !== norm(title);

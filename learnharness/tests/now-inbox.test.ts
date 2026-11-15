@@ -94,14 +94,22 @@ describe("shelfStatus", () => {
 		const inPlan = unit({ key: "/s/linalg#independence", topic: topic("independence", "Linear independence", "assisted", { review: due(4) }) });
 		assert.deepEqual(shelfStatus(inPlan, TODAY, planned), { kind: "review", words: "4d overdue" });
 		assert.deepEqual(shelfStatus(inPlan, TODAY), { kind: "studied", words: "19d ago" });
-		assert.deepEqual(shelfStatus(unit({ topic: topic("t", "T", "assisted", { review: back("2026-11-10") }) }), TODAY, planned), { kind: "returns", words: "Back in 2d" });
+		assert.deepEqual(shelfStatus(unit({ topic: topic("t", "T", "assisted", { review: back("2026-11-10") }) }), TODAY, planned), { kind: "returns", words: "Back Tue 10 Nov" });
 	});
 
 	it("says how overdue a solid topic is, when a known one comes back, and Your turn or Working first", () => {
 		assert.deepEqual(shelfStatus(unit({ shelf: "review", topic: topic("t", "T", "retained", { review: due(2) }) }), TODAY), { kind: "review", words: "2d overdue" });
-		assert.deepEqual(shelfStatus(unit({ shelf: "known", topic: topic("t", "T", "retained", { review: back("2026-11-13") }) }), TODAY), { kind: "returns", words: "Back in 5d" });
+		assert.deepEqual(shelfStatus(unit({ shelf: "known", topic: topic("t", "T", "retained", { review: back("2026-11-13") }) }), TODAY), { kind: "returns", words: "Back Fri 13 Nov" });
 		assert.deepEqual(shelfStatus(unit({ now: "your-turn" }), TODAY), { kind: "your-turn" });
 		assert.deepEqual(shelfStatus(unit({ now: "working" }), TODAY), { kind: "working" });
+	});
+
+	it("never hides a wrong answer still open behind Left for next time; a fixed one, or a gap with none open, lets the lesson say it (round 8, 2 m10)", () => {
+		const signals = { gap: "Reads the kernel off with a sign slip", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
+		const open = unit({ now: "left", slip: "Mistake to fix", topic: topic("eigen", "Eigen", "assisted", { weak: true, signals: { ...signals, mistake: true } }) });
+		assert.deepEqual(shelfStatus(open, TODAY), { kind: "slip", words: "Mistake to fix", slip: "gap" });
+		const closed = unit({ now: "left", slip: "Check on your own", topic: topic("eigen", "Eigen", "assisted", { weak: true, signals }) });
+		assert.deepEqual(shelfStatus(closed, TODAY), { kind: "task", words: "Left for next time" });
 	});
 });
 

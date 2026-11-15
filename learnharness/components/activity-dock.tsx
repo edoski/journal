@@ -191,7 +191,17 @@ const RUN_ACTIVITY: Record<string, string> = {
 	grouping: "Settling what each topic builds on, then grouping the topics into arcs from the material's chapters",
 };
 
-/** Merge the feed into one oldest-first blob list (the stable blob order). */
+/** Whether a background run shows under Background work: a course-map
+ *  build does, since he waits on it and may stop it; saving what a closed
+ *  lesson taught does not, since it is the close finishing its own work and
+ *  stopping it would lose what he learned (round 8: a "Saving what you
+ *  learned… Stop" row after every close). */
+export function runShows(run: Pick<FeedRun, "phase">): boolean {
+	return run.phase !== "digesting";
+}
+
+/** Merge the feed into one oldest-first blob list (the stable blob order),
+ *  leaving out the runs that do not show (`runShows`). */
 export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 	const blobs: ActivityBlob[] = feed.jobs.map((job) => ({
 		id: job.id,
@@ -205,7 +215,7 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 		// the dispatch card's quiet tone.
 		activity: isProviderKeyRefusal(job.error) ? "needs a sign-in" : (job.activity ?? ""),
 	}));
-	for (const run of feed.runs) {
+	for (const run of feed.runs.filter(runShows)) {
 		blobs.push({
 			id: run.id,
 			process: "run",
@@ -314,6 +324,13 @@ function openTarget(blob: ActivityBlob): { href: string; words: string } {
  *  controls do (round 4: a bare square read as nothing). */
 const STOP_WORDS: Record<AbortState | "idle", string> = { idle: "Stop", pending: "Stopping…", failed: "Couldn't stop" };
 
+/** Whether he may stop it: anything but the save of what a lesson taught
+ *  him, which keeps his record whole and is over in moments (round 8: a
+ *  Stop beside it invited losing what he learned). */
+function stoppable(blob: ActivityBlob): boolean {
+	return !(blob.process === "run" && blob.phase !== "mapping" && blob.phase !== "grouping");
+}
+
 /** One process as a sidebar row: kind icon, what it does for which
  *  lesson or course in full (the words wrap, never cut, its TeX typeset),
  *  and Stop at the right edge; a click opens its detail (what it is doing,
@@ -336,13 +353,13 @@ function ActivityRow({
 	const target = openTarget(blob);
 	return (
 		<div data-testid={`activity-blob-${blob.process}`} className="relative">
-			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="h-auto min-h-8 items-start py-1.5 pr-16 [&>svg]:mt-0.5">
+			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className={`h-auto min-h-8 items-start py-1.5 [&>svg]:mt-0.5 ${stoppable(blob) ? "pr-16" : "pr-2"}`}>
 				<Icon />
 				<span data-slot="nav-row-label" data-testid="activity-blob-label" className="min-w-0 flex-1 text-pretty break-words">
 					<MathText>{words}</MathText>
 				</span>
 			</NavRow>
-			<Button
+			{stoppable(blob) && (<Button
 				variant="quiet"
 				size="xs"
 				data-testid="activity-abort"
@@ -353,7 +370,7 @@ function ActivityRow({
 			>
 				<CircleStopIcon aria-hidden />
 				{STOP_WORDS[abortState ?? "idle"]}
-			</Button>
+			</Button>)}
 			{detailOpen && (
 				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground">
 					{blob.activity && <p className="break-words text-foreground">{blob.activity}</p>}

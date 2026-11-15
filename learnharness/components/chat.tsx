@@ -49,7 +49,6 @@ import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, Photo, JobRecord, LessonPlace, PracticeRequest, PracticeRequestDetails, QuestionAnswerData } from "@/src/core";
 import type { AnswerMark, CourseLink, DisputeDetails, LhViewMessage, SessionMode } from "@/src/core";
-import { CompactionCutDivider } from "@/components/compaction-divider";
 import {
 	activeProblemOf,
 	pendingQuestionOf,
@@ -75,20 +74,20 @@ import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, parseProviderKeyRefusal, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
-import { showsWorking } from "@/components/lesson/working-sign";
-import { forgetRescue, keepRescue, overtakenDraft, type LeftOpen } from "@/components/lesson/stranded-draft";
+import { waitingLine } from "@/components/lesson/working-sign";
+import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
 import { carryBox, carryWords, forgetClosedBoxes, keepForNewLesson, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
-import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
+import { DoneTonightButton, DoneTonightLine, doneTonightGone } from "@/components/lesson/done-tonight";
 import { CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
@@ -97,6 +96,7 @@ import { ProseQuestion } from "@/components/lesson/prose/prose-question";
 import { askedAgain, leftOpenOf, reaskedFrom } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
+import { focusWhereHeTypes } from "@/components/ui/overlay";
 
 /** The chat routes' answer for a deleted lesson: TurnError reads it as
  *  "This lesson was deleted." with Go to Home. */
@@ -609,6 +609,13 @@ export function Chat({
 		const before = prevDockRef.current;
 		prevDockRef.current = dock;
 		if (before.key === dockKey) return;
+		// A rescue dies with its own question: an untouched one leaves the
+		// box once the question after it closes (stranded-draft.ts).
+		const cleared = boxAfterClose(chatId, textRef.current, before.key);
+		if (cleared !== null) {
+			applyText(cleared);
+			setOvertaken((was) => (was === "answered" ? null : was));
+		}
 		const live = liveDraftRef.current;
 		liveDraftRef.current = null;
 		if (dockKey !== null) setOvertaken((was) => (was === "answered" ? was : null));
@@ -620,12 +627,12 @@ export function Chat({
 			if (dockKey === null) setOvertaken(moved.why);
 			return;
 		}
-		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${moved.words}` : moved.words);
-		keepRescue(chatId, moved.words);
+		applyText(rescuedBox(chatId, textRef.current, moved.words));
+		keepRescue(chatId, moved.words, before.key);
 		setOvertaken("answered");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
-	const { unconnected } = useModelSetup();
+	const { unconnected, status: modelStatus } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The explicitly-sent draft (composer send) until the server accepts
 	 *  it (sent-draft.ts): the
@@ -731,6 +738,18 @@ export function Chat({
 		// (setMessages is stable per useChat instance — the dep pair
 		//  [error, chatId] is what the flow actually keys on.)
 	}, [error, chatId]);
+	// The signed-out line leaves with its cause (round 8): once the account
+	// reads connected again after reading signed out, the line clears and
+	// his next key goes to the box (turn-error-text.ts refusalWatch).
+	const signedOutSeenRef = useRef(false);
+	useEffect(() => {
+		const watch = refusalWatch(signedOutSeenRef.current, !!error && parseProviderKeyRefusal(error.message), modelStatus?.connected);
+		signedOutSeenRef.current = watch.seenSignedOut;
+		if (!watch.clear) return;
+		clearError();
+		focusWhereHeTypes(document, false);
+		// clearError is stable per session.
+	}, [error, modelStatus?.connected]);
 	// A DELETED COURSE (course-gone.tsx): the lesson is history and has no
 	// box, so what he wrote there, sent and refused or still in the box,
 	// goes to the New lesson box, and the line says so. A send refused
@@ -776,6 +795,7 @@ export function Chat({
 	// until the compaction ends, so his Enter goes through and the line
 	// below the transcript says why the reply waits (round 6).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
+	const waiting = waitingLine(messages, { busy, compacting });
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -1392,6 +1412,9 @@ export function Chat({
 		steerOrSendRef.current();
 	}, [chatId, applyText]);
 
+	// The lesson's topic crumb, a link to its page (lesson-top-bar.md).
+	const topicCrumb = course && !courseGone && place?.topic ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined;
+
 	return (
 		<ChatActionsContext.Provider
 			value={{
@@ -1467,7 +1490,7 @@ export function Chat({
 									aria-label="Session title"
 									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-control font-medium text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
 								/>
-							) : (
+							) : topicCrumb && !topicCrumbShown(topicCrumb.title, titleText) ? null : (
 								<Hint label="Rename session" action="rename-session" side="bottom">
 									<Button
 										variant="quiet"
@@ -1485,7 +1508,7 @@ export function Chat({
 						course={course?.title}
 						// A deleted course has no page: its crumb goes Home.
 						courseHref={course ? (courseGone ? "/" : courseHref(course.workspace)) : undefined}
-						topic={course && !courseGone && place?.topic && topicCrumbShown(place.topic.title, titleText) ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined}
+						topic={topicCrumb}
 						roadmap={
 							<LessonRoadmap
 								steps={steps}
@@ -1496,7 +1519,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={<DoneTonightButton onDone={sendTonight} gone={closedForToday} disabled={doneTonight || gone || courseGone} />}
+						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, courseGone, lessonGone: gone })} disabled={doneTonight} />}
 					/>
 				</TopBar>
 
@@ -1540,8 +1563,6 @@ export function Chat({
 										switch (part.type) {
 											case "data-graph-context":
 												return <GraphContextCard key={pi} data={part.data as GraphContextData} />;
-											case "data-compaction-cut":
-												return <CompactionCutDivider key={pi} />;
 											case "data-practice-thinking":
 												return <ThinkingBubble key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-request":
@@ -1553,8 +1574,8 @@ export function Chat({
 												return <DoneTonightLine key={pi} />;
 											case "data-dispute":
 												return <DisputeBubble key={pi} data={part.data as DisputeDetails} />;
-											// data-compaction (the moment the summary ran) stays
-											// unmarked: the cut's hairline is enough.
+											// Compaction (the moment and the cut) is the tutor's
+											// bookkeeping and draws nothing (round 8).
 											default:
 												return null;
 										}
@@ -1695,15 +1716,15 @@ export function Chat({
 						    thinking placeholder, a visible session-wide state while
 						    the summarizer holds the model gate. It stands in for
 						    Thinking while his sent input waits on it (round 6). */}
-							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{!compacting && showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{waiting === "compacting" && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
+							{waiting === "thinking" && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={() => setSetupOpen(true)}>
+								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}
@@ -1753,7 +1774,6 @@ export function Chat({
 								placeholder: nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined,
 								photos: composerPhotos,
 							}}
-							messageText={{ read: () => textRef.current, write: applyText }}
 							onAskInstead={() => void askInstead()}
 							toggleRef={proseToggleRef}
 							busy={busy}

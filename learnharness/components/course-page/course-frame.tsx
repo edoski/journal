@@ -14,10 +14,14 @@ import { CourseLessonError } from "@/components/course-page/course-head/head-par
 import { CourseHeaderSkeleton } from "@/components/course-page/course-header-skeleton";
 import type { CourseRead, CourseView } from "@/components/course-page/course-model";
 import { useCourse } from "@/components/course-page/use-course";
+import { useCourseStanding, type StandingRead } from "@/components/course-page/use-course-standing";
+import type { CourseStanding } from "@/src/core";
 
 /** What the page draws once its course is read. */
 export interface CourseReady {
 	view: CourseView;
+	/** Where he stands for the exam and the open mistakes; null when the engine cannot say. */
+	standing: CourseStanding | null;
 	busy: boolean;
 	/** Take up the course's next step as Home's line does (`courseMove`). */
 	onContinue: (workspace: string) => void;
@@ -28,11 +32,14 @@ export interface CourseReady {
  * the read of the course with its states, each in the shared page frame
  * (`PageFrame`, page-frame.md), and the lesson start behind the head's
  * press, whose failure the head says under its next line (the window's
- * title is the route's metadata). The ready course draws its own frame;
- * the page fits the window with no bar showing.
+ * title is the route's metadata). The course and where he stands are read
+ * side by side, and the page draws once both are in, so the head never
+ * grows under him. The ready course draws its own frame; the page fits the
+ * window with no bar showing.
  */
 export function CourseFrame({ workspace, children }: { workspace: string; children: (ready: CourseReady) => React.ReactNode }) {
 	const { read, chats, retry } = useCourse(workspace);
+	const standing = useCourseStanding(workspace);
 	const lesson = useLessonStart();
 	const router = useRouter();
 	const onContinue = (view: CourseView) => (ws: string) => {
@@ -44,8 +51,8 @@ export function CourseFrame({ workspace, children }: { workspace: string; childr
 		<CourseChrome>
 			<ScrollArea bar={false} data-slot="course-page" className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full">
 				<CourseLessonError value={lesson.error}>
-					<CourseBody read={read} onRetry={retry}>
-						{(view) => children({ view, busy: lesson.busy, onContinue: onContinue(view) })}
+					<CourseBody read={read} standing={standing} onRetry={retry}>
+						{(view, known) => children({ view, standing: known, busy: lesson.busy, onContinue: onContinue(view) })}
 					</CourseBody>
 				</CourseLessonError>
 			</ScrollArea>
@@ -55,14 +62,10 @@ export function CourseFrame({ workspace, children }: { workspace: string; childr
 }
 
 /** The course, or the one plain sentence that says why it cannot show, in the page frame. */
-function CourseBody({ read, onRetry, children }: { read: CourseRead; onRetry: () => void; children: (view: CourseView) => React.ReactNode }) {
+function CourseBody({ read, standing, onRetry, children }: { read: CourseRead; standing: StandingRead; onRetry: () => void; children: (view: CourseView, standing: CourseStanding | null) => React.ReactNode }) {
 	switch (read.status) {
 		case "loading":
-			return (
-				<PageFrame className="h-full">
-					<CourseHeaderSkeleton />
-				</PageFrame>
-			);
+			return <Reading />;
 		case "unavailable":
 			return <Notice>The study engine is not answering, so this course can’t show right now.</Notice>;
 		case "failed":
@@ -93,8 +96,16 @@ function CourseBody({ read, onRetry, children }: { read: CourseRead; onRetry: ()
 				</Notice>
 			);
 		case "ready":
-			return children(read.view);
+			return standing.status === "read" ? children(read.view, standing.standing) : <Reading />;
 	}
+}
+
+function Reading() {
+	return (
+		<PageFrame className="h-full">
+			<CourseHeaderSkeleton />
+		</PageFrame>
+	);
 }
 
 function Notice({ children }: { children: React.ReactNode }) {

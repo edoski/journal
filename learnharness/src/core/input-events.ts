@@ -35,7 +35,7 @@ import { dismissedAnswer, type QuestionAnswerData } from "./question-core.ts";
 import { parsePhotos, type Photo } from "./photos.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import type { LhMessage } from "./native-messages.ts";
-import type { SessionMode } from "./contracts/chat.ts";
+import type { AnswerSaves, SessionMode } from "./contracts/chat.ts";
 import {
 	activeProblemOf,
 	sessionModeOf,
@@ -317,7 +317,7 @@ export function parseChatInput(input: unknown): ChatInput {
  * double-answering.
  */
 export function inputAppends(
-	record: { messages: LhMessage[]; kind?: SessionMode },
+	record: { messages: LhMessage[]; kind?: SessionMode; answerSaves?: AnswerSaves },
 	input: ChatInput,
 ): LhMessage[] {
 	switch (input.type) {
@@ -414,9 +414,9 @@ function askedBefore(messages: readonly LhMessage[], at: number): string {
  *  pair, then the dispute itself. Refused when the answer carries no mark
  *  the record links to it (answer-marks.ts). An open question is left as
  *  it is: the agent reads it as set aside and asks it again. */
-export function disputeAppends(record: { messages: LhMessage[] }, input: Extract<ChatInput, { type: "dispute" }>): LhMessage[] {
+export function disputeAppends(record: { messages: LhMessage[]; answerSaves?: AnswerSaves }, input: Extract<ChatInput, { type: "dispute" }>): LhMessage[] {
 	const question = answeredQuestionText(record.messages, input.answerId);
-	if (question === null || !markLinks(record.messages)[input.answerId]) {
+	if (question === null || !markLinks(record)[input.answerId]) {
 		throw new ChatInputError("dispute input targets no marked answer");
 	}
 	const { answerId, observations, said, proposed, proposedHow } = input;

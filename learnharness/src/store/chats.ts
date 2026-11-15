@@ -19,6 +19,8 @@ import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
+import { openedAsReview } from "../core/session-opening.ts";
+import { stoppedByHim } from "../core/turn-cut.ts";
 import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
@@ -127,7 +129,9 @@ function listChats(): ChatSummary[] {
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
 						ownTopics: own,
 						ended: sessionEndOf(messages, tree, summary.kind, own),
+						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						tasks: sessionTasksOf(messages),
+						review: openedAsReview({ topics: summary.topics, messages }),
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);
@@ -171,6 +175,20 @@ function saveDigestLedger(id: string, ledger: DigestLedger): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
 	record.digest = ledger;
+	writeChat(record);
+}
+
+/** Add a save's links to the record's kept answer saves. Silent, and not
+ * conversation activity: updatedAt stays put. */
+function saveAnswerSaves(id: string, links: Readonly<Record<string, readonly string[]>>): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	const saves: Record<string, readonly string[]> = { ...(record.answerSaves ?? {}) };
+	for (const [key, ids] of Object.entries(links)) {
+		const seen = saves[key] ?? [];
+		saves[key] = [...seen, ...ids.filter((o) => !seen.includes(o))];
+	}
+	record.answerSaves = saves;
 	writeChat(record);
 }
 
@@ -263,4 +281,5 @@ export const chatStore: ChatStore = {
 	deleteChat,
 	appendTurnUsage,
 	saveDigestLedger,
+	saveAnswerSaves,
 };
