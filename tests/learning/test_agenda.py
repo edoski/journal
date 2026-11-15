@@ -748,6 +748,51 @@ def test_a_save_that_changes_no_topic_moves_no_courses_days() -> None:
     assert after.days == before.days
 
 
+
+def test_a_night_with_nothing_saved_moves_no_estimate() -> None:
+    history = {
+        on(-n): Done(reviews=1 + n % 4, new=n % 2, reviews_short=n % 5 == 0)
+        for n in range(1, 40)
+    }
+    history[MONDAY] = Done(reviews=6, new=1)
+    tonight = capacity.estimate(history, MONDAY)
+    assert tonight.on(MONDAY).reviews.value > capacity.estimate(
+        {day: done for day, done in history.items() if day < MONDAY}, MONDAY
+    ).on(MONDAY).reviews.value
+    assert capacity.estimate(history, on(1)) == tonight
+    del history[MONDAY]
+    skipped, before = capacity.estimate(history, on(1)), capacity.estimate(history, MONDAY)
+    for kind in ("reviews", "new"):
+        assert [getattr(day, kind) for day in skipped.weekdays] == [
+            getattr(day, kind) for day in before.weekdays
+        ]
+
+
+def studied(record: dict[str, Any], first: int, last: int) -> dict[str, Any]:
+    """Each day from ``first`` to ``last``, the reviews due answered right, as
+    many as its weekday's number (all of them on ``last``), so he stops short
+    on some days and the plan learns his limits from the record."""
+    for offset in range(first, last + 1):
+        day = on(offset)
+        due = progress.due(record, day, limit=0)
+        count = len(due) if offset == last else 1 + day.weekday() % 3
+        topics = [item["topic"] for item in due[:count]]
+        if topics:
+            record = save(record, {"observations": [answer(t) for t in topics]}, day)
+    return record
+
+
+def test_a_plan_made_tomorrow_from_the_same_record_gives_the_same_dates() -> None:
+    record = studied(taught(course(24), on(-36)), -35, 0)
+    first = agenda.plan({"c": record}, MONDAY, 40)
+    assert first.when("c", MONDAY, True).reviews
+    tomorrow = agenda.plan({"c": record}, on(1), 39)
+    today = first.when("c", MONDAY, True).reviews
+    assert tomorrow.when("c", on(1), True).reviews == {
+        topic: day for topic, day in today.items() if day > MONDAY
+    }
+
+
 EVERY_DAY = frozenset(range(7))
 
 
