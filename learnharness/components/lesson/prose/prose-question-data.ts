@@ -136,14 +136,44 @@ export function leftOpen(output: unknown): LeftOpen | null {
  *  re-ask after a hint dropped "Say why." and lost his carried work). */
 export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>, toolCallId: string): string | null {
 	let previous: QuestionPart | null = null;
+	const lastOfKind = new Map<string, QuestionPart>();
 	for (const message of messages) {
 		for (const part of message.parts) {
 			if (!part.type.startsWith("tool-") || !(QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) continue;
-			if (part.toolCallId === toolCallId) return previous?.toolCallId && leftOpen(previous.output) ? previous.toolCallId : null;
+			if (part.toolCallId === toolCallId) {
+				if (previous?.toolCallId && leftOpen(previous.output)) return previous.toolCallId;
+				const same = lastOfKind.get(questionKindOf(part));
+				return same?.toolCallId && leftForToday(same.output) && sameStep(same, part) ? same.toolCallId : null;
+			}
 			previous = part;
+			lastOfKind.set(questionKindOf(part), part);
 		}
 	}
 	return null;
+}
+
+/** A question's kind as a re-ask keeps it: its tool and its form (his
+ *  words, one pick or several). */
+function questionKindOf(part: QuestionPart): string {
+	const input = part.input as { options?: unknown; multiSelect?: unknown } | undefined;
+	const form = Array.isArray(input?.options) && input.options.length > 0 ? (input.multiSelect === true ? "multi" : "single") : "text";
+	return `${part.type}:${form}`;
+}
+
+/** Done for today set the question aside unanswered (round 8: the tutor
+ *  asked it again in other words, and the half answer kept for it never
+ *  came back). The next question of its kind asks it again, unless the two
+ *  name different plan steps. */
+function leftForToday(output: unknown): boolean {
+	const left = output as Partial<QuestionAnswerData> | undefined;
+	return left?.dismissed === true && left.reason === "tonight";
+}
+
+function sameStep(a: QuestionPart, b: QuestionPart): boolean {
+	const step = (part: QuestionPart) => (part.input as { nodeId?: unknown } | undefined)?.nodeId;
+	const x = step(a);
+	const y = step(b);
+	return typeof x !== "string" || typeof y !== "string" || x === y;
 }
 
 /** How the question call `toolCallId` left, when it is still open. */
