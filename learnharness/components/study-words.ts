@@ -700,12 +700,19 @@ export const READY_WORDS = {
 	ready: "Ready for the exam",
 	notYet: "Not ready for the exam yet",
 	notYetIn: "Not ready yet in",
+	/** After the least ready topics, the press that shows them all. */
+	rest: "and the rest",
 } as const;
 
 /** A course without arcs, not ready: the topics not yet solid, else those
  *  still to start. "Not yet solid for the exam: Basis and Rank". */
 export function notReadyWords(kind: "notYet" | "toStart", names: string): string {
-	return kind === "notYet" ? `Not yet solid for the exam: ${names}` : `Still to start before the exam: ${names}`;
+	return `${notReadyHeading(kind)}: ${names}`;
+}
+
+/** The same list's name, heading every topic it means. */
+export function notReadyHeading(kind: "notYet" | "toStart"): string {
+	return kind === "notYet" ? "Not yet solid for the exam" : "Still to start before the exam";
 }
 
 /** The mistakes still open in a course: the list's name, the head's press,

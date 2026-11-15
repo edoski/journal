@@ -5,13 +5,13 @@ What the course page's head says about the exam and the mistakes still open (Edo
 | | What it shows |
 |---|---|
 | the head's first line | `ReadyLine`: "Ready for the exam"; "Not ready yet in" and the bubbles of the arcs not ready, each showing its arc on the page; "Not ready for the exam yet" when no arc is |
-| mistakes | Mistakes, a quiet press before Context, opens a popover of the rows (`mistakes-press.tsx`) |
+| mistakes | Mistakes, a quiet press before Context, opens a popover of the rows under the whole head (`mistakes-press.tsx`, `MistakesHead`), covering none of its lines |
 
-Topics with no room before the exam lead the line in the warning ink, in the run-up's words ("No room before the exam to start Kernel"); a course the page shows without arcs names the topics not yet solid ("Not yet solid for the exam: Basis and Rank"), else those still to start; without an exam, what the plan does with its reviews (`noExamWords`); nothing when the engine cannot say.
+Topics with no room before the exam lead the line in the warning ink, in the run-up's words ("No room before the exam to start Kernel"); a course the page shows without arcs names the topics not yet solid ("Not yet solid for the exam: Basis and Rank"), else those still to start, and with more than four only the three least ready, then "and the rest", a press that lists them all (`leastReadyFirst`: open mistake, newest first; engine level; weak; path order); without an exam, what the plan does with its reviews (`noExamWords`); nothing when the engine cannot say.
 
 ## A mistake's row
 
-`mistake-list.tsx`, `data-slot` `mistake-row`: Today's row at the list's width, 48px. The slip's mark (the one the sidebar and map draw for the topic, else the mistake's own), the topic and its arc's bubble; under it what went wrong in the tutor's words (the diagnosis, else the newest answer) and when ("Today", "6 Nov"), with a hand when it had help. Its hint says what it was on and his answer. The whole row starts fixing it as the sidebar's rows do: Resume the session that waits on the topic, else a new session on it (`useStartUnit`). No count anywhere; the newest first. The press does not show when nothing is open.
+`mistake-list.tsx`, `data-slot` `mistake-row`: Today's row at the list's width, 48px at least. The slip's mark (the one the sidebar and map draw for the topic, else the mistake's own), the topic and its arc's bubble; under it what went wrong in the tutor's words (the diagnosis, else the newest answer), on up to two lines (round 9, 2 m2: cut at one, it said too little to act on), and when ("Today", "6 Nov"), with a hand when it had help. Its hint says what it was on and his answer. The whole row starts fixing it as the sidebar's rows do: Resume the session that waits on the topic, else a new session on it (`useStartUnit`). No count anywhere; the newest first. The press does not show when nothing is open.
 
 ## Open
 

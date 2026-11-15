@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { CircleCheckIcon, CircleDotDashedIcon, TriangleAlertIcon } from "lucide-react";
 import type { StudyCourse } from "@/src/core";
 import { ArcPill } from "@/components/course-map/arc-strip";
+import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { MathText } from "@/components/ui/math-text";
-import { noExamWords } from "@/components/study-words";
+import { noExamWords, READY_WORDS } from "@/components/study-words";
+import { unitHref } from "@/components/unit-inbox/unit-href";
 import { arcOnPage } from "@/components/course-page/course-head/course-head";
 import type { ExamReady } from "@/components/course-page/standing/standing-model";
 import { cn } from "@/lib/utils";
@@ -16,7 +19,8 @@ const ICON: Record<ExamReady["kind"], typeof CircleCheckIcon> = { ready: CircleC
  * engine's `standing` as `examReady` words it (spec: standing/standing.md): ready; not all of it
  * fits, naming what has no room; or not ready yet, naming the arcs not
  * ready as their bubbles, each showing its arc on the page. A course the
- * page shows without arcs names the topics. Nothing while the engine is read;
+ * page shows without arcs names the topics, the least ready when they are
+ * many, then "and the rest" (`ReadyWords`). Nothing while the engine is read;
  * without an exam, what the plan does with its reviews (`noExamWords`).
  */
 export function ReadyLine({ course, ready }: { course: StudyCourse; ready: ExamReady | null }) {
@@ -26,7 +30,7 @@ export function ReadyLine({ course, ready }: { course: StudyCourse; ready: ExamR
 	return (
 		<p data-slot="course-ready" data-kind={ready?.kind} className={cn("flex min-h-5 min-w-0 items-start gap-1.5", ready?.kind === "short" && "text-warning")}>
 			{Icon && <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", ready?.kind !== "short" && "text-muted-foreground")} />}
-			{ready ? <MathText>{ready.words}</MathText> : !map.exam && <span className="font-normal text-muted-foreground">{noExamWords(map.topics)}</span>}
+			{ready ? <ReadyWords ready={ready} workspace={map.workspace} /> : !map.exam && <span className="font-normal text-muted-foreground">{noExamWords(map.topics)}</span>}
 			{bubbles.length > 0 && (
 				<span className="ml-0.5 flex min-w-0 items-center gap-1">
 					{bubbles.map((arc) => (
@@ -35,5 +39,43 @@ export function ReadyLine({ course, ready }: { course: StudyCourse; ready: ExamR
 				</span>
 			)}
 		</p>
+	);
+}
+
+/** The readiness words, as the head's line and the exam's run-up both say
+ *  them, so the two never differ: when the line names only the least ready
+ *  topics, "and the rest" follows, a press that shows every topic it means,
+ *  least ready first, each opening its page (round 9, 2 m13: nine names said
+ *  little; round 7: "and others" hid them with no way to see them). */
+export function ReadyWords({ ready, workspace }: { ready: ExamReady; workspace: string }) {
+	const rest = ready.kind === "notYet" ? ready.rest : null;
+	return (
+		<span data-slot="ready-words" className="min-w-0">
+			<MathText>{ready.words}</MathText>
+			{rest && (
+				<>
+					{" "}
+					<Popover>
+						<PopoverTrigger data-slot="ready-rest" className="rounded-sm text-link outline-none underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:underline">
+							{READY_WORDS.rest}
+						</PopoverTrigger>
+						<PopoverContent data-slot="ready-rest-list" align="start" collisionPadding={12} className="p-3">
+							<PopoverHeader className="px-1 pb-1">
+								<PopoverTitle>{rest.heading}</PopoverTitle>
+							</PopoverHeader>
+							<ol className="flex flex-col">
+								{rest.topics.map((topic) => (
+									<li key={topic.handle}>
+										<Link href={unitHref(workspace, topic.handle)} className="flex min-h-8 items-center rounded-md px-1 text-row font-normal text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring">
+											<MathText>{topic.title}</MathText>
+										</Link>
+									</li>
+								))}
+							</ol>
+						</PopoverContent>
+					</Popover>
+				</>
+			)}
+		</span>
 	);
 }

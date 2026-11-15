@@ -8,13 +8,14 @@ import { MISTAKE_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { MathLine } from "@/components/ui/math-line";
-import { mathPlain } from "@/components/ui/math-text";
+import { MathText, mathPlain } from "@/components/ui/math-text";
 import { useStartUnit } from "@/components/unit-inbox/start-unit";
 import type { MistakeRow } from "@/components/course-page/standing/standing-model";
 import { cn } from "@/lib/utils";
 
-/** Today's hybrid row, at the list's width: the mark beside two lines. */
-const ROW = "-mx-3 flex h-12 w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 text-left font-normal whitespace-normal";
+/** Today's hybrid row, at the list's width: the mark beside the topic and
+ *  what went wrong, which runs to two lines (round 9, 2 m2: cut at one). */
+const ROW = "-mx-3 flex h-auto min-h-12 w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-1.5 text-left font-normal whitespace-normal";
 
 /** One open mistake (spec: standing/standing.md): its slip's mark, the
  *  topic and its arc's bubble, then what went wrong in the tutor's words
@@ -31,8 +32,10 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 					<MathLine className="min-w-0 flex-1 text-row font-medium text-foreground">{row.topic.title}</MathLine>
 					{row.arc && <ArcPill arc={row.arc} className="max-w-3/5 shrink-0" />}
 				</span>
-				<span className="flex min-w-0 items-center gap-3 text-label text-muted-foreground">
-					<MathLine className="min-w-0 flex-1">{row.words}</MathLine>
+				<span className="flex min-w-0 items-start gap-3 text-label text-muted-foreground">
+					<span data-slot="mistake-words" className="line-clamp-2 min-w-0 flex-1">
+						<MathText>{row.words}</MathText>
+					</span>
 					<span className="inline-flex shrink-0 items-center gap-1.5">
 						{row.helped && <HandHelpingIcon role="img" aria-label={MISTAKE_WORDS.helped} className="size-3.5" />}
 						{row.when}
