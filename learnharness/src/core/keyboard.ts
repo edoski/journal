@@ -51,7 +51,9 @@ export type KeyAction =
 	| "stop-reply"
 	| "attach-photo"
 	| "question-pick-digit"
-	| "question-ask-instead";
+	| "question-ask-instead"
+	| "home-course"
+	| "home-map-enlarge";
 
 /** Where Settings and the cheat sheet group an action (display only —
  *  dispatch is global; a seam that isn't mounted simply no-ops). */
@@ -66,7 +68,7 @@ export const KEY_SCOPES: readonly { scope: KeyScope; label: string }[] = [
 
 /** A finer heading the Proposed cheat sheet files an action under, inside
  *  its scope's place. Settings lists by scope alone. */
-export type KeyGroup = "pages" | "calendar";
+export type KeyGroup = "pages" | "calendar" | "home";
 
 export interface KeyActionDef {
 	id: KeyAction;
@@ -133,6 +135,9 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "confidence-up", label: "More sure", scope: "lesson", binding: "alt+arrowup", displayOnly: true },
 	{ id: "confidence-down", label: "Less sure", scope: "lesson", binding: "alt+arrowdown", displayOnly: true },
 	{ id: "pick-course", label: "Pick a course", scope: "lesson", binding: "mod+o" },
+	// Home owns its keys (components/study-home/home-keys.ts), so they never leak to other pages.
+	{ id: "home-course", label: "The course left or right on the map", scope: "global", binding: "arrows-lr", displayOnly: true, group: "home" },
+	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "f", displayOnly: true, group: "home" },
 ];
 
 const STORAGE_KEY = "lh:keymap";
@@ -263,6 +268,7 @@ const KEY_GLYPH: Record<string, string> = {
 	space: "Space",
 	// Display-only: the four arrows as one cheat-sheet row (page-move).
 	arrows: "↑ ↓ ← →",
+	"arrows-lr": "← →",
 };
 
 /** Format a binding for display: "mod+shift+f" → "⌘⇧F". */

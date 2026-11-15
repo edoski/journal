@@ -172,6 +172,7 @@ const SHEET_SECTIONS: readonly { label: string; scope: KeyScope; group?: KeyGrou
 	{ label: "Anywhere", scope: "global" },
 	{ label: "Pages", scope: "global", group: "pages" },
 	{ label: "Calendar", scope: "global", group: "calendar" },
+	{ label: "Home", scope: "global", group: "home" },
 	...KEY_SCOPES.filter(({ scope }) => scope !== "global"),
 ];
 

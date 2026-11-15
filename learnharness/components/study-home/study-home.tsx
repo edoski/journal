@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
+import { neighbourCourse, useHomeKeys } from "@/components/study-home/home-keys";
 import { followedRow, lineKey } from "@/components/study-home/agenda-rows/row-facts";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { TodayRow } from "@/components/study-home/study-facts";
@@ -42,7 +43,7 @@ export function StudyHome() {
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 
-function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
+export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
 	const { rows, courses, chats, done, exam, busy, onContinue } = ready;
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	// The line under the pointer or holding focus, if any: only then does the line the map follows wear its fill, so
@@ -56,6 +57,18 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
 	const highlight = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
 	const pointed = followed && pointingAt === lineKey(followed) ? pointingAt : null;
+	useHomeKeys({
+		moveCourse: (step) => {
+			const next = neighbourCourse(
+				courses.map((c) => c.map.workspace),
+				workspace,
+				step,
+			);
+			if (next) setChosen({ by: "tab", workspace: next });
+			return next !== null;
+		},
+		enlarge: () => onEnlarge(!enlarged),
+	});
 
 	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
 		clearTimeout(dwell.current);

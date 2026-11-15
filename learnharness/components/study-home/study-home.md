@@ -36,6 +36,15 @@ Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes 
 
 Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights in the body (400, 500) plus 600 on the heading and "Your turn". One accent (`link`) for "Your turn"; no fills.
 
+## Keys
+
+Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is mounted and in the capture phase, so they run before the page's arrows (`spatial-arrows.ts`). None fires while he types in a field, holds a modifier, or has a dialog, menu or popover open. The ? sheet lists them under Home.
+
+| Key | What it does |
+|---|---|
+| ← → | the map shows the course left or right of the chosen one, from anywhere on the page outside the map (the map's cards, tabs and arc strip keep their own arrows); past the first or last tab the key is the page's again, so ← still reaches the sidebar (Edo's notes, 15 Nov 2026, N2) |
+| f | presses the map's enlarge button: the map takes Home, and f again brings it back (N2) |
+
 ## States
 
 | State | Shows |
