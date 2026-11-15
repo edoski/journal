@@ -21,6 +21,6 @@ Thesis: Edo liked progress, recency and reason (13 Nov 2026) and asked for one r
 
 ## Order
 
-Unchanged (today.md): a reply waiting on him first, then courses in the exam run-up, nearest exam first, then the most recently studied.
+As today.md says: a reply waiting on him first, then the plan, courses in the exam run-up first, nearest exam first, then the most recently studied; lessons left for next time after the plan.
 
 Trade-offs: the richest row of the candidates, at 64px against the old line's 52; four courses still fit 1024×700 with no page scroll. The pie has no number: its words are for a screen reader, and the definition lives here.

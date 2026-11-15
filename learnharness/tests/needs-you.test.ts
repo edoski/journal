@@ -38,15 +38,16 @@ describe("needsYouNow", () => {
 		const today = needsYouNow(COURSES, [left("2026-11-08T09:20:00")], TODAY).rows.map(label);
 		assert.ok(!today.includes("session chat_left"), "the lesson he ended today waits for tomorrow");
 		const tomorrow = needsYouNow(COURSES, [left("2026-11-08T09:20:00")], "2026-11-09").rows.map(label);
-		assert.equal(tomorrow[0], "session chat_left", "the next day it heads Today as Left for next time");
+		assert.ok(tomorrow.includes("session chat_left"), "the next day it is back as Left for next time");
+		assert.ok(tomorrow.indexOf("session chat_left") > tomorrow.indexOf("Probability"), "after the plan, which leads (round 9, 1 D1)");
 		const earlier = needsYouNow(COURSES, [left("2026-10-30T09:20:00")], TODAY).rows.map(label);
-		assert.equal(earlier[0], "session chat_left", "one left on an earlier day keeps its line however long ago");
+		assert.ok(earlier.includes("session chat_left"), "one left on an earlier day keeps its line however long ago");
 	});
 
 	it("gives a lesson whose course was deleted no line: it is history", () => {
 		const gone = chat("chat_gone", { title: "Series tests", course: { workspace: "/s/graphs", title: "Graph Algorithms" }, ended: "left", courseDeleted: true, updatedAt: "2026-11-07T09:00:00" });
 		assert.ok(!needsYouNow(COURSES, [gone], TODAY).rows.some((r) => r.kind === "session"));
-		assert.equal(needsYouNow(COURSES, [{ ...gone, courseDeleted: false }], TODAY).rows[0]?.kind, "session", "the same lesson in a course still there keeps its line");
+		assert.ok(needsYouNow(COURSES, [{ ...gone, courseDeleted: false }], TODAY).rows.some((r) => r.kind === "session"), "the same lesson in a course still there keeps its line");
 	});
 
 	it("orders the courses after the sessions by urgency: the exam run-up, the nearest exam, then the most recent study", () => {
