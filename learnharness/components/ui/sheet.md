@@ -13,7 +13,7 @@ Radix owns the focus trap, the scroll lock, Esc (one Esc closes one layer, `clai
 
 ## Motion
 
-The app carries no shadcn animation package, so the `animate-in`, `fade-in-*` and `slide-in-from-*` utilities shadcn's sheet ships with draw nothing here (round 9: Context appeared at once, so it did not read as a sheet). The sheet's motion is its own tokens in `app/globals.css` (`animate-sheet-in`, `animate-sheet-out`, `animate-scrim-in`, `animate-scrim-out`), applied under `motion-safe:` so reduced motion shows the panel in place.
+shadcn's own classes through `tw-animate-css` (`app/globals.css`): the panel `slide-in-from-right` and `slide-out-to-right`, its dimmed layer `fade-in-0` and `fade-out-0`, both at `duration-200` in and `duration-150` out. Reduced motion stops them with the app's one rule in `globals.css`, so the panel appears in place.
 
 ## Sources
 
