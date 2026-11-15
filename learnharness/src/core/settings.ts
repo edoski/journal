@@ -1,5 +1,5 @@
 /**
- * THE USER SETTINGS RECORD's shape + sanitizer (settings-storage wave,
+ * THE USER SETTINGS RECORD's shape and schemas (settings-storage wave,
  * 2026-09-19): one versioned, DELTA-shaped record at the data-dir seam
  * (config.SETTINGS_FILE) holding every non-secret product preference.
  *
@@ -15,18 +15,15 @@
  * There is no model choice (owner, 2026-11-14): every agent runs
  * CLAUDE_MODEL. The record names only the Claude account they run on.
  *
- * Sanitizer contract: whatever
- * arrives from disk or the network passes through sanitizeUserSettings
- * before use — never trusted raw. Strict on known fields, PRESERVES
- * unknown keys verbatim (a newer record must never be destroyed by an
- * older app reading it). Invalid known values degrade gracefully:
- * out-of-range numbers CLAMP, wrong-typed/invalid fields DROP (resolve to
- * factory default), never throw.
+ * Zod schemas check both doors: what a PUT may send (strict, a bad field
+ * is a 400) and what settings.json holds (lenient per field, unknown keys
+ * kept verbatim so a newer record survives an older app reading it).
  *
- * Browser-safe: pure logic + types only, no node imports. The resolved
+ * Browser-safe: no node imports. The resolved
  * (fully concrete) view lives in settings-resolution.ts.
  */
 
+import { z } from "zod";
 import { isClaudeProvider } from "./contracts/claude.ts";
 
 /** The schema version this code understands. Bump ONLY for breaking shape
@@ -70,43 +67,40 @@ export class ProviderKeyMissingError extends Error {
 	}
 }
 
-/** The `claude` section: which Claude account every agent runs on (a
- *  provider id, contracts/claude.ts). Absent = the default account. */
-export interface ClaudeSettings {
-	account?: string;
-}
+const color = z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i).nullable();
+const fontName = z.string().regex(/\S/).nullable();
+const claudeAccount = z.string().refine(isClaudeProvider);
 
-/** Markdown-rendering knobs — the bare-bones set (owner decision). */
-export interface MdRenderingSettings {
-	/** Heading font weight (100–900, default 900). CSS resolves the nearest
-	 *  available weight of the chosen font — no font introspection needed. */
-	headingWeight?: number;
-	/** Color for **bold** spans (default #ffffff). */
-	boldColor?: string | null;
-	/** Color for *italic* spans (default #ffffff). */
-	italicColor?: string | null;
-}
+/** The reading size's bounds in px, which the record clamps to and
+ *  Settings' Text size menu offers. */
+export const PROSE_FONT_MIN = 12;
+export const PROSE_FONT_MAX = 24;
 
-/** Appearance settings — mode, colors, type, markdown emphasis. */
-export interface AppearanceSettings {
-	/** "dark" | "light" (default dark). */
-	mode?: "dark" | "light";
-	/** The one user-chosen color; everything else derives per-mode in code.
-	 *  null = the mode's default background. */
-	background?: string | null;
-	/** The main reading font (everything that is Source Sans 3 today), by
-	 *  name — user-chosen from installed fonts. null = Source Sans 3. */
-	fontFamily?: string | null;
-	/** Reading font size in px (12–24, default 16). Headings render as
-	 *  multiples of this, so one knob scales the document coherently. */
-	proseFontSize?: number;
-	/** Session names in CMU Serif (default true — today's look). */
-	sessionNameSerif?: boolean;
-	mdRendering?: MdRenderingSettings;
-}
+/** The appearance section a PUT may send: every field optional, any bad
+ *  one rejects the body. `headingWeight` needs no font introspection: CSS
+ *  resolves the nearest weight the chosen font has. Null colors and fonts
+ *  mean the mode's default. */
+export const AppearanceSettingsSchema = z.object({
+	mode: z.enum(["dark", "light"]).optional(),
+	background: color.optional(),
+	fontFamily: fontName.optional(),
+	proseFontSize: z.int().min(PROSE_FONT_MIN).max(PROSE_FONT_MAX).optional(),
+	sessionNameSerif: z.boolean().optional(),
+	mdRendering: z.object({
+		headingWeight: z.int().min(100).max(900).optional(),
+		boldColor: color.optional(),
+		italicColor: color.optional(),
+	}).optional(),
+});
+export type AppearanceSettings = z.infer<typeof AppearanceSettingsSchema>;
+
+/** The claude section: which Claude account every agent runs on. Absent
+ *  means the default account. */
+export const ClaudeSettingsSchema = z.object({ account: claudeAccount.optional() });
+export type ClaudeSettings = z.infer<typeof ClaudeSettingsSchema>;
 
 /** THE record. Every section optional (delta); unknown top-level keys are
- *  preserved verbatim by the sanitizer (forward-compat with newer records). */
+ *  preserved verbatim (forward-compat with newer records). */
 export interface UserSettings {
 	version: number;
 	claude?: ClaudeSettings;
@@ -144,108 +138,47 @@ export const FACTORY_SETTINGS: FactorySettings = {
 	},
 };
 
-// ─── Sanitizer ─────────────────────────────────────────────────────────────
+const clampedInt = (min: number, max: number) =>
+	z.number().transform((n) => Math.min(Math.max(Math.round(n), min), max));
 
-/** The reading size's bounds in px, which the record clamps to and
- *  Settings' Text size menu offers. */
-export const PROSE_FONT_MIN = 12;
-export const PROSE_FONT_MAX = 24;
+/** A Claude account a record from before the model slots died (owner,
+ *  2026-11-14) ran on. */
+const slotAccount = z.object({ model: z.object({ provider: claudeAccount }) })
+	.transform((slot) => slot.model.provider)
+	.optional()
+	.catch(undefined);
 
-const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+/** settings.json as read from disk. A bad field falls back on its own and
+ *  never costs the rest of the file: out-of-range numbers clamp, bad colors
+ *  and fonts become null (the default), anything else drops. */
+const UserSettingsSchema = z.looseObject({
+	version: z.int().min(1).catch(CURRENT_SETTINGS_VERSION),
+	appearance: z.object({
+		mode: z.enum(["dark", "light"]).optional().catch(undefined),
+		background: color.optional().catch(null),
+		fontFamily: fontName.optional().catch(null),
+		proseFontSize: clampedInt(PROSE_FONT_MIN, PROSE_FONT_MAX).optional().catch(undefined),
+		sessionNameSerif: z.boolean().optional().catch(undefined),
+		mdRendering: z.object({
+			headingWeight: clampedInt(100, 900).optional().catch(undefined),
+			boldColor: color.optional().catch(null),
+			italicColor: color.optional().catch(null),
+		}).optional().catch({}),
+	}).optional().catch(undefined),
+	claude: z.object({ account: claudeAccount.optional().catch(undefined) }).optional().catch(undefined),
+	models: z.object({ strong: slotAccount, cheap: slotAccount, vision: slotAccount }).optional().catch(undefined),
+}).transform(({ chat, models, agent, ...record }): UserSettings => {
+	// The known-dead keys go, so a fossil copy never resurrects through reads
+	// and the next write flushes it: `chat` (per-session models, owner
+	// 2026-09-28), `agent` (every tool always on, owner 2026-11-14) and
+	// `models`, whose Lessons, else Helpers, else Pictures account carries
+	// over into `claude` unless one is already chosen.
+	const legacy = models?.strong ?? models?.cheap ?? models?.vision;
+	return legacy && !record.claude?.account ? { ...record, claude: { ...record.claude, account: legacy } } : record;
+});
 
-/** #rgb / #rrggbb (case-insensitive) — the only color format we accept. */
-export function isHexColor(value: string): boolean {
-	return /^#[0-9a-fA-F]{3}$/.test(value) || /^#[0-9a-fA-F]{6}$/.test(value);
-}
-
-/** Coerce an arbitrary hex-or-null field: null and valid hex pass through,
- *  anything else becomes null (the factory/per-mode default). */
-function sanitizeHexOrNull(value: unknown): string | null {
-	if (value === null) return null;
-	if (typeof value === "string" && isHexColor(value)) return value;
-	return null;
-}
-
-const boolOrDrop = (value: unknown): boolean | undefined =>
-	typeof value === "boolean" ? value : undefined;
-
-/** The `claude` section: an account id that is not a Claude provider drops. */
-function sanitizeClaude(raw: Record<string, unknown>): ClaudeSettings {
-	return typeof raw.account === "string" && isClaudeProvider(raw.account) ? { account: raw.account } : {};
-}
-
-/** The Claude account a record from before the model slots died (owner,
- *  2026-11-14) ran on: its Lessons slot's, else Helpers', else Pictures'. */
-function legacySlotAccount(models: unknown): string | undefined {
-	if (models === null || typeof models !== "object" || Array.isArray(models)) return undefined;
-	for (const slot of ["strong", "cheap", "vision"]) {
-		const provider = ((models as Record<string, { model?: { provider?: unknown } } | undefined>)[slot])?.model?.provider;
-		if (typeof provider === "string" && isClaudeProvider(provider)) return provider;
-	}
-	return undefined;
-}
-
-function sanitizeMdRendering(raw: unknown): MdRenderingSettings {
-	const out: MdRenderingSettings = {};
-	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return out;
-	const r = raw as Record<string, unknown>;
-	if (typeof r.headingWeight === "number" && Number.isFinite(r.headingWeight)) {
-		out.headingWeight = clamp(Math.round(r.headingWeight), 100, 900);
-	}
-	if (r.boldColor !== undefined) out.boldColor = sanitizeHexOrNull(r.boldColor);
-	if (r.italicColor !== undefined) out.italicColor = sanitizeHexOrNull(r.italicColor);
-	return out;
-}
-
-function sanitizeAppearance(raw: Record<string, unknown>): AppearanceSettings {
-	const out: AppearanceSettings = {};
-	if (raw.mode === "dark" || raw.mode === "light") out.mode = raw.mode;
-	if (raw.background !== undefined) out.background = sanitizeHexOrNull(raw.background);
-	if (raw.fontFamily !== undefined) {
-		out.fontFamily = typeof raw.fontFamily === "string" && raw.fontFamily.trim() ? raw.fontFamily : null;
-	}
-	if (typeof raw.proseFontSize === "number" && Number.isFinite(raw.proseFontSize)) {
-		out.proseFontSize = clamp(Math.round(raw.proseFontSize), PROSE_FONT_MIN, PROSE_FONT_MAX);
-	}
-	const sessionNameSerif = boolOrDrop(raw.sessionNameSerif);
-	if (sessionNameSerif !== undefined) out.sessionNameSerif = sessionNameSerif;
-	if (raw.mdRendering !== undefined) out.mdRendering = sanitizeMdRendering(raw.mdRendering);
-	return out;
-}
-
-/**
- * Coerce arbitrary JSON (disk file, network body) into a valid delta record:
- * known fields validated strictly (invalid ones drop/clamp per module doc),
- * UNKNOWN KEYS PRESERVED VERBATIM (a newer record must survive an older
- * app). Never throws. Non-objects → null.
- */
+/** Any JSON (the disk file, a record to write) as a valid delta record, or
+ *  null when it is not an object. Never throws. */
 export function sanitizeUserSettings(raw: unknown): UserSettings | null {
-	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
-	const r = raw as Record<string, unknown>;
-	const out: UserSettings = {
-		version: typeof r.version === "number" && Number.isInteger(r.version) && r.version >= 1 ? r.version : CURRENT_SETTINGS_VERSION,
-	};
-	if (r.appearance !== null && typeof r.appearance === "object" && !Array.isArray(r.appearance)) {
-		out.appearance = sanitizeAppearance(r.appearance as Record<string, unknown>);
-	}
-	if (r.claude !== null && typeof r.claude === "object" && !Array.isArray(r.claude)) {
-		out.claude = sanitizeClaude(r.claude as Record<string, unknown>);
-	}
-	if (!out.claude?.account) {
-		const account = legacySlotAccount(r.models);
-		if (account) out.claude = { ...out.claude, account };
-	}
-	// Unknown top-level keys ride along untouched (forward-compat). The
-	// known-DEAD keys are stripped instead of riding, so a fossil copy on
-	// disk never resurrects through reads and any later write flushes it:
-	// `chat` (the old default-settings section, died with per-session
-	// models, owner 2026-09-28), `models` (the model slots, owner
-	// 2026-11-14 — their account carried over into `claude` above) and
-	// `agent` (the tool switches, owner 2026-11-14 — every tool is always
-	// on, so a stored `agent.tools` switches nothing off).
-	for (const [key, value] of Object.entries(r)) {
-		if (key === "chat" || key === "models" || key === "agent") continue;
-		if (!(key in out)) out[key] = value;
-	}
-	return out;
+	return UserSettingsSchema.safeParse(raw).data ?? null;
 }

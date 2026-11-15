@@ -12,9 +12,11 @@ import { describe, it } from "node:test";
 import {
 	CURRENT_SETTINGS_VERSION,
 	FACTORY_SETTINGS,
-	isHexColor,
 	sanitizeUserSettings,
 } from "../src/core/settings.ts";
+
+/** What settings.json holds once the sanitized record is written. */
+const stored = (raw: unknown) => JSON.parse(JSON.stringify(sanitizeUserSettings(raw)));
 
 describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 	it("pins the owner-decided defaults", () => {
@@ -34,15 +36,6 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		assert.equal("chat" in FACTORY_SETTINGS, false);
 		assert.equal("agent" in FACTORY_SETTINGS, false);
 		assert.equal("claude" in FACTORY_SETTINGS, false);
-	});
-});
-
-describe("isHexColor", () => {
-	it("accepts #rgb and #rrggbb (case-insensitive), rejects everything else", () => {
-		for (const good of ["#fff", "#FFF", "#141414", "#8B5CF6"]) assert.equal(isHexColor(good), true, good);
-		for (const bad of ["fff", "#ffff", "#gggggg", "141414", "#12345", "", "white"]) {
-			assert.equal(isHexColor(bad), false, bad);
-		}
 	});
 });
 
@@ -79,11 +72,11 @@ describe("sanitizeUserSettings", () => {
 	});
 
 	it("wrong-typed fields DROP (resolve to factory), never crash", () => {
-		const out = sanitizeUserSettings({
-			appearance: { mode: "sepia", sessionNameSerif: "true" },
-		});
-		assert.ok(out);
-		assert.deepEqual(out.appearance, {});
+		assert.deepEqual(stored({ appearance: { mode: "sepia", sessionNameSerif: "true" } }), { version: 1, appearance: {} });
+	});
+
+	it("a known section that is not an object drops instead of riding along", () => {
+		assert.deepEqual(stored({ appearance: "junk", claude: 7, general: "kept" }), { version: 1, general: "kept" });
 	});
 
 	it("out-of-range numbers CLAMP (proseFontSize, headingWeight)", () => {
@@ -97,6 +90,15 @@ describe("sanitizeUserSettings", () => {
 		assert.ok(low);
 		assert.equal(low.appearance?.proseFontSize, 12);
 		assert.equal(low.appearance?.mdRendering?.headingWeight, 100);
+	});
+
+	it("colors are #rgb or #rrggbb in any case; anything else becomes null", () => {
+		for (const good of ["#fff", "#FFF", "#141414", "#8B5CF6"]) {
+			assert.equal(sanitizeUserSettings({ appearance: { background: good } })?.appearance?.background, good, good);
+		}
+		for (const bad of ["fff", "#ffff", "#gggggg", "141414", "#12345", "", "white"]) {
+			assert.equal(sanitizeUserSettings({ appearance: { background: bad } })?.appearance?.background, null, bad);
+		}
 	});
 
 	it("invalid colors become null (the factory default), valid ones pass", () => {
@@ -119,8 +121,8 @@ describe("sanitizeUserSettings", () => {
 
 	it("the claude section keeps only a Claude account id", () => {
 		assert.deepEqual(sanitizeUserSettings({ claude: { account: "claude-subscription" } })?.claude, { account: "claude-subscription" });
-		assert.deepEqual(sanitizeUserSettings({ claude: { account: "chatgpt" } })?.claude, {});
-		assert.deepEqual(sanitizeUserSettings({ claude: { account: 7 } })?.claude, {});
+		assert.deepEqual(stored({ claude: { account: "chatgpt" } }).claude, {});
+		assert.deepEqual(stored({ claude: { account: 7 } }).claude, {});
 	});
 
 	it("a record from the model-slot days drops its slots and role pins and keeps the slots' Claude account", () => {
