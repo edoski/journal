@@ -1205,10 +1205,14 @@ def test_a_schema_6_course_is_refused_with_the_command_that_fixes_it(
     with pytest.raises(storage.Unreadable) as error:
         records.load(workspace)
     assert str(error.value).endswith(
-        "has schema 6; run python -m learning migrate --all (it keeps a backup) and "
-        "retry. Nothing was changed"
+        "has schema 6, which this engine does not read. Only the learner moves a "
+        "course, on purpose: python -m learning migrate --workspace "
+        f"{workspace.directory} (it keeps a backup). Nothing was changed"
     )
-    with pytest.raises(storage.Unreadable, match="migrate --all"):
+    assert "--all" not in str(error.value), (
+        "an agent is never told to move every course"
+    )
+    with pytest.raises(storage.Unreadable, match="migrate --workspace"):
         records.save(workspace, {"title": "Calculus"})
     assert json.loads(workspace.record.read_text())["schema"] == 6
 

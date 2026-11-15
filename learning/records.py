@@ -40,8 +40,10 @@ def _readable(workspace: Workspace, stored: dict[str, Any] | None) -> dict[str, 
     version = stored.get("schema")
     if type(version) is int and version == schema.SCHEMA - 1:
         raise storage.Unreadable(
-            f"{workspace.record} has schema {version}; run python -m learning "
-            "migrate --all (it keeps a backup) and retry. Nothing was changed"
+            f"{workspace.record} has schema {version}, which this engine does not "
+            "read. Only the learner moves a course, on purpose: python -m learning "
+            f"migrate --workspace {workspace.directory} (it keeps a backup). "
+            "Nothing was changed"
         )
     if type(version) is int and version > schema.SCHEMA:
         raise storage.Unreadable(
