@@ -8,7 +8,7 @@ import { EXAM_GAP_WORDS, examGapAsk, examGapPickWords, examGapWhyWords } from "@
 import { topicCreation, useStartSession } from "@/components/unit-inbox/start-unit";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
 
-const PRESS = "text-row text-link hover:text-link";
+const PRESS = "text-body system-current:text-row text-link hover:text-link";
 
 /**
  * Under the head's first line, when the exam's plan leaves topics out
@@ -36,7 +36,7 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 	// in the engine's order (round 8: eight options and no pick).
 	const [pick, ...others] = ways;
 	return (
-		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-row font-normal text-muted-foreground">
+		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-body system-current:text-row font-normal system-current:font-normal text-muted-foreground">
 			<span data-slot="exam-gaps-why" className="mr-1">
 				<MathText>{why}</MathText>
 			</span>

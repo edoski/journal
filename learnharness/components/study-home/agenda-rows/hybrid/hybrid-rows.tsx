@@ -14,7 +14,7 @@ import { MathText } from "@/components/ui/math-text";
  *  it at its end, then the lesson line with why now at its end. The ends
  *  sit flush right, so each lines up down the list. */
 const ROW =
-	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-lg px-3 text-left font-normal whitespace-normal data-[pointed]:bg-fill-hover";
+	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-lg px-3 text-left font-normal system-current:font-normal whitespace-normal data-[pointed]:bg-fill-hover";
 /** Home's Proposed: the hover fill's corners at 8, as every other row with
  *  a hover fill (the sidebar's, the course page's, Settings'). */
 const ROW_CORNERS = "rounded-md";
@@ -27,7 +27,7 @@ const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_auto]";
 const COLUMNS_STANDING = "grid-cols-[1rem_minmax(0,1fr)_15rem_14rem]";
 
 /** A standing fact: a 14px mark, as the reason's, then its words. */
-const FACT = "flex min-w-0 items-center gap-1.5 text-label text-muted-foreground";
+const FACT = "flex min-w-0 items-center gap-1.5 text-callout system-current:text-label text-muted-foreground";
 
 /** A hairline above every row but the first, inset to the text's edges. */
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
@@ -49,12 +49,12 @@ export function HybridRows({ rows, busy, onContinue, standing = false, ...point 
 					<li key={lineKey(row)} className={HAIRLINE}>
 						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? cn(COLUMNS_STANDING, ROW_CORNERS) : COLUMNS)} {...pointProps(row, point)}>
 							<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
-							<MathLine className="text-label text-muted-foreground">{courseTitle(row)}</MathLine>
+							<MathLine className="text-callout system-current:text-label text-muted-foreground">{courseTitle(row)}</MathLine>
 							{facts !== undefined && <SlipFact facts={facts} />}
-							<span data-slot="today-when" className="justify-self-end text-label text-muted-foreground tabular-nums">
+							<span data-slot="today-when" className="justify-self-end text-callout system-current:text-label text-muted-foreground tabular-nums">
 								{studiedLabel(row)}
 							</span>
-							<MathLine className="text-control font-medium text-foreground">{lessonTitle(row)}</MathLine>
+							<MathLine className="text-headline system-current:text-control system-current:font-medium text-foreground">{lessonTitle(row)}</MathLine>
 							{facts !== undefined && <StandingFact facts={facts} />}
 							<WhyMark why={whyOf(row)} />
 						</LineTarget>

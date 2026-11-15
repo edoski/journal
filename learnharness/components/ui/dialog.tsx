@@ -70,7 +70,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
 
 /** 14/20, muted. */
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-	return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-control text-muted-foreground", className)} {...props} />;
+	return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-body system-current:text-control text-muted-foreground", className)} {...props} />;
 }
 
 /** Actions at the right, the primary one last. */

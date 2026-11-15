@@ -59,7 +59,7 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	// lesson marks only a failure.
 	if (job.status !== "error") return null;
 	return (
-		<div className="flex items-center gap-2 text-row text-muted-foreground" data-testid="dispatch-settled">
+		<div className="flex items-center gap-2 text-body system-current:text-row text-muted-foreground" data-testid="dispatch-settled">
 			<CircleSlashIcon className="size-3.5" />
 			<span>{KIND_FAILED[kind]}</span>
 		</div>
@@ -71,14 +71,14 @@ function DispatchRefusedCard({ label, line, button }: { label: string; line: str
 	const ctx = useContext(ChatActionsContext);
 	return (
 		<div
-			className="flex items-center gap-2 text-xs text-muted-foreground"
+			className="flex items-center gap-2 text-subheadline system-current:text-xs text-muted-foreground"
 			data-testid="dispatch-refused"
 		>
 			<SettingsIcon className="size-3.5" />
-			<span className="font-medium uppercase tracking-wide">{label}</span>
+			<span className="system-current:font-medium uppercase tracking-wide">{label}</span>
 			<span>{line}</span>
 			{ctx && (
-				<Button variant="outline" size="xs" data-testid="dispatch-setup-link" onClick={ctx.openSetup} className="ml-1 h-auto px-2 py-0.5 font-ui font-normal normal-case tracking-normal text-foreground">
+				<Button variant="outline" size="xs" data-testid="dispatch-setup-link" onClick={ctx.openSetup} className="ml-1 h-auto px-2 py-0.5 font-ui font-normal system-current:font-normal normal-case tracking-normal text-foreground">
 					{button}
 				</Button>
 			)}

@@ -130,7 +130,7 @@ export function Composer({
 				placeholder={placeholder}
 				autoFocus={autoFocus}
 				rows={1}
-				className="max-h-48 min-h-12 resize-none rounded-none border-0 px-4 pb-2 pt-3.5 text-control focus-visible:ring-0"
+				className="max-h-48 min-h-12 resize-none rounded-none border-0 px-4 pb-2 pt-3.5 text-body system-current:text-control focus-visible:ring-0"
 			/>
 			<div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-1 p-2">
 				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">

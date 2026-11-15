@@ -202,7 +202,7 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
  *  every send is blocked with the same words. */
 export function CoursesUnavailable({ reason }: { reason: string }) {
 	return (
-		<p role="alert" data-testid="courses-unavailable" className="text-row text-muted-foreground">
+		<p role="alert" data-testid="courses-unavailable" className="text-body system-current:text-row text-muted-foreground">
 			<span className="text-danger">{unavailableMessage(reason)}.</span> If the engine is not found, set
 			LH_LEARNING_ENGINE to its folder and LH_LEARNING_PYTHON to its Python, then restart.
 		</p>
@@ -246,7 +246,7 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 				data-slot="composer-chip"
 				aria-label="Course"
 				className={cn(
-					"flex h-8 min-w-0 items-center gap-1.5 rounded-full px-3 text-row outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-fill-hover motion-reduce:transition-none",
+					"flex h-8 min-w-0 items-center gap-1.5 rounded-full px-3 text-body system-current:text-row outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-fill-hover motion-reduce:transition-none",
 					picked ? "text-foreground" : "text-muted-foreground",
 				)}
 			>
@@ -308,7 +308,7 @@ function rootLabel(root: string): string {
  *  hint carries the full path. */
 function RootSelect({ roots, value, onChange }: { roots: readonly string[]; value: string; onChange: (root: string) => void }) {
 	const trigger = (
-		<SelectTrigger data-testid="new-course-root" aria-label="Save in" className="w-full font-normal">
+		<SelectTrigger data-testid="new-course-root" aria-label="Save in" className="w-full font-normal system-current:font-normal">
 			<SelectValue placeholder="Pick a folder" />
 		</SelectTrigger>
 	);
@@ -371,7 +371,7 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 			</DialogContent>
 		);
 	}
-	const field = "flex flex-col gap-2 text-row font-medium text-foreground";
+	const field = "flex flex-col gap-2 text-body system-current:text-row system-current:font-medium text-foreground";
 	return (
 		<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
 			<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
@@ -380,7 +380,7 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 				</DialogHeader>
 				<label className={field}>
 					Title
-					<Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus required disabled={busy} placeholder="Group Theory" data-testid="new-course-title" className="font-normal" />
+					<Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus required disabled={busy} placeholder="Group Theory" data-testid="new-course-title" className="font-normal system-current:font-normal" />
 				</label>
 				<div role="group" aria-labelledby="new-course-exam-label" className={field}>
 					<span id="new-course-exam-label">Exam day</span>
@@ -388,7 +388,7 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 				</div>
 				<div role="group" aria-labelledby="new-course-material-label" className={field}>
 					<span id="new-course-material-label">Course material</span>
-					<span className="text-label font-normal text-muted-foreground">Slides, notes or past papers. They are copied into the course, so the tutor can read them.</span>
+					<span className="text-callout system-current:text-label font-normal system-current:font-normal text-muted-foreground">Slides, notes or past papers. They are copied into the course, so the tutor can read them.</span>
 					<MaterialField picks={picks} onChange={setPicks} disabled={busy} />
 				</div>
 				{roots.length > 1 && (
@@ -398,11 +398,11 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 					</label>
 				)}
 				{roots.length === 0 && (
-					<p className="text-row text-muted-foreground">
+					<p className="text-body system-current:text-row text-muted-foreground">
 						LearnHarness does not know your courses folder yet. Set up the first course from the Terminal with <code>study init</code>.
 					</p>
 				)}
-				{error && <p role="alert" className="text-row text-danger">{error}</p>}
+				{error && <p role="alert" className="text-body system-current:text-row text-danger">{error}</p>}
 				<DialogFooter className="pt-2">
 					<Button type="button" variant="quiet" onClick={onClose}>
 						Cancel

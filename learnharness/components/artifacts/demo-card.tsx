@@ -105,7 +105,7 @@ export function DemoOutputCard({
 	const result = output as DemoResult | undefined;
 	if (!result || typeof result.html !== "string" || typeof result.title !== "string") {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+			<div className="rounded-xl border bg-card p-4 text-body system-current:text-sm text-muted-foreground">
 				Demo completed, but the result could not be displayed.
 			</div>
 		);
@@ -114,11 +114,11 @@ export function DemoOutputCard({
 	if (failed) {
 		return (
 			<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="demo-card-failed">
-				<div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				<div className="flex items-center gap-2 text-subheadline system-current:text-xs system-current:font-medium uppercase tracking-wide text-muted-foreground">
 					Interactive demo
 					<span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">failed</span>
 				</div>
-				<p className="mt-2 text-sm text-muted-foreground">{result.notes ?? "The demo could not be built."}</p>
+				<p className="mt-2 text-body system-current:text-sm text-muted-foreground">{result.notes ?? "The demo could not be built."}</p>
 			</div>
 		);
 	}
@@ -178,10 +178,10 @@ function DemoFrame({
 			   figure card's grammar plus a name. Switch + download far right. */}
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex min-w-0 items-baseline gap-2">
-					<span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<span className="shrink-0 text-subheadline system-current:text-xs system-current:font-medium uppercase tracking-wide text-muted-foreground">
 						interactive demo
 					</span>
-					<span className="truncate text-xs font-medium tracking-wide text-foreground">{title}</span>
+					<span className="truncate text-subheadline system-current:text-xs system-current:font-medium tracking-wide text-foreground">{title}</span>
 				</div>
 				<div className="flex shrink-0 items-center gap-1.5">
 					<Toggle
@@ -244,10 +244,10 @@ export function DemoErrorChip({
 }) {
 	return (
 		<div
-			className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger"
+			className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-body system-current:text-sm text-danger"
 			data-testid="demo-error-chip"
 		>
-			<span className="font-medium">This demo threw an error</span>
+			<span className="system-current:font-medium">This demo threw an error</span>
 			<span className="min-w-0 flex-1 truncate font-mono text-xs" title={message}>
 				{message}
 			</span>

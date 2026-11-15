@@ -81,7 +81,7 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
 
 /** 14/20, muted. */
 function SheetDescription({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Description>) {
-	return <SheetPrimitive.Description data-slot="sheet-description" className={cn("text-control text-muted-foreground", className)} {...props} />;
+	return <SheetPrimitive.Description data-slot="sheet-description" className={cn("text-body system-current:text-control text-muted-foreground", className)} {...props} />;
 }
 
 export { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription };

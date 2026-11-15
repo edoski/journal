@@ -113,7 +113,7 @@ export function LessonRoadmap({
 						data-slot="lesson-roadmap-trigger"
 						data-testid="roadmap"
 						aria-label={label ? `Where this lesson is: ${mathPlain(label)}` : "Where this lesson is"}
-						className="min-w-0 shrink gap-2.5 font-normal"
+						className="min-w-0 shrink gap-2.5 font-normal system-current:font-normal"
 					>
 						<span data-slot="roadmap-strip" aria-hidden className="flex shrink-0 items-center gap-1">
 							{steps.map((s) => (
@@ -154,12 +154,12 @@ export function LessonRoadmap({
 											onOpenChange(false);
 											onJump(s.id);
 										}}
-										className="flex min-h-8 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+										className="flex min-h-8 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-body system-current:text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 									>
 										{inner}
 									</button>
 								) : (
-									<div data-slot="roadmap-step" data-status={s.status} className="flex min-h-8 items-center gap-3 rounded-md px-2 py-1.5 text-row">
+									<div data-slot="roadmap-step" data-status={s.status} className="flex min-h-8 items-center gap-3 rounded-md px-2 py-1.5 text-body system-current:text-row">
 										{inner}
 									</div>
 								)}
@@ -226,7 +226,7 @@ function RoadmapLinks({ place, course }: { place?: LessonPlace; course: { title:
 				<MapIcon aria-hidden className="size-4 shrink-0" />
 				<span className="min-w-0 flex-1 truncate">Course map</span>
 				{place?.arc && (
-					<span data-slot="arc-pill" className="max-w-32 shrink-0 truncate rounded-full bg-fill-hover px-2 py-0.5 text-label text-muted-foreground">
+					<span data-slot="arc-pill" className="max-w-32 shrink-0 truncate rounded-full bg-fill-hover px-2 py-0.5 text-callout system-current:text-label text-muted-foreground">
 						{place.arc.title}
 					</span>
 				)}
@@ -236,4 +236,4 @@ function RoadmapLinks({ place, course }: { place?: LessonPlace; course: { title:
 }
 
 const LINK_ROW =
-	"flex h-8 items-center gap-3 rounded-md px-2 text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
+	"flex h-8 items-center gap-3 rounded-md px-2 text-body system-current:text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";

@@ -273,7 +273,7 @@ function CourseDrawing({
 	onOpensWhole: (fits: boolean) => void;
 }) {
 	const { map } = course;
-	if (map.topics.length === 0) return <p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>;
+	if (map.topics.length === 0) return <p className="m-auto text-body system-current:text-row text-muted-foreground">Topics appear as you study this course.</p>;
 	// As much room as the fade, so a topic at the edge scrolls clear of it.
 	return <TopicMap map={map} arc={arc} said={said} margin={FADE} highlight={highlight} framed={framed} whole={whole} onOpensWhole={onOpensWhole} />;
 }

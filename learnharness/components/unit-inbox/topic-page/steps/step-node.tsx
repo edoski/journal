@@ -79,7 +79,7 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 		>
 			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />
 			{/* KaTeX's fonts have no medium face, so a hairline stroke sets the math at the title's weight. */}
-			<span className="line-clamp-2 min-w-0 text-row font-medium text-foreground [&_.katex]:[-webkit-text-stroke:0.015em_currentcolor]">
+			<span className="line-clamp-2 min-w-0 text-body system-current:text-row system-current:font-medium text-foreground [&_.katex]:[-webkit-text-stroke:0.015em_currentcolor]">
 				<MathText>{title}</MathText>
 			</span>
 		</Link>
@@ -93,7 +93,7 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 			style={{ animationDelay: `${Math.min(layer * STAGGER_MS, STAGGER_CAP_MS)}ms` }}
 		>
 			{tag && (
-				<span data-slot="topic-step-tag" aria-hidden className="absolute -top-5 left-0 text-caption font-medium text-foreground">
+				<span data-slot="topic-step-tag" aria-hidden className="absolute -top-5 left-0 text-callout system-current:text-caption system-current:font-medium text-foreground">
 					{tag}
 				</span>
 			)}

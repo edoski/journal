@@ -40,12 +40,12 @@ export type WhyMarkSize = "row" | "slot";
  */
 export function WhyMark({ why, size = "row", words }: { why: Why | null; size?: WhyMarkSize; words?: string | null }) {
 	if (!why) return <span />;
-	const tone = why.kind === "reply" ? "font-medium text-link" : "text-muted-foreground";
+	const tone = why.kind === "reply" ? "system-current:font-medium text-link" : "text-muted-foreground";
 	if (size === "row") return <RowMark key={why.starts?.words ?? why.short} why={why} words={words} tone={tone} />;
 	const Icon = WHY_ICON[why.kind];
 	return (
 		// `contents`: the icon and the words are the status slot's own items (`TRAILING_SLOT`).
-		<span data-slot="why-mark" data-kind={why.kind} className={cn("contents text-label", tone)}>
+		<span data-slot="why-mark" data-kind={why.kind} className={cn("contents text-callout system-current:text-label", tone)}>
 			<span className="flex h-4 shrink-0 items-center">
 				<Icon aria-hidden className="size-3" />
 			</span>
@@ -81,7 +81,7 @@ function RowMark({ why, words, tone }: { why: Why; words?: string | null; tone: 
 	}, [why.starts?.words, cut]);
 	const Icon = starts ? STARTS_ICON[starts.kind] : WHY_ICON[why.kind];
 	return (
-		<span data-slot="today-why" data-kind={why.kind} data-starts={starts?.kind} className={cn("inline-flex max-w-56 items-center gap-1.5 justify-self-end text-label", tone)}>
+		<span data-slot="today-why" data-kind={why.kind} data-starts={starts?.kind} className={cn("inline-flex max-w-56 items-center gap-1.5 justify-self-end text-callout system-current:text-label", tone)}>
 			<Icon aria-hidden className="size-3.5" />
 			<span ref={ref} className="truncate">
 				<MathText>{starts?.words ?? words ?? why.short}</MathText>

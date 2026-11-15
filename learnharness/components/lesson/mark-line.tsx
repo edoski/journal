@@ -21,7 +21,7 @@ export function MarkLine({ answerId }: { answerId: string }) {
 	const { onDispute, canDispute } = useAnswerMarkActions();
 	if (!mark) return null;
 	return (
-		<div data-testid="mark-line" data-slot="mark-line" className="group/mark flex min-h-8 min-w-0 justify-end pe-4 text-row text-muted-foreground">
+		<div data-testid="mark-line" data-slot="mark-line" className="group/mark flex min-h-8 min-w-0 justify-end pe-4 text-body system-current:text-row text-muted-foreground">
 			<div data-slot="mark-facts" className="relative flex min-w-0 flex-col items-end justify-center gap-y-1">
 				<Hint label={MARK_WORDS.disputeTitle} action="dispute-mark">
 					<Button

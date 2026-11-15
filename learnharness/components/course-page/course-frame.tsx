@@ -111,7 +111,7 @@ function Reading() {
 function Notice({ children }: { children: React.ReactNode }) {
 	return (
 		<PageFrame className="h-full">
-			<p data-slot="course-notice" className="flex min-h-8 flex-wrap items-center text-row text-muted-foreground">
+			<p data-slot="course-notice" className="flex min-h-8 flex-wrap items-center text-body system-current:text-row text-muted-foreground">
 				{children}
 			</p>
 		</PageFrame>

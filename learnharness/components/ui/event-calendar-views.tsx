@@ -32,7 +32,7 @@ const dayRowCommonClasses: CalendarOptions = {
   listItemEventInnerClass: (info) => (
     info.isNarrow
       ? `py-px ${xxsTextClass}`
-      : 'py-0.5 text-xs'
+      : 'py-0.5 text-subheadline system-current:text-xs'
   ),
   listItemEventTimeClass: (info) => cn(
     info.isNarrow ? 'ps-0.5' : 'ps-1',
@@ -40,7 +40,7 @@ const dayRowCommonClasses: CalendarOptions = {
   ),
   listItemEventTitleClass: (info) => cn(
     info.isNarrow ? 'px-0.5' : 'px-1',
-    'font-bold whitespace-nowrap overflow-hidden shrink-100',
+    'system-current:font-bold whitespace-nowrap overflow-hidden shrink-100',
   ),
 
   /* Day Row > Row Event
@@ -64,7 +64,7 @@ const dayRowCommonClasses: CalendarOptions = {
   rowMoreLinkInnerClass: (info) => (
     info.isNarrow
       ? `px-0.5 py-px ${xxsTextClass}`
-      : 'px-1 py-0.5 text-xs'
+      : 'px-1 py-0.5 text-subheadline system-current:text-xs'
   ),
 }
 
@@ -101,7 +101,7 @@ export function EventCalendarViews({
         'opacity-50 italic',
         info.isNarrow
           ? `px-1 py-1.5 ${xxsTextClass}`
-          : 'px-2 py-2.5 text-xs',
+          : 'px-2 py-2.5 text-subheadline system-current:text-xs',
       )}
 
       /* List-Item Event
@@ -164,10 +164,10 @@ export function EventCalendarViews({
       )}
       rowEventInnerClass={(info) => cn(
         'flex flex-row items-center',
-        info.isNarrow ? xxsTextClass : 'text-xs',
+        info.isNarrow ? xxsTextClass : 'text-subheadline system-current:text-xs',
       )}
       rowEventTimeClass={(info) => cn(
-        'font-bold shrink-1',
+        'system-current:font-bold shrink-1',
         info.isNarrow ? 'ps-0.5' : 'ps-1',
       )}
       rowEventTitleClass={(info) => cn(
@@ -201,7 +201,7 @@ export function EventCalendarViews({
         info.isShort
           ? 'flex-row items-center p-1 gap-1'
           : ['flex-col', info.isNarrow ? 'px-1 py-0.5' : 'px-2 py-1'],
-        (info.isShort || info.isNarrow) ? xxsTextClass : 'text-xs',
+        (info.isShort || info.isNarrow) ? xxsTextClass : 'text-subheadline system-current:text-xs',
       )}
       columnEventTimeClass={(info) => cn(
         'order-1 shrink-100',
@@ -221,7 +221,7 @@ export function EventCalendarViews({
       columnMoreLinkInnerClass={(info) => (
         info.isNarrow
           ? `p-0.5 ${xxsTextClass}`
-          : 'p-1 text-xs'
+          : 'p-1 text-subheadline system-current:text-xs'
       )}
 
       /* Day Header
@@ -237,15 +237,15 @@ export function EventCalendarViews({
       dayHeaderContent={(info) => (
         <>
           {info.weekdayText && (
-            <div className="text-xs uppercase text-muted-foreground">{info.weekdayText}</div>
+            <div className="text-subheadline system-current:text-xs uppercase text-muted-foreground">{info.weekdayText}</div>
           )}
           {info.dayNumberText && (
             <div
               className={cn(
                 'm-0.5 rounded-full flex flex-row items-center justify-center',
                 info.isNarrow
-                  ? 'size-7 text-base'
-                  : 'size-8 text-lg',
+                  ? 'size-7 text-body system-current:text-base'
+                  : 'size-8 text-title-3 system-current:text-lg',
                 info.isToday
                   ? [
                       'bg-chart-1/50',
@@ -277,7 +277,7 @@ export function EventCalendarViews({
         'flex flex-row items-center justify-center whitespace-nowrap rounded-full',
         info.isNarrow
           ? `m-px h-5 ${xxsTextClass}`
-          : 'm-1.5 h-6 text-sm',
+          : 'm-1.5 h-6 text-body system-current:text-sm',
         info.text === info.dayNumberText
           ? (info.isNarrow ? 'w-5' : 'w-6')
           : (info.isNarrow ? 'px-1' : 'px-2'),
@@ -288,7 +288,7 @@ export function EventCalendarViews({
             ]
           : (info.hasNavLink && 'hover:bg-foreground/5'),
         info.isOther && 'text-muted-foreground',
-        info.monthText && 'font-bold',
+        info.monthText && 'system-current:font-bold',
       )}
       dayCellInnerClass={(info) => cn(info.inPopover && 'p-2')}
 
@@ -330,7 +330,7 @@ export function EventCalendarViews({
       listDayHeaderInnerClass={(info) => cn(
         !info.level
           ? [
-              'h-9 rounded-full flex flex-row items-center text-lg',
+              'h-9 rounded-full flex flex-row items-center text-title-3 system-current:text-lg',
               info.text === info.dayNumberText
                 ? 'w-9 justify-center'
                 : 'px-3',
@@ -342,7 +342,7 @@ export function EventCalendarViews({
                 : (info.hasNavLink && 'hover:bg-foreground/5')
             ]
           : [
-              'text-xs uppercase',
+              'text-subheadline system-current:text-xs uppercase',
               info.hasNavLink && 'hover:underline',
             ]
       )}
@@ -362,7 +362,7 @@ export function EventCalendarViews({
         'items-center',
       )}
       singleMonthHeaderInnerClass={(info) => cn(
-        'px-3 py-1 rounded-full text-base font-bold',
+        'px-3 py-1 rounded-full text-headline system-current:text-base system-current:font-bold',
         info.hasNavLink && 'hover:bg-foreground/5',
       )}
 
@@ -386,7 +386,7 @@ export function EventCalendarViews({
         'absolute flex flex-row items-center whitespace-nowrap bg-foreground/10',
         info.isNarrow
           ? `top-0.5 start-0 my-px h-4 pe-1 rounded-e-full ${xxsTextClass}`
-          : 'top-1.5 start-1 h-6 px-2 rounded-full text-sm',
+          : 'top-1.5 start-1 h-6 px-2 rounded-full text-body system-current:text-sm',
         info.hasNavLink && 'hover:bg-foreground/20 focus-visible:outline-3 outline-ring/50',
       )}
       nonBusinessHoursClass='bg-foreground/3'
@@ -428,8 +428,8 @@ export function EventCalendarViews({
             'ms-1 my-2 flex flex-row items-center rounded-full bg-foreground/10',
             info.options.dayMinWidth !== undefined && 'me-1',
             info.isNarrow
-              ? 'h-5 px-1.5 text-xs'
-              : 'h-6 px-2 text-sm',
+              ? 'h-5 px-1.5 text-subheadline system-current:text-xs'
+              : 'h-6 px-2 text-body system-current:text-sm',
             info.hasNavLink && 'hover:bg-foreground/20 focus-visible:outline-3 outline-ring/50',
           ),
 
@@ -439,7 +439,7 @@ export function EventCalendarViews({
           allDayHeaderClass: 'items-center justify-end',
           allDayHeaderInnerClass: (info) => cn(
             'm-2 text-end',
-            info.isNarrow ? xxsTextClass : 'text-sm',
+            info.isNarrow ? xxsTextClass : 'text-body system-current:text-sm',
           ),
           allDayDividerClass: 'border-b',
 
@@ -455,7 +455,7 @@ export function EventCalendarViews({
             'relative ms-2 me-3 my-2',
             info.isNarrow
               ? `-top-4 ${xxsTextClass}`
-              : '-top-5 text-sm',
+              : '-top-5 text-body system-current:text-sm',
             info.isFirst && 'hidden',
           ),
           slotHeaderDividerClass: (info) => cn(
@@ -472,7 +472,7 @@ export function EventCalendarViews({
 
           listItemEventClass: 'group p-2 rounded-s-full gap-2',
           listItemEventBeforeClass: 'mx-2 border-5',
-          listItemEventInnerClass: 'gap-2 text-sm',
+          listItemEventInnerClass: 'gap-2 text-body system-current:text-sm',
           listItemEventTimeClass: 'shrink-0 w-1/2 max-w-40 whitespace-nowrap overflow-hidden text-ellipsis',
           listItemEventTitleClass: (info) => cn(
             'grow min-w-0 whitespace-nowrap overflow-hidden',

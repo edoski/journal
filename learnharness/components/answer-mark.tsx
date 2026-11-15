@@ -88,7 +88,7 @@ export function AnswerMarkLine({ answerId }: { answerId: string }) {
 	const mark = marks[answerId];
 	if (!mark) return null;
 	return (
-		<div data-testid="answer-mark" className="mt-3 flex items-start gap-3 border-t pt-3 text-row text-muted-foreground">
+		<div data-testid="answer-mark" className="mt-3 flex items-start gap-3 border-t pt-3 text-body system-current:text-row text-muted-foreground">
 			<div className="flex min-w-0 flex-1 flex-col gap-1">
 				{mark.rows.map((row) => (
 					<RowFacts key={row.id} row={row} />
@@ -221,7 +221,7 @@ export function DisputeDialog({ mark, onClose, onSend }: { mark: AnswerMark; onC
 export function DisputeRow({ data }: { data: DisputeDetails }) {
 	return (
 		<div data-testid="dispute-row" className="my-1 w-full rounded-xl bg-card px-4 py-3">
-			<div className="flex items-center gap-2 text-row text-muted-foreground">
+			<div className="flex items-center gap-2 text-body system-current:text-row text-muted-foreground">
 				<FlagIcon aria-hidden className="size-4 shrink-0" />
 				{disputeStampWords(data)}
 			</div>

@@ -4,7 +4,23 @@ The app's visual system on one page: what every page draws with, where each valu
 
 ## Type
 
-One name per job, tokens in `app/globals.css` (`@theme`, `--text-*`). Two weights in the chrome, 400 and 500.
+**Proposed (the Visual system switch): macOS's own text styles,** as Apple publishes them for macOS (Apple HIG, Typography, "macOS built-in text styles", developer.apple.com/design/human-interface-guidelines/typography): size, line height and weight, nothing of our own. Tokens in `app/globals.css` (`@theme`, `--text-*`), only the styles the app uses.
+
+| Token | Apple style | Size / line / weight | Job |
+|---|---|---|---|
+| `text-large-title` | Large Title | 26 / 32 / 400 | the composer's question |
+| `text-title-3` | Title 3 | 15 / 20 / 400 | the calendar's day numbers |
+| `text-headline` | Headline | 13 / 16 / 700 | an item's title over its own line: a sidebar card, a Today row, the topic page's Now, a mistake, a page's lead, the lesson's name in its top bar |
+| `text-body` | Body | 13 / 16 / 400 | everything else that reads: nav, tabs, buttons, page facts, one-line list rows (the course page's topics), the maps' card titles, Settings, the lesson's trail |
+| `text-callout` | Callout | 12 / 15 / 400 | meta: a row's course line, standing, slip and reason, section headers, a page's eyebrow, tooltips, a map card's line and the maps' tags (You are here, Next) |
+| `text-subheadline` | Subheadline | 11 / 14 / 400 | calendar events, a card's caption in the lesson |
+| `text-caption-2` | Caption 2 | 10 / 13 / 500 | the course's two-letter badge |
+
+Weight comes with the style, never from a `font-*` class: emphasis is Headline, and meta that was 500 is Callout at 400 with its ink saying the rest. A map card's title is Body, since Headline's bold cut the current topic's name on its fixed card. Lesson prose stays at his reading size (`text-prose`, Settings), and its markdown headings, tables and KaTeX are the prose's own.
+
+**How the switch works.** Each use names its macOS style and keeps Current's classes under the `system-current:` variant (`text-body system-current:text-row system-current:font-medium`), which applies while `<html>` has no `data-polish-system="proposed"`, so production draws Current. Tokens alone could not switch it: Current's styles fold into macOS's unevenly (14/500 is Body for nav and Headline for a title), and Tailwind's `font-medium` is one number for every role. Shipping deletes every `system-current:` class and the variant: a deletion diff.
+
+**Current:** one name per job, two weights in the chrome, 400 and 500.
 
 | Token | Size / line | Job |
 |---|---|---|
@@ -62,5 +78,5 @@ Words come from `study-words.ts` and `topic-standing.ts` (`standingOf`, `slipBes
 
 ## Open (Edo's call)
 
-- The research's budget of five type styles a page and one icon stroke would mean a new type scale and lucide's `absoluteStrokeWidth` everywhere.
+- The research's budget of one icon stroke would mean lucide's `absoluteStrokeWidth` everywhere.
 - Dialog titles at 18/600 against page titles at 20/500.

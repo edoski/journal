@@ -18,7 +18,7 @@ export const NOW_RULE = "before:absolute before:inset-y-3 before:left-3 before:w
  *  classes private): no surface, radius as Home's, bleeding past the
  *  column so the hover fill reaches past the text, the gutter, the icon
  *  column then the text then a trailing fact flush right. */
-const ROW_GRID = `${BLEED} grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 rounded-lg text-left font-normal whitespace-normal`;
+const ROW_GRID = `${BLEED} grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 rounded-lg text-left font-normal system-current:font-normal whitespace-normal`;
 
 /** A 64px row of two lines. */
 export const TWO_LINE_ROW = `${ROW_GRID} h-16 grid-rows-[auto_auto] content-center gap-y-1`;

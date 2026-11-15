@@ -42,7 +42,7 @@ const DAY_GRID = {
 	rowEventClass: "mx-1 mb-0.5",
 	rowEventInnerClass: "",
 	rowMoreLinkClass: "mx-1 mb-0.5 rounded-md text-muted-foreground hover:bg-fill-hover hover:text-foreground",
-	rowMoreLinkInnerClass: "px-1.5 py-0.5 text-label",
+	rowMoreLinkInnerClass: "px-1.5 py-0.5 text-callout system-current:text-label",
 };
 
 /** A day's More panel, the day grid's own: the entry panels' surface
@@ -116,18 +116,18 @@ function DayHead({ info, schedule }: { info: DayHeaderInfo; schedule: ReadonlyMa
 	return (
 		<div data-slot="calendar-day-head" data-today={info.isToday || undefined} className="flex w-full min-w-0 flex-col items-start gap-1 px-2 pb-2 pt-1">
 			<div className="flex items-center gap-1.5">
-				<span className="text-label text-muted-foreground">{info.weekdayText}</span>
+				<span className="text-callout system-current:text-label text-muted-foreground">{info.weekdayText}</span>
 				<span
 					className={cn(
-						"flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-control tabular-nums",
-						info.isToday ? "bg-foreground font-medium text-background" : "text-foreground",
+						"flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-body system-current:text-control tabular-nums",
+						info.isToday ? "bg-foreground system-current:font-medium text-background" : "text-foreground",
 					)}
 				>
 					{info.dayNumberText}
 				</span>
 			</div>
 			{words && (
-				<span className="flex min-w-0 items-center gap-1 text-label text-muted-foreground">
+				<span className="flex min-w-0 items-center gap-1 text-callout system-current:text-label text-muted-foreground">
 					{day?.off || day?.journalOff ? <MoonIcon aria-hidden className="size-3.5 shrink-0" /> : <ClockIcon aria-hidden className="size-3.5 shrink-0" />}
 					<span className="truncate">{words}</span>
 				</span>
@@ -262,11 +262,11 @@ export function CalendarView({
 					}
 					dayHeaderContent={(info) =>
 						info.inPopover ? (
-							<span data-slot="calendar-day-panel-head" className="px-1.5 text-row font-medium text-foreground">
+							<span data-slot="calendar-day-panel-head" className="px-1.5 text-headline system-current:text-row system-current:font-medium text-foreground">
 								{longDayWords(isoDay(info.date))}
 							</span>
 						) : compact ? (
-							<span className="px-2 pb-2 pt-1 text-label text-muted-foreground">{info.weekdayText}</span>
+							<span className="px-2 pb-2 pt-1 text-callout system-current:text-label text-muted-foreground">{info.weekdayText}</span>
 						) : (
 							<DayHead info={info} schedule={days} />
 						)
@@ -275,8 +275,8 @@ export function CalendarView({
 					dayCellTopClass={compact ? "flex flex-row justify-start" : "hidden"}
 					dayCellTopInnerClass={(info) =>
 						cn(
-							"m-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-row tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-							info.isToday ? "bg-foreground font-medium text-background" : info.isOther ? "text-muted-foreground/80" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
+							"m-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-body system-current:text-row tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
+							info.isToday ? "bg-foreground system-current:font-medium text-background" : info.isOther ? "text-muted-foreground/80" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
 						)
 					}
 					dayHeaderRowClass="border-0"
@@ -287,7 +287,7 @@ export function CalendarView({
 					popoverCloseContent={() => <XIcon aria-hidden className="size-4" />}
 				/>
 				{quiet && (
-					<p data-slot="calendar-quiet" className="pointer-events-none absolute inset-0 flex items-center justify-center text-row text-muted-foreground">
+					<p data-slot="calendar-quiet" className="pointer-events-none absolute inset-0 flex items-center justify-center text-body system-current:text-row text-muted-foreground">
 						{words.quiet}
 					</p>
 				)}

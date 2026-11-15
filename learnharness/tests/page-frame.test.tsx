@@ -41,7 +41,7 @@ describe("the page frame", () => {
 			["page-eyebrow", "page-title", "page-actions", "page-lines", "page-lead", "next", "page-standing", "page-fact", "page-fact", "extra"],
 		);
 		assert.equal(document.querySelector('[data-slot="page-title"]')!.tagName, "H1");
-		assert.match(document.querySelector('[data-slot="page-lead"]')!.className, /text-control font-medium text-foreground/, "what to do next leads in full ink");
+		assert.match(document.querySelector('[data-slot="page-lead"]')!.className, /\btext-headline\b.*\btext-foreground\b/, "what to do next leads as a Headline in full ink");
 		assert.match(document.querySelector('[data-slot="page-standing"]')!.className, /\*:not-first:before:w-px/, "a hairline between facts");
 		assert.match(head.className, /border-b/, "a hairline closes the head");
 		const press = document.querySelector('[data-slot="page-actions"] a')!;

@@ -5,6 +5,11 @@
 @import "@fullcalendar/react/skeleton.css" layer(base);
 
 @custom-variant dark (&:is(.dark *));
+/* Current's type, kept while the Visual system switch compares it with
+   macOS's text styles (components/design-variant.ts): shipping deletes this
+   variant and every class it prefixes. Production builds set no switch, so
+   they draw Current. */
+@custom-variant system-current (&:where(html:not([data-polish-system="proposed"]) *));
 
 /*
  * THE SKIN — wave 5. Design tokens, the single place to restyle the app.
@@ -175,6 +180,32 @@ main [class*="focus-visible:outline-"]:not([class*="focus-visible:outline-none"]
 	--text-display: 30px;
 	--text-display--line-height: calc(36 / 30);
 	--text-display--letter-spacing: -0.025em;
+	/* macOS's own text styles, as published: size, line height, weight
+	   (Apple HIG, Typography, "macOS built-in text styles",
+	   developer.apple.com/design/human-interface-guidelines/typography).
+	   Only the styles the app uses; behind the Visual system switch every
+	   use names one of these. */
+	--text-large-title: 26px;
+	--text-large-title--line-height: calc(32 / 26);
+	--text-large-title--font-weight: 400;
+	--text-title-3: 15px;
+	--text-title-3--line-height: calc(20 / 15);
+	--text-title-3--font-weight: 400;
+	--text-headline: 13px;
+	--text-headline--line-height: calc(16 / 13);
+	--text-headline--font-weight: 700;
+	--text-body: 13px;
+	--text-body--line-height: calc(16 / 13);
+	--text-body--font-weight: 400;
+	--text-callout: 12px;
+	--text-callout--line-height: calc(15 / 12);
+	--text-callout--font-weight: 400;
+	--text-subheadline: 11px;
+	--text-subheadline--line-height: calc(14 / 11);
+	--text-subheadline--font-weight: 400;
+	--text-caption-2: 10px;
+	--text-caption-2--line-height: calc(13 / 10);
+	--text-caption-2--font-weight: 500;
 	/* Radii ladder — 4/8/12/16 multiples of the 4px base. */
 	--radius-sm: var(--lh-radius-sm);
 	--radius-md: var(--lh-radius-md);

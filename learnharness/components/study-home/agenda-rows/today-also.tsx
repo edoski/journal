@@ -21,9 +21,9 @@ export function alsoHint(row: TodayRow): string {
  *  the first lesson as the lessons sit from each other. A lesson too long
  *  for the room left is cut at its end, never inside a formula. */
 export function TodayAlso({ rows, busy, onContinue, className }: { rows: readonly TodayRow[]; busy: boolean; onContinue: (workspace: string, step?: NextStep) => void; className?: string }) {
-	const label = "min-w-0 shrink text-row font-normal text-foreground";
+	const label = "min-w-0 shrink text-body system-current:text-row font-normal system-current:font-normal text-foreground";
 	return (
-		<li data-slot="today-also" className={cn("flex h-13 min-w-0 items-center gap-1 text-row text-muted-foreground", className)}>
+		<li data-slot="today-also" className={cn("flex h-13 min-w-0 items-center gap-1 text-body system-current:text-row text-muted-foreground", className)}>
 			<span className="mr-3 shrink-0">Also today:</span>
 			{rows.map((row) => (
 				<Hint key={row.kind === "session" ? row.chat.id : row.course.map.workspace} label={alsoHint(row)} side="top">
