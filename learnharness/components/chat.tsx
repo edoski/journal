@@ -1725,7 +1725,7 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}

@@ -75,10 +75,12 @@ export function isCourseDeletedRefusal(message: string | undefined): boolean {
 	}
 }
 
-export function turnErrorText(message: string): TurnErrorText {
+/** `again`: the press before failed the same way, so the line says so
+ *  where its words allow (round 9: a second Enter changed nothing). */
+export function turnErrorText(message: string, again = false): TurnErrorText {
 	const raw = message.trim();
 	if (UNREACHABLE.test(raw)) {
-		return { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then try again.", details: null };
+		return { kind: "offline", sentence: `${again ? "Still can't" : "Couldn't"} reach the app. Check it's running, then try again.`, details: null };
 	}
 	if (parseProviderKeyRefusal(raw)) {
 		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null };
