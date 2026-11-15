@@ -149,13 +149,12 @@ describe("a lesson waiting on his typed answer", () => {
 		assert.equal(first?.kind === "session" ? first.chat.id : null, id);
 
 		const action = topicAction(RANK, MAP, listed());
-		assert.equal(action.kind, "resume", "the page of the topic it worked on resumes the lesson");
-		assert.equal("chat" in action ? action.chat.id : null, id);
+		assert.notEqual("chat" in action ? action.chat.id : null, id, "the page of a topic it only worked on never resumes it: the lesson belongs to no topic (round 7)");
 		const inbox = buildInbox([COURSE], listed(), WS);
 		const unit = inbox.active.find((u) => u.topic.handle === RANK.handle);
 		assert.equal(unit?.now, null, "a topic the lesson only worked on is not its turn: the lesson belongs to no topic until its plan names one");
 		assert.ok(inbox.other.some((c) => c.id === id), "so the lesson is a session of its own in the sidebar");
-		assert.equal(resumableSession(unit!.sessions)?.id, id, "and the topic's action resumes it");
+		assert.equal(resumableSession(unit!.sessions)?.id, id, "the topic's row still lists it among the sessions tied to it");
 
 		const held = topicAction(KERNEL, MAP, listed());
 		assert.ok(held.kind === "continue" && "chat" in held && held.chat.id === id, "a topic its task holds continues the task in that lesson");
