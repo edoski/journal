@@ -139,6 +139,15 @@ describe("a re-mark corrects only what this session saved or he disputed (round 
 		assert.equal(saves.length, 2);
 	});
 
+	it("an answer saved earlier in the same turn may be set right in that turn, though the turn began before it was saved", async () => {
+		const check = asked("check");
+		const { saves, tools } = savingCourse(check.messages);
+		assert.equal((await courseSave(tools, [attempt({ question: check.id })])).isError, false);
+		const remark = await courseSave(tools, [attempt({ corrects: ["o41"], result: "partial" })]);
+		assert.equal(remark.isError, false, remark.text);
+		assert.equal(saves.length, 2);
+	});
+
 	it("an answer saved just before a restart is this session's own, from the save kept with the lesson, though the transcript lost its receipt (round 8: J2's re-mark rule meeting J5's kept saves)", () => {
 		const check = asked("check");
 		assert.equal(remarkableOf(check.messages).saved.has("o6"), false);

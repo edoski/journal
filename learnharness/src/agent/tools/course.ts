@@ -68,6 +68,11 @@ const recordsAnAnswer = (o: Record<string, unknown>) => (o.kind ?? "attempt") ==
  *  through: the session's record holds them only from the next turn. */
 const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
 
+/** The attempts each session's saves recorded in this turn, from their
+ *  receipts: this session saved them, so it may set them right in the same
+ *  turn, though `remarkable` was read before they existed. */
+const recordedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
+
 /** The help a Show me gave, in the words practice's Show me saves (its
  *  R5 rung): one rule for a shown answer, in a lesson as in practice
  *  (round 8, 2 M3: a lesson's Show me was saved as no help). */
@@ -155,6 +160,12 @@ function namedQuestions(
 	return { observations, questions, refused };
 }
 
+/** The observation ids a save's receipt gives (`saved`). */
+function receiptIds(json: unknown): string[] {
+	const saved = (json as { saved?: unknown } | null)?.saved;
+	return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : [];
+}
+
 /** Hands the lesson each named answer's observation id, from the
  *  receipt's `saved` (one id per observation, in the save's order). */
 function keepLinks(ctx: CourseToolContext, questions: readonly (string | null)[], json: unknown): void {
@@ -187,7 +198,10 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	const answers = ctx.answers ?? new Map<string, AnsweredQuestion>();
 	const saved = savedThisTurn.get(ctx) ?? new Set<string>();
 	savedThisTurn.set(ctx, saved);
-	const named = problem ? { observations: listed, questions: listed.map(() => null), refused: null } : namedQuestions(listed, answers, saved, ctx.remarkable);
+	const recorded = recordedThisTurn.get(ctx) ?? new Set<string>();
+	recordedThisTurn.set(ctx, recorded);
+	const remarkable = ctx.remarkable && { saved: new Set([...ctx.remarkable.saved, ...recorded]), disputed: ctx.remarkable.disputed };
+	const named = problem ? { observations: listed, questions: listed.map(() => null), refused: null } : namedQuestions(listed, answers, saved, remarkable);
 	if (named.refused) return { ok: false, kind: "validation", message: named.refused };
 	const ruled = withShownHelp(named.observations, (_o, i) => {
 		const question = named.questions[i];
@@ -195,6 +209,7 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	});
 	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
+	if (result.ok) for (const id of receiptIds(result.json)) recorded.add(id);
 	if (result.ok && !problem) keepLinks(ctx, named.questions, result.json);
 	const note = shownHelpNote(ruled.helped);
 	if (!result.ok || !note || typeof result.json !== "object" || result.json === null) return result;
