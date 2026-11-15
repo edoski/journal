@@ -36,6 +36,18 @@ Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes 
 
 Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights in the body (400, 500) plus 600 on the heading and "Your turn". One accent (`link`) for "Your turn"; no fills.
 
+## Width (a choice for Edo, behind the polish switch)
+
+Edo's notes, 15 Nov 2026, N1: a wider Home gives the map more room, "but also the rows below would get wider … is there any super useful info at all that we could cleanly fit into it". The switch (`components/design-variant.ts`, group `home`, dev only; production draws Current) offers Current and two candidates. Both widen Home's column to the course page's frame (`HOME_WIDTH`, 80rem, as `PageFrame`) and give each Today row one fact he would act on, from what the engine already reads (`agenda-rows/row-aside.ts`), in its own column before the row's ends, so the facts line up:
+
+| Option | The added fact |
+|---|---|
+| Current | none; the column stays 60rem |
+| `exam` | the course's exam as a day ("Exam Thu 3 Dec", "Exam tomorrow"), on the course line of the course's first row only, so rows of one course never repeat it; nothing for a course with no exam |
+| `standing` | where he stands on the row's one topic, in the map's words ("Right with help"), on the lesson line; nothing on a row of several topics |
+
+Shipping one means deleting the other, Current and the switch.
+
 ## Keys
 
 Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is mounted and in the capture phase, so they run before the page's arrows (`spatial-arrows.ts`). None fires while he types in a field, holds a modifier, or has a dialog, menu or popover open. The ? sheet lists them under Home.

@@ -8,6 +8,7 @@ import { SIDEBAR_OPEN_COOKIE, SIDEBAR_WIDTH_COOKIE, sidebarFirstFrame } from "@/
 import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
+import { PolishHost } from "@/components/dev/polish-host";
 
 export const metadata: Metadata = {
 	title: "Learning Harness",
@@ -33,6 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 					</SidebarProvider>
 				</AppearanceProvider>
 			</ServerEventsProvider>
+			{process.env.NODE_ENV === "development" && <PolishHost />}
 		</body>
 		</html>
 	);
