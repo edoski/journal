@@ -31,6 +31,9 @@ type Family = "message" | "question";
 
 const PROBE_DONE_TOOL = "probe_done";
 
+/** The words that give a topic's planned day. */
+const PLANNED_DAY = /^(?:is planned for|planned to start)$/i;
+
 /** His question is about the plan: when something comes back, is due or
  *  overdue, the exam, the days ahead. */
 const PLAN_QUESTION = /\b(?:reviews?|plan(?:ned)?|overdue|due|exam|when|days?|schedule|calendar|week|tomorrow)\b/i;
@@ -602,9 +605,11 @@ export class VoiceGuard {
 	}
 
 	private messageBreaks(text: string, kind: TurnKind | undefined): VoiceBreak[] {
-		// The plan's days are the answer to his question about the plan.
+		// The plan's days are the answer to his question about the plan, and
+		// a close names the day he picks up on (round 10: "Its review is
+		// planned for tomorrow" refused in a close).
 		const asksPlan = kind === "direct" && PLAN_QUESTION.test(this.input.words ?? "");
-		const out = voiceBreaks(text, kind).filter((b) => !(asksPlan && b.rule === "plan"));
+		const out = voiceBreaks(text, kind).filter((b) => !(b.rule === "plan" && (asksPlan || (kind === "close" && PLANNED_DAY.test(b.excerpt)))));
 		if (!out.some((b) => b.rule === "questions")) {
 			const asked = [...this.asked, ...sentences(text).filter((s) => s.trim().endsWith("?"))];
 			if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });

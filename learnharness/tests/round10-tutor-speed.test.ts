@@ -214,3 +214,11 @@ describe("a compaction inside the turn names its wait (round 10, robustness mino
 		assert.match(chat, /label=\{compacting \? COMPACTING_LINE : "Thinking…"\}/);
 	});
 });
+
+describe("a close names the day he picks up on (round 10)", () => {
+	it("\"Its review is planned for tomorrow\" in a Done for today close is shown, and still refused as a reason in a lesson", () => {
+		const close = new VoiceGuard([newUserMessage("Linear maps"), assistant([send("A step.")]), newDoneTonightMessage("teacher") as LhMessage]);
+		assert.deepEqual(rules(close, send("Next time you pick up Linear maps and their matrices at the open question about the columns of a matrix. Its review is planned for tomorrow, Tuesday 10 November.")), []);
+		assert.ok(rules(new VoiceGuard([newUserMessage("Linear maps")]), send("The kernel is planned for tomorrow, so first a check on columns.")).includes("plan"));
+	});
+});
