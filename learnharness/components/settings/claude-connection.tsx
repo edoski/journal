@@ -113,12 +113,12 @@ export function AccountRow({ status, current, busy, onUse, alias }: { status: Cl
 	const inUse = current === account.providerId;
 	return <div className={cn(CLAUDE_ROW, "flex flex-col gap-0.5")} data-testid="claude-account" data-provider={account.providerId}>
 		<div className="flex min-h-7 items-center gap-3">
-			<span className="min-w-0 flex-1 truncate text-row text-foreground" data-testid="claude-account-name">
+			<span className="min-w-0 flex-1 truncate text-body system-current:text-row text-foreground" data-testid="claude-account-name">
 				{claudeAccountName(status)}
 				{alias && <span className="text-muted-foreground">, named {alias} in T3 Code</span>}
 			</span>
 			{inUse
-				? <span className="text-label text-muted-foreground" data-testid="claude-in-use">In use</span>
+				? <span className="text-callout system-current:text-label text-muted-foreground" data-testid="claude-in-use">In use</span>
 				: connected && current !== undefined && <Button type="button" size="compact" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" data-testid="claude-use-account" disabled={busy} onClick={onUse}>Use this account</Button>}
 		</div>
 		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection, account)}</p>

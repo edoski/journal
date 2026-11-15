@@ -60,7 +60,7 @@ export function HomeFrame({
 						{children}
 					</HomeBody>
 					{lesson.error && (
-						<p role="alert" className="shrink-0 text-row text-danger">
+						<p role="alert" className="shrink-0 text-body system-current:text-row text-danger">
 							{lesson.error}
 						</p>
 					)}
@@ -134,5 +134,5 @@ function HomeBody({
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
-	return <p className="text-row text-muted-foreground">{children}</p>;
+	return <p className="text-body system-current:text-row text-muted-foreground">{children}</p>;
 }

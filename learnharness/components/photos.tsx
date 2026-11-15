@@ -274,7 +274,7 @@ export function PendingPhotos({ draft, className }: { draft: PhotoDraft; classNa
 					))}
 				</div>
 			)}
-			{draft.error && <p data-testid="photo-error" className="text-label text-muted-foreground">{draft.error}</p>}
+			{draft.error && <p data-testid="photo-error" className="text-callout system-current:text-label text-muted-foreground">{draft.error}</p>}
 		</div>
 	);
 }

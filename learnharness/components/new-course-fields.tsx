@@ -23,7 +23,7 @@ export function ExamDayField({ value, onChange, disabled }: { value: string | nu
 						variant="outline"
 						disabled={disabled}
 						data-testid="new-course-exam"
-						className={cn("flex-1 justify-start font-normal", !value && "text-muted-foreground")}
+						className={cn("flex-1 justify-start font-normal system-current:font-normal", !value && "text-muted-foreground")}
 					>
 						<CalendarIcon aria-hidden />
 						{value ? longDay(value) : "Not set yet"}
@@ -68,7 +68,7 @@ export function MaterialField({ picks, onChange, disabled }: { picks: readonly M
 					{picks.map((pick, index) => {
 						const Icon = pick.kind === "folder" ? FolderIcon : FileTextIcon;
 						return (
-							<li key={index} data-testid="new-course-material-pick" className="flex h-8 min-w-0 items-center gap-2 text-row font-normal text-foreground">
+							<li key={index} data-testid="new-course-material-pick" className="flex h-8 min-w-0 items-center gap-2 text-body system-current:text-row font-normal system-current:font-normal text-foreground">
 								<Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
 								<span className="min-w-0 flex-1 truncate">{pickWords(pick)}</span>
 								<Button

@@ -7,7 +7,7 @@ import { MathText } from "@/components/ui/math-text";
 
 /** A crumb takes the room its words need and gives way first when the bar
  *  is full (round 8: "Rank and the column s…" with half the bar free). */
-const CRUMB = "min-w-0 shrink-[2] truncate text-control text-muted-foreground";
+const CRUMB = "min-w-0 shrink-[2] truncate text-body system-current:text-control text-muted-foreground";
 const CRUMB_LINK = `lh-no-drag ${CRUMB} rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none`;
 
 /** The lesson's top bar contents (spec: lesson-top-bar.md), rendered inside

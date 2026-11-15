@@ -364,15 +364,15 @@ function ActivityRow({
 				onClick={onAbort}
 				disabled={abortState === "pending"}
 				aria-label={`Stop: ${mathPlain(words)}`}
-				className="absolute right-1 top-1 font-normal hover:text-danger"
+				className="absolute right-1 top-1 font-normal system-current:font-normal hover:text-danger"
 			>
 				<CircleStopIcon aria-hidden />
 				{STOP_WORDS[abortState ?? "idle"]}
 			</Button>)}
 			{detailOpen && (
-				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground">
+				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-callout system-current:text-label text-muted-foreground">
 					{blob.activity && <p className="break-words text-foreground">{blob.activity}</p>}
-					<Button variant="quiet" size="xs" asChild className="-ml-1.5 w-fit font-normal">
+					<Button variant="quiet" size="xs" asChild className="-ml-1.5 w-fit font-normal system-current:font-normal">
 						<Link href={target.href}>
 							{target.words}
 							<ArrowRightIcon aria-hidden />

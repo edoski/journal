@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  *  selection, so nothing moves; `attention` (the row waits on the learner)
  *  is the one state drawn in full ink at 500. */
 const navRowVariants = cva(
-	"relative flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&>svg]:size-4 [&>svg]:shrink-0",
+	"relative flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-body system-current:text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&>svg]:size-4 [&>svg]:shrink-0",
 	{
 		variants: {
 			state: {
@@ -20,7 +20,7 @@ const navRowVariants = cva(
 			},
 			attention: {
 				false: "",
-				true: "font-medium text-foreground",
+				true: "system-current:font-medium text-foreground",
 			},
 		},
 		defaultVariants: { state: "rest", attention: false },
@@ -75,7 +75,7 @@ export function NavRowTrailing({ className, ...props }: React.ComponentProps<"sp
 		<span
 			data-slot="nav-row-trailing"
 			className={cn(
-				"ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end gap-1.5 text-label font-normal tabular-nums text-muted-foreground",
+				"ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end gap-1.5 text-callout system-current:text-label font-normal system-current:font-normal tabular-nums text-muted-foreground",
 				className,
 			)}
 			{...props}

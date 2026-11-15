@@ -39,7 +39,7 @@ export function PdfBriefCard({ output }: { output: unknown }) {
 	const result = output as PdfResult | undefined;
 	if (!result || typeof result.brief !== "string") {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+			<div className="rounded-xl border bg-card p-4 text-body system-current:text-sm text-muted-foreground">
 				PDF reading completed, but the result could not be displayed.
 			</div>
 		);
@@ -52,20 +52,20 @@ export function PdfBriefCard({ output }: { output: unknown }) {
 	const consultedList = result.pagesConsulted ?? [];
 	return (
 		<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="pdf-brief-card">
-			<div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+			<div className="mb-1 flex items-center gap-2 text-subheadline system-current:text-xs system-current:font-medium uppercase tracking-wide text-muted-foreground">
 				PDF brief
 				{failed && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">failed</span>}
 			</div>
-			<div className="text-sm [&_p:first-child]:mt-0 [&_p:last-child]:mb-0">
+			<div className="text-body system-current:text-sm [&_p:first-child]:mt-0 [&_p:last-child]:mb-0">
 				<MessageResponse>{result.brief}</MessageResponse>
 			</div>
 			{!failed && readList.length > 0 && (
-				<div className="mt-3 border-t pt-2 text-xs text-muted-foreground">
+				<div className="mt-3 border-t pt-2 text-subheadline system-current:text-xs text-muted-foreground">
 					Pages read: {readList.join(", ")}
 				</div>
 			)}
 			{!failed && consultedList.length > readList.length && (
-				<div className="mt-3 border-t pt-2 text-xs text-muted-foreground">
+				<div className="mt-3 border-t pt-2 text-subheadline system-current:text-xs text-muted-foreground">
 					Pages consulted: {consultedList.join(", ")}
 				</div>
 			)}
@@ -81,7 +81,7 @@ export function ResearchBriefCard({ output }: { output: unknown }) {
 	const result = output as ResearchResult | undefined;
 	if (!result || typeof result.brief !== "string") {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+			<div className="rounded-xl border bg-card p-4 text-body system-current:text-sm text-muted-foreground">
 				Research completed, but the result could not be displayed.
 			</div>
 		);
@@ -91,7 +91,7 @@ export function ResearchBriefCard({ output }: { output: unknown }) {
 		<LessonCard data-testid="research-brief-card" label="Research brief" note={failed ? <span className="text-danger">Failed</span> : undefined}>
 			<MessageResponse>{result.brief}</MessageResponse>
 			{result.sources.length > 0 && (
-				<ul className="mt-3 flex flex-col gap-1 border-t pt-3 text-row">
+				<ul className="mt-3 flex flex-col gap-1 border-t pt-3 text-body system-current:text-row">
 					{result.sources.map((s) => (
 						<li key={s.url} className="truncate">
 							<a href={s.url} target="_blank" rel="noopener noreferrer" className="text-link underline-offset-2 hover:underline">

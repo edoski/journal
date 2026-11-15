@@ -65,12 +65,12 @@ export function DialogHeader({ className, ...props }: React.ComponentProps<"div"
 
 /** 18/24 at 600. */
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-	return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-subheading font-semibold text-foreground", className)} {...props} />;
+	return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-title-1 system-current:text-subheading system-current:font-semibold text-foreground", className)} {...props} />;
 }
 
 /** 14/20, muted. */
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-	return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-control text-muted-foreground", className)} {...props} />;
+	return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-body system-current:text-control text-muted-foreground", className)} {...props} />;
 }
 
 /** Actions at the right, the primary one last. */

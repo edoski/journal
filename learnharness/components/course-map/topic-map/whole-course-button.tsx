@@ -32,7 +32,7 @@ export function WholeCourseButton({ whole, onToggle, className }: { whole: boole
 				data-slot="course-map-whole"
 				aria-pressed={whole}
 				onClick={onToggle}
-				className={cn("lh-no-drag text-label font-normal", className)}
+				className={cn("lh-no-drag text-callout system-current:text-label font-normal system-current:font-normal", className)}
 			>
 				{whole ? <LocateFixedIcon aria-hidden className="size-3.5" /> : <ZoomOutIcon aria-hidden className="size-3.5" />}
 				{label}

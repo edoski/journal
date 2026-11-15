@@ -1,6 +1,6 @@
 import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
-import { cardLine, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_SAID_BY, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { cardLine, slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -254,14 +254,12 @@ export { agoWords, studiedDaysWords as studiedWords };
 /**
  * What the head says beside the pie, in the app's words (study-words.ts),
  * each drawn as an icon and a few words: why the engine calls the topic
- * weak, unless the standing beside it already says so (`SLIP_SAID_BY`;
- * the sidebar keeps it as the row's reason), then its review, due ("Due since 5 Nov"), held past memory's day ("Due
+ * weak (the sidebar keeps it as the row's reason), then its review, due ("Due since 5 Nov"), held past memory's day ("Due
  * since 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
  * say it (`reviewWords`). `today` is the engine's study day.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {
-	const found = topic.weak ? slipMark(topic.signals, titleOf) : null;
-	const slip = found && SLIP_SAID_BY[found.key] !== standingOf(topic).words ? found : null;
+	const slip = slipBeside(topic, titleOf);
 	const review = topic.review ? reviewWords(topic.review, today) : null;
 	return [...(slip ? [{ kind: "slip" as const, words: slip.words, slip: slip.key }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }

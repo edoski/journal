@@ -21,7 +21,7 @@ export function useModelSetup() {
 /** The pill itself. testid "setup-cta-keys". */
 export function SignInPill({ onOpen, inline = false }: { onOpen: () => void; inline?: boolean }) {
 	const button = (
-		<Button type="button" variant="outline" size="compact" data-testid="setup-cta-keys" onClick={onOpen} className="cursor-pointer font-ui text-xs font-normal">
+		<Button type="button" variant="outline" size="compact" data-testid="setup-cta-keys" onClick={onOpen} className="cursor-pointer font-ui text-subheadline system-current:text-xs font-normal system-current:font-normal">
 			Sign in to Claude
 		</Button>
 	);

@@ -39,12 +39,12 @@ export function ClaudeLimitPrompt({ failure, onContinue }: {
 		}
 	}
 
-	if (prompt.state === "checking") return <span className="text-row text-muted-foreground" data-testid="claude-limit-checking">Checking your other Claude accounts…</span>;
+	if (prompt.state === "checking") return <span className="text-body system-current:text-row text-muted-foreground" data-testid="claude-limit-checking">Checking your other Claude accounts…</span>;
 	if (prompt.state === "failed") return null;
 	const next = nextClaudeAccount(failure.provider, prompt.statuses);
 	if (!next) {
 		const reset = soonestClaudeReset(prompt.statuses);
-		return <span className="text-row text-muted-foreground" data-testid="claude-limit-none">All Claude accounts are at their limit{reset ? ` · the first resets ${claudeResetLabel(reset)}` : ""}</span>;
+		return <span className="text-body system-current:text-row text-muted-foreground" data-testid="claude-limit-none">All Claude accounts are at their limit{reset ? ` · the first resets ${claudeResetLabel(reset)}` : ""}</span>;
 	}
 	const left = next.usage ? ` (${next.usage.percentLeft}% left)` : "";
 
@@ -52,6 +52,6 @@ export function ClaudeLimitPrompt({ failure, onContinue }: {
 		<Button variant="quiet" size="row" className="text-foreground" data-testid="claude-limit-continue" disabled={busy} onClick={() => void continueOn(next.account.providerId)}>
 			Continue on {next.account.label}{left}
 		</Button>
-		{error && <span role="alert" className="text-row text-danger">{error}</span>}
+		{error && <span role="alert" className="text-body system-current:text-row text-danger">{error}</span>}
 	</span>;
 }

@@ -27,8 +27,8 @@ function Fact({ fact, iconOnly: compact }: { fact: TopicFact; iconOnly: boolean 
 			data-slot="course-topic-fact"
 			data-kind={fact.kind}
 			className={cn(
-				"inline-flex h-5 max-w-56 shrink-0 items-center gap-1.5 text-label",
-				fact.kind === "your-turn" ? "font-medium text-link" : "text-muted-foreground",
+				"inline-flex h-5 max-w-56 shrink-0 items-center gap-1.5 text-callout system-current:text-label",
+				fact.kind === "your-turn" ? "system-current:font-medium text-link" : "text-muted-foreground",
 			)}
 		>
 			{Icon ? <Icon aria-hidden className="size-3.5 shrink-0" /> : fact.kind === "working" && <BrailleSpinner />}
@@ -88,12 +88,12 @@ export function CourseTopicRow({
 			>
 				<TopicGlyph standing={row.standing} className={detail ? "mt-px" : undefined} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span data-slot="course-topic-title" className={cn("flex min-w-0 text-row font-medium", started ? "text-foreground" : "text-muted-foreground")}>
+					<span data-slot="course-topic-title" className={cn("flex min-w-0 text-body system-current:text-row system-current:font-medium", started ? "text-foreground" : "text-muted-foreground")}>
 						<MathLine className="min-w-0">{row.topic.title}</MathLine>
 						<span className="sr-only">, {row.standing.words}</span>
 					</span>
 					{detail && (
-						<span className="line-clamp-2 text-row text-muted-foreground">
+						<span className="line-clamp-2 text-body system-current:text-row text-muted-foreground">
 							<MathText>{detail}</MathText>
 						</span>
 					)}

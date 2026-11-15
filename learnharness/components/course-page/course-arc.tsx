@@ -91,7 +91,7 @@ export function CourseArc<T>({
 							id={headerId}
 							data-slot="course-arc-header"
 							onKeyDown={onHeaderKeyDown}
-							className="h-9 min-w-0 flex-1 gap-4 px-3 text-row font-medium text-foreground duration-150"
+							className="h-9 min-w-0 flex-1 gap-4 px-3 text-headline system-current:text-row system-current:font-medium text-foreground duration-150"
 						>
 							{section.share === null ? <span className="size-4 shrink-0" /> : <Ring aria-hidden share={section.share} />}
 							<span className="flex min-w-0 flex-1 items-center gap-1">
@@ -100,7 +100,7 @@ export function CourseArc<T>({
 								</span>
 								<ChevronDownIcon aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none", !open && "-rotate-90")} />
 								{section.exam && (
-									<span data-slot="course-arc-exam" className="ml-1 min-w-0 truncate text-label font-normal text-muted-foreground">
+									<span data-slot="course-arc-exam" className="ml-1 min-w-0 truncate text-callout system-current:text-label font-normal system-current:font-normal text-muted-foreground">
 										{section.exam}
 									</span>
 								)}
@@ -108,7 +108,7 @@ export function CourseArc<T>({
 							<span
 								data-slot="course-arc-state"
 								data-kind={end.kind}
-								className={cn("inline-flex h-5 shrink-0 items-center gap-1.5 text-label font-normal", end.kind === "needs-you" ? "text-warning" : "text-muted-foreground", giveWay)}
+								className={cn("inline-flex h-5 shrink-0 items-center gap-1.5 text-callout system-current:text-label font-normal system-current:font-normal", end.kind === "needs-you" ? "text-warning" : "text-muted-foreground", giveWay)}
 							>
 								<Icon aria-hidden className="size-3.5 shrink-0" />
 								{end.words}

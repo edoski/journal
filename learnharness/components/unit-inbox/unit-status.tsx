@@ -57,7 +57,7 @@ export function UnitStatusText({ status }: { status: UnitStatus }) {
 				<span
 					data-slot="unit-status"
 					data-kind={status.kind}
-					className={cn("contents", status.kind === "your-turn" && "font-medium text-link")}
+					className={cn("contents", status.kind === "your-turn" && "system-current:font-medium text-link")}
 				>
 					<span className="flex h-4 shrink-0 items-center">
 						<Icon aria-hidden className="size-3" />

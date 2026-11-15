@@ -11,7 +11,7 @@ export function WhyMark({ kind, words }: { kind: "reply" | "writing"; words?: st
 		<span
 			data-slot="topic-why"
 			data-kind={kind}
-			className={cn("inline-flex max-w-56 items-center gap-1.5 justify-self-end text-label", kind === "reply" ? "font-medium text-link" : "text-muted-foreground")}
+			className={cn("inline-flex max-w-56 items-center gap-1.5 justify-self-end text-callout system-current:text-label", kind === "reply" ? "system-current:font-medium text-link" : "text-muted-foreground")}
 		>
 			{kind === "reply" ? <MessageCircleQuestionIcon aria-hidden className="size-3.5" /> : <BrailleSpinner className="text-muted-foreground" />}
 			{words && <span className="truncate">{words}</span>}

@@ -80,14 +80,14 @@ const SEARCH_LABEL = KEYBOARD_ACTIONS.find((action) => action.id === "sessions-s
 
 /** A results heading, T3 Code's quiet 12px label. */
 function ResultsLabel({ children }: { children: React.ReactNode }) {
-	return <li className="flex h-8 list-none items-center px-2 text-label font-medium text-muted-foreground">{children}</li>;
+	return <li className="flex h-8 list-none items-center px-2 text-callout system-current:text-label system-current:font-medium text-muted-foreground">{children}</li>;
 }
 
 /** A top row that opens a page, Home or Calendar: the selected fill on
  *  its own page. */
 const navLinkClass = (here: boolean) =>
 	cn(
-		"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
+		"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-body system-current:text-control system-current:font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
 		here ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
 	);
 
@@ -192,7 +192,7 @@ export function UnitSidebar() {
 					<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
 						<InputGroup
 							variant="quiet"
-							className="flex-1 pr-0.5 text-control font-medium text-muted-foreground hover:text-foreground focus-within:text-foreground"
+							className="flex-1 pr-0.5 text-body system-current:text-control system-current:font-medium text-muted-foreground hover:text-foreground focus-within:text-foreground"
 						>
 							<Hint label={SEARCH_LABEL} action="sessions-search" side="bottom">
 								<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
@@ -213,7 +213,7 @@ export function UnitSidebar() {
 										placeholder="Search"
 										aria-label={SEARCH_LABEL}
 										spellCheck={false}
-										className="h-auto px-0 py-0 text-control font-medium text-foreground md:text-control"
+										className="h-auto px-0 py-0 text-body system-current:text-control system-current:font-medium text-foreground system-current:md:text-control"
 									/>
 									{s.query && (
 										<InputGroupButton variant="quiet" size="icon-xs" aria-label="Clear search" onClick={() => s.changeQuery("")} className="size-5 hover:bg-transparent">
@@ -247,7 +247,7 @@ export function UnitSidebar() {
 								<NowSkeleton />
 							) : found ? (
 								found.courses.length + found.arcs.length + found.units.length + found.sessions.length === 0 ? (
-									<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing matches</li>
+									<li className="list-none px-2 py-6 text-center text-callout system-current:text-label text-muted-foreground">Nothing matches</li>
 								) : (
 									<>
 										{found.courses.length + found.arcs.length > 0 && <ResultsLabel>Courses</ResultsLabel>}

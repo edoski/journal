@@ -172,7 +172,7 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 			role="search"
 			aria-label="Session Find"
 			data-testid="session-find"
-			className="lh-no-drag h-11 shrink-0 gap-1 border-b border-border px-4 text-control"
+			className="lh-no-drag h-11 shrink-0 gap-1 border-b border-border px-4 text-body system-current:text-control"
 			onKeyDown={(event) => {
 				if (event.key === "Enter") {
 					event.stopPropagation(); // NEVER reach question/global Enter submits.
@@ -194,9 +194,9 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 				value={query}
 				onChange={(event) => setQuery(event.target.value)}
 				spellCheck={false}
-				className="ml-1 h-auto px-0 py-0 text-control text-foreground md:text-control"
+				className="ml-1 h-auto px-0 py-0 text-body system-current:text-control text-foreground md:text-control"
 			/>
-			<output aria-live="polite" data-testid="session-find-count" className="mr-1 shrink-0 text-label tabular-nums text-muted-foreground">
+			<output aria-live="polite" data-testid="session-find-count" className="mr-1 shrink-0 text-callout system-current:text-label tabular-nums text-muted-foreground">
 				{query ? `${result.index + 1}/${result.count}` : ""}
 			</output>
 			<Hint label="Previous match" binding="shift+enter" side="bottom">

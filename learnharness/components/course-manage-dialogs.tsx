@@ -81,7 +81,7 @@ function RenameCourse({ open, course, onClose, onRenamed, fetchLike = fetch }: O
 					<DialogHeader>
 						<DialogTitle>Rename course</DialogTitle>
 					</DialogHeader>
-					<label className="flex flex-col gap-2 text-row font-medium text-foreground">
+					<label className="flex flex-col gap-2 text-body system-current:text-row system-current:font-medium text-foreground">
 						Title
 						<Input
 							value={title}
@@ -90,10 +90,10 @@ function RenameCourse({ open, course, onClose, onRenamed, fetchLike = fetch }: O
 							autoFocus
 							disabled={busy}
 							data-testid="rename-course-title"
-							className="font-normal"
+							className="font-normal system-current:font-normal"
 						/>
 					</label>
-					{error && <p role="alert" className="text-row text-danger">{error}</p>}
+					{error && <p role="alert" className="text-body system-current:text-row text-danger">{error}</p>}
 					<DialogFooter className="pt-2">
 						<Button type="button" variant="quiet" onClick={onClose} disabled={busy}>
 							Cancel
@@ -137,7 +137,7 @@ function DeleteCourse({ open, course, onClose, onDeleted, fetchLike = fetch }: O
 						and the files in its folder stay on your Mac.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
-				{error && <p role="alert" className="text-row text-danger">{error}</p>}
+				{error && <p role="alert" className="text-body system-current:text-row text-danger">{error}</p>}
 				<AlertDialogFooter>
 					<Button type="button" variant="quiet" onClick={onClose} disabled={busy}>
 						Cancel
@@ -199,13 +199,13 @@ function AddMaterial({ open, course, onClose, fetchLike = fetch }: OneOpening) {
 						<DialogHeader>
 							<DialogTitle>Add material to {courseLabel(course)}</DialogTitle>
 						</DialogHeader>
-						<div className="flex flex-col gap-2 text-row font-medium text-foreground">
-							<span className="text-label font-normal text-muted-foreground">
+						<div className="flex flex-col gap-2 text-body system-current:text-row system-current:font-medium text-foreground">
+							<span className="text-callout system-current:text-label font-normal system-current:font-normal text-muted-foreground">
 								Slides, notes or past papers. They are copied into the course, and its topic map grows to cover them.
 							</span>
 							<MaterialField picks={picks} onChange={setPicks} disabled={busy} />
 						</div>
-						{error && <p role="alert" className="text-row text-danger">{error}</p>}
+						{error && <p role="alert" className="text-body system-current:text-row text-danger">{error}</p>}
 						<DialogFooter className="pt-2">
 							<Button type="button" variant="quiet" onClick={onClose} disabled={busy}>
 								Cancel

@@ -54,7 +54,7 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 			{/* Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
 			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null }}>
 				{error && (
-					<p role="alert" data-slot="topic-lesson-error" className="flex min-h-5 items-center text-row text-danger">
+					<p role="alert" data-slot="topic-lesson-error" className="flex min-h-5 items-center text-body system-current:text-row text-danger">
 						{error}
 					</p>
 				)}

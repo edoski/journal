@@ -1,11 +1,9 @@
 /**
- * A wider Home, to judge (Edo's notes, 15 Nov 2026, N1: "is there any
- * super useful info at all that we could cleanly fit into it"): Proposed
- * widens Home to the course page's frame and gives each Today row one
- * more fact he would act on, from what the engine already reads. Two
- * candidates on the polish switch: the course's exam day, once per course
- * (`exam`), or where he stands on the row's one topic (`standing`).
- * Current keeps the old width and draws neither.
+ * A wider Home (Edo's notes, 15 Nov 2026, N1: "is there any super useful
+ * info at all that we could cleanly fit into it"): Proposed widens Home to
+ * the course page's frame and gives each Today row where he stands on its
+ * one topic, which he picked over the course's exam day. Current keeps the
+ * old width and draws none.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -16,68 +14,81 @@ import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { foldLines } from "../components/study-home/agenda-rows/row-facts.ts";
-import { rowAsides } from "../components/study-home/agenda-rows/row-aside.ts";
+import { rowStanding } from "../components/study-home/agenda-rows/row-standing.ts";
+import { whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
+import type { TodayRow } from "../components/study-home/study-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
-import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { lineTopics } from "../components/study-home/needs-you.ts";
+import { lineTopics, needsYouNow } from "../components/study-home/needs-you.ts";
 import { HOME_WIDTH } from "../components/study-home/study-home.tsx";
-import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
+import { slipBeside, standingOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { CHATS, COURSES, TODAY } from "./fixtures/now-demo.ts";
 
 const { rows } = needsYouNow(COURSES, CHATS, TODAY);
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
-const draw = (aside?: "exam" | "standing") =>
+const draw = (standing = false) =>
 	parseHTML(
 		`<html><body>${renderToStaticMarkup(
 			<AppRouterContext.Provider value={router as never}>
-				<HybridRows rows={rows} busy={false} onContinue={() => {}} aside={aside} />
+				<HybridRows rows={rows} busy={false} onContinue={() => {}} standing={standing} />
 			</AppRouterContext.Provider>,
 		)}</body></html>`,
 	).document;
 
 describe("Home's width (N1)", () => {
-	it("keeps Current at its width and widens both candidates to the course page's frame", () => {
+	it("keeps Current at its width and widens Proposed to the course page's frame", () => {
 		assert.equal(HOME_WIDTH.current, "max-w-[60rem]");
-		assert.equal(HOME_WIDTH.exam, "max-w-[80rem]");
-		assert.equal(HOME_WIDTH.standing, "max-w-[80rem]");
+		assert.equal(HOME_WIDTH.proposed, "max-w-[80rem]");
 	});
 });
 
-describe("the exam candidate", () => {
-	it("names a course's exam day on its first row only, never a count of days, and nothing for a course with no exam", () => {
-		const asides = rowAsides(rows, "exam");
-		const seen = new Set<string>();
-		rows.forEach((row, i) => {
-			const exam = row.course?.map.exam;
-			const first = row.course !== null && !seen.has(row.course.map.workspace);
-			if (row.course) seen.add(row.course.map.workspace);
-			if (first && exam) assert.match(asides[i]!, /^Exam (today|tomorrow|[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2})$/, `row ${i}`);
-			else assert.equal(asides[i], null, `row ${i}`);
-		});
-		assert.ok(asides.some((a) => a !== null), "the demo day has a course with an exam");
-	});
-});
+/** The row's one topic once started; a topic not started has no standing on a row. */
+const topicOf = (row: TodayRow) => {
+	const topics = lineTopics(row);
+	const topic = topics.length === 1 ? row.course?.map.topics.find((t) => t.handle === topics[0]) : undefined;
+	return topic?.level === "new" ? undefined : topic;
+};
+const titleOf = (row: TodayRow) => (h: string) => row.course?.map.topics.find((t) => t.handle === h)?.title ?? h;
 
-describe("the standing candidate", () => {
-	it("says where he stands on a row's one topic in the map's words, and nothing on a row of several or none", () => {
-		const asides = rowAsides(rows, "standing");
+describe("the standing", () => {
+	it("says where he stands on a row's one topic as the map does, and nothing on a row of several, none, or a topic not started", () => {
 		rows.forEach((row, i) => {
-			const topics = lineTopics(row);
-			const topic = topics.length === 1 ? row.course?.map.topics.find((t) => t.handle === topics[0]) : undefined;
-			assert.equal(asides[i], topic ? standingOf(topic).words : null, `row ${i}`);
+			const topic = topicOf(row);
+			assert.deepEqual(rowStanding(row)?.standing ?? null, topic ? standingOf(topic) : null, `row ${i}`);
 		});
-		assert.ok(asides.some((a) => a !== null));
+		assert.ok(rows.some((row) => rowStanding(row) !== null));
+		const row = rows.find((r) => rowStanding(r) !== null)!;
+		const [handle] = lineTopics(row);
+		const map = row.course!.map;
+		const fresh = { ...row, course: { ...row.course!, map: { ...map, topics: map.topics.map((t) => (t.handle === handle ? { ...t, level: "new" as const } : t)) } } };
+		assert.equal(rowStanding(fresh), null, "a topic not started: its row reads Start, never Not started beside it");
+	});
+
+	it("adds why the engine calls the topic weak, as the topic page's head does, unless the row's reason is the miss", () => {
+		rows.forEach((row, i) => {
+			const topic = topicOf(row);
+			const slip = topic && whyOf(row)?.kind !== "missed" ? slipBeside(topic, titleOf(row) as never) : null;
+			assert.deepEqual(rowStanding(row)?.slip ?? null, slip, `row ${i}`);
+		});
+		assert.ok(rows.some((row) => rowStanding(row)?.slip), "the demo day has a row on a weak topic");
 	});
 });
 
 describe("the rows drawn", () => {
-	it("draw the candidate's fact in its own column, and Current draws none", () => {
-		assert.equal(draw().querySelectorAll('[data-slot="today-aside"]').length, 0);
-		for (const kind of ["exam", "standing"] as const) {
-			const words = [...draw(kind).querySelectorAll('[data-slot="today-aside"]')].map((el) => el.textContent);
-			const shown = foldLines(rows).shown.length;
-			assert.deepEqual(words, rowAsides(rows, kind).slice(0, shown).filter((a) => a !== null), kind);
-			assert.ok(words.length > 0, kind);
-		}
+	it("draw the pie and the standing words on the lesson line, the slip with its own icon on the course line, and Current draws none", () => {
+		const current = draw();
+		assert.equal(current.querySelectorAll('[data-slot="today-standing"], [data-slot="today-slip"]').length, 0);
+		const proposed = draw(true);
+		const lines = [...proposed.querySelectorAll('[data-slot="today-line"]')];
+		const shown = foldLines(rows).shown;
+		assert.equal(lines.length, shown.length);
+		shown.forEach((row, i) => {
+			const facts = rowStanding(row);
+			const cell = lines[i]!.querySelector('[data-slot="today-standing"]');
+			assert.equal(cell?.textContent ?? null, facts?.standing.words ?? null, `row ${i}`);
+			if (facts) assert.equal(cell!.querySelector('[data-slot="topic-glyph"]')?.getAttribute("data-fill"), String(facts.standing.fill), `row ${i}`);
+			const slip = lines[i]!.querySelector('[data-slot="today-slip"]');
+			assert.equal(slip?.textContent ?? null, facts?.slip?.words ?? null, `row ${i}`);
+			if (facts?.slip) assert.equal(slip!.getAttribute("data-slip"), facts.slip.key, `row ${i}`);
+		});
 	});
 });

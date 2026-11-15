@@ -13,7 +13,7 @@ import { OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/over
 
 /** The menu surface, shared with context-menu.tsx. */
 export const MENU_CONTENT =
-  "min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border bg-popover p-1 text-row text-popover-foreground shadow-lg outline-none"
+  "min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border bg-popover p-1 text-body system-current:text-row text-popover-foreground shadow-lg outline-none"
 
 /** One 32px row, shared with context-menu.tsx. Radix marks the pointer's or
  *  the arrow keys' row `data-highlighted`; both take the same fill step. */
@@ -29,9 +29,9 @@ export const MENU_ROW_DESTRUCTIVE =
 export const MENU_ROW_CHECKED =
   "pr-8 data-[state=checked]:bg-fill-selected data-[state=checked]:data-[highlighted]:bg-fill-selected"
 
-export const MENU_LABEL = "px-2 py-1.5 text-label font-medium text-muted-foreground data-[inset]:pl-8"
+export const MENU_LABEL = "px-2 py-1.5 text-callout system-current:text-label system-current:font-medium text-muted-foreground data-[inset]:pl-8"
 export const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border"
-export const MENU_SHORTCUT = "ml-auto text-label text-muted-foreground tabular-nums"
+export const MENU_SHORTCUT = "ml-auto text-callout system-current:text-label text-muted-foreground tabular-nums"
 export const MENU_INDICATOR = "pointer-events-none absolute right-2 flex size-3.5 items-center justify-center"
 
 function DropdownMenu({

@@ -23,7 +23,7 @@ export function DoneTonightButton({ onDone, disabled, gone = false }: { onDone: 
 			aria-hidden={gone || undefined}
 			tabIndex={gone ? -1 : undefined}
 			onClick={onDone}
-			className={cn("shrink-0 px-3 font-normal has-[>svg]:px-3", gone && "invisible")}
+			className={cn("shrink-0 px-3 font-normal system-current:font-normal has-[>svg]:px-3", gone && "invisible")}
 		>
 			<CircleCheckIcon />
 			{LESSON_WORDS.doneTonight}

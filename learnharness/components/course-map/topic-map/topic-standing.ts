@@ -1,6 +1,6 @@
-import type { CourseMapTopic, TopicLevel } from "@/src/core";
+import type { CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
 import { mathPlain } from "@/components/ui/math-text";
-import { standingWords, type Fill } from "@/components/study-words";
+import { SLIPPING_WORDS, slipMark, standingWords, type Fill, type SlipKey } from "@/components/study-words";
 import type { Said, TopicFact } from "@/components/unit-inbox/sidebar-says";
 
 /** Where the learner stands on a topic, as the map draws and says it. */
@@ -10,7 +10,8 @@ export interface Standing {
 	fill: Fill;
 	/** The engine calls the topic weak: the pie wears the warning ink. */
 	slipping: boolean;
-	/** Where he stands in words true to the record (`standingWords`). */
+	/** Where he stands in words true to the record (`standingWords`), or
+	 *  `SLIPPING_WORDS` on a weak topic. */
 	words: string;
 }
 
@@ -23,12 +24,20 @@ const FILL: Record<TopicLevel, Fill> = { new: 0, introduced: 0.25, attempted: 0.
  * The standing from the engine's level and weak verdict. A full pie is
  * exactly a topic the course's progress ring counts (Today's rows): one he
  * can do on his own that the engine does not call weak. A weak topic he
- * could do on his own draws a quarter short of full. Pure.
+ * could do on his own draws a quarter short of full, and says Slipping. Pure.
  */
 export function standingOf(topic: CourseMapTopic): Standing {
 	const full = ON_HIS_OWN.has(topic.level);
 	const fill = full && topic.weak ? 0.75 : FILL[topic.level];
-	return { fill, slipping: topic.weak, words: standingWords(fill, topic) };
+	return { fill, slipping: topic.weak, words: topic.weak ? SLIPPING_WORDS : standingWords(fill, topic) };
+}
+
+/** Why the engine calls a topic weak, beside its Slipping: the slip's key,
+ *  which picks its icon (`SLIP_ICON`), and its words; null when the engine
+ *  does not call it weak. The topic page's head and Home's rows say it so.
+ *  Pure. */
+export function slipBeside(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } | null {
+	return topic.weak ? slipMark(topic.signals, titleOf) : null;
 }
 
 /** What a card can say under its title in place of where he stands: a

@@ -45,7 +45,7 @@ export function SubagentSteerCard({ message, figures = "card" }: {
 			| undefined;
 		if (aborted?.data) return <AbortedBadge kind={aborted.data.kind} />;
 		return (
-				<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+				<div className="rounded-xl border bg-card p-4 text-body system-current:text-sm text-muted-foreground">
 				A sub-agent finished, but its result could not be displayed.
 			</div>
 		);
@@ -78,7 +78,7 @@ export function SubagentSteerCard({ message, figures = "card" }: {
 function AbortedBadge({ kind }: { kind?: string }) {
 	const words = kind && kind in STOPPED_WORDS ? STOPPED_WORDS[kind as keyof typeof STOPPED_WORDS] : STOPPED_WORDS.unknown;
 	return (
-		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-row text-muted-foreground">
+		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-body system-current:text-row text-muted-foreground">
 			<CircleX aria-hidden className="size-4" />
 			<span>{words}</span>
 		</div>
@@ -116,7 +116,7 @@ function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
 /** The complete badge: a quiet line that discloses the brief. */
 function BriefDisclosure({ testid, summary, children }: { testid: string; summary: string; children: React.ReactNode }) {
 	return (
-		<Collapsible data-testid={testid} className="group w-full text-row text-muted-foreground">
+		<Collapsible data-testid={testid} className="group w-full text-body system-current:text-row text-muted-foreground">
 			<CollapsibleTrigger className="-mx-1 flex items-center gap-2 rounded-md px-1 text-left outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
 				<CheckIcon className="size-4" />
 				<span>{summary}</span>

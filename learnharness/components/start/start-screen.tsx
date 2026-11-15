@@ -106,7 +106,7 @@ export function StartScreen() {
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<main data-slot="start-screen" className="relative flex min-h-0 flex-1 flex-col px-5">
 				<div className="flex min-h-0 flex-1 flex-col justify-end pb-8">
-					<h1 className="text-center text-display font-normal tracking-[-0.025em] text-foreground">{START_HEADING}</h1>
+					<h1 className="text-center text-large-title system-current:text-display font-normal system-current:font-normal system-current:tracking-[-0.025em] text-foreground">{START_HEADING}</h1>
 				</div>
 				<div className="mx-auto w-full max-w-[46rem]">
 					<Composer
@@ -125,16 +125,16 @@ export function StartScreen() {
 				<div className="mx-auto flex min-h-0 w-full max-w-[46rem] flex-1 flex-col gap-6 overflow-y-auto pt-4 pb-6">
 					{(startError || courseChoice.notice || unconnected) && (
 						<div className="flex flex-col items-start gap-2 px-4">
-							{startError && <p role="alert" className="text-row text-danger">{startError}</p>}
+							{startError && <p role="alert" className="text-body system-current:text-row text-danger">{startError}</p>}
 							{courseChoice.notice && (
-								<p role="alert" data-testid="course-notice" className="text-row text-danger">{courseChoice.notice}</p>
+								<p role="alert" data-testid="course-notice" className="text-body system-current:text-row text-danger">{courseChoice.notice}</p>
 							)}
 							{unconnected && (
 								<Button
 									variant="quiet"
 									data-testid="setup-cta-keys"
 									onClick={() => setSetupOpen(true)}
-									className="-ml-3 h-8 px-3 text-row font-normal text-link hover:text-link"
+									className="-ml-3 h-8 px-3 text-body system-current:text-row font-normal system-current:font-normal text-link hover:text-link"
 								>
 									Sign in to Claude to start
 								</Button>

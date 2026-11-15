@@ -30,7 +30,7 @@ export function ReadyLine({ course, ready }: { course: StudyCourse; ready: ExamR
 	return (
 		<p data-slot="course-ready" data-kind={ready?.kind} className={cn("flex min-h-5 min-w-0 items-start gap-1.5", ready?.kind === "short" && "text-warning")}>
 			{Icon && <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", ready?.kind !== "short" && "text-muted-foreground")} />}
-			{ready ? <ReadyWords ready={ready} workspace={map.workspace} /> : !map.exam && <span className="font-normal text-muted-foreground">{noExamWords(map.topics)}</span>}
+			{ready ? <ReadyWords ready={ready} workspace={map.workspace} /> : !map.exam && <span className="font-normal system-current:font-normal text-muted-foreground">{noExamWords(map.topics)}</span>}
 			{bubbles.length > 0 && (
 				<span className="ml-0.5 flex min-w-0 items-center gap-1">
 					{bubbles.map((arc) => (
@@ -66,7 +66,7 @@ export function ReadyWords({ ready, workspace }: { ready: ExamReady; workspace: 
 							<ol className="flex flex-col">
 								{rest.topics.map((topic) => (
 									<li key={topic.handle}>
-										<Link href={unitHref(workspace, topic.handle)} className="flex min-h-8 items-center rounded-md px-1 text-row font-normal text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring">
+										<Link href={unitHref(workspace, topic.handle)} className="flex min-h-8 items-center rounded-md px-1 text-body system-current:text-row font-normal system-current:font-normal text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring">
 											<MathText>{topic.title}</MathText>
 										</Link>
 									</li>

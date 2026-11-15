@@ -51,7 +51,7 @@ export function AppearanceSection({
 						onSectionChange({ ...appearance, proseFontSize: n === FACTORY_SIZE ? undefined : n });
 					}}
 				>
-					<SelectTrigger size="sm" aria-label="Text size" data-testid="input-prose-size" className="w-32 font-normal">
+					<SelectTrigger size="sm" aria-label="Text size" data-testid="input-prose-size" className="w-32 font-normal system-current:font-normal">
 						<SelectValue />
 					</SelectTrigger>
 					<SelectContent data-testid="prose-size-menu">
