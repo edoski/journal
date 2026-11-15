@@ -52,6 +52,9 @@ export interface TurnInput {
 	/** His work on a problem, which a reply leaves open: the reply ends on
 	 *  a way on (round 8: photo feedback stopped on the faulty line). */
 	work?: boolean;
+	/** A ruling on his dispute of a mark: each ruling is news, however much
+	 *  it reads like an earlier one ("The mark stays …"). */
+	ruling?: boolean;
 }
 
 /** Words in his answer that say he is not sure of it or of its reason. */
@@ -122,7 +125,7 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 		case UNGRADED_ANSWER:
 			return { kind: "wrong", answers: true, words: textOf(input.content) };
 		case "dispute":
-			return { kind: "direct", answers: false, words: null };
+			return { kind: "direct", answers: false, words: null, ruling: true };
 		case "mode-handoff":
 			return isRecord(input.details) && input.details.mode === "teach" ? { kind: "teach", answers: false, words: null, handedBack: true } : none;
 		default:
@@ -659,7 +662,10 @@ export class VoiceGuard {
 	private repeats(text: string, message = false): VoiceBreak[] {
 		const repeat = repeatedAdvice(text, [...this.earlier, ...this.said]);
 		if (repeat) return [{ rule: "repeat", excerpt: `${quoted(repeat.said)}, said before as ${quoted(repeat.before)}` }];
-		const point = message ? repeatedPoint(text, [...this.told, ...this.toldNow]) : null;
+		// A close names what he picks up and its day, as its rule says, each
+		// time he closes; a ruling is news (round 10: both refused as repeats).
+		const pointsHeld = message && this.input.kind !== "close" && !this.input.ruling;
+		const point = pointsHeld ? repeatedPoint(text, [...this.told, ...this.toldNow]) : null;
 		return point ? [{ rule: "repeat", excerpt: `point ${quoted(point.said)}, said before as ${quoted(point.before)}` }] : [];
 	}
 }

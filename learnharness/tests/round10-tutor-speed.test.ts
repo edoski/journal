@@ -151,3 +151,23 @@ describe("a reply to an unsure answer is told to open on the fact, not on \"That
 		assert.match(echo!.content[0]!.text, /Open on the fact that makes it hold\./);
 	});
 });
+
+describe("a point made once still lets news through (round 10)", () => {
+	it("a review's new day is news, though it reads like the old one", async () => {
+		const { repeatedPoint } = await import("../src/core/voice-check.ts");
+		assert.equal(repeatedPoint("Your eigenvalue review is on Friday 20 November, in 3 days.", ["Your eigenvalue review is tomorrow, Monday 9 November."]), null);
+		assert.notEqual(repeatedPoint("Your eigenvalue review is tomorrow, Monday 9 November.", ["Your eigenvalue review is tomorrow, Monday 9 November."]), null);
+	});
+
+	it("a second Done for today names what he picks up and its day again, as a close must", () => {
+		const first = "Your eigenvalue review is tomorrow, Monday 9 November. You pick up at the open question on the last step of the eigenvalue lesson.";
+		const turn = [newUserMessage("Eigenvalues"), assistant([send(first)]), newUserMessage("ok I am back"), assistant([send("A step.")]), newDoneTonightMessage("teacher") as LhMessage];
+		assert.deepEqual(rules(new VoiceGuard(turn), send("Your eigenvalue review is tomorrow, Monday 9 November. After that you pick up the open question at the last step of the eigenvalue lesson.")), []);
+	});
+
+	it("a ruling on a second dispute is its own news (practice, the guessed quiz)", async () => {
+		const { newDisputeMessage } = await import("../src/core/native-messages.ts");
+		const turn = [newUserMessage("Binomial distribution"), assistant([send("The mark stays partly right, on your own. Your answer was $168$, which is $336$ divided by $2$ carried all the way through.")]), newDisputeMessage({ answerId: "q-1", observations: ["o12"], proposedHow: "ownWork" }, "What is the probability?") as LhMessage];
+		assert.deepEqual(rules(new VoiceGuard(turn), send("The mark stays right, with help. Before the hint you had written \"$(\\frac14)^3$ times something for the other 5\", and the hint pointed at exactly that missing piece, the $\\frac34$ for each wrong answer.")), []);
+	});
+});

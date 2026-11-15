@@ -478,19 +478,29 @@ const SHARED_RUN = 3;
 export function repeatedPoint(text: string, earlier: readonly string[]): { said: string; before: string } | null {
 	const before = earlier.flatMap((t) => sentences(prose(t).text)).map((s) => {
 		const run = contentStems(s);
-		return { s, set: new Set(run), runs: new Set(run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "))) };
+		return { s, set: new Set(run), facts: factsOf(s), runs: new Set(run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "))) };
 	});
 	for (const said of sentences(prose(text).text)) {
 		const run = contentStems(said);
 		const mine = new Set(run);
+		const facts = factsOf(said);
 		const runs = run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "));
 		const match = before.find((b) => {
+			// A day or a number the earlier sentence lacks is news, however
+			// alike the words (round 10: a review's new day was refused as
+			// the old day said again).
+			if ([...facts].some((f) => !b.facts.has(f))) return false;
 			const shared = [...mine].filter((w) => b.set.has(w)).length;
 			return (shared >= SHARED_RUN && shared * 2 > mine.size) || runs.some((r) => b.runs.has(r));
 		});
 		if (match) return { said, before: match.s };
 	}
 	return null;
+}
+
+/** The days and numbers a sentence states, each as written in lower case. */
+function factsOf(sentence: string): Set<string> {
+	return new Set((sentence.toLowerCase().match(/\b(?:\d+(?:[.,]\d+)?|today|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)\b/g) ?? []));
 }
 
 /** A direct answer's last sentence that draws a lesson from it instead of
