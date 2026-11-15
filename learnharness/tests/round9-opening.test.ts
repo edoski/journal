@@ -16,7 +16,7 @@ const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-opening-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
 const { chatStore } = await import("../src/store/chats.ts");
-const { appOpeningAt } = await import("../src/core/session-opening.ts");
+const { appOpeningAt, openedByApp } = await import("../src/core/session-opening.ts");
 
 after(() => {
 	fs.rmSync(TMP_DATA, { recursive: true, force: true });
@@ -42,5 +42,22 @@ describe("the app's opening words are never his bubble (round 9 m11)", () => {
 		assert.equal(appOpeningAt(messages, true), 1, "the first message of his with words");
 		assert.equal(appOpeningAt(messages, false), -1, "his own opening stays");
 		assert.equal(appOpeningAt([], true), -1);
+	});
+});
+
+describe("a session recorded before the opening was marked (round 9 m11)", () => {
+	const record = (first: string, extra: Record<string, unknown> = {}) => ({ title: "Poisson distribution", topics: ["poisson"], messages: [{ role: "user", content: first }], ...extra });
+
+	it("reads a press's words on topics as the app's: Review, Start or Continue, or the topic's own name", () => {
+		assert.equal(openedByApp(record("Review Substitution")), true);
+		assert.equal(openedByApp(record("Continue Problem sheet 4")), true);
+		assert.equal(openedByApp(record("Poisson distribution")), true);
+	});
+
+	it("keeps his own words, and a session on no topic", () => {
+		assert.equal(openedByApp(record("Go.")), false);
+		assert.equal(openedByApp(record("why is the Poisson a limit of binomials?")), false);
+		assert.equal(openedByApp(record("Review Substitution", { topics: [] })), false);
+		assert.equal(openedByApp(record("anything", { appOpening: true })), true, "a marked session needs no reading");
 	});
 });

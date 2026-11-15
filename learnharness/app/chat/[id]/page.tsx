@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
+import { openedByApp } from "@/src/core";
 import { compactionInFlight, courseDeleted, getChat, isTurnRunning, lessonPlace, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function ChatPage({
 			chatId={chat.id}
 			title={chat.title}
 			startedIn={chat.kind}
-			appOpening={chat.appOpening === true}
+			appOpening={openedByApp(chat)}
 			course={chat.course}
 			place={place ?? undefined}
 			// A deleted course's lesson is history (courses.ts courseDeleted).

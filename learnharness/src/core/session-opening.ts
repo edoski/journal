@@ -37,6 +37,17 @@ export function appOpeningAt(messages: readonly { role: string; parts: readonly 
 	return messages.findIndex((m) => m.role === "user" && m.parts.some((p) => p.type === "text"));
 }
 
+/** Whether a session's first message is the app's opening (`appOpening`).
+ *  A session made before that was recorded reads it from its words: on
+ *  topics, a press's words ("Review …", "Start …", "Continue …", or the
+ *  topic's name, which a new lesson opens with and is named after). */
+export function openedByApp(record: { appOpening?: true; title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
+	if (record.appOpening) return true;
+	if ((record.topics ?? []).length === 0) return false;
+	const opening = openingText(record.messages)?.trim() ?? "";
+	return REVIEW_OPENING.test(opening) || LESSON_VERB.test(opening) || (opening !== "" && opening.toLowerCase() === record.title.trim().toLowerCase());
+}
+
 /** Whether a session record is a review of course topics: opened on topics
  *  with a review's words ("Review Binomial distribution", or "Review" alone,
  *  the topics it was opened on saying which), whatever it is named now. */
