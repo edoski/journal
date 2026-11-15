@@ -159,8 +159,8 @@ describe("why a review waits", () => {
 		assert.equal(movedWords(late, "2026-11-08", { from: "2026-11-09", by: "left" }), "Moved from 9 Nov, yesterday's plan was not finished");
 		assert.equal(movedWords(null, "2026-11-08", { from: "2026-11-10", by: "study", courses: ["Probability", "Calculus"] }), "Moved from 10 Nov after your Probability and Calculus study today", "a start moves too");
 	});
-	it("says from when a held review moved, so a day the tutor named never moves in silence", () => {
-		assert.equal(movedWords(behind, "2026-11-08"), "Moved from 13 Nov", "memory's day is still ahead");
+	it("says since when a held review was due once memory's day has passed, and names no day he was never told", () => {
+		assert.equal(movedWords(behind, "2026-11-08"), null, "memory's day is still ahead: no 'Moved from' a day he never heard (round 8)");
 		assert.equal(movedWords(late, "2026-11-08"), "Due since 1 Oct");
 		assert.equal(movedWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), null);
 		assert.equal(movedWords({ kind: "due", date: "2026-11-08", overdue: 0 }, "2026-11-08"), null);

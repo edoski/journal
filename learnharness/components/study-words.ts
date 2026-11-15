@@ -211,13 +211,14 @@ const MOVED_BY = {
 
 /** A day that moved, from when: one he was told ("Moved from 10 Nov after
  *  your Probability study today", round 7: a told day moved in silence),
- *  else a review the plan moved past the day memory asked for it, "Due
- *  since 1 Oct" once that day has passed, else "Moved from 9 Nov" (round
- *  5); null for a day that did neither. */
+ *  else a review the plan holds past a day memory asked for that has
+ *  passed, "Due since 1 Oct"; null otherwise. Memory's day still ahead was
+ *  never a day he was told, so nothing moved "from" it (round 8: "Moved
+ *  from 11 Nov" named a day he never heard). */
 export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
 	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses) : MOVED_BY[told.by]}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
-	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : `Moved from ${shortDay(review.held.since)}`;
+	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
 }
 
 /** A review that is due: "Due today", "3d overdue"; one the plan holds

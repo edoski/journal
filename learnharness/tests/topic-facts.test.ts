@@ -348,9 +348,9 @@ describe("when a topic comes up", () => {
 		assert.equal(factsOf(start).starts?.waits, "Moved from 14 Nov, yesterday's plan was not finished");
 	});
 
-	it("says from when a review moved past the day memory asked for it, and why", () => {
+	it("says why a review waits past the day memory asked for it, and since when once that day has passed", () => {
 		const moved = topic("series", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-22", held: { exam: null, since: "2026-11-09" } } });
-		assert.equal(factsOf(moved).waits, "Moved from 9 Nov, earlier days are full");
+		assert.equal(factsOf(moved).waits, "Earlier days are full", "memory's day still ahead was never told him (round 8)");
 		const late = topic("series", { level: "independent", introduced: "2026-09-01", review: { kind: "scheduled", date: "2026-11-13", held: { exam: "Probability", since: "2026-10-02" } } });
 		assert.equal(factsOf(late).waits, "Due since 2 Oct, waits for your Probability exam");
 	});
