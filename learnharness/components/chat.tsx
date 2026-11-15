@@ -75,7 +75,7 @@ import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, parseProviderKeyRefusal, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
@@ -97,6 +97,7 @@ import { ProseQuestion } from "@/components/lesson/prose/prose-question";
 import { askedAgain, leftOpenOf, reaskedFrom } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
+import { focusWhereHeTypes } from "@/components/ui/overlay";
 
 /** The chat routes' answer for a deleted lesson: TurnError reads it as
  *  "This lesson was deleted." with Go to Home. */
@@ -632,7 +633,7 @@ export function Chat({
 		setOvertaken("answered");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
-	const { unconnected } = useModelSetup();
+	const { unconnected, status: modelStatus } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The explicitly-sent draft (composer send) until the server accepts
 	 *  it (sent-draft.ts): the
@@ -738,6 +739,18 @@ export function Chat({
 		// (setMessages is stable per useChat instance — the dep pair
 		//  [error, chatId] is what the flow actually keys on.)
 	}, [error, chatId]);
+	// The signed-out line leaves with its cause (round 8): once the account
+	// reads connected again after reading signed out, the line clears and
+	// his next key goes to the box (turn-error-text.ts refusalWatch).
+	const signedOutSeenRef = useRef(false);
+	useEffect(() => {
+		const watch = refusalWatch(signedOutSeenRef.current, !!error && parseProviderKeyRefusal(error.message), modelStatus?.connected);
+		signedOutSeenRef.current = watch.seenSignedOut;
+		if (!watch.clear) return;
+		clearError();
+		focusWhereHeTypes(document, false);
+		// clearError is stable per session.
+	}, [error, modelStatus?.connected]);
 	// A DELETED COURSE (course-gone.tsx): the lesson is history and has no
 	// box, so what he wrote there, sent and refused or still in the box,
 	// goes to the New lesson box, and the line says so. A send refused
@@ -1710,7 +1723,7 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={() => setSetupOpen(true)}>
+								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}

@@ -16,7 +16,7 @@ A failed reply, under the learner's message. `data-testid="turn-error"`, `role="
 
 | Kind | When | Sentence |
 |---|---|---|
-| signed-out | the server refused the turn before it started (`provider_key_missing`: Claude isn't signed in); his words went back into the box | Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box. |
+| signed-out | the server refused the turn before it started (`provider_key_missing`: Claude isn't signed in); his words went back into the box. The line leaves once the account reads connected again, and his box takes focus (round 8: it stayed red after Refresh, and focus went to Sign in). While the composer's "Sign in to Claude" pill shows, the line has no Sign in of its own | Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box. |
 | key | status 401 or 403, or the text says the key is invalid | The provider rejected your API key. |
 | busy | status 429 or 529, or a rate limit or overload | The provider is busy. Wait a moment, then retry. |
 | offline | the browser never reached the app (`Failed to fetch`, `Load failed`, Firefox's `NetworkError…`) | Couldn't reach the app. Check it's running, then try again. |
