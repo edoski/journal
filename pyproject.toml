@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "journal-sync"
 version = "0.0.0"
 description = "Daily/periodic journal sync automation"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 readme = "AGENTS.md"
 authors = [{ name = "Edo", email = "edo@example.com" }]
 
