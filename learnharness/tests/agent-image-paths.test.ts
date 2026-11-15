@@ -215,7 +215,8 @@ for (const [role, resize, expected] of [
 			// Exact existing heal contract: schema-integer fields encoded as
 			// JSON number strings heal before validation. The path stays intact.
 			fauxAssistantMessage([fauxToolCall("read", { path: textFile, offset: "2", limit: "2" }, { id: "registry-text" })], { stopReason: "toolUse" }),
-			fauxAssistantMessage([fauxText("Inspected the image and selected text lines.")]),
+			fauxAssistantMessage([fauxToolCall("send_to_user", { message: "Inspected the image and selected text lines." }, { id: "registry-sent" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage(""),
 		], resize);
 		const originalExecute = readTool.execute;
 		const forbidden = () => { throw new Error("unexpected job dispatch or handoff"); };
@@ -237,7 +238,7 @@ for (const [role, resize, expected] of [
 		assert.notEqual(boundRead.execute, originalExecute, "shared read execute is rebound to the active model");
 		assert.deepEqual(boundRead.prepareArguments({ path: textFile, offset: "2", limit: "2" }), { path: textFile, offset: 2, limit: 2 });
 		await agent.continue();
-		assert.equal(requests.length, 3);
+		assert.equal(requests.length, 4);
 		assertProcessedImage(requests[1]!, expected, bytes);
 		const selected = requests[2]!.messages.find((message) => message.role === "toolResult" && message.toolCallId === "registry-text");
 		assert.ok(selected && selected.role === "toolResult");

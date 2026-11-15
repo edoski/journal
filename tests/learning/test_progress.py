@@ -233,14 +233,50 @@ def test_a_repair_only_with_help_says_so_and_one_on_his_own_does_not() -> None:
         ([attempt("rank", "partial"), attempt("rank", help="A hint")], "helped"),
         ([attempt("rank", sure="guess")], "guess"),
         ([attempt("rank", uncertain="Maybe read from notes")], "uncertain"),
-        ([attempt("rank", "partial"), attempt("rank", "incorrect")], "partial"),
+        ([attempt("rank", "partial")], "partial"),
+        ([attempt("rank"), attempt("rank", "partial")], "partial"),
+        (
+            [
+                attempt("rank"),
+                attempt("rank", "partial"),
+                attempt("rank", sure="guess"),
+            ],
+            "guess",
+        ),
     ],
 )
-def test_a_topic_not_yet_solid_says_how_it_was_best_answered(
+def test_a_topic_not_yet_solid_says_how_it_was_answered_since_its_last_slip(
     observations: list[dict[str, Any]], right: str
 ) -> None:
     standing = progress.standing(course(observations, introduced=day(0)), "rank")
     assert (standing["level"], standing["right"]) == ("assisted", right)
+
+
+def test_a_newest_answer_that_was_wrong_says_no_right_answer() -> None:
+    record = course(
+        [attempt("rank"), attempt("rank", "partial"), attempt("rank", "incorrect")],
+        introduced=day(0),
+    )
+    assert "right" not in progress.standing(record, "rank")
+
+
+def test_right_answers_after_a_review_day_slip_are_said_at_attempted() -> None:
+    record = course(
+        [
+            attempt("rank", "incorrect", offset=-2),
+            attempt("rank", "incorrect", sure="confident"),
+            attempt("rank", help="Pointed at the columns"),
+            attempt("rank"),
+        ],
+        introduced=day(-2),
+    )
+    standing = progress.standing(record, "rank")
+    assert (standing["level"], standing["right"]) == ("attempted", "unaided")
+    wrong = course(
+        [attempt("rank", "incorrect", offset=-2), attempt("rank", "incorrect")],
+        introduced=day(-2),
+    )
+    assert "right" not in progress.standing(wrong, "rank")
 
 
 def test_only_a_topic_not_yet_solid_says_how_it_was_answered() -> None:

@@ -84,6 +84,10 @@ test("the child gets the user's environment minus every credential and app secre
 	assert.equal(env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK, "1");
 	assert.equal(env.CLAUDE_CODE_DISABLE_THINKING, undefined, "thinking stays on at a set effort");
 	assert.equal(env.CLAUDE_CONFIG_DIR, "/parent/claude-config", "the synthetic default runs exactly like a terminal `claude`");
+	// Round 6: a turn ending on send_to_user and no plain text read to Claude
+	// Code as one with no visible output, so it asked the model to answer
+	// again, and the paragraph printed twice.
+	assert.deepEqual(env.CLAUDE_CODE_TERMINAL_MCP_TOOLS?.split(","), ["mcp__lh__send_to_user"], "send_to_user is the turn's visible output");
 
 	assert.equal(options.pathToClaudeCodeExecutable, BINARY);
 	assert.equal(options.model, "claude-opus-5-5");

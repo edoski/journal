@@ -203,7 +203,7 @@ describe("course records adapter (fake engine)", () => {
 			today: "2026-11-08",
 			revision: 12,
 			title: "Linear Algebra",
-			exam: { date: "2026-11-29", days_left: 21, final_review: "2026-11-23", unreviewed: ["basis", "gone"], does_not_fit: ["cramer"] },
+			exam: { date: "2026-11-29", days_left: 21, final_review: "2026-11-23", unreviewed: ["basis", "gone"], does_not_fit: ["cramer"], reasons: { basis: "full", gone: "full", cramer: "not_ready", rank: "busy" } },
 			current: "rank",
 			focus: "sheet-4",
 			tasks: [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }],
@@ -225,7 +225,7 @@ describe("course records adapter (fake engine)", () => {
 		assert.ok(result.ok);
 		const { map } = result;
 		assert.equal(map.workspace, "/s/linalg");
-		assert.deepEqual(map.exam, { date: "2026-11-29", daysLeft: 21, finalReview: "2026-11-23", doesNotFit: ["cramer"], unreviewed: ["basis"] }, "the run-up, with topics the map lists");
+		assert.deepEqual(map.exam, { date: "2026-11-29", daysLeft: 21, finalReview: "2026-11-23", doesNotFit: ["cramer"], unreviewed: ["basis"], reasons: { basis: "full", cramer: "not_ready" } }, "the run-up, with topics the map lists and the reasons the engine knows");
 		assert.equal(map.current, "rank");
 		assert.deepEqual(map.tasks, [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)", updated: "2026-11-06" }]);
 		assert.deepEqual(
@@ -447,7 +447,7 @@ describe("course tools", () => {
 		const tools = courseTools({ course: COURSE, records, arcs: false });
 		assert.deepEqual(Object.keys(tools).sort(), ["course_resume", "course_save", "course_search", "course_show"]);
 		assert.match(tools.course_save!.description, /Linear Algebra/);
-		const changes = { observations: [{ topics: ["rank"], text: "q", help: "none", result: "partial" }] };
+		const changes = { observations: [{ kind: "self_report", topics: ["rank"], text: "Says he worked through the rank exercises" }] };
 		const result = await tools.course_save!.execute("call-1", { changes }, undefined);
 		assert.deepEqual(JSON.parse((result.content[0] as { text: string }).text), { revision: 2, observations: ["o4"] });
 		assert.deepEqual(seen, [{ workspace: "/s/linalg", verb: { verb: "save", changes } }]);

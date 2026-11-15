@@ -50,12 +50,11 @@ describe("the mark on the card and in Earlier", () => {
 	});
 
 	it("says how a right answer counted in the same words on both", () => {
-		for (const which of ["guess", "hinted"] as const) {
-			const words = earlier(which).words!;
-			assert.ok(card(which).includes(words), `${which}: the card says ${words}`);
+		assert.ok(card("hinted").includes(earlier("hinted").words!), "the card says With help");
+		for (const which of ["guess", "own"] as const) {
+			assert.equal(earlier(which).words, null, `${which}: Earlier says nothing of his own work`);
+			assert.match(card(which), /On your own/, `${which}: no help, so his own, a guess included (round 6)`);
 		}
-		assert.equal(earlier("own").words, null);
-		assert.match(card("own"), /On your own/);
 	});
 
 	it("shows no confidence he did not choose: Neutral is the meter left alone", () => {

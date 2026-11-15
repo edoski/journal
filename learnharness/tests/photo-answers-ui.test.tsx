@@ -36,7 +36,6 @@ const composer = (open: ProseComposerProps["open"], initialDraft?: QuestionFormD
 			onAskInstead={noop}
 			toggleRef={{ current: null }}
 			busy={false}
-			compacting={false}
 			chatId="c1"
 			initialDraft={initialDraft}
 			onSaveDraft={noop}

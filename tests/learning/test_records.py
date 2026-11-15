@@ -392,3 +392,138 @@ def test_a_final_review_is_stored_once_begun_and_moving_the_exam_drops_it(
     storage.publish_text(workspace.record, storage.encode(stored))
     monkeypatch.setenv("LEARNING_TODAY", "2026-10-28")
     assert records.load(workspace)["exam"]["final_review"] == "2026-10-25"
+
+
+DIAGONAL = {"diag": {"title": "Diagonalization", "needs": ["rank"]}}
+
+
+def test_a_prediction_alone_never_teaches_marks_dates_or_moves_to_its_topic(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {**COURSE, "topics": {**COURSE["topics"], **DIAGONAL}})
+    records.save(
+        workspace,
+        {"observations": [attempt("diag", result="partial", predicted=True)]},
+    )
+    claims = {
+        "introduced": {"topics": {"diag": {"introduced": True}}},
+        "gap": {"topics": {"diag": {"gap": "Takes the identity for any diagonal"}}},
+        "review": {"topics": {"diag": {"review": {"in_days": 1}}}},
+        "path": {"path": {"current": "diag"}},
+    }
+    for claim in claims.values():
+        with pytest.raises(ValueError, match=r"only answers are predictions \(o1\)"):
+            records.save(workspace, claim)
+    stored = records.load(workspace)
+    assert stored["topics"]["diag"] == DIAGONAL["diag"]
+    assert stored["path"]["current"] == "rank"
+    with pytest.raises(ValueError, match="only answers are predictions"):
+        records.save(
+            workspace,
+            {
+                "observations": [attempt("diag", text="Guess again", predicted=True)],
+                "topics": {"diag": {"introduced": True}},
+            },
+        )
+    receipt = records.save(
+        workspace,
+        {
+            "observations": [attempt("diag", text="Checked the step")],
+            **claims["introduced"],
+            **claims["path"],
+        },
+    )
+    assert receipt["path_current"] == "diag"
+    assert records.load(workspace)["topics"]["diag"]["introduced"] == TODAY
+
+
+def test_a_save_whose_only_answer_on_a_taught_topic_is_a_prediction_sets_no_gap(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {**COURSE, "observations": [attempt()]})
+    prediction = attempt(text="Guess the next step", result="partial", predicted=True)
+    with pytest.raises(
+        ValueError, match=r"only answers on rank in this save are predictions"
+    ):
+        records.save(
+            workspace,
+            {"observations": [prediction], "topics": {"rank": {"gap": "Misreads it"}}},
+        )
+    records.save(
+        workspace,
+        {
+            "observations": [
+                prediction,
+                attempt(text="Checked the step", result="partial"),
+            ],
+            "topics": {"rank": {"gap": "Misreads it"}},
+        },
+    )
+    assert records.load(workspace)["topics"]["rank"]["gap"] == "Misreads it"
+
+
+def test_a_gap_beside_a_wrong_prediction_and_only_right_answers_is_refused(
+    workspace: Workspace,
+) -> None:
+    """Round 7: a save held a right answer and a wrong prediction on eigen,
+    and the gap it set was the prediction's miss, which then read as a
+    mistake to fix."""
+    records.save(workspace, {**COURSE, "observations": [attempt(result="incorrect")]})
+    prediction = attempt(
+        text="Read it off the diagonal", result="incorrect", predicted=True
+    )
+    right = attempt(text="Found both eigenvalues")
+    with pytest.raises(
+        ValueError, match=r"the only miss on rank in this save is a prediction"
+    ):
+        records.save(
+            workspace,
+            {
+                "observations": [prediction, right],
+                "topics": {"rank": {"gap": "Reads eigenvalues off the diagonal"}},
+            },
+        )
+    assert records.load(workspace)["topics"]["rank"]["gap"] == "Counts vectors"
+    records.save(workspace, {"observations": [prediction, right]})
+    records.save(workspace, {"topics": {"rank": {"gap": "Misreads the rank"}}})
+    assert records.load(workspace)["topics"]["rank"]["gap"] == "Misreads the rank"
+
+
+def test_a_topic_taught_without_any_question_is_still_introduced(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, {**COURSE, "topics": {**COURSE["topics"], **DIAGONAL}})
+    receipt = records.save(
+        workspace,
+        {"topics": {"diag": {"introduced": True}}, "path": {"current": "diag"}},
+    )
+    assert receipt["reviews"]["diag"]["by"] == "engine"
+    assert receipt["path_current"] == "diag"
+
+
+def test_a_re_marked_answer_keeps_the_confidence_he_gave_it(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, COURSE)
+    records.save(
+        workspace,
+        {
+            "observations": [
+                attempt(result="partial"),
+                attempt(text="Again", sure="guess"),
+            ]
+        },
+    )
+    remark = {"disputed": "It was right", "ruling": "It was right", "result": "correct"}
+    records.save(
+        workspace,
+        {
+            "observations": [
+                attempt(corrects=["o1"], sure="confident", **remark),
+                attempt(text="Again", corrects=["o2"], sure="confident", **remark),
+            ]
+        },
+    )
+    stored = records.load(workspace)["observations"]
+    assert "sure" not in stored["o3"]
+    assert stored["o4"]["sure"] == "guess"

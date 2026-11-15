@@ -10,6 +10,10 @@
  * - `promptVoiceBreaks(text)`: an instruction text the agents read, whose
  *   quoted examples must not model what the voice bans, and which must not
  *   ask for a banned form.
+ *
+ * The turn guard (src/agent/voice-guard.ts) adds the rules a turn needs its
+ * context for: advice under a question, advice said earlier in the session,
+ * and his answer handed back to him.
  */
 
 /** The kinds of turn the voice budgets (### How long each kind of turn is). */
@@ -28,8 +32,13 @@ export type VoiceRule =
 	| "length"
 	| "displays"
 	| "questions"
+	| "compound"
+	| "verdict"
 	| "headings"
 	| "repeat"
+	| "advice"
+	| "echo"
+	| "duplicate"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -47,6 +56,7 @@ const DISPLAYS: Readonly<Record<TurnKind, number>> = { teach: 1, right: 1, wrong
 const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "praise", re: /(?:^|[.!?]\s+|\n)(?:that(?:'s| is) )?(?:exactly|great|nice|perfect|excellent|spot on|well done|good (?:question|instinct|timing|catch|thinking|work|job))\b/i },
 	{ rule: "praise", re: /\b(?:nice work|great job|well done|good question|good instinct|good timing|that is exactly it)\b/i },
+	{ rule: "praise", re: /\b(?:is|was) (?:the|a) (?:right|good|great|nice) (?:instinct|idea|start|move|approach|thought)\b/i },
 	{ rule: "preview", re: /\b(?:next (?:is|up|comes|you'?ll|we'?ll)|next,? (?:we|you)(?:'ll| will)|the next (?:question|step|problem) (?:tests|is|will)|here(?:'s| is) a fresh|now (?:we|you)(?:'ll| will)|coming up next)\b/i },
 	{ rule: "narration", re: /\b(?:I(?:'ll| will| am going to|'m going to) (?:save|record|ask|check|build|verify|now|start|move|give|stop|wait)|I(?:'ve| have) (?:saved|recorded|noted|told you)|let me (?:verify|check|build|save|record|ask|start)|I'?m (?:having|waiting|saving|recording|building)|I'?ll stop)\b/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
@@ -97,10 +107,12 @@ const FENCE = /^\s*```[^\n]*\n[\s\S]*?^\s*```/gm;
 
 const ABBREVIATIONS = /\b(?:e\.g|i\.e|etc|vs|cf)\.$/i;
 
-/** The sentences of a prose text, list markers and callout marks dropped. */
+/** The sentences of a prose text, list markers and callout marks dropped,
+ *  and table rows left out: a table is read like a display. */
 export function sentences(text: string): string[] {
 	const lines = text
 		.split(/\n+/)
+		.filter((l) => !/^\s*\|/.test(l))
 		.map((l) => l.replace(/^\s*(?:[-*+]|\d+\.|>\s*\[![A-Z]+\]|>)\s*/, "").trim())
 		.filter((l) => /[A-Za-z]/.test(l));
 	const out: string[] = [];
@@ -205,4 +217,124 @@ export function promptVoiceBreaks(text: string): VoiceBreak[] {
 		if (m) out.push({ rule: "asks-banned", excerpt: `${m[0]} (asks for ${asks})` });
 	}
 	return out;
+}
+
+/** Words that open an ask: a question word, a verb a question starts
+ *  with, or a task. */
+const ASK_OPENS =
+	/^(?:what|which|who|whom|whose|when|where|why|how|whether|is|are|was|were|do|does|did|can|could|would|should|will|has|have|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b/i;
+/** Words that open an ask after a bare "and" or "then": a question word
+ *  or a task, never a verb like "is", which also joins a description
+ *  ("lies in ker A and is nonzero", "why does Ax = b then have…"). */
+const ASK_AFTER_AND =
+	/\s+(?:and\s+then|and|then)\s+(?=(?:what|which|who|whom|whose|when|where|why|how|whether|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b)/i;
+/** "and why", "why or why not", "and how do you know?": a reason asked
+ *  for with the answer, part of the one ask. */
+const BARE_WHY = /^(?:why(?:\s+or\s+why\s+not|\s+not)?|how (?:do|can|would) you (?:know|tell)(?: that)?)\s*[?.]?$/i;
+/** "When you meet v…", "Where the curve turns…": a clause that sets the
+ *  scene, unless a verb asks next ("When does it converge?"). */
+const SCENE = /^(?:when|where)\b(?!\s+(?:does|do|did|is|are|was|were|will|would|can|could|should|has|have)\b)/i;
+
+/** The asks of a question: its clauses that ask something of him, joined
+ *  by commas, "then", "and" or a new sentence ("What is the rank of A,
+ *  what is dim ker A, and is A invertible?" asks three). Alternatives
+ *  ("…, or …") and a reason asked for with the answer ("…, and why?") stay
+ *  one ask. Maths is read as one word. */
+export function questionAsks(text: string): string[] {
+	const out: string[] = [];
+	// A display is part of its sentence here ("Show that $$N$$ is not invertible").
+	const said = sentences(prose(text.replace(/\s*(?:\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*/g, " X ")).text);
+	// What sits under the last question is advice, its own rule.
+	const last = said.map((s) => s.trim().endsWith("?")).lastIndexOf(true);
+	for (const sentence of last < 0 ? said : said.slice(0, last + 1)) {
+		if (ADVICE.test(sentence)) continue;
+		const clauses = sentence
+			.replace(/^(?:then|and|also|now)\b[,\s]*/i, "")
+			.split(/\s*;\s*|,\s*(?:and\s+|then\s+)?/i)
+			.flatMap((c) => c.split(ASK_AFTER_AND))
+			.map((c) => c.trim().replace(/^(?:and|then)\s+/i, ""));
+		for (const clause of clauses) if (ASK_OPENS.test(clause) && !BARE_WHY.test(clause) && !SCENE.test(clause)) out.push(clause);
+	}
+	return out;
+}
+
+/** A question's text that asks more than one thing (`questionAsks`), or
+ *  null. */
+export function compoundAsk(text: string): VoiceBreak | null {
+	const asks = questionAsks(text);
+	return asks.length > 1 ? { rule: "compound", excerpt: asks.join(" / ") } : null;
+}
+
+/** A sentence of advice on how he should work: checking, verifying, what
+ *  to think of, where to stop, what would have caught a slip. */
+const ADVICE =
+	/^(?:check|verify|make sure|remember|be careful|note that|don'?t forget|try to|think of|always)\b|^(?:before|when|whenever|if) you\b[^,]*,\s*(?:check|verify|multiply|make sure|always)\b|\b(?:should have caught|would have caught|protects you|you can stop there|stop there)\b/i;
+
+/** The sentences of a text that give advice on how to work. */
+export function adviceSentences(text: string): string[] {
+	return sentences(prose(text).text).filter((s) => ADVICE.test(s));
+}
+
+const STOP = new Set(
+	"a an the of to it its it's your you you're by on in at and or but is are was were be been that this these those when before after every each one only would should could have has had with for from as so if then there here not no".split(" "),
+);
+
+/** The content words of a sentence, each cut to a rough stem, so "multiply
+ *  it out" and "multiplying out" share one. */
+function stems(sentence: string): Set<string> {
+	const out = new Set<string>();
+	for (const w of sentence.toLowerCase().match(/[a-z]+/g) ?? []) {
+		if (STOP.has(w) || w === "x" || w.length < 3) continue;
+		out.add(w.length > 4 ? w.replace(/(?:ing|ed|es|s)$/, "") : w);
+	}
+	return out;
+}
+
+/** The first advice sentence of `text` that says again what an advice
+ *  sentence of `earlier` said: two content words in common, however
+ *  reworded. Null when none repeats. */
+export function repeatedAdvice(text: string, earlier: readonly string[]): { said: string; before: string } | null {
+	const before = earlier.flatMap(adviceSentences).map((s) => ({ s, stems: stems(s) }));
+	for (const said of adviceSentences(text)) {
+		const mine = stems(said);
+		const match = before.find((b) => [...mine].filter((w) => b.stems.has(w)).length >= 2);
+		if (match) return { said, before: match.s };
+	}
+	return null;
+}
+
+/** The prose sentences after a message's last question: what sits under
+ *  the question, list items aside (a question's options). */
+export function afterQuestion(text: string): string[] {
+	const lines = prose(text)
+		.text.split(/\n+/)
+		.filter((l) => !/^\s*(?:[-*+]|\d+\.)\s/.test(l))
+		.join("\n");
+	const said = sentences(lines);
+	const last = said.map((s) => s.trim().endsWith("?")).lastIndexOf(true);
+	return last < 0 ? [] : said.slice(last + 1);
+}
+
+/** A first sentence that hands his answer back to him or grades a right
+ *  one: "You got it right: …", "Yes, …", "That is right, …" always; "That
+ *  is X, …" and "The product is X, …" when X is what he answered. */
+const GRADES = /^(?:you got (?:it|(?:[a-z]+ ){0,3}(?:right|correct))\b|you(?:'re| are) right|you said|your answer (?:is|was)|yes\b|(?:that|this|it)(?:'s| is) (?:right|correct)\b|(?:right|correct)[,.])/i;
+/** "Your last answer is right", "Both parts are correct": a right answer
+ *  called right, where no "but" goes on to where it broke. */
+const CALLED_RIGHT = /^(?:[a-z]+ ){1,4}(?:is|are|was|were) (?:right|correct)\b/i;
+const RESTATES = /^(?:(?:that|this|it)(?:'s| is) X\b|the [a-z]+(?: [a-z]+){0,3} (?:is|are) X\s*[,.])/i;
+
+const bare = (math: string) => math.replace(/\\(?:left|right)|[\s${}]/g, "");
+
+/** The opening sentence of a reply to his answer when it echoes or grades
+ *  his answer instead of starting with the content; `answer` is his words. */
+export function echoOf(text: string, answer: string | null): string | null {
+	const raw = sentences(text.replace(FENCE, " ").replace(/\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]/g, "\n"))[0]?.trim();
+	const plain = raw ? sentences(prose(raw).text)[0]?.trim() : undefined;
+	if (!raw || !plain) return null;
+	if (GRADES.test(plain) || (CALLED_RIGHT.test(plain) && !/\bbut\b|\bnot (?:right|correct)\b/i.test(plain))) return raw;
+	if (!answer || !RESTATES.test(plain)) return null;
+	const said = bare(answer);
+	const maths = [...raw.matchAll(/\$([^$\n]+)\$/g)].map((m) => bare(m[1]!)).filter(Boolean);
+	return maths.some((m) => said.includes(m)) ? raw : null;
 }

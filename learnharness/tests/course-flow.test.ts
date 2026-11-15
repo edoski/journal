@@ -24,7 +24,7 @@ import {
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
-import { fakeEngine, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { fakeEngine, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-flow-")));
@@ -353,7 +353,7 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
 		assert.equal(verbs.filter((v) => v === "map").length, 2, "each brief reads every course's daily plan");
 		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
-		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each practice brief also reads the exam run-up");
+		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each brief reads the daily plan, practice's exam run-up with it");
 		const save = linked.find((c) => c.args[2] === "save")!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
 		assert.deepEqual(JSON.parse(save.stdin), {
@@ -372,11 +372,14 @@ describe("a course-linked turn", () => {
 		const pose = { statement: "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.", mode: "recall", topics: ["rank"], modelSolution: "Row 2 is twice row 1, so the rank is 1." };
 		const engine = scripted([
 			() => fauxAssistantMessage([fauxToolCall("problem", pose, { id: "p1" })], { stopReason: "toolUse" }),
-			() => fauxAssistantMessage([fauxText("Look at the rows.")]),
+			() => sendToUser("Look at the rows."),
+			() => fauxAssistantMessage(""),
 			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right.", rung: null, missClass: null, retest: false, result: "correct", response: "1, the rows are dependent" }, { id: "c1" })], { stopReason: "toolUse" }),
-			() => fauxAssistantMessage([fauxText("Send it as your answer when you're ready.")]),
+			() => sendToUser("Send it as your answer when you're ready."),
+			() => fauxAssistantMessage(""),
 			() => fauxAssistantMessage([fauxToolCall("conclude", { outcome: "surrendered", verdict: "Given up.", rung: null, missClass: null, retest: false, result: "incorrect", response: "no answer" }, { id: "c2" })], { stopReason: "toolUse" }),
-			() => fauxAssistantMessage([fauxText("Here is the solution.")]),
+			() => sendToUser("Here is the solution."),
+			() => fauxAssistantMessage(""),
 		]);
 		const factory: Factory = (opts) => createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
 		const saves = () => engineCalls().filter((c) => c.args[2] === "save");

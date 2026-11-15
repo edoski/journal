@@ -4,7 +4,7 @@ import { nowFor, plannedKeys, restShelves, shelfStatus } from "@/components/unit
 import { claimedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
 import { buildInbox, unitKey, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 import type { Why } from "@/components/study-home/agenda-rows/row-facts";
-import { overdueWords, SLIP_WORDS, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
+import { lapsedNow, overdueWords, SLIP_WORDS, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
 
 /** The one fact a topic says, in the words the sidebar's row or Today's
  *  card says for it. `kind` picks its icon. */
@@ -51,7 +51,7 @@ const WHY_FACT: Record<Why["kind"], TopicFact["kind"]> = { reply: "your-turn", w
 function todayFact(item: NowItem, topic: CourseMapTopic): TopicFact | null {
 	const { why } = item.line;
 	if (why?.kind === "review" || why?.kind === "missed") {
-		if (why.kind === "missed" && topic.signals.lapsed) return { kind: "slip", words: SLIP_WORDS.lapsed, slip: "lapsed" };
+		if (why.kind === "missed" && lapsedNow(topic.signals)) return { kind: "slip", words: SLIP_WORDS.lapsed, slip: "lapsed" };
 		if (topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	}
 	const words = slotWords(why, topic);

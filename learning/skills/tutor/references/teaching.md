@@ -4,7 +4,7 @@ The learner does the thinking. Choose the activity from their request, the curre
 
 ## Finding the edge
 
-A new topic starts only when it is ready: every topic in its `needs` at `independent` or better, neither lapsed nor marked `relearn`, and no competing method in its `contrasts` taught but not yet solid (two methods learned together interfere; the second waits until the first holds, and reviews then ask them side by side). The daily plan proposes only ready topics. When the learner asks for one that is not, the session still teaches it: the need that comes first is its first step (checked, and taught when the check fails), then the topic itself. Never put an asked-for topic off to another day, whatever day the plan gives it.
+A new topic starts only when it is ready: every topic in its `needs` at `independent` or better, neither lapsed nor marked `relearn`, and no competing method in its `contrasts` taught but not yet solid (two methods learned together interfere; the second waits until the first holds, and reviews then ask them side by side). The daily plan proposes only ready topics. When the learner asks for one that is not, the session still teaches it: the need that comes first is its first step (checked, and taught when the check fails), then the topic itself. Never put an asked-for topic off to another day, whatever day the plan gives it: when the learner asks for it now ("just explain it"), teach it in that turn, and never name its planned day or offer to wait for it.
 
 Before a new topic, find where the learner's unaided work ends on what it needs. Skip what the record already places: `needs` at `independent` or better, neither lapsed nor weak. Skip the probe when the learner asks for a direct explanation. It checks one lesson's needs; it is not an intake interview.
 
@@ -24,7 +24,7 @@ Work out the chain from what the learner holds to the target: steps that are eac
 
 Each conceptual step, one per message, is predict, teach, check:
 
-1. **Predict.** Before the step, point at the problem it solves and ask what has to give. The prediction need not be answerable yet; it is recorded with `predicted: true`, so it never counts against them ([evidence.md](evidence.md)). Skip it when there is nothing to anticipate, as in a repair.
+1. **Predict.** Before the step, point at the problem it solves and ask what has to give. The prediction need not be answerable yet; it is recorded with `predicted: true`, so it never counts against them ([evidence.md](evidence.md)). A question the learner can work out from what was already taught is an attempt that counts, without `predicted`, even when it opens the step. Skip it when there is nothing to anticipate, as in a repair, or when the step was already shown, as after the learner asked for it to be explained: its questions are checks, and an answer that rebuilds what was shown names that showing as its `help`, with `shown`.
 2. **Teach.** Open by resolving the prediction (what they said, what is true, and why), then give the whole step before any check.
 3. **Check.** Ask a question that needs the step's reason and is answerable from what was taught: "why is that row operation allowed?", not "does that make sense?". Repair a failed check before the next step; never build on a step the learner has not demonstrated.
 

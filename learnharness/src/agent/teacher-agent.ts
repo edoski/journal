@@ -24,7 +24,8 @@ import { createGrepTool, grepTool } from "./tools/grep.ts";
 import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../core/native-messages.ts";
+import { VoiceGuard } from "./voice-guard.ts";
 
 /**
  * The two teaching-side agents (docs/probe-teach-split.md): the PROBER and
@@ -136,6 +137,10 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const engine = opts.engine;
 	const composed = composedInstructions[kind]!;
 	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt(kind, { arcs: opts.course.arcs })}` : composed;
+	// Every message and question of the turn is read against the voice
+	// before he sees it, and one that breaks it is rewritten.
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind));
+	const spoken = (tool: AgentTool<any, any>) => (voice.guards(tool.name) ? voice.wrap(tool) : tool);
 	return new SdkAgent({
 		engine,
 		systemPrompt,
@@ -147,7 +152,10 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			...tools.map((tool) => sessionTool(tool, engine.model, opts.course?.course.workspace)),
 			...(opts.course ? Object.values(courseTools(opts.course)) : []),
 			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
-		],
+		].map(spoken),
+		screen: (call) => voice.screen(call),
+		// Ordinary text never reaches him where send_to_user is his channel.
+		...(opts.tools === undefined ? { screenText: (text: string) => voice.screenText(text), beforeEnd: () => voice.beforeEnd() } : {}),
 		messages: opts.messages ?? [],
 		endsTurn: endsTurnFor(kind),
 		session: opts.session,

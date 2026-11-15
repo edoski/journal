@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useRef, useState, type KeyboardEvent } from "react";
-import { CircleCheckIcon, CircleDashedIcon, CircleMinusIcon, CircleXIcon, FlagIcon, FlagOffIcon, GaugeIcon, HandHelpingIcon, ScaleIcon, UserIcon, type LucideIcon } from "lucide-react";
-import { markHow, type AnswerMark, type DisputeDetails, type MarkHow, type MarkResult, type MarkRow } from "@/src/core";
+import { CircleCheckIcon, CircleDashedIcon, CircleHelpIcon, CircleMinusIcon, CircleXIcon, FlagIcon, FlagOffIcon, GaugeIcon, HandHelpingIcon, ScaleIcon, UserIcon, type LucideIcon } from "lucide-react";
+import { markHow, type AnswerMark, type DisputeDetails, type DisputedHow, type MarkHow, type MarkResult, type MarkRow } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
@@ -45,7 +45,7 @@ const HOW_ICON: Record<MarkHow, LucideIcon> = {
 	predicted: CircleDashedIcon,
 	gaveUp: FlagOffIcon,
 	withHelp: HandHelpingIcon,
-	countedHelped: HandHelpingIcon,
+	unconfirmed: CircleHelpIcon,
 	ownWork: UserIcon,
 };
 
@@ -112,34 +112,46 @@ export function AnswerMarkLine({ answerId }: { answerId: string }) {
 	);
 }
 
-/** What the dialog sends: his words, the mark he picked, or both. */
-export type DisputeDraft = Pick<DisputeDetails, "said" | "proposed">;
+/** What the dialog sends: his words, the mark he picked, how he thinks it
+ *  should count, or any of them. */
+export type DisputeDraft = Pick<DisputeDetails, "said" | "proposed" | "proposedHow">;
 
 const PICKS: readonly MarkResult[] = ["correct", "partial", "incorrect"];
+const HOW_PICKS: readonly DisputedHow[] = ["ownWork", "withHelp"];
 
-/** The dispute: a sentence on what's wrong, or the mark he thinks is
- *  right. ↑ from the start of the field reaches the marks, ↓ comes back,
- *  ← → move between marks, ⌘↵ sends. */
+/** The dispute: a sentence on what's wrong, the mark he thinks is right,
+ *  or how he thinks it should count (round 6: help could be argued only
+ *  in words). ↑ from the start of the field reaches the choices, ↑ ↓ move
+ *  between them and back, ← → within one, ⌘↵ sends. */
 export function DisputeDialog({ mark, onClose, onSend }: { mark: AnswerMark; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
 	const [said, setSaid] = useState("");
 	const [proposed, setProposed] = useState<MarkResult | "">("");
+	const [proposedHow, setProposedHow] = useState<DisputedHow | "">("");
 	const fieldRef = useRef<HTMLTextAreaElement>(null);
 	const groupRef = useRef<HTMLDivElement>(null);
-	const ready = said.trim().length > 0 || proposed !== "";
+	const howRef = useRef<HTMLDivElement>(null);
+	const ready = said.trim().length > 0 || proposed !== "" || proposedHow !== "";
 	const send = () => {
 		if (!ready) return;
-		onSend({ ...(said.trim() ? { said: said.trim() } : {}), ...(proposed ? { proposed } : {}) });
+		onSend({ ...(said.trim() ? { said: said.trim() } : {}), ...(proposed ? { proposed } : {}), ...(proposedHow ? { proposedHow } : {}) });
 	};
-	const marked = mark.rows.map((row) => MARK_WORDS.result[row.result]).join(", ");
+	const marked = mark.rows.map((row) => `${MARK_WORDS.result[row.result]} · ${MARK_HOW_WORDS[markHow(row)]}`).join(", ");
+	const focusGroup = (group: HTMLDivElement | null) => (group?.querySelector<HTMLButtonElement>('[data-state="on"]') ?? group?.querySelector<HTMLButtonElement>("[data-pick]"))?.focus();
 	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+		const target = e.target as Node;
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			e.preventDefault();
 			send();
 		} else if (e.key === "ArrowUp" && e.target === fieldRef.current && fieldRef.current.selectionStart === 0 && fieldRef.current.selectionEnd === 0) {
 			e.preventDefault();
-			const items = groupRef.current?.querySelectorAll<HTMLButtonElement>("[data-pick]");
-			(groupRef.current?.querySelector<HTMLButtonElement>('[data-state="on"]') ?? items?.[0])?.focus();
-		} else if (e.key === "ArrowDown" && groupRef.current?.contains(e.target as Node)) {
+			focusGroup(howRef.current);
+		} else if (e.key === "ArrowUp" && howRef.current?.contains(target)) {
+			e.preventDefault();
+			focusGroup(groupRef.current);
+		} else if (e.key === "ArrowDown" && groupRef.current?.contains(target)) {
+			e.preventDefault();
+			focusGroup(howRef.current);
+		} else if (e.key === "ArrowDown" && howRef.current?.contains(target)) {
 			e.preventDefault();
 			fieldRef.current?.focus();
 		}
@@ -170,6 +182,23 @@ export function DisputeDialog({ mark, onClose, onSend }: { mark: AnswerMark; onC
 						</ToggleGroupItem>
 					))}
 				</ToggleGroup>
+				<ToggleGroup
+					ref={howRef}
+					type="single"
+					variant="segmented"
+					size="segment"
+					aria-label="How you think it should count"
+					data-testid="dispute-how"
+					value={proposedHow}
+					onValueChange={(next) => setProposedHow(next as DisputedHow | "")}
+					className="self-start"
+				>
+					{HOW_PICKS.map((pick) => (
+						<ToggleGroupItem key={pick} value={pick} data-pick={pick}>
+							{MARK_HOW_WORDS[pick]}
+						</ToggleGroupItem>
+					))}
+				</ToggleGroup>
 				<Textarea ref={fieldRef} data-testid="dispute-said" value={said} onChange={(e) => setSaid(e.target.value)} placeholder={MARK_WORDS.disputePlaceholder} rows={3} className="min-h-20" />
 				<DialogFooter>
 					<Button variant="quiet" size="row" onClick={onClose}>
@@ -194,10 +223,10 @@ export function DisputeRow({ data }: { data: DisputeDetails }) {
 			<div className="flex items-center gap-2 text-row text-muted-foreground">
 				<FlagIcon aria-hidden className="size-4 shrink-0" />
 				{MARK_WORDS.youDisputed}
-				{data.proposed && (
+				{(data.proposed || data.proposedHow) && (
 					<>
 						<span aria-hidden>·</span>
-						{MARK_WORDS.youThink}: {MARK_WORDS.result[data.proposed]}
+						{MARK_WORDS.youThink}: {[data.proposed && MARK_WORDS.result[data.proposed], data.proposedHow && MARK_HOW_WORDS[data.proposedHow]].filter(Boolean).join(", ")}
 					</>
 				)}
 			</div>

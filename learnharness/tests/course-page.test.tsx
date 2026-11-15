@@ -43,7 +43,7 @@ const TOPICS = [
 	topic("span", { title: "Span", level: "retained", introduced: "2026-09-05", review: due(10) }),
 	topic("independence", { title: "Linear independence", level: "assisted", introduced: "2026-09-10", weak: true, review: due(16), signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent" } }),
 	topic("basis", { title: "Basis and dimension", level: "independent", introduced: "2026-09-12", review: later("2026-11-20") }),
-	topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-10-20", weak: true, review: due(1), signals: { ...QUIET, confidentErrors: 1 } }),
+	topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-10-20", weak: true, review: due(1), signals: { ...QUIET, confidentErrors: 1, mistake: true } }),
 	topic("determinant", { title: "Determinants", level: "assisted", introduced: "2026-10-01", review: due(4) }),
 	topic("rank", { title: "Rank", level: "introduced", introduced: "2026-10-25", review: due(2), tasks: ["sheet-4"] }),
 	topic("cramer", { title: "Cramer's rule", level: "introduced", introduced: "2026-10-28", review: due(2) }),
@@ -187,9 +187,9 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
 		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held } : t)) });
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
-		assert.deepEqual(row.fact, { kind: "back", words: "Due since 21 Oct" });
+		assert.deepEqual(row.fact, { kind: "review", words: "Due since 21 Oct" }, "a late review needs him, so the map's card says it too");
 		const unit = buildInbox([map], [], WS).known.find((u) => u.topic.handle === "basis")!;
-		assert.deepEqual(unitStatus(unit, "2026-11-08"), { kind: "returns", words: row.fact!.words }, "the sidebar's row says the same");
+		assert.deepEqual(unitStatus(unit, "2026-11-08"), { kind: "review", words: row.fact!.words }, "the sidebar's row says the same");
 		assert.deepEqual(
 			headMarks(unit.topic, (handle) => handle, "2026-11-08").map((m) => m.words),
 			[row.fact!.words],
@@ -265,10 +265,11 @@ describe("the header's facts and next lesson", () => {
 
 	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
 		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
-		const next = courseNext(course(), [left]);
+		const next = courseNext(course({ tasks: [], focus: null }), [left]);
 		assert.equal(next.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
+		assert.equal(courseNext(course(), [left]).lesson.title, `Continue ${course().map.tasks[0]!.title}`, "with an open task, the line Home still has for the course");
 	});
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {

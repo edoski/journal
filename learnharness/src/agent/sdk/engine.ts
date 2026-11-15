@@ -4,6 +4,7 @@ import { query as sdkQuery, type Options, type SDKMessage, type SDKUserMessage, 
 import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { CLAUDE_MODEL, CLAUDE_SUBSCRIPTION } from "../../core/contracts/claude.ts";
+import { SEND_TO_USER_TOOL } from "../../core/native-messages.ts";
 import { claudeLaunch, type LoadedClaudeAccount } from "../claude-accounts.ts";
 import { claudeChildEnv, claudeWorkDir, resolveClaudeBinary, type ClaudeEnv, type ClaudeLaunch } from "../claude-cli.ts";
 import { claudeAccount, claudeAccountConnections } from "../claude-connection.ts";
@@ -80,11 +81,14 @@ export function launchConfigDir(launch: ClaudeLaunch | undefined, env: ClaudeEnv
  * private working folder, with none of the user's settings, CLAUDE.md files,
  * memory or MCP servers. Each caller adds its prompt, tools and session.
  * Replayed user messages tell a turn when a steered message reached the model.
+ * `send_to_user` is the turn's visible output: a turn that ends on it with no
+ * plain text is done, so Claude Code does not ask the model to answer again
+ * (which printed the same paragraph twice, round 6).
  */
 export function claudeSdkOptions(binary: string, launch: ClaudeLaunch | undefined, env: ClaudeEnv = process.env): Options {
 	return {
 		pathToClaudeCodeExecutable: binary,
-		env: claudeChildEnv(env, { binary, launch }) as Record<string, string>,
+		env: { ...claudeChildEnv(env, { binary, launch }), CLAUDE_CODE_TERMINAL_MCP_TOOLS: `${SDK_TOOL_PREFIX}${SEND_TO_USER_TOOL}` } as Record<string, string>,
 		cwd: claudeWorkDir(),
 		model: CLAUDE_MODEL.id,
 		effort: CLAUDE_MODEL.thinkingLevel,

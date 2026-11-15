@@ -39,10 +39,27 @@ describe("the mark line", () => {
 		const { document } = parseHTML(line({ a1: mark }));
 		const facts = document.querySelector('[data-slot="mark-facts"]');
 		assert.ok(facts, "the facts are one group");
-		assert.match(facts!.className, /justify-end/, "they end where his words end");
+		assert.match(facts!.className, /items-end/, "they end where his words end");
 		const dispute = document.querySelector('[data-testid="dispute-mark"]')!;
 		assert.match(dispute.className, /\babsolute\b/, "Dispute is drawn beside the facts, out of the line's flow");
 		assert.ok(facts!.contains(dispute), "and placed against the facts, not the bubble");
+	});
+
+	it("gives each try of a problem its own line, its facts read across it", () => {
+		const tries = {
+			rows: [
+				{ id: "r1", result: "partial", grade: "assisted", helped: false, sure: "guess", label: "First try" },
+				{ id: "r2", result: "correct", grade: "assisted", helped: true, sure: "confident", label: "Then" },
+			],
+			disputed: false,
+			ruling: null,
+		} as unknown as AnswerMark;
+		const { document } = parseHTML(line({ a1: tries }));
+		const facts = document.querySelector('[data-slot="mark-facts"]')!;
+		assert.match(facts.className, /\bflex-col\b/, "the tries stack, one line each, never one row of chips");
+		assert.match(facts.className, /\bitems-end\b/, "each line ends where his words end");
+		const rows = [...document.querySelectorAll('[data-testid="mark-row"]')];
+		assert.deepEqual(rows.map((r) => r.textContent), ["First tryPartly rightOn your ownGuessing", "ThenRightWith helpConfident"]);
 	});
 
 	it("draws nothing until the engine holds a mark", () => {

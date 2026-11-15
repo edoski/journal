@@ -19,6 +19,16 @@ test("a turn the restart cut right after his answer is owed, past the course not
 	assert.equal(needsContinuation([ask, answer, courseNote, reply]), false);
 });
 
+test("a compaction run in his pause, between the question and his answer, still leaves the reply owed", () => {
+	// Round 6: the compaction marker landed after the question call; the app
+	// restarted after his answer, and the lesson read finished, with no
+	// reply and no Try again. The session keeps its own summary, so the
+	// record's marker is nothing the tutor reads.
+	const compacted = { id: "k1", role: "custom", customType: "compaction", content: "[Compacted history]", display: true, details: { firstKeptMessageId: "", tokensBefore: 43507, at: "2026-11-08T10:00:00Z" }, timestamp: 2 } as unknown as LhMessage;
+	assert.equal(needsContinuation([ask, compacted, answer, courseNote]), true);
+	assert.equal(needsContinuation([ask, compacted, answer, courseNote, reply]), false);
+});
+
 test("his message or dock card with no reply after it says the reply never came", () => {
 	assert.equal(replyNeverCame([reply, courseNote, message]), true);
 	assert.equal(replyNeverCame([reply, courseNote, thinking]), true);

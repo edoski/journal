@@ -115,6 +115,19 @@ describe("projectView compaction dividers", () => {
 		assert.equal((part.data as { content: string }).content.includes("SUMMARY TEXT"), true);
 	});
 
+	it("Claude Code's own compaction keeps no verbatim tail: the cut draws at the marker, before what came after it (round 6, report 6 minor 4)", () => {
+		const view = projectView([
+			{ id: "old1", role: "user", content: "earliest", timestamp: 1 },
+			newCompactionMarker("SUMMARY TEXT", { firstKeptMessageId: "", tokensBefore: 52000, at: new Date(0).toISOString() }) as unknown as LhMessage,
+			{ id: "next", role: "user", content: "after it", timestamp: 3 },
+		]);
+		const cut = view.findIndex((m) => m.parts.some((p) => p.type === "data-compaction-cut"));
+		const earliest = view.findIndex((m) => m.parts.some((p) => p.type === "text" && p.text === "earliest"));
+		const next = view.findIndex((m) => m.parts.some((p) => p.type === "text" && p.text === "after it"));
+		assert.ok(cut > earliest && cut < next, "one divider, between the summarized history and what follows");
+		assert.equal(view.filter((m) => m.parts.some((p) => p.type === "data-compaction-cut")).length, 1);
+	});
+
 	it("emits the moment divider at the marker (the transcript tail)", () => {
 		const view = projectView(record());
 		const moment = view.find((m) => m.parts.some((p) => p.type === "data-compaction"));

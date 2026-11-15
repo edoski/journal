@@ -143,6 +143,26 @@ describe("render — standard dollar math + legacy compatibility (streamdown + K
 		assert.ok(!html.includes("katex-error"), "both formulas are valid");
 	});
 
+	it("renders a display formula written on one line as display math", () => {
+		for (const md of [
+			"So\n\n$$c + 2c + 3c + 4c = 10c = 1,$$\n\nthen",
+			"So the limit is\n$$P(X = k) = \\lim_{n \\to \\infty} \\binom{n}{k} \\left(\\frac{\\lambda}{n}\\right)^k$$\nwhich",
+			"$$X_n \\sim \\mathrm{Bin}(n, \\lambda/n)$$",
+			"> [!IMPORTANT]\n> The Poisson formula:\n> $$P(X = k) = e^{-\\lambda} \\frac{\\lambda^k}{k!}$$",
+		]) {
+			const html = render(md);
+			assert.ok(html.includes("katex-display"), `a one-line $$…$$ on its own line is display: ${md}`);
+			assert.ok(!html.includes("$$"), "no literal $$ leaks");
+			assert.ok(!html.includes("katex-error"), "no KaTeX parse errors");
+		}
+	});
+
+	it("keeps $$…$$ inside a sentence inline", () => {
+		const html = render("The sum $$a + b$$ is small.");
+		assert.ok(html.includes("katex"), "renders");
+		assert.ok(!html.includes("katex-display"), "mid-sentence two-dollar math stays inline");
+	});
+
 	it("keeps dollar examples in inline code and code fences literal", () => {
 		const html = render("Use `$x$` here.\n\n```text\n$$\ny = x^2\n$$\n```");
 		assert.ok(!html.includes("katex"), "code examples are not math");
@@ -306,9 +326,10 @@ describe("escaped dollars inside math — transform units", () => {
 		assert.equal(transformMathDelimiters(md), md);
 	});
 
-	it("leaves display spans untouched — a lone $ can't close $$, \\$ already survives", () => {
-		const md = "$$x = \\$5,\\ q = \\$12$$";
-		assert.equal(transformMathDelimiters(md), md);
+	it("leaves display bodies untouched — a lone $ can't close $$, \\$ already survives", () => {
+		assert.equal(transformMathDelimiters("$$x = \\$5,\\ q = \\$12$$"), "$$\nx = \\$5,\\ q = \\$12\n$$");
+		const inline = "so $$x = \\$5$$ here";
+		assert.equal(transformMathDelimiters(inline), inline);
 	});
 
 	it("leaves code spans, fences, and unbalanced spans untouched", () => {

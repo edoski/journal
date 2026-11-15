@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronRightIcon, LightbulbIcon } from "lucide-react";
+import { ChevronRightIcon, EyeIcon, LightbulbIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { answerForPresentation, type Photo, type QuestionAnswerData, type QuestionOption } from "@/src/core";
@@ -15,7 +15,8 @@ import { LearnerBubble, LearnerWords } from "@/components/lesson/prose/learner-b
 const SMALL_SIZE = "[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]";
 const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
 
-/** The quiet mark that ends the tutor's message when it hands him the turn. */
+/** The quiet mark that ends the tutor's message when it hands him the turn,
+ *  over the question's words or choices; never over nothing. */
 export function YourTurn() {
 	return (
 		<p data-slot="your-turn" className="mb-1 text-row text-muted-foreground">
@@ -41,8 +42,8 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 	/** The plan step this question first taught, when the roadmap opens
 	 *  the transcript here (roadmap-facts.ts). */
 	stepAnchor?: string;
-	/** It asks again, word for word, the question he pressed Hint on
-	 *  (`reaskedAfterHint`): its words are drawn above the hint already. */
+	/** It asks again, word for word, the question he pressed Hint on or
+	 *  asked about (`askedAgain`): its words are drawn above already. */
 	repeat?: boolean;
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
@@ -69,7 +70,7 @@ function OpenQuestion({ spec, stepAnchor, repeat }: { spec: ProseQuestionSpec; s
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
 		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			<YourTurn />
+			{(!repeat || spec.mode !== "text") && <YourTurn />}
 			{!repeat && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows
@@ -152,6 +153,8 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 			{spec.mode !== "text" && <ChoiceRows options={spec.data.options} multi={spec.mode === "multi-select"} selected={new Set()} />}
 		</div>
 	);
+	// Set aside for his side question, it stays as asked: it comes back open.
+	if (answer.dismissed && answer.reason === "asked") return question;
 	if (answer.dismissed) {
 		return (
 			<>
@@ -172,6 +175,8 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 			{answer.readingThinking && <LearnerBubble testId="reading-thinking-bubble" text={answer.readingThinking} />}
 			{answer.hintRequested ? (
 				<LearnerBubble testId="prose-answer" icon={LightbulbIcon} label="Hint" text={[words, added].filter(Boolean).join("\n\n")} photos={photos} />
+			) : answer.showMe ? (
+				<LearnerBubble testId="prose-answer" icon={EyeIcon} label="Show me" text={[words, added].filter(Boolean).join("\n\n")} photos={photos} markId={toolCallId} />
 			) : (
 				<>
 					<LearnerBubble testId="prose-answer" text={words} photos={photos} markId={toolCallId}>

@@ -18,7 +18,13 @@ describe("the line Home's map follows", () => {
 	});
 
 	it("is the line he points at", () => {
-		assert.equal(followedRow([LA, PR], "pr"), PR);
+		assert.equal(followedRow([LA, PR], lineKey(PR)), PR);
+	});
+
+	it("tells apart two lines of one course, as a course's review and its open task", () => {
+		const task: TodayRow = { kind: "course", course: course("la"), step: { kind: "task", key: "sheet-4", title: "Sheet 4", updated: null, topics: [] } } as never;
+		assert.notEqual(lineKey(task), lineKey(LA));
+		assert.equal(followedRow([LA, task], lineKey(task)), task);
 	});
 
 	it("stays on Today's first course line when the pointed line has no course or is gone", () => {
@@ -41,7 +47,7 @@ describe("a line reporting that he points at it", () => {
 		(props.onFocus as () => void)();
 		(props.onPointerLeave as () => void)();
 		(props.onBlur as () => void)();
-		assert.deepEqual(seen, ["pr:pointer", "pr:focus", "end", "end"]);
-		assert.equal((pointProps(LA, { pointed: "pr", onPoint: () => {} }) as Record<string, unknown>)["data-pointed"], undefined);
+		assert.deepEqual(seen, [`${lineKey(PR)}:pointer`, `${lineKey(PR)}:focus`, "end", "end"]);
+		assert.equal((pointProps(LA, { pointed: lineKey(PR), onPoint: () => {} }) as Record<string, unknown>)["data-pointed"], undefined);
 	});
 });

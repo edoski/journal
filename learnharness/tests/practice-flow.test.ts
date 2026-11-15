@@ -25,7 +25,7 @@ import {
 	type FauxResponseStep,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { createPracticeAgent } from "../src/agent/teacher-agent.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
@@ -154,8 +154,9 @@ describe("practice flow (scripted model)", () => {
 			() => fauxAssistantMessage([fauxToolCall("problem", POSE, { id: "call-p1" })], { stopReason: "toolUse" }),
 			// Turn 2 (after the commit): conclude (non-terminating) …
 			() => fauxAssistantMessage([fauxToolCall("conclude", CONCLUDE, { id: "call-c1" })], { stopReason: "toolUse" }),
-			// … the loop continues: reveal text ends the turn.
-			() => fauxAssistantMessage([fauxText("Clean proof. Ready for the next one?")]),
+			// … the loop continues: the reveal goes out with send_to_user, then the turn ends.
+			() => sendToUser("Clean proof. Ready for the next one?"),
+			() => fauxAssistantMessage(""),
 		]);
 		const factory = practiceFactory(chat.id, engine);
 

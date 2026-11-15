@@ -14,13 +14,15 @@ One phrase per step of the topic's pie (`topic-standing.ts` sets the fill from t
 | 3/4 | Right with help |
 | full | On your own |
 
+On a topic not yet solid (`attempted` or `assisted`), the words say how he answered it since his newest answer that was not right, the engine's `right` (`RIGHT_WORDS`, `standingWords`): Right on your own, check another day; Right with help; Right, but a guess; Right, not yet confirmed; Partly right when that newest answer was partly right. Right answers after a review day's wrong first try never read "Tried, not right yet" (round 7); `attempted` with no right answer since keeps it. The pie stays the pie.
+
 ## Why it needs him
 
 One form each, wherever it shows.
 
 | Reason | Words |
 |---|---|
-| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Look again (a magnifier). A repair made only with help (`repairedWithHelp`) is not "Fixed": it is Mistake to fix, since the signals under it describe answers before that right one ("Not right last time" or "Sure, but wrong" would contradict it). |
+| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); with no wrong answer open (the engine's `mistake`, which any right answer closes, with help or not), Check on your own (a person with a check), whatever else the record says, since the signals below describe a wrong answer a right one has since answered (round 7: "Not right last time" after a right last try); else Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Mistake to fix. A repair made only with help (`repairedWithHelp`) is not "Fixed", since help may have carried it. |
 | a review come due | Due today, 3d overdue, 16d overdue (always days, round 4) |
 | a review dated ahead | Back in 5d, Back in 21d, Back in 60d |
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 20d ago; Unfinished when no day is known. Never the tutor's step text. |
@@ -35,12 +37,12 @@ A topic often has more than one reason, and a row says one. Every surface takes 
 2. a slip;
 3. a review come due (Due today, 3d overdue): the engine dates it today;
 4. unfinished work that holds it (Left off 2d ago);
-5. when its review comes back (Back in 5d), a review the plan holds back included (Due since 21 Oct): the engine dates that review on a later day, so the work he left comes first;
+5. when its review comes back (Back in 5d), a review the plan holds back included (Due since 21 Oct): the engine dates that review on a later day, so the work he left comes first. A review held past memory's day is due already, so it is a fact that needs him, with the review's icon, and the map's card says it as the lists do (round 6: Cramer's rule read Due since 6 Nov in the lists and its standing on the map);
 6. how long since he studied it.
 
 Both "left off" and "due" are true at once, and neither is wrong: a review due today is today's work, so it leads; a review the plan has moved to a later day is not, so the unfinished work leads until that day. A topic Home's Today takes up says Today's reason instead, wherever it shows (the sidebar's card, the course page's Needs you).
 
-Home's line names the lapsed topic when the line is about another one ("Not right last time: Chain rule", `lapsedOnWords`, `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Not right: `ATTEMPT_WORDS`) is not a reason and keeps its own words.
+Home's line names the lapsed topic when the line is about another one ("Not right last time: Chain rule", `lapsedOnWords`, `row-facts.ts`), only while that topic's slip is a lapse (`lapsedNow`), as every line that names a lapse reads. An attempt's result in a topic's history (Right, Partly right, Not right: `ATTEMPT_WORDS`) is not a reason and keeps its own words.
 
 ## Arcs
 
@@ -99,7 +101,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right |
-| counted | Prediction, not counted; Gave up; With help; Counted as helped (a right guess, an unsure or a partly right answer with no help); On your own |
+| counted | Prediction, not counted; Gave up; With help; Not yet confirmed (a right answer the engine doubts, `uncertain`, such as one given straight after Explain instead: not his own yet, as Right, not yet confirmed says of the topic); On your own (no help, a guess or a partly right answer included) |
 | confidence he chose | Guessing, Confident; none when he left the meter alone (Neutral is never shown as his choice) |
 | a dispute | Dispute; Disputed: and the tutor's ruling; in the transcript, You disputed the mark, You think: Partly right |
 

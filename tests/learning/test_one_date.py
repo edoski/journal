@@ -197,5 +197,7 @@ def test_the_map_names_the_topics_a_final_review_has_no_room_for(
     )
     mapped = run(monkeypatch, capsys, root, "map")
     assert mapped["exam"]["unreviewed"] == ["c"]
+    assert mapped["exam"]["reasons"] == {"c": "full"}
     planned = run(monkeypatch, capsys, root, "plan", "--days", "3")["courses"][0]
     assert planned["plan"]["unreviewed"] == ["c"]
+    assert planned["plan"]["reasons"] == {"c": "full"}

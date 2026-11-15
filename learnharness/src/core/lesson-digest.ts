@@ -124,6 +124,10 @@ export interface DigestCourseView {
 	/** In a course with arcs; absent in one without, which the digest
 	 *  treats exactly as before arcs. */
 	arcs?: DigestArcs;
+	/** The lesson ended on its close, which marked its topics introduced and
+	 *  named their days from the plan after that save. A topic introduced or
+	 *  created later would move those days, so the patch does neither. */
+	closed?: boolean;
 }
 
 /** What a digest reads of a course's arcs. */
@@ -261,7 +265,7 @@ export function digestChanges(input: DigestSubmit, view: DigestCourseView): { ch
 	const known = new Map(view.topics.map((t) => [t.handle, t]));
 	const order = view.topics.map((t) => t.handle);
 	const created = new Set(
-		submitTopics.filter((t) => validHandle(t.handle) && !known.has(t.handle) && t.title?.trim()).map((t) => t.handle),
+		view.closed ? [] : submitTopics.filter((t) => validHandle(t.handle) && !known.has(t.handle) && t.title?.trim()).map((t) => t.handle),
 	);
 	const exists = (h: string) => known.has(h) || created.has(h);
 	const arcs = view.arcs;
@@ -295,7 +299,7 @@ export function digestChanges(input: DigestSubmit, view: DigestCourseView): { ch
 			Object.assign(patch, { title: t.title!.trim(), introduced: true, ...(needs.length > 0 ? { needs } : {}), ...(joins ? { arc: ownArc } : {}) });
 			order.splice(Math.max(-1, ...needs.map((n) => order.indexOf(n))) + 1, 0, t.handle);
 			said.push(joins ? `new topic ${t.handle} in ${arcTitle}` : `new topic ${t.handle}`);
-		} else if (t.introduced === true && !current.introduced) {
+		} else if (t.introduced === true && !current.introduced && !view.closed) {
 			patch.introduced = true;
 			said.push(`introduced ${t.handle}`);
 		}

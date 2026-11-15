@@ -272,7 +272,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 	// The same problem posed again after its solution was shown: his
 	// answer repeats what he saw (shown-help.ts).
 	const seen = seenBeforeAsked(record.messages, active.toolCallId);
-	const saved = await saveCourse(rec.course, { observations }, () => seen);
+	const saved = await saveCourse(rec.course, { observations }, { id: concludeCallId, seen });
 	if (saved.ok) return { text: `Course record: ${JSON.stringify(withDayWords(saved.json, studyDay()))}` };
 	// The problem still concludes: a pose's topics cannot change after the
 	// fact, so holding the problem open would lock the session.

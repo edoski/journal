@@ -20,7 +20,7 @@ const FOLLOW_DWELL_MS = 150;
 
 /**
  * The agenda study home (spec: study-home.md): what to study now, in one
- * window. A course's map on top behind course tabs, then Today, one line per course. The
+ * window. A course's map on top behind course tabs, then Today, a line per step of today's plan. The
  * map follows Today: it shows the course of the line he points at, with
  * that line's topics lit and, in a course with arcs, the arc they lie in
  * picked on the map's arc strip (home-map.md); while he points at the line,

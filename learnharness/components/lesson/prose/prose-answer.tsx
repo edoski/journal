@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CONFIDENCE, emptyDockSelection, toggleOption, type Confidence, type DockSelection, type QuestionFormDraft } from "@/src/core";
-import { carriedForm, keptWords } from "@/components/lesson/kept-drafts";
+import { keptWords } from "@/components/lesson/kept-drafts";
 
 /** What the open question or problem holds besides his words (spec:
  *  prose.md): the options he picked in the tutor's message, his confidence,
@@ -31,15 +31,15 @@ const fresh = (key: string | null): State => ({ key, selection: emptyDockSelecti
 
 /** The open item's picks, confidence and mode, fresh for each question or
  *  problem. A question starts from this call's unconfirmed submission, else
- *  what he chose before a reload, else the confidence the carry brought.
+ *  what he chose before a reload; the composer sets the confidence a carry
+ *  brings, as it takes the carry.
  *  Ask is one message: once the tutor's reply settles, the composer answers
  *  again (round 5: Ask stayed on over an open problem and his answer went
  *  as a question), unless he is already typing his next question. */
-export function useProseAnswer({ openKey, box, carry, draft, replying = false, askDraft }: {
+export function useProseAnswer({ openKey, box, draft, replying = false, askDraft }: {
 	openKey: string | null;
 	/** The open box's scope in kept-drafts.ts. */
 	box: string | null;
-	carry?: string;
 	/** This call's unconfirmed submission, back after a refused send. */
 	draft?: QuestionFormDraft;
 	/** The tutor is writing a reply. */
@@ -61,13 +61,9 @@ export function useProseAnswer({ openKey, box, carry, draft, replying = false, a
 	useEffect(() => {
 		if (!openKey) return;
 		const kept = draft ?? (box ? keptWords(box)?.form : undefined);
-		const carried = !kept && carry ? keptWords(carry) : undefined;
-		const restored = kept
-			? { selection: "selection" in kept ? kept.selection : { selected: new Set(kept.selected), otherSelected: kept.otherSelected }, confidence: kept.confidence }
-			: carried
-				? { selection: emptyDockSelection(), confidence: carriedForm(carried, true)?.confidence ?? DEFAULT_CONFIDENCE }
-				: null;
-		if (restored) setState((s) => (s.key === openKey ? { ...s, ...restored } : s));
+		if (!kept) return;
+		const restored = { selection: "selection" in kept ? kept.selection : { selected: new Set(kept.selected), otherSelected: kept.otherSelected }, confidence: kept.confidence };
+		setState((s) => (s.key === openKey ? { ...s, ...restored } : s));
 		// Once per open item.
 	}, [openKey]);
 	const toggle = useCallback((index: number, multi: boolean) => {

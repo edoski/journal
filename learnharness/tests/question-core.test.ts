@@ -8,6 +8,7 @@ import { Value } from "typebox/value";
 import type { TSchema } from "typebox";
 import {
 	askInputSchema,
+	askLabelProblems,
 	askOptionProblems,
 	buildAnswer,
 	compactAnswerForModel,
@@ -46,6 +47,12 @@ describe("askInputSchema / askOptionProblems", () => {
 		const emptyLabel = { question: "?", options: [{ label: "" }, { label: "B" }] };
 		assert.equal(boundaryOk(askInputSchema, emptyLabel, askOptionProblems(emptyLabel.options ?? [])), false);
 		assert.match(askOptionProblems(emptyLabel.options).join(" "), /label is empty/);
+	});
+
+	it("refuses a label tagged \"(Recommended)\": the label becomes his answer's words", () => {
+		const tagged = [{ label: "The whole picture (Recommended)" }, { label: "Just the method" }];
+		assert.match(askLabelProblems(tagged).join(" "), /"The whole picture \(Recommended\)" carries a tag/);
+		assert.deepEqual(askLabelProblems([{ label: "The whole picture" }, { label: "Defaults of a loan" }]), []);
 	});
 });
 
@@ -192,6 +199,15 @@ describe("compactAnswerForModel (the model-visible diet, owner 2026-10-02)", () 
 });
 
 // ─── dismissedAnswer / toolQuestionKind (ESC-abort dismissal, 2026-10-02) ──
+
+describe("a question set aside for his side question", () => {
+	it("tells the tutor it is no answer and to ask it again as it was, after answering him", () => {
+		const compact = compactAnswerForModel(dismissedAnswer("explain", "Why?", "asked"));
+		assert.equal(compact.dismissed, true);
+		assert.match(String(compact.reason), /not an answer/i);
+		assert.match(String(compact.reason), /again, word for word/);
+	});
+});
 
 describe("dismissedAnswer (the ESC-abort record)", () => {
 	it("the minimum honest answer: kind, questionText, dismissed — nothing else claimed", () => {

@@ -28,7 +28,7 @@ from itertools import groupby
 from typing import Any
 
 from learning import arc_rules, preferences
-from learning.schema import PatchResult, number, unaided
+from learning.schema import PatchResult, counts, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
 INTERVALS = {"missed": 1, "helped": 2}
@@ -40,17 +40,6 @@ RELEARN_MISSES = 2
 # The shortest final review: a topic missed on its first day comes back after
 # the miss interval and is answered again before the exam.
 SHORTEST_FINAL_REVIEW = INTERVALS["missed"] + 1
-SCHEDULING_KINDS = frozenset({"attempt", "exam"})
-
-
-def counts(observation: dict[str, Any]) -> bool:
-    """An answer that counts for levels and reviews: an attempt or an exam,
-    except a prediction made before its step was taught (``predicted``).
-    Before the teaching a wrong guess is expected, so it says nothing about
-    what is held, and a right one is not yet recall of what was taught; it
-    stays in the history as what happened."""
-    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
-
 
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
@@ -508,10 +497,18 @@ def _answered(item: dict[str, Any]) -> str | None:
 
 
 def _right(attempts: list[Attempt]) -> str | None:
-    """How the learner has best answered a topic not yet solid, the first of
-    ``RIGHT`` any attempt shows: right with no help (on the day it was
-    learned), with help, as a guess, on doubtful evidence, or partly."""
-    found = {_answered(item) for _, item in attempts}
+    """How the learner has answered a topic not yet solid since his newest
+    counted answer that was not right: the first of ``RIGHT`` the correct
+    answers after it show (right with no help, with help, as a guess, or on
+    doubtful evidence); ``partial`` when the newest answer was partly right,
+    and none when it was wrong. Every answer counts when none was wrong."""
+    results = [item["result"] for _, item in attempts]
+    slip = next(
+        (at for at in reversed(range(len(results))) if results[at] != "correct"), -1
+    )
+    if slip == len(results) - 1:
+        return "partial" if results[slip] == "partial" else None
+    found = {_answered(item) for _, item in attempts[slip + 1 :]}
     return next((kind for kind in RIGHT if kind in found), None)
 
 
@@ -525,8 +522,9 @@ def _standing(
         "attempts": len(attempts),
         "unaided_days": sum(verdict == "solid" for _, verdict in replayed.verdicts),
     }
-    if result["level"] == "assisted":
-        result["right"] = _right(attempts)
+    right = _right(attempts) if result["level"] in ("attempted", "assisted") else None
+    if right:
+        result["right"] = right
     if attempts:
         key, item = attempts[-1]
         last = {"id": key, "date": item["date"], "result": item["result"]}
@@ -612,14 +610,15 @@ def standing(record: dict[str, Any], topic: str) -> dict[str, Any]:
 def open_mistakes(record: dict[str, Any]) -> dict[str, list[Attempt]]:
     """Each topic's mistakes still open, newest first: its counted answers
     that were not right (``incorrect`` or ``partial``) since its latest
-    answer right with no help. Only that answer closes them, since help may
-    have carried a right answer (``repaired_with_help``); a wrong answer
-    after it opens a new one. A topic with none is left out."""
+    right answer, with help or not. A repair with help closes them too: what
+    is left is a check on his own (``repaired_with_help``), never a mistake
+    he made; a wrong answer after it opens a new one. A topic with none is
+    left out."""
     found: dict[str, list[Attempt]] = {}
     for key, history in _histories(record["observations"]).items():
         wrong: list[Attempt] = []
         for pair in reversed(history.attempts):
-            if pair[1]["result"] == "correct" and unaided(pair[1]):
+            if pair[1]["result"] == "correct":
                 break
             if pair[1]["result"] != "correct":
                 wrong.append(pair)

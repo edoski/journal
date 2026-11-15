@@ -101,7 +101,7 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "open-model-picker", label: "Where this lesson is: its steps, topic and course map", scope: "lesson", binding: "mod+k" },
 	// The practice problem's requests: the mounted problem box answers them.
 	{ id: "practice-hint", label: "Problem or check · hint", scope: "lesson", binding: "mod+shift+h" },
-	{ id: "practice-show", label: "Problem · show me", scope: "lesson", binding: "mod+shift+s" },
+	{ id: "practice-show", label: "Problem or check · show me", scope: "lesson", binding: "mod+shift+s" },
 	{ id: "practice-explain", label: "Problem · explain instead", scope: "lesson", binding: "mod+shift+e" },
 	{ id: "jump-latest", label: "Go to the newest reply", scope: "lesson", binding: "mod+arrowdown" },
 	{ id: "done-tonight", label: "Done for today", scope: "lesson", binding: "mod+shift+d" },

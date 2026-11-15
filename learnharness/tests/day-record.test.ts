@@ -61,7 +61,7 @@ describe("what he studied today", () => {
 });
 
 describe("Home's heading and its done line", () => {
-	it("asks for the part of his day, and what else once he has studied, never tonight", () => {
+	it("asks for the part of his day, and what else once he has studied, never tonight or this evening", () => {
 		assert.deepEqual(
 			[4, 5, 11, 12, 17, 18, 21, 22].map((hour) => dayQuestion(hour, false)),
 			[
@@ -70,8 +70,8 @@ describe("Home's heading and its done line", () => {
 				"What are we studying this morning?",
 				"What are we studying this afternoon?",
 				"What are we studying this afternoon?",
-				"What are we studying this evening?",
-				"What are we studying this evening?",
+				"What are we studying today?",
+				"What are we studying today?",
 				"What are we studying today?",
 			],
 		);

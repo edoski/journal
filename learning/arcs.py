@@ -99,7 +99,7 @@ def _checked(
     place = progress.positions(observations)
     latest: dict[tuple[str, str], tuple[tuple[str, int, int], dict[str, Any]]] = {}
     for key, item in progress.effective(observations).items():
-        if "checkpoint" not in item or not progress.counts(item):
+        if "checkpoint" not in item or not schema.counts(item):
             continue
         rank = (item["date"], place[key], schema.number(key))
         for topic in item["topics"]:

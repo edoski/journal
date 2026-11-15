@@ -48,11 +48,16 @@ export interface TopicSignals {
 	/** Every answer that repaired it had help: help may have carried it.
 	 *  Absent: not repaired, or repaired on his own. */
 	repairedWithHelp?: boolean;
+	/** A counted answer not right since his latest right answer, with help
+	 *  or not (the engine's `mistake`): only then is a gap a mistake; without one
+	 *  it is what is left to check. Absent: none open. */
+	mistake?: boolean;
 }
 
-/** How he has best answered a topic he cannot yet do on his own (the
- *  engine's `right`): right with no help (on the day it was learned), with
- *  help, as a guess, on doubtful evidence, or partly. */
+/** How he answered a topic he cannot yet do on his own since his newest
+ *  counted answer that was not right (the engine's `right`): right with no
+ *  help, with help, as a guess, or on doubtful evidence; `partial` when that
+ *  newest answer was partly right. */
 export type RightAnswer = "unaided" | "helped" | "guess" | "uncertain" | "partial";
 
 /** Why the plan starts an untaught topic when it does, in the material's
@@ -79,8 +84,9 @@ export interface CourseMapTopic {
 	review: TopicReview | null;
 	/** The engine's weak verdict. */
 	weak: boolean;
-	/** At the `assisted` level, how he has best answered it; absent at
-	 *  every other level. */
+	/** At the `attempted` and `assisted` levels, how he answered it since
+	 *  his newest answer that was not right; absent when that newest answer
+	 *  was wrong, and at every other level. */
 	right?: RightAnswer;
 	signals: TopicSignals;
 	/** Keys of open tasks that hold this topic. */
@@ -113,15 +119,28 @@ export interface CourseMapTask {
 	updated: string | null;
 }
 
+/** Why the engine's plan leaves a topic out before the exam
+ *  (`agenda.Reason`). For one it cannot start (`doesNotFit`): no study day
+ *  is left before the exam, its prerequisites are not solid on any study
+ *  day before it (`not_ready`), or every day it could start is full at his
+ *  limit. For a taught one with no review in the final review
+ *  (`unreviewed`): no study day is left in the final review, it starts too
+ *  near the exam for its first review (`too_late`), or every day of the
+ *  final review is full at his limit. */
+export type ExamGapReason = "no_study_day" | "not_ready" | "full" | "too_late";
+export const EXAM_GAP_REASONS: readonly ExamGapReason[] = ["no_study_day", "not_ready", "full", "too_late"];
+
 /** The exam and its run-up, as the engine's `map` gives it: the final
  *  review's first day, the path topics the plan cannot start before the
- *  exam and the taught ones its final review has no room for. */
+ *  exam, the taught ones its final review has no room for, and why each
+ *  of those is left out. */
 export interface CourseExam {
 	date: string;
 	daysLeft: number;
 	finalReview?: string;
 	doesNotFit?: readonly TopicHandle[];
 	unreviewed?: readonly TopicHandle[];
+	reasons?: Readonly<Partial<Record<TopicHandle, ExamGapReason>>>;
 	/** The arcs it examines, in arc order; absent when it covers the whole
 	 *  course. Read it through `examCovers`. */
 	arcs?: readonly ArcHandle[];

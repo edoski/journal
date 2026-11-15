@@ -32,7 +32,7 @@ const RANK = topic("rank", {
 	introduced: "2026-10-30",
 	review: { kind: "due", date: "2026-11-05", overdue: 3 },
 	weak: true,
-	signals: { ...QUIET, gap: "Counts nonzero entries instead of pivots" },
+	signals: { ...QUIET, gap: "Counts nonzero entries instead of pivots", mistake: true },
 	tasks: ["sheet-4"],
 });
 const SPAN = topic("span", { title: "Span", level: "retained", introduced: "2026-10-16", review: { kind: "due", date: "2026-10-29", overdue: 10 } });

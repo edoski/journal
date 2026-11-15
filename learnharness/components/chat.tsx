@@ -82,9 +82,10 @@ import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
-import { strandedDraft } from "@/components/lesson/stranded-draft";
+import { dropRescue, keepRescue, strandedDraft } from "@/components/lesson/stranded-draft";
+import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carryBox, forgetClosedBoxes, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -93,7 +94,7 @@ import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
 import { ProseQuestion } from "@/components/lesson/prose/prose-question";
-import { reaskedAfterHint } from "@/components/lesson/prose/prose-question-data";
+import { askedAgain } from "@/components/lesson/prose/prose-question-data";
 import { DisputeBubble, problemStatement, ProseConclude, ProseProblem, RequestBubble, ThinkingBubble, type PracticeThinkingData } from "@/components/lesson/prose/prose-practice";
 import { LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 
@@ -203,7 +204,7 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
@@ -481,7 +482,6 @@ export function Chat({
 	const proseAnswer = useProseAnswer({
 		openKey: proseOpenKey(proseOpen),
 		box: proseBox(chatId, proseOpen),
-		carry: course ? `carry:${course.workspace}` : undefined,
 		draft: pending ? questionDraft(pending.key)?.form : undefined,
 		replying: status === "submitted" || status === "streaming" || turnInFlight,
 		askDraft: () => textRef.current,
@@ -598,13 +598,20 @@ export function Chat({
 		const live = liveDraftRef.current;
 		const words = before === sentFromDockRef.current ? null : strandedDraft(before, dockKey, live);
 		liveDraftRef.current = null;
+		const left = dockKey === null ? null : dropRescue(chatId, textRef.current);
+		if (left !== null) {
+			applyText(left);
+			setAnsweredElsewhere(false);
+		}
 		if (words === null) return;
 		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${words}` : words);
+		keepRescue(chatId, words);
 		setAnsweredElsewhere(true);
-	}, [dockKey, applyText]);
+	}, [chatId, dockKey, applyText]);
 	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
-	/** The last explicitly-sent draft (composer send): the
+	/** The explicitly-sent draft (composer send) until the server accepts
+	 *  it (sent-draft.ts): the
 	 *  refusal flow restores it into the composer, where it waits for the
 	 *  learner to re-send (Save never auto-sends, owner 2026-10-09).
 	 *  Auto-continuations (probe answers) never set it — their refusal
@@ -722,23 +729,23 @@ export function Chat({
 	// a pending question still owns the interaction (the dock replaces the
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
-	// Compaction (owner round 14): the RUNNING state — compaction-changed
-	// flips it; the send paths, sendAllowed, and the docks gate on it (the
-	// server's registry mutex is the structural gate; this is the
-	// affordance).
+	// Compaction (owner round 14): the RUNNING state, flipped by
+	// compaction-changed. Nothing gates on it: the server holds any turn
+	// until the compaction ends, so his Enter goes through and the line
+	// below the transcript says why the reply waits (round 6).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
 	// recovers from it. Later compaction requires new input instead.
-	const retryable = (status === "ready" || status === "error") && !busy && !compacting && endsInFailedTurn(nativeMessages);
+	const retryable = (status === "ready" || status === "error") && !busy && endsInFailedTurn(nativeMessages);
 	const retryFailedTurn = () => retryFailedResponse(send, draftRef);
 	const failure = failedResponseAtEnd(nativeMessages);
 	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
 	// A turn that ended with no word after his input (a restart, a stop
 	// before the reply began) says so, with Try again (turn-cut.ts).
-	const replyCut = status === "ready" && !busy && !compacting && !error ? replyCutOf(nativeMessages) : null;
-	const sendAllowed = !pending && !activeProblem && !compacting;
+	const replyCut = status === "ready" && !busy && !error ? replyCutOf(nativeMessages) : null;
+	const sendAllowed = !pending && !activeProblem;
 	// Try again's key (round 3): Enter on the empty composer, from the field
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
@@ -755,17 +762,12 @@ export function Chat({
 	// again: the top bar says so, and has nothing left to stop.
 	const closedForToday = closedTonight(nativeMessages);
 	const sendTonight = useCallback(() => {
-		if (busy || compacting || doneTonight) return;
+		if (busy || doneTonight) return;
 		// His half-typed answer waits for the same question next time
 		// (kept-drafts.ts); the answer itself stays hidden.
-		if (pending && carryScope) {
-			const box = `${chatId}:q:${pending.key}`;
-			const kept = keptWords(box);
-			if (kept) keepWords(carryScope, kept);
-			void keptPhotos(box).then((photos) => { if (photos.length) void keepPhotos(carryScope, photos); });
-		}
+		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, (pending.input as { question?: string } | null)?.question ?? "");
 		void send({ type: "tonight" });
-	}, [busy, compacting, doneTonight, send, pending, carryScope, chatId]);
+	}, [busy, doneTonight, send, pending, carryScope, chatId]);
 	const sendTonightRef = useRef(sendTonight);
 	sendTonightRef.current = sendTonight;
 	useEffect(() => {
@@ -779,7 +781,7 @@ export function Chat({
 	// landed. ⌘⇧M disputes the newest one.
 	const marks = useAnswerMarks(chatId, busy ? null : nativeMessages.length);
 	const [disputing, setDisputing] = useState<string | null>(null);
-	const canDispute = !!course && !busy && !compacting;
+	const canDispute = !!course && !busy;
 	const disputeMark = marks[disputing ?? ""];
 	const sendDispute = (answerId: string, mark: AnswerMark, draft: DisputeDraft) => {
 		setDisputing(null);
@@ -801,7 +803,6 @@ export function Chat({
 		mode === "practice" &&
 		!pending &&
 		!activeProblem &&
-		!compacting &&
 		!busy &&
 		nativeMessages.some(
 			(m) => (m as { role?: string }).role === "assistant" &&
@@ -907,7 +908,7 @@ export function Chat({
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
-	const reasked = useMemo(() => reaskedAfterHint(messages), [messages]);
+	const reasked = useMemo(() => askedAgain(messages), [messages]);
 	const steps = useMemo(() => {
 		if (!planTree) return [];
 		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()));
@@ -1124,7 +1125,7 @@ export function Chat({
 				attachToRunningTurn();
 				return;
 			}
-			clearError();
+			recoverDroppedStream();
 			void syncFromServer();
 		} catch {
 			/* still unreachable: the next resync asks again */
@@ -1230,7 +1231,7 @@ export function Chat({
 	}, [chatId]);
 
 	const onSend = () => {
-		if (pending || compacting) return;
+		if (pending) return;
 		doSteerOrSend();
 	};
 	// A refused send puts its photos back, as the refusal flow keeps the text.
@@ -1241,7 +1242,7 @@ export function Chat({
 		});
 	};
 	const doSend = () => {
-		if (busy || pending || compacting) return;
+		if (busy || pending) return;
 		const t = textRef.current.trim();
 		const withPhotos = composerPhotos.photos.length > 0;
 		if (!t && !withPhotos) return;
@@ -1253,9 +1254,8 @@ export function Chat({
 			deliverOpeningPrompt(t);
 			return;
 		}
-		draftRef.current = t; // the refusal flow's preserve-and-replay seam
 		applyText("");
-		sendWithPhotos((photos) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }));
+		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }, onAccepted)));
 	};
 
 	/* STEER VS SEND (owner arc 2026-10-03): a send while a turn runs steers
@@ -1268,7 +1268,7 @@ export function Chat({
 	 * time the send's POST resolved, so the steer lands. Idle takes the
 	 * plain send; a raced settle 409s and falls back to exactly that. */
 	const doSteerOrSend = () => {
-		if (pending || compacting) return;
+		if (pending) return;
 		const t = textRef.current.trim();
 		if (!t && composerPhotos.photos.length === 0) return;
 		if (busy) {
@@ -1281,10 +1281,11 @@ export function Chat({
 
 	/* ASK INSTEAD (Prose): his message while a question or problem waits.
 	 * A question is set aside first through the silent dismissal, so the
-	 * record never holds a message after an unanswered call; a problem stays
-	 * open and his message reaches the tutor beside it. */
+	 * record never holds a message after an unanswered call; it stays open
+	 * all the same (round 6): the dismissal says he asked, the tutor asks it
+	 * again as it was, and his answer so far waits for it in the carry. A
+	 * problem stays open and his message reaches the tutor beside it. */
 	const askInstead = async () => {
-		if (compacting) return;
 		const t = textRef.current.trim();
 		if (!t && composerPhotos.photos.length === 0) return;
 		if (unconnected) {
@@ -1296,15 +1297,15 @@ export function Chat({
 			liveDraftRef.current = null;
 			sentFromDockRef.current = dockKeyRef.current;
 			const question = (p.input as { question?: string } | null)?.question ?? "";
-			if (!(await dismissQuestion(p.toolCallId, dismissedAnswer(toolQuestionKind(p.tool), question), p.key))) return;
+			if (carryScope) carryBox(`${chatId}:q:${p.key}`, carryScope, question);
+			if (!(await dismissQuestion(p.toolCallId, dismissedAnswer(toolQuestionKind(p.tool), question, "asked"), p.key))) return;
 		} else if (busyRef.current) {
 			applyText("");
 			sendWithPhotos((photos) => steer(t, photos));
 			return;
 		}
-		draftRef.current = t;
 		applyText("");
-		sendWithPhotos((photos) => send({ type: "text", text: t, asked: true, ...(photos ? { photos } : {}) }));
+		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, asked: true, ...(photos ? { photos } : {}) }, onAccepted)));
 	};
 
 	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
@@ -1433,7 +1434,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone || courseGone} />}
+						tonight={<DoneTonightButton onDone={sendTonight} gone={closedForToday} disabled={busy || doneTonight || gone || courseGone} />}
 					/>
 				</TopBar>
 
@@ -1558,7 +1559,7 @@ export function Chat({
 													case "tool-explain":
 													case "tool-recall": {
 														const malformed = !busy && malformedQuestions.find(call => call.messageId === part.sourceMessageId && call.contentIndex === part.sourceContentIndex && call.toolCallId === part.toolCallId);
-														if (malformed) return <MalformedQuestion key={pi} disabled={!!pending || compacting}
+														if (malformed) return <MalformedQuestion key={pi} disabled={!!pending}
 															reason={pending ? "Answer or discard the remaining question first." : undefined}
 															onRetry={() => {
 																draftRef.current = null;
@@ -1629,12 +1630,11 @@ export function Chat({
 							    entered by external discovery (wake) / the poll
 							    fallback. Never collapsible itself. */}
 							{/* Compaction (owner round 15): the same register as the
-						    thinking placeholder — a visible session-wide state while
-						    the summarizer holds the model gate. Mutually exclusive with
-						    the THINKING placeholder by construction (the gate sits
-						    BEFORE beginTurn; the settle kick runs after endTurn). */}
+						    thinking placeholder, a visible session-wide state while
+						    the summarizer holds the model gate. It stands in for
+						    Thinking while his sent input waits on it (round 6). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{!compacting && showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
 							{replyCut && !courseGone && !gone && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
@@ -1695,7 +1695,6 @@ export function Chat({
 							onAskInstead={() => void askInstead()}
 							toggleRef={proseToggleRef}
 							busy={busy}
-							compacting={compacting}
 							chatId={chatId}
 							carryScope={carryScope}
 							initialDraft={pending ? questionDraft(pending.key)?.form : undefined}

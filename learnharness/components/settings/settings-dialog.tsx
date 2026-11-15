@@ -42,7 +42,6 @@ import { Hint } from "@/components/ui/hint";
 import { AppearanceSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
 import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
-import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
 
@@ -106,7 +105,6 @@ function SettingsDialog({
 				data-testid="settings-dialog"
 				className="h-[792px] max-h-[90vh] w-[880px] max-w-[90vw] flex-row gap-0 overflow-hidden p-0"
 			>
-				<DialogTitle className="sr-only">Settings</DialogTitle>
 				<SettingsDialogBody onClose={onClose} initialSection={initialSection} />
 			</DialogContent>
 		</Dialog>
@@ -259,17 +257,18 @@ export function SettingsDialogBody({
 	return (
 		<Tabs orientation="vertical" value={active} onValueChange={(v) => setActive(v as SectionId)} className="contents">
 			<nav aria-label="Settings sections" data-testid="settings-nav" className="flex w-52 shrink-0 flex-col border-r p-2">
-				<NavSection title="Settings">
-					<TabsList variant="line" className="w-full">
-						{SECTIONS.map((s) => (
-							<TabsTrigger key={s.id} value={s.id} asChild>
-								<NavRow data-testid={`settings-nav-${s.id}`} active={active === s.id}>
-									<NavRowLabel>{s.label}</NavRowLabel>
-								</NavRow>
-							</TabsTrigger>
-						))}
-					</TabsList>
-				</NavSection>
+				{/* The dialog's title in every dialog's style (round 6: a 13px
+				    muted section header named it, beside an 18/600 sheet). */}
+				<DialogTitle className="px-2 pt-4 pb-3">Settings</DialogTitle>
+				<TabsList variant="line" className="w-full">
+					{SECTIONS.map((s) => (
+						<TabsTrigger key={s.id} value={s.id} asChild>
+							<NavRow data-testid={`settings-nav-${s.id}`} active={active === s.id}>
+								<NavRowLabel>{s.label}</NavRowLabel>
+							</NavRow>
+						</TabsTrigger>
+					))}
+				</TabsList>
 			</nav>
 			<TabsContent value={active} className="relative flex min-w-0 flex-1 flex-col">
 				<Hint label="Close" binding="escape" side="left">

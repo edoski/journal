@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -36,44 +36,74 @@ describe("where he stands, true to the record", () => {
 		assert.equal(assisted("helped"), "Right with help");
 		assert.equal(assisted(), "Right with help", "an engine that does not say keeps the pie's words");
 		assert.equal(standingWords(0.75, { level: "independent" }), "Right with help", "a weak topic he could do on his own keeps its pie's words");
-		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet");
+		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet", "no right answer since his newest wrong one");
+	});
+
+	it("says the right answers since a review day's wrong first try, never that he has not got it right (round 7)", () => {
+		assert.equal(standingWords(0.5, { level: "attempted", right: "unaided" }), "Right on your own, check another day");
+		assert.equal(standingWords(0.5, { level: "attempted", right: "helped" }), "Right with help");
+		assert.equal(standingWords(0.5, { level: "attempted", right: "partial" }), "Partly right");
 	});
 });
 
 describe("why a slip needs him", () => {
-	it("says each signal on its own", () => {
+	it("says each signal on its own, the signals about a wrong answer only while one is open", () => {
 		assert.equal(slip({ repaired: true }), "Fixed, check again later");
-		assert.equal(slip({ lapsed: true }), "Not right last time");
-		assert.equal(slip({ gap: "Writes det as ad + bc" }), "Mistake to fix");
-		assert.equal(slip({ choiceErrors: { cramer: 2 } }), "Mixed up with Cramer's rule");
-		assert.equal(slip({ confidentErrors: 1 }), "Sure, but wrong");
-		assert.equal(slip({}), "Look again");
+		assert.equal(slip({ lapsed: true, mistake: true }), "Not right last time");
+		assert.equal(slip({ gap: "Writes det as ad + bc", mistake: true }), "Mistake to fix");
+		assert.equal(slip({ choiceErrors: { cramer: 2 }, mistake: true }), "Mixed up with Cramer's rule");
+		assert.equal(slip({ confidentErrors: 1, mistake: true }), "Sure, but wrong");
+		assert.equal(slip({ mistake: true }), "Mistake to fix", "a wrong answer open with no other signal");
 	});
 
-	it("says the first signal when several hold: fixed, missed, a mistake, mixed up, then sure but wrong", () => {
-		const all = { repaired: true, lapsed: true, gap: "sign error", choiceErrors: { cramer: 1 }, confidentErrors: 1 };
+	it("says the first signal when several hold: fixed, nothing open to check, missed, a mistake, mixed up, then sure but wrong", () => {
+		const all = { repaired: true, lapsed: true, gap: "sign error", mistake: true, choiceErrors: { cramer: 1 }, confidentErrors: 1 };
 		assert.equal(slip(all), "Fixed, check again later");
+		assert.equal(slip({ ...all, repaired: false, mistake: false }), "Check on your own");
 		assert.equal(slip({ ...all, repaired: false }), "Not right last time");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false }), "Mistake to fix");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false, gap: null }), "Mixed up with Cramer's rule");
-		assert.equal(slip({ confidentErrors: 1, choiceErrors: {} }), "Sure, but wrong");
+		assert.equal(slip({ confidentErrors: 1, choiceErrors: {}, mistake: true }), "Sure, but wrong");
 	});
 
-	it("never calls a mistake fixed when only help repaired it, nor contradicts the right answer since with words about the ones before it", () => {
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Counts nonzero rows" }), "Mistake to fix");
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true }), "Mistake to fix", "not 'Not right last time' after a right answer");
-		assert.equal(slip({ repaired: true, repairedWithHelp: true, confidentErrors: 1 }), "Mistake to fix", "not 'Sure, but wrong' after a right answer");
-		assert.equal(slipMark({ ...QUIET, repaired: true, repairedWithHelp: true, confidentErrors: 1 }, titleOf).key, "gap", "its icon is a mistake's");
+	it("never says a wrong answer's words once a right one closed it (round 7: 'Not right last time' after a right last try)", () => {
+		assert.equal(slip({ lapsed: true }), "Check on your own", "Independence: partly right, then right");
+		assert.equal(slip({ confidentErrors: 1 }), "Check on your own");
+		assert.equal(slip({ choiceErrors: { cramer: 1 } }), "Check on your own");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true, confidentErrors: 1 }), "Check on your own", "Rank: right with a hint after the partial answer");
+		assert.equal(slipMark({ ...QUIET, lapsed: true }, titleOf).key, "check");
+		assert.equal(lapsedNow({ ...QUIET, lapsed: true }), false, "Home's line names no lapse a right answer closed");
+		assert.equal(lapsedNow({ ...QUIET, lapsed: true, mistake: true }), true);
+	});
+
+	it("never calls a mistake fixed when only help repaired it; a wrong answer after the repair is said as any other", () => {
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Counts nonzero rows", mistake: true }), "Mistake to fix");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true, mistake: true }), "Not right last time");
+		assert.equal(slipMark({ ...QUIET, repaired: true, repairedWithHelp: true, mistake: true }, titleOf).key, "gap", "its icon is a mistake's");
 	});
 
 	it("gives each slip its own icon, so a fix never wears the mistake's", () => {
-		const keys = [{ repaired: true }, { lapsed: true }, { gap: "g" }, { choiceErrors: { cramer: 1 } }, { confidentErrors: 1 }, {}].map((s) => slipMark({ ...QUIET, ...s }, titleOf).key);
-		assert.deepEqual(keys, ["repaired", "lapsed", "gap", "mixed", "confident", "none"]);
+		const keys = [{ repaired: true }, { lapsed: true, mistake: true }, { gap: "g", mistake: true }, { gap: "g" }, { choiceErrors: { cramer: 1 }, mistake: true }, { confidentErrors: 1, mistake: true }].map((s) => slipMark({ ...QUIET, ...s }, titleOf).key);
+		assert.deepEqual(keys, ["repaired", "lapsed", "gap", "check", "mixed", "confident"]);
 		assert.equal(new Set(keys.map((k) => SLIP_ICON[k])).size, keys.length);
+		assert.deepEqual(Object.keys(SLIP_ICON).sort(), [...keys].sort(), "every slip has an icon and no icon is left over");
+	});
+
+	it("calls a gap a mistake only when a wrong answer is open; a gap with none is what is left to check on his own (round 6)", () => {
+		assert.equal(slip({ gap: "Still to check on your own: drawing without replacement" }), "Check on your own");
+		assert.equal(slip({ gap: "Loses the sign", mistake: true }), "Mistake to fix");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Still to check on your own" }), "Check on your own", "two right answers with help and no wrong one");
+		const check = slipMark({ ...QUIET, gap: "g" }, titleOf).key;
+		assert.notEqual(SLIP_ICON[check], SLIP_ICON.gap, "its icon is not a mistake's");
+	});
+
+	it("reads the engine's mistake from the map", () => {
+		const map = courseMapOf("/c", { today: "2026-11-08", topics: [{ topic: "binomial", level: "assisted", gap: "Still to check" }, { topic: "kernel", level: "assisted", gap: "Loses a sign", mistake: true }] });
+		assert.deepEqual(map?.topics.map((t) => [t.handle, t.signals.mistake === true]), [["binomial", false], ["kernel", true]]);
 	});
 
 	it("names a method by its handle when the map has no title for it", () => {
-		assert.equal(slip({ choiceErrors: { pivots: 1 } }), "Mixed up with pivots");
+		assert.equal(slip({ choiceErrors: { pivots: 1 }, mistake: true }), "Mixed up with pivots");
 	});
 });
 

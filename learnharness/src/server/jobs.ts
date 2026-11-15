@@ -66,7 +66,8 @@ import {
 	type SteerMessage,
 } from "../core/contracts.ts";
 import type { TurnInput } from "../core/input-events.ts";
-import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, type LhMessage } from "../core/native-messages.ts";
+import { hasUnresolvedQuestion, endsInDismissal, endsInQuestionRecovery, nativeInputCause, probeDoneResultIds, type LhMessage } from "../core/native-messages.ts";
+import { closedTonight } from "../core/session-end.ts";
 import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores, effectiveSettings } from "./stores.ts";
 import { connectionBackgroundAllowed } from "../agent/subscription-connections.ts";
@@ -177,7 +178,7 @@ export function noteSteersDurable(chatId: string, persisted: readonly LhMessage[
 		if (message.role === "custom") finalizeSteer(message);
 	}
 	for (const entry of [...(state().queues.get(chatId) ?? [])]) {
-		if (persisted.some((message) => message.id === entry.steer.id)) completeEntry(chatId, entry);
+		if (persisted.some((message) => message.id === entry.steer.id) || handoffOvertaken(entry.steer, persisted)) completeEntry(chatId, entry);
 	}
 }
 
@@ -263,12 +264,29 @@ export function automaticFollowUpAllowed(chatId: string, agent?: Agent): boolean
 const HANDOFF_STEERS: readonly string[] = ["probe-handoff", "mode-handoff"];
 const isHandoff = (steer: SteerMessage): boolean => HANDOFF_STEERS.includes(steer.customType);
 
+/** A handoff only starts the next agent's run, and any input of his after
+ *  its seam (the concluded probe, or the handoff call's result) already
+ *  ran that agent. Delivered later, it would start the lesson again, after
+ *  his Done for today included (round 6, report 8 B1). Pure. */
+function handoffOvertaken(steer: SteerMessage, record: readonly LhMessage[]): boolean {
+	if (!isHandoff(steer)) return false;
+	const concluded = steer.customType === "probe-handoff" ? probeDoneResultIds(record) : null;
+	const seam = record.findIndex((m) => m.role === "toolResult" && (concluded ? concluded.has(m.id) : `steer_mode_${m.toolCallId}` === steer.id));
+	if (seam < 0) return false;
+	for (let i = seam + 1; i < record.length; i++) {
+		if (nativeInputCause(record[i]!, record.slice(0, i)) === "learner") return true;
+	}
+	return false;
+}
+
 function handOffEligible(chatId: string, agent: Agent): void {
 	const queue = state().queues.get(chatId);
 	// Keep automatic results in their owning registry. Never mix them into a
 	// foreground batch without express account consent. Learner steers below
 	// remain deliverable, including the first poll of an answer run.
-	if (automaticFollowUpAllowed(chatId, agent) && queue && queue.length > 0) {
+	// A lesson closed for today takes nothing automatic: it waits for him.
+	const closed = closedTonight((agent.state?.messages ?? []) as LhMessage[]);
+	if (!closed && automaticFollowUpAllowed(chatId, agent) && queue && queue.length > 0) {
 		for (const entry of queue) {
 			if (!entry.waking && !entry.deferred && entry.handedTo !== agent && !isHandoff(entry.steer)) {
 				agent.steer(entry.steer);
@@ -555,7 +573,9 @@ async function pump(chatId: string): Promise<void> {
 			// derived from the tail, so any user message un-holds by construction.
 			// An interrupted question-recovery request also waits for explicit
 			// input; a queued job must not restart its replacement turn.
-			if (endsInDismissal(fresh.messages) || endsInQuestionRecovery(fresh.messages) || !automaticFollowUpAllowed(chatId)) {
+			// A lesson closed for today (his Done for today, or the tutor's own
+			// close) likewise waits for his next message.
+			if (endsInDismissal(fresh.messages) || endsInQuestionRecovery(fresh.messages) || closedTonight(fresh.messages) || !automaticFollowUpAllowed(chatId)) {
 				parked = true;
 				return;
 			}

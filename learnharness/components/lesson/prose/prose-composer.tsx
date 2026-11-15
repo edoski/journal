@@ -10,7 +10,7 @@ import { useEnterSubmits } from "@/components/enter-submits";
 import { stepConfidence } from "@/components/confidence-choice";
 import { usePhotoDraft, sentPhotos } from "@/components/photos";
 import { ComposerIcon, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
-import { carriedForm, formToKept, keepPhotos, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carriedForm, carryWords, formToKept, keepPhotos, keepWords, keptWords, takeCarry } from "@/components/lesson/kept-drafts";
 import {
 	CONFIDENCE_CHOICES,
 	DEFAULT_CONFIDENCE,
@@ -25,7 +25,7 @@ import {
 	type QuestionFormDraft,
 } from "@/src/core";
 import type { ProseAnswer } from "@/components/lesson/prose/prose-answer";
-import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
+import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec, proseShowMeRequest, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
 import { ChoiceRows, QuestionWords } from "@/components/lesson/prose/prose-question";
 
 /** What waits for his answer: a question the tutor asked, or a problem. */
@@ -58,7 +58,6 @@ export interface ProseComposerProps {
 	/** Esc lands here while something is open: the lesson binds the switch. */
 	toggleRef: MutableRefObject<(() => void) | null>;
 	busy: boolean;
-	compacting: boolean;
 	chatId: string;
 	carryScope?: string;
 	initialDraft?: QuestionFormDraft;
@@ -77,7 +76,7 @@ export interface ProseComposerProps {
  *  Send answers. Esc or the toggle turns it into a message to the tutor
  *  until Esc or the toggle again. */
 export function ProseComposer(props: ProseComposerProps) {
-	const { open, answer, message, messageText, onAskInstead, toggleRef, chatId, compacting } = props;
+	const { open, answer, message, messageText, onAskInstead, toggleRef, chatId } = props;
 	const box = proseBox(chatId, open);
 	const asking = open !== null && answer.mode === "ask";
 	// Esc carries his words to the other side when that side holds none.
@@ -110,10 +109,10 @@ export function ProseComposer(props: ProseComposerProps) {
 				{...(open
 					? {
 							onSend: onAskInstead,
-							sendAllowed: !compacting,
+							sendAllowed: true,
 							nextProblem: false,
 							onEmptyEnter: undefined,
-							placeholder: open.kind === "question" ? "Ask anything. Sending skips this question." : "Ask anything. The problem stays open.",
+							placeholder: `Ask anything. The ${open.kind} stays open.`,
 						}
 					: {})}
 				toolbar={back}
@@ -129,7 +128,6 @@ function AnswerComposer({
 	box,
 	onAsk,
 	busy,
-	compacting,
 	carryScope,
 	initialDraft,
 	onSaveDraft,
@@ -143,15 +141,15 @@ function AnswerComposer({
 	const problem = open.kind === "problem";
 	const textMode = problem || spec?.mode === "text";
 	const { selection, confidence, setConfidence, toggle: pick } = answer;
-	const waiting = compacting || (problem && busy);
+	const waiting = problem && busy;
 	const [text, setText] = useState(() => (initialDraft ? initialDraft.text || initialDraft.other || initialDraft.thinking : ""));
 	const photos = usePhotoDraft(initialDraft?.photos, textMode ? box : undefined);
 	const restorePhotos = photos.restore;
 
 	// Where the field starts, after mount so the server's page and the first
 	// client render agree: this call's unconfirmed submission, else what he
-	// typed here before a reload, else the work Hint or Done for today
-	// carried from the question before, taken once.
+	// typed here before a reload, else the work Hint, a side question or
+	// Done for today left on this same question, taken once.
 	// Saving starts the render after the restore, so the empty first
 	// render never overwrites the box it is about to read.
 	const [restored, setRestored] = useState(false);
@@ -159,16 +157,14 @@ function AnswerComposer({
 		if (!initialDraft) {
 			const kept = keptWords(box);
 			const keptText = kept?.form ? kept.form.text || kept.form.other || kept.form.thinking : kept?.text;
-			const carry = !keptText && !problem && carryScope ? keptWords(carryScope) : undefined;
-			const carried = carry ? carriedForm(carry, true)?.text : undefined;
+			const carry = !keptText && spec && carryScope ? takeCarry(carryScope, spec.data.question) : undefined;
+			const carried = carry ? carriedForm(carry.words, true) : undefined;
 			if (keptText) setText(keptText);
-			else if (carried) setText(carried);
-			if (carry && carryScope) {
-				keepWords(carryScope, null);
-				void takeKeptPhotos(carryScope).then((list) => {
-					if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
-				});
-			}
+			else if (carried) setText(carried.text);
+			if (carried) setConfidence(carried.confidence);
+			void carry?.photos.then((list) => {
+				if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
+			});
 		}
 		setRestored(true);
 		// Once, when the field mounts for this question or problem.
@@ -233,21 +229,24 @@ function AnswerComposer({
 	// Hint on a check: a request, never an answer. The check comes back
 	// as a new question, and his work waits in the carry to fill it.
 	const hint = () => {
-		if (compacting || !spec || spec.kind !== "explain") return;
-		if (carryScope) {
-			keepWords(carryScope, { form: keptForm(text, selection) });
-			void keepPhotos(carryScope, photos.photos.map((p) => p.photo));
-		}
+		if (!spec || spec.kind !== "explain") return;
+		if (carryScope) carryWords(carryScope, spec.data.question, { form: keptForm(text, selection) }, photos.photos.map((p) => p.photo));
 		forgetBox();
 		onSubmitAnswer(proseHintRequest(spec, text));
+	};
+	// Show me on a check: he gives up, his words going with it as his work.
+	const showMe = () => {
+		if (!spec?.showsAnswer || waiting) return;
+		forgetBox();
+		onSubmitAnswer(proseShowMeRequest(spec, text));
 	};
 	// A request on a problem carries the work so far and leaves it in the field.
 	const request = (kind: PracticeRequest) => {
 		if (waiting) return;
 		onRequest(kind, text.trim());
 	};
-	const actRef = useRef({ hint, request });
-	actRef.current = { hint, request };
+	const actRef = useRef({ hint, showMe, request });
+	actRef.current = { hint, showMe, request };
 	useEffect(() => {
 		const binds: [KeyAction, () => void][] = problem
 			? [
@@ -255,7 +254,10 @@ function AnswerComposer({
 					["practice-show", () => actRef.current.request("show")],
 					["practice-explain", () => actRef.current.request("explain")],
 				]
-			: [["practice-hint", () => actRef.current.hint()]];
+			: [
+					["practice-hint", () => actRef.current.hint()],
+					["practice-show", () => actRef.current.showMe()],
+				];
 		const offs = binds.map(([action, run]) => {
 			window.addEventListener(kbdEventForAction(action), run);
 			return () => window.removeEventListener(kbdEventForAction(action), run);
@@ -288,7 +290,12 @@ function AnswerComposer({
 			<RequestIcon icon={BookOpenIcon} label="Explain instead" hint="Explain instead: leave this problem and be taught the idea" action="practice-explain" testId="practice-request-explain" disabled={waiting} onClick={() => request("explain")} />
 		</>
 	) : (
-		spec?.kind === "explain" && <RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={compacting} onClick={hint} />
+		spec?.kind === "explain" && (
+			<>
+				<RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={waiting} onClick={hint} />
+				{spec.showsAnswer && <RequestIcon icon={EyeIcon} label="Show me" hint="Show me: stop here and see the answer" action="practice-show" testId="question-show" disabled={waiting} onClick={showMe} />}
+			</>
+		)
 	);
 	const toolbar = (
 		<>
@@ -305,7 +312,7 @@ function AnswerComposer({
 			onSend={submit}
 			onStop={message.onStop}
 			canSend={ready}
-			placeholder={compacting ? "Compacting the conversation…" : placeholder}
+			placeholder={placeholder}
 			leading={leading}
 			toolbar={toolbar}
 			answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
@@ -333,7 +340,7 @@ function RequestIcon({ icon: Icon, label, hint, action, testId, disabled, onClic
  *  between the two when it has focus. */
 export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; kind: ProseOpen["kind"]; onToggle: () => void }) {
 	const answerWords = kind === "question" ? "Answer the question" : "Work on the problem";
-	const askWords = kind === "question" ? "Ask the tutor instead. Sending skips this question" : "Ask the tutor instead. The problem stays open";
+	const askWords = `Ask the tutor instead. The ${kind} stays open`;
 	return (
 		<ToggleGroup
 			type="single"
@@ -382,8 +389,8 @@ function ConfidenceMeter({ value }: { value: Confidence }) {
 }
 
 /** How sure he is, Guessing, Neutral or Confident, as the meter. Its words
- *  are in its tooltip; a press steps to the next of the three, ⌥↑ and ⌥↓
- *  move it from anywhere while it shows. */
+ *  are in its tooltip; a press steps to the next of the three and leaves
+ *  focus in his field, ⌥↑ and ⌥↓ move it from anywhere while it shows. */
 export function ConfidenceIcon({ value, onChange }: { value: Confidence; onChange: (next: Confidence) => void }) {
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -400,7 +407,16 @@ export function ConfidenceIcon({ value, onChange }: { value: Confidence; onChang
 	const next = CONFIDENCE_CHOICES[(at + 1) % CONFIDENCE_CHOICES.length]!.state;
 	return (
 		<Hint label={`How sure you are: ${label}. Press for ${CONFIDENCE_CHOICES.find((c) => c.state === next)?.label ?? "the next"}`} binding="alt+arrowup">
-			<ComposerIcon data-testid="confidence-choice" data-confidence={value} pressed={value !== DEFAULT_CONFIDENCE} aria-label={`How sure you are: ${label}`} onClick={() => onChange(next)}>
+			<ComposerIcon
+				data-testid="confidence-choice"
+				data-confidence={value}
+				pressed={value !== DEFAULT_CONFIDENCE}
+				aria-label={`How sure you are: ${label}`}
+				// His field keeps focus, so Enter right after sends with this
+				// confidence instead of pressing the meter again (round 6).
+				onMouseDown={(e) => e.preventDefault()}
+				onClick={() => onChange(next)}
+			>
 				<ConfidenceMeter value={value} />
 			</ComposerIcon>
 		</Hint>

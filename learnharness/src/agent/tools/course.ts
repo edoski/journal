@@ -4,8 +4,8 @@
  * Claude Desktop reads and writes. Every tool is bound to the session's one
  * course, so the model never names a course. Results are the engine's own
  * JSON, verbatim; a refused save comes back as an error result naming the
- * field and the fix, and the model repairs and resends (saves are safe to
- * repeat: the engine skips an identical observation within 30 minutes).
+ * field and the fix, and the model repairs and resends (a save that failed
+ * is safe to resend; an answer already saved is refused).
  */
 
 import { Type } from "typebox";
@@ -15,6 +15,7 @@ import { healToolRecord } from "./heal.ts";
 import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/course.ts";
 import type { CourseRecords } from "../../core/ports.ts";
 import { shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
+import { engineConfidence } from "../../core/engine-confidence.ts";
 import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 
@@ -49,51 +50,97 @@ function patchOf(changes: unknown): Record<string, unknown> | null {
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** What a save's `question` fields say: the observations without them, as
- *  the engine reads them, the question each names, and the first one that
- *  names no answer of this session. */
-function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string, AnsweredQuestion>): { observations: unknown[]; questions: (string | null)[]; refused: string | null } {
+/** An attempt records an answer of his, so it names it: any attempt but a
+ *  re-mark, which names what it corrects. An exam result and his own
+ *  report answer no question of the session. */
+const recordsAnAnswer = (o: Record<string, unknown>) => (o.kind ?? "attempt") === "attempt" && !("corrects" in o);
+
+/** The answers each session's saves named in this turn, after they went
+ *  through: the session's record holds them only from the next turn. */
+const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
+
+/** What a save's observations say, ruled by the answers they name: each
+ *  observation as the engine reads it, without `question`, never a
+ *  prediction unless he was asked to predict, and its confidence as he
+ *  chose it; the question each
+ *  names; and the first one refused, which saves nothing. Refused: an
+ *  attempt that names no answer, a name that is no answer of this session,
+ *  and an answer already saved (round 6: once an unreadable course read
+ *  again, a 4 Nov answer was saved a second time, dated today). */
+function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string, AnsweredQuestion>, saved: ReadonlySet<string>): { observations: unknown[]; questions: (string | null)[]; refused: string | null } {
 	const questions: (string | null)[] = [];
 	let refused: string | null = null;
+	const refuse = (why: string) => {
+		refused ??= why;
+	};
 	const observations = listed.map((o, i) => {
-		if (!isObject(o) || !("question" in o)) {
+		if (!isObject(o)) {
 			questions.push(null);
 			return o;
 		}
 		const { question, ...rest } = o;
-		const named = typeof question === "string" ? question.trim() : "";
-		if (!answers.has(named) && refused === null) {
-			refused =
-				`observations[${i}].question: ${JSON.stringify(question)} is not an answer of this session. ` +
-				'Copy the "question" id his answer carried, or name "his-message" for an answer he gave in words in his message.';
+		if (!("question" in o)) {
+			if (recordsAnAnswer(rest)) {
+				refuse(
+					`observations[${i}]: name the answer it records with question, the id his answer carried, or "his-message" for an answer he gave in words in his message. ` +
+						"A re-mark names none and names the attempt it corrects with corrects. An answer a save or a problem's conclude already recorded is saved: never save it again.",
+				);
+			}
+			questions.push(null);
+			return rest;
 		}
+		const named = typeof question === "string" ? question.trim() : "";
 		questions.push(named || null);
-		return rest;
+		const answer = answers.get(named);
+		if (!answer) {
+			refuse(
+				`observations[${i}].question: ${JSON.stringify(question)} is not an answer of this session. ` +
+					'Copy the "question" id his answer carried, or name "his-message" for an answer he gave in words in his message.',
+			);
+			return rest;
+		}
+		if ((answer.recorded || saved.has(named)) && !("corrects" in rest)) {
+			refuse(`observations[${i}].question: ${JSON.stringify(named)} is already saved, so it is not saved again. Leave it out and send the rest; a re-mark of it names its attempt with corrects.`);
+		}
+		const ruled: Record<string, unknown> = { ...rest };
+		if (answer.predicted === false) delete ruled.predicted;
+		if (answer.confidence !== undefined) {
+			delete ruled.sure;
+			Object.assign(ruled, engineConfidence(answer.confidence ?? undefined));
+		}
+		return ruled;
 	});
 	return { observations, questions, refused };
 }
 
 /**
- * Save one patch with the shown-solution rule applied (shown-help.ts): an
- * attempt saved as unaided on a question whose solution he saw before it
- * was asked is saved helped, and the receipt says so. Each observation may
- * name the answer it records (`question`); the field is the app's, so it is
- * checked against the session's answers and taken off before the engine
- * reads the patch. `seen` says the same for attempts that name none, as a
- * concluded problem's. Every save of a session's answers comes through here.
+ * Save one patch with the record's rules applied. Each attempt names the
+ * answer it records (`question`); the field is the app's, so it is checked
+ * against the session's answers and taken off before the engine reads the
+ * patch. The answer then sets what only he and the question can say: it is
+ * never a prediction unless he was asked to predict, and its confidence is
+ * the one he chose, none when he chose none (round 6: a check saved as a
+ * prediction, "gut feeling" saved as a guess over his Confident). An answer
+ * already saved is refused. The shown-solution rule (shown-help.ts) saves
+ * an attempt as helped when he saw its question solved before it was
+ * asked. A concluded problem's attempts name its conclude (`problem`), the
+ * answer they record. Every save of a session's answers comes through here.
  */
-export async function saveCourse(ctx: CourseToolContext, changes: unknown, seen: (o: Record<string, unknown>) => boolean = () => false): Promise<CourseResult> {
+export async function saveCourse(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
 	const patch = patchOf(changes);
 	const listed = patch && Array.isArray(patch.observations) ? patch.observations : null;
 	if (!patch || !listed) return ctx.records.run(ctx.course.workspace, { verb: "save", changes });
 	const answers = ctx.answers ?? new Map<string, AnsweredQuestion>();
-	const named = namedQuestions(listed, answers);
+	const saved = savedThisTurn.get(ctx) ?? new Set<string>();
+	savedThisTurn.set(ctx, saved);
+	const named = problem ? { observations: listed, questions: listed.map(() => null), refused: null } : namedQuestions(listed, answers, saved);
 	if (named.refused) return { ok: false, kind: "validation", message: named.refused };
-	const ruled = withShownHelp(named.observations, (o, i) => {
+	const ruled = withShownHelp(named.observations, (_o, i) => {
 		const question = named.questions[i];
-		return question ? answers.get(question)?.seenBefore === true : seen(o);
+		return question ? answers.get(question)?.seenBefore === true : problem?.seen === true;
 	});
 	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
+	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
 	const note = shownHelpNote(ruled.helped);
 	if (!result.ok || !note || typeof result.json !== "object" || result.json === null) return result;
 	const receipt = result.json as Record<string, unknown>;
@@ -186,7 +233,7 @@ export function courseTools(ctx: CourseToolContext): Record<string, AgentTool<an
 			description:
 				`Record into ${course}'s shared study record. Applies one merge patch and returns a receipt: new observation ids, the reviews it set, ` +
 				"level changes, the focus and current path topic, the due count, and notes worth acting on. A refused patch saved nothing; " +
-				"the error names the field and the fix. Repeating an identical save is safe.",
+				"the error names the field and the fix. Resending a save that failed is safe; an answer already saved is refused.",
 			parameters: saveInput,
 			execute: serverExecute("course_save", saveInput, (input) => call(ctx, { verb: "save", changes: input.changes })),
 		},

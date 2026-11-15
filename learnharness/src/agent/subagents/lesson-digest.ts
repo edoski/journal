@@ -19,6 +19,7 @@ import type { ChatStore, CourseRecords } from "../../core/ports.ts";
 import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/plan.ts";
 import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
 import { sessionMarkdown } from "../../core/session-markdown.ts";
+import { closedTonight } from "../../core/session-end.ts";
 import {
 	digestArcs,
 	digestChanges,
@@ -233,6 +234,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 			knowledge,
 			reached: reachedSteps(record.tree, record.messages),
 			...(arcs ? { arcs } : {}),
+			closed: closedTonight(record.messages),
 		};
 		// The save runs at the submit call, so a patch the engine refuses
 		// (a learner-facing text naming an id, a date or "he") goes back to

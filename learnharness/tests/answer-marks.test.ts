@@ -134,7 +134,7 @@ describe("the mark that stands", () => {
 		assert.deepEqual(correctorsToRead({ o4: shown.o4 }, ["o4"]), ["o6"]);
 		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, shown), {
 			q1: {
-				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, predicted: false, gaveUp: false, sure: "confident" }],
+				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, predicted: false, gaveUp: false, uncertain: false, sure: "confident" }],
 				disputed: true,
 				ruling: "You are right: the pivots give rank 2.",
 			},
@@ -166,9 +166,19 @@ describe("the mark that stands", () => {
 		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, reported), {});
 	});
 
-	it("a right guess counted as helped says so", () => {
-		assert.equal(countedWords({ grade: "helped", helped: false, predicted: false, gaveUp: false }), "Counted as helped");
-		assert.equal(countedWords({ grade: "solid", helped: false, predicted: false, gaveUp: false }), "On your own");
+	it("an answer with no help reads On your own whatever its grade: a guess or a partly right answer was never helped (round 6)", () => {
+		assert.equal(countedWords({ helped: false, predicted: false, gaveUp: false, uncertain: false, result: "correct" }), "On your own");
+		assert.equal(countedWords({ helped: true, predicted: false, gaveUp: false, uncertain: false, result: "correct" }), "With help");
+		assert.ok(!Object.values(MARK_HOW_WORDS).includes("Counted as helped"), "no card names help he never got");
+	});
+
+	it("a right answer the engine doubts reads Not yet confirmed, never On your own (round 7: right straight after Explain instead)", () => {
+		const after = { o9: { kind: "attempt", topics: ["eigen"], result: "correct", help: "none", grade: "helped", uncertain: "Answered straight after the explanation" } };
+		const [row] = answerMarksOf({ q1: ["o9"] }, after).q1!.rows;
+		assert.equal(row!.uncertain, true);
+		assert.equal(countedWords(row!), "Not yet confirmed");
+		assert.equal(countedWords({ ...row!, result: "incorrect" }), "On your own", "a wrong answer is not waiting on a confirmation");
+		assert.equal(countedWords({ ...row!, helped: true }), "With help");
 	});
 
 	it("⌘⇧M picks the newest marked answer", () => {
@@ -207,10 +217,18 @@ describe("the dispute input", () => {
 
 	it("tells the tutor how the card words each grade, so the ruling never contradicts the card (round 5)", () => {
 		const content = String((inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q1", observations: ["o4"], said: "It is my own work" }).at(-1) as { content: string }).content);
-		for (const how of ["withHelp", "countedHelped", "predicted", "gaveUp", "ownWork"] as const) {
+		for (const how of ["withHelp", "predicted", "gaveUp", "ownWork"] as const) {
 			assert.ok(content.includes(`"${MARK_HOW_WORDS[how]}"`), `the dispute names the card's words for ${how}`);
 		}
-		assert.match(content, /never call it his own work/);
+		assert.doesNotMatch(content, /Counted as helped/);
+	});
+
+	it("disputes how it counted as well as the mark (round 6 N9)", () => {
+		assert.deepEqual(parseChatInput({ type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "ownWork" }), { type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "ownWork" });
+		assert.throws(() => parseChatInput({ type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "mine" }), ChatInputError);
+		const marker = inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q1", observations: ["o4"], proposedHow: "ownWork" }).at(-1) as { content: string; details: unknown };
+		assert.match(marker.content, /How he thinks it should count: on his own \("On your own": help "none"\)/);
+		assert.deepEqual(marker.details, { answerId: "q1", observations: ["o4"], proposedHow: "ownWork" });
 	});
 
 	it("is refused for an answer with no mark", () => {

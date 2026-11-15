@@ -126,8 +126,8 @@ describe("unitFor and topicUnit", () => {
 describe("nowFor", () => {
 	it("keeps every course's lines with no filter, and only the chosen course's under it", () => {
 		assert.deepEqual(nowFor(COURSES, CHATS, null, TODAY), needsYouNow(COURSES, CHATS, TODAY));
-		assert.deepEqual(nowFor(COURSES, CHATS, "/s/linalg", TODAY).lines.map((l) => l.key), ["chat_eigen", "chat_rank", "/s/linalg"]);
-		assert.deepEqual(nowFor(COURSES, CHATS, "/s/prob", TODAY).lines.map((l) => l.key), ["/s/prob"]);
+		assert.deepEqual(nowFor(COURSES, CHATS, "/s/linalg", TODAY).lines.map((l) => l.key.split("#")[0]), ["chat_eigen", "chat_rank", "/s/linalg"]);
+		assert.deepEqual(nowFor(COURSES, CHATS, "/s/prob", TODAY).lines.map((l) => l.key.split("#")[0]), ["/s/prob"]);
 	});
 
 	it("takes the engine's study day, else the learner's own date", () => {

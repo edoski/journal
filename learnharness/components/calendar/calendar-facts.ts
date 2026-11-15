@@ -1,7 +1,7 @@
 import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldWords, movedWords, overdueWords, startsAfterWords } from "@/components/study-words";
+import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 
@@ -306,7 +306,7 @@ export function calendarEntries({
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held ? heldWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
-			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? startsAfterWords(topic.startsAfter) : null, ...facts(topic) });
+			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? startsAfterWords(topic.startsAfter)) : null, ...facts(topic) });
 		const topicOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle);
 		for (const handle of due ?? []) {
 			const topic = topicOf(handle);

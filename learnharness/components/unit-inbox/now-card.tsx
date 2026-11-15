@@ -8,6 +8,7 @@ import { courseTitle } from "@/components/study-home/agenda-rows/row-facts";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { NowLine } from "@/components/study-home/needs-you";
+import type { NextStep } from "@/components/study-home/study-facts";
 import { useContinueCourse } from "@/components/unit-inbox/continue-course";
 import { CARD_ACTION_PLACE, ROW_ACTION, RowCard } from "@/components/unit-inbox/row-card";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
@@ -21,10 +22,10 @@ import { cn } from "@/lib/utils";
 /** What a line's action does, as Home's line does: Resume the session that
  *  waits, or the course's next step in Home's word (Review, Continue or
  *  Start), which starts the same lesson as Home's line. Pure. */
-export function nowActionOf(line: NowLine): { label: string; href: string } | { label: string; workspace: string } {
+export function nowActionOf(line: NowLine): { label: string; href: string } | { label: string; workspace: string; step: NextStep } {
 	const { row } = line;
 	if (row.kind === "session") return { label: "Resume", href: `/chat/${row.chat.id}` };
-	return { label: lessonOf(row).action, workspace: row.course.map.workspace };
+	return { label: lessonOf(row).action, workspace: row.course.map.workspace, step: row.step };
 }
 
 /** The line's action over the card's status slot, shown on hover and on
@@ -53,7 +54,7 @@ export function NowAction({ line, title, className }: { line: NowLine; title: st
 			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
-				start(action.workspace);
+				start(action.workspace, action.step);
 				blurAfterPointerClick(e);
 			}}
 			{...props}

@@ -538,7 +538,7 @@ def _topic_item(
 def _graded(item: dict[str, Any]) -> dict[str, Any]:
     """An observation with its ``grade`` when it is scored, so a reader shows
     how each answer counted without judging it again."""
-    if item["kind"] not in progress.SCHEDULING_KINDS:
+    if item["kind"] not in schema.SCHEDULING_KINDS:
         return item
     return {**item, "grade": progress.grade(item)}
 
@@ -656,8 +656,9 @@ def _runup(
     record: dict[str, Any], countdown: dict[str, Any], planned: agenda.When
 ) -> dict[str, Any]:
     """The exam and its run-up: when the final review starts, the path topics
-    the plan cannot start before it (``does_not_fit``), and the taught ones
-    its final review has no room for (``unreviewed``); with a scope, its
+    the plan cannot start before it (``does_not_fit``), the taught ones its
+    final review has no room for (``unreviewed``), and why the plan leaves
+    each of those out (``reasons``, ``agenda.Reason``); with a scope, its
     ``arcs``, the topics it ``leaves_out``, and the untaught
     earlier topics it ``needed`` started first (``progress.exam_topics``),
     in path order."""
@@ -677,6 +678,7 @@ def _runup(
             "final_review": plan.final.isoformat() if plan else None,
             "does_not_fit": planned.does_not_fit,
             "unreviewed": planned.unreviewed,
+            "reasons": dict(planned.reasons),
         },
         keep=("date", "days_left"),
     )
@@ -706,7 +708,14 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     whose new topics take the days before that start, and ``starts_why``
     why it comes then in the material (``agenda.Why``). ``exam`` carries the
     run-up: the final review's first day, the topics that do not fit before
-    the exam and those its final review has no room for.
+    the exam and those its final review has no room for. ``right``, on a
+    topic not yet solid (``attempted`` or ``assisted``), is how he answered
+    it since his newest counted answer that was not right (``unaided``,
+    ``helped``, ``guess``, ``uncertain``), ``partial`` when that newest
+    answer was partly right, and absent when it was wrong. ``mistake`` marks a
+    topic with a counted answer not right since his latest right answer,
+    with help or not (``progress.open_mistakes``): a ``gap`` without one is
+    what is left to check, never a mistake.
 
     In a course with arcs, each topic names its ``arc``, ``arcs`` holds each
     arc's title and standing in study order, and ``current_arc`` is the arc
@@ -716,6 +725,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     record = records.load(workspace)
     today = clock.today()
     levels = progress.standings(record)
+    wrong = progress.open_mistakes(record)
     order = progress.path_order(record, everything=True)
     planned = when(workspace, record, today)
     overdue = {
@@ -747,6 +757,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
             "weak": _is_weak(topic, standing),
             "right": standing.get("right"),
             "gap": topic.get("gap"),
+            "mistake": True if key in wrong else None,
             "excluded": topic.get("excluded"),
             **{
                 flag: standing[flag]
@@ -940,17 +951,19 @@ def _mistake(record: dict[str, Any], key: str, item: dict[str, Any]) -> dict[str
 def _mistakes(
     record: dict[str, Any], levels: dict[str, dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Every topic with a mistake still open, the newest first."""
+    """Every topic with a mistake still open, the newest first: a counted
+    answer not right since his latest right answer, with help or not. A gap
+    with no such answer is what is left to check, not a mistake."""
     wrong = progress.open_mistakes(record)
     rank = {key: at for at, key in enumerate(progress.path_order(record))}
     found = []
     for key in rank:
         topic, standing = record["topics"][key], levels[key]
+        answers = wrong.get(key, [])
+        if not answers:
+            continue
         fixed = standing.get("repaired") and not standing.get("repaired_with_help")
         gap = topic.get("gap") if not fixed else None
-        answers = wrong.get(key, [])
-        if not gap and not answers:
-            continue
         judged = topic.get("judged") if gap else None
         latest = max(
             [item["date"] for _, item in answers] + ([judged] if judged else []),
@@ -991,7 +1004,7 @@ def course_standing(workspace: Workspace) -> dict[str, Any]:
     ``mistakes`` lists every topic with a mistake still open, the newest
     first: its ``gap`` (the tutor's diagnosis, until he answers it right on
     his own after the day it was ``judged``) and its ``answers`` that were
-    not right since his latest right answer with no help
+    not right since his latest right answer, with help or not
     (``progress.open_mistakes``), newest first, each with the tutor's
     ``text``, his ``response``, the ``task`` and the places in his material
     (``where``) it was on, whether it had help (``helped``), whether he was

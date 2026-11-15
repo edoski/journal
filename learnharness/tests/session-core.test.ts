@@ -313,9 +313,12 @@ describe("send (one input event, verbatim consumption)", () => {
 		const done = m.send({ type: "text", text: "go" });
 		const settle = () => new Promise((r) => setTimeout(r, 0));
 
+		// The tutor's words stream as send_to_user's argument (plain text never
+		// shows while its message streams).
+		const said = (message: string) => ({ type: "toolCall", id: "said-1", name: "send_to_user", arguments: { message } });
 		push({ type: "message_start", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }] } });
 		for (const text of ["Hel", "Hello", "Hello wor", "Hello world"]) {
-			push(partial([{ type: "thinking", thinking: "hmm" }, { type: "text", text }]));
+			push(partial([{ type: "thinking", thinking: "hmm" }, said(text)]));
 			await settle();
 		}
 		// MID-STREAM: exactly ONE assistant message in the tail — never one
@@ -329,7 +332,7 @@ describe("send (one input event, verbatim consumption)", () => {
 		const idMid = (assistants[0] as { id?: string }).id;
 		assert.match(idMid ?? "", /^c_/, "client-minted slot id");
 
-		push({ type: "message_end", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }, { type: "text", text: "Hello world" }], stopReason: "stop" } });
+		push({ type: "message_end", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }, said("Hello world")], stopReason: "toolUse" } });
 		push({ type: "agent_end", messages: [] });
 		push("[DONE]");
 		await done;
@@ -918,6 +921,55 @@ describe("automatic continuation after recovery failure", () => {
 		const m = model({ initialMessages: answered, fetch: dietFetch({ onPost: () => posts++, stream: () => sseResponse("[DONE]") }) });
 		await m.continueIfOwed(answered);
 		assert.equal(posts, 1);
+	});
+
+	/** Round 6, report 6 major 1: the app restarts while the tutor reads his
+	 *  answer, and the open window's stream drops twice. */
+	function droppedByRestart(bodies: string[]): SessionModel {
+		const partialReply = () => sseResponse({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "partial" }] } });
+		return model({ initialMessages: [question], fetch: async (url, init) => {
+			if (String(url) === "/api/chat") { bodies.push(String(init?.body)); return Response.json({ ok: true }); }
+			if (String(url).endsWith("/stream")) return bodies.length > 1 ? sseResponse("[DONE]") : partialReply();
+			return Response.json({ messages: answered });
+		} });
+	}
+
+	it("a window whose stream the app's restart dropped gets the reply its answer is owed once the app is back", async () => {
+		const bodies: string[] = [];
+		const m = droppedByRestart(bodies);
+		await m.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.");
+		m.recoverDroppedStream();
+		m.setMessages(answered);
+		await m.continueIfOwed(answered);
+		assert.equal(bodies.length, 2, "the answer, then one continue");
+		assert.equal(JSON.parse(bodies[1]!).input.type, "continue");
+		assert.equal(m.getState().error, null);
+	});
+
+	it("an app that stops just after accepting his answer reads as a dropped connection too, and recovers the same way", async () => {
+		const bodies: string[] = [];
+		const m = model({ initialMessages: [question], fetch: async (url, init) => {
+			if (String(url) === "/api/chat") { bodies.push(String(init?.body)); return Response.json({ ok: true }); }
+			if (bodies.length === 1) throw new TypeError("Failed to fetch");
+			if (String(url).endsWith("/stream")) return sseResponse("[DONE]");
+			return Response.json({ messages: answered });
+		} });
+		await m.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(m.getState().error?.message, "The connection dropped before the tutor finished replying.", "not \"Couldn't reach the app\": the app took his answer");
+		m.recoverDroppedStream();
+		m.setMessages(answered);
+		await m.continueIfOwed(answered);
+		assert.equal(JSON.parse(bodies.at(-1)!).input.type, "continue");
+	});
+
+	it("only a dropped stream recovers so: a failed reply still waits for him", async () => {
+		const bodies: string[] = [];
+		const m = model({ initialMessages: answered, initialError: "The reply could not be saved.", fetch: dietFetch({ onPost: (body) => bodies.push(body), stream: () => sseResponse("[DONE]") }) });
+		m.recoverDroppedStream();
+		await m.continueIfOwed(answered);
+		assert.equal(bodies.length, 0);
+		assert.equal(m.getState().error?.message, "The reply could not be saved.");
 	});
 });
 

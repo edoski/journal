@@ -249,6 +249,20 @@ describe("plain text after a turn's last send_to_user", () => {
 		assert.deepEqual(prose(projectView(messages)), ["The step.", "Plain reply to the answer.", "Verdict."]);
 	});
 
+	it("a message sent twice in one turn prints once (round 6: practice N3, robustness minor 5, reading M5)", () => {
+		const paragraph = "In rank-nullity, you subtract the rank from the number of columns.";
+		const messages = [
+			learner("Explain instead", "u1"),
+			assistant([outputCall(paragraph, "send-1")], "a1"), ack("send-1"),
+			assistant([], "a2"),
+			assistant([outputCall(paragraph, "send-2")], "a3"), ack("send-2"),
+			assistant([fauxText(paragraph)], "a4"),
+			learner("again, please", "u2"),
+			assistant([outputCall(paragraph, "send-3")], "a5"), ack("send-3"),
+		];
+		assert.deepEqual(prose(projectView(messages)), [paragraph, paragraph], "once per turn; a later turn may say it again");
+	});
+
 	it("is shown again in the next turn, and a failed delivery does not count", () => {
 		const messages = [
 			learner("one", "u1"),

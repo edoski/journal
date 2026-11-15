@@ -174,6 +174,30 @@ function textAfterFinalOutput(messages: readonly LhMessage[], live: LiveTurnStat
 	return dropped;
 }
 
+/** The `send_to_user` calls that repeat, word for word, a message the same
+ *  turn already delivered (round 6: Claude Code asked the model to answer
+ *  again after a turn that ended on the tool, and it sent the paragraph a
+ *  second time). Each message shows once per turn. */
+function repeatedOutputCalls(messages: readonly LhMessage[]): ReadonlySet<string> {
+	const repeated = new Set<string>();
+	const failed = failedOutputCallIds(messages);
+	let delivered = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "assistant") {
+			if (opensTurn(m)) delivered = new Set();
+			continue;
+		}
+		if (m.stopReason === "error" || m.stopReason === "aborted") continue;
+		for (const block of m.content) {
+			const text = block.type === "toolCall" && !failed.has(block.id) ? sendToUserText(block) : undefined;
+			if (text === undefined) continue;
+			if (delivered.has(text)) repeated.add((block as { id: string }).id);
+			else delivered.add(text);
+		}
+	}
+	return repeated;
+}
+
 /** Project the native record (+ live turn working list) into the client's
  *  view messages. Pure: the same input always projects to the same list. */
 export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
@@ -188,6 +212,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 	}
 
 	const afterFinalOutput = textAfterFinalOutput(messages, live);
+	const repeatedOutputs = repeatedOutputCalls(messages);
 
 	const lastAssistant = (): LhViewMessage | undefined => {
 		const last = out[out.length - 1];
@@ -220,7 +245,10 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 	for (const m of messages) {
 		const role = (m as { role?: string }).role;
 
-		if (compaction && m.id === compaction.details.firstKeptMessageId) {
+		// Claude Code's own compaction keeps no verbatim tail (an empty
+		// firstKeptMessageId): its cut is the marker itself.
+		const cutHere = compaction && (compaction.details.firstKeptMessageId === "" ? m === compaction : m.id === compaction.details.firstKeptMessageId);
+		if (compaction && cutHere) {
 			out.push({
 				id: `cut_${compaction.id}`,
 				role: "user",
@@ -279,7 +307,9 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
-					if (afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
+					// Ordinary text shows only from a settled reply: the voice guard
+					// takes the tutor's out as each block ends (an empty block).
+					if (streamingMessage || !block.text || afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });
@@ -292,7 +322,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 					if (block.name === SEND_TO_USER_TOOL) {
 						// Failed/aborted generations never execute their calls;
 						// the provider error/abort UI already owns that outcome.
-						if (assistant.stopReason === "error" || assistant.stopReason === "aborted") continue;
+						if (assistant.stopReason === "error" || assistant.stopReason === "aborted" || repeatedOutputs.has(block.id)) continue;
 						const error = outputErrors.get(block.id);
 						if (error) applyResult(part, error);
 						if (part.state === "output-error") {

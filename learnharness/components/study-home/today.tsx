@@ -9,8 +9,8 @@ import { MathLine } from "@/components/ui/math-line";
 
 /**
  * Today (spec: today.md): the page's title, what he finished today once he
- * has, then one line per course, each its course and its one next lesson;
- * the whole line opens it. The lines are agenda's hybrid rows
+ * has, then each session to pick up and every step each course's plan
+ * holds today, each its course and its lesson; the whole line opens it. The lines are agenda's hybrid rows
  * (agenda-rows/hybrid/hybrid.md).
  */
 export function Today({ done, ...props }: RowsProps & { done: readonly string[] }) {

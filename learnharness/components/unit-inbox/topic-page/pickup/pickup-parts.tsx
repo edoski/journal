@@ -228,9 +228,10 @@ export function ScheduledEntry({ kind, day, waits, why }: { kind: "review" | "st
 }
 
 /** Earlier: the history's sessions and attempts on its line, newest
- *  first, each day's words in the date column of its first row. */
+ *  first, each session followed by the attempts it saved (`trailDays`),
+ *  each day's words in the date column of its first row. */
 export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly TrailDay[]; titleOf: (handle: string) => string } & Pick<HybridPaneProps, "shown" | "onShow">) {
-	const count = days.reduce((n, day) => n + day.sessions.length + day.attempts.length, 0);
+	const count = days.reduce((n, day) => n + day.rows.length, 0);
 	let at = 0;
 	const ends = (): Ends => {
 		const i = at++;
@@ -238,14 +239,16 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
 	};
 	return (
 		<ol aria-label="Earlier" className="flex flex-col">
-			{days.flatMap((day) => [
-				...day.sessions.map((entry, i) => (
-					<SessionItem key={entry.chat.id} entry={entry} shown={entry.chat.id === shown} onShow={onShow} ends={ends()} date={i === 0 ? day.label : null} writing="Tutor writing" />
-				)),
-				...day.attempts.map((attempt, i) => (
-					<AttemptEntry key={attempt.id} attempt={attempt} titleOf={titleOf} ends={ends()} date={i === 0 && day.sessions.length === 0 ? day.label : null} />
-				)),
-			])}
+			{days.flatMap((day) =>
+				day.rows.map((row, i) => {
+					const date = i === 0 ? day.label : null;
+					return row.kind === "session" ? (
+						<SessionItem key={row.entry.chat.id} entry={row.entry} shown={row.entry.chat.id === shown} onShow={onShow} ends={ends()} date={date} writing="Tutor writing" />
+					) : (
+						<AttemptEntry key={row.attempt.id} attempt={row.attempt} titleOf={titleOf} ends={ends()} date={date} />
+					);
+				}),
+			)}
 		</ol>
 	);
 }

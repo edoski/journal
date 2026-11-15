@@ -3,7 +3,6 @@ and Journal effort."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -108,18 +107,17 @@ def _runup(
 
 def _days(
     record: dict[str, Any],
-    today: date,
     days: int,
     planned: list[dict[str, Any]],
-    misfits: tuple[list[str], list[str]],
-    why: Mapping[str, agenda.Why],
+    when: agenda.When,
 ) -> dict[str, Any] | None:
     """The daily plan: each day that proposes something, why each of its new
     topics comes then (``agenda.Why``), what no longer fits before the exam,
-    and the taught topics its final review has no room for."""
+    the taught topics its final review has no room for, and why each of
+    those is left out (``agenda.Reason``)."""
     exam = progress.exam_plan(record)
     proposed = [day for day in planned[:days] if day["reviews"] or day["new"]]
-    late, unreviewed = misfits
+    late, unreviewed, why = when.does_not_fit, when.unreviewed, when.why
     if not proposed and not late and not unreviewed:
         return None
     return compact(
@@ -134,6 +132,7 @@ def _days(
             },
             "does_not_fit": late,
             "unreviewed": unreviewed,
+            "reasons": dict(when.reasons),
         }
     )
 
@@ -198,17 +197,7 @@ def _course(
             "journal": _effort(record.get("journal"), journal),
             "week": _week(record, today, week_journal),
             "runup": _runup(record, today, order, levels, week),
-            "plan": _days(
-                record,
-                today,
-                days,
-                together.days[name],
-                (
-                    together.does_not_fit.get(name, []),
-                    together.unreviewed.get(name, []),
-                ),
-                planned.why,
-            ),
+            "plan": _days(record, days, together.days[name], planned),
         }
     )
 

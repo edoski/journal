@@ -282,7 +282,7 @@ def test_an_open_mistake_says_what_went_wrong_where_and_how(
     }
 
 
-def test_only_a_right_answer_on_his_own_closes_a_mistake(
+def test_a_right_answer_closes_a_mistake_with_help_or_not(
     workspace: Workspace,
 ) -> None:
     records.save(
@@ -304,18 +304,14 @@ def test_only_a_right_answer_on_his_own_closes_a_mistake(
         },
     )
     mistakes = {entry["topic"]: entry for entry in standing(workspace)["mistakes"]}
-    assert set(mistakes) == {"helped", "again"}
+    assert set(mistakes) == {"again"}
     assert [answer["text"] for answer in mistakes["again"]["answers"]] == [
         "Third miss",
         "Second miss",
     ]
-    assert [entry["topic"] for entry in standing(workspace)["mistakes"]] == [
-        "again",
-        "helped",
-    ]
 
 
-def test_a_gap_stays_open_until_he_answers_it_right_on_his_own(
+def test_a_gap_answered_right_with_help_is_left_to_check_not_a_mistake(
     workspace: Workspace,
 ) -> None:
     records.save(
@@ -340,10 +336,10 @@ def test_a_gap_stays_open_until_he_answers_it_right_on_his_own(
             ]
         },
     )
-    mistakes = standing(workspace)["mistakes"]
-    assert [(entry["topic"], entry.get("gap")) for entry in mistakes] == [
-        ("carried", "Mixes the order")
-    ]
+    assert standing(workspace)["mistakes"] == []
+    topics = {t["topic"]: t for t in retrieval.course_map(workspace)["topics"]}
+    assert topics["carried"]["gap"] == "Mixes the order"
+    assert topics["carried"].get("mistake") is None
 
 
 def test_predictions_corrected_answers_and_left_out_topics_are_no_mistakes(
@@ -357,6 +353,11 @@ def test_predictions_corrected_answers_and_left_out_topics_are_no_mistakes(
                 "remarked": {"introduced": day(-3)},
                 "dropped": {"introduced": day(-3), "excluded": "Not on the exam"},
             },
+        },
+    )
+    records.save(
+        workspace,
+        {
             "observations": [
                 attempt("guess", -2, result="incorrect", predicted=True),
                 attempt("remarked", -2, result="incorrect"),
@@ -404,3 +405,42 @@ def test_standing_is_a_read_only_verb(
     assert result["readiness"]["parts"] == [{"not_yet": ["span"]}]
     assert result["mistakes"][0]["topic"] == "span"
     assert (root / ".study" / "course.json").read_bytes() == stored
+
+
+def test_a_gap_with_no_wrong_answer_is_left_to_check_not_a_mistake(
+    workspace: Workspace,
+) -> None:
+    records.save(
+        workspace,
+        {
+            "topics": {
+                "binomial": {"introduced": day(-1)},
+                "kernel": {"introduced": day(-1)},
+            },
+            "observations": [
+                attempt("binomial", 0, help="A hint on the urn"),
+                attempt("binomial", 0, text="Again", help="An Ask on replacement"),
+                attempt("kernel", 0, result="incorrect"),
+                attempt(
+                    "kernel", 0, text="Again", result="partial", help="The first line"
+                ),
+            ],
+        },
+    )
+    still = "Still to check on your own: drawing without replacement"
+    records.save(
+        workspace,
+        {
+            "topics": {
+                "binomial": {"gap": still},
+                "kernel": {"gap": "Loses a sign in the kernel"},
+            }
+        },
+    )
+    assert [entry["topic"] for entry in standing(workspace)["mistakes"]] == ["kernel"]
+    topics = {item["topic"]: item for item in retrieval.course_map(workspace)["topics"]}
+    assert (topics["binomial"]["gap"], topics["binomial"].get("mistake")) == (
+        still,
+        None,
+    )
+    assert topics["kernel"]["mistake"] is True

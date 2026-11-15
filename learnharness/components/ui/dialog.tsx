@@ -5,7 +5,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { DIALOG_LAYER, claimEscape, landFocusAfterClose } from "@/components/ui/overlay";
+import { DIALOG_LAYER, claimEscape, openerReturn } from "@/components/ui/overlay";
 
 /** shadcn's Radix dialog on the Proposed tokens (spec: dialog.md). Only
  *  Proposed code imports it. Esc and a click on the dimmed layer close it;
@@ -32,14 +32,22 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
 
 /** The panel, portalled over the overlay: centred, radius 12, the raised
  *  popover fill, padding 24, slots 16 apart, 150ms fade and zoom in. */
-function DialogContent({ className, onEscapeKeyDown, onCloseAutoFocus, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+function DialogContent({ className, onEscapeKeyDown, onOpenAutoFocus, onCloseAutoFocus, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+	const [focusReturn] = React.useState(() => openerReturn());
 	return (
 		<DialogPrimitive.Portal>
 			<DialogOverlay />
 			<DialogPrimitive.Content
 				data-slot="dialog-content"
 				onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
-				onCloseAutoFocus={landFocusAfterClose(onCloseAutoFocus)}
+				onOpenAutoFocus={(e) => {
+					focusReturn.onOpenAutoFocus();
+					onOpenAutoFocus?.(e);
+				}}
+				onCloseAutoFocus={(e) => {
+					onCloseAutoFocus?.(e);
+					if (!e.defaultPrevented) focusReturn.onCloseAutoFocus(e);
+				}}
 				className={cn(
 					DIALOG_LAYER,
 					"fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none",

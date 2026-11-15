@@ -37,7 +37,7 @@ function course(arcs: boolean, exam = true): StudyCourse {
 			current: h("span"),
 			focus: null,
 			tasks: [],
-			topics: [topic("span", { level: "retained", ...inArc("spaces") }), topic("basis", { ...inArc("spaces"), signals: { ...QUIET, confidentErrors: 1 } }), topic("rank", inArc("maps")), topic("kernel", { level: "new", introduced: null, ...inArc("maps") })],
+			topics: [topic("span", { level: "retained", ...inArc("spaces") }), topic("basis", { ...inArc("spaces"), signals: { ...QUIET, confidentErrors: 1, mistake: true } }), topic("rank", inArc("maps")), topic("kernel", { level: "new", introduced: null, ...inArc("maps") })],
 			edges: [],
 			...(arcs
 				? {

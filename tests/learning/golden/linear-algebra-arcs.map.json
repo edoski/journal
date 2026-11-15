@@ -160,6 +160,7 @@
       "held": true,
       "due": "2026-11-06",
       "weak": true,
+      "mistake": true,
       "lapsed": true,
       "tasks": []
     },
@@ -177,6 +178,7 @@
       "held": true,
       "due": "2026-11-06",
       "weak": true,
+      "mistake": true,
       "lapsed": true,
       "choice_errors": {
         "cramer": 1
@@ -223,6 +225,7 @@
       "held": true,
       "due": "2026-11-07",
       "weak": true,
+      "mistake": true,
       "confident_errors": 1,
       "tasks": [
         "sheet-4"
@@ -324,6 +327,7 @@
       "review": "2026-11-09",
       "weak": false,
       "right": "partial",
+      "mistake": true,
       "tasks": []
     },
     {
