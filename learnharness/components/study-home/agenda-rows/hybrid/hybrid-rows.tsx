@@ -1,6 +1,5 @@
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
-import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
-import { CourseMark } from "@/components/unit-inbox/unit-row";
+import { CourseBadge, ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
 import { useSystemVariant } from "@/components/design-variant";
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedLabel, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
@@ -28,6 +27,11 @@ const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_auto]";
  *  at one edge down the list and its marks stack. */
 const COLUMNS_STANDING = "grid-cols-[1rem_minmax(0,1fr)_15rem_14rem]";
 
+/** The same columns with the first at the badge's width (40px), so both
+ *  lines start at one edge beside it. */
+const COLUMNS_BADGE = "grid-cols-[2.5rem_minmax(0,1fr)_auto]";
+const COLUMNS_STANDING_BADGE = "grid-cols-[2.5rem_minmax(0,1fr)_15rem_14rem]";
+
 /** A standing fact: a 14px mark, as the reason's, then its words. */
 const FACT = "flex min-w-0 items-center gap-1.5 text-callout system-current:text-label text-muted-foreground";
 
@@ -42,7 +46,7 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  */
 export function HybridRows({ rows, busy, onContinue, standing = false, ...point }: RowsProps & { standing?: boolean }) {
 	const { shown, also } = foldLines(rows);
-	// The visual system's Proposed: the course's badge, the sidebar card's own, on the course line, where a ring read as a checkbox.
+	// The visual system's Proposed: the course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox.
 	const badge = useSystemVariant() === "proposed";
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
@@ -51,9 +55,9 @@ export function HybridRows({ rows, busy, onContinue, standing = false, ...point 
 				const facts = standing ? rowStanding(row) : undefined;
 				return (
 					<li key={lineKey(row)} className={HAIRLINE}>
-						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? cn(COLUMNS_STANDING, ROW_CORNERS) : COLUMNS)} {...pointProps(row, point)}>
+						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? cn(badge ? COLUMNS_STANDING_BADGE : COLUMNS_STANDING, ROW_CORNERS) : badge ? COLUMNS_BADGE : COLUMNS)} {...pointProps(row, point)}>
 							{badge ? (
-								<span className="row-span-2 self-start">{row.course && <CourseMark title={row.course.map.title} />}</span>
+								<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
 							) : (
 								<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
 							)}
