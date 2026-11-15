@@ -17,7 +17,7 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
 import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
@@ -98,6 +98,10 @@ function listChats(): ChatSummary[] {
 				// zero-back-compat wipe makes these "corrupt") must not blank the
 				// whole sidebar — same isolation getChat's per-file catch gives.
 				try {
+					// Its own topics: the ones it was started on or named after, else
+					// for practice its first problem's.
+					const kind = sessionModeOf(messages, summary.kind);
+					const own = summary.topics?.length ? summary.topics : kind === "practice" ? firstProblemTopicsOf(messages) : [];
 					return {
 						// turns stay out of the list payload (list =
 						// summaries; usage aggregates ride the full record, the picker
@@ -105,7 +109,7 @@ function listChats(): ChatSummary[] {
 						...summary,
 						// The mode now, folded over the transcript from the
 						// mode an older record stored at creation.
-						kind: sessionModeOf(messages, summary.kind),
+						kind,
 						messageCount: messages.length,
 						// Record-derived status for the session picker: phase from the
 						// transcript's explicit events (probe_done concluded / verdict
@@ -121,8 +125,8 @@ function listChats(): ChatSummary[] {
 						// is refused while one is active.
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
-						ownTopics: summary.topics ?? [],
-						ended: sessionEndOf(messages, tree, summary.kind, summary.topics ?? []),
+						ownTopics: own,
+						ended: sessionEndOf(messages, tree, summary.kind, own),
 						tasks: sessionTasksOf(messages),
 					};
 				} catch (err) {

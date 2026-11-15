@@ -17,7 +17,6 @@ import { after, afterEach, describe, it } from "node:test";
 import {
 	createFauxCore,
 	fauxAssistantMessage,
-	fauxText,
 	fauxToolCall,
 	type AssistantMessage,
 	type Context,
@@ -25,7 +24,7 @@ import {
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { composeInstructions, createPracticeAgent, createProberAgent, createTeacherAgent, type AgentKind } from "../src/agent/teacher-agent.ts";
 import { practiceHandoffTool, teachHandoffTool } from "../src/agent/tools/handoff.ts";
 import { practiceTools } from "../src/agent/tools/practice.ts";
@@ -295,7 +294,11 @@ describe("routing end to end (scripted model)", () => {
 				assert.equal(seen.agent, "prober", "back in teaching, the probe has not concluded");
 				assert.ok(seen.last.includes("[TEACHING]"));
 				assert.ok(seen.prompt.includes("**Back from practice.**"), "the prober reads why the session came back");
-				return fauxAssistantMessage([fauxText("Rank is the number of pivots after elimination. Back to the problems, or a full lesson on rank?")]);
+				// Back from practice, the turn ends on one question for him.
+				return fauxAssistantMessage([
+					fauxToolCall("send_to_user", { message: "Rank is the number of pivots after elimination." }, { id: "said-back" }),
+					fauxToolCall("recall", { question: "What is the rank of a $3 \\times 3$ matrix with two equal rows and a third independent one?", correctAnswer: "2" }, { id: "q-back" }),
+				], { stopReason: "toolUse" });
 			},
 		]);
 
@@ -306,12 +309,13 @@ describe("routing end to end (scripted model)", () => {
 
 		await send(chatId, { type: "thinking", problemCallId: "p-rank", text: "actually just explain it", confidence: "neutral" }, factory);
 		await waitFor(() => agents.length === 4, "the teaching wake");
-		await waitFor(() => JSON.stringify(messagesOf(chatId).at(-1)).includes("Back to the problems"), "the prober's direct answer");
+		await waitFor(() => runningTurn(chatId) === undefined && JSON.stringify(messagesOf(chatId)).includes("q-back"), "the prober's direct answer and its question");
 
 		const messages = messagesOf(chatId);
 		assert.deepEqual(agents, ["prober", "practice", "practice", "prober"]);
 		assert.equal(sessionModeOf(messages), "teach");
 		assert.equal(activeProblemOf(messages), null);
+		assert.ok(!messages.some((m) => m.role === "toolResult" && ["said-back", "q-back"].includes(m.toolCallId) && m.isError), "the guard passes the answer and its question");
 		const dividers = projectView(messages).flatMap((m) => m.parts.filter((p) => p.type === "data-mode-handoff").map((p) => (p as { data: { mode: string } }).data.mode));
 		assert.deepEqual(dividers, ["practice", "teach"], "the transcript marks both switches");
 	});
@@ -323,18 +327,20 @@ describe("routing end to end (scripted model)", () => {
 				assert.equal(seen.agent, "prober");
 				assert.ok(seen.tools.includes("practice") && seen.prompt.includes(ROUTING_STEP));
 				assert.match(seen.last, /explain eigenvalues/);
-				return fauxAssistantMessage([fauxText("An eigenvector of $A$ is a direction $A$ only stretches: $Av = \\lambda v$. Want a lesson on eigenvalues?")]);
+				return sendToUser("An eigenvector of $A$ is a direction $A$ only stretches: $Av = \\lambda v$. Want a lesson on eigenvalues?");
 			},
+			() => fauxAssistantMessage(""),
 			(seen) => {
 				assert.equal(seen.agent, "prober", "a direct answer concludes no probe: a full lesson still starts with the probe");
 				assert.match(seen.last, /full lesson/);
-				return fauxAssistantMessage([fauxText("What do you want to be able to do with eigenvalues?")]);
+				return sendToUser("What do you want to be able to do with eigenvalues?");
 			},
+			() => fauxAssistantMessage(""),
 		]);
 		await send(chatId, { type: "text", text: "explain eigenvalues" }, factory);
 		let messages = messagesOf(chatId);
 		const calls = messages.flatMap((m) => (m.role === "assistant" ? m.content.filter((b) => b.type === "toolCall").map((b) => b.name) : []));
-		assert.deepEqual(calls, [], "the direct answer poses no question and saves nothing");
+		assert.deepEqual(calls.filter((name) => name !== "send_to_user"), [], "the direct answer poses no question and saves nothing");
 		await send(chatId, { type: "text", text: "a full lesson please" }, factory);
 		messages = messagesOf(chatId);
 		assert.deepEqual(agents, ["prober", "prober"]);

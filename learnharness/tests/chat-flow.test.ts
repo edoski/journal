@@ -39,7 +39,7 @@ import { jobStore } from "../src/store/jobs.ts";
 import { buildAnswer, dismissedAnswer, type QuestionData } from "../src/core/question-core.ts";
 import { danglingQuestionOf, endsInDismissal, needsContinuation, newAnswerResult, newUserMessage } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
-import { fakeEngine, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { fakeEngine, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 
 // Route-level pin (the chat-birth-stamp pattern): the dismiss route's
@@ -64,7 +64,7 @@ const QUESTION_INPUT = {
 	correctAnswer: "Mercury — the innermost orbit.",
 };
 
-/** Turn 1: a bit of reasoning, then the explain tool call. Turn 2: plain text.
+/** Turn 1: a bit of reasoning, then the explain tool call. Turn 2: words sent with send_to_user.
  *  Each response factory records the prompt it received (the transcript the
  *  model saw) — the old doStream capture, engine-shaped. */
 function scriptedTeacher(steps: (calls: string[][]) => FauxResponseStep[]): {
@@ -89,8 +89,9 @@ function defaultLesson(calls: string[][]): FauxResponseStep[] {
 		},
 		(context) => {
 			calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
-			return fauxAssistantMessage([fauxText("Right — Mercury it is.")]);
+			return sendToUser("It is also the fastest planet, one orbit every 88 days.", "said-1");
 		},
+		fauxAssistantMessage(""),
 	];
 }
 
@@ -188,8 +189,9 @@ function gatedTeacher(gate: Promise<void>): ScriptedModel {
 	faux.setResponses([
 		async () => {
 			await gate;
-			return fauxAssistantMessage([fauxText("Gated reply.")]);
+			return sendToUser("Gated reply.");
 		},
+		fauxAssistantMessage(""),
 	]);
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
 }
@@ -314,15 +316,16 @@ describe("teacher chat flow (scripted model)", () => {
 		// grouping canon: consecutive assistant/toolResult messages bounded
 		// by user messages form one group). ──
 		const saved2 = chatStore.getChat(chat.id)!;
-		// Native: user, assistant, answer toolResult, reaction assistant.
-		assert.equal(saved2.messages.length, 4, "the answer + reaction append natively");
+		// Native: user, assistant, answer toolResult, then the reaction: its
+		// send_to_user call, the call's ack, and the reply that closes the turn.
+		assert.equal(saved2.messages.length, 6, "the answer + reaction append natively");
 		assert.equal((saved2.messages[2] as { role?: string }).role, "toolResult", "the graded answer is the call's tool result");
 		const view2 = projectView(saved2.messages);
 		assert.equal(view2.length, 2, "the reaction continues the same assistant message (one group)");
 		const finalParts = view2[1]!.parts;
 		const textPart = finalParts.find((p) => p.type === "text");
 		assert.ok(textPart && textPart.type === "text", "reaction text appended after the tool part");
-		assert.match((textPart as { text?: string }).text!, /Mercury it is/);
+		assert.match((textPart as { text?: string }).text!, /fastest planet/);
 		// The answered quiz part is still there, now with its output.
 		const answeredQuiz = finalParts.find((p) => p.type === "tool-explain");
 		assert.ok(answeredQuiz && answeredQuiz.type === "tool-explain" && (answeredQuiz as { state?: string }).state === "output-available");
@@ -334,7 +337,7 @@ describe("teacher chat flow (scripted model)", () => {
 		assert.equal(out.text, "Mercury");
 
 		// The model actually received the graded answer as a tool result.
-		assert.equal(calls.length, 2, "model saw exactly two prompts");
+		assert.equal(calls.length, 2, "the two recorded prompts: the opening and the answer");
 		const toolResultSent = calls[1]!.some((c) => c.includes("toolResult") || c.includes("Mercury"));
 		assert.ok(toolResultSent, "continuation prompt carries the tool result to the model");
 
@@ -487,8 +490,9 @@ describe("teacher chat flow (scripted model)", () => {
 				// turn's settle.
 				jobFlippedMidTurn = jobStore.getJob(jobIdMid)?.status;
 				await gate2;
-				return fauxAssistantMessage([fauxText("Folded the marker in.")]);
+				return sendToUser("Folded the marker in.");
 			},
+			fauxAssistantMessage(""),
 		]);
 		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 
@@ -635,7 +639,7 @@ describe("teacher chat flow (scripted model)", () => {
 		release();
 		await waitFor(() => !isTurnRunning(chat.id), 8000, "turn settle after view cancel");
 		const saved = chatStore.getChat(chat.id)!;
-		assert.equal(saved.messages.length, 2, "complete turn persisted — not a partial");
+		assert.equal(saved.messages.length, 4, "complete turn persisted — not a partial (user, send_to_user call, its ack, the closing reply)");
 		assert.equal(runningTurn(chat.id), undefined, "handle unregistered at settle");
 	});
 
@@ -960,9 +964,10 @@ describe("mid-turn navigation (turn liveness + write-ahead)", () => {
 
 		await drainRunning(chat.id); // finish → persist the full turn → endTurn
 		const saved2 = chatStore.getChat(chat.id)!;
-		// Native: user, assistant, answer result, reaction — one append-only
-		// history; the projection still renders ONE assistant group.
-		assert.equal(saved2.messages.length, 4, "full turn persisted as usual at finish");
+		// Native: user, assistant, answer result, reaction (send_to_user call,
+		// its ack, the closing reply) — one append-only history; the
+		// projection still renders ONE assistant group.
+		assert.equal(saved2.messages.length, 6, "full turn persisted as usual at finish");
 		assert.equal(projectView(saved2.messages).length, 2, "the projection groups the answered quiz + reaction");
 		assert.equal(isTurnRunning(chat.id), false, "registry cleared at finish");
 	});
@@ -1069,20 +1074,22 @@ describe("background-turn runner (owner ruling 2026-09-25: every turn is a serve
 		// made memory and replay quadratic in message length (one high-thinking
 		// message = hundreds of MB retained; every reattach re-stringified the
 		// whole history in one blocking stretch). Pins the fix end-to-end: faux
-		// streams a long text as many immediate chunks (microtask pacing — all
+		// streams a long send_to_user message as many immediate chunks (microtask pacing — all
 		// inside one flush window), yet the wire carries exactly ONE
 		// message_update for the run, it is the LATEST snapshot, and the wire
 		// never carries pi's duplicate partial.
 		const long = "quadratic blowup ".repeat(40); // ~40 faux chunks
 		const faux = createFauxCore({});
-		faux.setResponses([fauxAssistantMessage([fauxText(long)])]);
+		faux.setResponses([sendToUser(long), fauxAssistantMessage("")]);
 		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 		const chat = createConfiguredChat("Test: compaction law");
 		createdChats.push(chat.id);
 		const body = await drainTurn(post(chat.id, { type: "text", text: "go" }), agentFactory(engine));
 		const events = eventsOf(body);
 		const updates = events.filter((e) => e.type === "message_update");
-		assert.equal(updates.length, 1, "a burst of chunks coalesces to exactly one update on the wire");
+		const perMessage = new Map<unknown, number>();
+		for (const u of updates) perMessage.set(u.message?.responseId, (perMessage.get(u.message?.responseId) ?? 0) + 1);
+		assert.deepEqual([...perMessage.values()], [1, 1], "each message's burst of chunks coalesces to exactly one update on the wire (the long send_to_user, then the reply that closes the turn)");
 		assert.ok(
 			JSON.stringify(updates[0]!.message?.content ?? []).includes(long),
 			"the one update is the LATEST snapshot — the full streamed text",
@@ -1167,7 +1174,7 @@ describe("background-turn runner (owner ruling 2026-09-25: every turn is a serve
 			assert.ok(text.includes("Gated reply."), `chat ${chat.id} view replayed its own turn`);
 			assert.ok(text.endsWith("data: [DONE]\n\n"), `chat ${chat.id} view closed at settle`);
 			await waitFor(() => !isTurnRunning(chat.id), 8000, `chat ${chat.id} settle`);
-			assert.equal(chatStore.getChat(chat.id)!.messages.length, 2, `chat ${chat.id} persisted its full turn`);
+			assert.equal(chatStore.getChat(chat.id)!.messages.length, 4, `chat ${chat.id} persisted its full turn`);
 		}
 	});
 });
@@ -1498,12 +1505,13 @@ describe("composer steering: POST /api/chats/[id]/steer", () => {
 			async (context: { messages: unknown[] }) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 				await gate;
-				return fauxAssistantMessage([fauxText("Teaching the solar system…")]);
+				return sendToUser("The solar system has eight planets.");
 			},
 			(context: { messages: unknown[] }) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
-				return fauxAssistantMessage([fauxText("Steered — covering Venus too.")]);
+				return sendToUser("Venus is the second planet from the Sun.");
 			},
+			fauxAssistantMessage(""),
 		]);
 		const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
 
@@ -1527,15 +1535,15 @@ describe("composer steering: POST /api/chats/[id]/steer", () => {
 		assert.match(body, /also cover Venus/, "the drained steer rode the live stream verbatim");
 
 		// ONE turn: the second model call's context contains the steer
-		// BETWEEN the user message and the continuing assistant text.
+		// BETWEEN the first delivery and the continuing reply.
 		assert.equal(calls.length, 2, "still one run — the steer continued it, not a new turn");
 		assert.match(calls[1]!.join("\n"), /also cover Venus/, "the model saw the steer in its context");
 
 		// The record persists the user steer in its true position.
 		const saved = chatStore.getChat(chat.id)!;
 		const roles = saved.messages.map((m) => (m as { role?: string }).role);
-		assert.deepEqual(roles, ["user", "assistant", "user", "assistant"], "text → teaching → STEER → steered reply");
-		const steerMsg = saved.messages[2] as { id?: string; content?: unknown };
+		assert.deepEqual(roles, ["user", "assistant", "toolResult", "user", "assistant", "toolResult", "assistant"], "text → teaching (sent, acked) → STEER → steered reply (sent, acked) → the closing reply");
+		const steerMsg = saved.messages[3] as { id?: string; content?: unknown };
 		assert.equal(steerMsg.id, "steer_live1", "the client-minted id survived to the record");
 		assert.equal(steerMsg.content, "also cover Venus");
 	});

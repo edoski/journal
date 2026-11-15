@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { sessionTopicsOf, type LhMessage } from "../src/core/native-messages.ts";
+import { firstProblemTopicsOf, sessionTopicsOf, type LhMessage } from "../src/core/native-messages.ts";
 
 const call = (id: string, name: string, args: unknown) => ({ type: "toolCall", id, name, arguments: args });
 const assistant = (...content: unknown[]) => ({ role: "assistant", content, stopReason: "toolUse", timestamp: 0 });
@@ -51,5 +51,20 @@ describe("sessionTopicsOf", () => {
 		);
 		assert.deepEqual(sessionTopicsOf(messages), []);
 		assert.deepEqual(sessionTopicsOf(transcript({ role: "user", content: "Why columns?", timestamp: 0 })), []);
+	});
+});
+
+describe("firstProblemTopicsOf: the topic a practice session with none of its own belongs to (round 6 N10)", () => {
+	it("is its first problem's topics, not every topic it touched later", () => {
+		const messages = transcript(
+			assistant(call("s0", "course_save", { changes: { observations: [{ topics: ["span"], text: "…" }] } })),
+			result("s0"),
+			assistant(call("p1", "problem", { statement: "…", topics: ["rank"] })),
+			result("p1"),
+			assistant(call("s1", "course_save", { changes: { observations: [{ topics: ["kernel"], text: "…" }] } })),
+			result("s1"),
+		);
+		assert.deepEqual(firstProblemTopicsOf(messages), ["rank"]);
+		assert.deepEqual(firstProblemTopicsOf(transcript({ role: "user", content: "Why columns?", timestamp: 0 })), []);
 	});
 });

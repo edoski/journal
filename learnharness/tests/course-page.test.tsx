@@ -43,7 +43,7 @@ const TOPICS = [
 	topic("span", { title: "Span", level: "retained", introduced: "2026-09-05", review: due(10) }),
 	topic("independence", { title: "Linear independence", level: "assisted", introduced: "2026-09-10", weak: true, review: due(16), signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent" } }),
 	topic("basis", { title: "Basis and dimension", level: "independent", introduced: "2026-09-12", review: later("2026-11-20") }),
-	topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-10-20", weak: true, review: due(1), signals: { ...QUIET, confidentErrors: 1 } }),
+	topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-10-20", weak: true, review: due(1), signals: { ...QUIET, confidentErrors: 1, mistake: true } }),
 	topic("determinant", { title: "Determinants", level: "assisted", introduced: "2026-10-01", review: due(4) }),
 	topic("rank", { title: "Rank", level: "introduced", introduced: "2026-10-25", review: due(2), tasks: ["sheet-4"] }),
 	topic("cramer", { title: "Cramer's rule", level: "introduced", introduced: "2026-10-28", review: due(2) }),

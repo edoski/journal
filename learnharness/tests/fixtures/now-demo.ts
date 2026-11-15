@@ -26,7 +26,7 @@ export function topic(handle: string, title: string, level: TopicLevel, over: Pa
 
 export const due = (overdue: number): TopicReview => ({ kind: "due", date: "2026-11-01", overdue });
 export const back = (date: string): TopicReview => ({ kind: "scheduled", date });
-const lapsed = { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
+const lapsed = { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false, mistake: true };
 
 export function map(over: Partial<CourseMap>): CourseMap {
 	return { workspace: "/s/x", title: "X", today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [], ...over };

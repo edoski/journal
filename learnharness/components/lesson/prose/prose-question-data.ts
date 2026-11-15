@@ -29,6 +29,9 @@ export interface ProseQuestionSpec {
 	data: QuestionData;
 	/** An ask with choices also takes his own answer when nothing is picked. */
 	takesOwnAnswer: boolean;
+	/** He can give it up with Show me: a check, never a prediction, which
+	 *  asks before anything is taught. */
+	showsAnswer: boolean;
 }
 
 /** The question a tool call asks, or null when its input doesn't parse. */
@@ -49,7 +52,8 @@ export function proseQuestionSpec(tool: string, toolCallId: string, input: unkno
 		createdAt: new Date().toISOString(),
 		...(explain ? { committedAnswer: explain.correctAnswer } : {}),
 	};
-	return { tool, kind, mode, data, takesOwnAnswer: kind === "ask" && mode !== "text" };
+	const predicts = normalizeQuestionType((input as { type?: unknown } | null)?.type) === "predict";
+	return { tool, kind, mode, data, takesOwnAnswer: kind === "ask" && mode !== "text", showsAnswer: kind === "explain" && !predicts };
 }
 
 /** What the field says it wants while the question is open: literal words,
@@ -94,6 +98,12 @@ export function proseAnswer(spec: ProseQuestionSpec, selection: DockSelection, t
 export function proseHintRequest(spec: ProseQuestionSpec, text: string): QuestionAnswerData {
 	const words = text.trim() || undefined;
 	return buildAnswer(spec.data, { text: spec.mode === "text" ? words : undefined, thinking: spec.mode !== "text" ? words : undefined, hint: true }, spec.tool);
+}
+
+/** Show me on a check: he gives up, with his words so far as his work. */
+export function proseShowMeRequest(spec: ProseQuestionSpec, text: string): QuestionAnswerData {
+	const words = text.trim() || undefined;
+	return buildAnswer(spec.data, { text: spec.mode === "text" ? words : undefined, thinking: spec.mode !== "text" ? words : undefined, showMe: true }, spec.tool);
 }
 
 /** The digit key's option: 1 to 9 pick the options in order. */

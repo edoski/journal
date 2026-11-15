@@ -29,7 +29,7 @@ const engineFake = useFakeEngine(TMP, [
 ]);
 process.env.LH_DATA_DIR = path.join(TMP, "data");
 
-const { topicRecordOf, sessionPlanOf } = await import("../src/server/topic.ts");
+const { topicRecordOf, sessionPlanOf, savedBy } = await import("../src/server/topic.ts");
 const { GET } = await import("../app/api/topic/route.ts");
 
 /** A seeded session stored under this run's data folder, in a course. */
@@ -116,6 +116,39 @@ describe("the engine's show as the topic's record", () => {
 			"o6 is his own statement, o4 was corrected by o5, o2 has no result, o1 is past the engine's limit",
 		);
 		assert.deepEqual([attempts[1]!.unaided, attempts[1]!.sure, attempts[1]!.recorded], [true, null, null]);
+	});
+
+	it("names the session that saved each attempt, from its save receipts, and a re-mark by the attempt it corrects (round 7)", () => {
+		const session = (id: string, question: string, saved: string): ChatRecord =>
+			({
+				id,
+				messages: [
+					{ id: `${id}_q`, role: "assistant", content: [{ type: "toolCall", id: question, name: "explain", arguments: { type: "check", question: "What is dim ker A?", correctAnswer: "2" } }] },
+					{ id: `${id}_a`, role: "toolResult", toolCallId: question, toolName: "explain", content: [{ type: "text", text: '{"kind":"explain","text":"2","confidence":"neutral"}' }], details: { kind: "explain", tool: "explain", text: "2", answers: [], options: [], dontKnow: false }, isError: false },
+					{ id: `${id}_s`, role: "assistant", content: [{ type: "toolCall", id: `${id}_save`, name: "course_save", arguments: { changes: { observations: [{ topics: ["rank"], text: "x", result: "correct", help: "none", question }] } } }] },
+					{ id: `${id}_r`, role: "toolResult", toolCallId: `${id}_save`, toolName: "course_save", content: [{ type: "text", text: JSON.stringify({ revision: 2, changed: true, saved: [saved] }) }], isError: false },
+				],
+			}) as unknown as ChatRecord;
+		const saved = savedBy([session("chat_rank", "toolu_r1", "o4"), session("chat_eigen", "toolu_e1", "o3")]);
+		assert.deepEqual([...saved], [["o4", "chat_rank"], ["o3", "chat_eigen"]]);
+		const show = {
+			items: { rank: { kind: "topic", observations: ["o5", "o4", "o3", "o2"] } },
+			evidence: {
+				o5: { kind: "attempt", text: "Re-marked", help: "none", result: "correct", corrects: ["o4"], date: "2026-11-05" },
+				o4: { kind: "attempt", text: "Marked first", help: "none", result: "incorrect", date: "2026-11-05" },
+				o3: { kind: "attempt", text: "In the Eigen lesson", help: "none", result: "correct", date: "2026-11-05" },
+				o2: { kind: "attempt", text: "From a session not asked for", help: "none", result: "correct", date: "2026-11-04" },
+			},
+		};
+		assert.deepEqual(
+			topicRecordOf(show, "rank", [], saved)!.attempts.map((a) => [a.id, a.session]),
+			[
+				["o5", "chat_rank"],
+				["o3", "chat_eigen"],
+				["o2", null],
+			],
+		);
+		assert.ok(topicRecordOf(show, "rank", [])!.attempts.every((a) => a.session === null), "no sessions named, none known");
 	});
 
 	it("is null for a handle that is not a topic, and for anything that is not a show answer", () => {

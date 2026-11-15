@@ -25,12 +25,19 @@ export interface TopicAttempt {
 	/** A prediction made before its step was taught: kept as what happened,
 	 *  never counted. */
 	predicted: boolean;
+	/** The engine doubts the evidence (`uncertain`: given straight after an
+	 *  explanation, or with its solution in view). */
+	uncertain: boolean;
 	/** The confidence he chose (`chosenSure`: never the meter left alone). */
 	sure: "guess" | "confident" | null;
 	/** The method he reached for in its place (a topic handle), when the tutor recorded one. */
 	chose: string | null;
 	/** The tutor's sentence: what happened, or the question asked. */
 	text: string;
+	/** The session that saved it (its save receipt or practice conclude,
+	 *  `markLinks`), among the sessions the read named; null when none of
+	 *  them did. */
+	session: string | null;
 }
 
 /** Where the topic is in his material, as the engine's record points to

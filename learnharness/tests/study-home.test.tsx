@@ -358,7 +358,7 @@ describe("what a line of Today reads", () => {
 	const waiting = chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } });
 	const lapsed: StudyCourse = {
 		...ANALYSIS,
-		map: { ...ANALYSIS.map, topics: [topic("seq", "Sequences", "independent", { review: due(0), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } })] },
+		map: { ...ANALYSIS.map, topics: [topic("seq", "Sequences", "independent", { review: due(0), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false, mistake: true } })] },
 	};
 	const rowOf = (course: StudyCourse) => todayRows([course], [], TODAY)[0]!;
 

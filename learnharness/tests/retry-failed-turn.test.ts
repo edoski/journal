@@ -13,7 +13,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it, mock } from "node:test";
-import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep, type Message } from "@earendil-works/pi-ai";
+import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep, type Message } from "@earendil-works/pi-ai";
 import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
 import type { AgentBuildOptions, AgentKind, TeachingAgent } from "../src/agent/teacher-agent.ts";
@@ -21,7 +21,7 @@ import type { LhMessage } from "../src/core/native-messages.ts";
 import type { QuestionData } from "../src/core/question-core.ts";
 import type { SteerMessage } from "../src/core/contracts.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
-import { fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { fakeFor, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 // Set the storage/auth seams BEFORE any app/config-loading imports.
 assert.equal(process.env.NODE_ENV, "test", "Run with NODE_ENV=test; these tests must not invoke real providers.");
@@ -144,7 +144,8 @@ describe("failed-response Retry (issue #110)", () => {
 		const { engine, contexts, histories } = scripted([
 			() => fauxAssistantMessage([fauxToolCall("explain", QUESTION_INPUT, { id: "call-1" })], { stopReason: "toolUse" }),
 			networkFailure,
-			() => fauxAssistantMessage([fauxText("Right — Mercury it is.")]),
+			() => sendToUser("It is also the fastest planet, one orbit every 88 days."),
+			() => fauxAssistantMessage(""),
 		]);
 		const chat = createConfiguredChat("Test: retry after failed answer");
 		const answer = gradedAnswer();
@@ -159,21 +160,21 @@ describe("failed-response Retry (issue #110)", () => {
 
 		const saved = chatStore.getChat(chat.id)!.messages;
 		assertPreserved(before, saved);
-		assert.deepEqual(roles(chat.id), ["user", "assistant", "toolResult", "assistant", "assistant"]);
+		assert.deepEqual(roles(chat.id), ["user", "assistant", "toolResult", "assistant", "assistant", "toolResult", "assistant"]);
 		assert.equal(endsInFailedTurn(saved), false, "a new successful response supersedes the retained failure");
 		const results = saved.filter((m) => m.role === "toolResult" && m.toolCallId === "call-1");
 		assert.equal(results.length, 1, "the learner's answer was not submitted twice");
 		const result = results[0]!;
 		assert.ok(result.role === "toolResult");
 		assert.deepEqual(result.details, JSON.parse(JSON.stringify(answer)));
-		assert.match(JSON.stringify(saved.at(-1)), /Mercury it is/);
-		assert.deepEqual(contexts.at(-1), ["user", "assistant", "toolResult", "user"], "the failed attempt's input is dropped from the session and sent once more");
-		assert.match(histories.at(-1)!, /<answer tool=\\"explain\\" call=\\"call-1\\">/);
-		assert.match(histories.at(-1)!, /Mercury is the innermost/);
+		assert.match(JSON.stringify(saved.at(-3)), /fastest planet/);
+		assert.deepEqual(contexts.at(-2), ["user", "assistant", "toolResult", "user"], "the failed attempt's input is dropped from the session and sent once more");
+		assert.match(histories.at(-2)!, /<answer tool=\\"explain\\" call=\\"call-1\\">/);
+		assert.match(histories.at(-2)!, /Mercury is the innermost/);
 	});
 
 	it("a failed text turn retries without adding another learner message", async () => {
-		const { engine, contexts } = scripted([networkFailure, () => fauxAssistantMessage("Hello again.")]);
+		const { engine, contexts } = scripted([networkFailure, () => sendToUser("Hello again."), () => fauxAssistantMessage("")]);
 		const chat = createConfiguredChat("Test: retry after failed text");
 		await turn(engine, chat.id, { type: "text", text: "hello" });
 		const before = chatStore.getChat(chat.id)!.messages;
@@ -181,9 +182,9 @@ describe("failed-response Retry (issue #110)", () => {
 		assert.equal((await turn(engine, chat.id, { type: "retry" })).status, 200);
 		const saved = chatStore.getChat(chat.id)!.messages;
 		assertPreserved(before, saved);
-		assert.deepEqual(roles(chat.id), ["user", "assistant", "assistant"]);
-		assert.deepEqual(contexts.at(-1), ["user"]);
-		assert.match(JSON.stringify(saved.at(-1)), /Hello again/);
+		assert.deepEqual(roles(chat.id), ["user", "assistant", "assistant", "toolResult", "assistant"]);
+		assert.deepEqual(contexts.at(-2), ["user"]);
+		assert.match(JSON.stringify(saved.at(-3)), /Hello again/);
 	});
 
 	it("preserves partial text and its usage reference before the replacement succeeds", { timeout: 5_000 }, async () => {
@@ -199,8 +200,8 @@ describe("failed-response Retry (issue #110)", () => {
 		const { engine, histories } = scripted([async () => {
 			started();
 			await waiting;
-			return fauxAssistantMessage("Replacement response.");
-		}]);
+			return sendToUser("Replacement response.");
+		}, () => fauxAssistantMessage("")]);
 		const retry = turn(engine, chat.id, { type: "retry" });
 		await entered;
 		try {
@@ -214,11 +215,11 @@ describe("failed-response Retry (issue #110)", () => {
 		const saved = chatStore.getChat(chat.id)!;
 		assertPreserved(before, saved.messages);
 		assert.ok(saved.turns?.some((entry) => entry.id === usage.id && entry.messageId === "partial"));
-		assert.equal(saved.messages.length, before.length + 1, "the persistence offset counts the temporary prefix, not the full saved record");
+		assert.equal(saved.messages.length, before.length + 3, "the persistence offset counts the temporary prefix, not the full saved record (the reply's send_to_user call, its ack, the closing reply)");
 	});
 
 	it("keeps every failed attempt across repeated retries, then appends success once", async () => {
-		const { engine, contexts } = scripted([networkFailure, networkFailure, () => fauxAssistantMessage("Recovered.")]);
+		const { engine, contexts } = scripted([networkFailure, networkFailure, () => sendToUser("Recovered."), () => fauxAssistantMessage("")]);
 		const chat = createConfiguredChat("Test: repeated model failure");
 		await turn(engine, chat.id, { type: "text", text: "hello" });
 		const first = chatStore.getChat(chat.id)!.messages;
@@ -230,13 +231,13 @@ describe("failed-response Retry (issue #110)", () => {
 		await turn(engine, chat.id, { type: "retry" });
 		const saved = chatStore.getChat(chat.id)!.messages;
 		assertPreserved(second, saved);
-		assert.equal(saved.length, second.length + 1);
-		assert.deepEqual(contexts, [["user"], ["user"], ["user"]]);
+		assert.equal(saved.length, second.length + 3, "the reply's send_to_user call, its ack, the closing reply");
+		assert.deepEqual(contexts.slice(0, 3), [["user"], ["user"], ["user"]]);
 		assert.equal(new SessionModel({ chatId: chat.id, initialMessages: saved }).getState().error, null);
 	});
 
 	it("preserves a trailing plan block while retrying from the preceding input", async () => {
-		const { engine, contexts } = scripted([networkFailure, () => fauxAssistantMessage("Planned reply.")]);
+		const { engine, contexts } = scripted([networkFailure, () => sendToUser("Planned reply."), () => fauxAssistantMessage("")]);
 		const chat = createConfiguredChat("Test: retry past a plan block");
 		await turn(engine, chat.id, { type: "text", text: "hello" });
 		const before = [...chatStore.getChat(chat.id)!.messages, newPlanBlockMessage("plan-1", {})];
@@ -245,8 +246,8 @@ describe("failed-response Retry (issue #110)", () => {
 		assert.equal((await turn(engine, chat.id, { type: "retry" })).status, 200);
 		const saved = chatStore.getChat(chat.id)!.messages;
 		assertPreserved(before, saved);
-		assert.deepEqual(roles(chat.id), ["user", "assistant", "custom", "assistant"]);
-		assert.deepEqual(contexts.at(-1), ["user"], "the plan block remains UI-only");
+		assert.deepEqual(roles(chat.id), ["user", "assistant", "custom", "assistant", "toolResult", "assistant"]);
+		assert.deepEqual(contexts.at(-2), ["user"], "the plan block remains UI-only");
 	});
 
 	it("does not reexecute completed tools before a later model failure", async () => {
@@ -347,7 +348,7 @@ describe("failed-response Retry (issue #110)", () => {
 
 	for (const kind of ["prober", "teacher", "practice"] as const) {
 		it(`uses the same retained-history retry boundary for the ${kind}`, async () => {
-			const { engine, contexts } = scripted([() => fauxAssistantMessage("Recovered response.")]);
+			const { engine, contexts } = scripted([() => sendToUser("Recovered response."), () => fauxAssistantMessage("")]);
 			const chat = createConfiguredChat(`Test: ${kind} retry`);
 			const before: LhMessage[] = kind === "practice" ? [newSessionModeMessage("practice"), newUserMessage("hello")] : [newUserMessage("hello")];
 			if (kind === "teacher") {
@@ -367,8 +368,8 @@ describe("failed-response Retry (issue #110)", () => {
 			};
 			assert.equal((await turn(engine, chat.id, { type: "retry" }, factory)).status, 200);
 			assertPreserved(before, chatStore.getChat(chat.id)!.messages);
-			assert.equal(chatStore.getChat(chat.id)!.messages.length, before.length + 1);
-			assert.deepEqual(contexts.at(-1), kind === "teacher" ? ["user", "assistant", "toolResult", "user"] : ["user"]);
+			assert.equal(chatStore.getChat(chat.id)!.messages.length, before.length + 3, "the reply's send_to_user call, its ack, the closing reply");
+			assert.deepEqual(contexts.at(-2), kind === "teacher" ? ["user", "assistant", "toolResult", "user"] : ["user"]);
 		});
 	}
 

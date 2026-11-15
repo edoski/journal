@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { foldLines, lessonTitle, lineKey, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
 import { laterOnly, openSessions, todayRows, type TodayRow } from "@/components/study-home/study-facts";
-import { lapsedOnWords, SLIP_WORDS } from "@/components/study-words";
+import { lapsedNow, lapsedOnWords, SLIP_WORDS } from "@/components/study-words";
 
 /** One of Today's lines with what the sidebar draws it by: its reason, the
  *  topics it takes up (resolved on its course's map) and the one it leads
@@ -79,7 +79,7 @@ export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Wh
 	}
 	if (why?.kind === "missed") {
 		const held = new Set(topics.map((t) => t.handle));
-		const lapsed = row.course?.map.topics.find((t) => held.has(t.handle) && t.signals.lapsed);
+		const lapsed = row.course?.map.topics.find((t) => held.has(t.handle) && lapsedNow(t.signals));
 		if (lapsed) return lapsed;
 	}
 	if (row.kind === "course" && row.step.kind === "task") return topics.find((t) => t.handle === row.course.map.current) ?? null;
