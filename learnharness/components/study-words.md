@@ -74,7 +74,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 | Moment | Words |
 |---|---|
 | a reply arrived below what he can see | New reply (the cue above the dock) |
-| the tutor's turn ended with no reply | You stopped the tutor before it replied. (his stop, from any window) / The tutor stopped before replying. (the app restarted while it ran); then Try again |
+| the tutor's turn ended with no reply | You stopped the tutor before it replied. (his stop, from any window, before it wrote anything) / You stopped the tutor mid-reply. (his stop after it had written to him) / The tutor stopped before replying. (the app restarted while it ran); then Try again |
 | the connection dropped mid-reply | The connection dropped before the tutor finished replying. |
 | another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. (once the next question holds the box: Answered in another window. Press Esc to see what you typed here.) |
 | another window asked for a hint on it, or asked the tutor something | Another window asked for a hint. / Another window asked the tutor something. Then: What you typed here comes back when the tutor asks the question again. |

@@ -61,3 +61,13 @@ test("a reply stopped while its first tool call was still empty is a stop before
 	const shownCall = { ...cutCall, content: [{ type: "toolCall", id: "c1", name: "send_to_user", arguments: { text: "Half a sen" } }] } as unknown as LhMessage;
 	assert.equal(replyCutOf([ask, answer, shownCall]), null, "a call that had begun to show something is a reply");
 });
+
+test("a stop after the tutor had already written to him reads as a stop mid-reply, not before it", () => {
+	// Round 7 (robustness minor 5): "You stopped the tutor before it
+	// replied." stood under a full paragraph he could read.
+	const said = { id: "a5", role: "assistant", content: [{ type: "toolCall", id: "s1", name: "send_to_user", arguments: { text: "The trace is the sum of the eigenvalues, so…" } }], stopReason: "toolUse", timestamp: 6 } as unknown as LhMessage;
+	const shown = { id: "r5", role: "toolResult", toolCallId: "s1", toolName: "send_to_user", isError: false, timestamp: 7, content: [{ type: "text", text: "Message received for display." }] } as unknown as LhMessage;
+	assert.equal(replyCutOf([reply, message, said, shown, stoppedEmpty]), "stopped-mid");
+	assert.equal(replyCutOf([reply, message, stoppedEmpty]), "stopped", "nothing written since his message: before it replied");
+	assert.deepEqual([...stoppedReplyIds([reply, message, said, shown, stoppedEmpty])], ["a3"], "Try again resumes past the empty stop");
+});

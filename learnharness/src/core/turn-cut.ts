@@ -22,6 +22,20 @@ function isEmptyStop(m: LhMessage): boolean {
 		!m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && hasArguments(b.arguments)));
 }
 
+/** Whether the tutor wrote to him after his latest input: a reply in the
+ *  turn that was then stopped. */
+function saidSinceInput(messages: readonly LhMessage[]): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "assistant") {
+			if (!isEmptyStop(m) && m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && hasArguments(b.arguments)))) return true;
+			continue;
+		}
+		if (!isNeutral(m) && nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") return false;
+	}
+	return false;
+}
+
 function hasArguments(args: unknown): boolean {
 	if (typeof args === "string") return args.trim() !== "" && args.trim() !== "{}";
 	return args != null && typeof args === "object" && Object.keys(args).length > 0;
@@ -29,15 +43,17 @@ function hasArguments(args: unknown): boolean {
 
 /** Why the reply never came (`replyNeverCame`): "stopped" when the record
  *  ends at an empty reply someone stopped (only a stop press, his, from
- *  any window, aborts a turn), "lost" when it ends at his input with no
- *  reply at all (the app restarted while it ran); null when a reply came.
- *  Pure. */
-export function replyCutOf(messages: readonly LhMessage[]): "stopped" | "lost" | null {
+ *  any window, aborts a turn) with nothing said to him since his input,
+ *  "stopped-mid" when the tutor had already written to him in that turn
+ *  (round 7: "before it replied" stood under a full paragraph), "lost"
+ *  when it ends at his input with no reply at all (the app restarted while
+ *  it ran); null when a reply came. Pure. */
+export function replyCutOf(messages: readonly LhMessage[]): "stopped" | "stopped-mid" | "lost" | null {
 	let i = messages.length - 1;
 	while (i >= 0 && isNeutral(messages[i]!)) i--;
 	const last = messages[i];
 	if (!last) return null;
-	if (last.role === "assistant") return isEmptyStop(last) ? "stopped" : null;
+	if (last.role === "assistant") return isEmptyStop(last) ? (saidSinceInput(messages.slice(0, i)) ? "stopped-mid" : "stopped") : null;
 	if (last.role === "toolResult") return null;
 	return nativeInputCause(last as never, messages.slice(0, i) as never) === "learner" ? "lost" : null;
 }

@@ -1697,7 +1697,7 @@ export function Chat({
 						    Thinking while his sent input waits on it (round 6). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
 							{!compacting && showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
-							{replyCut && !courseGone && !gone && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
+							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}

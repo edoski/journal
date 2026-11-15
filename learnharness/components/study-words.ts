@@ -416,6 +416,7 @@ export const LESSON_WORDS = {
 	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
 	youStoppedReply: "You stopped the tutor before it replied.",
+	youStoppedMidReply: "You stopped the tutor mid-reply.",
 	tryAgain: "Try again",
 	connectionDropped: "The connection dropped before the tutor finished replying.",
 	tryAgainPlaceholder: "Press Enter to try again, or write something new.",
