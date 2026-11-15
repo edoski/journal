@@ -27,6 +27,7 @@ import {
 	type QuestionData,
 } from "../src/core/question-core.ts";
 import { toolQuestionKind } from "../src/core/pending.ts";
+import { probeDoneTool } from "../src/agent/tools/probe.ts";
 
 // The boundary predicate is BOTH: structural check AND zero authoring problems.
 const boundaryOk = (schema: TSchema, input: unknown, problems: string[]): boolean =>
@@ -347,7 +348,23 @@ describe("a question he set aside to ask something", () => {
 		const reason = String(compactAnswerForModel({ kind: "explain", dismissed: true, reason: "asked" } as never).reason);
 		assert.match(reason, /ask this question again, word for word/);
 		assert.match(reason, /When his message asks to be taught or told instead of asked[^.]*the question is set aside[^.]*never ask it again/);
+		assert.doesNotMatch(reason, /\bteach\b/, "it names no action, so the prober hands over and the teacher teaches");
 		const prober = fs.readFileSync(new URL("../src/agent/prompts/prober/05-opening.md", import.meta.url), "utf8");
-		assert.match(prober, /stop quizzing me and explain"\): the probe ends there/, "the prober's rule that this text yields to");
+		assert.match(prober, /stop quizzing me"[^)]*\): the probe ends there/, "the prober's rule that this text yields to");
+	});
+});
+
+describe("a request to be taught during the opening check", () => {
+	it("ends the check and hands over to the teacher, who teaches from its plan (round 9: the prober explained inline instead)", () => {
+		const prober = fs.readFileSync(new URL("../src/agent/prompts/prober/05-opening.md", import.meta.url), "utf8");
+		const rule = prober.split("\n").find((l) => l.startsWith("**He asks to be taught instead of asked**"));
+		assert.ok(rule, "the prober's rule for a request to be taught");
+		assert.match(rule, /"teach me", "stop quizzing me"/);
+		assert.match(rule, /explain nothing yourself and ask nothing more/);
+		assert.match(rule, /Conclude at once with `probe_done`/);
+		assert.match(rule, /the teacher opens the lesson/);
+		assert.doesNotMatch(prober, /Explain what he asked about directly in this reply, as above, then conclude with `probe_done`/);
+		const tool = probeDoneTool({ chatId: "c", chatStore: {} as never, deliver: () => {} }).probe_done!;
+		assert.match(tool.description, /"teach me\", \"stop quizzing me\"\), from what you measured so far, explaining nothing yourself: the teacher teaches/);
 	});
 });
