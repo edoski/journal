@@ -3,7 +3,7 @@ import type { Options, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-a
 import type { AgentContext, AgentEvent, AgentMessage, AgentTool, AgentToolCallOutcome } from "@earendil-works/pi-agent-core";
 import type { Api, AssistantMessage, AssistantMessageEvent, Model, ToolCall, ToolResultMessage, Usage } from "@earendil-works/pi-ai";
 import { CLAUDE_MODEL } from "../../core/contracts/claude.ts";
-import { newCompactionMarker } from "../../core/compaction.ts";
+import { newCompactionMarker, type CompactionEvent } from "../../core/compaction.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { CONTINUE_TEXT, owedMessages, sdkInputBlocks, sessionResume, sessionSeed, type ChatSession, type SdkInputBlock, type SessionTurnEnd } from "../../core/sdk-session.ts";
 import { CLAUDE_ABORTED, CLAUDE_API_KEY_REFUSAL, CLAUDE_MODEL_MISSING, CLAUDE_TOOLS_MISSING, NO_KEY, claudeErrorMessage, type ClaudeRateLimit } from "../claude-errors.ts";
@@ -52,7 +52,7 @@ export interface SdkAgentConfig {
 	beforeEnd?: () => string | undefined;
 }
 
-type Listener = (event: AgentEvent) => void;
+type Listener = (event: AgentEvent | CompactionEvent) => void;
 
 /** A Claude Code that sends nothing for this long is stopped: background
  *  jobs have no one to press Stop. */
@@ -119,7 +119,7 @@ export class SdkAgent {
 		return this.end;
 	}
 
-	private emit(event: AgentEvent): void {
+	private emit(event: AgentEvent | CompactionEvent): void {
 		for (const listener of this.listeners) listener(event);
 	}
 
@@ -224,6 +224,12 @@ export class SdkAgent {
 		// Claude Code's summary of a compaction, read by its PostCompact hook,
 		// which runs before the compact boundary reaches the stream.
 		let summary: string | undefined;
+		let compacting = false;
+		const compaction = (active: boolean) => {
+			if (active === compacting) return;
+			compacting = active;
+			this.emit({ type: "compaction", active });
+		};
 		const options: Options = {
 			...launch.options,
 			systemPrompt: { type: "custom", prompt: this.config.systemPrompt, snapshot: false },
@@ -307,7 +313,10 @@ export class SdkAgent {
 						sessionId = message.session_id;
 						if (message.apiKeySource !== "none") { this.fail(CLAUDE_API_KEY_REFUSAL); return false; }
 						if (!message.mcp_servers.some((s) => s.name === SDK_TOOL_SERVER && s.status === "connected")) { this.fail(CLAUDE_TOOLS_MISSING); return false; }
+					} else if (message.subtype === "status") {
+						compaction(message.status === "compacting");
 					} else if (message.subtype === "compact_boundary") {
+						compaction(false);
 						anchor = uuid ?? anchor;
 						if (summary !== undefined) this.append(newCompactionMarker(compactSummary(summary), { firstKeptMessageId: "", tokensBefore: message.compact_metadata.pre_tokens, model: `${provider}:${CLAUDE_MODEL.id}`, at: new Date().toISOString() }) as AgentMessage);
 						summary = undefined;

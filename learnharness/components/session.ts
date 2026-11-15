@@ -154,6 +154,7 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 		status: state.status,
 		error: state.error,
 		steerQueue: state.steerQueue,
+		compacting: state.compacting,
 		send,
 		continueIfOwed,
 		steer,

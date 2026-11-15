@@ -194,3 +194,23 @@ describe("the probe-to-teaching wait says what is happening (round 10, 3 m4)", (
 		assert.equal(toolActivityLabel("probe_done"), "Planning the lesson…");
 	});
 });
+
+describe("a compaction inside the turn names its wait (round 10, robustness minor 3)", () => {
+	it("the lesson's working line reads the compaction line while Claude Code compacts, and Thinking again once it ends", async () => {
+		const { SessionModel } = await import("../components/session-core.ts");
+		const { COMPACTING_LINE } = await import("../src/core/compaction.ts");
+		assert.equal(COMPACTING_LINE, "Summarising the lesson so far…");
+		const m = new SessionModel({ chatId: "chat_x", initialMessages: [] });
+		(m as unknown as { setStatus(s: string): void }).setStatus("streaming");
+		assert.equal(m.getState().compacting, false);
+		m.applyWireEvent({ type: "compaction", active: true });
+		assert.equal(m.getState().compacting, true);
+		m.applyWireEvent({ type: "compaction", active: false });
+		assert.equal(m.getState().compacting, false);
+		m.applyWireEvent({ type: "compaction", active: true });
+		(m as unknown as { setStatus(s: string): void }).setStatus("ready");
+		assert.equal(m.getState().compacting, false, "a settled turn compacts nothing");
+		const chat = fs.readFileSync(path.join(import.meta.dirname, "..", "components", "chat.tsx"), "utf-8");
+		assert.match(chat, /label=\{compacting \? COMPACTING_LINE : "Thinking…"\}/);
+	});
+});

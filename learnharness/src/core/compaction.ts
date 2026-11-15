@@ -13,6 +13,20 @@ import { COMPACTED_HISTORY_HEADER } from "./contracts/chat.ts";
 import type { LhMessage, LhMarkerMessage } from "./native-messages.ts";
 import { newMessageId } from "./native-messages.ts";
 
+// ─── the wait ────────────────────────────────────────────────────────────────
+
+/** Claude Code started or ended compacting inside the turn (the Agent
+ *  SDK's own `system` / `status: "compacting"` message): a turn event the
+ *  stream carries beside the agent's, so the lesson names the wait instead
+ *  of a bare "Thinking…" (round 10, robustness minor 3: about 105 s). */
+export interface CompactionEvent {
+	type: "compaction";
+	active: boolean;
+}
+
+/** The lesson's working line while Claude Code compacts. */
+export const COMPACTING_LINE = "Summarising the lesson so far…";
+
 // ─── the marker ──────────────────────────────────────────────────────────────
 
 /** The compaction marker's details (UI payload — never model-visible;
