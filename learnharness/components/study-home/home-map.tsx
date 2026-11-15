@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { ArrowRightIcon, Maximize2Icon, Minimize2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
 import { ArcStrip } from "@/components/course-map/arc-strip";
 import { arcShare, shownArcs } from "@/components/course-page/course-model";
@@ -72,7 +72,6 @@ export function HomeMap({
 }) {
 	const said = useMemo(() => new Map(courses.map((c) => [c.map.workspace, sidebarSays(courses, chats, c.map.workspace)])), [courses, chats]);
 	const chosen = courses.some((c) => c.map.workspace === workspace) ? workspace : courses[0]!.map.workspace;
-	const chosenTitle = mathPlain(courses.find((c) => c.map.workspace === chosen)!.map.title);
 	// The enlarged map's zoom out: the whole course, until he zooms back in or leaves the enlarged map.
 	const [whole, setWhole] = useState(false);
 	const [opensWhole, setOpensWhole] = useState<ReadonlyMap<string, boolean>>(new Map());
@@ -116,14 +115,6 @@ export function HomeMap({
 				<CourseTabs courses={courses} workspace={chosen} onSelect={onSelect} />
 				<div className="flex shrink-0 items-center gap-1">
 					{canZoomOut && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} />}
-					<Hint label={`${chosenTitle}'s course page`} side="bottom">
-						<Button variant="quiet" size="sm" asChild data-slot="home-map-course-page" className="lh-no-drag text-label font-normal">
-							<Link href={courseHref(chosen)}>
-								Course page
-								<ArrowRightIcon aria-hidden className="size-3.5" />
-							</Link>
-						</Button>
-					</Hint>
 					<Hint label={enlarged ? "Back to Home" : "Enlarge map"} binding={enlarged ? "escape" : undefined} side="left">
 						<Button
 							variant="quiet"
@@ -185,8 +176,13 @@ export function HomeMap({
 	);
 }
 
-/** The courses as underline tabs, the underline sliding to the chosen one. */
+/** The courses as underline tabs, the underline sliding to the chosen one.
+ *  Pressing the chosen tab again opens its course page (Edo's notes, 15
+ *  Nov 2026, N4: the header's "Course page" link went), as c does. */
 function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyCourse[]; workspace: string; onSelect: (workspace: string) => void }) {
+	const router = useRouter();
+	// Radix chooses a tab on mouse down, so by its click every pressed tab is chosen: whether it already was is read at pointer down.
+	const pressedChosen = useRef(false);
 	const list = useRef<HTMLDivElement>(null);
 	const [bar, setBar] = useState<{ left: number; width: number } | null>(null);
 	useLayoutEffect(() => {
@@ -218,11 +214,33 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 				}}
 				className="relative [&_[data-slot=tabs-trigger]]:after:hidden"
 			>
-				{courses.map((c) => (
-					<TabsTrigger key={c.map.workspace} value={c.map.workspace} className="lh-no-drag">
-						<MathText>{c.map.title}</MathText>
-					</TabsTrigger>
-				))}
+				{courses.map((c) => {
+					const chosen = c.map.workspace === workspace;
+					const title = <MathText>{c.map.title}</MathText>;
+					return (
+						<TabsTrigger
+							key={c.map.workspace}
+							value={c.map.workspace}
+							onPointerDown={() => {
+								pressedChosen.current = chosen;
+							}}
+							// A click from the keyboard (Enter) has no pointer press before it.
+							onClick={(e) => {
+								if (e.detail === 0 ? chosen : pressedChosen.current) router.push(courseHref(c.map.workspace));
+							}}
+							className="lh-no-drag"
+						>
+							{/* On the label, not the tab: a tooltip trigger writes its own data-state over the tab's. */}
+							{chosen ? (
+								<Hint label={`${mathPlain(c.map.title)}'s course page`} binding="c" side="bottom">
+									<span>{title}</span>
+								</Hint>
+							) : (
+								title
+							)}
+						</TabsTrigger>
+					);
+				})}
 				{bar && (
 					<span
 						aria-hidden="true"

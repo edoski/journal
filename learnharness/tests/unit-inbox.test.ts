@@ -8,6 +8,7 @@ import {
 	monogram,
 	openingFor,
 	sessionTwins,
+	sessionsNow,
 	shelfOf,
 	topicSessions,
 	unitStatus,
@@ -160,12 +161,12 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("kernel"), inbox.today), { kind: "slip", words: "Mistake to fix", slip: "gap" });
 		assert.deepEqual(unitStatus(by("elimination"), inbox.today), { kind: "slip", words: "Mixed up with cramer", slip: "mixed" }, "the method named by its title, as the map says it");
 		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Fixed, check again later", slip: "repaired" });
-		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "2d overdue" });
-		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "9d overdue" });
-		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 2d ago" });
+		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "Due since 6 Nov" });
+		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "Due since 30 Oct" });
+		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 6 Nov" });
 		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back Mon 9 Nov" });
 		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back Mon 30 Nov" });
-		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "3d ago" });
+		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "5 Nov" });
 	});
 
 	it("says Your turn only on a row whose session waits on him", () => {
@@ -229,6 +230,19 @@ describe("the topic page", () => {
 		assert.equal(resumableSession([stopped, newer, running])?.id, "running");
 		assert.equal(resumableSession([newer, stopped])?.id, "stopped");
 		assert.equal(resumableSession([newer]), null);
+	});
+
+	it("drops a session a later one on the topic started after, so the newer lesson is Now and the page and the sidebar agree (round 9, 2 m7)", () => {
+		const preview = chat("preview", { ended: "cut", createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:40:05.000Z" });
+		const lesson = chat("lesson", { ended: "left", createdAt: "2026-11-08T09:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
+		assert.equal(resumableSession([lesson, preview])?.id, "lesson", "the stale preview never leads the topic page");
+		assert.equal(sessionsNow([lesson, preview]), "left");
+		const asked = chat("asked", { pendingQuestion: true, createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:41:00.000Z" });
+		const closed = chat("closed", { createdAt: "2026-11-08T09:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
+		assert.equal(resumableSession([closed, asked]), null, "a question a later lesson moved past waits on nobody");
+		assert.equal(sessionsNow([closed, asked]), null);
+		const writing = chat("writing", { busy: true, createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:41:00.000Z" });
+		assert.equal(resumableSession([closed, writing])?.id, "writing", "a turn running now is never dropped");
 	});
 
 	it("lists only the sessions the engine's records tie to the topic, never one that only holds a task covering it", () => {

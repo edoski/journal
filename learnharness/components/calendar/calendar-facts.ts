@@ -1,4 +1,4 @@
-import { isReviewSession, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
+import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
 import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
@@ -193,11 +193,11 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
 
 /** An entry's words beside its icon: its look's, except a review due
  *  today, which says how late as Home's rows and the sidebar do ("Due
- *  today", "2d overdue"), so one review never reads "2d overdue" on Home
+ *  today", "Due since 5 Nov"), so one review never reads "Due since 5 Nov" on Home
  *  and "Overdue" here (round 5). Pure. */
 export function lookWords(entry: CalendarEntry, today: string): string {
 	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;
-	return review?.kind === "due" ? overdueWords(review.overdue) : LOOKS[lookOf(entry)].words;
+	return review?.kind === "due" ? overdueWords(review.overdue, today) : LOOKS[lookOf(entry)].words;
 }
 
 export function lookOf(entry: CalendarEntry): EntryLook {
@@ -352,7 +352,7 @@ export function calendarEntries({
 		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));
 		reviewedToday.set(map.workspace, reviewing);
 		for (const task of map.tasks) {
-			const holders = map.topics.filter((t) => t.tasks.includes(task.key));
+			const holders = taskTopics(task, map);
 			if (inReview(holders.map((t) => t.handle), reviewing)) continue;
 			const lesson = ofToday(map.workspace).find((chat) => !heldBy.has(chat.id) && !inReview(sessionTopics(chat, courses), reviewing) && holdsTask(chat, task, holders.map((t) => t.handle)));
 			if (lesson) {

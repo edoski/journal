@@ -4,7 +4,7 @@ import { Hint } from "@/components/ui/hint";
 import { MathLine } from "@/components/ui/math-line";
 import { mathPlain } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
-import { courseTitle, lessonTitle, whyOf } from "@/components/study-home/agenda-rows/row-facts";
+import { courseTitle, lessonTitle, lineKey, whyOf } from "@/components/study-home/agenda-rows/row-facts";
 import type { NextStep, TodayRow } from "@/components/study-home/study-facts";
 
 /** What a folded line's button leaves out, for its tooltip: its course and
@@ -28,13 +28,13 @@ export function TodayAlso({ rows, busy, onContinue, className }: { rows: readonl
 			{rows.map((row) => (
 				<Hint key={row.kind === "session" ? row.chat.id : row.course.map.workspace} label={alsoHint(row)} side="top">
 					{row.kind === "session" ? (
-						<Button variant="quiet" size="sm" asChild className={label}>
+						<Button variant="quiet" size="sm" asChild data-line={lineKey(row)} className={label}>
 							<Link href={`/chat/${row.chat.id}`}>
 								<MathLine>{lessonTitle(row)}</MathLine>
 							</Link>
 						</Button>
 					) : (
-						<Button variant="quiet" size="sm" disabled={busy} onClick={() => onContinue(row.course.map.workspace, row.step)} className={label}>
+						<Button variant="quiet" size="sm" disabled={busy} onClick={() => onContinue(row.course.map.workspace, row.step)} data-line={lineKey(row)} className={label}>
 							<MathLine>{lessonTitle(row)}</MathLine>
 						</Button>
 					)}

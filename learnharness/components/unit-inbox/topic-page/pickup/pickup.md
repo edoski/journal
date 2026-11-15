@@ -23,7 +23,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 |---|---|---|
 | Resume | the step the lesson stopped on, else its title | Your turn |
 | Open | the same | Tutor writing |
-| Review | "2d overdue", the head's mark | |
+| Review | "Due since 5 Nov", the head's mark | |
 | Continue a task | the task's title | its step, "Part (c)" |
 | Start | First lesson (the head already says Not started) | the day the plan starts it (`plannedWords`): Planned today, Planned Wed 11 Nov, then the courses whose new topics come first ("Planned Wed 11 Nov, after Probability's new topics"); nothing when the plan has no day for it. A line under it says why it comes then, whole, in every course (but plain next in a course without arcs, which only names the course) (`facts.startsWhy`, `startsWhyWords`, `data-slot="topic-starts-why"`): its `STARTS_ICON` and "After Expectation and linearity, which it needs"; Scheduled's first lesson carries the same line |
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |

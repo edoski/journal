@@ -92,11 +92,11 @@ describe("the topic head", () => {
 	it("says where he stands, when he last studied it and what went wrong", () => {
 		const document = head(factsOf(RANK));
 		assert.equal(document.querySelector("h1")!.textContent, "Rank and the column space");
-		assert.equal(document.querySelector('[data-slot="page-standing"]')!.textContent, "Not right last time. Mistake to fix. 3d overdue. Studied 9 days ago");
+		assert.equal(document.querySelector('[data-slot="page-standing"]')!.textContent, "Not right last time. Mistake to fix. Due since 5 Nov. Studied 30 Oct");
 		const facts = Array.from(document.querySelectorAll('[data-slot="page-fact"]'));
 		assert.deepEqual(
 			facts.map((fact) => [fact.getAttribute("data-kind"), fact.textContent, fact.firstElementChild!.tagName.toLowerCase()]),
-			[["standing", "Not right last time", "svg"], ["slip", ". Mistake to fix", "svg"], ["review", ". 3d overdue", "svg"], ["studied", ". Studied 9 days ago", "svg"]],
+			[["standing", "Not right last time", "svg"], ["slip", ". Mistake to fix", "svg"], ["review", ". Due since 5 Nov", "svg"], ["studied", ". Studied 30 Oct", "svg"]],
 			"each fact a mark, then its words",
 		);
 		assert.equal(document.querySelector('[data-slot="unit-gap"]')!.textContent, "Counts nonzero entries instead of pivots");

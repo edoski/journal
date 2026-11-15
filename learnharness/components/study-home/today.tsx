@@ -5,6 +5,7 @@ import { DayHeading } from "@/components/study-home/day-heading";
 import { doneWords, type NearExam } from "@/components/study-home/day-record";
 import { HybridRows } from "@/components/study-home/agenda-rows/hybrid/hybrid-rows";
 import type { RowsProps } from "@/components/study-home/agenda-rows/row-facts";
+import type { RowAside } from "@/components/study-home/agenda-rows/row-aside";
 import { MathLine } from "@/components/ui/math-line";
 
 /**
@@ -15,7 +16,7 @@ import { MathLine } from "@/components/ui/math-line";
  * nothing is left today. The lines are agenda's hybrid rows
  * (agenda-rows/hybrid/hybrid.md).
  */
-export function Today({ done, exam = null, ...props }: RowsProps & { done: readonly string[]; exam?: NearExam | null }) {
+export function Today({ done, exam = null, ...props }: RowsProps & { done: readonly string[]; exam?: NearExam | null; aside?: RowAside }) {
 	const words = doneWords(done);
 	return (
 		<section aria-labelledby="today-heading" data-slot="today" className="flex shrink-0 flex-col gap-2">

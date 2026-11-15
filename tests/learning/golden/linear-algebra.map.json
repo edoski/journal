@@ -14,7 +14,12 @@
       "key": "sheet-4",
       "title": "Problem sheet 4: rank and nullity",
       "step": "Part (c): show $\\dim \\ker A = 2$ for the $3 \\times 5$ matrix $A$",
-      "updated": "2026-11-06"
+      "updated": "2026-11-06",
+      "topics": [
+        "rank",
+        "basis",
+        "kernel"
+      ]
     }
   ],
   "topics": [

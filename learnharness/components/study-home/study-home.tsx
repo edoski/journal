@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
+import { neighbourCourse, useHomeKeys } from "@/components/study-home/home-keys";
 import { followedRow, lineKey } from "@/components/study-home/agenda-rows/row-facts";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { TodayRow } from "@/components/study-home/study-facts";
 import { Today } from "@/components/study-home/today";
+import type { RowAside } from "@/components/study-home/agenda-rows/row-aside";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
+import { useHomeVariant, type HomeVariant } from "@/components/design-variant";
 import type { TopicHandle } from "@/src/core";
 
 /** The map's share of the column while Today shows: enough to see where
@@ -28,22 +33,30 @@ const FOLLOW_DWELL_MS = 150;
  */
 export function StudyHome() {
 	const [enlarged, setEnlarged] = useState(false);
+	const variant = useHomeVariant();
 
 	return (
-		<HomeFrame
-			quiet={enlarged}
-			className={cn("mx-auto flex h-full w-full flex-col gap-5 px-8 pt-13 pb-6", !enlarged && "max-w-[60rem]")}
-		>
-			{(ready) => <HomeBody ready={ready} enlarged={enlarged} onEnlarge={setEnlarged} />}
+		<HomeFrame quiet={enlarged} className={cn("mx-auto flex h-full w-full flex-col gap-5 px-8 pt-13 pb-6", !enlarged && HOME_WIDTH[variant])}>
+			{(ready) => <HomeBody ready={ready} enlarged={enlarged} onEnlarge={setEnlarged} aside={variant === "current" ? undefined : variant} />}
 		</HomeFrame>
 	);
 }
 
+/** Home's column by variant: Current as it was; each candidate as wide as
+ *  the course page's frame (`PageFrame`), so the map has more room and the
+ *  rows room for their added fact (Edo's notes, 15 Nov 2026, N1). */
+export const HOME_WIDTH: Record<HomeVariant, string> = {
+	current: "max-w-[60rem]",
+	exam: "max-w-[80rem]",
+	standing: "max-w-[80rem]",
+};
+
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 
-function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
+export function HomeBody({ ready, enlarged, onEnlarge, aside }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void; aside?: RowAside }) {
 	const { rows, courses, chats, done, exam, busy, onContinue } = ready;
+	const router = useRouter();
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	// The line under the pointer or holding focus, if any: only then does the line the map follows wear its fill, so
 	// no row has a card behind it at rest.
@@ -56,6 +69,23 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
 	const highlight = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);
 	const pointed = followed && pointingAt === lineKey(followed) ? pointingAt : null;
+	useHomeKeys({
+		moveCourse: (step) => {
+			const next = neighbourCourse(
+				courses.map((c) => c.map.workspace),
+				workspace,
+				step,
+			);
+			if (next) setChosen({ by: "tab", workspace: next });
+			return next !== null;
+		},
+		enlarge: () => onEnlarge(!enlarged),
+		openCoursePage: (line) => {
+			const course = rows.find((row) => lineKey(row) === line)?.course;
+			if (course) router.push(courseHref(course.map.workspace));
+		},
+		openShownCoursePage: () => router.push(courseHref(workspace)),
+	});
 
 	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
 		clearTimeout(dwell.current);
@@ -82,6 +112,7 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 			</div>
 			{!enlarged && (
 				<Today
+					aside={aside}
 					rows={rows}
 					done={done}
 					exam={exam}

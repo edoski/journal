@@ -157,7 +157,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 
 	it("puts what Home's Today takes up in Needs you, with Today's reason", () => {
 		assert.deepEqual(handles(groupOf(groups, "needs-you")), ["span"]);
-		assert.deepEqual(groupOf(groups, "needs-you").topics[0]!.fact, { kind: "review", words: "10d overdue" });
+		assert.deepEqual(groupOf(groups, "needs-you").topics[0]!.fact, { kind: "review", words: "Due since 29 Oct" });
 	});
 
 	it("keeps a weak topic Today does not take up in Learning, as the sidebar's Learning shelf does, saying why it is weak", () => {
@@ -171,16 +171,16 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const fact = (handle: string) => groups.flatMap((g) => g.topics).find((t) => t.topic.handle === handle)!.fact;
 		assert.deepEqual(fact("cramer"), { kind: "here", words: "You are here" });
 		const elsewhere = courseGroups(course({ current: h("rank") }));
-		assert.deepEqual(elsewhere.flatMap((g) => g.topics).find((t) => t.topic.handle === "rank")!.fact, { kind: "task", words: "Left off 7d ago" });
+		assert.deepEqual(elsewhere.flatMap((g) => g.topics).find((t) => t.topic.handle === "rank")!.fact, { kind: "task", words: "Left off 1 Nov" });
 	});
 
 	it("puts unfinished work before a review the plan dates later, on the page, the sidebar and the map alike", () => {
 		const held = { kind: "scheduled" as const, date: "2026-12-08", held: { exam: null, since: "2026-10-21" } };
 		const map = course({ topics: TOPICS.map((t) => (t.handle === "basis" ? { ...t, review: held, tasks: ["sheet-4"] } : t)) });
 		const row = groupOf(courseGroups(map), "on-your-own").topics.find((t) => t.topic.handle === "basis")!;
-		assert.deepEqual(row.fact, { kind: "task", words: "Left off 7d ago" });
-		assert.equal(sidebar(map).get(`${WS}#basis`), "On your own: Left off 7d ago");
-		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis")))?.words, "Left off 7d ago");
+		assert.deepEqual(row.fact, { kind: "task", words: "Left off 1 Nov" });
+		assert.equal(sidebar(map).get(`${WS}#basis`), "On your own: Left off 1 Nov");
+		assert.equal(cardLine(sidebarSays([map], [], WS).get(h("basis")))?.words, "Left off 1 Nov");
 	});
 
 	it("says since when a review held past its day was due, in the words the sidebar and the topic page use", () => {
@@ -223,7 +223,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 
 describe("the header's facts and next lesson", () => {
 	it("counts what Home's pie counts, names the exam once and when he last studied", () => {
-		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam in 21 days", studied: "Studied 2 days ago", lastSession: null });
+		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam in 21 days", studied: "Studied 6 Nov", lastSession: null });
 	});
 
 	it("leaves out an exam that is not set and a count for a course with no topics", () => {
@@ -251,7 +251,7 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(next.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
-		assert.equal(next.why?.short, "10d overdue");
+		assert.equal(next.why?.short, "Due since 29 Oct");
 	});
 
 	it("resumes a session in this course that has waited on him since yesterday, and ignores one in another course", () => {

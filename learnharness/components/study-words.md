@@ -23,9 +23,9 @@ One form each, wherever it shows.
 | Reason | Words |
 |---|---|
 | a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); with no wrong answer open (the engine's `mistake`, which any right answer closes, with help or not), Check on your own (a person with a check), whatever else the record says, since the signals below describe a wrong answer a right one has since answered (round 7: "Not right last time" after a right last try); else Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Mistake to fix. A repair made only with help (`repairedWithHelp`) is not "Fixed", since help may have carried it. |
-| a review come due | Due today, 3d overdue, 16d overdue (always days, round 4) |
+| a review come due | Due today, Due since 3 Nov (its day, never a count, round 9) |
 | a review dated ahead | its day, never a count: Back Tue 10 Nov (`returnWords`) |
-| unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 20d ago; Unfinished when no day is known. Never the tutor's step text. |
+| unfinished work holds it | Left off today, Left off yesterday, Left off 6 Nov (its day, never a count, round 9); Unfinished when no day is known. Never the tutor's step text. |
 | a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first and the day the plan brings it back (`reviewWords`): Due since 21 Oct, back 4 Dec; never "Moved from" a memory day still ahead, which nobody told him |
 | a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started; under it the day the plan starts it, once (Planned today, Planned Wed 11 Nov) |
 
@@ -35,8 +35,8 @@ A topic often has more than one reason, and a row says one. Every surface takes 
 
 1. a session on it waits on him, or the tutor writes in it (Your turn, Working);
 2. a slip;
-3. a review come due (Due today, 3d overdue): the engine dates it today;
-4. unfinished work that holds it (Left off 2d ago);
+3. a review come due (Due today, Due since 5 Nov): the engine dates it today;
+4. unfinished work that holds it (Left off 6 Nov);
 5. when its review comes back (Back Tue 10 Nov), a review the plan holds back included (Due since 21 Oct): the engine dates that review on a later day, so the work he left comes first. A review held past memory's day is due already, so it is a fact that needs him, with the review's icon, and the map's card says it as the lists do (round 6: Cramer's rule read Due since 6 Nov in the lists and its standing on the map);
 6. how long since he studied it.
 

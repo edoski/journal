@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { LESSON_WORDS, leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
+import { leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { sessionState } from "@/components/nav/session-state";
+import { currentSessions, sessionState } from "@/components/nav/session-state";
 
 /**
  * The sidebar's topics. Each unit (a course map topic the learner has
@@ -109,7 +109,7 @@ export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNo
  *  every session tied to it (`topicSessions`) says what its page's Now and
  *  the session's card on Today's top say. Pure. */
 export function sessionsNow(sessions: readonly ChatListItem[]): UnitNow {
-	const states = sessions.map(sessionState);
+	const states = currentSessions(sessions).map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	if (states.includes("working")) return "working";
 	return states.includes("left") ? "left" : null;
@@ -172,10 +172,10 @@ export function daysBetween(from: string, to: string): number {
  *     first;
  *   - the engine calls the topic weak ("Not right last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
- *   - a solid topic's review is due ("Due today", "3d overdue");
- *   - an open task holds it, and when he left off ("Left off 3d ago");
+ *   - a solid topic's review is due ("Due today", "Due since 5 Nov");
+ *   - an open task holds it, and when he left off ("Left off 6 Nov");
  *   - when its next review comes ("Back in 5d");
- *   - else when he last studied it ("Today", "3d ago").
+ *   - else when he last studied it ("Today", "6 Nov").
  * A topic still being learned never says its review is due: almost all
  * of them are.
  */
@@ -188,11 +188,11 @@ export type UnitStatus =
 	 *  started"), which search lists beside the topics he has. */
 	| { kind: "none"; words?: string };
 
-/** When an open task was left, in the app's words ("Left off 3d ago"):
+/** When an open task was left, in the app's words ("Left off 6 Nov"):
  *  the engine's day it last changed, never its step, which the tutor
  *  writes. Pure. */
 export function taskWords(task: Pick<CourseMapTask, "updated">, today: string): string {
-	return leftOffWords(task.updated ? Math.max(0, daysBetween(task.updated, today)) : null);
+	return leftOffWords(task.updated ? Math.max(0, daysBetween(task.updated, today)) : null, today);
 }
 
 /** The learner's own calendar day of a session's time, or a study day as
@@ -203,10 +203,19 @@ const dayOf = (at: string) => {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** When something was last studied, in Home's words: "Today", "3d ago".
+/** When something was last studied, in Home's words: "Today", "6 Nov".
  *  `at` is a session's time or a study day. Pure. */
 export function studiedWords(at: string, today: string): string {
-	return agoWords(Math.max(0, daysBetween(dayOf(at), today || dayOf(new Date().toISOString()))));
+	const day = today || dayOf(new Date().toISOString());
+	return agoWords(Math.max(0, daysBetween(dayOf(at), day)), day);
+}
+
+/** When a session left for next time was left, in the app's one phrase for
+ *  work left open (round 9, 2 m6: one Eigen lesson read "Left for next
+ *  time" on its topic and "Left off today" on the topic its task holds):
+ *  "Left off today", "Left off 6 Nov". `today` is the engine's day. Pure. */
+export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string): string {
+	return leftOffWords(Math.max(0, daysBetween(dayOf(chat.updatedAt), today)), today);
 }
 
 export function unitStatus(unit: Unit, today: string): UnitStatus {
@@ -216,10 +225,13 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	// was left for next time (round 8: Eigen's mistake hid behind "Left for
 	// next time"; round 9, 3 m13: Determinants' behind "Your turn").
 	if (slip && topic.signals.mistake && unit.now !== "working") return slip;
-	if (unit.now === "left") return { kind: "task", words: LESSON_WORDS.leftForTonight };
+	if (unit.now === "left") {
+		const left = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left");
+		return { kind: "task", words: left ? leftWords(left, today) : leftOffWords(null, today) };
+	}
 	if (unit.now) return { kind: unit.now };
 	if (slip) return slip;
-	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
+	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue, today) };
 	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
 	// A review held past memory's day is due already ("Due since 6 Nov"):
 	// a fact that needs him, which the map's card shows, never a date ahead.

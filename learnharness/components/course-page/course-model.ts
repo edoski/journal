@@ -247,7 +247,7 @@ export interface CourseFacts {
 	progress: string | null;
 	/** "Exam in 21 days", "Exam tomorrow", "Exam today". */
 	exam: string | null;
-	/** "Studied 2 days ago", "Studied today"; a course not studied yet,
+	/** "Studied 4 Nov", "Studied today"; a course not studied yet,
 	 *  when its first lesson comes and why ("First lesson Thu 19 Nov, after
 	 *  Probability's new topics"), else "Not studied yet". */
 	studied: string | null;

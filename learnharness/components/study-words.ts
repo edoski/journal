@@ -149,26 +149,39 @@ export const MARK_HOW_WORDS: Record<MarkHow, string> = {
 };
 
 /*
- * Every distance in time counts whole days, one scheme wherever it shows:
- * "3d ago", "13d ago", "45d ago", never weeks or months (round 4: search
- * put "13d ago" beside "2w ago" and "4w ago", where 13 days read as more
- * recent than 14 by a different unit). `distanceWords` already said days.
+ * A time in the past is named by its day, never counted (round 9, 2 m5:
+ * "Due since 5 Nov", "Left off 6 Nov" and "Studied 4 Nov" made him count
+ * back): "today", "yesterday", else the day, "3 Nov", as "Due since 3 Nov"
+ * and "Back Tue 10 Nov" already said. `today` is the engine's study day.
  */
 
-/** A review come due: "Due today", "3d overdue", "16d overdue". */
-export function overdueWords(overdue: number): string {
+/** The engine day some days before `today`. */
+function dayBefore(today: string, days: number): string {
+	const d = new Date(`${today}T00:00:00Z`);
+	d.setUTCDate(d.getUTCDate() - days);
+	return d.toISOString().slice(0, 10);
+}
+
+/** The day some days before `today`: "today", "yesterday", else "3 Nov". */
+function pastDay(days: number, today: string): string {
+	if (days <= 0) return "today";
+	if (days === 1) return "yesterday";
+	return shortDay(dayBefore(today, days));
+}
+
+/** A review come due: "Due today", else since the day it fell due, "Due
+ *  since 3 Nov". */
+export function overdueWords(overdue: number, today: string): string {
 	if (overdue <= 0) return "Due today";
-	return `${overdue}d overdue`;
+	return `Due since ${shortDay(dayBefore(today, overdue))}`;
 }
 
 /** Where unfinished work holding a topic was left, by when, never by the
- *  tutor's step: "Left off today", "Left off yesterday", "Left off 3d
- *  ago", "Left off 20d ago"; "Unfinished" when no day is known. */
-export function leftOffWords(days: number | null): string {
+ *  tutor's step: "Left off today", "Left off yesterday", "Left off 6 Nov";
+ *  "Unfinished" when no day is known. */
+export function leftOffWords(days: number | null, today: string): string {
 	if (days === null) return "Unfinished";
-	if (days <= 0) return "Left off today";
-	if (days === 1) return "Left off yesterday";
-	return `Left off ${days}d ago`;
+	return `Left off ${pastDay(days, today)}`;
 }
 
 /** A review the engine has dated ahead, by its day, never a count of
@@ -183,28 +196,17 @@ export function weekdayWords(day: string): string {
 	return SHORT_WEEKDAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
 }
 
-/** Some days ago in a trailing column: "Today", "Yesterday", "3d ago",
- *  "40d ago". */
-export function agoWords(days: number): string {
-	if (days <= 0) return "Today";
-	if (days === 1) return "Yesterday";
-	return `${days}d ago`;
+/** A past day in a trailing column: "Today", "Yesterday", "26 Oct". */
+export function agoWords(days: number, today: string): string {
+	const day = pastDay(days, today);
+	return day.charAt(0).toUpperCase() + day.slice(1);
 }
 
-/** Home's clock beside a course or a session, labelled so it never reads
- *  as the line's reason: "Studied today", "Studied yesterday", "Studied 7d
- *  ago" (round 8: "7d ago" above "Planned today" read as a contradiction).
- *  The short days are `agoWords`'. */
-export function studiedAgoWords(days: number): string {
-	return days <= 1 ? studiedDaysWords(days) : `Studied ${agoWords(days)}`;
-}
-
-/** When he last studied something, as a phrase: "Studied today",
- *  "Studied yesterday", "Studied 3 days ago", "Studied 40 days ago". */
-export function studiedDaysWords(days: number): string {
-	if (days <= 0) return "Studied today";
-	if (days === 1) return "Studied yesterday";
-	return `Studied ${days} days ago`;
+/** When he last studied something, as a phrase, labelled so beside a
+ *  line's reason it never reads as one (round 8): "Studied today",
+ *  "Studied yesterday", "Studied 4 Nov". */
+export function studiedDaysWords(days: number, today: string): string {
+	return `Studied ${pastDay(days, today)}`;
 }
 
 /** What a topic page's Now row offers on a topic not started: its first
@@ -251,13 +253,13 @@ export function movedWords(review: CourseMapTopic["review"], today: string, told
 	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
 }
 
-/** A review that is due: "Due today", "3d overdue"; one the plan holds
+/** A review that is due: "Due today", "Due since 5 Nov"; one the plan holds
  *  past a day memory asked for already says since when, so a review weeks
  *  late never reads as spacing, and the day the plan brings it back, "Due
  *  since 1 Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
  *  any other dated review "Back in 5d". `today` is the engine's day. */
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
-	if (review.kind === "due") return overdueWords(review.overdue);
+	if (review.kind === "due") return overdueWords(review.overdue, today);
 	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}, back ${shortDay(review.date)}`;
 	return returnWords(review.date);
 }

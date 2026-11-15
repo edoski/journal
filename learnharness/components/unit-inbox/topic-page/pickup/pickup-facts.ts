@@ -2,7 +2,9 @@ import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-fact
 import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import type { TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { FIRST_LESSON, LESSON_WORDS, TUTOR_WRITING, overdueWords, reviewWords, startsAfterWords } from "@/components/study-words";
+import { leftWords } from "@/components/unit-inbox/units";
+import { pausedWords } from "@/components/nav/session-state";
+import { FIRST_LESSON, TUTOR_WRITING, overdueWords, reviewWords, startsAfterWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -84,7 +86,7 @@ export const NOTHING_DUE = "Nothing due";
  *  is due ("Due since 6 Nov", "Due today"); null for any other. */
 function heldPastDue(review: TopicFacts["topic"]["review"], today: string): string | null {
 	if (review?.kind !== "scheduled" || !review.held || review.held.since > today) return null;
-	return review.held.since < today ? reviewWords(review, today) : overdueWords(0);
+	return review.held.since < today ? reviewWords(review, today) : overdueWords(0, today);
 }
 
 /** The step a lesson stopped on, when its tutor planned. */
@@ -110,12 +112,12 @@ export function nowItem(facts: TopicFacts): NowItem {
 				...base,
 				icon: action.kind === "open" ? "writing" : left ? "task" : "reply",
 				words: stoppedOn(entry) ?? action.chat.title,
-				note: action.kind === "open" ? TUTOR_WRITING : left ? LESSON_WORDS.leftForTonight : "Your turn",
+				note: action.kind === "open" ? TUTOR_WRITING : left ? leftWords(action.chat, facts.today) : entry?.state === "paused" ? pausedWords(action.chat) : "Your turn",
 				chat: action.chat.id,
 			};
 		}
 		case "review":
-			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0) };
+			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today) };
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
@@ -146,7 +148,7 @@ export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	const waiting = (["your-turn", "working", "left"] as const).flatMap((state) => sessions.filter((entry) => entry.state === state));
 	const review =
 		facts.action.kind !== "review" && facts.topic.review?.kind === "due"
-			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0), press: { opening: `Review ${facts.topic.title}` } }]
+			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), press: { opening: `Review ${facts.topic.title}` } }]
 			: [];
 	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;
 	const tasks = facts.pickups.flatMap((pickup): NextItem[] =>

@@ -11,7 +11,7 @@ Topics with no room before the exam lead the line in the warning ink, in the run
 
 ## A mistake's row
 
-`mistake-list.tsx`, `data-slot` `mistake-row`: Today's row at the list's width, 48px. The slip's mark (the one the sidebar and map draw for the topic, else the mistake's own), the topic and its arc's bubble; under it what went wrong in the tutor's words (the diagnosis, else the newest answer) and when ("Today", "3d ago"), with a hand when it had help. Its hint says what it was on and his answer. The whole row starts fixing it as the sidebar's rows do: Resume the session that waits on the topic, else a new session on it (`useStartUnit`). No count anywhere; the newest first. The press does not show when nothing is open.
+`mistake-list.tsx`, `data-slot` `mistake-row`: Today's row at the list's width, 48px. The slip's mark (the one the sidebar and map draw for the topic, else the mistake's own), the topic and its arc's bubble; under it what went wrong in the tutor's words (the diagnosis, else the newest answer) and when ("Today", "6 Nov"), with a hand when it had help. Its hint says what it was on and his answer. The whole row starts fixing it as the sidebar's rows do: Resume the session that waits on the topic, else a new session on it (`useStartUnit`). No count anywhere; the newest first. The press does not show when nothing is open.
 
 ## Open
 

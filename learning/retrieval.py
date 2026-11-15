@@ -800,6 +800,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
                         "title": task.get("title"),
                         "step": task.get("step"),
                         "updated": task.get("updated"),
+                        "topics": list(task.get("topics", ())),
                     }
                 )
                 for key, task in tasks.items()

@@ -1,4 +1,4 @@
-import { isReviewSession, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
+import { isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -75,7 +75,7 @@ export function todaySteps(course: StudyCourse): NextStep[] {
 		steps.push({ kind: "review", titles: reviews.map((t) => t.title), topics: reviews.map((t) => t.handle), then: tasks[0]?.title ?? current?.title ?? null });
 	}
 	for (const task of tasks) {
-		const held = map.topics.filter((t) => t.tasks.includes(task.key)).map((t) => t.handle);
+		const held = taskTopics(task, map).map((t) => t.handle);
 		steps.push({ kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] });
 	}
 	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
@@ -199,37 +199,56 @@ function yieldsToReview(chat: ChatListItem, course: StudyCourse | null): boolean
 const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
 
 /**
- * Today's lines: each session to pick up since yesterday (it waits on the
- * learner, the tutor writes in it, or stopped mid-reply) and each one left
- * for next time on an earlier day however long ago, most recent first,
- * then each course's steps for today (`todaySteps`), most urgent course
- * first and a line with nothing for today last (`laterOnly`), each unless a
- * session shown, or one he ended today, already works on it. A session he ended with Done for today has
- * no line until tomorrow: he said he is done with it for today, and Home's
- * Studied today names it (round 4: the finished lesson stayed the first
- * row). A lesson left for next time whose topics are all in today's review
- * gives its line to that review (`yieldsToReview`). A session stays on its
- * line while the tutor writes. An older session to pick up stays in the
+ * Today's lines, the day's plan first (round 9, 1 D1: every session closed
+ * with Done for today came back to the top, due or not, and pushed the
+ * plan into "Also today"):
+ *   1. each session waiting on him since yesterday (it waits on the
+ *      learner, the tutor writes in it, or stopped mid-reply), most recent
+ *      first;
+ *   2. each course's steps for today (`todaySteps`), most urgent course
+ *      first, so the exam's course leads; a step a lesson left for next
+ *      time works on is that lesson's line, in the step's place, and a step
+ *      a waiting session, or one he ended today, works on has no line;
+ *   3. each other lesson left for next time on an earlier day, however long
+ *      ago, most recent first;
+ *   4. the lines with nothing for today (`laterOnly`).
+ * A review left for next time has no line of its own: it waits for its
+ * topics' next review day, when the review's line opens it (`courseMove`),
+ * and its topic page keeps it meanwhile. A session he ended with Done for
+ * today has no line until tomorrow: he said he is done with it for today,
+ * and Home's Studied today names it (round 4). A lesson left for next time
+ * whose topics are all in today's review gives its line to that review
+ * (`yieldsToReview`). An older session waiting on him stays in the
  * sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
-	const leftToday = (c: ChatListItem) => sessionState(c) === "left" && lastDay(c) >= today;
-	const recent = open.filter((c) => !leftToday(c) && (sessionState(c) === "left" || lastDay(c) >= since));
+	const left = (c: ChatListItem) => sessionState(c) === "left";
+	const leftToday = (c: ChatListItem) => left(c) && lastDay(c) >= today;
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
 	const courseOf = (chat: ChatListItem) => (chat.course && byWorkspace.get(chat.course.workspace)) ?? null;
-	const shown = recent.filter((chat) => !yieldsToReview(chat, courseOf(chat)));
-	const sessions: TodayRow[] = shown.map((chat) => ({ kind: "session", chat, course: courseOf(chat) }));
-	const working = open.filter((c) => shown.includes(c) || leftToday(c));
-	const rest = ordered
-		.flatMap((course): (TodayRow & { kind: "course" })[] =>
-			todaySteps(course)
-				.filter((step) => !working.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step)))
-				.map((step) => ({ kind: "course", course, step })),
-		)
-		.sort((a, b) => Number(laterOnly(a.step)) - Number(laterOnly(b.step)));
-	return [...sessions, ...rest];
+	const waiting = open.filter((c) => !left(c) && lastDay(c) >= since);
+	const leftovers = open.filter((c) => left(c) && !leftToday(c) && !isReviewSession(c) && !yieldsToReview(c, courseOf(c)));
+	const quiet = open.filter((c) => waiting.includes(c) || leftToday(c));
+	const session = (chat: ChatListItem): TodayRow => ({ kind: "session", chat, course: courseOf(chat) });
+	const placed = new Set<ChatListItem>();
+	const plan: TodayRow[] = [];
+	const later: TodayRow[] = [];
+	for (const course of ordered) {
+		const own = (chats: readonly ChatListItem[], step: NextStep) => chats.find((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
+		for (const step of todaySteps(course)) {
+			if (own(quiet, step)) continue;
+			const lesson = laterOnly(step) ? undefined : own(leftovers, step);
+			if (lesson && !placed.has(lesson)) {
+				placed.add(lesson);
+				plan.push(session(lesson));
+			} else if (!lesson && !(laterOnly(step) && own(leftovers, step))) {
+				(laterOnly(step) ? later : plan).push({ kind: "course", course, step });
+			}
+		}
+	}
+	return [...waiting.map(session), ...plan, ...leftovers.filter((c) => !placed.has(c)).map(session), ...later];
 }
 
 /** The courses of Today's lines, each once, in the lines' order: a course

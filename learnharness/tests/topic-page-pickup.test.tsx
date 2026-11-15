@@ -119,13 +119,19 @@ describe("Now", () => {
 			[
 				["resume", "Computing a 2×2 spectrum", "Your turn", "Resume", "chat_demo_eigen"],
 				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
-				["review", "2d overdue", null, "Review", null],
+				["review", "Due since 6 Nov", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],
 				["continue", DET_STOPPED, "Left off yesterday", "Continue", "chat_demo_det"],
 				["study", "Nothing due", null, "Study", null],
 			],
 		);
+	});
+
+	it("says a reply cut short as the sidebar and Home say it, never Your turn (round 9, 2 m7)", () => {
+		const cut = chat("chat_cut", "Diagonalization preview", "2026-11-06T21:40:05.000Z", { ended: "cut", topics: ["eigen"] });
+		assert.equal(pickupSections(factsOf(EIGEN, [cut])).now.note, "Reply cut off");
+		assert.equal(pickupSections(factsOf(EIGEN, [{ ...cut, stopped: true }])).now.note, "You stopped the tutor");
 	});
 
 	it("names the session when the lesson planned nothing", () => {

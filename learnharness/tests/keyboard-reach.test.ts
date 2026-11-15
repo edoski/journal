@@ -38,7 +38,7 @@ describe("the cheat sheet groups them in plain words", () => {
 	it("lists its sections in order", () => {
 		assert.deepEqual(
 			sections.map((s) => s.label),
-			["Anywhere", "Pages", "Calendar", "In a lesson", "Answering a question"],
+			["Anywhere", "Pages", "Calendar", "Home", "In a lesson", "Answering a question"],
 		);
 	});
 
@@ -56,6 +56,16 @@ describe("the cheat sheet groups them in plain words", () => {
 			["Show the month", "M"],
 			["Previous week or month", "P"],
 			["Next week or month", "N"],
+		]);
+	});
+
+	it("Home: the map's course and its enlarge, and Today's rows (Edo's notes, N2 and N3)", () => {
+		assert.deepEqual(rows("Home"), [
+			["The course left or right on the map", "← →"],
+			["Enlarge the map, and back", "F"],
+			["Move between Today's rows", "↑ ↓"],
+			["Open the row", "O"],
+			["Open the row's course page, else the map's", "C"],
 		]);
 	});
 

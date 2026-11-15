@@ -1,8 +1,9 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
-import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedAgoWords, studiedDaysWords } from "@/components/study-words";
+import { TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { pausedWords, sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
-import { taskWords } from "@/components/unit-inbox/units";
+import { leftWords, taskWords } from "@/components/unit-inbox/units";
+import { localDay } from "@/components/day-change";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
@@ -85,21 +86,21 @@ export interface Why {
 
 /** A review's reason from the engine's own fields: a lapse first (the
  *  topic it was), else how overdue the most overdue one is. Pure. */
-function reviewReason(due: readonly CourseMapTopic[]): Why | null {
+function reviewReason(due: readonly CourseMapTopic[], today: string): Why | null {
 	const lapsed = due.find((t) => lapsedNow(t.signals));
 	if (lapsed) return { kind: "missed", short: lapsedOnWords(lapsed.title) };
 	const overdue = Math.max(-1, ...due.map((t) => (t.review?.kind === "due" ? t.review.overdue : -1)));
 	if (overdue < 0) return null;
-	return { kind: "review", short: overdueWords(overdue) };
+	return { kind: "review", short: overdueWords(overdue, today) };
 }
 
 /** A session's line by where it stands; a finished session has no line. */
-const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
-	"your-turn": { kind: "reply", short: "Your turn" },
-	working: { kind: "working", short: TUTOR_WRITING },
-	paused: { kind: "stopped", short: "Reply cut off" },
-	left: { kind: "task", short: LESSON_WORDS.leftForTonight },
-	finished: null,
+const SESSION_WHY: Record<ReturnType<typeof sessionState>, (row: TodayRow & { kind: "session" }) => Why | null> = {
+	"your-turn": () => ({ kind: "reply", short: "Your turn" }),
+	working: () => ({ kind: "working", short: TUTOR_WRITING }),
+	paused: (row) => ({ kind: "stopped", short: pausedWords(row.chat) }),
+	left: (row) => ({ kind: "task", short: leftWords(row.chat, row.course?.map.today ?? localDay(new Date())) }),
+	finished: () => null,
 };
 
 /**
@@ -117,15 +118,14 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  */
 export function whyOf(row: TodayRow): Why | null {
 	if (row.kind === "session") {
-		const state = sessionState(row.chat);
-		return state === "paused" ? { kind: "stopped", short: pausedWords(row.chat) } : SESSION_WHY[state];
+		return SESSION_WHY[sessionState(row.chat)](row);
 	}
 	const { course, step } = row;
 	switch (step.kind) {
 		case "review": {
 			if (step.on) return { kind: "review", short: `Planned ${planDay(step.on)}` };
 			const handles = new Set<string>(step.topics);
-			return reviewReason(course.map.topics.filter((t) => handles.has(t.handle)));
+			return reviewReason(course.map.topics.filter((t) => handles.has(t.handle)), course.map.today);
 		}
 		case "task":
 			return { kind: "task", short: taskWords(step, course.map.today) };
@@ -141,50 +141,49 @@ export function whyOf(row: TodayRow): Why | null {
 	}
 }
 
-/** The days since the line's one clock: a session's line, since he last
- *  wrote in that session, so one started minutes ago is 0; a course's
- *  line, since he last studied the course; an open task's line has none,
- *  since its reason already dates it ("Left off 2d ago"), so a row never
- *  shows two days at once. Null for a course never studied or a line with
- *  no course. Pure. */
+/** The days since the line's one clock, which only a session's line has:
+ *  since he last wrote in that session, so one started minutes ago is 0;
+ *  none for one left for next time, whose reason dates it ("Left off 6
+ *  Nov"), so a row never shows two days.
+ *  A course's line has none (round 9, 1 D5: it showed the course's last
+ *  study, so "Studied today" sat on "Start Linear maps", a topic never
+ *  studied, and every row repeated the same day); its reason says what
+ *  the row is about. Null for a line with no clock. Pure. */
 function studiedDays(row: TodayRow): number | null {
-	if (row.kind === "session") {
-		const today = row.course?.map.today;
-		if (!today) return null;
-		const at = new Date(row.chat.updatedAt);
-		const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
-		return Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000));
-	}
-	if (row.step.kind === "task") return null;
-	return row.course.lastActiveDaysAgo;
+	if (row.kind !== "session" || sessionState(row.chat) === "left") return null;
+	const today = row.course?.map.today;
+	if (!today) return null;
+	const at = new Date(row.chat.updatedAt);
+	const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+	return Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000));
 }
 
 /** The line's one clock, short enough for a trailing column: "Today",
- *  "Yesterday", "3d ago", "40d ago" (`studiedDays`). Pure. */
+ *  "Yesterday", "6 Nov" (`studiedDays`). Pure. */
 export function studiedAgo(row: TodayRow): string | null {
 	const days = studiedDays(row);
-	return days === null ? null : agoWords(days);
+	return days === null || !row.course ? null : agoWords(days, row.course.map.today);
 }
 
 /** Some days ago in Home's words, the app's one form (`study-words.ts`). */
 export { agoWords };
 
-/** What Home's row shows of its clock, labelled: "Studied 7d ago" beside
+/** What Home's row shows of its clock, labelled: "Studied 6 Nov" beside
  *  the course, so it never reads as the line's reason ("7d ago · Planned
  *  today", round 8). Null where `studiedAgo` is. Pure. */
 export function studiedLabel(row: TodayRow): string | null {
 	const days = studiedDays(row);
-	return days === null ? null : studiedAgoWords(days);
+	return days === null || !row.course ? null : studiedDaysWords(days, row.course.map.today);
 }
 
 /** When the learner last studied a line's course, in words: "Studied
- *  today", "Studied 3 days ago", "Studied 20 days ago", or "Not studied
- *  yet"; null for a line with no course. Pure. */
+ *  today", "Studied 4 Nov", or "Not studied yet"; null for a line with no
+ *  course. Pure. */
 export function lastStudied(row: TodayRow): string | null {
 	const days = row.course?.lastActiveDaysAgo;
 	if (row.course === null || days === undefined) return null;
 	if (days === null) return "Not studied yet";
-	return studiedDaysWords(days);
+	return studiedDaysWords(days, row.course.map.today);
 }
 
 /** The levels at which the learner can do a topic on their own: the
