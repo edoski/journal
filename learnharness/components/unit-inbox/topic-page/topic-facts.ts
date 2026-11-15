@@ -1,5 +1,5 @@
 import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
-import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { cardLine, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_SAID_BY, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -73,10 +73,14 @@ export interface HeadMark {
 }
 
 /** A topic this one builds on (a `needs` edge into it on the course map),
- *  where he stands on it, and its page. */
+ *  where he stands on it, its words, and its page. */
 export interface BuildsOn {
 	topic: CourseMapTopic;
 	standing: Standing;
+	/** What its card on the map says (`cardLine`), else where he stands:
+	 *  one word for one topic on the page (round 8: Rank read "Partly
+	 *  right" here and "Your turn" on its card). */
+	words: string;
 	href: string;
 }
 
@@ -167,9 +171,14 @@ export function buildsMapOf(topic: CourseMapTopic, map: CourseMap): CourseMap | 
 
 /** The topics a topic builds on, from the course map's `needs` edges, in
  *  the engine's path order, each with where he stands on it. */
-export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
+export function buildsOn(topic: CourseMapTopic, map: CourseMap, said?: ReadonlyMap<TopicHandle, Said>): BuildsOn[] {
 	const needs = new Set(map.edges.flatMap((edge) => (edge.kind === "needs" && edge.topic === topic.handle ? [edge.prerequisite] : [])));
-	return map.topics.filter((t) => needs.has(t.handle)).map((t) => ({ topic: t, standing: standingOf(t), href: unitHref(map.workspace, t.handle) }));
+	return map.topics
+		.filter((t) => needs.has(t.handle))
+		.map((t) => {
+			const standing = standingOf(t);
+			return { topic: t, standing, words: cardLine(said?.get(t.handle))?.words ?? standing.words, href: unitHref(map.workspace, t.handle) };
+		});
 }
 
 /** Why the review waits past the day memory asked for it, after from
@@ -388,6 +397,7 @@ export function topicFacts({
 	const picked = new Set(pickups.flatMap((pickup) => (pickup.kind === "session" ? [pickup.chat.id] : [])));
 	const silent = topic.level === "new" && sessions.length > 0;
 	const studied = lastStudiedDay(topic, entries, attempts);
+	const said = sidebarSays(courses, chats, map.workspace);
 	return {
 		course: { workspace: map.workspace, title: map.title },
 		arc: arcOf(course, topic),
@@ -405,9 +415,9 @@ export function topicFacts({
 		sessions: entries,
 		listed: entries.filter((entry) => !picked.has(entry.chat.id)),
 		attempts,
-		builds: buildsOn(topic, map),
+		builds: buildsOn(topic, map, said),
 		buildsMap: buildsMapOf(topic, map),
-		said: sidebarSays(courses, chats, map.workspace),
+		said,
 		refs: read?.record?.refs ?? [],
 		titleOf,
 	};

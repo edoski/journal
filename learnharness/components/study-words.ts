@@ -38,13 +38,28 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  since his newest answer that was not right (the engine's `right`), so
  *  an unaided or a partial answer never reads "Right with help", and right
  *  answers after a review day's wrong first try never read "Tried, not
- *  right yet" (round 7). `attempted` with no right answer since keeps its
- *  pie's words; a weak topic he could do on his own keeps its 3/4 pie's
- *  words. Pure. */
-export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right">): string {
-	if (topic.level === "assisted") return RIGHT_WORDS[topic.right ?? "helped"];
-	return topic.level === "attempted" && topic.right ? RIGHT_WORDS[topic.right] : STANDING_WORDS[fill];
+ *  right yet" (round 7). With no right answer since that wrong one (no
+ *  `right`), it says so: "Not right last time", never "Right with help"
+ *  (round 8: Eigen read "Right with help" after a Show me). Right on his
+ *  own drops "check another day" once that day has come, beside the review
+ *  due (round 8). `attempted` with no right answer since keeps its pie's
+ *  words; a weak topic he could do on his own keeps its 3/4 pie's words,
+ *  but says "Not right last time" while a wrong answer is open. Pure. */
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals">>): string {
+	const learning = topic.level === "assisted" || topic.level === "attempted";
+	if (learning && topic.right) return topic.right === "unaided" && topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS[topic.right];
+	// No right answer since his newest wrong one: on a topic still being
+	// learned, or one he could do on his own whose wrong answer is open.
+	if (topic.level === "assisted" || (fill === 0.75 && topic.signals?.mistake)) return WRONG_LAST_WORDS;
+	return STANDING_WORDS[fill];
 }
+
+/** A topic whose newest answer that counts was not right, and none right
+ *  since. */
+const WRONG_LAST_WORDS = "Not right last time";
+
+/** Right on his own, on the day its check has come. */
+const RIGHT_ON_YOUR_OWN = "Right on your own";
 
 /** A slip's words for each of the engine's signals but a mixed-up method,
  *  which names the method (`slipWords`). */
@@ -52,7 +67,7 @@ export const SLIP_WORDS = {
 	repaired: "Fixed, check again later",
 	// Not "Missed": beside an overdue review he read that as a review he
 	// skipped (round 3). A lapse is an answer that was not right.
-	lapsed: "Not right last time",
+	lapsed: WRONG_LAST_WORDS,
 	gap: "Mistake to fix",
 	// A gap with no wrong answer open: two right answers with help left
 	// "still to check on your own" (round 6), never a mistake he made.
@@ -90,6 +105,7 @@ export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) =
  *  check on another day (round 7). */
 export const SLIP_SAID_BY: Readonly<Partial<Record<SlipKey, string>>> = {
 	repaired: RIGHT_WORDS.unaided,
+	lapsed: WRONG_LAST_WORDS,
 };
 
 /** The slip's words alone (`slipMark`). */
@@ -155,10 +171,16 @@ export function leftOffWords(days: number | null): string {
 	return `Left off ${days}d ago`;
 }
 
-/** A review the engine has dated ahead, some days away: "Back in 5d",
- *  "Back in 21d". */
-export function returnWords(days: number): string {
-	return `Back in ${days}d`;
+/** A review the engine has dated ahead, by its day, never a count of
+ *  days (round 8: "Back in 2d" where the tutor said Tuesday 10 November):
+ *  "Back Tue 10 Nov". */
+export function returnWords(day: string): string {
+	return `Back ${weekdayWords(day)}`;
+}
+
+/** "Tue 10 Nov". */
+export function weekdayWords(day: string): string {
+	return SHORT_WEEKDAY.format(new Date(`${day}T00:00:00Z`)).replace(",", "");
 }
 
 /** Some days ago in a trailing column: "Today", "Yesterday", "3d ago",
@@ -192,7 +214,7 @@ export const FIRST_LESSON = "First lesson";
 
 const SHORT_DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 /** "1 Oct". */
-const shortDay = (day: string) => SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
+export const shortDay = (day: string) => SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
 
 /** Why a review waits past the day memory asks for it (the engine's
  *  `held`): another course's final review came first, or the days before
@@ -237,7 +259,7 @@ export function movedWords(review: CourseMapTopic["review"], today: string, told
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
 	if (review.kind === "due") return overdueWords(review.overdue);
 	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}, back ${shortDay(review.date)}`;
-	return returnWords(Math.max(1, daysBetween(today, review.date)));
+	return returnWords(review.date);
 }
 
 /** "A", "A and B", "A, B and C". */
@@ -552,6 +574,14 @@ export const MARK_WORDS = {
 	youThink: "You think",
 } as const;
 
+/** His dispute's stamp in the transcript: "You disputed the mark", then
+ *  what he picked, the mark and how it should count, "You think: Right,
+ *  On your own". One rule for the lesson's row and practice's bubble
+ *  (round 8: practice's stamp dropped a help pick). Pure. */
+export function disputeStampWords(dispute: { proposed?: MarkResult; proposedHow?: MarkHow & ("ownWork" | "withHelp") }): string {
+	const picked = [dispute.proposed && MARK_WORDS.result[dispute.proposed], dispute.proposedHow && MARK_HOW_WORDS[dispute.proposedHow]].filter(Boolean);
+	return picked.length > 0 ? `${MARK_WORDS.youDisputed} · ${MARK_WORDS.youThink}: ${picked.join(", ")}` : MARK_WORDS.youDisputed;
+}
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
  *  `stopped` when the kind is unknown. */

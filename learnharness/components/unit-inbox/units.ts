@@ -166,7 +166,8 @@ export function daysBetween(from: string, to: string): number {
  * priority:
  *   - a session waits on the learner ("Your turn"), the tutor writes in
  *     one (Working), or one is left for next time, as the session state
- *     reads them;
+ *     reads them, unless a wrong answer is still open, whose slip comes
+ *     first;
  *   - the engine calls the topic weak ("Not right last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
  *   - a solid topic's review is due ("Due today", "3d overdue");
@@ -207,10 +208,13 @@ export function studiedWords(at: string, today: string): string {
 }
 
 export function unitStatus(unit: Unit, today: string): UnitStatus {
-	if (unit.now === "left") return { kind: "task", words: LESSON_WORDS.leftForTonight };
-	if (unit.now) return { kind: unit.now };
 	const { topic } = unit;
-	if (unit.slip) return { kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key };
+	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
+	// A wrong answer still open outranks a lesson left for next time
+	// (round 8: Eigen's mistake hid behind "Left for next time").
+	if (unit.now === "left") return slip && topic.signals.mistake ? slip : { kind: "task", words: LESSON_WORDS.leftForTonight };
+	if (unit.now) return { kind: unit.now };
+	if (slip) return slip;
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
 	// A review held past memory's day is due already ("Due since 6 Nov"):

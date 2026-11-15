@@ -36,6 +36,7 @@ import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { answeredQuestionsOf, hasUnresolvedQuestion, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
+import { remarkableOf } from "../core/answer-marks.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { PATHS } from "../../config.ts";
@@ -466,7 +467,7 @@ export async function handleChatInput(
 		// record through the engine, whatever the agent kind, with the
 		// answers a save may name (answeredQuestionsOf), read from the
 		// whole record.
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: answeredQuestionsOf(merged) } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: answeredQuestionsOf(merged), remarkable: remarkableOf(merged) } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the

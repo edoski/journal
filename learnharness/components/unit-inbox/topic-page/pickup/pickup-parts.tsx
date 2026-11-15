@@ -150,7 +150,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[]; onPoint?: (handle: string | null) => void }) {
 	return (
 		<ul className="flex flex-col">
-			{builds.map(({ topic, standing, href }) => (
+			{builds.map(({ topic, standing, words, href }) => (
 				<li key={topic.handle} className={HAIRLINE}>
 					<Link
 						href={href}
@@ -167,7 +167,7 @@ export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[];
 							<LineText>{topic.title}</LineText>
 						</span>
 						<span data-slot="pickup-builds-on-standing" className="text-label text-muted-foreground">
-							{standing.words}
+							{words}
 						</span>
 					</Link>
 				</li>
@@ -245,7 +245,7 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
 					return row.kind === "session" ? (
 						<SessionItem key={row.entry.chat.id} entry={row.entry} shown={row.entry.chat.id === shown} onShow={onShow} ends={ends()} date={date} writing="Tutor writing" />
 					) : (
-						<AttemptEntry key={row.attempt.id} attempt={row.attempt} titleOf={titleOf} ends={ends()} date={date} />
+						<AttemptEntry key={row.attempt.id} attempt={row.attempt} title={row.title} titleOf={titleOf} ends={ends()} date={date} />
 					);
 				}),
 			)}

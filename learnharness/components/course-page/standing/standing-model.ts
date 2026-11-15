@@ -4,7 +4,7 @@ import { misfitWords } from "@/components/calendar/calendar-facts";
 import { resumableSession } from "@/components/nav/session-state";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { agoWords, finalReviewMissWords, notReadyWords, READY_WORDS, slipMark, type SlipKey } from "@/components/study-words";
+import { finalReviewMissWords, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -64,7 +64,7 @@ export interface MistakeRow {
 	topic: CourseMapTopic;
 	slip: SlipKey;
 	words: string;
-	/** "Today", "3d ago"; null when the engine gives no day. */
+	/** "Today", "5 Nov"; null when the engine gives no day. */
 	when: string | null;
 	helped: boolean;
 	/** What it was on, with his answer: the row's hint. */
@@ -76,6 +76,13 @@ export interface MistakeRow {
 }
 
 const days = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+
+/** The day of a mistake, never a count of days (round 8: "3d ago"):
+ *  "Today", "5 Nov", as narrow as the count was, so the gap beside it
+ *  keeps its room. */
+function mistakeDayWords(day: string, today: string): string {
+	return days(day, today) <= 0 ? "Today" : shortDay(day);
+}
 
 /** The open mistakes in the engine's order, newest first, as rows; a
  *  topic the map no longer lists is left out. `arcs` are the arcs the page
@@ -96,7 +103,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				topic,
 				slip,
 				words: m.gap ?? newest!.text,
-				when: m.latest ? agoWords(days(m.latest, map.today)) : null,
+				when: m.latest ? mistakeDayWords(m.latest, map.today) : null,
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
 				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
