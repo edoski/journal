@@ -154,6 +154,8 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
 		].map(spoken),
 		screen: (call) => voice.screen(call),
+		// Ordinary text never reaches him where send_to_user is his channel.
+		...(opts.tools === undefined ? { screenText: (text: string) => voice.screenText(text), beforeEnd: () => voice.beforeEnd() } : {}),
 		messages: opts.messages ?? [],
 		endsTurn: endsTurnFor(kind),
 		session: opts.session,

@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync, exis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Options, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { normalizeContext, type Api, type AssistantMessage, type AssistantMessageEvent, type ImageContent, type Message, type Model, type StreamFunction, type TextContent, type Tool, type ToolResultMessage } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxToolCall, normalizeContext, type Api, type AssistantMessage, type AssistantMessageEvent, type ImageContent, type Message, type Model, type StreamFunction, type TextContent, type Tool, type ToolResultMessage } from "@earendil-works/pi-ai";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { claudeWorkDir } from "../../src/agent/claude-cli.ts";
@@ -203,9 +203,12 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 					}
 					save();
 					yield result("success");
-					// Claude Code reads a queued message as the next turn of the same process.
-					if (endTurn || !inbox.length) return;
-					yield (await takeUser(inbox.shift()))!;
+					// Claude Code reads the next message it is sent as the next turn of the
+					// same process, until its input closes.
+					if (endTurn) return;
+					const more = await next();
+					if (!more) return;
+					yield (await takeUser(more))!;
 				}
 			} finally {
 				await client.close().catch(() => undefined);
@@ -253,4 +256,11 @@ export function onFake(scripted: ScriptedModel, opts: { messages?: unknown[]; se
 		session: import("../../src/core/sdk-session.ts").ChatSession | undefined;
 		sessionStore: import("../../src/agent/sdk/session-files.ts").SessionStore | undefined;
 	};
+}
+
+/** The tutor's words as production sends them: a send_to_user call. The
+ *  model runs once more after its ack, so a script follows it with that
+ *  reply (usually `fauxAssistantMessage("")`). */
+export function sendToUser(message: string, id?: string): AssistantMessage {
+	return fauxAssistantMessage([fauxToolCall("send_to_user", { message }, id ? { id } : undefined)], { stopReason: "toolUse" });
 }

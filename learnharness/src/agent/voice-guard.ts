@@ -10,13 +10,19 @@
  * streaming, before any view reads it, and takes its text out of the live
  * call (the refusal's details keep it). A refused question never showed:
  * the question dock waits for the call's result.
+ *
+ * Ordinary text never reaches him (round 7: an answer written as plain
+ * text skipped every rule): `screenText` takes it out of the reply as it
+ * ends, and a turn that would end having given him nothing of what it
+ * wrote is told to send it with `send_to_user`, where it is read like any
+ * message (`beforeEnd`).
  */
 
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { opensTurn, PRACTICE_CONCLUDE_TOOL, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, echoOf, repeatedAdvice, sentences, voiceBreaks, type TurnKind, type VoiceBreak } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, compoundAsk, echoOf, repeatedAdvice, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -33,6 +39,9 @@ export interface TurnInput {
 	kind: TurnKind | undefined;
 	answers: boolean;
 	words: string | null;
+	/** Practice handed the session back to teaching (Explain instead, or a
+	 *  request to be taught): the turn must leave him something to do. */
+	handedBack?: boolean;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -58,6 +67,8 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 	if (input.role === "toolResult") {
 		const details = isRecord(input.details) ? input.details : {};
 		if (details.hintRequested === true) return { kind: "hint", answers: false, words: null };
+		// A shown answer sets its own length, as a shown solution does.
+		if (details.showMe === true) return { kind: undefined, answers: false, words: null };
 		return { kind: "wrong", answers: true, words: typeof details.text === "string" ? details.text : textOf(input.content) };
 	}
 	if (input.role !== "custom") return none;
@@ -76,6 +87,8 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 			return { kind: "wrong", answers: true, words: textOf(input.content) };
 		case "dispute":
 			return { kind: "direct", answers: false, words: null };
+		case "mode-handoff":
+			return isRecord(input.details) && input.details.mode === "teach" ? { kind: "teach", answers: false, words: null, handedBack: true } : none;
 		default:
 			return none;
 	}
@@ -110,6 +123,42 @@ const KIND_WORDS: Readonly<Record<TurnKind, string>> = {
 	close: "a close",
 };
 
+/** The rules a rewrite is still read against after its call was refused
+ *  once: a question asks one thing, so no rewrite passes by asking two
+ *  (round 7: a rewrite that fixed advice added a second question). */
+const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict"]);
+
+const SAVE_TOOL = "course_save";
+
+/** A reply that calls his whole answer wrong: "That's not right.", "Not
+ *  right: …", "No, …", with no part named right ("but", "partly"). */
+const FLAT_MISS = /^(?:(?:that|this|it)(?:'s| is) not (?:right|correct)\b|not (?:quite )?(?:right|correct)\b|no(?=[,.]))(?![^.?!]*\b(?:but|partly|part of)\b)/i;
+
+/** The results a save or a conclude records for his answers. */
+function savedResults(name: string, args: unknown): string[] {
+	if (!isRecord(args)) return [];
+	if (name === PRACTICE_CONCLUDE_TOOL) return typeof args.result === "string" ? [args.result] : [];
+	let changes: unknown = args.changes;
+	if (typeof changes === "string") {
+		try {
+			changes = JSON.parse(changes);
+		} catch {
+			return [];
+		}
+	}
+	const listed = isRecord(changes) && Array.isArray(changes.observations) ? changes.observations : [];
+	return listed.flatMap((o) => (isRecord(o) && typeof o.result === "string" && !("corrects" in o) ? [o.result] : []));
+}
+
+/** A save of a partly right answer after he was told it was not right:
+ *  the mark under the card would contradict the words above it (round 7:
+ *  "Partly right" under "That's not right."). */
+const SAVED_AGAINST_WORDS: AgentToolResult<unknown> = {
+	content: [{ type: "text", text: "Not saved: your message told him his answer is not right, so it is not partly right. Save it with result incorrect." }],
+	isError: true,
+	details: { withheld: "verdict" },
+};
+
 const quoted = (text: string) => `"${text.length > 160 ? `${text.slice(0, 157)}…` : text}"`;
 
 /** What to fix for each break, in the voice's own terms. */
@@ -134,7 +183,11 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 		case "headings":
 			return "No headings.";
 		case "questions":
-			return `One question per turn, and this turn asks more: ${quoted(b.excerpt)}.`;
+			return `One question per turn, and this turn asks more: ${quoted(b.excerpt)}. Ask the first alone; the rest waits for his answer.`;
+		case "verdict":
+			return `You saved his answer as partly right, so never call it not right: open with the part that is right, then where it broke: ${quoted(b.excerpt)}.`;
+		case "compound":
+			return `One question asks one thing, and this one asks more: ${b.excerpt.split(" / ").map(quoted).join(", ")}. Ask the first alone; the rest waits for his answer.`;
 		case "length":
 			return `It is too long for ${kind ? KIND_WORDS[kind] : "one turn"} (${b.excerpt}). Keep the one idea and cut the rest.`;
 		case "displays":
@@ -181,6 +234,15 @@ const AFTER_PROBE = (text: string): AgentToolResult<unknown> => ({
 	details: { withheld: "after-probe", text },
 });
 
+/** A question after `probe_done`: its teaching was withheld, so it would
+ *  reach him cold, and the teacher asks next (round 7: one was posed, he
+ *  missed it, and the miss was saved as a confident error). */
+const ASKED_AFTER_PROBE = (text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: "Not posed: the probe has ended and the teacher opens the lesson. End your turn with no question and no words." }],
+	isError: true,
+	details: { withheld: "after-probe", text },
+});
+
 /** A call that would end the turn while a refused message is still owed:
  *  he would never get the rewrite. */
 const OWED = (tool: string): AgentToolResult<unknown> => ({
@@ -188,6 +250,21 @@ const OWED = (tool: string): AgentToolResult<unknown> => ({
 	isError: true,
 	details: { withheld: "owed" },
 });
+
+/** A turn-ending call after ordinary text: he never reads that text. */
+const PLAIN_OWED = (tool: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not done: he never sees ordinary text, only what you send with send_to_user. If your text before this held anything for him, send it with send_to_user first; then call ${tool} again.` }],
+	isError: true,
+	details: { withheld: "plain-text" },
+});
+
+/** What the tutor reads when its turn would end with nothing shown: the
+ *  ordinary text it wrote, or a message refused and never rewritten. */
+const PLAIN_TEXT_NOTE = "Not shown to him: he never sees ordinary text, only what you send with send_to_user. Send your reply to him with send_to_user now, with nothing else.";
+const OWED_NOTE = "Not shown to him: your message was refused and you sent no rewrite, so he has nothing to read. Send the rewritten message with send_to_user now.";
+/** A turn after practice handed back that would end with nothing for him
+ *  to do (round 7: Explain instead ended on an explanation and no action). */
+const NEXT_ACTION_NOTE = "He has nothing to do next. End this turn on one question for him with your question tool, a check of what you just explained or the lesson's first question, with no words after it.";
 
 /** One turn's guard, built from the record the turn runs on. `endsTurn`
  *  names the calls that end the turn (a question, a pose, a handoff). */
@@ -207,6 +284,15 @@ export class VoiceGuard {
 	 *  was already held back for it (once a turn). */
 	private owed = false;
 	private heldForOwed = false;
+	/** Ordinary text this turn took out of a reply, and whether the turn
+	 *  posed a question he can answer, and was already told at its end. */
+	private plain = false;
+	private posed = false;
+	/** This turn saved an answer of his as partly right, or told him one
+	 *  was not right: the mark and the words must agree. */
+	private savedPartial = false;
+	private toldWrong = false;
+	private readonly noted = new Set<string>();
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -219,7 +305,7 @@ export class VoiceGuard {
 	/** Whether a tool's calls pass through the guard: the probe's end too,
 	 *  which it reads only once the probe has ended. */
 	guards(toolName: string): boolean {
-		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || this.endsTurn(toolName);
+		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
@@ -228,9 +314,32 @@ export class VoiceGuard {
 		if (call.name === PRACTICE_CONCLUDE_TOOL && !this.concluded) {
 			this.concluded = true;
 			this.sentAtConclude = this.sent;
+			if (savedResults(call.name, call.arguments).includes("partial")) this.savedPartial = true;
 		}
 		const refused = this.decide(call);
 		if (refused && call.name === SEND_TO_USER_TOOL) call.arguments = {};
+	}
+
+	/** Read ordinary text as its block ends: he never sees it, so it is
+	 *  always taken out (true); blank text is left alone. */
+	screenText(text: string): boolean {
+		if (!text.trim()) return false;
+		this.plain = true;
+		return true;
+	}
+
+	/** What the tutor must read before a turn ends that no tool ended:
+	 *  he got nothing to read, though it wrote him something (ordinary
+	 *  text, or a refused message never rewritten), or, after practice
+	 *  handed the session back, nothing to do. Each once a turn; nothing
+	 *  after the probe ends, where the teacher speaks next. */
+	beforeEnd(): string | undefined {
+		if (this.probeEnded || this.posed) return undefined;
+		const shown = this.sent > 0;
+		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : undefined;
+		if (!note || this.noted.has(note)) return undefined;
+		this.noted.add(note);
+		return note;
 	}
 
 	/** The tool, refusing the calls `screen` refused, and deciding the ones
@@ -241,7 +350,10 @@ export class VoiceGuard {
 			execute: async (toolCallId, params, signal, onUpdate) => {
 				const refused = this.decide({ type: "toolCall", id: toolCallId, name: tool.name, arguments: params as ToolCall["arguments"] });
 				if (refused) return refused;
+				const partial = tool.name === SAVE_TOOL && savedResults(tool.name, params).includes("partial");
+				if (partial && this.toldWrong) return SAVED_AGAINST_WORDS;
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
+				if (partial && !result.isError) this.savedPartial = true;
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				return result;
 			},
@@ -267,32 +379,42 @@ export class VoiceGuard {
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
 			const kind = this.messageKind();
-			const breaks = this.refused.has("message") ? [] : this.messageBreaks(text, kind);
+			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
 				this.refused.add("message");
 				this.owed = true;
 				return refusal("message", call.name, text, breaks, kind);
 			}
 			this.owed = false;
+			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
 			this.sent++;
 			return null;
 		}
-		if (this.owed && !this.heldForOwed && this.endsTurn(call.name)) {
+		if (this.probeEnded && (QUESTION_TOOLS as readonly string[]).includes(call.name)) return ASKED_AFTER_PROBE(questionText(call) ?? "");
+		if ((this.owed || (this.plain && this.sent === 0)) && !this.heldForOwed && this.endsTurn(call.name)) {
 			this.heldForOwed = true;
-			return OWED(call.name);
+			return this.owed ? OWED(call.name) : PLAIN_OWED(call.name);
 		}
 		if (!(QUESTION_TOOLS as readonly string[]).includes(call.name)) return null;
 		const text = questionText(call);
 		if (!text) return null;
-		const breaks = this.refused.has("question") ? [] : this.questionBreaks(text);
+		const breaks = this.held("question", this.questionBreaks(text));
 		if (breaks.length > 0) {
 			this.refused.add("question");
 			return refusal("question", call.name, text, breaks, undefined);
 		}
 		this.said.push(text);
+		this.posed = true;
 		return null;
+	}
+
+	/** The breaks a call is refused for: all of them the first time its
+	 *  kind of call is refused in a turn, then only the hard rules, so a
+	 *  rewrite that still slips elsewhere is shown rather than looped. */
+	private held(family: Family, breaks: VoiceBreak[]): VoiceBreak[] {
+		return this.refused.has(family) ? breaks.filter((b) => HARD.has(b.rule)) : breaks;
 	}
 
 	/** The kind of turn this message is: the input's for the turn's first
@@ -312,6 +434,10 @@ export class VoiceGuard {
 			const asked = [...this.asked, ...sentences(text).filter((s) => s.trim().endsWith("?"))];
 			if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });
 		}
+		const first = sentences(text)[0]?.trim() ?? "";
+		if (this.savedPartial && FLAT_MISS.test(first)) out.push({ rule: "verdict", excerpt: first });
+		const compound = compoundAsk(sentences(text).filter((s) => s.trim().endsWith("?")).join(" "));
+		if (compound) out.push(compound);
 		const under = afterQuestion(text);
 		if (under.length > 0 && kind !== "hint") out.push({ rule: "advice", excerpt: under.join(" ") });
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
@@ -322,6 +448,8 @@ export class VoiceGuard {
 
 	private questionBreaks(text: string): VoiceBreak[] {
 		const out = voiceBreaks(text).filter((b) => b.rule !== "headings");
+		const compound = compoundAsk(text);
+		if (compound) out.push(compound);
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
 		return [...out, ...this.repeats(text)];

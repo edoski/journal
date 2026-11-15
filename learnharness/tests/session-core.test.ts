@@ -313,9 +313,12 @@ describe("send (one input event, verbatim consumption)", () => {
 		const done = m.send({ type: "text", text: "go" });
 		const settle = () => new Promise((r) => setTimeout(r, 0));
 
+		// The tutor's words stream as send_to_user's argument (plain text never
+		// shows while its message streams).
+		const said = (message: string) => ({ type: "toolCall", id: "said-1", name: "send_to_user", arguments: { message } });
 		push({ type: "message_start", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }] } });
 		for (const text of ["Hel", "Hello", "Hello wor", "Hello world"]) {
-			push(partial([{ type: "thinking", thinking: "hmm" }, { type: "text", text }]));
+			push(partial([{ type: "thinking", thinking: "hmm" }, said(text)]));
 			await settle();
 		}
 		// MID-STREAM: exactly ONE assistant message in the tail — never one
@@ -329,7 +332,7 @@ describe("send (one input event, verbatim consumption)", () => {
 		const idMid = (assistants[0] as { id?: string }).id;
 		assert.match(idMid ?? "", /^c_/, "client-minted slot id");
 
-		push({ type: "message_end", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }, { type: "text", text: "Hello world" }], stopReason: "stop" } });
+		push({ type: "message_end", message: { role: "assistant", content: [{ type: "thinking", thinking: "hmm" }, said("Hello world")], stopReason: "toolUse" } });
 		push({ type: "agent_end", messages: [] });
 		push("[DONE]");
 		await done;

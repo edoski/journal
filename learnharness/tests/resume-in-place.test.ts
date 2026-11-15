@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { createFauxCore, fauxAssistantMessage, fauxText, type Context, type Message } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
-import { fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { fakeFor, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-resume-in-place-"));
 process.env.LH_DATA_DIR = TMP_DATA;
@@ -173,16 +173,17 @@ describe("a lesson waiting on his typed answer", () => {
 
 // ─── Continue, end to end ───────────────────────────────────────────────────
 
-/** One scripted model; records which agent each turn ran and what it saw. */
+/** One scripted model; records which agent each turn ran and what it saw.
+ *  Each turn sends the reply with send_to_user, then ends. */
 function scripted(reply: string) {
 	const seen: { agent: AgentKind; prompt: string; tools: string[] }[] = [];
 	let agent: AgentKind = "prober";
 	const faux = createFauxCore({});
 	faux.setResponses(
-		Array.from({ length: 4 }, () => (context: Context) => {
+		Array.from({ length: 4 }, () => [(context: Context) => {
 			seen.push({ agent, prompt: context.systemPrompt ?? "", tools: (context.tools ?? []).map((t) => t.name) });
-			return fauxAssistantMessage([fauxText(reply)]);
-		}),
+			return sendToUser(reply);
+		}, fauxAssistantMessage("")]).flat(),
 	);
 	const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 	const deliver = (steer: SteerMessage) => void deliverJobResult(steer);

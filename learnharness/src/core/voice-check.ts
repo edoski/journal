@@ -32,6 +32,8 @@ export type VoiceRule =
 	| "length"
 	| "displays"
 	| "questions"
+	| "compound"
+	| "verdict"
 	| "headings"
 	| "repeat"
 	| "advice"
@@ -215,6 +217,52 @@ export function promptVoiceBreaks(text: string): VoiceBreak[] {
 		if (m) out.push({ rule: "asks-banned", excerpt: `${m[0]} (asks for ${asks})` });
 	}
 	return out;
+}
+
+/** Words that open an ask: a question word, a verb a question starts
+ *  with, or a task. */
+const ASK_OPENS =
+	/^(?:what|which|who|whom|whose|when|where|why|how|whether|is|are|was|were|do|does|did|can|could|would|should|will|has|have|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b/i;
+/** Words that open an ask after a bare "and": a question word or a task,
+ *  never a verb like "is", which also joins a description ("lies in ker A
+ *  and is nonzero"). */
+const ASK_AFTER_AND =
+	/\s+and\s+(?=(?:what|which|who|whom|whose|when|where|why|how|whether|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b)/i;
+/** "and why", "why or why not": a reason asked for with the answer, part
+ *  of the one ask. */
+const BARE_WHY = /^why(?:\s+or\s+why\s+not|\s+not)?\s*[?.]?$/i;
+/** "When you meet v…", "Where the curve turns…": a clause that sets the
+ *  scene, unless a verb asks next ("When does it converge?"). */
+const SCENE = /^(?:when|where)\b(?!\s+(?:does|do|did|is|are|was|were|will|would|can|could|should|has|have)\b)/i;
+
+/** The asks of a question: its clauses that ask something of him, joined
+ *  by commas, "then", "and" or a new sentence ("What is the rank of A,
+ *  what is dim ker A, and is A invertible?" asks three). Alternatives
+ *  ("…, or …") and a reason asked for with the answer ("…, and why?") stay
+ *  one ask. Maths is read as one word. */
+export function questionAsks(text: string): string[] {
+	const out: string[] = [];
+	// A display is part of its sentence here ("Show that $$N$$ is not invertible").
+	const said = sentences(prose(text.replace(/\s*(?:\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*/g, " X ")).text);
+	// What sits under the last question is advice, its own rule.
+	const last = said.map((s) => s.trim().endsWith("?")).lastIndexOf(true);
+	for (const sentence of last < 0 ? said : said.slice(0, last + 1)) {
+		if (ADVICE.test(sentence)) continue;
+		const clauses = sentence
+			.replace(/^(?:then|and|also|now)\b[,\s]*/i, "")
+			.split(/\s*;\s*|,\s*(?:and\s+|then\s+)?|\s+(?:and\s+)?then\s+/i)
+			.flatMap((c) => c.split(ASK_AFTER_AND))
+			.map((c) => c.trim().replace(/^(?:and|then)\s+/i, ""));
+		for (const clause of clauses) if (ASK_OPENS.test(clause) && !BARE_WHY.test(clause) && !SCENE.test(clause)) out.push(clause);
+	}
+	return out;
+}
+
+/** A question's text that asks more than one thing (`questionAsks`), or
+ *  null. */
+export function compoundAsk(text: string): VoiceBreak | null {
+	const asks = questionAsks(text);
+	return asks.length > 1 ? { rule: "compound", excerpt: asks.join(" / ") } : null;
 }
 
 /** A sentence of advice on how he should work: checking, verifying, what
