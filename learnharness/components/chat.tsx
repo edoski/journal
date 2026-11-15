@@ -400,9 +400,10 @@ export function Chat({
 				setupOpen: setupOpenRef.current,
 				pending: pendingRef.current !== null,
 				problem: activeProblemRef.current !== null,
+				askToggle: proseToggleRef.current !== null,
 				busy: busyRef.current,
 			});
-			if ((target === "question" || target === "problem") && proseToggleRef.current) proseToggleRef.current();
+			if (target === "ask") proseToggleRef.current?.();
 			else if (target === "question") setAbortAsk("question");
 			else if (target === "problem") setAbortAsk("problem");
 			else if (target === "turn") setAbortAsk("turn");
@@ -1836,7 +1837,7 @@ export function Chat({
  *  then the session overlays (mermaid paints above plan — later in DOM),
  *  then setup (self-closing — the gate only must not fire), then the
  *  2026-10-02 abort chain proper (question before turn). */
-export type EscAbortTarget = "mermaid" | "plan" | "setup" | "question" | "problem" | "turn" | null;
+export type EscAbortTarget = "mermaid" | "plan" | "setup" | "ask" | "question" | "problem" | "turn" | null;
 
 /**
  * Does the opening topic still owe its first send? The topic is the
@@ -1864,12 +1865,17 @@ export function escAbortTarget(s: {
 	 *  abort (a live turn can be running BEHIND an idle problem only in
 	 *  teaching sessions — practice problems end their pose turns). */
 	problem: boolean;
+	/** The answer box's Answer or Ask switch is there: Esc switches it while
+	 *  the tutor waits on him, and stops the tutor while it replies
+	 *  (round 9: Esc mid-reply switched to Ask and nothing stopped it). */
+	askToggle: boolean;
 	busy: boolean;
 }): EscAbortTarget {
 	if (s.abortAsk) return null; // the popup's own Esc — claimed by the dialog
 	if (s.mermaidFocus) return "mermaid";
 	if (s.planOpen) return "plan";
 	if (s.setupOpen) return "setup";
+	if (s.askToggle) return s.busy ? "turn" : "ask";
 	if (s.pending) return "question";
 	if (s.problem) return "problem";
 	if (s.busy) return "turn";
