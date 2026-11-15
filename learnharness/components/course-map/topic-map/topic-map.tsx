@@ -63,6 +63,7 @@ export function TopicMap({
 	whole = false,
 	framed = null,
 	onOpensWhole,
+	opensOn,
 }: {
 	map: CourseMap;
 	/** The one arc to draw; unset, the whole course. */
@@ -88,6 +89,11 @@ export function TopicMap({
 	 *  course (it fits at a readable scale), so a page offers a zoom out only
 	 *  when there is more to see. */
 	onOpensWhole?: (fits: boolean) => void;
+	/** The topic the map opens framed on; unset, where he is (the course's
+	 *  current topic). A topic's page opens on its own topic (round 10,
+	 *  3 m9: Invertible matrices' page opened on the top of the map,
+	 *  without it). */
+	opensOn?: TopicHandle | null;
 }) {
 	const view = useMemo(() => arcView(course, arc), [course, arc]);
 	const map = view.map;
@@ -146,7 +152,7 @@ export function TopicMap({
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} onOpensWhole={onOpensWhole} />
+			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} />
 		</ReactFlowProvider>
 	);
 }
@@ -164,6 +170,7 @@ function Flow({
 	whole,
 	framed,
 	onOpensWhole,
+	opensOn,
 }: {
 	map: CourseMap;
 	layout: TopicMapLayout;
@@ -177,6 +184,7 @@ function Flow({
 	whole: boolean;
 	framed: ReadonlySet<TopicHandle> | null;
 	onOpensWhole: ((fits: boolean) => void) | undefined;
+	opensOn: TopicHandle | null;
 }) {
 	const captionId = useId();
 	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y]);
@@ -253,7 +261,7 @@ function Flow({
 		const camera = whole
 			? cameraAt(layout, middle, minZoom, size, margin)
 			: fixedZoom === undefined
-				? framedCamera(layout, map.current, size, frameMargin, TAG_ROOM)
+				? framedCamera(layout, opensOn, size, frameMargin, TAG_ROOM)
 				: cameraAt(layout, middle, fixedZoom, size, margin);
 		// Zooming out to the whole course and back glides; any other move is at once. Without a duration React Flow
 		// sets the viewport synchronously; only its promise settles later.
@@ -263,7 +271,7 @@ function Flow({
 		follower.stay();
 		void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
 		setPlaced(true);
-	}, [flow, follower, layout, map.current, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom]);
+	}, [flow, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom]);
 
 	// The topics a page points at on this drawing, which the camera follows; none while it shows the whole course.
 	const pointedAt = useMemo(() => {
