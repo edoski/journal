@@ -35,6 +35,15 @@ export function leaveSearch(field: { blur(): void }, changeQuery: (next: string)
 	focusWhereHeTypes(doc, false);
 }
 
+/** Whether a click in the search results opens one (a course, an arc, a
+ *  topic or a session row): the search then empties, so the sidebar shows
+ *  its agenda again on the page he opened (round 9: the filter stayed and
+ *  hid Today until ✕). */
+export function opensSearchResult(target: EventTarget | null): boolean {
+	const el = target as Element | null;
+	return typeof el?.closest === "function" && el.closest("[data-sidebar-row]") !== null;
+}
+
 export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: () => void }) {
 	const [chats, setChats] = useState<ChatListItem[] | null>(null);
 	const [query, setQuery] = useState("");
@@ -161,7 +170,8 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	// cycle's successor): ↑/↓ cycle the filtered rows (wrap), Enter opens
 	// the walked row — or the FIRST match when nothing is walked (the
 	// quick-open pattern) — then blurs (focus returns to the app per the
-	// Enter law; the query stays for re-searching). Esc leaves the search
+	// Enter law; opening a result empties the search, opensSearchResult).
+	// Esc leaves the search
 	// (owner, keyboard wave): blur back to normal, and claim the key so the
 	// window Esc chain (abort) doesn't also fire.
 	const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shown: readonly ChatListItem[] | null) => {
