@@ -362,6 +362,14 @@ describe("a real turn on the Agent SDK", () => {
 		const results = agent.state.messages.slice(3).filter((m) => m.role === "toolResult").map((m) => [(m as { toolCallId: string }).toolCallId, (m as { isError: boolean }).isError]);
 		assert.deepEqual(results, [["q1", true], ["m1", false], ["q2", false]]);
 	});
+	it("after Explain instead, his answer to the check still owes him a way on, until he writes or practice resumes (round 7)", () => {
+		const handBack = { id: "steer_mode_t2", role: "custom", customType: "mode-handoff", content: "[TEACHING]", display: true, details: { chatId: "c", mode: "teach" }, timestamp: 1 } as LhMessage;
+		const q = ask("What is $\\operatorname{rank} B$?", "recall");
+		assert.equal(turnInputOf([newUserMessage("Rank practice"), handBack, assistant([q]), answered(q.id, "2")]).handedBack, true);
+		assert.equal(turnInputOf([newUserMessage("Rank practice"), handBack, newUserMessage("ok"), assistant([q]), answered(q.id, "2")]).handedBack, undefined);
+		assert.equal(turnInputOf(answering("rank 2")).handedBack, undefined);
+	});
+
 	it("after Explain instead, the explanation always leaves him a next action (round 7)", async () => {
 		const handBack = { id: "steer_mode_t1", role: "custom", customType: "mode-handoff", content: "[TEACHING]", display: true, details: { chatId: "c", mode: "teach" }, timestamp: 1 } as LhMessage;
 		const check = { question: "Which columns of $A$ form a basis of $\\operatorname{im} A$?", type: "check", nodeId: "rank", correctAnswer: "The pivot columns of A." };

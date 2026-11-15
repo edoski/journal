@@ -52,6 +52,18 @@ function textOf(content: unknown): string {
 	return content.flatMap((p) => (isRecord(p) && p.type === "text" && typeof p.text === "string" ? [p.text] : [])).join("\n");
 }
 
+/** Practice handed the session back to teaching, and since then he wrote
+ *  nothing of his own and no handoff went back to practice. */
+function afterHandBack(messages: readonly LhMessage[]): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "user") return false;
+		if (m.role === "toolResult" && m.toolName === "practice" && !m.isError) return false;
+		if (m.role === "custom" && m.customType === "mode-handoff") return isRecord(m.details) && m.details.mode === "teach";
+	}
+	return false;
+}
+
 /** The turn's input, read from the last message that opens a turn. */
 export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 	const at = messages.findLastIndex(opensTurn);
@@ -66,10 +78,12 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 	}
 	if (input.role === "toolResult") {
 		const details = isRecord(input.details) ? input.details : {};
+		// His answer to the check after practice handed back: he still needs a way on.
+		const handedBack = afterHandBack(messages.slice(0, at)) ? { handedBack: true } : {};
 		if (details.hintRequested === true) return { kind: "hint", answers: false, words: null };
 		// A shown answer sets its own length, as a shown solution does.
 		if (details.showMe === true) return { kind: undefined, answers: false, words: null };
-		return { kind: "wrong", answers: true, words: typeof details.text === "string" ? details.text : textOf(input.content) };
+		return { kind: "wrong", answers: true, words: typeof details.text === "string" ? details.text : textOf(input.content), ...handedBack };
 	}
 	if (input.role !== "custom") return none;
 	switch (input.customType) {
@@ -264,7 +278,7 @@ const PLAIN_TEXT_NOTE = "Not shown to him: he never sees ordinary text, only wha
 const OWED_NOTE = "Not shown to him: your message was refused and you sent no rewrite, so he has nothing to read. Send the rewritten message with send_to_user now.";
 /** A turn after practice handed back that would end with nothing for him
  *  to do (round 7: Explain instead ended on an explanation and no action). */
-const NEXT_ACTION_NOTE = "He has nothing to do next. End this turn on one question for him with your question tool, a check of what you just explained or the lesson's first question, with no words after it.";
+const NEXT_ACTION_NOTE = "He has nothing to do next. End this turn on one question for him with your question tool, or, once he has answered your check, hand the session back to the problems with practice.";
 
 /** One turn's guard, built from the record the turn runs on. `endsTurn`
  *  names the calls that end the turn (a question, a pose, a handoff). */
