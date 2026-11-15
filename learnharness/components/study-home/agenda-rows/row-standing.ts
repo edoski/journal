@@ -5,8 +5,9 @@ import type { TodayRow } from "@/components/study-home/study-facts";
 import type { SlipKey } from "@/components/study-words";
 
 /** Where he stands on a Today row's topic, as the topic page's head says
- *  it: the pie and its words, and why the engine calls it weak when the
- *  words and the row's reason leave that unsaid. */
+ *  it: the pie and its words, and the slip (why the engine calls it weak,
+ *  or its open mistake) when the row's reason leaves that unsaid. The row
+ *  says the slip in place of the standing's words (`rowWords`). */
 export interface RowStanding {
 	standing: Standing;
 	slip: { key: SlipKey; words: string } | null;
@@ -28,4 +29,12 @@ export function rowStanding(row: TodayRow): RowStanding | null {
 	if (!map || !topic || topic.level === "new") return null;
 	const slip = whyOf(row)?.kind === "missed" ? null : slipBeside(topic, (h) => map.topics.find((t) => t.handle === h)?.title ?? h);
 	return { standing: standingOf(topic), slip };
+}
+
+/** The row's one status words: the slip he would act on ("Check on your
+ *  own", "Mistake to fix"), else where he stands. The pie beside them
+ *  keeps the warning ink of a topic that slips, so "Slipping" is never a
+ *  second status beside the slip (round 10, 1 m4). Pure. */
+export function rowWords(facts: RowStanding): string {
+	return facts.slip?.words ?? facts.standing.words;
 }
