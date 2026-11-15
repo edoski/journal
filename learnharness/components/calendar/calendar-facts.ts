@@ -195,7 +195,9 @@ export function lookOf(entry: CalendarEntry): EntryLook {
 		case "task":
 			return "task";
 		case "session":
-			return entry.task ? "task" : entry.type;
+			// A review that turned into teaching is still the review (round 9,
+			// 2 m4: it read Unfinished).
+			return entry.task && entry.type !== "review" ? "task" : entry.type;
 	}
 }
 
