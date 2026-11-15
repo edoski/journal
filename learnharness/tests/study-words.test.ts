@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, disputeStampWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, disputeStampWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, leftOffWords, studiedDaysWords, agoWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -122,8 +122,14 @@ describe("why a slip needs him", () => {
 });
 
 describe("why a review needs him", () => {
-	it("says a due review in days under a week, then whole weeks", () => {
-		assert.deepEqual([0, 1, 3, 6, 7, 13, 14, 30].map(overdueWords), ["Due today", "1d overdue", "3d overdue", "6d overdue", "7d overdue", "13d overdue", "14d overdue", "30d overdue"]);
+	it("says since which day a review is due, never a count of days (round 9, 2 m5)", () => {
+		assert.deepEqual([0, 1, 5, 40].map((days) => overdueWords(days, "2026-11-08")), ["Due today", "Due since 7 Nov", "Due since 3 Nov", "Due since 29 Sept"]);
+	});
+
+	it("says the day work was left and the day he studied, never a count of days (round 9, 2 m5)", () => {
+		assert.deepEqual([0, 1, 2, null].map((days) => leftOffWords(days, "2026-11-08")), ["Left off today", "Left off yesterday", "Left off 6 Nov", "Unfinished"]);
+		assert.deepEqual([0, 1, 4].map((days) => studiedDaysWords(days, "2026-11-08")), ["Studied today", "Studied yesterday", "Studied 4 Nov"]);
+		assert.deepEqual([0, 1, 13].map((days) => agoWords(days, "2026-11-08")), ["Today", "Yesterday", "26 Oct"]);
 	});
 
 	it("says the day a dated review comes back, never a count of days (round 8, 2 m4)", () => {
@@ -164,7 +170,7 @@ describe("why a review waits", () => {
 		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct, back 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
 		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back Thu 3 Dec");
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back Fri 20 Nov", "memory's day is still ahead");
-		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
+		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "Due since 5 Nov");
 	});
 	it("says from which told day a review moved and what of his study moved it, ahead of memory's day", () => {
 		const told = { from: "2026-11-10", by: "study" as const, courses: ["Probability"] };

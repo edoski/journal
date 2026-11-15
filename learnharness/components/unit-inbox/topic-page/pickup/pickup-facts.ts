@@ -84,7 +84,7 @@ export const NOTHING_DUE = "Nothing due";
  *  is due ("Due since 6 Nov", "Due today"); null for any other. */
 function heldPastDue(review: TopicFacts["topic"]["review"], today: string): string | null {
 	if (review?.kind !== "scheduled" || !review.held || review.held.since > today) return null;
-	return review.held.since < today ? reviewWords(review, today) : overdueWords(0);
+	return review.held.since < today ? reviewWords(review, today) : overdueWords(0, today);
 }
 
 /** The step a lesson stopped on, when its tutor planned. */
@@ -115,7 +115,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 			};
 		}
 		case "review":
-			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0) };
+			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today) };
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
@@ -146,7 +146,7 @@ export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	const waiting = (["your-turn", "working", "left"] as const).flatMap((state) => sessions.filter((entry) => entry.state === state));
 	const review =
 		facts.action.kind !== "review" && facts.topic.review?.kind === "due"
-			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0), press: { opening: `Review ${facts.topic.title}` } }]
+			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), press: { opening: `Review ${facts.topic.title}` } }]
 			: [];
 	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;
 	const tasks = facts.pickups.flatMap((pickup): NextItem[] =>

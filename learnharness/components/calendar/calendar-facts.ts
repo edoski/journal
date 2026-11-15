@@ -177,11 +177,11 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
 
 /** An entry's words beside its icon: its look's, except a review due
  *  today, which says how late as Home's rows and the sidebar do ("Due
- *  today", "2d overdue"), so one review never reads "2d overdue" on Home
+ *  today", "Due since 5 Nov"), so one review never reads "Due since 5 Nov" on Home
  *  and "Overdue" here (round 5). Pure. */
 export function lookWords(entry: CalendarEntry, today: string): string {
 	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;
-	return review?.kind === "due" ? overdueWords(review.overdue) : LOOKS[lookOf(entry)].words;
+	return review?.kind === "due" ? overdueWords(review.overdue, today) : LOOKS[lookOf(entry)].words;
 }
 
 export function lookOf(entry: CalendarEntry): EntryLook {

@@ -160,12 +160,12 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("kernel"), inbox.today), { kind: "slip", words: "Mistake to fix", slip: "gap" });
 		assert.deepEqual(unitStatus(by("elimination"), inbox.today), { kind: "slip", words: "Mixed up with cramer", slip: "mixed" }, "the method named by its title, as the map says it");
 		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Fixed, check again later", slip: "repaired" });
-		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "2d overdue" });
-		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "9d overdue" });
-		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 2d ago" });
+		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "Due since 6 Nov" });
+		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "Due since 30 Oct" });
+		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 6 Nov" });
 		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back Mon 9 Nov" });
 		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back Mon 30 Nov" });
-		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "3d ago" });
+		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "5 Nov" });
 	});
 
 	it("says Your turn only on a row whose session waits on him", () => {

@@ -69,7 +69,7 @@ describe("needsYouNow", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
 			[...lines, ...also].map((l) => l.slot),
-			["Your turn", "Your turn", "3d overdue", "4d overdue", "7d overdue", "Not right last time"],
+			["Your turn", "Your turn", "Due since 5 Nov", "Due since 4 Nov", "Due since 1 Nov", "Not right last time"],
 		);
 		const task: StudyCourse = {
 			...LINALG,

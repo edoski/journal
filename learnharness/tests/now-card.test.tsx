@@ -44,7 +44,7 @@ describe("NowCard", () => {
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Your turn", "Your turn", "3d overdue", "4d overdue"],
+			["Your turn", "Your turn", "Due since 5 Nov", "Due since 4 Nov"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="row-action"]')?.getAttribute("aria-label")),

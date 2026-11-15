@@ -187,17 +187,17 @@ describe("the open tasks that hold a topic", () => {
 describe("where he stands, in the app's one wording", () => {
 	it("says every seeded head line word for word", () => {
 		const lines: [CourseMapTopic, string][] = [
-			[TOPICS.rank, "Not right last time. Mistake to fix. 3d overdue"],
-			[TOPICS.matmul, "Not right last time. 2d overdue"],
-			[TOPICS.span, "On your own. 10d overdue"],
+			[TOPICS.rank, "Not right last time. Mistake to fix. Due since 5 Nov"],
+			[TOPICS.matmul, "Not right last time. Due since 6 Nov"],
+			[TOPICS.span, "On your own. Due since 29 Oct"],
 			[TOPICS.vectors, "On your own. Back Fri 13 Nov"],
-			[TOPICS.cramer, "Taught, not tried. 2d overdue"],
+			[TOPICS.cramer, "Taught, not tried. Due since 6 Nov"],
 			[TOPICS.riemann, "Not right last time. Due today"],
-			[TOPICS.elimination, "Not right last time. Mixed up with Cramer's rule. 2d overdue"],
-			[TOPICS.kernel, "Tried, not right yet. Sure, but wrong. 1d overdue"],
-			[TOPICS.basis, "On your own. 9d overdue"],
-			[TOPICS.independence, "Not right last time. Mistake to fix. 16d overdue"],
-			[TOPICS.chain, "Not right last time. 30d overdue"],
+			[TOPICS.elimination, "Not right last time. Mixed up with Cramer's rule. Due since 6 Nov"],
+			[TOPICS.kernel, "Tried, not right yet. Sure, but wrong. Due since 7 Nov"],
+			[TOPICS.basis, "On your own. Due since 30 Oct"],
+			[TOPICS.independence, "Not right last time. Mistake to fix. Due since 23 Oct"],
+			[TOPICS.chain, "Not right last time. Due since 9 Oct"],
 			[TOPICS.eigen, "Not started"],
 		];
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
@@ -207,9 +207,9 @@ describe("where he stands, in the app's one wording", () => {
 	it("gives why it needs him and its review as marks of their own kind", () => {
 		assert.deepEqual(headMarks(TOPICS.elimination, titleOf, TODAY), [
 			{ kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" },
-			{ kind: "review", words: "2d overdue" },
+			{ kind: "review", words: "Due since 6 Nov" },
 		]);
-		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [{ kind: "review", words: "2d overdue" }], "the standing already says Not right last time (round 8)");
+		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [{ kind: "review", words: "Due since 6 Nov" }], "the standing already says Not right last time (round 8)");
 		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);
 	});
 
@@ -228,7 +228,7 @@ describe("where he stands, in the app's one wording", () => {
 	});
 
 	it("says a topic still being learned is due, as its action does, and dates a later review", () => {
-		assert.deepEqual(headMarks(TOPICS.determinant, titleOf, TODAY), [{ kind: "review", words: "4d overdue" }]);
+		assert.deepEqual(headMarks(TOPICS.determinant, titleOf, TODAY), [{ kind: "review", words: "Due since 4 Nov" }]);
 		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: null }, titleOf, TODAY), []);
 		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: { kind: "scheduled", date: "2026-11-09" } }, titleOf, TODAY), [{ kind: "review", words: "Back Mon 9 Nov" }]);
 	});
@@ -242,11 +242,11 @@ describe("the page's words for time", () => {
 	};
 
 	it("are Home's, for every day from today to more than a year back", () => {
-		for (let days = 0; days <= 400; days++) assert.equal(agoWords(days), studiedAgo(row(days)), `ago ${days}`);
+		for (let days = 0; days <= 400; days++) assert.equal(agoWords(days, COURSE.map.today), studiedAgo(row(days)), `ago ${days}`);
 	});
 
-	it("say when he last studied the topic, in days, then weeks, then months", () => {
-		assert.deepEqual([0, 1, 2, 13, 14, 59, 60].map(studiedWords), ["Studied today", "Studied yesterday", "Studied 2 days ago", "Studied 13 days ago", "Studied 14 days ago", "Studied 59 days ago", "Studied 60 days ago"]);
+	it("say the day he last studied the topic, never a count of days (round 9, 2 m5)", () => {
+		assert.deepEqual([0, 1, 2, 13, 60].map((days) => studiedWords(days, "2026-11-08")), ["Studied today", "Studied yesterday", "Studied 6 Nov", "Studied 26 Oct", "Studied 9 Sept"]);
 	});
 
 	it("name a day against the engine's: today, yesterday, else the date", () => {
@@ -272,14 +272,14 @@ describe("when he last studied the topic", () => {
 	it("reads a session dated after the engine's day as today", () => {
 		const chats = [chat({ topics: ["cramer"], updatedAt: "2026-11-10T08:00:00.000Z" })];
 		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, chats, read: null }).studied, "Studied today");
-		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, chats: [], read: null }).studied, "Studied 3 days ago");
+		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, chats: [], read: null }).studied, "Studied 5 Nov");
 	});
 
 	it("dates a session by its local day, never after the engine's", () => {
 		const late = new Date(2026, 10, 6, 23, 30).toISOString();
 		assert.equal(localDay(late), "2026-11-06");
 		const [entry] = sessionEntries([chat({ updatedAt: late })], [], TODAY, "rank");
-		assert.deepEqual([entry!.day, entry!.when], ["2026-11-06", "2d ago"]);
+		assert.deepEqual([entry!.day, entry!.when], ["2026-11-06", "6 Nov"]);
 		const [later] = sessionEntries([chat({ updatedAt: "2026-11-12T10:00:00.000Z" })], [], TODAY, "rank");
 		assert.deepEqual([later!.day, later!.when], [TODAY, "Today"]);
 	});
@@ -395,8 +395,8 @@ describe("where to pick the topic back up", () => {
 		assert.deepEqual(
 			rows.map((p) => [p.kind, p.title, p.where, p.when]),
 			[
-				["session", "Rank practice", "Problem waiting", "7d ago"],
-				["task", SHEET.title, SHEET.step, "2d ago"],
+				["session", "Rank practice", "Problem waiting", "1 Nov"],
+				["task", SHEET.title, SHEET.step, "6 Nov"],
 			],
 		);
 		const task = rows[1]!;
@@ -423,7 +423,7 @@ describe("the topic's sessions", () => {
 			[
 				[newest.id, "your-turn", "Today"],
 				[second.id, "your-turn", "Yesterday"],
-				[old.id, "finished", "19d ago"],
+				[old.id, "finished", "20 Oct"],
 			],
 		);
 		assert.deepEqual(
@@ -467,6 +467,6 @@ describe("the facts a candidate draws", () => {
 			chats: [],
 			read: { record: { attempts: [attempt({ date: "2026-11-03" })], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] }, plans: [] },
 		});
-		assert.deepEqual([rank.studied, rank.attempts.length, rank.pickups.map((p) => p.when)], ["Studied 5 days ago", 1, ["2d ago"]]);
+		assert.deepEqual([rank.studied, rank.attempts.length, rank.pickups.map((p) => p.when)], ["Studied 3 Nov", 1, ["6 Nov"]]);
 	});
 });

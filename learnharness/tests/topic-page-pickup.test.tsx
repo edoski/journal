@@ -119,7 +119,7 @@ describe("Now", () => {
 			[
 				["resume", "Computing a 2×2 spectrum", "Your turn", "Resume", "chat_demo_eigen"],
 				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
-				["review", "2d overdue", null, "Review", null],
+				["review", "Due since 6 Nov", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],
 				["continue", DET_STOPPED, "Left off yesterday", "Continue", "chat_demo_det"],

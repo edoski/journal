@@ -1,8 +1,8 @@
 # Agenda rows
 
-How a line of agenda's Today reads: the hybrid rows (`hybrid/hybrid.md`), the pie by the course, "2d ago" at the end of the course line, the reason as an icon and a few words at the end of the lesson line, both flush right. `today.tsx` draws them with no switch.
+How a line of agenda's Today reads: the hybrid rows (`hybrid/hybrid.md`), the pie by the course, "6 Nov" at the end of the course line, the reason as an icon and a few words at the end of the lesson line, both flush right. `today.tsx` draws them with no switch.
 
-Four candidates ran behind a Rows switch: `reason` (every row says why it is there now, as a sentence), `recency` (a row is a thread, "Studied 2 days ago"), `progress` (each course a tile with a pie that fills) and `hybrid`, against the course-and-lesson line of 12 Nov 2026. Edo picked hybrid on 13 Nov 2026, and the other three, the old line and the switch were deleted.
+Four candidates ran behind a Rows switch: `reason` (every row says why it is there now, as a sentence), `recency` (a row is a thread, "Studied 4 Nov"), `progress` (each course a tile with a pie that fills) and `hybrid`, against the course-and-lesson line of 12 Nov 2026. Edo picked hybrid on 13 Nov 2026, and the other three, the old line and the switch were deleted.
 
 ## Shared
 

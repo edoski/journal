@@ -280,7 +280,7 @@ describe("what next, above the arcs", () => {
 	it("picks up what Home's Today puts first for the course, naming its arc, even when that is a slip in another arc than where he is", () => {
 		const next = whatNext(ARCS)!;
 		assert.equal(next.pickUp?.line.title, "Review Linear independence");
-		assert.equal(next.pickUp?.line.why?.short, "4d overdue");
+		assert.equal(next.pickUp?.line.why?.short, "Due since 4 Nov");
 		assert.equal(next.pickUp?.arc?.handle, "spaces", "You are here is in Linear systems");
 		const waiting = whatNext(ARCS, CHATS)!;
 		assert.equal(waiting.pickUp?.line.why?.short, "Your turn", "a session waiting on him comes first, as on Today");

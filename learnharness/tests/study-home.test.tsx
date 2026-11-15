@@ -324,7 +324,7 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNext up", "Linear AlgebraReview Linear independence, Rank, Span16d overdue", "Linear AlgebraContinue Problem sheet 4Left off 3d ago", "Real AnalysisReview Sequences1d overdue"],
+			["Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNext up", "Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Linear AlgebraContinue Problem sheet 4Left off 5 Nov", "Real AnalysisReview SequencesDue since 7 Nov"],
 		);
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
@@ -370,10 +370,10 @@ describe("what a line of Today reads", () => {
 			return why && [why.kind, why.short];
 		};
 		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY)[0]!), ["reply", "Your turn"]);
-		assert.deepEqual(short(rowOf(LINALG)), ["review", "16d overdue"]);
-		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "1d overdue"]);
+		assert.deepEqual(short(rowOf(LINALG)), ["review", "Due since 23 Oct"]);
+		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "Due since 7 Nov"]);
 		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time: Sequences"]);
-		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 3d ago"], "when the task was left, never the tutor's step");
+		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 5 Nov"], "when the task was left, never the tutor's step");
 		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
 	});
 
@@ -406,7 +406,7 @@ describe("what a line of Today reads", () => {
 		const [row] = todayRows([{ ...LINALG, lastActiveDaysAgo: 3 }], [started], TODAY);
 		assert.equal(studiedAgo(row!), "Today", "a session started minutes ago never reads 3d ago");
 		const task = rowOf({ ...LINALG, due: [], lastActiveDaysAgo: 0 });
-		assert.deepEqual([studiedAgo(task), whyOf(task)?.short], [null, "Left off 3d ago"], "no Today above Left off 3d ago");
+		assert.deepEqual([studiedAgo(task), whyOf(task)?.short], [null, "Left off 5 Nov"], "no Today above Left off 5 Nov");
 	});
 
 	it("counts how much of a course he can do on his own, weak topics left out", () => {
@@ -437,9 +437,9 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(lines, [
 			"Linear AlgebraStudied todayEigen lessonYour turn",
 			"ProbabilityContinue Bayes' ruleNext up",
-			"Linear AlgebraReview Linear independence, Rank, Span16d overdue",
-			"Linear AlgebraContinue Problem sheet 4Left off 3d ago",
-			"Real AnalysisReview Sequences1d overdue",
+			"Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
+			"Linear AlgebraContinue Problem sheet 4Left off 5 Nov",
+			"Real AnalysisReview SequencesDue since 7 Nov",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["task", 1], ["review", 1]]);

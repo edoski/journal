@@ -170,10 +170,10 @@ export function daysBetween(from: string, to: string): number {
  *     first;
  *   - the engine calls the topic weak ("Not right last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
- *   - a solid topic's review is due ("Due today", "3d overdue");
- *   - an open task holds it, and when he left off ("Left off 3d ago");
+ *   - a solid topic's review is due ("Due today", "Due since 5 Nov");
+ *   - an open task holds it, and when he left off ("Left off 6 Nov");
  *   - when its next review comes ("Back in 5d");
- *   - else when he last studied it ("Today", "3d ago").
+ *   - else when he last studied it ("Today", "6 Nov").
  * A topic still being learned never says its review is due: almost all
  * of them are.
  */
@@ -186,11 +186,11 @@ export type UnitStatus =
 	 *  started"), which search lists beside the topics he has. */
 	| { kind: "none"; words?: string };
 
-/** When an open task was left, in the app's words ("Left off 3d ago"):
+/** When an open task was left, in the app's words ("Left off 6 Nov"):
  *  the engine's day it last changed, never its step, which the tutor
  *  writes. Pure. */
 export function taskWords(task: Pick<CourseMapTask, "updated">, today: string): string {
-	return leftOffWords(task.updated ? Math.max(0, daysBetween(task.updated, today)) : null);
+	return leftOffWords(task.updated ? Math.max(0, daysBetween(task.updated, today)) : null, today);
 }
 
 /** The learner's own calendar day of a session's time, or a study day as
@@ -201,10 +201,11 @@ const dayOf = (at: string) => {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** When something was last studied, in Home's words: "Today", "3d ago".
+/** When something was last studied, in Home's words: "Today", "6 Nov".
  *  `at` is a session's time or a study day. Pure. */
 export function studiedWords(at: string, today: string): string {
-	return agoWords(Math.max(0, daysBetween(dayOf(at), today || dayOf(new Date().toISOString()))));
+	const day = today || dayOf(new Date().toISOString());
+	return agoWords(Math.max(0, daysBetween(dayOf(at), day)), day);
 }
 
 export function unitStatus(unit: Unit, today: string): UnitStatus {
@@ -215,7 +216,7 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.now === "left") return slip && topic.signals.mistake ? slip : { kind: "task", words: LESSON_WORDS.leftForTonight };
 	if (unit.now) return { kind: unit.now };
 	if (slip) return slip;
-	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
+	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue, today) };
 	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
 	// A review held past memory's day is due already ("Due since 6 Nov"):
 	// a fact that needs him, which the map's card shows, never a date ahead.

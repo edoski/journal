@@ -48,11 +48,11 @@ const WHY_FACT: Record<Why["kind"], TopicFact["kind"]> = { reply: "your-turn", w
  *  topics gives its most overdue one's days or its lapse, so each topic
  *  says its own (round 5: Random variables read "2d overdue", Binomial's
  *  days, while due today). Pure. */
-function todayFact(item: NowItem, topic: CourseMapTopic): TopicFact | null {
+function todayFact(item: NowItem, topic: CourseMapTopic, today: string): TopicFact | null {
 	const { why } = item.line;
 	if (why?.kind === "review" || why?.kind === "missed") {
 		if (why.kind === "missed" && lapsedNow(topic.signals)) return { kind: "slip", words: SLIP_WORDS.lapsed, slip: "lapsed" };
-		if (topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
+		if (topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue, today) };
 	}
 	const words = slotWords(why, topic);
 	if (!why || !words) return null;
@@ -98,7 +98,7 @@ export function sidebarSays(courses: readonly StudyCourse[], chats: readonly Cha
 	for (const item of todayTop(nowFor(courses, chats, null, map.today), inbox, chats)) for (const key of claimedKeys(item)) if (!today.has(key)) today.set(key, item);
 	for (const [key, item] of today) {
 		const topic = topics.get(key);
-		if (topic) said.set(topic.handle, { place: "today", fact: todayFact(item, topic) });
+		if (topic) said.set(topic.handle, { place: "today", fact: todayFact(item, topic, map.today) });
 	}
 	const shelves = restShelves(inbox, new Set(today.keys()));
 	const planned = plannedKeys(courses);

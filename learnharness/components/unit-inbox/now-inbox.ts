@@ -93,7 +93,7 @@ export function shelfStatus(unit: Unit, today: string, planned: ReadonlySet<stri
 	const own = unitStatus(unit, today);
 	const dated = own.kind === "returns" || (own.kind === "review" && unit.topic.review?.kind === "scheduled");
 	if (!planned.has(unit.key) || !(dated || own.kind === "studied" || own.kind === "none")) return own;
-	return { kind: "review", words: overdueWords(unit.topic.review?.kind === "due" ? unit.topic.review.overdue : 0) };
+	return { kind: "review", words: overdueWords(unit.topic.review?.kind === "due" ? unit.topic.review.overdue : 0, today) };
 }
 
 /** A unit whose session waits on the learner, for a folded shelf's dot.

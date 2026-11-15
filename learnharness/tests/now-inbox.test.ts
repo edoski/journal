@@ -84,7 +84,7 @@ describe("shelfStatus", () => {
 
 	it("says how long since a Learning topic was studied in Home's words, falling back to the day it was first taught, and that one never taught is not started", () => {
 		assert.deepEqual(shelfStatus(unit({ sessions: [chat("a", { updatedAt: "2026-11-07T09:00:00.000Z" })] }), TODAY), { kind: "studied", words: "Yesterday" });
-		assert.deepEqual(shelfStatus(unit({}), TODAY), { kind: "studied", words: "19d ago" });
+		assert.deepEqual(shelfStatus(unit({}), TODAY), { kind: "studied", words: "20 Oct" });
 		assert.deepEqual(shelfStatus(unit({ topic: topic("t", "T", "new") }), TODAY), { kind: "none", words: "Not started" });
 	});
 
@@ -92,13 +92,13 @@ describe("shelfStatus", () => {
 		const planned = plannedKeys([LINALG]);
 		assert.ok(planned.has("/s/linalg#independence"));
 		const inPlan = unit({ key: "/s/linalg#independence", topic: topic("independence", "Linear independence", "assisted", { review: due(4) }) });
-		assert.deepEqual(shelfStatus(inPlan, TODAY, planned), { kind: "review", words: "4d overdue" });
-		assert.deepEqual(shelfStatus(inPlan, TODAY), { kind: "studied", words: "19d ago" });
+		assert.deepEqual(shelfStatus(inPlan, TODAY, planned), { kind: "review", words: "Due since 4 Nov" });
+		assert.deepEqual(shelfStatus(inPlan, TODAY), { kind: "studied", words: "20 Oct" });
 		assert.deepEqual(shelfStatus(unit({ topic: topic("t", "T", "assisted", { review: back("2026-11-10") }) }), TODAY, planned), { kind: "returns", words: "Back Tue 10 Nov" });
 	});
 
 	it("says how overdue a solid topic is, when a known one comes back, and Your turn or Working first", () => {
-		assert.deepEqual(shelfStatus(unit({ shelf: "review", topic: topic("t", "T", "retained", { review: due(2) }) }), TODAY), { kind: "review", words: "2d overdue" });
+		assert.deepEqual(shelfStatus(unit({ shelf: "review", topic: topic("t", "T", "retained", { review: due(2) }) }), TODAY), { kind: "review", words: "Due since 6 Nov" });
 		assert.deepEqual(shelfStatus(unit({ shelf: "known", topic: topic("t", "T", "retained", { review: back("2026-11-13") }) }), TODAY), { kind: "returns", words: "Back Fri 13 Nov" });
 		assert.deepEqual(shelfStatus(unit({ now: "your-turn" }), TODAY), { kind: "your-turn" });
 		assert.deepEqual(shelfStatus(unit({ now: "working" }), TODAY), { kind: "working" });

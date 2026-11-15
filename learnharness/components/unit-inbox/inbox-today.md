@@ -26,7 +26,7 @@ No header, no count and no total on top: cards leave as the day's plan empties, 
 | 1100×700 | the same | 554 to 652 | none |
 | 1512×982 | the same | 836 to 934 | none |
 
-The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors (the lesson); Linear Algebra, Your turn, Rank practice; Probability, 3d overdue, Review Random variables and distributions; Real Analysis, 7d overdue, Review Convergent sequences; Calculus I, Not right last time, Review Chain rule. Home's Today shows the same five lines in that order with the same reasons.
+The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors (the lesson); Linear Algebra, Your turn, Rank practice; Probability, Due since 5 Nov, Review Random variables and distributions; Real Analysis, Due since 5 Nov, Review Convergent sequences; Calculus I, Not right last time, Review Chain rule. Home's Today shows the same five lines in that order with the same reasons.
 
 The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowShelves`, `NowSkeleton` and `SidebarNote` (`now-shelves.md`).
 
@@ -35,7 +35,7 @@ The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowS
 | State | List |
 |---|---|
 | loading | three 60px skeleton cards, `aria-busy`, sr-only "Loading"; no shelves |
-| a quiet day | one card per line: "Left off 2d ago" (bookmark) under "Continue Problem sheet 4", opening the topic the task is about (the course's current topic when the task holds it), else the course's page, since the record does not say which of its topics the task is at; "Next up" (arrow) for a current topic |
+| a quiet day | one card per line: "Left off 6 Nov" (bookmark) under "Continue Problem sheet 4", opening the topic the task is about (the course's current topic when the task holds it), else the course's page, since the record does not say which of its topics the task is at; "Next up" (arrow) for a current topic |
 | nothing needs him | "Nothing needs you today", then the shelves |
 | everything due | still one card per course line (the engine plans at most five reviews a course, Today at most five lines), a lapse's card titled by the lapsed topic with "Not right last time"; every other due topic sits on On your own with Review, or on Learning when the engine calls it weak |
 | a lesson running | a card whose topic the tutor writes in shows the spinner and Tutor writing at 70%, in its place through every turn (`steadyTop`); a topic not on top (or one already running when the sidebar first draws) sits on Tutor writing, whose open row stays in view while folded |

@@ -56,7 +56,7 @@ export interface SessionEntry {
 	state: SessionState;
 	/** The day of its last message, YYYY-MM-DD. */
 	day: string;
-	/** "Today", "3d ago". */
+	/** "Today", "6 Nov". */
 	when: string;
 	/** Its plan, when its tutor authored one. */
 	plan: SessionPlan | null;
@@ -106,7 +106,7 @@ export interface TopicFacts {
 	standing: Standing | null;
 	/** What the head says beside the pie; empty when the line is silent. */
 	marks: readonly HeadMark[];
-	/** "Studied 3 days ago"; null when nothing dates it or the line is silent. */
+	/** "Studied 4 Nov"; null when nothing dates it or the line is silent. */
 	studied: string | null;
 	/** The engine's diagnosed mistake, else the last attempt of a topic it
 	 *  calls weak when that attempt was not right, in the tutor's words. */
@@ -255,7 +255,7 @@ export { agoWords, studiedDaysWords as studiedWords };
  * What the head says beside the pie, in the app's words (study-words.ts),
  * each drawn as an icon and a few words: why the engine calls the topic
  * weak, unless the standing beside it already says so (`SLIP_SAID_BY`;
- * the sidebar keeps it as the row's reason), then its review, due ("3d overdue"), held past memory's day ("Due
+ * the sidebar keeps it as the row's reason), then its review, due ("Due since 5 Nov"), held past memory's day ("Due
  * since 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
  * say it (`reviewWords`). `today` is the engine's study day.
  */
@@ -301,7 +301,7 @@ export function sessionEntries(sessions: readonly ChatListItem[], plans: readonl
 	return sessions.map((chat) => {
 		const local = localDay(chat.updatedAt);
 		const day = local > today ? today : local;
-		return { chat, own: ownsTopic(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today)), plan: plans.find((plan) => plan.id === chat.id) ?? null };
+		return { chat, own: ownsTopic(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today), today), plan: plans.find((plan) => plan.id === chat.id) ?? null };
 	});
 }
 
@@ -337,7 +337,7 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
 		.map((task): Pickup => {
 			const updated = record?.tasks.find((t) => t.key === task.key)?.updated;
 			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), `Continue ${task.title}`);
-			return { kind: "task", task, title: task.title, where: task.step ?? "Unfinished", when: updated ? agoWords(daysBetween(updated, today)) : null, press };
+			return { kind: "task", task, title: task.title, where: task.step ?? "Unfinished", when: updated ? agoWords(daysBetween(updated, today), today) : null, press };
 		});
 	return [...session, ...tasks];
 }
@@ -402,7 +402,7 @@ export function topicFacts({
 		today: map.today,
 		standing: silent ? null : standingOf(topic),
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
-		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today)) : null,
+		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today), map.today) : null,
 		mistake: mistakeOf(topic, attempts),
 		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam) : null) ?? waitsWords(topic, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
