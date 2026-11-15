@@ -5,7 +5,7 @@
   "exam": {
     "date": "2026-12-03",
     "days_left": 25,
-    "final_review": "2026-11-18"
+    "final_review": "2026-11-19"
   },
   "current": "eigen",
   "current_arc": "eigenvalues",
@@ -84,7 +84,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-20",
+      "review": "2026-11-15",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -100,7 +100,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-30",
-      "review": "2026-11-21",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -116,11 +116,11 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-16",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-10-28",
       "moved": {
-        "from": "2026-11-09",
+        "from": "2026-11-16",
         "by": "left"
       },
       "weak": true,
@@ -142,7 +142,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-21",
+      "review": "2026-11-19",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -160,9 +160,15 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-09",
-      "held": true,
-      "due": "2026-11-06",
+      "review": "2026-11-08",
+      "overdue": 2,
+      "moved": {
+        "from": "2026-11-09",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ]
+      },
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -178,11 +184,11 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-18",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-11-06",
       "moved": {
-        "from": "2026-11-14",
+        "from": "2026-11-18",
         "by": "left"
       },
       "weak": true,
@@ -254,11 +260,11 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-04",
-      "review": "2026-11-14",
+      "review": "2026-11-15",
       "held": true,
       "due": "2026-11-09",
       "moved": {
-        "from": "2026-11-16",
+        "from": "2026-11-13",
         "by": "left"
       },
       "weak": false,
@@ -294,15 +300,14 @@
       "contrasts": [],
       "level": "new",
       "moved": {
-        "from": "2026-11-16",
+        "from": "2026-11-13",
         "by": "left"
       },
-      "starts": "2026-11-14",
+      "starts": "2026-11-15",
       "starts_why": {
         "arc": "determinants",
         "kind": "after",
         "needs": [
-          "rank",
           "determinant"
         ]
       },
@@ -321,10 +326,10 @@
       "contrasts": [],
       "level": "new",
       "moved": {
-        "from": "2026-11-18",
+        "from": "2026-11-14",
         "by": "left"
       },
-      "starts": "2026-11-15",
+      "starts": "2026-11-16",
       "starts_why": {
         "arc": "eigenvalues",
         "kind": "after",
@@ -365,11 +370,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-21",
-        "by": "left"
-      },
-      "starts": "2026-11-16",
+      "starts": "2026-11-19",
       "starts_why": {
         "arc": "eigenvalues",
         "kind": "after",

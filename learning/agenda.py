@@ -691,16 +691,8 @@ class Plan:
 
 
 def _whole(week: Capacity, day: date, kind: str) -> int:
-    """A study day's whole items of ``kind`` from his fractional rates, the
-    fractions carried within the calendar week (``capacity.whole``)."""
-
-    def rate(other: date) -> float:
-        if not week.studies(other):
-            return 0.0
-        weekday = week.on(other)
-        return (weekday.reviews if kind == "reviews" else weekday.new).value
-
-    return capacity.whole(day, rate)
+    """A study day's whole items of ``kind`` (``Capacity.room``)."""
+    return week.room(day, kind)
 
 
 def _gaps(record: dict[str, Any], untaught: set[str]) -> set[str]:

@@ -391,18 +391,23 @@ def test_doing_exactly_what_the_plan_proposes_never_shows_a_limit() -> None:
     assert not learned.on(on(21)).new.shown
 
 
-def test_each_day_he_starts_fewer_than_a_pace_of_several_is_a_short_day() -> None:
+def test_each_day_he_starts_fewer_than_the_plan_proposed_is_a_short_day() -> None:
     record = course(20, exam=9)
-    paced = 0
+    proposed = []
     for offset in range(5):
         today = plan_for(record, on(offset))
-        paced = max(paced, len(today["new"]))
+        proposed.append(len(today["new"]))
         if today["new"]:
             first = {today["new"][0]: {"introduced": True}}
             record = save(record, {"topics": first}, on(offset))
-    assert paced >= 2, "the pace needs several topics a day"
+    assert proposed[0] >= 2, "the pace needs several topics a day"
     days = capacity.activity([planned(record)], on(5))
-    assert all(days[on(offset)].new_short for offset in range(5)), days
+    assert [days[on(offset)].new_short for offset in range(5)] == [
+        count > 1 for count in proposed
+    ], (proposed, days)
+    assert [days[on(offset)].new_kept for offset in range(5)] == [
+        count == 1 for count in proposed
+    ], "a day he started what his limit proposed says nothing of it"
 
 
 def plan_for(record: dict[str, Any], day: date) -> dict[str, Any]:
@@ -874,3 +879,63 @@ def test_a_pace_never_leaves_a_topic_to_days_with_no_room_for_it() -> None:
     assert started(days.days["c"]) and max(started(days.days["c"]).values()) <= (
         last.isoformat()
     )
+
+
+def behind(days: int, least: int) -> dict[str, Any]:
+    """A course with a backlog: each day of the ``days`` before Monday he
+    answered ``least`` due reviews or one more, a weekday's number
+    alternating from week to week, fewer than were due, so his limit is
+    shown, each weekday's is fractional, and more is always owed."""
+    record = taught(course(40), on(-days - 1))
+    for offset in range(-days, 0):
+        day = on(offset)
+        due = progress.due(record, day, limit=0)
+        count = least + (offset // 7 + day.weekday()) % 2
+        topics = [item["topic"] for item in due[:count]]
+        record = save(record, {"observations": [answer(t) for t in topics]}, day)
+    return record
+
+
+def dates(result: agenda.Plan, after: date) -> dict[str, date]:
+    found = result.when("c", after, True)
+    return {
+        **{("review", key): day for key, day in found.reviews.items() if day > after},
+        **{("start", key): day for key, day in found.starts.items() if day > after},
+    }
+
+
+def test_a_night_after_he_did_exactly_todays_plan_keeps_every_date() -> None:
+    """Round 8 (1 D1): a day he finished the plan his limit proposed, with
+    a backlog still owed, read as a day he stopped short once it ended, so
+    his limit fell and 22 dates moved overnight with nothing saved."""
+    record = behind(35, 1)
+    assert capacity.of([record], MONDAY).on(MONDAY).reviews.shown
+    for offset in range(7):
+        today = on(offset)
+        proposed = plan_for(record, today)
+        assert proposed["reviews"], "his limit proposes some of the backlog"
+        answers = [answer(topic) for topic in proposed["reviews"]]
+        record = save(record, {"observations": answers}, today)
+        tonight = agenda.plan({"c": record}, today, 40)
+        tomorrow = agenda.plan({"c": record}, today + timedelta(days=1), 39)
+        assert dates(tomorrow, today) == dates(tonight, today), today
+
+
+def test_part_of_todays_plan_done_moves_no_estimate() -> None:
+    """Round 8 (1 D4): one review answered reshuffled 14 to 22 untold
+    dates, as today's work counted as a finished day and a new day of study
+    moved earlier days to another week's weight. On a Monday, a new week."""
+    record = behind(35, 2)
+    proposed = plan_for(record, MONDAY)["reviews"]
+    assert len(proposed) >= 2
+    before = capacity.of([record], MONDAY)
+    one = save(record, {"observations": [answer(proposed[0])]}, MONDAY)
+
+    def limits(week: Capacity) -> list[tuple[Limit, Limit]]:
+        return [(weekday.reviews, weekday.new) for weekday in week.weekdays]
+
+    after = capacity.of([one], MONDAY)
+    assert limits(after) == limits(before)
+    assert after.study_weekdays == before.study_weekdays
+    every = save(one, {"observations": [answer(t) for t in proposed[1:]]}, MONDAY)
+    assert limits(capacity.of([every], MONDAY)) == limits(before)

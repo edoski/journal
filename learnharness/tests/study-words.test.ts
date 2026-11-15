@@ -209,7 +209,7 @@ describe("why a topic starts then", () => {
 	const why = (map: CourseMap, handle: string) => startsWhyWords(map.topics.find((t) => t.handle === handle)!.startsWhy!, map);
 	it("names its prerequisites, in a course with arcs or without", () => {
 		assert.equal(why(arcs, "change-basis"), "After Invertible matrices, which it needs");
-		assert.equal(why(plain, "invertibility"), "After Rank and the column space and Determinants as volume scaling, which it needs");
+		assert.equal(why(plain, "invertibility"), "After Determinants as volume scaling, which it needs");
 	});
 	it("names the arc an early start comes from, or the exam's pace that took it", () => {
 		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, to keep pace with the exam");

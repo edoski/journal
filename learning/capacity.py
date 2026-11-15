@@ -20,9 +20,14 @@ something about it: every day he stopped short, and every finished day at or
 above the limit itself. A finished day below it says only that he can do that
 little, which the limit already allows. Once he has stopped short, the plan
 proposes no more than the limit and keeps the rest owed; doing more than it
-proposes raises it. Until then the same mean, over finished days only, is the
-most he has shown he does: new topics are proposed at least at that pace, and
-past each exam's pace when it needs more.
+proposes raises it. A day he did exactly what the limit proposed, with more
+owed, says nothing either (``Done.reviews_kept``): he stopped where the plan
+stopped him, so counting it would let the plan's own rounding of his limit to
+whole items (``whole``) move his limit, and with it the days he was told. So
+whether a day stopped short is read against the plan made that morning, from
+the days before it (``_settled``). Until then the same mean, over finished
+days only, is the most he has shown he does: new topics are proposed at least
+at that pace, and past each exam's pace when it needs more.
 
 A day he answered no review at all says only that he did not review that
 day, not how many he gets through when he does, so it never shows a review
@@ -36,18 +41,18 @@ stays off until he studies on it.
 
 Before there is any evidence a prior stands in: he studies every day and
 starts ``PRIOR_NEW`` new topics on a study day, each weighing as much as one
-observed day. Recent weeks count more (each week half as much as the next
-every ``HALF_LIFE_DAYS``), so a change of routine shows within a week or two;
-the days of one week weigh alike, so no weekday counts more for being the most
-recent. The evidence starts on his first recorded day.
+observed day, his first. Recent weeks count more (each calendar week twice as
+much as the one ``HALF_LIFE_DAYS`` before it), so a change of routine shows
+within a week or two; the days of one week weigh alike, so no weekday counts
+more for being the most recent, and a day's weight never changes, so adding
+a day moves no other. The evidence starts on his first recorded day.
 
 Only his study moves the estimate, never the calendar alone, so a plan made
 tomorrow from the same records keeps the days today's plan told him. Today's
-work counts as he saves it, as a day he finished (whether he stopped short is
-known only once the day is over), and the weeks are counted back from his
-latest day of study, not from the day the plan is made: a night with nothing
-saved moves no weight. What the end of a day adds is evidence of its own: a
-day he skipped, or stopped with work still owed. A weekday leans on his
+work counts as he saves it, read as if the day ended now, but for a day not
+yet done with what it owes: that says nothing until the day is over, since he
+may still finish it. What the end of a day adds is evidence of its own: a day
+he skipped, or stopped with work the plan proposed still owed. A weekday leans on his
 overall rates as much as one day would, so a weekday seen once does not swing
 the plan and a single skip does not turn it off.
 """
@@ -56,7 +61,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable, Hashable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 import math
 from typing import Any, TypeVar
@@ -78,12 +83,17 @@ Name = TypeVar("Name", bound=Hashable)
 @dataclass(frozen=True)
 class Done:
     """What one day's record shows was completed, across every course, and
-    whether he stopped with reviews or exam-paced new topics still owed."""
+    whether he stopped with reviews or exam-paced new topics still owed
+    (``reviews_short``), or did exactly what his limit proposed with more
+    owed, or has not finished today's yet (``reviews_kept``): such a day says
+    nothing about that kind's limit."""
 
     reviews: int = 0
     new: int = 0
     reviews_short: bool = False
     new_short: bool = False
+    reviews_kept: bool = False
+    new_kept: bool = False
 
 
 @dataclass(frozen=True)
@@ -119,6 +129,18 @@ class Capacity:
 
     def on(self, day: date) -> Weekday:
         return self.weekdays[day.weekday()]
+
+    def room(self, day: date, kind: str) -> int:
+        """A study day's whole items of ``kind`` from his fractional rates,
+        the fractions carried within the calendar week (``whole``)."""
+
+        def rate(other: date) -> float:
+            if not self.studies(other):
+                return 0.0
+            limit: Limit = getattr(self.on(other), kind)
+            return limit.value
+
+        return whole(day, rate)
 
     def share(self, day: date, last: date) -> float:
         """``day``'s part of the reviews he does from ``day`` to ``last``: by
@@ -314,8 +336,9 @@ def _new_short(
 
 def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]:
     """Every day with recorded study, across the given courses: reviews
-    answered on a review day, topics started, and, on a day before ``today``
-    the plan held work for, whether he stopped with work owed.
+    answered on a review day, topics started, and, on a day the plan held
+    work for, whether he stopped with work owed, today's as it stands now
+    (``_settled``).
 
     What was due on a past day is replayed without the exam: an exam set later
     would replay it earlier than it stood (no credit for late answers, and
@@ -343,28 +366,79 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
         if progress.asks(record):
             exam_of = progress.examining(record)
             for key, replay in progress.replays({**record, "exam": {}}).items():
-                left |= _reviews_left(replay, exam_of(key), today)
+                left |= _reviews_left(replay, exam_of(key), today + timedelta(days=1))
         short |= _new_short(record, replays, week.planned, week.study)
-    return {
-        day: Done(
-            reviews.get(day, 0),
-            new.get(day, 0),
-            day in left and day in week.planned and reviews.get(day, 0) > 0,
-            day in short,
-        )
-        for day in studied
-    }
+    return _settled(
+        {
+            day: Done(
+                reviews.get(day, 0),
+                new.get(day, 0),
+                day in left and day in week.planned and reviews.get(day, 0) > 0,
+                day in short,
+            )
+            for day in studied
+        },
+        today,
+    )
+
+
+def _settled(days: dict[date, Done], today: date) -> dict[date, Done]:
+    """Each day read against the plan made that morning, from the days
+    before it (``estimate``), oldest first. A day he stopped with work owed
+    is short only where he did less than that plan proposed, or more (he
+    chose where to stop); once he has shown a limit, the plan proposed his
+    limit's whole items (``Capacity.room``), and a day he did exactly that
+    much is kept: the plan stopped him, so it says nothing of his limit.
+    Today, not over, is kept while it is short of what it owes, since he may
+    still finish it: only the end of the day says he stopped."""
+    settled: dict[date, Done] = {}
+    for day in sorted(days):
+        done = days[day]
+        if done.reviews_short or done.new_short:
+            morning = estimate(settled, day)
+            reviews = _stop(morning, day, "reviews", done.reviews, today)
+            new = _stop(morning, day, "new", done.new, today)
+            done = replace(
+                done,
+                reviews_short=done.reviews_short and reviews,
+                reviews_kept=done.reviews_short and not reviews,
+                new_short=done.new_short and new,
+                new_kept=done.new_short and not new,
+            )
+        settled[day] = done
+    return settled
+
+
+def _stop(morning: Capacity, day: date, kind: str, done: int, today: date) -> bool:
+    """Whether a day he left work of ``kind`` owed shows where he stops: he
+    did other than what the morning's plan proposed (his limit's whole
+    items once shown, else all that was owed), and the day is over or he
+    already did more."""
+    limit: Limit = getattr(morning.on(day), kind)
+    proposed = morning.room(day, kind) if limit.shown else None
+    if proposed is not None and done > proposed:
+        return True
+    if day >= today:
+        return False
+    return proposed is None or done < proposed
 
 
 # --- the estimate -------------------------------------------------------------
 
 
-def _weight(day: date, latest: date) -> float:
-    """Whole weeks back from his ``latest`` day of study weigh alike, so no
-    weekday counts more for being the most recent, and a day with nothing
-    saved shifts no weight."""
-    weeks_back = (latest - day).days // WEEK
-    return float(0.5 ** (weeks_back * WEEK / HALF_LIFE_DAYS))
+def _monday(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def _weight(day: date, first: date) -> float:
+    """Each calendar week weighs twice as much as the one ``HALF_LIFE_DAYS``
+    before it, counted from the week of his ``first`` day of study. The days
+    of one week weigh alike, so no weekday counts more for being the most
+    recent, and a day's weight never changes: a new day of study, or a night
+    with nothing saved, moves no other day's weight, and every mean reads
+    the same until a day he studied is added."""
+    weeks = (_monday(day) - _monday(first)).days // WEEK
+    return float(2.0 ** (weeks * WEEK / HALF_LIFE_DAYS))
 
 
 @dataclass
@@ -422,12 +496,14 @@ def _kind(
     days: dict[date, Done], done: str, short: str, prior: float | None
 ) -> list[Limit]:
     """One kind's limit on each weekday, leaning on his overall limit."""
-    latest = max(days, default=date.min)
+    first = min(days, default=date.min)
+    kept = short.replace("short", "kept")
     seen = [
-        _Seen(day, _weight(day, latest), getattr(item, done), getattr(item, short))
+        _Seen(day, _weight(day, first), getattr(item, done), getattr(item, short))
         for day, item in days.items()
+        if not getattr(item, kept)
     ]
-    priors = [] if prior is None else [_Seen(latest, PRIOR_WEIGHT, prior, False)]
+    priors = [] if prior is None else [_Seen(first, PRIOR_WEIGHT, prior, False)]
     overall = _limit([*seen, *priors])
     weekdays = [_Tally() for _ in range(WEEK)]
     for item in seen:
@@ -450,7 +526,7 @@ def _study_weekdays(days: Iterable[date], today: date) -> _Week:
     """His study weekdays, replayed day by day from his first record: a day
     off the plan held nothing for, and he did nothing on, is not counted.
     Today counts once he has studied; a day skipped is known only once it is
-    over."""
+    over. ``planned`` holds the days through today the plan held work for."""
     studied = {day for day in days if day <= today}
     fade = 0.5 ** (WEEK / HALF_LIFE_DAYS)
     weight = [0.0] * WEEK
@@ -471,8 +547,7 @@ def _study_weekdays(days: Iterable[date], today: date) -> _Week:
         day = first + timedelta(days=offset)
         weekday = day.weekday()
         if weekday in week()[1]:
-            if day < today:
-                planned.add(day)
+            planned.add(day)
         elif day not in studied:
             continue
         weight[weekday] = weight[weekday] * fade + 1

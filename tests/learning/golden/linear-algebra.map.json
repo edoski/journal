@@ -5,7 +5,7 @@
   "exam": {
     "date": "2026-12-03",
     "days_left": 25,
-    "final_review": "2026-11-18"
+    "final_review": "2026-11-19"
   },
   "current": "eigen",
   "focus": "sheet-4",
@@ -25,13 +25,9 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-20",
+      "review": "2026-11-15",
       "held": true,
       "due": "2026-10-12",
-      "moved": {
-        "from": "2026-11-18",
-        "by": "left"
-      },
       "weak": false,
       "tasks": []
     },
@@ -44,7 +40,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-30",
-      "review": "2026-11-21",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -59,11 +55,11 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-16",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-10-28",
       "moved": {
-        "from": "2026-11-09",
+        "from": "2026-11-16",
         "by": "left"
       },
       "weak": true,
@@ -84,7 +80,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-21",
+      "review": "2026-11-18",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -101,9 +97,15 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-09",
-      "held": true,
-      "due": "2026-11-06",
+      "review": "2026-11-08",
+      "overdue": 2,
+      "moved": {
+        "from": "2026-11-09",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ]
+      },
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -118,12 +120,15 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-18",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-11-06",
       "moved": {
-        "from": "2026-11-14",
-        "by": "left"
+        "from": "2026-11-18",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ]
       },
       "weak": true,
       "mistake": true,
@@ -191,11 +196,11 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-04",
-      "review": "2026-11-14",
+      "review": "2026-11-15",
       "held": true,
       "due": "2026-11-09",
       "moved": {
-        "from": "2026-11-16",
+        "from": "2026-11-13",
         "by": "left"
       },
       "weak": false,
@@ -229,14 +234,13 @@
       "contrasts": [],
       "level": "new",
       "moved": {
-        "from": "2026-11-18",
+        "from": "2026-11-13",
         "by": "left"
       },
-      "starts": "2026-11-14",
+      "starts": "2026-11-15",
       "starts_why": {
         "kind": "after",
         "needs": [
-          "rank",
           "determinant"
         ]
       },
@@ -254,10 +258,10 @@
       "contrasts": [],
       "level": "new",
       "moved": {
-        "from": "2026-11-19",
+        "from": "2026-11-14",
         "by": "left"
       },
-      "starts": "2026-11-15",
+      "starts": "2026-11-18",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -295,11 +299,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-21",
-        "by": "left"
-      },
-      "starts": "2026-11-18",
+      "starts": "2026-11-19",
       "starts_why": {
         "kind": "after",
         "needs": [

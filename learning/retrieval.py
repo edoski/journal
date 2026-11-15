@@ -1220,15 +1220,15 @@ def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.Wh
 
 
 def _began(
-    stored: dict[str, dict[str, Any]], name: str, day: date, today: date, last: date
-) -> agenda.When:
-    """This course's days in the plan made on ``day`` from every course's
-    record as ``today`` began (``agenda.morning``), through ``last``."""
+    stored: dict[str, dict[str, Any]], day: date, today: date, last: date
+) -> agenda.Plan:
+    """The plan made on ``day`` from every course's record as ``today``
+    began (``agenda.morning``), through ``last``."""
     read = capacity.final_reviews(stored, day)
     began = {key: agenda.morning(record, today) for key, record in read.items()}
     week = capacity.of(began.values(), day)
     days = (last - day).days + 1
-    return agenda.plan(began, day, days, week).when(name, day, True)
+    return agenda.plan(began, day, days, week)
 
 
 def moved(
@@ -1239,9 +1239,13 @@ def moved(
     study moves a day: ``study``, today's answers or starts in ``courses``
     (a topic he answered or started today has its own new day and is not
     listed); ``missed``, yesterday went by with no study; ``left``,
-    yesterday ended with planned work not done. Nothing is stored: the
-    plan as yesterday ended is made again from the records without today's
-    work. ``record`` is this course read with the plan."""
+    yesterday ended with work its plan held not done, in any course. A day
+    that moved for none of these has no cause in his study, so it is not
+    listed as moved: the plan reads its days from his study alone
+    (``capacity``), and a told day that moves otherwise is a fault the tests
+    catch, never a reason to give him. Nothing is stored: the plan as
+    yesterday ended is made again from the records without today's work.
+    ``record`` is this course read with the plan."""
     name = str(workspace.directory)
     now = {
         **{("review", key): day for key, day in planned.reviews.items()},
@@ -1253,7 +1257,8 @@ def moved(
     mine = agenda.touched(record, today)
     yesterday = today - timedelta(days=1)
     last = max(now.values())
-    told = _began(stored, name, yesterday, today, last)
+    ended = _began(stored, yesterday, today, last)
+    told = ended.when(name, yesterday, True)
 
     def told_on(when: agenda.When, kind: str, key: str) -> date | None:
         return (when.reviews if kind == "review" else when.starts).get(key)
@@ -1272,12 +1277,19 @@ def moved(
         for key, course in stored.items()
         if agenda.touched(course, today)
     }
-    began = _began(stored, name, today, today, last) if studied else told
+    began = (
+        _began(stored, today, today, last).when(name, today, True) if studied else told
+    )
     day = yesterday.isoformat()
     went = any(
         any(item["date"] == day for item in course["observations"].values())
         or any(topic.get("introduced") == day for topic in course["topics"].values())
         for course in stored.values()
+    )
+    left = any(
+        planned["reviews"] or planned["new"]
+        for days in ended.days.values()
+        for planned in days[:1]
     )
     result: dict[str, dict[str, Any]] = {}
     for kind, key in changed:
@@ -1285,8 +1297,12 @@ def moved(
         assert was is not None
         if studied and told_on(began, kind, key) == was:
             why: dict[str, Any] = {"by": "study", "courses": sorted(studied.values())}
+        elif not went:
+            why = {"by": "missed"}
+        elif left:
+            why = {"by": "left"}
         else:
-            why = {"by": "left" if went else "missed"}
+            continue
         result[key] = {"from": was.isoformat(), **why}
     return result
 
