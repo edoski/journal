@@ -79,6 +79,7 @@ export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";
  */
 export function RowCard({
 	href,
+	onSelect,
 	active,
 	rowKey,
 	parent,
@@ -89,7 +90,10 @@ export function RowCard({
 	action,
 	recede = false,
 }: {
-	href: string;
+	/** Where the card goes; without it the card is a button that does
+	 *  `onSelect` (a course line's lesson, started as Home's line starts it). */
+	href?: string;
+	onSelect?: () => void;
 	active: boolean;
 	/** The keyboard walk's name for the row (`data-sidebar-row`). */
 	rowKey: string;
@@ -102,22 +106,9 @@ export function RowCard({
 	action?: React.ReactNode;
 	recede?: boolean;
 }) {
-	return (
-		<li data-slot="unit-card" className={ROW_ITEM}>
-			<Link
-				href={href}
-				onClick={blurAfterPointerClick}
-				aria-current={active ? "page" : undefined}
-				data-sidebar-row={rowKey}
-				data-sidebar-parent={parent}
-				data-testid="unit-row"
-				className={cn(
-					rowSurface(active),
-					ROW_FRAME,
-					recede && !active && "opacity-70 group-hover/sidebar-row:opacity-100 group-has-[:focus-visible]/sidebar-row:opacity-100",
-				)}
-			>
-				<span className="flex h-5 items-center gap-2">
+	const body = (
+		<>
+			<span className="flex h-5 items-center gap-2">
 					<span className="flex h-5 shrink-0 items-center">{mark}</span>
 					<span data-slot="unit-card-course" className="min-w-0 flex-1 truncate text-label text-muted-foreground">
 						{course}
@@ -126,10 +117,40 @@ export function RowCard({
 						{status}
 					</span>
 				</span>
-				<span data-slot="unit-row-title" className={cn(ROW_TITLE, "mt-1 pl-6 font-medium text-foreground")}>
-					<MathText>{title}</MathText>
-				</span>
-			</Link>
+			<span data-slot="unit-row-title" className={cn(ROW_TITLE, "mt-1 pl-6 font-medium text-foreground")}>
+				<MathText>{title}</MathText>
+			</span>
+		</>
+	);
+	const shared = {
+		"aria-current": active ? ("page" as const) : undefined,
+		"data-sidebar-row": rowKey,
+		"data-sidebar-parent": parent,
+		"data-testid": "unit-row",
+		className: cn(
+			rowSurface(active),
+			ROW_FRAME,
+			recede && !active && "opacity-70 group-hover/sidebar-row:opacity-100 group-has-[:focus-visible]/sidebar-row:opacity-100",
+		),
+	};
+	return (
+		<li data-slot="unit-card" className={ROW_ITEM}>
+			{href !== undefined ? (
+				<Link href={href} onClick={blurAfterPointerClick} {...shared}>
+					{body}
+				</Link>
+			) : (
+				<button
+					type="button"
+					onClick={(e) => {
+						onSelect?.();
+						blurAfterPointerClick(e);
+					}}
+					{...shared}
+				>
+					{body}
+				</button>
+			)}
 			{action}
 		</li>
 	);
