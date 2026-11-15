@@ -13,6 +13,7 @@ import { fauxAssistantMessage, type ToolCall } from "@earendil-works/pi-ai";
 import { VoiceGuard } from "../src/agent/voice-guard.ts";
 import { newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
 import { ASKED_INSTEAD_TEXT } from "../src/core/question-core.ts";
+import { newAskedMessage } from "../src/core/native-messages.ts";
 import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 
 let n = 0;
@@ -72,5 +73,6 @@ describe("a guess he sent through Ask", () => {
 	it("is his answer, saved naming his message, in every agent's doctrine and in what the dismissal tells the tutor", () => {
 		for (const agent of ["prober", "teacher", "practice"] as const) assert.match(courseRecordPrompt(agent, { arcs: false }), /unless it only answers the open question and asks nothing[^;]*saved naming `"his-message"`, a prediction when the question asked for one/, agent);
 		assert.match(ASKED_INSTEAD_TEXT, /only answers the question[^.]*save it as his attempt naming "his-message", a prediction when the question asked for one/);
+		assert.match(newAskedMessage("question").content, /only answers the open question[^.]*save it as his attempt naming "his-message", a prediction when the question asked for one/, "the note riding his Ask message says so too");
 	});
 });

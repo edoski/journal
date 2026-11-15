@@ -60,8 +60,10 @@ import {
 	newUngradedAnswerMessage,
 	ungradedAnswerOf,
 	newAskedMessage,
+	newLeftQuestionMessage,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
+import { questionLeftForToday } from "./session-end.ts";
 import { markLinks } from "./answer-marks.ts";
 import { isMarkResult, MARK_RESULTS, type MarkResult } from "./contracts/marks.ts";
 import { CONFIDENCE_STATES, isConfidence, type Confidence } from "./contracts/course.ts";
@@ -322,7 +324,7 @@ export function inputAppends(
 ): LhMessage[] {
 	switch (input.type) {
 		case "text":
-			return [...dismissalConclusion(record), ...ungradedNote(record), ...askedNote(record, input), newUserMessage(input.text, input.photos)];
+			return [...dismissalConclusion(record), ...ungradedNote(record), ...askedNote(record, input), ...leftQuestionNote(record), newUserMessage(input.text, input.photos)];
 		case "answer": {
 			const pending = danglingQuestionOf(record.messages);
 			if (!pending || pending.toolCallId !== input.toolCallId) {
@@ -449,6 +451,13 @@ export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMo
 function askedNote(record: { messages: LhMessage[] }, input: Extract<ChatInput, { type: "text" }>): LhMessage[] {
 	if (!input.asked) return [];
 	return [newAskedMessage(activeProblemOf(record.messages) && !pendingProblemDismissalOf(record.messages) ? "problem" : "question")];
+}
+
+/** His first message after Done for today left a question open picks the
+ *  lesson up at it (`questionLeftForToday`). */
+function leftQuestionNote(record: { messages: LhMessage[] }): LhMessage[] {
+	const left = questionLeftForToday(record.messages);
+	return left ? [newLeftQuestionMessage(left.question)] : [];
 }
 
 function ungradedNote(record: { messages: LhMessage[] }): LhMessage[] {

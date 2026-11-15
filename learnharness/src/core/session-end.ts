@@ -149,6 +149,27 @@ function doneTonightAt(messages: readonly LhMessage[]): number | null {
 	return null;
 }
 
+/** The question he left open when he pressed Done for today, while that
+ *  Done is still his latest input: its words and its call. His next
+ *  message picks the lesson up there (round 10, 3 m2: Resume landed on the
+ *  closed lesson with no question, and his half-typed answer waited unseen
+ *  for the tutor to ask it again). Null otherwise. Pure. */
+export function questionLeftForToday(messages: readonly LhMessage[]): { question: string; toolCallId: string } | null {
+	const done = doneTonightAt(messages);
+	if (done === null) return null;
+	for (let i = done - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		// The turn's course brief rides just before the marker.
+		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
+		if (m.role !== "toolResult") break;
+		const details = m.details as { dismissed?: unknown; reason?: unknown; questionText?: unknown } | undefined;
+		if (details?.dismissed === true && details.reason === "tonight" && typeof details.questionText === "string" && details.questionText.trim()) {
+			return { question: details.questionText, toolCallId: m.toolCallId };
+		}
+	}
+	return null;
+}
+
 function isDoneTonight(m: LhMessage): boolean {
 	return m.role === "custom" && m.customType === "done-tonight";
 }

@@ -563,6 +563,9 @@ export const LESSON_WORDS = {
 	tryAgain: "Try again",
 	connectionDropped: "The connection dropped before the tutor finished replying.",
 	tryAgainPlaceholder: "Press Enter to try again, or write something new.",
+	/** The box after Done for today left a question open: his next message
+	 *  answers it (round 10, 3 m2). */
+	leftQuestionPlaceholder: "Your answer to the question above, or ask anything",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	answeredElsewhereOpen: "Answered in another window. Press Esc to see what you typed here.",
 	hintElsewhere: "Another window asked for a hint. What you typed here comes back when the tutor asks the question again.",
