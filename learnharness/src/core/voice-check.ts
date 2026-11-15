@@ -488,6 +488,17 @@ export function repeatedPoint(text: string, earlier: readonly string[]): { said:
 	return null;
 }
 
+/** A callout ("> …") that makes again a point the same message's prose
+ *  made above it (round 10, 3 m9: "A square matrix A is invertible exactly
+ *  when det A ≠ 0." boxed under the paragraph that said so): the callout's
+ *  sentence and the one it restates, or null. */
+export function restatingCallout(text: string): { said: string; before: string } | null {
+	const lines = text.split("\n");
+	const callout = lines.filter((l) => /^\s*>/.test(l)).map((l) => l.replace(/^\s*>\s?/, "")).join(" ").trim();
+	const rest = lines.filter((l) => !/^\s*>/.test(l)).join("\n").trim();
+	return callout && rest ? repeatedPoint(callout, [rest]) : null;
+}
+
 /** A direct answer's last sentence that draws a lesson from it instead of
  *  answering: it opens "So …" or ends "…, which is why …", and what it draws
  *  holds no maths or number, so it states no step (round 9: "So checking for independent,

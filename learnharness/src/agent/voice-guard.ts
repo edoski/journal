@@ -25,7 +25,7 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, narratedConfidence, problemAdvice, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -254,6 +254,7 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `A question is its own words with nothing under them: no advice on how to answer it, ${quoted(b.excerpt)}.`;
 		case "repeat":
 			if (b.excerpt.startsWith("display ")) return `He has already seen ${b.excerpt.slice("display ".length)} earlier in the session, and what he was told is said once: build on it with a new case, never show or explain it again.`;
+			if (b.excerpt.startsWith("callout ")) return `A callout holds what the message has not said, and this one says again what the paragraph above it said: ${b.excerpt.slice("callout ".length)}. Drop the callout, or the sentence it restates.`;
 			if (b.excerpt.startsWith("point ")) return `He was already told this earlier in the session, and a point is made once: ${b.excerpt.slice("point ".length)}. Leave it out; say only what is new.`;
 			return `This advice was given earlier in the session, and advice is said once: ${b.excerpt}. Leave it out.`;
 		case "colon":
@@ -657,6 +658,8 @@ export class VoiceGuard {
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
+		const boxed = restatingCallout(text);
+		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
 		return [...out, ...this.letters(text), ...this.repeats(text, true)];
 	}
 
