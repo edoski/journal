@@ -5,6 +5,7 @@ import { continueMove, pausedWords, resumableSession, sessionState, type Continu
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
+import { continueWords } from "@/components/study-home/study-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
@@ -243,7 +244,7 @@ export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readon
 		return { kind: "review", opening: `Review ${topic.title}`, ...(left ? { chat: left } : {}) };
 	}
 	const [task] = heldTasks(topic, map);
-	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), `Continue ${task.title}`, task);
+	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), continueWords(task.title), task);
 	if (topic.level === "new") return { kind: "start", opening: topic.title };
 	if (shelfOf(topic, null) === "learning" && !topic.review) return continueAction(sessions, `Continue ${topic.title}`, null);
 	return { kind: "study", opening: topic.title };
@@ -348,7 +349,7 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
 		.filter((task) => !active?.tasks?.includes(task.key))
 		.map((task): Pickup => {
 			const updated = record?.tasks.find((t) => t.key === task.key)?.updated;
-			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), `Continue ${task.title}`);
+			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), continueWords(task.title));
 			return { kind: "task", task, title: task.title, where: task.step ?? "Unfinished", when: updated ? agoWords(daysBetween(updated, today), today) : null, press };
 		});
 	return [...session, ...tasks];
