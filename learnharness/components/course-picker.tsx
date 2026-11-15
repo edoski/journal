@@ -225,9 +225,9 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 }) {
 	const picked = courses.find((c) => c.workspace === workspace);
 	const [open, setOpen] = useState(false);
-	// A course was chosen: focus goes on to the composer's field, where
-	// he types his question next, not back to this chip (focus-home.ts).
-	const chosenRef = useRef(false);
+	// The menu closed, chosen or let go with Esc: focus goes on to the
+	// composer's field, where he types his question next, not back to this
+	// chip (focus-home.ts; round 7: Esc left it on the chip).
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	useEffect(() => {
 		if (asked > 0) setOpen(true);
@@ -259,8 +259,6 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 				className="w-64"
 				data-testid="course-menu"
 				onCloseAutoFocus={(e) => {
-					if (!chosenRef.current) return;
-					chosenRef.current = false;
 					const field = triggerRef.current?.closest('[data-testid="composer"]')?.querySelector("textarea");
 					if (!field) return;
 					e.preventDefault();
@@ -271,7 +269,7 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 					<>
 						<DropdownMenuRadioGroup value={picked ? workspace : ""} onValueChange={onChange}>
 							{courses.map((c) => (
-								<DropdownMenuRadioItem key={c.workspace} value={c.workspace} data-testid="course-option" onSelect={() => { chosenRef.current = true; }}>
+								<DropdownMenuRadioItem key={c.workspace} value={c.workspace} data-testid="course-option">
 									<span className="min-w-0 flex-1 truncate">{courseLabel(c)}</span>
 								</DropdownMenuRadioItem>
 							))}

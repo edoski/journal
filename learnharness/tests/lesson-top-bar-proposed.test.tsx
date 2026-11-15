@@ -169,4 +169,18 @@ describe("where the lesson is", () => {
 		await mount(<LessonRoadmap steps={[]} open={false} onOpenChange={() => {}} onJump={() => {}} />);
 		assert.equal(document.querySelector('[data-testid="roadmap"]'), null);
 	});
+
+	it("⌘K in a lesson with no plan opens the way up, with no strip drawn", async () => {
+		// Round 7 (robustness): ⌘K did nothing in a practice lesson.
+		function NoPlan() {
+			const [open, setOpen] = React.useState(false);
+			return <LessonRoadmap steps={[]} place={PLACE} course={COURSE} open={open} onOpenChange={setOpen} onJump={() => {}} />;
+		}
+		await mount(<NoPlan />);
+		assert.equal(document.querySelector('[data-testid="roadmap"]'), null, "no strip without a plan");
+		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
+		assert.match(element('[data-testid="roadmap-topic"]').getAttribute("href")!, /^\/unit\/[^/]+\/eigen$/);
+		assert.match(element('[data-testid="roadmap-course"]').getAttribute("href")!, /^\/unit\/[^/]+$/);
+		assert.equal(document.querySelector('[data-slot="roadmap-steps"]'), null);
+	});
 });

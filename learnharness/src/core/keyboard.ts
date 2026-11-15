@@ -48,6 +48,7 @@ export type KeyAction =
 	| "dispute-mark"
 	| "dialog-confirm"
 	| "try-again"
+	| "stop-reply"
 	| "attach-photo"
 	| "question-pick-digit"
 	| "question-ask-instead";
@@ -109,6 +110,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "dispute-mark", label: "Dispute the newest answer's mark", scope: "lesson", binding: "mod+shift+m" },
 	// The answer field on show (composer, check or problem) opens its picker.
 	{ id: "attach-photo", label: "Attach a photo of your working", scope: "lesson", binding: "mod+shift+p" },
+	// Esc while the tutor writes asks to stop it (keyboard-shortcuts.tsx owns Esc).
+	{ id: "stop-reply", label: "Stop the tutor's reply", scope: "lesson", binding: "escape", displayOnly: true },
 	{ id: "try-again", label: "Try again after a reply that never came", scope: "lesson", binding: "enter", displayOnly: true },
 	{ id: "dialog-confirm", label: "Confirm a stop or skip (← → pick a button)", scope: "lesson", binding: "mod+enter", displayOnly: true },
 	// A question (components/lesson/prose/prose.md): its choices are rows

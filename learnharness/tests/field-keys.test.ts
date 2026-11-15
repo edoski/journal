@@ -33,4 +33,12 @@ describe("the cheat sheet", () => {
 		const lesson = cheatSheetSections().find((s) => s.label === "In a lesson");
 		assert.ok(lesson?.actions.some((a) => a.id === "try-again"));
 	});
+
+	it("lists Esc to stop the tutor's reply under In a lesson", () => {
+		// Round 7 (robustness): the sheet still did not say Esc stops the tutor.
+		const lesson = cheatSheetSections().find((s) => s.label === "In a lesson");
+		const stop = lesson?.actions.find((a) => a.id === "stop-reply");
+		assert.equal(stop?.binding, "escape");
+		assert.equal(stop?.label, "Stop the tutor's reply");
+	});
 });

@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, type KeyboardEvent } from "react";
+import { useEffect, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BookOpenIcon, MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { MathText, mathPlain } from "@/components/ui/math-text";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
 import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { kbdEventForAction, type LessonPlace } from "@/src/core";
@@ -85,7 +85,21 @@ export function LessonRoadmap({
 		return () => window.removeEventListener(kbdEventForAction("open-model-picker"), onOpen);
 	}, [onOpenChange]);
 	const label = roadmapLabel(steps);
-	if (label === null) return null;
+	// A lesson with no plan (practice) draws no strip, but ⌘K still opens
+	// the way up from where the strip would be (round 7: ⌘K did nothing).
+	if (label === null) {
+		if (!course) return null;
+		return (
+			<Popover open={open} onOpenChange={onOpenChange}>
+				<PopoverAnchor asChild>
+					<span aria-hidden data-slot="roadmap-anchor" className="h-8 w-0 shrink-0" />
+				</PopoverAnchor>
+				<RoadmapPanel>
+					<RoadmapLinks place={place} course={course} />
+				</RoadmapPanel>
+			</Popover>
+		);
+	}
 	return (
 		<Popover open={open} onOpenChange={onOpenChange}>
 			<Hint label="Where this lesson is" action="open-model-picker" side="bottom">
@@ -109,19 +123,7 @@ export function LessonRoadmap({
 					</Button>
 				</PopoverTrigger>
 			</Hint>
-			<PopoverContent
-				align="end"
-				aria-label="Where this lesson is"
-				data-testid="roadmap-panel"
-				className="p-1"
-				onKeyDown={walkStops}
-				// Closed by Esc, a jump or a link: his next key goes to the
-				// box he answers in, not back to the strip.
-				onCloseAutoFocus={(e) => {
-					e.preventDefault();
-					focusWhereHeTypes(document, false);
-				}}
-			>
+			<RoadmapPanel>
 				<ol data-slot="roadmap-steps" className="flex flex-col">
 					{steps.map((s) => {
 						const word = rowWord(s);
@@ -162,27 +164,57 @@ export function LessonRoadmap({
 				{course && (
 					<>
 						<div role="separator" className="mx-2 my-1 h-px bg-border" />
-						{place?.topic && (
-							<Link href={unitHref(course.workspace, place.topic.handle)} data-slot="roadmap-link" data-testid="roadmap-topic" className={LINK_ROW}>
-								<BookOpenIcon aria-hidden className="size-4 shrink-0" />
-								<span className="min-w-0 flex-1 truncate">
-									<MathText>{place.topic.title}</MathText>
-								</span>
-							</Link>
-						)}
-						<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={LINK_ROW}>
-							<MapIcon aria-hidden className="size-4 shrink-0" />
-							<span className="min-w-0 flex-1 truncate">Course map</span>
-							{place?.arc && (
-								<span data-slot="arc-pill" className="max-w-32 shrink-0 truncate rounded-full bg-fill-hover px-2 py-0.5 text-label text-muted-foreground">
-									{place.arc.title}
-								</span>
-							)}
-						</Link>
+						<RoadmapLinks place={place} course={course} />
 					</>
 				)}
-			</PopoverContent>
+			</RoadmapPanel>
 		</Popover>
+	);
+}
+
+/** The panel: its own arrows, and focus back where he types once it closes. */
+function RoadmapPanel({ children }: { children: ReactNode }) {
+	return (
+		<PopoverContent
+			align="end"
+			aria-label="Where this lesson is"
+			data-testid="roadmap-panel"
+			className="p-1"
+			onKeyDown={walkStops}
+			// Closed by Esc, a jump or a link: his next key goes to the
+			// box he answers in, not back to the strip.
+			onCloseAutoFocus={(e) => {
+				e.preventDefault();
+				focusWhereHeTypes(document, false);
+			}}
+		>
+			{children}
+		</PopoverContent>
+	);
+}
+
+/** The way up: the topic's page and the course map with the topic's arc. */
+function RoadmapLinks({ place, course }: { place?: LessonPlace; course: { title: string; workspace: string } }) {
+	return (
+		<>
+			{place?.topic && (
+				<Link href={unitHref(course.workspace, place.topic.handle)} data-slot="roadmap-link" data-testid="roadmap-topic" className={LINK_ROW}>
+					<BookOpenIcon aria-hidden className="size-4 shrink-0" />
+					<span className="min-w-0 flex-1 truncate">
+						<MathText>{place.topic.title}</MathText>
+					</span>
+				</Link>
+			)}
+			<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={LINK_ROW}>
+				<MapIcon aria-hidden className="size-4 shrink-0" />
+				<span className="min-w-0 flex-1 truncate">Course map</span>
+				{place?.arc && (
+					<span data-slot="arc-pill" className="max-w-32 shrink-0 truncate rounded-full bg-fill-hover px-2 py-0.5 text-label text-muted-foreground">
+						{place.arc.title}
+					</span>
+				)}
+			</Link>
+		</>
 	);
 }
 

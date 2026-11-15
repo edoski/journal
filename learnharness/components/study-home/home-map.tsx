@@ -206,6 +206,16 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 				variant="line"
 				aria-label="Course"
 				data-slot="home-map-tabs"
+				// ↓ goes into the map beneath, to its card that takes focus
+				// (You are here): the page's arrows chose the full-width
+				// Today row below it (round 7).
+				onKeyDown={(e) => {
+					if (e.key !== "ArrowDown" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+					const card = list.current?.closest('[data-slot="home-map"]')?.querySelector<HTMLElement>('[data-slot="home-map-course"][data-shown] a[tabindex="0"]');
+					if (!card) return;
+					e.preventDefault();
+					card.focus({ preventScroll: true });
+				}}
 				className="relative [&_[data-slot=tabs-trigger]]:after:hidden"
 			>
 				{courses.map((c) => (

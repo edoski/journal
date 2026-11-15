@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { fuzzyScore, type ChatListItem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { focusWhereHeTypes } from "@/components/ui/overlay";
 
 /** The search over the list (owner round 8, 2026-10-05): a fuzzy
  *  subsequence match ranked by fuzzyScore — prefix beats word-boundary
@@ -155,8 +156,11 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	// window Esc chain (abort) doesn't also fire.
 	const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shown: readonly ChatListItem[] | null) => {
 		if (e.key === "Escape") {
+			// Out of the search, back to the box he types in where there is
+			// one (round 7: Esc left focus on the page).
 			e.stopPropagation();
 			e.currentTarget.blur();
+			focusWhereHeTypes(document, false);
 			return;
 		}
 		// Modified keys belong to the surface (⇧↵ etc.).
