@@ -213,7 +213,7 @@ describe("course records adapter (fake engine)", () => {
 				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", right: "partial", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
 				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", right: "sideways", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
 				{ topic: "cramer", needs: ["vectors"], contrasts: ["elimination"], level: "introduced", weak: false, tasks: [] },
-				{ topic: "det", title: "Determinants", needs: [], contrasts: [], level: "new", starts: "2026-11-19", starts_after: ["Probability"], weak: false, tasks: [] },
+				{ topic: "det", title: "Determinants", needs: [], contrasts: [], level: "new", starts: "2026-11-19", starts_after: ["Probability"], moved: { from: "2026-11-12", by: "study", courses: ["Probability"] }, weak: false, tasks: [] },
 				{ topic: "odd", level: "mastered", needs: [], contrasts: [], weak: false, tasks: [] },
 			],
 		};
@@ -236,6 +236,8 @@ describe("course records adapter (fake engine)", () => {
 		const [vectors, basis, elimination, rank, cramer] = map.topics;
 		assert.deepEqual(vectors!.review, { kind: "scheduled", date: "2026-11-23" });
 		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.startsAfter, ["Probability"], "a start says which courses' new topics come first");
+		assert.deepEqual(map.topics.find((t) => t.handle === "det")?.moved, { from: "2026-11-12", by: "study", courses: ["Probability"] }, "a day he was told that moved says from which day and why");
+		assert.equal("moved" in basis!, false);
 		assert.deepEqual(basis!.review, { kind: "scheduled", date: "2026-12-04", held: { exam: "Probability", since: "2026-11-02" } }, "a review a final review holds back says which, and since when");
 		assert.deepEqual(rank!.review, { kind: "due", date: "2026-11-05", overdue: 3 });
 		assert.deepEqual(rank!.signals, { gap: "Counts nonzero entries", lapsed: false, stale: true, choiceErrors: {}, confidentErrors: 0, repaired: true });

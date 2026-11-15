@@ -136,6 +136,13 @@ describe("why a review waits", () => {
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back in 12d", "memory's day is still ahead");
 		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
 	});
+	it("says from which told day a review moved and what of his study moved it, ahead of memory's day", () => {
+		const told = { from: "2026-11-10", by: "study" as const, courses: ["Probability"] };
+		assert.equal(movedWords(behind, "2026-11-08", told), "Moved from 10 Nov after your Probability study today");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-12" }, "2026-11-08", { from: "2026-11-10", by: "missed" }), "Moved from 10 Nov, no study yesterday");
+		assert.equal(movedWords(late, "2026-11-08", { from: "2026-11-09", by: "left" }), "Moved from 9 Nov, yesterday's plan was not finished");
+		assert.equal(movedWords(null, "2026-11-08", { from: "2026-11-10", by: "study", courses: ["Probability", "Calculus"] }), "Moved from 10 Nov after your Probability and Calculus study today", "a start moves too");
+	});
 	it("says from when a held review moved, so a day the tutor named never moves in silence", () => {
 		assert.equal(movedWords(behind, "2026-11-08"), "Moved from 13 Nov", "memory's day is still ahead");
 		assert.equal(movedWords(late, "2026-11-08"), "Due since 1 Oct");

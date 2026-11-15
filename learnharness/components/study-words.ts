@@ -1,4 +1,4 @@
-import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, type RightAnswer, type StartsWhy, type TopicHandle, type TopicSignals, type UnreadableProblem } from "@/src/core";
+import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, type UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -182,11 +182,20 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
 }
 
-/** A review the plan moved past the day memory asked for it, from when:
- *  "Due since 1 Oct" once that day has passed, else "Moved from 9 Nov", so
- *  a day the tutor named that a later review took never changes in
- *  silence (round 5); null for a review the plan does not hold. */
-export function movedWords(review: CourseMapTopic["review"], today: string): string | null {
+/** What of his study moved a day he was told (`TopicMoved`). */
+const MOVED_BY = {
+	study: (courses: readonly string[]) => ` after your ${listWords(courses)} study today`,
+	missed: ", no study yesterday",
+	left: ", yesterday's plan was not finished",
+} as const;
+
+/** A day that moved, from when: one he was told ("Moved from 10 Nov after
+ *  your Probability study today", round 7: a told day moved in silence),
+ *  else a review the plan moved past the day memory asked for it, "Due
+ *  since 1 Oct" once that day has passed, else "Moved from 9 Nov" (round
+ *  5); null for a day that did neither. */
+export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
+	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses) : MOVED_BY[told.by]}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
 	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : `Moved from ${shortDay(review.held.since)}`;
 }

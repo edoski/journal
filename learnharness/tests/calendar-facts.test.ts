@@ -150,6 +150,25 @@ describe("calendar entries", () => {
 		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", "Moved from 9 Nov", "Earlier days are full"]);
 	});
 
+	it("says from which told day a review or a start moved and what of his study moved it", () => {
+		const MOVED = course(
+			"/study/la",
+			"Linear Algebra",
+			{
+				topics: [
+					topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"] } }),
+					topic("projection", { title: "Projection", level: "new", starts: "2026-11-12", moved: { from: "2026-11-11", by: "missed" } }),
+				],
+			},
+			{ planned: [{ date: "2026-11-11", reviews: ["eigen" as TopicHandle], new: [] }, { date: "2026-11-12", reviews: [], new: ["projection" as TopicHandle] }] },
+		);
+		const entries = calendarEntries({ courses: [MOVED], chats: [], scope: null });
+		const review = entries.find((e) => e.kind === "review");
+		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", "Moved from 10 Nov after your Probability study today", null]);
+		const fresh = entries.find((e) => e.kind === "new");
+		assert.deepEqual(fresh?.kind === "new" && [fresh.day, fresh.waits], ["2026-11-12", "Moved from 11 Nov, no study yesterday"]);
+	});
+
 	it("gives a review the topic page's action and an open task its opening and topic", () => {
 		const entries = calendarEntries({ courses: [LINALG], chats: [], scope: null });
 		const span = entries.find((e) => e.kind === "review" && e.title === "Span");

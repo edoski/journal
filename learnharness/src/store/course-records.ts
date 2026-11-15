@@ -24,7 +24,7 @@ import {
 	type UnreadableCourse,
 	type UnreadableProblem,
 } from "../core/contracts/course.ts";
-import { EXAM_GAP_REASONS, isTopicLevel, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle } from "../core/contracts/course-map.ts";
+import { EXAM_GAP_REASONS, isTopicLevel, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapEdge, type CourseMapTopic, type RightAnswer, type TopicHandle, type TopicMoved } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
 import { arcBlockOf, startsWhyOf, type ArcBlock } from "./course-arcs.ts";
 
@@ -248,6 +248,15 @@ function count(value: unknown): number {
 const RIGHT_ANSWERS: readonly RightAnswer[] = ["unaided", "helped", "guess", "uncertain", "partial"];
 const isRightAnswer = (value: unknown): value is RightAnswer => RIGHT_ANSWERS.includes(value as RightAnswer);
 
+/** The engine's `moved`, when it is one the app can say. */
+function movedOf(value: unknown): { moved: TopicMoved } | Record<string, never> {
+	const m = record(value);
+	const from = str(m?.from);
+	if (!m || !from) return {};
+	if (m.by === "study") return { moved: { from, by: "study", courses: strings(m.courses) } };
+	return m.by === "missed" || m.by === "left" ? { moved: { from, by: m.by } } : {};
+}
+
 /** One `map` topic with its raw edges, arc and start reason; null when it
  *  lacks a handle or an engine level. */
 function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contrasts: string[]; rawArc: string | null; rawWhy: unknown }) | null {
@@ -283,6 +292,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 		...(str(e.excluded) ? { excluded: str(e.excluded)! } : {}),
 		...(str(e.starts) ? { starts: str(e.starts)! } : {}),
 		...(str(e.starts) && strings(e.starts_after).length > 0 ? { startsAfter: strings(e.starts_after) } : {}),
+		...movedOf(e.moved),
 		needs: strings(e.needs),
 		contrasts: strings(e.contrasts),
 		rawArc: str(e.arc),

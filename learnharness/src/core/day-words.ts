@@ -54,7 +54,8 @@ export function studyNow(env: Record<string, string | undefined> = process.env, 
 
 /** The engine's JSON with `planned_words` beside every `planned` day and
  *  `starts_words` beside every `starts` day, relative to the output's own
- *  `today` when it has one, else `today`. */
+ *  `today` when it has one, else `today`, and `from_words` beside the day a
+ *  `moved` day was told for. */
 export function withDayWords(json: unknown, today: string): unknown {
 	const own = typeof json === "object" && json !== null && typeof (json as { today?: unknown }).today === "string" ? (json as { today: string }).today : today;
 	const walk = (value: unknown): unknown => {
@@ -64,6 +65,7 @@ export function withDayWords(json: unknown, today: string): unknown {
 		for (const [key, inner] of Object.entries(value)) {
 			out[key] = walk(inner);
 			if ((key === "planned" || key === "starts") && typeof inner === "string" && DAY.test(inner)) out[`${key}_words`] = plannedDayWords(inner, own);
+			if (key === "moved" && typeof inner === "object" && inner !== null && typeof (inner as { from?: unknown }).from === "string") out.moved = { ...(inner as object), from_words: longDay((inner as { from: string }).from) };
 		}
 		return out;
 	};
