@@ -13,24 +13,21 @@ import { MathText } from "@/components/ui/math-text";
 
 /** The pie beside both lines; the course line with when he last studied
  *  it at its end, then the lesson line with why now at its end. The ends
- *  sit flush right, so each lines up down the list. */
+ *  sit flush right, so each lines up down the list. The hover fill's
+ *  corners are at 8, as every other row with a hover fill (the sidebar's,
+ *  the course page's, Settings'). */
 const ROW =
-	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-lg px-3 text-left font-normal system-current:font-normal whitespace-normal data-[pointed]:bg-fill-hover";
-/** Home's Proposed: the hover fill's corners at 8, as every other row with
- *  a hover fill (the sidebar's, the course page's, Settings'). */
-const ROW_CORNERS = "rounded-md";
-const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_auto]";
-/** With the standing: its own column before the ends, its marks on the
+	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-md px-3 text-left font-normal system-current:font-normal whitespace-normal data-[pointed]:bg-fill-hover";
+/** The standing has its own column before the ends, its marks on the
  *  column's left edge, as wide as the longest standing words ("Right on
  *  your own, check another day"); the ends' column as wide as the reason's
  *  most (`WhyMark`'s 224), not each row's own words, so the standing starts
  *  at one edge down the list and its marks stack. */
-const COLUMNS_STANDING = "grid-cols-[1rem_minmax(0,1fr)_15rem_14rem]";
+const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_15rem_14rem]";
 
 /** The same columns with the first at the badge's width (40px), so both
  *  lines start at one edge beside it. */
-const COLUMNS_BADGE = "grid-cols-[2.5rem_minmax(0,1fr)_auto]";
-const COLUMNS_STANDING_BADGE = "grid-cols-[2.5rem_minmax(0,1fr)_15rem_14rem]";
+const COLUMNS_BADGE = "grid-cols-[2.5rem_minmax(0,1fr)_15rem_14rem]";
 
 /** A standing fact: a 14px mark, as the reason's, then its words. */
 const FACT = "flex min-w-0 items-center gap-1.5 text-callout system-current:text-label text-muted-foreground";
@@ -44,7 +41,7 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  * ends with when he last studied it; the lesson line ends with why it is
  * there today, as an icon and a few words.
  */
-export function HybridRows({ rows, busy, onContinue, standing = false, ...point }: RowsProps & { standing?: boolean }) {
+export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 	const { shown, also } = foldLines(rows);
 	// The visual system's Proposed: the course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox.
 	const badge = useSystemVariant() === "proposed";
@@ -52,22 +49,22 @@ export function HybridRows({ rows, busy, onContinue, standing = false, ...point 
 		<ul data-slot="hybrid-rows" className="flex flex-col">
 			{shown.map((row) => {
 				// The slip sits on the course line, the standing on the lesson line, so it reads beside its topic.
-				const facts = standing ? rowStanding(row) : undefined;
+				const facts = rowStanding(row);
 				return (
 					<li key={lineKey(row)} className={HAIRLINE}>
-						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? cn(badge ? COLUMNS_STANDING_BADGE : COLUMNS_STANDING, ROW_CORNERS) : badge ? COLUMNS_BADGE : COLUMNS)} {...pointProps(row, point)}>
+						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, badge ? COLUMNS_BADGE : COLUMNS)} {...pointProps(row, point)}>
 							{badge ? (
 								<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
 							) : (
 								<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
 							)}
 							<MathLine className="text-callout system-current:text-label text-muted-foreground">{courseTitle(row)}</MathLine>
-							{facts !== undefined && <SlipFact facts={facts} />}
+							<SlipFact facts={facts} />
 							<span data-slot="today-when" className="justify-self-end text-callout system-current:text-label text-muted-foreground tabular-nums">
 								{studiedLabel(row)}
 							</span>
 							<MathLine className="text-headline system-current:text-control system-current:font-medium text-foreground">{lessonTitle(row)}</MathLine>
-							{facts !== undefined && <StandingFact facts={facts} />}
+							<StandingFact facts={facts} />
 							<WhyMark why={whyOf(row)} />
 						</LineTarget>
 					</li>

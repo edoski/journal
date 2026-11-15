@@ -73,7 +73,7 @@ Words come from `study-words.ts` and `topic-standing.ts` (`standingOf`, `slipBes
 ## Frame
 
 - **Window band:** 52px at the top, a drag strip; the lesson's top bar sits in it, 16 in from the sidebar.
-- **Page column** (`PAGE_COLUMN`, `page-frame/page-frame.tsx`): centred, up to 80rem, 24 sides, 24 under the band and above the foot. At 1512 with the sidebar open it is 1256 wide and its content runs from x=280 to 1488; a page's first line sits at y=76, its title at y=99. The course page, the topic page and Home's Proposed sit on it.
+- **Page column** (`PAGE_COLUMN`, `page-frame/page-frame.tsx`): centred, up to 80rem, 24 sides, 24 under the band and above the foot. At 1512 with the sidebar open it is 1256 wide and its content runs from x=280 to 1488; a page's first line sits at y=76, its title at y=99. The course page, the topic page and Home sit on it.
 - **Lesson column:** centred, about 736 wide, as T3 Code's and Claude Desktop's (Edo, 14 Nov 2026).
 - **Settings:** a dialog, 880 wide, its own nav column.
 

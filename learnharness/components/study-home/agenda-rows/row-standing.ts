@@ -13,7 +13,7 @@ export interface RowStanding {
 }
 
 /**
- * The standing Home's Proposed adds to a Today row (Edo's notes, 15 Nov
+ * The standing a Today row on Home carries (Edo's notes, 15 Nov
  * 2026, N1), null on a row of several topics or none, and on a topic not
  * started: its plan step already reads "Start …", and on a session's row
  * "Not started" would contradict the lesson, as the topic page's head

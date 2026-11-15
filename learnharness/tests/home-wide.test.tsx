@@ -1,9 +1,8 @@
 /**
  * A wider Home (Edo's notes, 15 Nov 2026, N1: "is there any super useful
- * info at all that we could cleanly fit into it"): Proposed widens Home to
- * the course page's frame and gives each Today row where he stands on its
- * one topic, which he picked over the course's exam day. Current keeps the
- * old width and draws none.
+ * info at all that we could cleanly fit into it"): Home is as wide as the
+ * course page's frame and each Today row says where he stands on its one
+ * topic, which he picked over the course's exam day.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -25,19 +24,18 @@ import { CHATS, COURSES, TODAY } from "./fixtures/now-demo.ts";
 
 const { rows } = needsYouNow(COURSES, CHATS, TODAY);
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
-const draw = (standing = false) =>
+const draw = () =>
 	parseHTML(
 		`<html><body>${renderToStaticMarkup(
 			<AppRouterContext.Provider value={router as never}>
-				<HybridRows rows={rows} busy={false} onContinue={() => {}} standing={standing} />
+				<HybridRows rows={rows} busy={false} onContinue={() => {}} />
 			</AppRouterContext.Provider>,
 		)}</body></html>`,
 	).document;
 
 describe("Home's width (N1)", () => {
-	it("keeps Current at its width and widens Proposed to the course page's frame", () => {
-		assert.equal(HOME_WIDTH.current, "max-w-[60rem]");
-		assert.equal(HOME_WIDTH.proposed, "max-w-[80rem]");
+	it("is the course page's frame", () => {
+		assert.equal(HOME_WIDTH, "max-w-[80rem]");
 	});
 });
 
@@ -74,11 +72,8 @@ describe("the standing", () => {
 });
 
 describe("the rows drawn", () => {
-	it("draw the pie and the standing words on the lesson line, the slip with its own icon on the course line, and Current draws none", () => {
-		const current = draw();
-		assert.equal(current.querySelectorAll('[data-slot="today-standing"], [data-slot="today-slip"]').length, 0);
-		const proposed = draw(true);
-		const lines = [...proposed.querySelectorAll('[data-slot="today-line"]')];
+	it("draw the pie and the standing words on the lesson line, the slip with its own icon on the course line", () => {
+		const lines = [...draw().querySelectorAll('[data-slot="today-line"]')];
 		const shown = foldLines(rows).shown;
 		assert.equal(lines.length, shown.length);
 		shown.forEach((row, i) => {

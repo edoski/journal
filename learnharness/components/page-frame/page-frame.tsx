@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** The column every page sits in: centred, up to 80rem, 24px sides, 24px
- *  under the window's 52px band and above its foot. Home's Proposed wears
- *  it too, so moving between pages no edge moves. */
+ *  under the window's 52px band and above its foot. Home wears it
+ *  too, so moving between pages no edge moves. */
 export const PAGE_COLUMN = "mx-auto w-full max-w-[80rem] px-6 pb-6";
 
 /**

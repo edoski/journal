@@ -15,7 +15,7 @@ import { MathLine } from "@/components/ui/math-line";
  * nothing is left today. The lines are agenda's hybrid rows
  * (agenda-rows/hybrid/hybrid.md).
  */
-export function Today({ done, exam = null, ...props }: RowsProps & { done: readonly string[]; exam?: NearExam | null; standing?: boolean }) {
+export function Today({ done, exam = null, ...props }: RowsProps & { done: readonly string[]; exam?: NearExam | null }) {
 	const words = doneWords(done);
 	return (
 		<section aria-labelledby="today-heading" data-slot="today" className="flex shrink-0 flex-col gap-2">

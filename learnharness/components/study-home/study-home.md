@@ -30,17 +30,15 @@ Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes 
 | Part | Notes |
 |---|---|
 | chrome | the 52px drag strip and the sidebar toggle, as the composer's |
-| column | 960px, 32px sides, 52px above, 24px below (Proposed: the pages' own column, `PAGE_COLUMN`: up to 80rem, 24px sides, 24px under the 52px band, so the tabs start where a course or topic page's head does, at x=280, y=76 in his window); the page never scrolls: the map takes half the column (it shrinks to 192px at least when Today needs more), Today the rest |
+| column | the pages' own column, `PAGE_COLUMN`: up to 80rem, 24px sides, 24px under the 52px band, so the tabs start where a course or topic page's head does, at x=280, y=76 in his window; the page never scrolls: the map takes half the column (it shrinks to 192px at least when Today needs more), Today the rest |
 | map | `home-map` (home-map.md), half the column (Edo, 12 Nov 2026: smaller, so Today's rows lead); enlarged, the whole column |
 | Today | `today` (today.md), 20px under the map |
 
 Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights in the body (400, 500) plus 600 on the heading and "Your turn". One accent (`link`) for "Your turn"; no fills.
 
-## Width (Proposed, behind the polish switch)
+## Width
 
-Edo's notes, 15 Nov 2026, N1: a wider Home gives the map more room, "but also the rows below would get wider … is there any super useful info at all that we could cleanly fit into it". The switch (`components/design-variant.ts`, group `home`, dev only; production draws Current) offers Current and Proposed. Proposed widens Home's column to the course page's frame (`HOME_WIDTH`, 80rem, as `PageFrame`) and gives each Today row on one topic where he stands on it (`agenda-rows/row-standing.ts`), in its own column before the row's ends (hybrid.md, "Standing"). He looked at it beside a candidate with the course's exam day on its first row and picked the standing the same day; the exam candidate is deleted.
-
-Shipping it means deleting Current and the switch.
+Edo's notes, 15 Nov 2026, N1: a wider Home gives the map more room, "but also the rows below would get wider … is there any super useful info at all that we could cleanly fit into it". Home's column is the course page's frame (`HOME_WIDTH`, 80rem, as `PageFrame`), and each Today row on one topic says where he stands on it (`agenda-rows/row-standing.ts`), in its own column before the row's ends (hybrid.md, "Standing"). He picked it over the old 960px Home and over a candidate with the course's exam day on its first row, the same day.
 
 ## Keys
 

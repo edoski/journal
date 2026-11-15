@@ -3,12 +3,6 @@
 import { useSyncExternalStore } from "react";
 import { onPolishChange, polishVariant, type PolishGroup } from "@/components/dev/polish-variant.js";
 
-/** Home's Proposed (Edo's notes, 15 Nov 2026, N1; spec:
- *  components/study-home/study-home.md, "Width"): Home as wide as the
- *  course page's frame, each Today row on one topic saying where he stands
- *  on it. He picked it over the exam day the same day. */
-export type HomeVariant = "current" | "proposed";
-
 /** The visual system's Proposed (Edo, 15 Nov 2026; docs/visual-system.md):
  *  macOS's own text styles as the type scale, dialog titles as page titles,
  *  one icon line weight, and the course's badge on Today's rows. Type
@@ -19,7 +13,6 @@ export type SystemVariant = "current" | "proposed";
 /** The switch registry, which the Logbook's in-app guide switches (dev
  *  only). Read only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
-	{ id: "home", label: "Home" },
 	{ id: "system", label: "Visual system" },
 ];
 
@@ -38,13 +31,7 @@ function subscribeSwitch(onChange: () => void): () => void {
 }
 /** What production builds draw until Edo ships Proposed. */
 const readShipped = (): "current" => "current";
-const readHome = (): HomeVariant => (polishVariant("home") === "proposed" ? "proposed" : "current");
 const readSystem = (): SystemVariant => (polishVariant("system") === "proposed" ? "proposed" : "current");
-
-/** Which Home draws. Production builds draw the shipped one. */
-export function useHomeVariant(): HomeVariant {
-	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readHome : readShipped, readShipped);
-}
 
 /** Which visual system draws. Production builds draw the shipped one. */
 export function useSystemVariant(): SystemVariant {
