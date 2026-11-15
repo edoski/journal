@@ -37,6 +37,7 @@ import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { answeredQuestionsOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
+import { reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
 import { PATHS } from "../../config.ts";
 import { nextChatSession } from "../core/sdk-session.ts";
@@ -460,7 +461,7 @@ export async function handleChatInput(
 		// save's links are kept the moment the engine takes it, so a restart
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged, stores.chatStore.getChat(chatId)?.answerSaves), onSaved: keepSaves } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged, stores.chatStore.getChat(chatId)?.answerSaves), onSaved: keepSaves, review: reviewRecord(record) } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the

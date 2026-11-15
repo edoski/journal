@@ -41,6 +41,23 @@ export interface CourseToolContext {
 	 *  a restart between the engine's write and the transcript's lost the
 	 *  answer's mark). */
 	onSaved?: (links: { question: string; observation: string }[]) => void;
+	/** The session is a review (session-opening.ts `openedAsReview`): what
+	 *  it leaves stays with the topic, whose review carries it, so a save
+	 *  here keeps no task (round 9, 2 m4: a review turned into teaching saved
+	 *  "Re-learn checking independence"). */
+	review?: boolean;
+}
+
+/** Why a review's save is refused: it keeps a task. A task removed (null)
+ *  is allowed. */
+export const REVIEW_TASK_REFUSED =
+	"tasks: this session is his review, and a review saves no task: what is left of it stays with the topic, whose review carries it. Leave tasks and focus out and send the rest.";
+
+function reviewTaskRefused(ctx: CourseToolContext, patch: Record<string, unknown> | null): string | null {
+	if (!ctx.review || !patch) return null;
+	const tasks = patch.tasks;
+	const kept = tasks !== null && typeof tasks === "object" && Object.values(tasks).some((t) => t !== null);
+	return kept || (typeof patch.focus === "string" && patch.focus !== "") ? REVIEW_TASK_REFUSED : null;
 }
 
 /** A patch as the engine reads it: the object, or its JSON text, which the
@@ -208,6 +225,8 @@ function keepLinks(ctx: CourseToolContext, questions: readonly (string | null)[]
  */
 export async function saveCourse(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
 	const patch = patchOf(changes);
+	const reviewTask = reviewTaskRefused(ctx, patch);
+	if (reviewTask) return { ok: false, kind: "validation", message: reviewTask };
 	const listed = patch && Array.isArray(patch.observations) ? patch.observations : null;
 	if (!patch || !listed) return ctx.records.run(ctx.course.workspace, { verb: "save", changes });
 	const answers = ctx.answers ?? new Map<string, AnsweredQuestion>();

@@ -315,11 +315,12 @@ function arcCheckLines(arcsReady: unknown, arc: string | undefined): string[] | 
  *  started from Check it checks: the brief then carries that arc's check.
  *  `plan` is every course's daily plan; without it the brief has none.
  *  `opened` are the topics the session was opened on from their page, whose
- *  title the app posted as his first message. */
+ *  title the app posted as his first message; `review` says he opened them
+ *  as their review, which the session stays whatever it re-teaches. */
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [] }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[] } = {},
+	{ runup, arcCheck, plan, opened = [], review = false }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; review?: boolean } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -332,7 +333,8 @@ export function projectCourseBrief(
 	const examLine = typeof exam.days_left === "number" ? ` · exam in ${exam.days_left} days` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
-	if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
+	if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed Review, and the app posted his first message. The session is his review, whatever it re-teaches.`);
+	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);

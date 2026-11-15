@@ -65,6 +65,13 @@ export function isReviewSession(chat: { title: string; review?: boolean; ownTopi
 	return opened.length > 0 && REVIEW_OPENING.test(chat.title);
 }
 
+/** Whether a session's own record is a review: opened with a review's
+ *  words, or a summary made elsewhere named as one. The brief, the course
+ *  tools and the digest read a review the same way. */
+export function reviewRecord(record: { title: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
+	return openedAsReview(record) || isReviewSession(record);
+}
+
 /** The name a session opened on topics takes from its opening: a review
  *  keeps "Review A, B"; a lesson drops the verb that opened it ("Start
  *  Poisson distribution" is named "Poisson distribution"); anything else,
