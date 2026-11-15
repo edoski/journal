@@ -361,11 +361,6 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 const WRITE_VERBS: ReadonlySet<CourseVerb["verb"]> = new Set(["save", "sources", "forget-course"]);
 const writes = (verb: CourseVerb): boolean => WRITE_VERBS.has(verb.verb) && !("scan" in verb);
 
-/** Watch one course's record for writes from any host (Claude Code and
- *  Claude Desktop save through the engine's MCP server, never through the
- *  app). The engine keeps the record at `<workspace>/.study/course.json` and
- *  replaces it whole on each save, so the folder is watched, not the file.
- *  Returns the unwatch; a course whose folder is missing is not watched. */
 /** Whether the course was deleted: the engine's `forget --course` unlinks
  *  the record and leaves the initialised `.study` folder behind. An
  *  unreadable or damaged record is still there; a folder never made a
@@ -375,6 +370,11 @@ export function courseRecordForgotten(workspace: string): boolean {
 	return fs.existsSync(study) && !fs.existsSync(path.join(study, "course.json"));
 }
 
+/** Watch one course's record for writes from any host (Claude Code and
+ *  Claude Desktop save through the engine's MCP server, never through the
+ *  app). The engine keeps the record at `<workspace>/.study/course.json` and
+ *  replaces it whole on each save, so the folder is watched, not the file.
+ *  Returns the unwatch; a course whose folder is missing is not watched. */
 export function watchCourseRecord(workspace: string, onChange: () => void): () => void {
 	try {
 		const watcher = fs.watch(path.join(workspace, ".study"), (_event, file) => {
