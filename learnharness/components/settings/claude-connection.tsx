@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CLAUDE_MODEL, type ClaudeAccount, type ClaudeAccountStatus, type ClaudeConnection, type ClaudeUsage } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { useModelStatus } from "@/components/model-status";
+import { refreshModelStatus, useModelStatus } from "@/components/model-status";
 import { cn } from "@/lib/utils";
 import { ConnectionRow, connectionNoteClass } from "./connection-controls";
 
@@ -107,7 +107,7 @@ export async function readClaudeAccounts(refresh: boolean): Promise<ClaudeAccoun
  *  it, and Use this account (or In use) at the right. `current` is
  *  undefined until the model status loads. `alias` names the account as T3
  *  Code does when another row signs in with the same email. Exported for tests. */
-export function AccountRow({ status, current, busy, onUse, alias }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void; alias?: string }) {
+export function AccountRow({ status, current, busy, onUse, alias, checking = false }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void; alias?: string; checking?: boolean }) {
 	const { account, connection, usage, modelMissing } = status;
 	const connected = connection.state === "connected";
 	const inUse = current === account.providerId;
@@ -121,8 +121,8 @@ export function AccountRow({ status, current, busy, onUse, alias }: { status: Cl
 				? <span className="text-callout system-current:text-label text-muted-foreground" data-testid="claude-in-use">In use</span>
 				: connected && current !== undefined && <Button type="button" size="compact" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" data-testid="claude-use-account" disabled={busy} onClick={onUse}>Use this account</Button>}
 		</div>
-		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection, account)}</p>
-		{connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
+		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(checking ? null : connection, account)}</p>
+		{!checking && connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
 		{modelMissing && <p className={connectionNoteClass("danger")} data-testid="claude-model-missing">{CLAUDE_MODEL_MISSING_LINE}</p>}
 	</div>;
 }
@@ -139,6 +139,7 @@ export function ClaudeConnectionRow() {
 	const current = useModelStatus().status?.account;
 	const [accounts, setAccounts] = useState<ClaudeAccountStatus[] | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [checking, setChecking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const mounted = useRef(false);
 
@@ -150,17 +151,22 @@ export function ClaudeConnectionRow() {
 		return () => { mounted.current = false; };
 	}, []);
 
+	// Refresh (round 10, 4 minor 1): every row reads "Checking" until the
+	// fresh reading lands, the account in use is re-checked at once apart
+	// from the slower usage probes, so the dialog closes and the line
+	// clears as soon as it is signed in, and every reader hears the result
+	// even once the dialog has closed.
 	async function refresh() {
-		setBusy(true); setError(null);
+		setBusy(true); setChecking(true); setError(null);
+		refreshModelStatus(true);
 		try {
 			const value = await readClaudeAccounts(true);
-			if (!mounted.current) return;
-			setAccounts(value);
 			notifySettingsSaved("keys");
+			if (mounted.current) setAccounts(value);
 		} catch {
 			if (mounted.current) setError("Claude Code's status could not be loaded. Press Refresh to try again.");
 		} finally {
-			if (mounted.current) setBusy(false);
+			if (mounted.current) { setBusy(false); setChecking(false); }
 		}
 	}
 
@@ -182,7 +188,7 @@ export function ClaudeConnectionRow() {
 			{!accounts && !error && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
 			{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
 		</div>
-		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
+		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} checking={checking} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
 		<p className={cn(CLAUDE_ROW, connectionNoteClass("muted"))} data-testid="claude-notice">{CLAUDE_NOTICE}</p>
 	</>;
 }

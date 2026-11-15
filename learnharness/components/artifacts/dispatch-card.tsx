@@ -53,7 +53,7 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	// scary-error — gray glyph + "needs a sign-in" + the deep-link into the
 	// SetupDialog (the same flow the send interception uses).
 	if (isProviderKeyRefusal(job.error)) {
-		return <DispatchRefusedCard label={label} line="needs a sign-in" button="Sign in" />;
+		return <DispatchRefusedCard label={label} line="needs a sign-in" button="Sign in to Claude" />;
 	}
 	// Delivered: the result arrives in the steer card right below; the
 	// lesson marks only a failure.

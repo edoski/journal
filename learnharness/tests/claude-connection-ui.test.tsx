@@ -25,7 +25,7 @@ function install(rounds: ClaudeAccountStatus[][]) {
 		const path = String(input), method = init?.method ?? "GET";
 		calls.push({ path, method, ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}) });
 		if (path.startsWith("/api/subscriptions/claude")) return Response.json({ accounts: rounds.length > 1 ? rounds.shift() : rounds[0] });
-		if (path === "/api/models") return Response.json(status(current));
+		if (path.startsWith("/api/models")) return Response.json(status(current));
 		if (path === "/api/settings/claude" && method === "PUT") { current = (JSON.parse(String(init!.body)) as { account: string }).account; return Response.json({ settings: { version: 1, claude: { account: current } } }); }
 		return new Response("not found", { status: 404 });
 	};
@@ -113,6 +113,29 @@ test("Refresh forces a fresh check of every account and tells readers the connec
 	assert(calls.some((c) => c.path === "/api/subscriptions/claude?refresh=1"));
 	assert.equal(text(rows()[0], "claude-connection-state"), "Signed in through Claude Code on the Pro plan");
 	assert(signals.includes("keys"));
+});
+
+test("Refresh redraws every row as being checked until the fresh reading lands, and tells readers even once the dialog has closed (round 10, 4 minor 1)", async () => {
+	let land!: () => void;
+	const landed = new Promise<void>((done) => { land = done; });
+	const { calls, signals } = install([
+		[account("claude-subscription", "Claude Code", { state: "signed-out" }, null, null, "default")],
+		[account("claude-subscription", "Claude Code", connected, null, null, "default")],
+	]);
+	const served = globalThis.fetch;
+	globalThis.fetch = async (input, init) => {
+		if (String(input) === "/api/subscriptions/claude?refresh=1") await landed;
+		return served(input, init);
+	};
+	await mount();
+	assert.equal(text(rows()[0], "claude-connection-state"), "Run `claude` in a terminal and sign in with your Claude account, then press Refresh.");
+	await click(document.querySelector('[data-testid="claude-refresh"]'));
+	assert.equal(text(rows()[0], "claude-connection-state"), "Checking Claude Code…", "no row goes on saying it isn't signed in while the check runs (53)");
+	assert(calls.some((c) => c.path === "/api/models?refresh=1"), "the sign-in itself is re-checked at once, apart from the usage probes");
+	await act(async () => root?.unmount());
+	root = undefined;
+	await act(async () => { land(); await new Promise((r) => setTimeout(r, 0)); });
+	assert(signals.includes("keys"), "every reader hears the fresh reading, the pill and the line included");
 });
 
 test("usage reads in words from plenty to nothing, with the day it resets", async () => {

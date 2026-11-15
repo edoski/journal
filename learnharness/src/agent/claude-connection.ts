@@ -43,11 +43,11 @@ export function parseClaudeAuthStatus(stdout: string): ClaudeConnection {
 
 export interface ClaudeAccountConnection { account: LoadedClaudeAccount; connection: ClaudeConnection }
 
-interface ConnectionCache { accounts: ClaudeAccountConnection[]; checkedAt: number | null; inflight: Promise<ClaudeAccountConnection[]> | null }
+interface ConnectionCache { accounts: ClaudeAccountConnection[]; checkedAt: number | null; inflight: Promise<ClaudeAccountConnection[]> | null; inflightForced: boolean; round: number }
 const KEY = Symbol.for("lh.claude.connections");
 function cache(): ConnectionCache {
 	const g = globalThis as typeof globalThis & { [KEY]?: ConnectionCache };
-	return (g[KEY] ??= { accounts: [], checkedAt: null, inflight: null });
+	return (g[KEY] ??= { accounts: [], checkedAt: null, inflight: null, inflightForced: false, round: 0 });
 }
 
 async function check(account: LoadedClaudeAccount, run: ClaudeRunner, bin: string | null, env: ClaudeEnv): Promise<ClaudeConnection> {
@@ -75,12 +75,16 @@ export interface RefreshClaudeOptions {
 /** Re-reads the account list and re-checks every account's sign-in in
  * parallel, each with the same environment its turns use (the environment
  * decides which credential Claude Code picks). Cached for a short time
- * unless forced; concurrent callers share one round. */
+ * unless forced; concurrent callers share one round. A forced call never
+ * takes an ordinary round already under way, which may have read the
+ * sign-in before he fixed it (round 10, 4 minor 1), and only the latest
+ * round's reading is kept. */
 export async function refreshClaudeConnections({ force = false, run = runClaude, binary = () => resolveClaudeBinary(), env = process.env, now = Date.now, load = () => loadClaudeAccounts() }: RefreshClaudeOptions = {}): Promise<ClaudeAccountConnection[]> {
 	const state = cache();
-	if (state.inflight) return state.inflight;
+	if (state.inflight && (!force || state.inflightForced)) return state.inflight;
 	if (!force && state.checkedAt !== null && now() - state.checkedAt < TTL_MS) return state.accounts;
-	const round = async () => {
+	const round = state.round = (state.round ?? 0) + 1;
+	const checkAll = async () => {
 		const accounts = load();
 		const bin = binary();
 		return Promise.all(accounts.map(async (account) => ({
@@ -88,11 +92,13 @@ export async function refreshClaudeConnections({ force = false, run = runClaude,
 			connection: await check(account, run, bin, env).catch((): ClaudeConnection => ({ state: "error", message: "Claude Code's sign-in status could not be checked. Press Refresh to try again." })),
 		})));
 	};
-	const pending = round().then((accounts) => {
-		state.accounts = accounts; state.checkedAt = now(); state.inflight = null;
+	const latest = () => round === state.round;
+	const pending = checkAll().then((accounts) => {
+		if (latest()) { state.accounts = accounts; state.checkedAt = now(); state.inflight = null; }
 		return accounts;
-	}, (error: unknown) => { state.inflight = null; throw error; });
+	}, (error: unknown) => { if (latest()) state.inflight = null; throw error; });
 	state.inflight = pending;
+	state.inflightForced = force;
 	return pending;
 }
 
@@ -120,5 +126,5 @@ export function claudeConnected(providerId: string): boolean {
 
 export function resetClaudeConnections(): void {
 	const state = cache();
-	state.accounts = []; state.checkedAt = null; state.inflight = null;
+	state.accounts = []; state.checkedAt = null; state.inflight = null; state.inflightForced = false;
 }

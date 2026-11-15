@@ -46,7 +46,7 @@ export function TurnError({ message, again = false, onRetry, retryLabel = "Retry
 			)}
 			{text.kind === "signed-out" && onSignIn && (
 				<Button variant="quiet" size="sm" data-testid="turn-error-sign-in" onClick={onSignIn} className={cn(ACTION, "system-current:font-medium text-foreground")}>
-					Sign in
+					Sign in to Claude
 				</Button>
 			)}
 			{text.kind === "key" && (

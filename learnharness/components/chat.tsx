@@ -632,7 +632,7 @@ export function Chat({
 		setOvertaken("answered");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
-	const { unconnected, status: modelStatus } = useModelSetup();
+	const { unconnected, status: modelStatus, read: statusRead } = useModelSetup(busy);
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The explicitly-sent draft (composer send) until the server accepts
 	 *  it (sent-draft.ts): the
@@ -738,18 +738,19 @@ export function Chat({
 		// (setMessages is stable per useChat instance — the dep pair
 		//  [error, chatId] is what the flow actually keys on.)
 	}, [error, chatId]);
-	// The signed-out line leaves with its cause (round 8): once the account
-	// reads connected again after reading signed out, the line clears and
-	// his next key goes to the box (turn-error-text.ts refusalWatch).
-	const signedOutSeenRef = useRef(false);
+	// The signed-out line leaves with its cause (round 8): once a reading
+	// taken after the refusal says connected (the dialog re-checks as it
+	// opens, round 10), the line clears and his next key goes to the box
+	// (turn-error-text.ts refusalWatch).
+	const refusalSinceRef = useRef<number | null>(null);
 	useEffect(() => {
-		const watch = refusalWatch(signedOutSeenRef.current, !!error && parseProviderKeyRefusal(error.message), modelStatus?.connected);
-		signedOutSeenRef.current = watch.seenSignedOut;
+		const watch = refusalWatch(refusalSinceRef.current, !!error && parseProviderKeyRefusal(error.message), modelStatus?.connected, statusRead);
+		refusalSinceRef.current = watch.since;
 		if (!watch.clear) return;
 		clearError();
 		focusWhereHeTypes(document, false);
 		// clearError is stable per session.
-	}, [error, modelStatus?.connected]);
+	}, [error, modelStatus?.connected, statusRead]);
 	// A DELETED COURSE (course-gone.tsx): the lesson is history and has no
 	// box, so what he wrote there, sent and refused or still in the box,
 	// goes to the New lesson box, and the line says so. A send refused

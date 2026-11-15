@@ -104,13 +104,13 @@ export function turnErrorText(message: string, again = false): TurnErrorText {
 
 /** Whether the line for a send refused because Claude was signed out has
  *  outlived its cause (round 8: it stayed red after he signed in and
- *  pressed Refresh). It waits for the account to read signed out at least
- *  once while the line shows (`seenSignedOut`, a status read just before
- *  the refusal can still say connected), then clears the moment it reads
- *  connected. Pure. */
-export function refusalWatch(seenSignedOut: boolean, refusal: boolean, connected: boolean | undefined): { seenSignedOut: boolean; clear: boolean } {
-	if (!refusal) return { seenSignedOut: false, clear: false };
-	if (connected === false) return { seenSignedOut: true, clear: false };
-	if (connected === true && seenSignedOut) return { seenSignedOut: false, clear: true };
-	return { seenSignedOut, clear: false };
+ *  pressed Refresh). `since` is the status reading count when the line
+ *  appeared (`read`, model-status.ts): a reading from before the refusal
+ *  can still say connected, so the line clears on the first reading after
+ *  it that says connected (round 10: waiting to see "signed out" first
+ *  kept it forever when no reading ever said so). Pure. */
+export function refusalWatch(since: number | null, refusal: boolean, connected: boolean | undefined, read: number): { since: number | null; clear: boolean } {
+	if (!refusal) return { since: null, clear: false };
+	if (since === null) return { since: read, clear: false };
+	return { since, clear: connected === true && read > since };
 }

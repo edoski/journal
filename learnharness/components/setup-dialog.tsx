@@ -13,7 +13,7 @@
  * settings kit (components/settings/settings.md) inside the shared Dialog.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CLAUDE_MODEL } from "@/src/core";
 import { useModelStatus } from "@/components/model-status";
 import { signedInCloseFocus } from "@/components/setup-dialog-focus";
@@ -30,8 +30,18 @@ interface SetupDialogProps {
 }
 
 export function SetupDialog({ open, onClose }: SetupDialogProps) {
-	const { status } = useModelStatus();
-	const connected = status?.connected === true;
+	const { status, read, refresh } = useModelStatus();
+	// Opening re-checks the sign-in, and only a reading taken since then
+	// closes the dialog (round 10, 4 minor 1: a stale "connected" closed it
+	// as it opened, so Sign in did nothing).
+	const [openedAt, setOpenedAt] = useState<number | null>(null);
+	const readRef = useRef(read);
+	readRef.current = read;
+	useEffect(() => {
+		setOpenedAt(open ? readRef.current : null);
+		if (open) refresh(true);
+	}, [open, refresh]);
+	const connected = status?.connected === true && openedAt !== null && read > openedAt;
 	const signedInRef = useRef(false);
 	signedInRef.current = connected;
 	useEffect(() => {
@@ -63,7 +73,7 @@ export function SetupDialog({ open, onClose }: SetupDialogProps) {
 					<DialogClose aria-label="Close setup" data-testid="setup-close" />
 				</Hint>
 				<div className="flex flex-col gap-6" data-testid="setup-stage-keys">
-					<SettingsGroup label="Claude">
+					<SettingsGroup>
 						<ClaudeConnectionRow />
 					</SettingsGroup>
 				</div>

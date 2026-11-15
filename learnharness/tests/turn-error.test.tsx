@@ -39,7 +39,7 @@ describe("turnErrorText", () => {
 		assert.deepEqual(turnErrorText(refusal), { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null });
 		const html = renderToStaticMarkup(<TurnError message={refusal} onOpenSettings={() => {}} onSignIn={() => {}} />);
 		const { document } = parseHTML(html);
-		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in");
+		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in to Claude", "one label, as the pill and the dialog say it (round 10, 4 minor 7)");
 	});
 
 	it("reads a turn that failed because Claude was signed out as signed out, naming the buttons beside it", () => {
@@ -50,7 +50,7 @@ describe("turnErrorText", () => {
 			assert.equal(text.kind, "signed-out", raw);
 			const { document } = parseHTML(renderToStaticMarkup(<TurnError message={raw} onRetry={() => {}} onOpenSettings={() => {}} onSignIn={() => {}} />));
 			assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "Claude isn't signed in, so the tutor couldn't reply. Sign in, then press Retry.");
-			assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in");
+			assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in to Claude", "one label, as the pill and the dialog say it (round 10, 4 minor 7)");
 			assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Retry");
 			assert.doesNotMatch(document.body.textContent ?? "", /Refresh|token|T3 Code/);
 		}
