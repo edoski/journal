@@ -10,7 +10,7 @@ The three app rules every portalled shadcn primitive carries (`overlay.ts`). The
 
 Portalled menus also carry `data-lh-menu`, so the hand-rolled outside-click guards that remain (`enter-submits.ts`, session find) count them as inside.
 
-Motion (`OVERLAY_MOTION`): 150ms fade with a 95% zoom from the trigger's side, none under reduced motion.
+Motion (`OVERLAY_MOTION`): 150ms fade with a 95% zoom from the trigger's side, drawn by `tw-animate-css` (`app/globals.css`, as shadcn sets it up); under reduced motion the one rule there stops every primitive's enter and exit.
 
 ## Sources
 

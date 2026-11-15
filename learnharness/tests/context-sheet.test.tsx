@@ -71,7 +71,7 @@ describe("Context on the course head", () => {
 		assert.equal(sheet.getAttribute("data-slot"), "context-sheet");
 		const classes = (sheet.getAttribute("class") ?? "").split(/\s+/);
 		for (const anchor of ["fixed", "inset-y-0", "right-0"]) assert.ok(classes.includes(anchor), `the sheet is anchored to the right edge (${anchor})`);
-		assert.ok(classes.includes("motion-safe:data-[state=open]:animate-sheet-in"), "it slides in from the right, unless he asked for reduced motion");
+		assert.ok(classes.includes("data-[state=open]:slide-in-from-right"), "it slides in from the right");
 		assert.equal(sheet.querySelector("h2")?.textContent, "Context");
 		for (const slot of ["context-description", "context-folders", "context-websites", "context-files"]) assert.ok(sheet.querySelector(`[data-slot=${slot}]`), `the sheet holds ${slot}`);
 		assert.match(sheet.querySelector("[data-slot=context-file]")?.textContent ?? "", /Blitzstein and Hwang/);

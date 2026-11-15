@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 /* FullCalendar's structural styles (components/ui/event-calendar-views.tsx),
    in the base layer so its utilities win over them. */
 @import "@fullcalendar/react/skeleton.css" layer(base);
@@ -468,30 +469,6 @@ body {
 	}
 }
 
-/* Settings dialog pop (settings-app wave, 2026-09-20): a short fade +
-   2% settle-scale — understated by design, the app's motion taste
-   (200ms sidebar, 150ms here); honors reduced-motion by appearing. */
-@keyframes settings-pop {
-	from {
-		opacity: 0;
-		scale: 0.98;
-	}
-	to {
-		opacity: 1;
-		scale: 1;
-	}
-}
-
-.settings-dialog-pop {
-	animation: settings-pop 150ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.settings-dialog-pop {
-		animation: none;
-	}
-}
-
 /* ─────────────────────────────────────────────────────────────────────────
    Electron merged chrome (owner, 2026-09-17). The system title bar is
    hidden (macOS hiddenInset; Windows/Linux hidden + native controls
@@ -591,42 +568,9 @@ body {
 	--font-title: var(--lh-font-sans);
 }
 
-/* The sheet's motion (components/ui/sheet.md): the panel slides in from the
-   window's right edge over 200ms and out over 150ms, its dimmed layer fades
-   with it. The app carries no shadcn animation package, so its
-   `animate-in` and `slide-in-from-*` utilities draw nothing; these do. The
-   sheet applies them under `motion-safe:`, so reduced motion just shows it. */
-@theme {
-	--animate-sheet-in: lh-sheet-in 200ms cubic-bezier(0.32, 0.72, 0, 1);
-	--animate-sheet-out: lh-sheet-out 150ms ease-in;
-	--animate-scrim-in: lh-scrim-in 200ms ease-out;
-	--animate-scrim-out: lh-scrim-out 150ms ease-in;
-
-	@keyframes lh-sheet-in {
-		from {
-			transform: translateX(100%);
-		}
-	}
-	@keyframes lh-sheet-out {
-		to {
-			transform: translateX(100%);
-		}
-	}
-	@keyframes lh-scrim-in {
-		from {
-			opacity: 0;
-		}
-	}
-	@keyframes lh-scrim-out {
-		to {
-			opacity: 0;
-		}
-	}
-}
-
 /* Card enter (owner round, 2026-10-05): the transcript cards' one-shot
-   mount — a subtle fade + 4px rise, the app's motion register (150ms,
-   settings-pop taste). Nothing on update, nothing on
+   mount — a subtle fade + 4px rise, the app's motion register (150ms).
+   Nothing on update, nothing on
    unmount. Applied by the topic page's step cards; honors
    reduced-motion by appearing. */
 @keyframes lh-card-enter {
@@ -696,9 +640,17 @@ body {
 	border-radius: 0.25rem;
 }
 
+/* tw-animate-css leaves reduced motion to each element, so this one rule
+   stops every primitive's enter and exit (dialogs, sheets, popovers, menus,
+   selects, tooltips) instead: each appears and leaves in place. Unlayered,
+   so it beats the utilities. */
 @media (prefers-reduced-motion: reduce) {
 	:root {
 		--default-transition-duration: 0s;
+	}
+	[class*="animate-in"],
+	[class*="animate-out"] {
+		animation: none;
 	}
 }
 
