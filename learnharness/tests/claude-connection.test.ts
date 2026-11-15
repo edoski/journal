@@ -146,3 +146,22 @@ test("only the accounts module reads T3 Code's files or a Claude config dir's .c
 	const accounts = readFileSync(new URL("../src/agent/claude-accounts.ts", import.meta.url), "utf8");
 	assert(!/writeFileSync|appendFileSync|console\./.test(accounts), "the accounts module never writes or logs");
 });
+
+test("a forced check never returns a round that started before it (round 10, 4 minor 1)", async () => {
+	let signedIn = false;
+	let release!: () => void;
+	const held = new Promise<void>((done) => { release = done; });
+	const run: ClaudeRunner = async () => {
+		const answer = signedIn;
+		if (!answer) await held;
+		return { code: 0, stdout: status(answer ? { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" } : { loggedIn: false }), stderr: "" };
+	};
+	const options = { load: () => [DEFAULT], run, binary: () => "/fake/claude" };
+	const older = refreshClaudeConnections(options);
+	signedIn = true; // he signs in again while the older check runs
+	const forced = refreshClaudeConnections({ ...options, force: true });
+	release();
+	assert.equal((await forced)[0]!.connection.state, "connected", "Refresh reads the sign-in as it is now");
+	await older;
+	assert.equal(claudeConnected(ID), true, "the older round, finishing last, never overwrites the newer reading");
+});

@@ -9,14 +9,15 @@ import { test } from "node:test";
 import { refusalWatch } from "../components/lesson/turn-error-text.ts";
 import { signedInCloseFocus } from "../components/setup-dialog-focus.ts";
 
-test("the signed-out line clears once the account reads connected again", () => {
-	let watch = refusalWatch(false, true, true);
-	assert.equal(watch.clear, false, "a status read before the refusal still says connected: the line stays");
-	watch = refusalWatch(watch.seenSignedOut, true, false);
-	assert.equal(watch.clear, false);
-	watch = refusalWatch(watch.seenSignedOut, true, true);
+test("the signed-out line clears on the first read after the refusal that says connected (round 10, 4 minor 1)", () => {
+	let watch = refusalWatch(null, true, true, 3);
+	assert.deepEqual(watch, { since: 3, clear: false }, "a status read before the refusal still says connected: the line stays");
+	watch = refusalWatch(watch.since, true, false, 4);
+	assert.equal(watch.clear, false, "the re-read after the refusal says signed out");
+	watch = refusalWatch(watch.since, true, true, 5);
 	assert.equal(watch.clear, true, "signed in again: the line goes");
-	assert.deepEqual(refusalWatch(true, false, true), { seenSignedOut: false, clear: false }, "another error is never cleared");
+	assert.equal(refusalWatch(3, true, true, 4).clear, true, "a stale connected read before the refusal never keeps the line once a fresh read says connected (61b)");
+	assert.deepEqual(refusalWatch(3, false, true, 9), { since: null, clear: false }, "another error is never cleared");
 });
 
 test("the sign-in dialog closing because he signed in puts focus in the box, not on Sign in", () => {

@@ -41,3 +41,28 @@ test("one shared status read serves every reader; a sign-in change or account sw
  for (const value of Object.values(snapshots)) { assert.equal(value.status?.account, "claude-subscription-work"); assert.equal(value.unconnected, true); }
  assert(!document.body.textContent?.includes("stale"));
 });
+
+test("a forced refresh re-checks the sign-in on the server and counts as a fresh read (round 10, 4 minor 1)", async () => {
+ const paths: string[] = [];
+ globalThis.fetch = async (input) => { paths.push(String(input)); return Response.json(body("claude-subscription")); };
+ let latest: ReturnType<typeof useModelStatus> | undefined;
+ function Probe() { latest = useModelStatus(); return null; }
+ await mount(<Probe />);
+ const before = latest!.read;
+ await act(async () => latest!.refresh(true));
+ assert.equal(paths.at(-1), "/api/models?refresh=1");
+ assert.ok(latest!.read > before, "each landed read counts, so a watcher knows a read came after its moment");
+});
+
+test("a turn that runs while the status says signed out re-reads it, so the pill leaves with a success (round 10, 4 minor 1, 55)", async () => {
+ let connected = false;
+ globalThis.fetch = async () => Response.json(body("claude-subscription", connected));
+ let unconnected: boolean | undefined;
+ function Pill({ working }: { working: boolean }) { unconnected = useModelSetup(working).unconnected; return null; }
+ await mount(<Pill working={false} />);
+ assert.equal(unconnected, true);
+ connected = true;
+ await act(async () => root!.render(<Pill working={true} />));
+ await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+ assert.equal(unconnected, false);
+});

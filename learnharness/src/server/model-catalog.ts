@@ -6,7 +6,7 @@
  * key, no environment key, no keyed provider reaches a model call.
  */
 
-import { claudeConnected, refreshClaudeConnections } from "../agent/claude-connection.ts";
+import { claudeConnected, refreshClaudeConnections, type RefreshClaudeOptions } from "../agent/claude-connection.ts";
 import { claudeSubscriptionModel, claudeSubscriptionModels } from "../agent/sdk/engine.ts";
 import type { ModelStatus } from "../core/contracts/models.ts";
 import { effectiveSettings } from "./stores.ts";
@@ -29,9 +29,11 @@ export function claudeAccountKnown(provider: string): boolean {
 	return claudeSubscriptionModel(provider) !== undefined;
 }
 
-/** GET /api/models: the settings' account, re-checked, and the model's window. */
-export async function modelStatus(): Promise<ModelStatus> {
-	await refreshClaudeConnections();
+/** GET /api/models: the settings' account, re-checked, and the model's
+ *  window. Forced (`?refresh=1`), the sign-in is checked again at once,
+ *  with no usage probe to wait on (round 10, 4 minor 1). */
+export async function modelStatus(options: RefreshClaudeOptions = {}): Promise<ModelStatus> {
+	await refreshClaudeConnections(options);
 	const account = effectiveSettings().claude.account;
 	return {
 		account,

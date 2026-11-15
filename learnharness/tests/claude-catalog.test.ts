@@ -52,3 +52,10 @@ test("each account is its own provider, and dispatch runs on the account it name
 	assert.equal(claudeAccount(engine.model.provider)?.label, "Work");
 	assert.throws(() => claudeEngine("claude-subscription-gone"), /no claude-opus-5-5 on Claude account claude-subscription-gone/);
 });
+
+test("the model status re-checks the sign-in when asked to, without waiting for the cache to age (round 10, 4 minor 1)", async () => {
+	await connect(signedOut);
+	const options = { load: () => [DEFAULT], binary: () => "/fake/claude", run: async () => ({ code: 0, stdout: signedIn, stderr: "" }) };
+	assert.equal((await modelStatus(options)).connected, false, "an ordinary read keeps the recent check");
+	assert.equal((await modelStatus({ ...options, force: true })).connected, true);
+});

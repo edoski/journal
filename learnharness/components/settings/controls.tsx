@@ -47,7 +47,8 @@ export function SettingsGroup({
 	children,
 	testid,
 }: {
-	label: string;
+	/** None where the row inside already names the group (the sign-in dialog). */
+	label?: string;
 	/** One quiet line under the header. */
 	description?: string;
 	children: React.ReactNode;
@@ -55,7 +56,7 @@ export function SettingsGroup({
 }) {
 	return (
 		<div data-testid={testid} data-slot="settings-group" className="flex flex-col gap-2">
-			<h3 className="px-1 text-callout system-current:text-label system-current:font-medium text-muted-foreground">{label}</h3>
+			{label && <h3 className="px-1 text-callout system-current:text-label system-current:font-medium text-muted-foreground">{label}</h3>}
 			{description && <p className="-mt-1 px-1 text-callout system-current:text-label text-muted-foreground">{description}</p>}
 			<div className="flex flex-col divide-y rounded-lg border">{children}</div>
 		</div>

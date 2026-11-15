@@ -27,7 +27,7 @@ const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement });
 
 const { isCourseDeletedRefusal } = await import("../components/lesson/turn-error-text.ts");
-const { keepForNewLesson, keptWords, NEW_LESSON_BOX, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
+const { keepForNewLesson, keepWords, keptWords, NEW_LESSON_BOX, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
 const { CourseGoneLine } = await import("../components/lesson/course-gone.tsx");
 setKeptWindow("w-one", { live: ["w-one"] });
 
@@ -43,6 +43,15 @@ test("what he wrote in a deleted course's lesson waits in the New lesson box, af
 	assert.equal(keptWords(NEW_LESSON_BOX)?.text, "one more chain rule problem? d/dx sin(x^3)");
 	keepForNewLesson("and the product rule");
 	assert.equal(keptWords(NEW_LESSON_BOX)?.text, "one more chain rule problem? d/dx sin(x^3)\n\nand the product rule");
+});
+
+test("a deleted course's words reach the New lesson box as he typed them, trailing space too (round 10, 4 minor 5)", () => {
+	keepWords(NEW_LESSON_BOX, null);
+	keepForNewLesson("d/dx sin(x^3) ", "d/dx sin(x^3) ");
+	assert.equal(keptWords(NEW_LESSON_BOX)?.text, "d/dx sin(x^3) ", "the refused send and the box are one message, kept once");
+	keepForNewLesson(null, "  and the product rule ");
+	assert.equal(keptWords(NEW_LESSON_BOX)?.text, "d/dx sin(x^3)\n\nand the product rule ", "only the joint between two messages is tidied");
+	assert.equal(keepForNewLesson(null, "  "), false, "nothing written, nothing kept");
 });
 
 test("the deleted course's line says where his words went, and offers a new lesson", async () => {

@@ -119,4 +119,21 @@ describe("setup polish interactions", () => {
 		assert.equal(closed, 1);
 		assert.ok(document.querySelector('[data-testid="setup-dialog"]') === null);
 	});
+
+	it("Sign in re-checks the account and opens while it is signed out, though an older read said connected (round 10, 4 minor 1, 61b)", async () => {
+		connected = true;
+		await mount();
+		assert.equal(closed, 1, "the account read connected");
+		await act(async () => { root?.unmount(); });
+		host?.remove();
+		connected = false; // the account signed out since that read
+		await mount();
+		assert.equal(closed, 0, "the dialog waits for a read taken since it opened");
+		assert.ok(document.querySelector('[data-testid="setup-dialog"]') !== null, "Sign in opens the dialog");
+	});
+
+	it("names Claude once: no group heading repeats the row's name (round 10, 4 minor 7)", async () => {
+		await mount();
+		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] h3') === null, "no group heading");
+	});
 });

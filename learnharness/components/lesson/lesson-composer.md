@@ -11,7 +11,7 @@
 | field `composer-field` | `textarea` | 14/22.75 (`text-control`, 1.625), two lines tall (53.5px) growing to 208px, then it scrolls with no bar |
 | toolbar `composer-toolbar` | `div` | padding 0 8 8: `composer-leading` on the left (attach, then the host's request icons, 2px apart), `composer-controls` on the right (the host's controls, 4px apart), then the send |
 | icons `composer-control` | `ComposerIcon` | 32px circles, 16px icons in muted ink, the hover fill, the attach button's size; `pressed` reads selected; the words are in each one's tooltip and aria-label (Edo, 14 Nov 2026: composer controls are icons, not text chips) |
-| send `composer-send` | `button` | 32px circle, `primary`; 40% while there is nothing to send; a square on `fill-selected` while a turn runs and the field is empty (Stop) |
+| send `composer-send` | `button` | 32px circle, `primary`; 40% while there is nothing to send; a square on `fill-selected` while a turn runs and nothing can go: the message field is empty, or the answer waits for the turn to end (Stop; round 10: a dead send arrow showed while the tutor was still writing) |
 
 ## Props
 

@@ -47,6 +47,13 @@ describe("the lesson composer", () => {
 		assert.match(waiting, /disabled=""[^>]*aria-label="Check"|aria-label="Check"[^>]*disabled=""/);
 	});
 
+	it("shows the stop square while a turn runs and the work can't be submitted yet, never a dead send arrow (round 10, 4 minor 6)", () => {
+		const closing = composer({ busy: true, answer: { onSubmit: noop, ready: false, label: "Submit your work" } });
+		assert.match(closing, /aria-label="Stop"/);
+		assert.doesNotMatch(closing, /aria-label="Stop"[^>]*disabled=""|disabled=""[^>]*aria-label="Stop"/, "the square stops the turn by a click");
+		assert.match(composer({ busy: true, answer: { onSubmit: noop, ready: true } }), /aria-label="Submit answer"/, "an answer that can go, goes");
+	});
+
 	it("keeps today's moves: Stop while a turn runs on an empty field, Next problem in the practice pause", () => {
 		assert.match(composer({ busy: true }), /aria-label="Stop"/);
 		assert.match(composer({ busy: true, canSend: true }), /aria-label="Send"/);

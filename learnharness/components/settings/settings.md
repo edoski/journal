@@ -38,7 +38,7 @@ The Subscriptions group's box holds rows parted by hairlines, each padded 12 × 
 | sign-in (12/16 muted) | "Signed in through Claude Code", with "on the Max plan" when Claude Code reports the plan; the other states say what to do |
 | usage (12/16 muted) | no percentage (Edo's ruling): "Plenty left this week", "About half left this week", "Little left this week" or "Nothing left this week", then ", resets Tuesday 13:00"; at a limit, "At its limit until Tuesday 04:00". The bands are thirds of what Claude Code reports, the coarsest split that tells carrying on from watching it from switching soon |
 
-`src/agent/claude-accounts.ts`, the setup-token route and the switch are unchanged: only the words and the spacing moved. An account whose plan or Claude Code version lacks the model shows one danger line saying so (`claude-model-missing`); nothing falls back to another model. The sign-in dialog (`setup-dialog.tsx`) shows the same Claude rows and closes once the account in use is signed in.
+`src/agent/claude-accounts.ts`, the setup-token route and the switch are unchanged: only the words and the spacing moved. An account whose plan or Claude Code version lacks the model shows one danger line saying so (`claude-model-missing`); nothing falls back to another model. The sign-in dialog (`setup-dialog.tsx`) shows the same Claude rows, under no group heading of its own (its title already names Claude), checks the sign-in again as it opens, and closes once a reading taken since then says the account in use is signed in. Refresh shows "Checking Claude Code…" on every row until the fresh reading lands, and the account in use is re-checked at once, apart from the slower usage probes (round 10).
 
 ## What Appearance leaves out
 
