@@ -176,13 +176,17 @@ export function planTitlesGiveAway(tree: Pick<PlanTree, "nodes">): string | null
 }
 
 /** A step named after the lesson itself: its topic's handle as the id, or
- *  the lesson's title as the title's start. The whole map is the topic, so
+ *  the lesson's title as its title, alone or before a colon, comma or dash.
+ *  A step that only starts with the title's words names a part of it
+ *  ("Poisson distribution as a limit of the binomial"). The whole map is the topic, so
  *  such a step repeats it (round 8: "Invertible matrices: test and compute"
  *  closed the Invertible matrices map). Words the tutor can act on, or null. */
 export function planStepIsTheTopic(tree: Pick<PlanTree, "nodes">, lesson: { topic?: string; titles: readonly string[] }): string | null {
 	const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-	const titles = lesson.titles.map(norm).filter((t) => t.length > 0);
-	const named = tree.nodes.filter((n) => (lesson.topic && n.id === lesson.topic) || titles.some((t) => norm(n.title) === t || norm(n.title).startsWith(`${t} `)));
+	const spaced = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
+	const titles = lesson.titles.filter((t) => norm(t).length > 0);
+	const isTheLesson = (step: string, title: string) => norm(step) === norm(title) || (spaced(step).startsWith(spaced(title)) && /^\s*[:,;\u2013\u2014-]/.test(spaced(step).slice(spaced(title).length)));
+	const named = tree.nodes.filter((n) => (lesson.topic && n.id === lesson.topic) || titles.some((t) => isTheLesson(n.title, t)));
 	if (named.length === 0) return null;
 	return (
 		`These steps are the lesson itself: ${named.map((n) => JSON.stringify(n.title)).join(", ")}. ` +

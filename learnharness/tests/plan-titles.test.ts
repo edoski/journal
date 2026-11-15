@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PlanTree } from "../src/core/contracts/plan.ts";
-import { planTitlesGiveAway } from "../src/core/plan-tree.ts";
+import { planStepIsTheTopic, planTitlesGiveAway } from "../src/core/plan-tree.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
 
 const plan = (...titles: string[]): Pick<PlanTree, "nodes"> => ({ nodes: titles.map((title, i) => ({ id: `s${i}`, title })) });
@@ -83,6 +83,14 @@ describe("plan_init passes on the first try when the tutor follows its guidance 
 		assert.match(text, /Invertible matrices: test and compute/);
 		assert.match(text, /collapsed dimensions/);
 		assert.equal(saved.length, 0);
+	});
+
+	it("takes a step whose title only starts with the lesson's words, which names a part of it", () => {
+		const nodes = (title: string) => ({ nodes: [{ id: "limit", title }] }) as unknown as Pick<PlanTree, "nodes">;
+		const lesson = { titles: ["Poisson distribution"] };
+		assert.equal(planStepIsTheTopic(nodes("Poisson distribution as a limit of the binomial"), lesson), null);
+		assert.match(planStepIsTheTopic(nodes("Poisson distribution — test and compute"), lesson) ?? "", /the lesson itself/);
+		assert.match(planStepIsTheTopic(nodes("Poisson distribution"), lesson) ?? "", /the lesson itself/);
 	});
 
 	it("every example title in the planning guidance and the tool's description parses and passes", async () => {
