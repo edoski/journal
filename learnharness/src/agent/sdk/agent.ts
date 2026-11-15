@@ -46,8 +46,9 @@ export interface SdkAgentConfig {
 	/** Reads each block of ordinary text as it ends; true takes its text out
 	 *  of the reply, so the record and every view keep none of it. */
 	screenText?: (text: string) => boolean;
-	/** Asked when the model ends a turn no tool ended: words it must read
-	 *  first, which keep the turn going (the voice guard's `beforeEnd`). */
+	/** Asked by Claude Code's Stop hook when the model ends a turn no tool
+	 *  ended: words it must read first, which keep the turn going (the voice
+	 *  guard's `beforeEnd`). */
 	beforeEnd?: () => string | undefined;
 }
 
@@ -232,6 +233,12 @@ export class SdkAgent {
 			hooks: {
 				...(instructions ? { PreCompact: [{ hooks: [async () => ({ systemMessage: instructions(this.state.messages as LhMessage[]) })] }] } : {}),
 				PostCompact: [{ hooks: [async (input) => { if (input.hook_event_name === "PostCompact") summary = input.compact_summary; return {}; }] }],
+				// A steer Claude Code has not read yet goes on the run by itself; the
+				// note waits for the stop after it.
+				...(this.config.beforeEnd ? { Stop: [{ hooks: [async () => {
+					const note = !endedByTool && !this.aborted && this.inFlight.size === 0 ? this.config.beforeEnd!() : undefined;
+					return note ? { decision: "block" as const, reason: note } : {};
+				}] }] } : {}),
 			},
 			abortController: this.controller,
 			...(this.config.ephemeral ? { persistSession: false, maxTurns: this.config.ephemeral.maxTurns } : {}),
@@ -359,8 +366,6 @@ export class SdkAgent {
 						// run goes on with it. A turn a question ended waits for the
 						// learner instead, and the steer goes back to its queue.
 						if (!endedByTool && this.inFlight.size > 0 && !this.aborted) return true;
-						const note = !endedByTool && !this.aborted ? this.config.beforeEnd?.() : undefined;
-						if (note && this.push) { this.push(userMessage([{ type: "text", text: note }], randomUUID())); return true; }
 						if (stream && !stream.finished) endStream(stream.fail(`Claude Code ended the reply midway. Retry.${NO_KEY}`));
 						recordClaudeModelMissing(provider, false);
 						return false;

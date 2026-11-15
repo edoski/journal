@@ -11,7 +11,9 @@
  * compacts as Claude Code's automatic compaction does before a request: its
  * PreCompact hooks' `systemMessage`s become the summary's instructions, its
  * PostCompact hooks read the summary, and the stream carries the compact
- * boundary and the summary message.
+ * boundary and the summary message. When the model stops with no tool call,
+ * its Stop hooks run; one that blocks gives the model its reason as the next
+ * user message and the turn goes on, as Claude Code does.
  */
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync, existsSync } from "node:fs";
@@ -184,7 +186,7 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 			if (firstReplay) yield firstReplay;
 			const systemPrompt = typeof options.systemPrompt === "object" && !Array.isArray(options.systemPrompt) && "prompt" in options.systemPrompt ? String(options.systemPrompt.prompt) : typeof options.systemPrompt === "string" ? options.systemPrompt : undefined;
 			const maxTurns = options.maxTurns ?? Infinity;
-			const hooksOf = (event: "PreCompact" | "PostCompact") => (options.hooks?.[event] ?? []).flatMap((matcher) => matcher.hooks);
+			const hooksOf = (event: "PreCompact" | "PostCompact" | "Stop") => (options.hooks?.[event] ?? []).flatMap((matcher) => matcher.hooks);
 			async function* compact(): AsyncGenerator<SDKMessage> {
 				const base = { session_id: id, transcript_path: sessionFile(configDir, id), cwd: claudeWorkDir(), trigger: "auto" as const };
 				const outputs = await Promise.all(hooksOf("PreCompact").map((hook) => hook({ ...base, hook_event_name: "PreCompact", custom_instructions: null }, undefined, { signal: controller.signal })));
@@ -215,7 +217,13 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 						history.push({ uuid: replyUuid, message: reply });
 						yield { type: "assistant", message: { content: [] }, parent_tool_use_id: null, session_id: id, uuid: replyUuid } as unknown as SDKMessage;
 						const toolCalls = reply.content.filter((b) => b.type === "toolCall");
-						if (toolCalls.length === 0) break;
+						if (toolCalls.length === 0) {
+							const outputs = await Promise.all(hooksOf("Stop").map((hook) => hook({ session_id: id, transcript_path: sessionFile(configDir, id), cwd: claudeWorkDir(), hook_event_name: "Stop", stop_hook_active: false }, undefined, { signal: controller.signal })));
+							const blocked = (outputs as { decision?: string; reason?: string }[]).find((output) => output.decision === "block");
+							if (!blocked) break;
+							history.push({ uuid: randomUUID(), message: { role: "user", content: [{ type: "text", text: `Stop hook feedback:\n${blocked.reason ?? ""}` }], timestamp: Date.now() } });
+							continue;
+						}
 						for (const call of toolCalls) {
 							const out = await client.callTool({ name: call.name, arguments: call.arguments, _meta: { "claudecode/toolUseId": call.id } });
 							const content = (out.content as { type: string; text?: string; data?: string; mimeType?: string }[]).map((part) => part.type === "image" ? { type: "image" as const, data: part.data!, mimeType: part.mimeType! } : { type: "text" as const, text: part.text ?? "" });
