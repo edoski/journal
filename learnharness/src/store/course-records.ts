@@ -253,7 +253,7 @@ function movedOf(value: unknown): { moved: TopicMoved } | Record<string, never> 
 	const m = record(value);
 	const from = str(m?.from);
 	if (!m || !from) return {};
-	if (m.by === "study") return { moved: { from, by: "study", courses: strings(m.courses) } };
+	if (m.by === "study") return { moved: { from, by: "study", courses: strings(m.courses), day: m.day === "yesterday" ? "yesterday" : "today" } };
 	return m.by === "missed" || m.by === "left" ? { moved: { from, by: m.by } } : {};
 }
 

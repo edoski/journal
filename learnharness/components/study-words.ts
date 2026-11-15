@@ -234,7 +234,7 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 
 /** What of his study moved a day he was told (`TopicMoved`). */
 const MOVED_BY = {
-	study: (courses: readonly string[]) => ` after your ${listWords(courses)} study today`,
+	study: (courses: readonly string[], day: "today" | "yesterday") => ` after your ${listWords(courses)} study ${day}`,
 	missed: ", no study yesterday",
 	left: ", yesterday's plan was not finished",
 } as const;
@@ -246,7 +246,7 @@ const MOVED_BY = {
  *  never a day he was told, so nothing moved "from" it (round 8: "Moved
  *  from 11 Nov" named a day he never heard). */
 export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
-	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses) : MOVED_BY[told.by]}`;
+	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses, told.day) : MOVED_BY[told.by]}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
 	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
 }
@@ -391,6 +391,22 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
  *  today". */
 export function examGapPickWords(starts: boolean, title: string): string {
 	return `${starts ? EXAM_GAP_WORDS.startTopic : EXAM_GAP_WORDS.reviewTopic} ${title} today`;
+}
+
+/** The taught topics the final review leaves out, a line per reason,
+ *  under the calendar's "Final review" line: "No room in it for Kernel",
+ *  "Poisson starts too close to the exam for a review", "No study day left
+ *  in it for Geometric". Each reason in the head's words (`examGapWhyWords`),
+ *  so the two never disagree (round 9: "No room in it for Poisson" beside
+ *  the head's "starts too close to the exam"). Pure. */
+export function finalReviewGapWords(topics: readonly ExamGapTopic[]): string[] {
+	const by = (reason: ExamGapReason) => topics.filter((t) => (t.reason ?? "full") === reason).map((t) => t.title);
+	const [full, late, noDay] = [by("full"), by("too_late"), by("no_study_day")];
+	return [
+		...(full.length > 0 ? [`No room in it for ${listWords(full)}`] : []),
+		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
+		...(noDay.length > 0 ? [`No study day left in it for ${listWords(noDay)}`] : []),
+	];
 }
 
 /** The taught topics the final review has no room for, standing alone

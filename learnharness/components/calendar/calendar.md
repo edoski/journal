@@ -8,7 +8,7 @@ The engine owns every date; the page invents none (`calendar-facts.ts`, pure, te
 
 | Entry | Day | From |
 |---|---|---|
-| Exam | the record's exam date | `map`'s `exam`; its panel says, from the same daily plan the calendar draws (read up to the exam however far off), the topics it has no room to start (`plan.does_not_fit`) or that every topic is started, then the road to it: each week's new topics before the exam, and the day the final review starts (`plan.final_review_days` before the exam), or that it is under way |
+| Exam | the record's exam date | `map`'s `exam`; its panel says, from the same daily plan the calendar draws (read up to the exam however far off), the topics it has no room to start (`plan.does_not_fit`) or that every topic is started, then the road to it: each week's new topics before the exam, and the day the final review starts (`plan.final_review_days` before the exam), or that it is under way, among the weeks by date (`roadLines`; round 9 listed a start inside it above it), with what it leaves out and why in the head's words (`finalReviewGapWords`: "No room in it for Kernel", "Poisson starts too close to the exam for a review") |
 | Overdue, Review | today for the reviews `plan` makes today (Overdue when past their date); a later day's reviews as the engine's daily plan proposes them | `plan`'s `due`; `plan.plan.days`' `reviews` |
 | New topic | the day the daily plan proposes to start it, today included | `plan.plan.days`' `new` |
 | Unfinished | today, since the engine dates no task (an open task) | `map`'s `tasks` |

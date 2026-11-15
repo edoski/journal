@@ -803,13 +803,15 @@ def test_a_night_with_nothing_saved_moves_no_estimate() -> None:
 
 def studied(record: dict[str, Any], first: int, last: int) -> dict[str, Any]:
     """Each day from ``first`` to ``last``, the reviews due answered right, as
-    many as its weekday's number (all of them on ``last``), so he stops short
-    on some days and the plan learns his limits from the record."""
+    many as its weekday's number, so he stops short on some days and the plan
+    learns his limits from the record; on ``last``, what its plan proposes."""
     for offset in range(first, last + 1):
         day = on(offset)
         due = progress.due(record, day, limit=0)
-        count = len(due) if offset == last else 1 + day.weekday() % 3
+        count = 1 + day.weekday() % 3
         topics = [item["topic"] for item in due[:count]]
+        if offset == last:
+            topics = plan_for(record, day)["reviews"]
         if topics:
             record = save(record, {"observations": [answer(t) for t in topics]}, day)
     return record
@@ -1008,3 +1010,47 @@ def test_a_topic_that_does_not_fit_before_its_exam_names_the_exam_not_other_cour
     late = together.does_not_fit["exam"]
     assert set(late) & set(started(together.days["exam"])), "started after it"
     assert not set(late) & set(together.starts_after.get("exam", {}))
+
+
+def test_one_answer_today_moves_no_other_topics_day_in_any_course() -> None:
+    """Round 9 (1 D4): one review answer moved about twelve days he had been
+    told, in its own course and another, within the day."""
+    records = {
+        "algebra": studied(taught(course(24), on(-36)), -35, -1),
+        "chance": studied(taught(course(16, exam=40), on(-30)), -29, -1),
+    }
+    before = agenda.plan(records, MONDAY, 60)
+    told = {name: before.when(name, MONDAY, True) for name in records}
+    for name, result in (("algebra", "partial"), ("chance", "correct")):
+        topic = before.days[name][2]["reviews"][0]
+        records[name] = save(
+            records[name], {"observations": [answer(topic, result)]}, MONDAY
+        )
+        after = agenda.plan(records, MONDAY, 60)
+        for other in records:
+            now = after.when(other, MONDAY, True)
+            kept = {k: v for k, v in now.reviews.items() if k != topic or other != name}
+            assert kept == {
+                k: v
+                for k, v in told[other].reviews.items()
+                if k != topic or other != name
+            }, (name, other)
+            assert now.starts == told[other].starts, (name, other)
+
+
+def test_inside_a_final_review_its_topics_left_take_a_spare_start_before_a_course_without_an_exam() -> (
+    None
+):
+    """Round 9 (1 D2): two days before the Probability exam, Real Analysis
+    started Continuity while the head said there was no room for Geometric."""
+    exam = course(2, exam=5)
+    together = plan({"exam": exam, "open": course(10)}, 5, week(10, 1, EVERY_DAY))
+    assert started(together.days["exam"]) == {
+        "t00": on(0).isoformat(),
+        "t01": on(1).isoformat(),
+    }
+    assert started(together.days["open"]) == {
+        "t00": on(2).isoformat(),
+        "t01": on(3).isoformat(),
+        "t02": on(4).isoformat(),
+    }

@@ -179,7 +179,7 @@ function reviewNote(review: NonNullable<CourseMapTopic["review"]>, today: string
  *  of his study moved it: the words the topic page and the calendar show,
  *  for the tutor to say when it names the day. */
 function movedNote(moved: TopicMoved): string {
-	const by = moved.by === "study" ? ` after your ${moved.courses.join(" and ")} study today` : moved.by === "missed" ? ", no study yesterday" : ", yesterday's plan was not finished";
+	const by = moved.by === "study" ? ` after your ${moved.courses.join(" and ")} study ${moved.day}` : moved.by === "missed" ? ", no study yesterday" : ", yesterday's plan was not finished";
 	return `moved from ${shortDay(moved.from)}${by}`;
 }
 

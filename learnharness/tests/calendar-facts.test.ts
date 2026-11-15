@@ -11,7 +11,8 @@ import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
-import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, unreviewedWords, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { finalReviewGapWords } from "../components/study-words.ts";
+import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, roadLines, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -156,7 +157,7 @@ describe("calendar entries", () => {
 			"Linear Algebra",
 			{
 				topics: [
-					topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"] } }),
+					topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const } }),
 					topic("projection", { title: "Projection", level: "new", starts: "2026-11-12", moved: { from: "2026-11-11", by: "missed" } }),
 				],
 			},
@@ -380,6 +381,24 @@ describe("the road to an exam", () => {
 		assert.equal(finalReviewWords("2026-12-08", TODAY), "Final review from 8 Dec");
 	});
 
+	it("lists the final review among the road's weeks by its day, a week split at its start (round 9, 1 D8)", () => {
+		const planned = [day("2026-11-09", "a"), day("2026-11-13", "b"), day("2026-11-17", "c")];
+		const road = roadOf(planned, "2026-11-19", titleOf, "2026-11-12");
+		assert.deepEqual(roadLines(road, "2026-11-12"), [
+			{ kind: "week", week: { from: "2026-11-09", to: "2026-11-09", titles: ["Groups"] } },
+			{ kind: "final", day: "2026-11-12" },
+			{ kind: "week", week: { from: "2026-11-13", to: "2026-11-13", titles: ["Subgroups"] } },
+			{ kind: "week", week: { from: "2026-11-17", to: "2026-11-17", titles: ["Cosets"] } },
+		]);
+		const now = roadOf([day("2026-11-17"), day("2026-11-18", "d")], "2026-11-19", titleOf, "2026-11-13");
+		assert.deepEqual(
+			roadLines(now, "2026-11-13").map((line) => line.kind),
+			["final", "week"],
+			"\"Final review now\" comes before a start inside it",
+		);
+		assert.deepEqual(roadLines(road, null).map((line) => line.kind), ["week", "week", "week"]);
+	});
+
 	it("gives the exam entry its road and its final review", () => {
 		const topics = [topic("a", { title: "Groups", level: "new" }), topic("b", { title: "Subgroups", level: "new" })];
 		const gt = course("/study/gt", "Group Theory", { exam: { date: "2026-12-14", daysLeft: 36 }, topics }, { planned: [day("2026-11-09", "a"), day("2026-11-10", "b")], finalReview: "2026-12-08" });
@@ -435,8 +454,13 @@ describe("the plan's reasons and gaps in the calendar", () => {
 		);
 		const entries = calendarEntries({ courses: [COURSE], chats: [], scope: null });
 		const exam = entries.find((e) => e.kind === "exam");
-		assert.deepEqual(exam?.kind === "exam" && exam.unreviewed, ["Kernel"]);
-		assert.equal(unreviewedWords(["Kernel", "Rank"]), "No room in it for Kernel and Rank");
+		assert.deepEqual(exam?.kind === "exam" && exam.unreviewed, [{ title: "Kernel" }]);
+		assert.deepEqual(finalReviewGapWords([{ title: "Kernel" }, { title: "Rank", reason: "full" }]), ["No room in it for Kernel and Rank"]);
+		assert.deepEqual(
+			finalReviewGapWords([{ title: "Binomial", reason: "full" }, { title: "Poisson", reason: "too_late" }, { title: "Geometric", reason: "no_study_day" }]),
+			["No room in it for Binomial", "Poisson starts too close to the exam for a review", "No study day left in it for Geometric"],
+			"round 9 (1 D8): the calendar says why as the head does, never \"No room\" for a topic that starts too close",
+		);
 		const fresh = entries.find((e) => e.kind === "new");
 		assert.equal(fresh?.kind === "new" && fresh.waits, "After Probability's new topics");
 	});

@@ -32,7 +32,7 @@ describe("a planned day in words", () => {
 	});
 
 	it("names the day a moved day was told for, so the tutor says it moved without counting", () => {
-		const moved = { from: "2026-11-10", by: "study", courses: ["Probability"] };
+		const moved = { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const };
 		const show = withDayWords({ items: { eigen: { review: { planned: "2026-11-11" }, moved } } }, "2026-11-09") as { items: { eigen: { moved: Record<string, unknown> } } };
 		assert.deepEqual(show.items.eigen.moved, { ...moved, from_words: "Tuesday 10 November" });
 	});

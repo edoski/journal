@@ -54,7 +54,7 @@ afterEach(async () => {
 });
 
 /** The run-up as he sees it after pressing "Exam in 25 days". */
-async function opened(ready: ReturnType<typeof examReady> | null) {
+async function opened(ready: ReturnType<typeof examReady> | null, plan: CalendarCourse = runup) {
 	const host = document.createElement("div");
 	document.body.appendChild(host);
 	root = createRoot(host);
@@ -62,7 +62,7 @@ async function opened(ready: ReturnType<typeof examReady> | null) {
 	await act(async () =>
 		root!.render(
 			<AppRouterContext.Provider value={router as never}>
-				<ExamFact course={course} runup={runup} words="Exam in 25 days" ready={ready} />
+				<ExamFact course={course} runup={plan} words="Exam in 25 days" ready={ready} />
 			</AppRouterContext.Provider>,
 		),
 	);
@@ -87,6 +87,12 @@ describe("the exam's run-up", () => {
 		const line = (await opened(ready)).querySelector("[data-slot=course-exam-ready]")!;
 		assert.equal(line.textContent, "No room before the exam to start Eigen");
 		assert.match(line.getAttribute("class") ?? "", /text-warning/);
+	});
+
+	it("lists the final review among the road's weeks by its day (round 9, 1 D8: \"17 Nov Variance\" above \"Final review from 13 Nov\")", async () => {
+		const panel = await opened(null, { ...runup, finalReview: "2026-11-10" });
+		const lines = [...panel.querySelectorAll("[data-slot=course-exam-road] li")].map((li) => li.textContent);
+		assert.deepEqual(lines, ["Final review from 10 Nov", "12 Nov Eigen"]);
 	});
 
 	it("says nothing about readiness while the engine is read", async () => {

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
-import { distanceWords, finalReviewWords, longDayWords, roadOf, spanWords } from "@/components/calendar/calendar-facts";
+import { distanceWords, finalReviewWords, longDayWords, roadLines, roadOf, spanWords } from "@/components/calendar/calendar-facts";
 import { ContextSheet } from "@/components/course-context/context-sheet";
 import { ArcPill } from "@/components/course-map/arc-strip";
 import { arcOnPage } from "@/components/course-page/course-head/course-head";
@@ -54,7 +54,7 @@ export function ExamFact({ course, runup, words, ready }: { course: StudyCourse;
 	const exam = map.exam;
 	if (!exam) return null;
 	const titleOf = (h: string) => map.topics.find((t) => t.handle === h)?.title ?? h;
-	const road = runup ? roadOf(runup.planned, exam.date, titleOf) : [];
+	const road = runup ? roadOf(runup.planned, exam.date, titleOf, runup.finalReview) : [];
 	const finalReview = finalReviewWords(runup?.finalReview ?? null, map.today);
 	return (
 		<Popover>
@@ -79,22 +79,23 @@ export function ExamFact({ course, runup, words, ready }: { course: StudyCourse;
 					<div data-slot="course-exam-road" className="flex flex-col gap-1.5 border-t border-border pt-3">
 						<p className="text-label font-medium text-muted-foreground">The road to it</p>
 						<ol className="flex flex-col gap-1.5">
-							{road.map((week) => (
-								<li key={week.from} className="flex gap-2 text-label">
-									<BookOpenIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-									<span className="min-w-0">
-										<span className="text-muted-foreground">{spanWords(week)}</span>{" "}
-										<span className="text-foreground">
-											<MathText>{week.titles.join(", ")}</MathText>
+							{roadLines(road, runup?.finalReview ?? null).map((line) =>
+								line.kind === "week" ? (
+									<li key={line.week.from} className="flex gap-2 text-label">
+										<BookOpenIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+										<span className="min-w-0">
+											<span className="text-muted-foreground">{spanWords(line.week)}</span>{" "}
+											<span className="text-foreground">
+												<MathText>{line.week.titles.join(", ")}</MathText>
+											</span>
 										</span>
-									</span>
-								</li>
-							))}
-							{finalReview && (
-								<li className="flex gap-2 text-label text-muted-foreground">
-									<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-									{finalReview}
-								</li>
+									</li>
+								) : (
+									<li key="final" className="flex gap-2 text-label text-muted-foreground">
+										<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+										{finalReview}
+									</li>
+								),
 							)}
 						</ol>
 					</div>

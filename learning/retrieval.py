@@ -1236,14 +1236,17 @@ def moved(
 ) -> dict[str, dict[str, Any]]:
     """Each topic whose next day differs from the day the plan gave it as
     yesterday ended, the day he was last told, with why it moved. Only his
-    study moves a day: ``study``, today's answers or starts in ``courses``
-    (a topic he answered or started today has its own new day and is not
-    listed); ``missed``, yesterday went by with no study; ``left``,
-    yesterday ended with work its plan held not done, in any course. A day
-    that moved for none of these has no cause in his study, so it is not
-    listed as moved: the plan reads its days from his study alone
-    (``capacity``), and a told day that moves otherwise is a fault the tests
-    catch, never a reason to give him. Nothing is stored: the plan as
+    study moves a day, and during a day only the topics it touched move
+    (``agenda.plan``): ``study`` with ``day`` today, his answers today made
+    a topic it waited on not ready (a topic he answered or started today
+    has its own new day and is not listed); ``missed``, yesterday went by
+    with no study; ``left``, yesterday ended with work its plan held not
+    done, in any course; ``study`` with ``day`` yesterday, what he did
+    yesterday in ``courses`` (a review answered off the plan, an answer
+    that was not solid, a start) reached the other topics this morning. A
+    day that moved for none of these has no cause in his study, so it is
+    not listed as moved: a told day that moves otherwise is a fault the
+    tests catch, never a reason to give him. Nothing is stored: the plan as
     yesterday ended is made again from the records without today's work.
     ``record`` is this course read with the plan."""
     name = str(workspace.directory)
@@ -1272,20 +1275,19 @@ def moved(
     }
     if not changed:
         return {}
-    studied = {
-        key: str(course.get("title") or Path(key).name)
-        for key, course in stored.items()
-        if agenda.touched(course, today)
-    }
+
+    def studied(day: date) -> list[str]:
+        return sorted(
+            str(course.get("title") or Path(key).name)
+            for key, course in stored.items()
+            if _worked_on(course, day)
+        )
+
+    today_ = studied(today)
     began = (
-        _began(stored, today, today, last).when(name, today, True) if studied else told
+        _began(stored, today, today, last).when(name, today, True) if today_ else told
     )
-    day = yesterday.isoformat()
-    went = any(
-        any(item["date"] == day for item in course["observations"].values())
-        or any(topic.get("introduced") == day for topic in course["topics"].values())
-        for course in stored.values()
-    )
+    went = studied(yesterday)
     left = any(
         planned["reviews"] or planned["new"]
         for days in ended.days.values()
@@ -1295,16 +1297,26 @@ def moved(
     for kind, key in changed:
         was = told_on(told, kind, key)
         assert was is not None
-        if studied and told_on(began, kind, key) == was:
-            why: dict[str, Any] = {"by": "study", "courses": sorted(studied.values())}
+        if today_ and told_on(began, kind, key) == was:
+            why: dict[str, Any] = {"by": "study", "courses": today_, "day": "today"}
         elif not went:
             why = {"by": "missed"}
         elif left:
             why = {"by": "left"}
         else:
-            continue
+            why = {"by": "study", "courses": went, "day": "yesterday"}
         result[key] = {"from": was.isoformat(), **why}
     return result
+
+
+def _worked_on(record: dict[str, Any], day: date) -> bool:
+    """Whether he answered with an answer that counts, or started a topic,
+    on ``day``: a prediction moves nothing."""
+    when = day.isoformat()
+    return any(
+        item["date"] == when and schema.counts(item)
+        for item in record["observations"].values()
+    ) or any(topic.get("introduced") == when for topic in record["topics"].values())
 
 
 def dated(workspace: Workspace, receipt: dict[str, Any]) -> dict[str, Any]:

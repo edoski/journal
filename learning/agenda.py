@@ -91,7 +91,10 @@ topics ran out. Once he has shown a limit, a day's pace also takes what the
 days after it cannot hold, so a fraction carried to a day with no room is never
 a topic lost. Spare new-topic capacity then goes to courses with no exam
 ahead, the one that started a topic least recently first; then to the nearest
-exam with topics left; then to the topics outside an exam's scope.
+exam with topics left; then to the topics outside an exam's scope. While any
+final review runs, the exams with topics left come before the courses with no
+exam: the run-up is for the exam (round 9: Real Analysis started a topic two
+days before the Probability exam while Geometric had no room).
 Spare capacity starts one topic on a day that starts none, and a second only
 when it belongs with the first (one needs the other, or both rest on the same
 prerequisites) in the arc the plan is taking from, or his own rate that
@@ -139,7 +142,7 @@ from datetime import date, timedelta
 import math
 from typing import Any, Literal, TypedDict
 
-from learning import arc_rules, capacity, progress
+from learning import arc_rules, capacity, progress, schema
 from learning.capacity import Capacity
 
 # The longest plan the engine makes: a year from today, so every review on
@@ -236,6 +239,13 @@ class _Course:
     began: date | None = None
     ready_once: set[str] = field(default_factory=set)
     """The exam's untaught topics ready on some study day before it."""
+    moving: set[str] | None = None
+    """With work saved today, the topics it touched: only these take new
+    days, every other keeps the day the plan as today began gave it
+    (``_Told``). None with nothing saved today: every topic moves."""
+
+    def moves(self, topic: str) -> bool:
+        return self.moving is None or topic in self.moving
 
     @classmethod
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
@@ -754,7 +764,32 @@ def _reviews(
     nearest exam first, then by memory's need (the module's rule). Each one a full day
     leaves out waits on its course's ``holding``, with the course whose final
     review took some of the day."""
-    candidates: list[tuple[tuple[Any, ...], str, _Course, str]] = []
+    candidates, quota = _candidates(courses, day, week)
+    held = {
+        (course.name, topic)
+        for key, _, course, topic in candidates
+        if key[0] == 1 and key[2] and course.together(topic, day, week)
+    }
+    picked = _select(courses, candidates, day, room, quota, held)
+    for course, topic in picked.left:
+        nearer = [
+            other
+            for _, other in sorted(picked.taken, key=lambda f: f[0])
+            if other is not course
+        ]
+        course.wait(topic, nearer[0].title if nearer else None)
+    return picked.chosen
+
+
+Candidate = tuple[tuple[Any, ...], str, _Course, str]
+
+
+def _candidates(
+    courses: list[_Course], day: date, week: Capacity
+) -> tuple[list[Candidate], dict[str, int]]:
+    """Every review due on ``day``, in the module's order, and each final
+    review's quota of the day."""
+    candidates: list[Candidate] = []
     quota: dict[str, int] = {}
     for course in courses:
         items = course.due_items(day)
@@ -804,20 +839,52 @@ def _reviews(
             )
             candidates.append((key, course.name, course, topic))
     candidates.sort(key=lambda item: (item[0], item[1]))
-    held = {
-        (course.name, topic)
-        for key, _, course, topic in candidates
-        if key[0] == 1 and key[2] and course.together(topic, day, week)
-    }
-    picked = _select(courses, candidates, day, room, quota, held)
-    for course, topic in picked.left:
-        nearer = [
-            other
-            for _, other in sorted(picked.taken, key=lambda f: f[0])
-            if other is not course
-        ]
-        course.wait(topic, nearer[0].title if nearer else None)
-    return picked.chosen
+    return candidates, quota
+
+
+def _kept_reviews(
+    courses: list[_Course], day: date, room: float, week: Capacity, told: _Told
+) -> dict[str, list[str]]:
+    """The day's reviews with work saved today (``_Told``): the reviews the
+    plan as today began put on it, of topics that work did not touch, which
+    stay; then each topic it touched, in the order he last worked on it,
+    where the module's order puts it within ``room`` among the reviews
+    already on the day. So a later save never takes the day an earlier one
+    told him, and a day may hold more than his limit until the next
+    morning's plan, made from the day's whole record, spreads it again."""
+    offset = (day - told.today).days
+    chosen = {c.name: told.kept(c.name, offset, "reviews") for c in courses}
+    candidates, quota = _candidates(courses, day, week)
+    for course in courses:
+        if course.name in quota:
+            quota[course.name] -= sum(
+                course.final(topic, day) for topic in chosen[course.name]
+            )
+    rank = {(name, topic): key for key, name, _, topic in candidates}
+    first = (-math.inf,)
+    taken = [
+        rank.get((name, topic), first)
+        for name, topics in chosen.items()
+        for topic in topics
+    ]
+    held = told.plan.days
+    later = [topic in held[name][offset]["reviews"] for name, topic in told.order]
+    due = {(name, topic): course for _, name, course, topic in candidates}
+    for index, (name, topic) in enumerate(told.order):
+        owner = due.get((name, topic))
+        if owner is None or not owner.moves(topic):
+            continue
+        key = rank[(name, topic)]
+        ahead = sum(other < key for other in taken) + sum(later[index + 1 :])
+        final = owner.final(topic, day)
+        if week.studies(day) and ahead < room and (not final or quota[name] > 0):
+            chosen[name].append(topic)
+            taken.append(key)
+            if final:
+                quota[name] -= 1
+        else:
+            owner.wait(topic, None)
+    return chosen
 
 
 @dataclass
@@ -923,6 +990,7 @@ def _new(
                 topic
                 for topic in course.untaught
                 if (among is None or topic in among)
+                and course.moves(topic)
                 and course.ready(topic)
                 and (not bound or course.opens(topic, front))
             ]
@@ -1014,12 +1082,13 @@ def _new(
                 scoped = set(course.scoped)
                 more = min(room, pace - taken)
                 room -= take(course, more, scoped, bound=False, pace=True)
-    room -= share(
-        [course for course in others if course.exam is None or course.outside(day)]
-    )
+    open_ = [course for course in others if course.exam is None or course.outside(day)]
+    if not any(course.reviewing(day) for course in exams):
+        room -= share(open_)
     for course in exams:
         while room > 0 and spare(course, course.scoped, course.scoped):
             room -= 1
+    room -= share(open_)
     room -= share([course for course in exams if course.outside(day)])
     for course in courses:
         course.watch(course.startable(day))
@@ -1028,12 +1097,13 @@ def _new(
 
 
 def touched(record: dict[str, Any], today: date) -> set[str]:
-    """The topics he answered or started today."""
+    """The topics he answered or started today: a prediction, which never
+    counts, moves nothing."""
     day = today.isoformat()
     return {
         topic
         for item in record["observations"].values()
-        if item["date"] >= day
+        if item["date"] >= day and schema.counts(item)
         for topic in item["topics"]
     } | {
         key
@@ -1081,31 +1151,6 @@ def morning(record: dict[str, Any], today: date) -> dict[str, Any]:
     return {**before, "topics": topics}
 
 
-def _spent_today(
-    records: Mapping[str, dict[str, Any]],
-    courses: list[_Course],
-    today: date,
-    week: Capacity,
-) -> int:
-    """Today's reviews already answered that today's plan held as the day
-    began. A review he chose beyond them, one the plan had put on a later
-    day, is study past the plan: it takes no place from a review still
-    planned today, so nothing shown due today drops off it unstudied."""
-    began = plan(
-        {name: morning(record, today) for name, record in records.items()},
-        today,
-        1,
-        week,
-    )
-    day = today.isoformat()
-    return sum(
-        1
-        for course in courses
-        for topic in began.days[course.name][0]["reviews"]
-        if course.replayed[topic].days.get(day) == progress.PROBE
-    )
-
-
 def _waited(courses: list[_Course], chosen: dict[str, list[str]], day: date) -> None:
     """Why a start waits: the courses whose new topics took the room on the
     days one of this course's topics was ready and it started none, given to
@@ -1125,6 +1170,35 @@ def _waited(courses: list[_Course], chosen: dict[str, list[str]], day: date) -> 
             course.pending.extend(t for t in starters if t not in course.pending)
 
 
+@dataclass(frozen=True)
+class _Told:
+    """The plan made as today began (``morning``), and the topics today's
+    work touched in each course (``touched``): every other topic keeps the
+    days that plan gave it."""
+
+    plan: Plan
+    touched: dict[str, set[str]]
+    today: date
+    order: list[tuple[str, str]]
+    """Each course and topic today's work touched, in the order he last
+    worked on it."""
+
+    def kept(self, name: str, offset: int, kind: str) -> list[str]:
+        """The ``kind`` items it put on the day ``offset`` days from today,
+        of topics today's work did not touch."""
+        held: list[str] = self.plan.days[name][offset][kind]
+        return [topic for topic in held if topic not in self.touched[name]]
+
+    def untouched(self, name: str, found: Mapping[str, Any]) -> dict[str, Any]:
+        """Of a mapping by this course's topics in the plan as today began,
+        those today's work did not touch."""
+        return {
+            topic: value
+            for topic, value in found.get(name, {}).items()
+            if topic not in self.touched[name]
+        }
+
+
 def plan(
     records: Mapping[str, dict[str, Any]],
     today: date,
@@ -1133,17 +1207,78 @@ def plan(
 ) -> Plan:
     """Every course's plan for ``days`` days from today, together.
 
-    ``week`` defaults to the capacity learned from these records. Today's
-    allowance is what is left after the reviews done today that today's plan
-    held as the day began (``_spent_today``).
+    ``week`` defaults to the capacity learned from these records, as today
+    began (``capacity.of``). Today's allowance is what is left after the
+    reviews done today that the plan as today began held for today: a review
+    he chose beyond them, one it had put on a later day, is study past the
+    plan, and takes no place from a review still planned today.
+
+    A day he was told stays until his own study moves it, so today's work
+    moves only the topics it touched: an answer that counts, or a start.
+    Every other topic keeps the days the plan made as today began gave it
+    (``morning``), and the topics he worked on take what room those leave
+    (round 9: a save in Linear Algebra moved Probability's told review from
+    11 to 9 Nov and back). What the rest of today's work shows of his pace,
+    and the room it frees or takes, reaches the other topics the next
+    morning, from the day's whole record.
     """
+    touched_ = {name: touched(record, today) for name, record in records.items()}
+    if not any(touched_.values()):
+        return _planned(records, today, days, week, None)
+    began = {name: morning(record, today) for name, record in records.items()}
+    told = _Told(
+        _planned(began, today, days, week, None),
+        touched_,
+        today,
+        _last_worked(records, today, touched_),
+    )
+    return _planned(records, today, days, week, told)
+
+
+def _last_worked(
+    records: Mapping[str, dict[str, Any]],
+    today: date,
+    touched_: Mapping[str, set[str]],
+) -> list[tuple[str, str]]:
+    """The topics today's work touched, by course, in the order he last
+    worked on each: its latest answer saved today, a start with none first."""
+    day = today.isoformat()
+    last: dict[tuple[str, str], str] = {
+        (name, topic): "" for name, topics in touched_.items() for topic in topics
+    }
+    for name, record in records.items():
+        for item in record["observations"].values():
+            if item["date"] >= day and schema.counts(item):
+                for topic in item["topics"]:
+                    key = (name, topic)
+                    last[key] = max(last[key], str(item.get("recorded", "")))
+    return sorted(last, key=lambda key: (last[key], key))
+
+
+def _planned(
+    records: Mapping[str, dict[str, Any]],
+    today: date,
+    days: int,
+    week: Capacity | None,
+    told: _Told | None,
+) -> Plan:
     history = capacity.activity(records.values(), today)
-    week = (week or capacity.estimate(history, today)).resting(
+    week = (week or capacity.estimate(capacity.began(history, today), today)).resting(
         capacity.exam_days(records.values())
     )
     courses = [_Course.of(name, record) for name, record in records.items()]
+    if told is not None:
+        for course in courses:
+            course.moving = set(told.touched[course.name])
     done = history.get(today, capacity.Done())
-    spent = _spent_today(records, courses, today, week) if done.reviews else 0
+    spent = 0
+    if told is not None:
+        spent = sum(
+            1
+            for course in courses
+            for topic in told.plan.days[course.name][0]["reviews"]
+            if course.replayed[topic].days.get(today.isoformat()) == progress.PROBE
+        )
     for offset in range(days):
         day = today + timedelta(days=offset)
         rates = week.on(day)
@@ -1163,18 +1298,34 @@ def plan(
         for course in courses:
             if course.missed is None and course.ahead(today) and not course.ahead(day):
                 course.missed = course.scoped
-        reviews = _reviews(courses, day, reviews_room, week)
+        reviews = (
+            _reviews(courses, day, reviews_room, week)
+            if told is None
+            else _kept_reviews(courses, day, reviews_room, week, told)
+        )
         for course in courses:
             for topic in reviews[course.name]:
                 course.place(topic)
                 course.reviewed(topic, day)
-        new = _new(courses, day, new_room, week, begun)
+        starts = {course.name: list[str]() for course in courses}
+        if told is not None:
+            for course in courses:
+                assert course.moving is not None
+                for topic in told.kept(course.name, offset, "new"):
+                    if topic in course.untaught and course.ready(topic):
+                        course.start(topic, day, course.front(course.startable(day)))
+                        course.why[topic] = told.plan.why[course.name][topic]
+                        starts[course.name].append(topic)
+                        new_room -= 1
+                    else:
+                        course.moving.add(topic)
+        new = _new(courses, day, max(new_room, 0), week, begun)
         for course in courses:
             course.days.append(
                 {
                     "date": day.isoformat(),
                     "reviews": reviews[course.name],
-                    "new": new[course.name],
+                    "new": [*starts[course.name], *new[course.name]],
                 }
             )
     late = {
@@ -1188,6 +1339,12 @@ def plan(
         for course in courses
         if (missed := _unreviewed(course, records[course.name], today))
     }
+    if told is not None:
+        for course in courses:
+            course.held.update(told.untouched(course.name, told.plan.held))
+            course.starts_after.update(
+                told.untouched(course.name, told.plan.starts_after)
+            )
     return Plan(
         {course.name: course.days for course in courses},
         late,

@@ -5,7 +5,7 @@
   "exam": {
     "date": "2026-12-03",
     "days_left": 25,
-    "final_review": "2026-11-19"
+    "final_review": "2026-11-16"
   },
   "current": "eigen",
   "focus": "sheet-4",
@@ -25,16 +25,9 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-15",
+      "review": "2026-11-20",
       "held": true,
       "due": "2026-10-12",
-      "moved": {
-        "from": "2026-11-20",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ]
-      },
       "weak": false,
       "tasks": []
     },
@@ -47,7 +40,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-30",
-      "review": "2026-11-16",
+      "review": "2026-11-23",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -62,12 +55,16 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-09",
+      "review": "2026-11-18",
       "held": true,
       "due": "2026-10-28",
       "moved": {
         "from": "2026-11-13",
-        "by": "left"
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ],
+        "day": "yesterday"
       },
       "weak": true,
       "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
@@ -87,7 +84,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-20",
+      "review": "2026-11-23",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -104,15 +101,9 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-08",
-      "overdue": 2,
-      "moved": {
-        "from": "2026-11-09",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ]
-      },
+      "review": "2026-11-09",
+      "held": true,
+      "due": "2026-11-06",
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -127,15 +118,16 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-18",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-11-06",
       "moved": {
-        "from": "2026-11-16",
+        "from": "2026-11-13",
         "by": "study",
         "courses": [
           "Linear Algebra"
-        ]
+        ],
+        "day": "yesterday"
       },
       "weak": true,
       "mistake": true,
@@ -179,8 +171,9 @@
       "contrasts": [],
       "level": "attempted",
       "introduced": "2026-11-06",
-      "review": "2026-11-08",
-      "overdue": 1,
+      "review": "2026-11-09",
+      "held": true,
+      "due": "2026-11-07",
       "weak": true,
       "mistake": true,
       "confident_errors": 1,
@@ -202,6 +195,14 @@
       "review": "2026-11-13",
       "held": true,
       "due": "2026-11-09",
+      "moved": {
+        "from": "2026-11-16",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ],
+        "day": "yesterday"
+      },
       "weak": false,
       "right": "helped",
       "tasks": []
@@ -217,15 +218,16 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-19",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-11-06",
       "moved": {
-        "from": "2026-11-16",
+        "from": "2026-11-12",
         "by": "study",
         "courses": [
           "Linear Algebra"
-        ]
+        ],
+        "day": "yesterday"
       },
       "weak": false,
       "tasks": []
@@ -239,6 +241,14 @@
       ],
       "contrasts": [],
       "level": "new",
+      "moved": {
+        "from": "2026-11-18",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ],
+        "day": "yesterday"
+      },
       "starts": "2026-11-13",
       "starts_why": {
         "kind": "after",
@@ -259,7 +269,15 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-14",
+      "moved": {
+        "from": "2026-11-19",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ],
+        "day": "yesterday"
+      },
+      "starts": "2026-11-18",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -297,15 +315,11 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-19",
-        "by": "left"
-      },
-      "starts": "2026-11-15",
+      "starts": "2026-11-20",
       "starts_why": {
         "kind": "after",
         "needs": [
-          "change-basis"
+          "eigen"
         ]
       },
       "weak": false,
@@ -338,10 +352,6 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-11",
-        "by": "left"
-      },
       "starts": "2026-11-12",
       "starts_why": {
         "kind": "early",

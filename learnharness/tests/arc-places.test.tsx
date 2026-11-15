@@ -83,7 +83,9 @@ describe("Home's rows", () => {
 		const next = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
 		assert.equal(whyOf(row(next))?.starts?.words, "Next in Eigenvalues");
 		const early = planned(LINALG_ARCS, { kind: "early", arc: arc("eigenvalues"), waitingOn: h("rank"), exam: false });
-		assert.deepEqual(whyOf(row(early))?.starts, { kind: "early", words: "Early, from Eigenvalues" }, "the waiting clause stays on the topic page");
+		assert.deepEqual(whyOf(row(early)), { kind: "next", short: "Planned today" }, "round 9 (1 D6): the plan's own start never reads as a warning; the topic page keeps why");
+		const plainEarly = planned(LINALG, { kind: "early", waitingOn: h("rank"), exam: false });
+		assert.deepEqual(whyOf(row(plainEarly)), { kind: "next", short: "Planned today" }, "no \"Early, ahead of its place\" on today's planned start");
 		const doc = render(<HybridRows rows={[row(after)]} busy={false} onContinue={() => {}} />);
 		const why = doc.querySelector('[data-slot="today-why"]')!;
 		assert.equal(why.getAttribute("data-starts"), "after");
