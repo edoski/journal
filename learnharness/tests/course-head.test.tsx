@@ -15,7 +15,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { ChatListItem, CourseMapTopic, ExamGapReason, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
 import { examGaps, lastSessionOf, namesWords } from "../components/course-page/course-head/head-facts.ts";
-import { EXAM_GAP_WHY, EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
+import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
@@ -129,22 +129,40 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 
 	it("says why under the head's first line, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
 		const one = gapLine(gapped(["variance"], [], { variance: "full" }))!;
-		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WHY.start.full}.`);
+		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Your pace fills every study day before the exam.");
 		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask]);
 		const review = gapLine(gapped([], ["binomial"], { binomial: "full" }))!;
-		assert.equal(review.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WHY.review.full}.`);
+		assert.equal(review.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Your pace fills every day of the final review.");
 		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.review, EXAM_GAP_WORDS.ask]);
 		const late = gapLine(gapped([], ["poisson"], { poisson: "too_late" }))!;
-		assert.equal(late.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Starts too close to the exam for a review.");
+		assert.equal(late.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Poisson starts too close to the exam for a review.", "the topic that starts too late is named");
 		assert.deepEqual([...late.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask], "a topic never taught is started, never reviewed");
 		const both = gapLine(gapped(["variance", "geometric"], ["binomial"], { variance: "not_ready", geometric: "not_ready", binomial: "full" }))!;
 		assert.equal(
 			both.querySelector("[data-slot=exam-gaps-why]")?.textContent,
-			`${EXAM_GAP_WHY.start.not_ready}. No room in the final review for Binomial either. ${EXAM_GAP_WHY.review.full}.`,
-			"the engine's reason for each, each said once",
+			"What comes first won’t be solid in time. The final review has no room for Binomial at your pace.",
+			"the engine's reason for each, each said once, in two sentences",
 		);
-		assert.deepEqual([...both.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.startOne, EXAM_GAP_WORDS.ask], "one press picks which, from a menu");
 		assert.doesNotMatch(both.textContent ?? "", /\d/, "no counts");
+	});
+
+	it("says the round-8 gap in two sentences, your pace once, every reason naming the topics it alone covers (round 8: five sentences)", () => {
+		const c = gapped(["expectation", "variance"], ["binomial", "poisson", "geometric"], { expectation: "full", variance: "not_ready", binomial: "full", poisson: "full", geometric: "too_late" });
+		const map = { ...c.map, topics: [...c.map.topics, topic("expectation"), topic("geometric")] };
+		const line = gapLine({ ...c, map })!;
+		const why = line.querySelector("[data-slot=exam-gaps-why]")?.textContent ?? "";
+		assert.equal(why, "Your pace fills every study day before the exam, and what Variance needs won’t be solid in time. The final review has no room for Binomial and Poisson, and Geometric starts too close to the exam for a review.");
+		assert.equal(why.split(". ").length, 2, "two sentences");
+		assert.equal(why.match(/your pace/gi)?.length, 1, "your pace once");
+	});
+
+	it("picks one way in and keeps the rest under Or another (round 8: eight options and no pick)", () => {
+		const needs = (topic: string, prerequisite: string) => ({ kind: "needs" as const, topic: h(topic), prerequisite: h(prerequisite) });
+		const c = gapped(["expectation"], ["binomial", "poisson"], { expectation: "full", binomial: "full", poisson: "full" });
+		const map = { ...c.map, topics: [...c.map.topics, topic("expectation")], edges: [needs("poisson", "binomial")] };
+		const line = gapLine({ ...c, map })!;
+		const presses = [...line.querySelectorAll("button")].map((b) => b.textContent);
+		assert.deepEqual(presses, ["Start Expectation today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask], "the exam topic never started is the pick");
 	});
 
 	it("offers only what he can do today: review what is taught, start what has its prerequisites taught, nothing for the rest (round 7: Review Poisson, Start Variance before Expectation)", () => {
