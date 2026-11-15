@@ -1,4 +1,5 @@
-import { nativeInputCause, needsContinuation, NEUTRAL_MARKERS, type LhMessage } from "./native-messages.ts";
+import { nativeInputCause, needsContinuation, NEUTRAL_MARKERS, SEND_TO_USER_TOOL, type LhMessage } from "./native-messages.ts";
+import { QUESTION_TOOLS } from "./pending.ts";
 
 /**
  * The tutor's turn ended without a word after his input (round 2, 14 Nov
@@ -22,13 +23,17 @@ function isEmptyStop(m: LhMessage): boolean {
 		!m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && hasArguments(b.arguments)));
 }
 
+/** What of a reply he reads: text the voice guard kept, a message sent
+ *  to him, a question. A save or a lookup shows him nothing. */
+const SHOWN_TOOLS: readonly string[] = [SEND_TO_USER_TOOL, ...QUESTION_TOOLS];
+
 /** Whether the tutor wrote to him after his latest input: a reply in the
  *  turn that was then stopped. */
 function saidSinceInput(messages: readonly LhMessage[]): boolean {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const m = messages[i]!;
 		if (m.role === "assistant") {
-			if (!isEmptyStop(m) && m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && hasArguments(b.arguments)))) return true;
+			if (!isEmptyStop(m) && m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || (b.type === "toolCall" && SHOWN_TOOLS.includes(b.name) && hasArguments(b.arguments)))) return true;
 			continue;
 		}
 		if (!isNeutral(m) && nativeInputCause(m as never, messages.slice(0, i) as never) === "learner") return false;

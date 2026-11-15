@@ -10,7 +10,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
-import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
+import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import { onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";

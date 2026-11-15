@@ -71,3 +71,13 @@ test("a stop after the tutor had already written to him reads as a stop mid-repl
 	assert.equal(replyCutOf([reply, message, stoppedEmpty]), "stopped", "nothing written since his message: before it replied");
 	assert.deepEqual([...stoppedReplyIds([reply, message, said, shown, stoppedEmpty])], ["a3"], "Try again resumes past the empty stop");
 });
+
+test("a stop after the tutor only saved progress, or wrote plain text the voice guard took out, is a stop before it replied", () => {
+	// Round 7, on top of the voice guard: plain text no longer shows, and a
+	// save shows nothing, so neither is a reply he read.
+	const saved = { id: "a6", role: "assistant", content: [{ type: "toolCall", id: "p1", name: "lesson_progress", arguments: { step: "maps", status: "done" } }], stopReason: "toolUse", timestamp: 6 } as unknown as LhMessage;
+	const ack = { id: "r6", role: "toolResult", toolCallId: "p1", toolName: "lesson_progress", isError: false, timestamp: 7, content: [{ type: "text", text: "ok" }] } as unknown as LhMessage;
+	const guarded = { id: "a7", role: "assistant", content: [{ type: "text", text: "" }], stopReason: "stop", timestamp: 8 } as unknown as LhMessage;
+	assert.equal(replyCutOf([reply, message, saved, ack, stoppedEmpty]), "stopped");
+	assert.equal(replyCutOf([reply, message, saved, ack, guarded, stoppedEmpty]), "stopped");
+});
