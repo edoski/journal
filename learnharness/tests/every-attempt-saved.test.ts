@@ -12,6 +12,8 @@ import { describe, it } from "node:test";
 import { fauxAssistantMessage, type ToolCall } from "@earendil-works/pi-ai";
 import { VoiceGuard } from "../src/agent/voice-guard.ts";
 import { newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
+import { ASKED_INSTEAD_TEXT } from "../src/core/question-core.ts";
+import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 
 let n = 0;
 const predict = (question: string): ToolCall => ({ type: "toolCall", id: `q-${++n}`, name: "explain", arguments: { question, type: "predict", nodeId: "axes" } });
@@ -61,5 +63,14 @@ describe("a wrong prediction he answered", () => {
 		const kept = save(asked.id);
 		const saved = [...before, assistant([kept]), { id: `r-${++n}`, role: "toolResult", toolCallId: kept.id, toolName: "course_save", content: [{ type: "text", text: "saved" }], details: {}, isError: false, timestamp: 1 } as unknown as LhMessage];
 		assert.equal(withheld(new VoiceGuard(saved, undefined, false, true), predict(QUESTION)), null, "saved earlier in the turn");
+	});
+});
+
+// Round 10, 1 m1 as it happened: his wrong prediction went through Ask,
+// which the doctrine read as a question, never an answer, so nothing kept it.
+describe("a guess he sent through Ask", () => {
+	it("is his answer, saved naming his message, in every agent's doctrine and in what the dismissal tells the tutor", () => {
+		for (const agent of ["prober", "teacher", "practice"] as const) assert.match(courseRecordPrompt(agent, { arcs: false }), /unless it only answers the open question and asks nothing[^;]*saved naming `"his-message"`, a prediction when the question asked for one/, agent);
+		assert.match(ASKED_INSTEAD_TEXT, /only answers the question[^.]*save it as his attempt naming "his-message", a prediction when the question asked for one/);
 	});
 });

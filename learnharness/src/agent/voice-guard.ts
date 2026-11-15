@@ -344,11 +344,11 @@ const NUDGE_NOTE = "His work broke and the problem is still open, but your reply
  *  (round 10, 1 m1: a wrong prediction got a rebuttal and the same
  *  question again, and only his right retry was ever saved). */
 const UNSAVED = (tool: string): AgentToolResult<unknown> => ({
-	content: [{ type: "text", text: `Not done: his answer to your last question is not saved yet. Save it with course_save first, as it was, a wrong prediction included, since every attempt is kept; then call ${tool} again.` }],
+	content: [{ type: "text", text: `Not done: his answer to your last question is not saved yet. Save it with course_save first, as it was, a wrong prediction included, since every attempt is kept; then call ${tool} again. If it only asked you something and holds no attempt, call ${tool} again as it is.` }],
 	isError: true,
 	details: { withheld: "unsaved" },
 });
-const UNSAVED_NOTE = "His answer to your last question is not saved. Save it with course_save now, as it was, a wrong prediction included, since every attempt is kept.";
+const UNSAVED_NOTE = "His answer to your last question is not saved. Save it with course_save now, as it was, a wrong prediction included, since every attempt is kept; if it only asked you something, it holds no attempt.";
 
 /** The graded question his answer opening this turn replies to, while no
  *  save has kept it yet; null for any other turn. */
