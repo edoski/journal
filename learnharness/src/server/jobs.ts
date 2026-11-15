@@ -72,7 +72,7 @@ import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores, effectiveSettings } from "./stores.ts";
 import { connectionBackgroundAllowed } from "../agent/subscription-connections.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
-import { subscribe, type ServerEventType } from "../core/events.ts";
+import { emit, subscribe, type ServerEventType } from "../core/events.ts";
 import type { SdkAgent as Agent } from "../agent/sdk/agent.ts";
 
 /** Fires one server-side teacher turn: (chatId, input) → HTTP-ish status.
@@ -588,10 +588,14 @@ async function pump(chatId: string): Promise<void> {
 			// Fire the wake with cargo still registered. A 409 releases its
 			// vehicle flag and retries after the existing backoff, without
 			// appending another registry entry.
+			// The turn's setup (compaction gate, course brief) runs before it
+			// counts as running: say a wake is coming, so the lesson is never
+			// silent meanwhile (round 8).
+			emit("turn-waking", { chatId, waking: true });
 			const status = await s.turnRunner(chatId, { type: "steers", steers }).catch((err: unknown) => {
 				console.error(`[steer ${steers.map((x) => x.id).join(",")}] wake turn crashed:`, err);
 				return -1;
-			});
+			}).finally(() => emit("turn-waking", { chatId, waking: false }));
 			const saved = stores.chatStore.getChat(chatId);
 			if (saved) noteSteersDurable(chatId, saved.messages);
 			const owned = fire.filter((entry) => s.queues.get(chatId)?.includes(entry));

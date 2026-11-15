@@ -931,6 +931,27 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 		assert.equal(firedHandoff.steers[0]!.id, `steer_probe_${chat.id}`, "the handoff IS the wake turn's input");
 	});
 
+	it("announces a wake from before its turn is set up until it runs or is refused, so the lesson is never silent meanwhile (round 8/9, the ~10 s before practice)", async () => {
+		const chat = chatStore.createChat("Test: waking announced");
+		trackChat(chat.id);
+		chatStore.saveMessages(chat.id, nativeToolMessages("teach me calc", "probe_done", "call-pd", { ok: true }));
+		const seen: string[] = [];
+		const off = subscribe((e) => {
+			if (e.type === "turn-waking" && e.chatId === chat.id) seen.push(`waking ${e.waking}`);
+		});
+		setTurnRunner(async () => {
+			seen.push("turn set up");
+			return 200;
+		});
+		try {
+			await deliverJobResult(buildProbeHandoffSteer(chat.id));
+			await waitFor(() => seen.includes("waking false"), 8000, "wake announced and ended");
+			assert.deepEqual(seen, ["waking true", "turn set up", "waking false"]);
+		} finally {
+			off();
+		}
+	});
+
 	it("a redelivered handoff dedupes via the transcript (idempotent by steer id)", async () => {
 		const chat = chatStore.createChat("Test: handoff idempotent");
 		trackChat(chat.id);

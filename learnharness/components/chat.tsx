@@ -796,7 +796,10 @@ export function Chat({
 	// until the compaction ends, so his Enter goes through and the line
 	// below the transcript says why the reply waits (round 6).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
-	const waiting = waitingLine(messages, { busy, compacting });
+	// A turn the server is setting up itself (turn-waking): the line shows
+	// from the start of its setup, not only once it runs.
+	const [waking, setWaking] = useState(false);
+	const waiting = waitingLine(messages, { busy, compacting, waking });
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -1251,6 +1254,9 @@ export function Chat({
 		}
 		// Fully idle — a turn we never saw (every window missed): adopt now.
 		void syncFromServer();
+	});
+	useServerEvent("turn-waking", (p) => {
+		if (p.chatId === chatId) setWaking(p.waking);
 	});
 	useServerEvent("compaction-changed", (p) => {
 		// The settle-kick's background summary: while it runs, sends gate
