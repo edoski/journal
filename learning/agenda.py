@@ -990,32 +990,57 @@ def _new(
     return chosen
 
 
-def _morning(record: dict[str, Any], today: date) -> dict[str, Any]:
-    """The record as today began: without today's answers, and each review
-    the engine moved for one of them back on the day it had then."""
+def touched(record: dict[str, Any], today: date) -> set[str]:
+    """The topics he answered or started today."""
     day = today.isoformat()
-    observations = {
-        key: item for key, item in record["observations"].items() if item["date"] < day
-    }
-    touched = {
+    return {
         topic
         for item in record["observations"].values()
         if item["date"] >= day
         for topic in item["topics"]
+    } | {
+        key
+        for key, topic in record["topics"].items()
+        if topic.get("introduced", "") >= day
+    }
+
+
+def morning(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record as today began: without today's answers, a topic started
+    today not yet started, and each review the engine moved for one of
+    them back on the day it had then."""
+    day = today.isoformat()
+    observations = {
+        key: item for key, item in record["observations"].items() if item["date"] < day
+    }
+    started = {
+        key
+        for key, topic in record["topics"].items()
+        if topic.get("introduced", "") >= day
     }
     before = {**record, "observations": observations}
-    replayed = progress.replays(before)
-    topics = dict(record["topics"])
-    for key in touched & topics.keys():
+    topics = {
+        key: {name: value for name, value in topic.items() if name != "introduced"}
+        if key in started
+        else topic
+        for key, topic in record["topics"].items()
+    }
+    replayed = progress.replays({**before, "topics": topics})
+    for key in touched(record, today) & topics.keys():
         review = topics[key].get("review", {})
         if review.get("by") != "engine":
             continue
         rest = {name: value for name, value in review.items() if name != "due"}
         due = replayed[key].due
-        topics[key] = {
+        entry = {
             **topics[key],
             "review": {**rest, "due": due.isoformat()} if due else rest,
         }
+        topics[key] = (
+            entry
+            if entry["review"]
+            else {name: value for name, value in entry.items() if name != "review"}
+        )
     return {**before, "topics": topics}
 
 
@@ -1029,8 +1054,8 @@ def _spent_today(
     began. A review he chose beyond them, one the plan had put on a later
     day, is study past the plan: it takes no place from a review still
     planned today, so nothing shown due today drops off it unstudied."""
-    morning = plan(
-        {name: _morning(record, today) for name, record in records.items()},
+    began = plan(
+        {name: morning(record, today) for name, record in records.items()},
         today,
         1,
         week,
@@ -1039,7 +1064,7 @@ def _spent_today(
     return sum(
         1
         for course in courses
-        for topic in morning.days[course.name][0]["reviews"]
+        for topic in began.days[course.name][0]["reviews"]
         if course.replayed[topic].days.get(day) == progress.PROBE
     )
 

@@ -28,6 +28,10 @@
       "review": "2026-11-20",
       "held": true,
       "due": "2026-10-12",
+      "moved": {
+        "from": "2026-11-18",
+        "by": "left"
+      },
       "weak": false,
       "tasks": []
     },
@@ -58,6 +62,10 @@
       "review": "2026-11-16",
       "held": true,
       "due": "2026-10-28",
+      "moved": {
+        "from": "2026-11-09",
+        "by": "left"
+      },
       "weak": true,
       "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
       "mistake": true,
@@ -114,6 +122,10 @@
       "review": "2026-11-18",
       "held": true,
       "due": "2026-11-06",
+      "moved": {
+        "from": "2026-11-14",
+        "by": "left"
+      },
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -137,6 +149,10 @@
       "review": "2026-11-14",
       "held": true,
       "due": "2026-11-06",
+      "moved": {
+        "from": "2026-11-13",
+        "by": "left"
+      },
       "weak": true,
       "right": "helped",
       "gap": "You count nonzero entries instead of pivots, and mix up rank with the number of rows",
@@ -181,6 +197,10 @@
       "review": "2026-11-14",
       "held": true,
       "due": "2026-11-09",
+      "moved": {
+        "from": "2026-11-16",
+        "by": "left"
+      },
       "weak": false,
       "right": "helped",
       "tasks": []
@@ -198,6 +218,13 @@
       "introduced": "2026-11-05",
       "review": "2026-11-08",
       "overdue": 2,
+      "moved": {
+        "from": "2026-11-11",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ]
+      },
       "weak": false,
       "tasks": []
     },
@@ -210,6 +237,10 @@
       ],
       "contrasts": [],
       "level": "new",
+      "moved": {
+        "from": "2026-11-18",
+        "by": "left"
+      },
       "starts": "2026-11-14",
       "starts_why": {
         "kind": "after",
@@ -231,6 +262,10 @@
       ],
       "contrasts": [],
       "level": "new",
+      "moved": {
+        "from": "2026-11-19",
+        "by": "left"
+      },
       "starts": "2026-11-15",
       "starts_why": {
         "kind": "after",
@@ -269,6 +304,10 @@
       ],
       "contrasts": [],
       "level": "new",
+      "moved": {
+        "from": "2026-11-21",
+        "by": "left"
+      },
       "starts": "2026-11-18",
       "starts_why": {
         "kind": "after",
@@ -307,6 +346,10 @@
       ],
       "contrasts": [],
       "level": "new",
+      "moved": {
+        "from": "2026-11-11",
+        "by": "left"
+      },
       "starts": "2026-11-12",
       "starts_why": {
         "kind": "early",

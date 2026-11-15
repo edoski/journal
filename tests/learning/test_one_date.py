@@ -208,3 +208,100 @@ def test_the_map_names_the_topics_a_final_review_has_no_room_for(
     planned = run(monkeypatch, capsys, root, "plan", "--days", "3")["courses"][0]
     assert planned["plan"]["unreviewed"] == ["c"]
     assert planned["plan"]["reasons"] == {"c": "full"}
+
+
+def moves(monkeypatch: pytest.MonkeyPatch, capsys: Any, root: Path) -> dict[str, Any]:
+    topics = run(monkeypatch, capsys, root, "map")["topics"]
+    return {item["topic"]: (item.get("review"), item.get("moved")) for item in topics}
+
+
+def checked(topic: str, offset: int) -> dict[str, Any]:
+    """A right answer on its own, ``offset`` days from today."""
+    return {
+        "topics": [topic],
+        "text": "q",
+        "help": "none",
+        "result": "correct",
+        "date": day(offset),
+    }
+
+
+@pytest.fixture
+def no_new_topics(monkeypatch: pytest.MonkeyPatch) -> None:
+    weekday = Weekday(1.0, Limit(1.0, True), Limit(0.0, True))
+    week = Capacity((weekday,) * 7, frozenset(range(7)), 30.0)
+    monkeypatch.setattr(capacity, "of", lambda records, today: week)
+
+
+@pytest.mark.usefixtures("no_new_topics")
+def test_a_day_his_study_today_moves_says_from_which_day_and_which_course(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    algebra = course(tmp_path / "algebra")
+    chance = course(tmp_path / "chance")
+    eigen = {"introduced": day(-20), "review": {"due": day(1)}}
+    run(
+        monkeypatch,
+        capsys,
+        algebra,
+        "save",
+        stdin={
+            "title": "Linear Algebra",
+            "topics": {"eigen": eigen},
+            "observations": [checked("eigen", -17)],
+        },
+    )
+    run(
+        monkeypatch,
+        capsys,
+        chance,
+        "save",
+        stdin={"title": "Probability", "topics": {"expectation": {}}},
+    )
+    assert moves(monkeypatch, capsys, algebra) == {"eigen": (day(1), None)}
+
+    started = {"topics": {"expectation": {"introduced": True}}}
+    run(monkeypatch, capsys, chance, "save", stdin=started)
+    assert moves(monkeypatch, capsys, algebra) == {
+        "eigen": (day(2), {"from": day(1), "by": "study", "courses": ["Probability"]})
+    }
+    assert moves(monkeypatch, capsys, chance)["expectation"] == (day(1), None)
+    shown = run(monkeypatch, capsys, algebra, "show", "eigen")["items"]["eigen"]
+    assert shown["moved"] == {"from": day(1), "by": "study", "courses": ["Probability"]}
+
+
+@pytest.mark.parametrize("studied", [False, True])
+def test_a_day_yesterdays_end_moves_says_why(
+    studied: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = course(tmp_path / "c")
+    topics = {
+        "late": {"introduced": day(-20), "review": {"due": day(-1)}},
+        "told": {"introduced": day(-20), "review": {"due": day(0)}},
+        "other": {"introduced": day(-20)},
+    }
+    answers = [checked(key, -17) for key in topics]
+    answers += [checked("other", offset) for offset in (-14, -7)]
+    run(
+        monkeypatch,
+        capsys,
+        root,
+        "save",
+        stdin={"topics": topics, "observations": answers},
+    )
+    pins = {key: {"review": topics[key]["review"]} for key in ("late", "told")}
+    run(monkeypatch, capsys, root, "save", stdin={"topics": pins})
+    if studied:
+        practice = {"observations": [checked("other", -1)]}
+        run(monkeypatch, capsys, root, "save", stdin=practice)
+    found = moves(monkeypatch, capsys, root)
+    assert found["late"] == (day(0), None)
+    assert found["told"] == (
+        day(1),
+        {"from": day(0), "by": "left" if studied else "missed"},
+    )
