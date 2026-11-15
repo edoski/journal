@@ -222,12 +222,13 @@ export function movedWords(review: CourseMapTopic["review"], today: string, told
 }
 
 /** A review that is due: "Due today", "3d overdue"; one the plan holds
- *  past a day memory asked for already says since when, "Due since 1 Oct",
- *  so a review weeks late never reads as spacing; any other dated review
- *  "Back in 5d". `today` is the engine's day. */
+ *  past a day memory asked for already says since when, so a review weeks
+ *  late never reads as spacing, and the day the plan brings it back, "Due
+ *  since 1 Oct, back 3 Dec" (round 8: Calculus' rows gave no return day);
+ *  any other dated review "Back in 5d". `today` is the engine's day. */
 export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
 	if (review.kind === "due") return overdueWords(review.overdue);
-	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}`;
+	if (review.held && review.held.since < today) return `Due since ${shortDay(review.held.since)}, back ${shortDay(review.date)}`;
 	return returnWords(Math.max(1, daysBetween(today, review.date)));
 }
 

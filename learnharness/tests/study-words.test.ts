@@ -147,7 +147,7 @@ describe("why a review waits", () => {
 		assert.equal(heldWords(null), null);
 	});
 	it("says since when a held review was due, so weeks late never reads as 'Back in 25d'", () => {
-		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct");
+		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct, back 3 Dec", "with the day the plan brings it back (round 8: Calculus gave none)");
 		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back in 25d");
 		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back in 12d", "memory's day is still ahead");
 		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
