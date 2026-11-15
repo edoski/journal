@@ -1,4 +1,4 @@
-import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, type UnreadableProblem } from "@/src/core";
+import { currentArc, type ArcHandle, type ArcState, type CourseExam, type ExamGapReason, type CourseMap, type CourseMapTopic, type JobKind, type MarkHow, type MarkResult, type MarkRow, movedWhy, type RightAnswer, type StartsWhy, type TopicHandle, type TopicMoved, type TopicSignals, type UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -229,13 +229,6 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
 }
 
-/** What of his study moved a day he was told (`TopicMoved`). */
-const MOVED_BY = {
-	study: (courses: readonly string[], day: "today" | "yesterday") => ` after your ${listWords(courses)} study ${day}`,
-	missed: ", no study yesterday",
-	left: ", yesterday's plan was not finished",
-} as const;
-
 /** A day that moved, from when: one he was told ("Moved from 10 Nov after
  *  your Probability study today", round 7: a told day moved in silence),
  *  else a review the plan holds past a day memory asked for that has
@@ -243,7 +236,7 @@ const MOVED_BY = {
  *  never a day he was told, so nothing moved "from" it (round 8: "Moved
  *  from 11 Nov" named a day he never heard). */
 export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
-	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses, told.day) : MOVED_BY[told.by]}`;
+	if (told) return `Moved from ${shortDay(told.from)}${movedWhy(told, today, shortDay)}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
 	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
 }

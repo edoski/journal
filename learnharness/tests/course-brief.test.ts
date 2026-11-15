@@ -384,6 +384,9 @@ describe("the daily plan of every course", () => {
 		const { text } = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/linalg", courses: [{ map: moved, days }], unread: [] } });
 		assert.match(text, /- Wed 11 Nov: review Eigenvalues \(moved from Tue 10 Nov after your Probability study today\)/);
 		assert.match(text, /- Thu 12 Nov: start Projection \(moved from Wed 11 Nov, no study yesterday\)/);
+		const quiet = courseMap("/study/linalg", "Linear Algebra", null, [topic("eigen", "Eigenvalues", { review: scheduled("2026-11-11", { exam: null, since: "2026-11-09" }), moved: { from: "2026-11-09", by: "missed", on: "2026-11-05" } })]);
+		const after = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/linalg", courses: [{ map: quiet, days: [day("2026-11-11", ["eigen"])] }], unread: [] } }).text;
+		assert.match(after, /- Wed 11 Nov: review Eigenvalues \(moved from Mon 9 Nov, no study since Thu 5 Nov\)/, "round 10 (1 M3): the tutor reads the true cause, so it never guesses one");
 		const calm = projectCourseBrief(TODAY, "teach", plan([LINEAR_ALGEBRA])).text;
 		assert.match(calm, /\nLinear Algebra · [^\n]*\nOverdue: none\n/);
 		assert.match(projectCourseBrief(TODAY, "teach", plan([PROBABILITY])).text, /\nOverdue: 2 reviews: Binomial distribution \(2 days, planned today\), Law of total probability \(1 day, planned Sat 14 Nov\)\n/);

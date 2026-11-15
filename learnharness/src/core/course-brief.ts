@@ -23,6 +23,7 @@
 import type { PlannedDay } from "./contracts/calendar.ts";
 import type { CourseMap, CourseMapTopic, StartsWhy, TopicHandle, TopicMoved } from "./contracts/course-map.ts";
 import { shortDay } from "./day-words.ts";
+import { movedWhy } from "./moved-words.ts";
 
 export type BriefRole = "teach" | "practice";
 
@@ -178,9 +179,8 @@ function reviewNote(review: NonNullable<CourseMapTopic["review"]>, today: string
 /** A day he was told that moved (`TopicMoved`), from which day and what
  *  of his study moved it: the words the topic page and the calendar show,
  *  for the tutor to say when it names the day. */
-function movedNote(moved: TopicMoved): string {
-	const by = moved.by === "study" ? ` after your ${moved.courses.join(" and ")} study ${moved.day}` : moved.by === "missed" ? ", no study yesterday" : ", yesterday's plan was not finished";
-	return `moved from ${shortDay(moved.from)}${by}`;
+function movedNote(moved: TopicMoved, today: string): string {
+	return `moved from ${shortDay(moved.from)}${movedWhy(moved, today, shortDay)}`;
 }
 
 /** Why the plan starts a new topic then, in the material's terms (`StartsWhy`). */
@@ -231,11 +231,11 @@ function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boole
 		const reviews = d.reviews.filter(shown).map((h) => {
 			const { review, moved } = byHandle.get(h)!;
 			if (!review || review.date !== d.date) return title(h);
-			return noted(title(h), moved ? movedNote(moved) : reviewNote(review, map.today));
+			return noted(title(h), moved ? movedNote(moved, map.today) : reviewNote(review, map.today));
 		});
 		const starts = d.new.filter(shown).map((h) => {
 			const { moved, startsWhy, starts: day } = byHandle.get(h)!;
-			return noted(title(h), moved && day === d.date ? movedNote(moved) : startNote(startsWhy, title));
+			return noted(title(h), moved && day === d.date ? movedNote(moved, map.today) : startNote(startsWhy, title));
 		});
 		if (reviews.length + starts.length === 0) return [];
 		const parts = [reviews.length > 0 ? `review ${reviews.join(", ")}` : null, starts.length > 0 ? `start ${starts.join(", ")}` : null];

@@ -30,7 +30,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-28",
-      "review": "2026-11-20",
+      "review": "2026-11-30",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -45,7 +45,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-09-30",
-      "review": "2026-11-23",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-10-12",
       "weak": false,
@@ -60,17 +60,9 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-18",
+      "review": "2026-11-12",
       "held": true,
       "due": "2026-10-28",
-      "moved": {
-        "from": "2026-11-13",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ],
-        "day": "yesterday"
-      },
       "weak": true,
       "gap": "You treat pairwise non-parallel vectors as independent and miss a third vector in their span",
       "lapsed": true,
@@ -89,7 +81,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-23",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -106,7 +98,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-09",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -123,17 +115,9 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-16",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-11-06",
-      "moved": {
-        "from": "2026-11-13",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ],
-        "day": "yesterday"
-      },
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -154,7 +138,7 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-03",
-      "review": "2026-11-11",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -197,17 +181,7 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-04",
-      "review": "2026-11-13",
-      "held": true,
-      "due": "2026-11-09",
-      "moved": {
-        "from": "2026-11-16",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ],
-        "day": "yesterday"
-      },
+      "review": "2026-11-09",
       "weak": false,
       "right": "helped",
       "tasks": []
@@ -223,17 +197,9 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-16",
+      "review": "2026-11-26",
       "held": true,
       "due": "2026-11-06",
-      "moved": {
-        "from": "2026-11-12",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ],
-        "day": "yesterday"
-      },
       "weak": false,
       "tasks": []
     },
@@ -246,15 +212,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-18",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ],
-        "day": "yesterday"
-      },
-      "starts": "2026-11-13",
+      "starts": "2026-11-17",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -274,15 +232,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-19",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ],
-        "day": "yesterday"
-      },
-      "starts": "2026-11-18",
+      "starts": "2026-11-19",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -320,7 +270,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-20",
+      "starts": "2026-11-26",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -340,10 +290,7 @@
       "level": "new",
       "starts": "2026-11-11",
       "starts_why": {
-        "kind": "early",
-        "waiting_on": [
-          "determinant"
-        ]
+        "kind": "early"
       },
       "weak": false,
       "tasks": []
@@ -357,11 +304,11 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-12",
+      "starts": "2026-12-01",
       "starts_why": {
-        "kind": "early",
-        "waiting_on": [
-          "determinant"
+        "kind": "after",
+        "needs": [
+          "inner-product"
         ]
       },
       "weak": false,

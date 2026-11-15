@@ -13,6 +13,8 @@
  */
 
 export * from "./contracts.ts";
+// moved-words.ts: why a told day moved, the words every surface says (pure).
+export * from "./moved-words.ts";
 export * from "./ports.ts";
 
 export * from "./question-core.ts";

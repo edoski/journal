@@ -63,6 +63,7 @@ from collections import defaultdict
 from collections.abc import Callable, Hashable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
+import functools
 import math
 from typing import Any, TypeVar
 
@@ -140,14 +141,7 @@ class Capacity:
     def room(self, day: date, kind: str) -> int:
         """A study day's whole items of ``kind`` from his fractional rates,
         the fractions carried within the calendar week (``whole``)."""
-
-        def rate(other: date) -> float:
-            if not self.studies(other):
-                return 0.0
-            limit: Limit = getattr(self.on(other), kind)
-            return limit.value
-
-        return whole(day, rate)
+        return _room(self, day, kind)
 
     def share(self, day: date, last: date) -> float:
         """``day``'s part of the reviews he does from ``day`` to ``last``: by
@@ -188,6 +182,17 @@ class Capacity:
         }
 
 
+@functools.lru_cache(maxsize=4096)
+def _room(week: Capacity, day: date, kind: str) -> int:
+    def rate(other: date) -> float:
+        if not week.studies(other):
+            return 0.0
+        limit: Limit = getattr(week.on(other), kind)
+        return limit.value
+
+    return whole(day, rate)
+
+
 def whole(day: date, rate: Callable[[date], float]) -> int:
     """A day's whole items from a fractional daily ``rate``: the rates of its
     calendar week through ``day``, summed and rounded, less the same through
@@ -218,7 +223,9 @@ def pace(rest: int, left: int, day: date, studies: Callable[[date], bool]) -> in
 # --- what each day shows ------------------------------------------------------
 
 
-def _first_day(replayed: progress.Replay, topic: dict[str, Any]) -> date | None:
+def first_day(replayed: progress.Replay, topic: dict[str, Any]) -> date | None:
+    """The day he started the topic: its first lesson on record, or the day
+    it was introduced."""
     started = topic.get("introduced")
     learning = [day for day, kind in replayed.days.items() if kind == progress.LEARNING]
     first = min([*learning, *([started] if started else [])], default=None)
@@ -294,7 +301,7 @@ def _new_short(
     starts = {
         key: first
         for key, replay in replayed.items()
-        if (first := _first_day(replay, record["topics"][key])) is not None
+        if (first := first_day(replay, record["topics"][key])) is not None
     }
     order = progress.path_order(record)
     partners = progress.contrasts(record)
@@ -368,7 +375,7 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
     replayed = [progress.replays(record) for record in records]
     for record, replays in zip(records, replayed, strict=True):
         for key, replay in replays.items():
-            first = _first_day(replay, record["topics"][key])
+            first = first_day(replay, record["topics"][key])
             if first is not None:
                 new[first] += 1
             for day, kind in replay.days.items():
