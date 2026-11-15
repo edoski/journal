@@ -61,7 +61,7 @@ describe("where he stands, true to the record", () => {
 
 describe("why a slip needs him", () => {
 	it("says each signal on its own, the signals about a wrong answer only while one is open", () => {
-		assert.equal(slip({ repaired: true }), "Fixed, check again later");
+		assert.equal(slip({ repaired: true }), "Check again another day");
 		assert.equal(slip({ lapsed: true, mistake: true }), "Not right last time");
 		assert.equal(slip({ gap: "Writes det as ad + bc", mistake: true }), "Mistake to fix");
 		assert.equal(slip({ choiceErrors: { cramer: 2 }, mistake: true }), "Mixed up with Cramer's rule");
@@ -71,7 +71,7 @@ describe("why a slip needs him", () => {
 
 	it("says the first signal when several hold: fixed, nothing open to check, missed, a mistake, mixed up, then sure but wrong", () => {
 		const all = { repaired: true, lapsed: true, gap: "sign error", mistake: true, choiceErrors: { cramer: 1 }, confidentErrors: 1 };
-		assert.equal(slip(all), "Fixed, check again later");
+		assert.equal(slip(all), "Check again another day");
 		assert.equal(slip({ ...all, repaired: false, mistake: false }), "Check on your own");
 		assert.equal(slip({ ...all, repaired: false }), "Not right last time");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false }), "Mistake to fix");

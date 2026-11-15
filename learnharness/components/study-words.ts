@@ -67,7 +67,10 @@ const RIGHT_ON_YOUR_OWN = "Right on your own";
 /** A slip's words for each of the engine's signals but a mixed-up method,
  *  which names the method (`slipWords`). */
 export const SLIP_WORDS = {
-	repaired: "Fixed, check again later",
+	// Not "Fixed, check again later": beside "Slipping", which the engine
+	// keeps until a later day's answer on his own, it read as its opposite
+	// (round 10, 2 m3).
+	repaired: "Check again another day",
 	// Not "Missed": beside an overdue review he read that as a review he
 	// skipped (round 3). A lapse is an answer that was not right.
 	lapsed: WRONG_LAST_WORDS,

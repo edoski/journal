@@ -228,8 +228,8 @@ describe("where he stands, in the app's one wording", () => {
 	it("says Slipping beside a weak topic's pie, and the slip beside it says why", () => {
 		const kernel = { ...TOPICS.kernel, right: "unaided" as const, review: null, signals: { ...QUIET, confidentErrors: 2, repaired: true } };
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
-		assert.equal(said(kernel), "Slipping. Fixed, check again later");
-		assert.equal(slipOf(MAP, kernel), "Fixed, check again later");
+		assert.equal(said(kernel), "Slipping. Check again another day");
+		assert.equal(slipOf(MAP, kernel), "Check again another day");
 	});
 
 	it("is silent for a topic not started that already has a session", () => {
@@ -319,10 +319,10 @@ describe("what went wrong", () => {
 		assert.equal(mistakeOf(TOPICS.span, [missed]), null);
 	});
 
-	it("is nothing once he fixed it on his own, so it never sits under 'Fixed, check again later' as a mistake still open", () => {
+	it("is nothing once he fixed it on his own, so it never sits under 'Check again another day' as a mistake still open", () => {
 		const gap = "Forgot why det(A - lambda I) = 0 and guessed the reason backwards";
 		const fixed = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true } });
-		assert.deepEqual(headMarks(fixed, (x) => x, TODAY).map((mark) => mark.words), ["Fixed, check again later"]);
+		assert.deepEqual(headMarks(fixed, (x) => x, TODAY).map((mark) => mark.words), ["Check again another day"]);
 		assert.equal(mistakeOf(fixed, [missed]), null);
 		const helped = topic("eigen", { level: "assisted", weak: true, signals: { ...QUIET, gap, repaired: true, repairedWithHelp: true } });
 		assert.equal(mistakeOf(helped, [missed]), gap, "help may have carried the right answer: still a mistake to fix");

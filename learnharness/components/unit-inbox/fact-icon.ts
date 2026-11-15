@@ -20,7 +20,7 @@ export const FACT_ICON: Record<Exclude<TopicFact["kind"], "working" | "studied">
 };
 
 /** A fact's icon: a slip wears its own (`SLIP_ICON`), so "Sure, but wrong"
- *  and "Fixed, check again later" never share the crossed circle of a
+ *  and "Check again another day" never share the crossed circle of a
  *  miss; null for a fact drawn without one. */
 export function factIcon(fact: TopicFact): LucideIcon | null {
 	if (fact.kind === "working" || fact.kind === "studied") return null;

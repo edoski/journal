@@ -275,7 +275,7 @@ export function lastStudiedDay(topic: CourseMapTopic, sessions: readonly Session
 /** What went wrong, when the engine can say: the mistake it diagnosed,
  *  else, for a topic it calls weak, the newest attempt that counts (never
  *  a prediction) in the tutor's words when it was not right. Nothing once
- *  he has fixed it on his own: the head says "Fixed, check again later",
+ *  he has fixed it on his own: the head says "Check again another day",
  *  and the mistake under it read as one still open (round 5). */
 export function mistakeOf(topic: CourseMapTopic, attempts: readonly TopicAttempt[]): string | null {
 	const { gap, repaired, repairedWithHelp } = topic.signals;
