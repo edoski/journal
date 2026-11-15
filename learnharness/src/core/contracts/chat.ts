@@ -71,8 +71,7 @@ export interface ChatRecord {
 	 * re-POSTs its message list every turn and its copies never carry
 	 * server-stamped fields, so anything inside message objects gets clobbered
 	 * by the next persist. Keyed by messageId so the transcript view can fold
-	 * each entry onto its message; aggregates are folds over this log
-	 * (core/prices.ts). */
+	 * each entry onto its message. */
 	turns?: TurnUsage[];
 	/** The lesson digest's ledger: what the background digest already carried
 	 *  into the course record from this session. */
@@ -139,7 +138,7 @@ export interface CallUsage {
 /** One billing turn: one full invocation of the teacher (a client turn or a
  * wake turn — same handler, same log). A turn with tool calls spans several
  * agent steps, and each step bills separately. Capture lands at the persist
- * seam (server); cost is INFERRED at read time from core/prices.ts. */
+ * seam (server). */
 export interface TurnUsage {
 	/** Unique per REQUEST (turn): one invocation of the handler — the
 	 *  idempotency key for the append-only log. Continuation turns share a

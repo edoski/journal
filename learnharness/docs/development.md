@@ -133,7 +133,7 @@ src/
                                 (core code depends on these types only)
   core/                         question-core, plan-tree, phases, pending, graph
                                 (merger/derivation), coverage, layout, clusters,
-                                prices, tool-parts — all pure: storage
+                                tool-parts — all pure: storage
                                 arrives as parameters
   store/                        fs adapters implementing the ports: chats · graph
                                 ledgers · jobs (+ render-settings, default-settings)
@@ -149,8 +149,7 @@ data/                           chats/ · graph/ (nodes/chains/sessions/coverage
 ## Key mechanisms
 
 See [sessions and compaction](sessions-and-compaction.md) for how lessons run on the Agent SDK, and
-[compaction and accounting](compaction-accounting.md) for server-side current-catalog pricing. There is no
-pricing-generation step: Pi AI's catalog and public calculator are the authority.
+[compaction and accounting](compaction-accounting.md) for the token counts each turn and job keeps.
 
 **Client-side question tools.** `quiz` and `ask_user_question` have no server `execute`: the tool call streams to the browser, the learner answers in the dock, the client grades via `question-core` and returns the verdict with `addToolOutput` — which fires the SDK continuation so the teacher resumes mid-turn. Options are shuffled deterministically (seeded by toolCallId) so server and client renders match. A pending quiz persisted in the chat record is exactly what makes **resume mid-question free**.
 
@@ -166,7 +165,7 @@ pricing-generation step: Pi AI's catalog and public calculator are the authority
 
 All deterministic, no LLM, no network (engines are injected — pi-ai's faux provider scripted per test; `globalThis.fetch` stubbed where transport matters):
 
-1. **Pure core units** — merger (via the real fs adapters, backup-and-restored), derivation, coverage, question grading, plan tree, phases, clusters, layout, tool-parts, prices.
+1. **Pure core units** — merger (via the real fs adapters, backup-and-restored), derivation, coverage, question grading, plan tree, phases, clusters, layout, tool-parts.
 2. **Server flows** — `handleChatRequest` driven end-to-end with scripted engines: persistence, liveness, steer claiming, the wake pipeline (409 retry, quiz deferral, idempotency), crash recovery, the data-dir seam (including a fresh child process).
 3. **Sub-agent loops** — researcher/demo-builder/visual-maker with fake headless APIs; the extraction pipeline end-to-end (audit drops, failure-checkpoints-nothing, single-flight, abort).
 4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage via React server-side rendering.

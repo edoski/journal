@@ -37,4 +37,3 @@ export { runPiTurn, piTurnResponse, type PiTurnHandle, type PiTurnSpec } from ".
 export * from "./observability.ts";
 export * from "./model-catalog.ts";
 export { claudeConnectionResponse } from "./claude-connection-http.ts";
-export { sessionCost } from "./pricing.ts";

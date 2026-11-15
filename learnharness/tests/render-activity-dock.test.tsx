@@ -9,9 +9,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { ActivitySection, toBlobs, type ActivityFeed, type FeedRun } from "../components/activity-dock.tsx";
 import { backgroundWorkWords, BACKGROUND_WORDS } from "../components/study-words.ts";
-import { formatTokens, formatUsd } from "../components/usage-format.ts";
+import { formatTokens } from "../components/usage-format.ts";
 import { courseHref } from "../components/unit-inbox/unit-href.ts";
-import { jobCost } from "../src/server/pricing.ts";
 import { providerKeyMissing } from "../src/core/settings.ts";
 
 // The section's pure layer: folds, formatting, and blob order — then the
@@ -38,7 +37,6 @@ function job(over: Partial<ActivityFeed["jobs"][number]> = {}): ActivityFeed["jo
 		updatedAt: new Date(NOW - 1000).toISOString(),
 		title: "Limits lesson",
 		contextLimit: null,
-		costUsd: jobCost({ usage: over.usage }),
 		...over,
 	};
 }
@@ -96,11 +94,6 @@ describe("activity dock pure layer", () => {
 		});
 		assert.equal(map!.activity, "Reading the course's material to build its topic map");
 		assert.match(grouping!.activity, /grouping the topics into arcs/);
-	});
-
-	it("formatUsd keeps four decimals under $1, two above", () => {
-		assert.equal(formatUsd(0.0014), "$0.0014");
-		assert.equal(formatUsd(1.5), "$1.50");
 	});
 
 	it("formatTokens trims (never 38.0k)", () => {

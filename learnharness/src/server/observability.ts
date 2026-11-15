@@ -22,7 +22,6 @@ import { backgroundRuns, type RunPhase } from "../agent/subagents/background-run
 import { chatStore } from "../store/chats.ts";
 import { catalogContextLimits } from "./model-catalog.ts";
 import { listJobs } from "./jobs.ts";
-import { jobCost } from "./pricing.ts";
 import type { JobRecord } from "../core/contracts.ts";
 
 export { abortRuns, backgroundRuns, type BackgroundRun, type RunPhase } from "../agent/subagents/background-runs.ts";
@@ -35,7 +34,6 @@ export { chatStore } from "../store/chats.ts";
  *  model is missing from the catalog (the blob then renders no context
  *  line — never a fake window). */
 export interface ActivityJob extends JobRecord {
-	costUsd: number | null;
 	title: string;
 	contextLimit: number | null;
 }
@@ -53,8 +51,7 @@ export interface ActivityRun {
 
 /** The dock's whole world in one payload: every running process, every view.
  *  Jobs are RUNNING-ONLY — finished jobs belong to their chat's transcript;
- *  the blob disappears when the process ends. Costs are joined here through
- *  the server-side Pi pricing adapter; clients never reconstruct rates. */
+ *  the blob disappears when the process ends. */
 export function activityFeed(): {
 	jobs: ActivityJob[];
 	runs: ActivityRun[];
@@ -67,7 +64,6 @@ export function activityFeed(): {
 			if (job.status === "running") {
 				jobs.push({
 					...job,
-					costUsd: jobCost(job),
 					title: chat.title ?? chat.id,
 					contextLimit: job.usage ? (limits.get(job.usage.model) ?? null) : null,
 				});

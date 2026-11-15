@@ -92,7 +92,6 @@ describe("background agents", () => {
 				updatedAt: new Date(NOW).toISOString(),
 				title: "Eigenvalues and eigenvectors",
 				contextLimit: null,
-				costUsd: 0.04,
 			},
 		],
 		runs: [],
