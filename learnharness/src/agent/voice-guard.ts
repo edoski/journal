@@ -167,6 +167,10 @@ const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict"
 
 const SAVE_TOOL = "course_save";
 
+/** The session called a lesson, which a review never is (round 9, 2 m4:
+ *  the Binomial review closed on "the binomial lesson"). */
+const SESSION_AS_LESSON = /\b(?:this|today'?s|the|our|your)(?: [a-z]+)? lesson\b/i;
+
 /** A reply that calls his whole answer wrong: "That's not right.", "Not
  *  right: …", "No, …", with no part named right ("but", "partly"). */
 const FLAT_MISS = /^(?:(?:that|this|it)(?:'s| is) not (?:right|correct)\b|not (?:quite )?(?:right|correct)\b|no(?=[,.]))(?![^.?!]*\b(?:but|partly|part of)\b)/i;
@@ -266,6 +270,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `Start with the content, never by handing his answer back or grading a right one: ${quoted(b.excerpt)}.`;
 		case "feedback":
 			return `A right answer gets no feedback sentence: ${quoted(b.excerpt)}.`;
+		case "review-lesson":
+			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
 			return quoted(b.excerpt);
 	}
@@ -417,6 +423,8 @@ export class VoiceGuard {
 	constructor(
 		messages: readonly LhMessage[],
 		private readonly endsTurn: (toolName: string) => boolean = (name) => (QUESTION_TOOLS as readonly string[]).includes(name),
+		/** The session is his review (session-opening.ts `reviewRecord`). */
+		private readonly review = false,
 	) {
 		this.input = turnInputOf(messages);
 		const earlier = earlierTexts(messages);
@@ -602,6 +610,8 @@ export class VoiceGuard {
 			const { words } = lengthOf(text);
 			if (words > this.lengthDraft.allowed) out.push({ rule: "length", excerpt: `${words} words where the draft had ${this.lengthDraft.words}, so no whole sentence was cut` });
 		}
+		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
+		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
 		return [...out, ...this.repeats(text, true)];

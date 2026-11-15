@@ -4,7 +4,9 @@
  * tutor is never told it is a lesson, and a save there keeps no task:
  * round 9's live check saw "Review Independent events" re-teach and then
  * save the task "Re-learn checking independence" through course_save. The
- * engine is the fake CLI; the data dir is temporary.
+ * teacher's wake after the probe asks a review for its one-line switch, and
+ * a message calling the session a lesson is rewritten. The engine is the
+ * fake CLI; the data dir is temporary.
  */
 
 import assert from "node:assert/strict";
@@ -26,6 +28,11 @@ const { chatStore } = await import("../src/store/chats.ts");
 const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
 const { courseTools, REVIEW_TASK_REFUSED } = await import("../src/agent/tools/course.ts");
 type CourseToolContext = import("../src/agent/tools/course.ts").CourseToolContext;
+const { probeDoneTool } = await import("../src/agent/tools/probe.ts");
+const { REVIEW_HANDOFF_TEXT, HANDOFF_TEXT } = await import("../src/core/contracts/chat.ts");
+const { VoiceGuard } = await import("../src/agent/voice-guard.ts");
+const { SEND_TO_USER_TOOL, newDoneTonightMessage, newUserMessage } = await import("../src/core/native-messages.ts");
+type LhMessage = import("../src/core/native-messages.ts").LhMessage;
 
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
@@ -83,5 +90,29 @@ describe("a review that turns into teaching", () => {
 		const { saves, save } = saving(false);
 		assert.equal(await save({ tasks: TASK, focus: "independence-review" }), null);
 		assert.equal(saves.length, 1);
+	});
+
+	it("is asked, when the teacher takes over, to say it re-teaches and to stay his review", async () => {
+		const woken = async (title: string) => {
+			const chatId = await startFrom({ title, course: { workspace: PROB }, topics: ["independence"] });
+			const delivered: { content?: unknown }[] = [];
+			await probeDoneTool({ chatId, chatStore, deliver: (s) => void delivered.push(s as never) }).probe_done!.execute("t", { assessment: { strands: [{ strand: "independence", assessment: "Floor: the definition. Ceiling: the product test." }], summary: "Re-teach the product test." } } as never);
+			return String(delivered[0]?.content);
+		};
+		assert.equal(await woken("Review Independent events"), `${HANDOFF_TEXT} ${REVIEW_HANDOFF_TEXT}`);
+		assert.equal(await woken("Independent events"), HANDOFF_TEXT, "a lesson's wake is as before");
+	});
+
+	it("is never called a lesson in what he reads", () => {
+		const close = "That closes the binomial lesson for today. It comes back on Wednesday 11 November.";
+		const refusedIn = (review: boolean) => {
+			const guard = new VoiceGuard([newUserMessage("Review Binomial distribution"), newDoneTonightMessage("teacher") as LhMessage], undefined, review);
+			const call = { type: "toolCall" as const, id: `send-${review}`, name: SEND_TO_USER_TOOL, arguments: { message: close } };
+			guard.screen(call);
+			const refused = (guard as unknown as { decisions: Map<string, { details: { rules?: string[] } } | null> }).decisions.get(call.id);
+			return refused?.details.rules ?? [];
+		};
+		assert.deepEqual(refusedIn(true), ["review-lesson"]);
+		assert.deepEqual(refusedIn(false), [], "a lesson may say so");
 	});
 });

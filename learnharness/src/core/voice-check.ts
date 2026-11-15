@@ -47,6 +47,7 @@ export type VoiceRule =
 	| "moral"
 	| "reason"
 	| "machinery"
+	| "review-lesson"
 	| "asks-banned";
 
 export interface VoiceBreak {
