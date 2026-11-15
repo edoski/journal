@@ -25,7 +25,7 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, problemAdvice, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, problemAdvice, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -207,7 +207,7 @@ const REASON_ASK = /^(?:explain|say|justify|give|state)\b[^.?!]*\b(?:why|how|rea
 const quoted = (text: string) => `"${text.length > 160 ? `${text.slice(0, 157)}…` : text}"`;
 
 /** What to fix for each break, in the voice's own terms. */
-function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
+function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string {
 	switch (b.rule) {
 		case "praise":
 			return `No praise or performed reaction: ${quoted(b.excerpt)}.`;
@@ -242,8 +242,13 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 				? `One question asks one thing, and this one asks more: ${asks.map(quoted).join(", ")}. A reason asked with the answer is part of it: end the first ask with ", and why?".`
 				: `One question asks one thing, and this one asks more: ${asks.map(quoted).join(", ")}. Ask the first alone; the rest waits for his answer.`;
 		}
-		case "length":
-			return `It is too long for ${kind ? KIND_WORDS[kind] : "one turn"} (${b.excerpt}). Keep the one idea and cut whole sentences; a clause joined by a colon, a semicolon or a run of commas still counts as a sentence.`;
+		case "length": {
+			const what = kind ? KIND_WORDS[kind] : "one turn";
+			if (b.excerpt.startsWith("joined: ")) return `It is still too long for ${what}: it joins sentences the draft had apart and cuts almost nothing (${b.excerpt.slice("joined: ".length)}). Cut a whole sentence instead.`;
+			const heavy = heavySentences(text).map((h) => `${quoted(h.sentence)} is ${[h.words > SENTENCE_WORDS ? `${h.words} words` : null, h.joins > 0 ? `${h.joins + 1} clauses joined by a colon or a semicolon` : null].filter(Boolean).join(" and ")}`);
+			const counted = heavy.length > 0 ? ` A sentence over ${SENTENCE_WORDS} words counts as two, and each clause after a colon or a semicolon as one more: ${heavy.join("; ")}.` : "";
+			return `It is too long for ${what} (${b.excerpt}).${counted} Keep the one idea: cut whole sentences, or cut a long one to ${SENTENCE_WORDS} words or fewer; never join two.`;
+		}
 		case "options":
 			return `An option that joins others is a choice of several: drop ${quoted(b.excerpt)} and set multiSelect, so he picks each he wants.`;
 		case "symbol":
@@ -286,7 +291,7 @@ function refusal(family: Family, tool: string, text: string, breaks: VoiceBreak[
 			? "Send it again with send_to_user, rewritten to fix only these, and say nothing about the change."
 			: `Call ${tool} again with the question rewritten to fix only these, and say nothing about the change.`;
 	return {
-		content: [{ type: "text", text: [head, ...breaks.map((b) => `- ${fixFor(b, kind)}`), again].join("\n") }],
+		content: [{ type: "text", text: [head, ...breaks.map((b) => `- ${fixFor(b, kind, text)}`), again].join("\n") }],
 		isError: true,
 		details: { withheld: "voice", rules: breaks.map((b) => b.rule), text },
 	};
@@ -394,11 +399,14 @@ export class VoiceGuard {
 	private readonly said: string[] = [];
 	/** The messages shown this turn, questions aside. */
 	private readonly toldNow: string[] = [];
-	/** A message refused for its length this turn, and the most words its
-	 *  rewrite may keep: the draft less its shortest sentence, so a rewrite
-	 *  that joins the draft's sentences instead of cutting one is refused
-	 *  too (round 9: ", that" and "because" for a colon, nothing cut). */
-	private lengthDraft: { words: number; allowed: number } | null = null;
+	/** A message refused for its length this turn: its words and clauses,
+	 *  so a rewrite that has fewer clauses but cut less than the shortest
+	 *  of them joined them instead (round 9: ", that" and "because" for a
+	 *  colon, nothing cut). A rewrite that splits or trims a sentence keeps
+	 *  its clauses and is read by the budget alone (round 10: a one-sentence
+	 *  close split in two was refused, as the draft less its only sentence
+	 *  left no words at all). */
+	private lengthDraft: { words: number; clauses: number; shortest: number } | null = null;
 	private readonly asked: string[] = [];
 	private concluded = false;
 	private sentAtConclude = 0;
@@ -517,10 +525,7 @@ export class VoiceGuard {
 			if (breaks.length > 0) {
 				this.refused.set("message", (this.refused.get("message") ?? 0) + 1);
 				this.owed = true;
-				if (breaks.some((b) => b.rule === "length") && !this.lengthDraft) {
-					const { words, shortest } = lengthOf(text);
-					this.lengthDraft = { words, allowed: words - shortest };
-				}
+				if (breaks.some((b) => b.rule === "length") && !this.lengthDraft) this.lengthDraft = clausesOf(text);
 				return refusal("message", call.name, text, breaks, kind);
 			}
 			this.owed = false;
@@ -607,8 +612,9 @@ export class VoiceGuard {
 		const moral = kind === "direct" ? closingMoral(text) : null;
 		if (moral) out.push({ rule: "moral", excerpt: moral });
 		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
-			const { words } = lengthOf(text);
-			if (words > this.lengthDraft.allowed) out.push({ rule: "length", excerpt: `${words} words where the draft had ${this.lengthDraft.words}, so no whole sentence was cut` });
+			const { words, clauses } = clausesOf(text);
+			const draft = this.lengthDraft;
+			if (clauses < draft.clauses && words > draft.words - draft.shortest) out.push({ rule: "length", excerpt: `joined: ${words} words where the draft had ${draft.words}, in fewer sentences` });
 		}
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
