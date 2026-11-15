@@ -601,7 +601,12 @@ def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
     assert result["exam"] == {"date": day(23), "days_left": 23, "final_review": day(21)}
     assert result["current"] == "step-3" and result["focus"] == "sheet"
     assert result["tasks"] == [
-        {"key": "sheet", "title": "Sheet 1", "updated": TODAY.isoformat()}
+        {
+            "key": "sheet",
+            "title": "Sheet 1",
+            "updated": TODAY.isoformat(),
+            "topics": ["step-2"],
+        }
     ]
     topics = {item["topic"]: item for item in result["topics"]}
     assert [item["topic"] for item in result["topics"]] == [*names, "cramer"]
@@ -622,6 +627,30 @@ def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
     }
     assert topics["step-2"]["tasks"] == ["sheet"]
     assert "Private working" not in json.dumps(result)
+
+
+def test_map_lists_a_tasks_topics_in_the_tasks_own_order(workspace: Workspace) -> None:
+    """Round 9, 2 m8: the app rebuilt a task's topics in path order, so
+    Problem sheet 4 (rank, basis, kernel) was crumbed under Basis."""
+    records.save(
+        workspace,
+        {
+            "topics": {
+                "basis": {},
+                "rank": {"needs": ["basis"]},
+                "kernel": {"needs": ["rank"]},
+            },
+            "tasks": {
+                "sheet-4": {
+                    "title": "Problem sheet 4",
+                    "topics": ["rank", "basis", "kernel"],
+                }
+            },
+        },
+    )
+    result = retrieval.course_map(workspace)
+    assert [item["topic"] for item in result["topics"]] == ["basis", "rank", "kernel"]
+    assert result["tasks"][0]["topics"] == ["rank", "basis", "kernel"]
 
 
 def test_map_says_how_a_topic_not_yet_solid_was_best_answered(

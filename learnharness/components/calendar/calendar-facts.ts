@@ -1,4 +1,4 @@
-import { isReviewSession, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
+import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
 import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords } from "@/components/study-words";
@@ -330,7 +330,7 @@ export function calendarEntries({
 		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));
 		reviewedToday.set(map.workspace, reviewing);
 		for (const task of map.tasks) {
-			const holders = map.topics.filter((t) => t.tasks.includes(task.key));
+			const holders = taskTopics(task, map);
 			if (inReview(holders.map((t) => t.handle), reviewing)) continue;
 			const lesson = ofToday(map.workspace).find((chat) => !heldBy.has(chat.id) && !inReview(sessionTopics(chat, courses), reviewing) && holdsTask(chat, task, holders.map((t) => t.handle)));
 			if (lesson) {

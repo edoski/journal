@@ -1,4 +1,4 @@
-import { isReviewSession, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
+import { isReviewSession, taskTopics, type ChatListItem, type CourseMapTopic, type StudyCourse, type TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
 import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
@@ -75,7 +75,7 @@ export function todaySteps(course: StudyCourse): NextStep[] {
 		steps.push({ kind: "review", titles: reviews.map((t) => t.title), topics: reviews.map((t) => t.handle), then: tasks[0]?.title ?? current?.title ?? null });
 	}
 	for (const task of tasks) {
-		const held = map.topics.filter((t) => t.tasks.includes(task.key)).map((t) => t.handle);
+		const held = taskTopics(task, map).map((t) => t.handle);
 		steps.push({ kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] });
 	}
 	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);

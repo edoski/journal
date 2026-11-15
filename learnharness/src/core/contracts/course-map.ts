@@ -125,6 +125,10 @@ export interface CourseMapTask {
 	step: string | null;
 	/** The engine's day the task last changed, where he left off it. */
 	updated: string | null;
+	/** The topics it covers that the map lists, in the task's own order
+	 *  (round 9, 2 m8: rebuilt in path order, sheet 4 on rank, basis and
+	 *  kernel was placed under Basis). Read `taskTopics(task, map)`. */
+	topics?: readonly TopicHandle[];
 }
 
 /** Why the engine's plan leaves a topic out before the exam
@@ -186,4 +190,11 @@ export interface CourseMap {
 export function topicsToIntroduce(candidates: readonly string[], map: CourseMap): string[] {
 	const wanted = new Set(candidates);
 	return map.topics.filter((t) => wanted.has(t.handle) && t.introduced === null).map((t) => t.handle);
+}
+
+/** The topics a task covers, in the task's own order (`CourseMapTask.topics`),
+ *  else those whose `tasks` hold it, in path order. Pure. */
+export function taskTopics(task: CourseMapTask, map: Pick<CourseMap, "topics">): CourseMapTopic[] {
+	if (!task.topics) return map.topics.filter((t) => t.tasks.includes(task.key));
+	return task.topics.flatMap((handle) => map.topics.find((t) => t.handle === handle) ?? []);
 }

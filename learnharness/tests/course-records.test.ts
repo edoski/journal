@@ -18,6 +18,9 @@ import { courseMapOf, createCourseRecords } from "../src/store/course-records.ts
 import { currentArc, examCovers, type CourseMapArc } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { LINALG_ARCS } from "./fixtures/now-demo.ts";
+import { todaySteps } from "../components/study-home/study-facts.ts";
+import { lessonPlaceOf } from "../src/core/lesson-place.ts";
+import { calendarEntries } from "../components/calendar/calendar-facts.ts";
 import { subscribe } from "../src/core/events.ts";
 import { courseTools } from "../src/agent/tools/course.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
@@ -276,6 +279,20 @@ const parsed = (json: unknown): CourseMap => {
 	return map;
 };
 const topicOf = (map: CourseMap, handle: string) => map.topics.find((t) => t.handle === handle)!;
+
+describe("a task's topics (round 9, 2 m8)", () => {
+	it("keep the task's own order, so a session it starts is placed under its first topic, never the path's first", () => {
+		const map = parsed(goldenMap("linear-algebra"));
+		assert.deepEqual(map.tasks.find((t) => t.key === "sheet-4")?.topics, ["rank", "basis", "kernel"]);
+		const course = { map, unready: null, due: [], lastActiveDaysAgo: 0, newToday: [] };
+		const step = todaySteps(course).find((s) => s.kind === "task");
+		assert.ok(step?.kind === "task");
+		assert.deepEqual(step.topics, ["rank", "basis", "kernel"], "the topics Continue Problem sheet 4 starts its session on");
+		assert.equal(lessonPlaceOf(map, step.topics).topic?.title, "Rank and the column space", "the lesson's crumb");
+		const entry = calendarEntries({ courses: [{ ...course, planned: [], doesNotFit: [], finalReview: null }], chats: [], scope: null }).find((e) => e.kind === "task");
+		assert.equal(entry?.kind === "task" ? entry.topic?.handle : null, "rank", "the calendar's row for the sheet");
+	});
+});
 
 describe("course map arcs (E2's goldens)", () => {
 	it("a course without arcs has no arc fields, and each planned start says why it comes then", () => {
