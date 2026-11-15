@@ -33,6 +33,7 @@ import type { PiTurnHandle } from "./pi/ui-stream.ts";
 interface LhTurnRunsGlobal {
 	__lhTurnRuns?: Map<string, PiTurnHandle>;
 	__lhTurnFailures?: Map<string, string>;
+	__lhTurnStopping?: Set<string>;
 }
 
 function runs(): Map<string, PiTurnHandle> {
@@ -59,10 +60,30 @@ export function clearTurnFailure(chatId: string): void {
 	failures().delete(chatId);
 }
 
+/** Chats whose running turn was told to stop before it registered (it
+ *  had begun but not yet started): it stops the moment it registers. */
+function stopping(): Set<string> {
+	const g = globalThis as typeof globalThis & LhTurnRunsGlobal;
+	return (g.__lhTurnStopping ??= new Set<string>());
+}
+
 /** Register the chat's running turn (chat-handler, right after the turn
  *  starts). One per chat by construction — the 409 guard. */
 export function registerTurn(chatId: string, handle: PiTurnHandle): void {
 	runs().set(chatId, handle);
+	if (stopping().delete(chatId)) handle.abort();
+}
+
+/** Stops the chat's running turn, registered or still starting. */
+export function stopTurn(chatId: string): void {
+	const handle = runs().get(chatId);
+	if (handle) handle.abort();
+	else stopping().add(chatId);
+}
+
+/** Forgets a stop no turn took (the turn ended before registering). */
+export function forgetStop(chatId: string): void {
+	stopping().delete(chatId);
 }
 
 /** Unregister at settle — chat-handler's onFinish, LAST (after endTurn). */

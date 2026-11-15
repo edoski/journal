@@ -212,3 +212,37 @@ describe("Done for today on the server", () => {
 		assert.equal(doneTonightAtEnd(saved), true);
 	});
 });
+
+describe("Done for today while the tutor is working", () => {
+	it("stops the running turn and closes the lesson, never refused", async () => {
+		// Round 7 (robustness minor 3): Done pressed as a practice handoff
+		// woke the teacher got a 409, "A turn is already running", and the
+		// teacher went on with a new plan and a new question.
+		const faux = createFauxCore({});
+		faux.setResponses([
+			((_ctx: unknown, opts: { signal?: AbortSignal } | undefined) =>
+				new Promise((resolve) => {
+					const sig = opts?.signal;
+					const late = () => resolve(fauxAssistantMessage([fauxText("Now a new plan for eigenvalues")], { stopReason: "aborted" }));
+					if (sig?.aborted) return late();
+					sig?.addEventListener("abort", late, { once: true });
+				})) as unknown as FauxResponseStep,
+		]);
+		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const factory = ((opts: Parameters<typeof createTeacherAgent>[1]) => createTeacherAgent(undefined, { ...opts!, ...onFake(engine, opts!) })) as never;
+		const post = (chatId: string, input: unknown) => handleChatRequest(new Request("http://test/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId, input }) }), factory);
+		const chat = chatStore.createChat("Test: done while working");
+		assert.equal((await post(chat.id, { type: "text", text: "teach me again" })).status, 200);
+		const working = runningTurn(chat.id);
+		assert.ok(working, "the tutor is working");
+		const stopped = new Response(working.subscribe()).text();
+
+		const done = await post(chat.id, { type: "tonight" });
+		assert.equal(done.status, 200, "Done for today is never refused");
+		await stopped;
+		const saved = chatStore.getChat(chat.id)!.messages;
+		assert.equal(saved.find((m) => m.role === "assistant")?.stopReason, "aborted", "the tutor's turn was stopped, its partial saved");
+		assert.equal(closedTonight(saved), true, "the lesson is closed for today");
+		runningTurn(chat.id)?.abort();
+	});
+});

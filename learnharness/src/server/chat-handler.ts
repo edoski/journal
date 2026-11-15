@@ -31,9 +31,9 @@ import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefMarker, fetchCourseArcs, fetchCourseBrief } from "./course-brief.ts";
 import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
 import { providerKeyMissing as providerKeyMissingEnvelope } from "../core/settings.ts";
-import { beginTurn, endTurn } from "./turn-liveness.ts";
+import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
-import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
+import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { answeredQuestionsOf, hasUnresolvedQuestion, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
@@ -43,7 +43,7 @@ import { nextChatSession } from "../core/sdk-session.ts";
 import type { SessionStore } from "../agent/sdk/session-files.ts";
 import { catalogContextLimits } from "./model-catalog.ts";
 import { refreshClaudeConnections } from "../agent/claude-connection.ts";
-import { emit } from "../core/events.ts";
+import { emit, subscribe } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
 import { continuationOwed, stoppedReplyIds } from "../core/turn-cut.ts";
 import { asAgentMessages } from "../core/native-messages.ts";
@@ -205,6 +205,23 @@ export async function handleChatRequest(
 	return handleChatInput(chatId, input, buildAgent);
 }
 
+/** Stops the chat's running turn and resolves once it has settled (its
+ *  partial saved). Event-driven: each pass waits for the turn-settled. */
+async function stopRunningTurn(chatId: string): Promise<void> {
+	while (isTurnRunning(chatId)) {
+		const settled = new Promise<void>((resolve) => {
+			const off = subscribe((event) => {
+				if (event.type !== "turn-settled" || event.chatId !== chatId) return;
+				off();
+				resolve();
+			});
+		});
+		stopTurn(chatId);
+		await settled;
+	}
+	forgetStop(chatId);
+}
+
 /**
  * The turn composition: one input event → native record appends → one
  * agent turn as a background object. Also the wake pipeline's entry
@@ -224,6 +241,11 @@ export async function handleChatInput(
 	if (courseDeleted(chatId)) {
 		return Response.json({ error: COURSE_DELETED, code: "course_deleted" }, { status: 410 });
 	}
+
+	// Done for today wins over whatever the tutor is doing (round 7: pressed
+	// as a practice handoff woke the teacher, it was refused and the teacher
+	// went on): the running turn stops, its partial saves, then the close.
+	if (input.type === "tonight") await stopRunningTurn(chatId);
 
 	// Refuse an ineligible Retry before catalog refresh, compaction, or any
 	// turn/write effects. Revalidate after the awaited gates below too.
