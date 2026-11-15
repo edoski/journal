@@ -91,7 +91,10 @@ topics ran out. Once he has shown a limit, a day's pace also takes what the
 days after it cannot hold, so a fraction carried to a day with no room is never
 a topic lost. Spare new-topic capacity then goes to courses with no exam
 ahead, the one that started a topic least recently first; then to the nearest
-exam with topics left; then to the topics outside an exam's scope.
+exam with topics left; then to the topics outside an exam's scope. While any
+final review runs, the exams with topics left come before the courses with no
+exam: the run-up is for the exam (round 9: Real Analysis started a topic two
+days before the Probability exam while Geometric had no room).
 Spare capacity starts one topic on a day that starts none, and a second only
 when it belongs with the first (one needs the other, or both rest on the same
 prerequisites) in the arc the plan is taking from, or his own rate that
@@ -1079,12 +1082,13 @@ def _new(
                 scoped = set(course.scoped)
                 more = min(room, pace - taken)
                 room -= take(course, more, scoped, bound=False, pace=True)
-    room -= share(
-        [course for course in others if course.exam is None or course.outside(day)]
-    )
+    open_ = [course for course in others if course.exam is None or course.outside(day)]
+    if not any(course.reviewing(day) for course in exams):
+        room -= share(open_)
     for course in exams:
         while room > 0 and spare(course, course.scoped, course.scoped):
             room -= 1
+    room -= share(open_)
     room -= share([course for course in exams if course.outside(day)])
     for course in courses:
         course.watch(course.startable(day))

@@ -1036,3 +1036,21 @@ def test_one_answer_today_moves_no_other_topics_day_in_any_course() -> None:
                 if k != topic or other != name
             }, (name, other)
             assert now.starts == told[other].starts, (name, other)
+
+
+def test_inside_a_final_review_its_topics_left_take_a_spare_start_before_a_course_without_an_exam() -> (
+    None
+):
+    """Round 9 (1 D2): two days before the Probability exam, Real Analysis
+    started Continuity while the head said there was no room for Geometric."""
+    exam = course(2, exam=5)
+    together = plan({"exam": exam, "open": course(10)}, 5, week(10, 1, EVERY_DAY))
+    assert started(together.days["exam"]) == {
+        "t00": on(0).isoformat(),
+        "t01": on(1).isoformat(),
+    }
+    assert started(together.days["open"]) == {
+        "t00": on(2).isoformat(),
+        "t01": on(3).isoformat(),
+        "t02": on(4).isoformat(),
+    }
