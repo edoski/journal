@@ -23,7 +23,7 @@ export interface PendingPhoto {
 	photo: Photo;
 }
 
-/** The words for a photo that will not open (HEIC from Photos, a PDF). */
+/** The words for a photo that will not open (a PDF, or a HEIC away from a Mac). */
 export const PHOTO_UNREADABLE_TEXT = "This photo could not be read. Try a JPEG or PNG.";
 /** Shown when a fifth photo would join an answer. */
 export const PHOTO_LIMIT_TEXT = "Four photos at most for one answer.";
@@ -57,6 +57,20 @@ export async function photoFromFile(file: Blob): Promise<Photo> {
 		return { type: "image", mimeType: "image/jpeg", data: dataUrl.slice(dataUrl.indexOf(",") + 1) };
 	} finally {
 		bitmap.close();
+	}
+}
+
+/** A file as a sent photo, an iPhone's HEIC included (round 8: a photo
+ *  AirDropped from his phone arrives as HEIC, which the browser cannot
+ *  open): one the browser cannot read goes to the app to become JPEG
+ *  first (`/api/photos/heic`), then is resized like any other. */
+export async function readablePhoto(file: Blob, read: (file: Blob) => Promise<Photo> = photoFromFile, convert: (file: Blob) => Promise<Response> = (body) => fetch("/api/photos/heic", { method: "POST", body })): Promise<Photo> {
+	try {
+		return await read(file);
+	} catch (error) {
+		const res = await convert(file).catch(() => null);
+		if (!res?.ok) throw error;
+		return read(await res.blob());
 	}
 }
 
@@ -110,7 +124,7 @@ export function usePhotoDraft(initial?: readonly PendingPhoto[], keepAs?: string
 		const made: PendingPhoto[] = [];
 		for (const file of files.slice(0, room)) {
 			try {
-				made.push({ id: `photo_${++nextId}`, photo: await photoFromFile(file) });
+				made.push({ id: `photo_${++nextId}`, photo: await readablePhoto(file) });
 			} catch {
 				setError(PHOTO_UNREADABLE_TEXT);
 			}
