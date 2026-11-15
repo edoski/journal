@@ -111,8 +111,8 @@ export interface MistakeRow {
 
 /** A row's press from its topic's action: the session to open, else what
  *  to start, a continued task as the page starts it. Pure. */
-function pressOf(action: ReturnType<typeof topicAction>, workspace: string, topic: CourseMapTopic): Pick<MistakeRow, "resume" | "creation"> {
-	const creation = topicCreation(workspace, topic);
+function pressOf(action: ReturnType<typeof topicAction>, workspace: string, topic: CourseMapTopic, today: string): Pick<MistakeRow, "resume" | "creation"> {
+	const creation = topicCreation(workspace, topic, today);
 	if ("chat" in action) return { resume: action.chat, creation };
 	if (action.kind !== "continue") return { resume: null, creation };
 	return { resume: null, creation: { title: action.opening, course: { workspace }, topics: [topic.handle], ...(action.from ? { resume: { from: action.from } } : {}) } };
@@ -154,7 +154,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
 				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
-				...pressOf(topicAction(topic, map, chats), map.workspace, topic),
+				...pressOf(topicAction(topic, map, chats), map.workspace, topic, map.today),
 				workspace: map.workspace,
 				href: unitHref(map.workspace, topic.handle),
 			},

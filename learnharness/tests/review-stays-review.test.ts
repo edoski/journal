@@ -29,6 +29,8 @@ const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
 const { courseTools, REVIEW_TASK_REFUSED } = await import("../src/agent/tools/course.ts");
 type CourseToolContext = import("../src/agent/tools/course.ts").CourseToolContext;
 const { probeDoneTool } = await import("../src/agent/tools/probe.ts");
+const { topicCreation } = await import("../components/unit-inbox/start-unit.ts");
+const { reviewRecord } = await import("../src/core/session-opening.ts");
 const { REVIEW_HANDOFF_TEXT, HANDOFF_TEXT } = await import("../src/core/contracts/chat.ts");
 const { VoiceGuard } = await import("../src/agent/voice-guard.ts");
 const { SEND_TO_USER_TOOL, newDoneTonightMessage, newUserMessage } = await import("../src/core/native-messages.ts");
@@ -74,6 +76,25 @@ describe("a review that turns into teaching", () => {
 		assert.match((await fetchCourseBrief(chatStore.getChat(review)!))!.text, /^Opened on: independence, as its review\. .*The session is his review, whatever it re-teaches\.$/m);
 		const lesson = await startFrom({ title: "Independent events", course: { workspace: PROB }, topics: ["independence"] });
 		assert.doesNotMatch((await fetchCourseBrief(chatStore.getChat(lesson)!))!.text, /as its review/);
+	});
+
+	// Round 10, 2 M1: the sidebar's Study, a Mistakes row and the exam's
+	// gaps posted the topic's bare title even when memory asked for its
+	// review, so the review became a lesson that saved a lesson task.
+	it("is what every Study press on one topic opens when memory asks for the review", async () => {
+		const binomial = { title: "Binomial distribution", handle: "binomial" as Parameters<typeof topicCreation>[1]["handle"] };
+		const opened = async (review: Parameters<typeof topicCreation>[1]["review"]) => {
+			const id = await startFrom(topicCreation(PROB, { ...binomial, review }, "2026-11-08"));
+			return chatStore.getChat(id)!;
+		};
+		const due = await opened({ kind: "due", date: "2026-11-08", overdue: 2 });
+		assert.ok(reviewRecord(due), "a due review opens as the review");
+		assert.match((await fetchCourseBrief(due))!.text, /^Opened on: binomial, as its review\./m);
+		const held = await opened({ kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-06" } });
+		assert.ok(reviewRecord(held), "a review the plan holds past memory's day opens as the review");
+		assert.equal(held.title, "Review Binomial distribution");
+		assert.ok(!reviewRecord(await opened({ kind: "scheduled", date: "2026-11-13" })), "a review set for later: a lesson");
+		assert.ok(!reviewRecord(await opened(null)), "no review: a lesson");
 	});
 
 	it("saves no task, and the rest of a save waits for it to be sent without one", async () => {

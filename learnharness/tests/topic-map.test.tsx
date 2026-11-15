@@ -154,8 +154,8 @@ describe("why a topic needs him", () => {
 
 	it("says a mistake he has answered right since is fixed, to be checked again", () => {
 		const fixed = (signals: { gap?: string; lapsed?: boolean }) => slip(topic("t", { level: "assisted", weak: true, signals: { ...QUIET, ...signals, repaired: true } }))!;
-		assert.equal(fixed({ gap: "Writes det as ad + bc" }), "Fixed, check again later");
-		assert.equal(fixed({ lapsed: true }), "Fixed, check again later");
+		assert.equal(fixed({ gap: "Writes det as ad + bc" }), "Check again another day");
+		assert.equal(fixed({ lapsed: true }), "Check again another day");
 	});
 
 	it("says nothing for a topic still being learned, one resting until its review, or one not started", () => {

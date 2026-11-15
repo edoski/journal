@@ -1,6 +1,6 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import type { TopicRef } from "@/src/core";
+import { reviewAsked, type TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
 import { pausedWords } from "@/components/nav/session-state";
@@ -85,7 +85,7 @@ export const NOTHING_DUE = "Nothing due";
 /** Since when a review the plan holds past the day memory asked for it
  *  is due ("Due since 6 Nov", "Due today"); null for any other. */
 function heldPastDue(review: TopicFacts["topic"]["review"], today: string): string | null {
-	if (review?.kind !== "scheduled" || !review.held || review.held.since > today) return null;
+	if (review?.kind !== "scheduled" || !review.held || !reviewAsked(review, today)) return null;
 	return review.held.since < today ? reviewWords(review, today) : overdueWords(0, today);
 }
 

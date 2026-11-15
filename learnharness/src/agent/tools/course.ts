@@ -46,6 +46,27 @@ export interface CourseToolContext {
 	 *  here keeps no task (round 9, 2 m4: a review turned into teaching saved
 	 *  "Re-learn checking independence"). */
 	review?: boolean;
+	/** The steps of this session's lesson plan as they stand when a save
+	 *  runs (the plan may be written in the same turn). Absent: none. */
+	planSteps?: () => readonly { id: string; title: string }[];
+}
+
+/** A save that creates a course topic out of a step of the session's own
+ *  plan, by its id or its title (round 10, 3 m8: the Poisson lesson's
+ *  steps "The limit $(1+\frac{x}{n})^n \to e^x$" and "The exponential
+ *  series" became course topics with their own reviews on Home's map). A
+ *  topic named with no title updates one the course has, so it passes. */
+function planStepAsTopic(ctx: CourseToolContext, patch: Record<string, unknown> | null): string | null {
+	const steps = ctx.planSteps?.() ?? [];
+	const topics = patch?.topics;
+	if (steps.length === 0 || typeof topics !== "object" || topics === null || Array.isArray(topics)) return null;
+	const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+	const made = Object.entries(topics as Record<string, unknown>).filter(([handle, t]) => {
+		const title = typeof t === "object" && t !== null ? (t as { title?: unknown }).title : undefined;
+		return typeof title === "string" && steps.some((s) => s.id === handle || norm(s.title) === norm(title));
+	});
+	if (made.length === 0) return null;
+	return `topics: ${made.map(([h]) => h).join(", ")} ${made.length > 1 ? "are steps" : "is a step"} of this lesson's plan, not ${made.length > 1 ? "course topics" : "a course topic"}. A step lives on the lesson's map; what he did on it is saved to the lesson's own topic. Leave ${made.length > 1 ? "them" : "it"} out of topics and send the rest.`;
 }
 
 /** Why a review's save is refused: it keeps a task. A task removed (null)
@@ -225,7 +246,7 @@ function keepLinks(ctx: CourseToolContext, questions: readonly (string | null)[]
  */
 export async function saveCourse(ctx: CourseToolContext, changes: unknown, problem?: { id: string; seen: boolean }): Promise<CourseResult> {
 	const patch = patchOf(changes);
-	const reviewTask = reviewTaskRefused(ctx, patch);
+	const reviewTask = reviewTaskRefused(ctx, patch) ?? planStepAsTopic(ctx, patch);
 	if (reviewTask) return { ok: false, kind: "validation", message: reviewTask };
 	const listed = patch && Array.isArray(patch.observations) ? patch.observations : null;
 	if (!patch || !listed) return ctx.records.run(ctx.course.workspace, { verb: "save", changes });

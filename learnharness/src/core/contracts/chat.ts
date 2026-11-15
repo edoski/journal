@@ -447,6 +447,9 @@ export interface ChatSummary {
 	/** The tutor's last turn ended because he stopped it (`stoppedByHim`),
 	 *  not because the app restarted: a cut session then says he stopped it. */
 	stopped?: true;
+	/** He has said nothing in it past the words it opened with, so it
+	 *  holds nothing of his to pick up (`currentSessions`). */
+	untouched?: true;
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];

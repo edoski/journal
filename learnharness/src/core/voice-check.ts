@@ -48,6 +48,8 @@ export type VoiceRule =
 	| "reason"
 	| "machinery"
 	| "review-lesson"
+	| "confidence"
+	| "letter"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -261,17 +263,28 @@ function lineRelations(line: string): string[] {
  *  TeX, or null. A matrix's rows and an aligned derivation's lines are read
  *  one by one. */
 export function chainedDisplay(text: string): string | null {
-	const bodies = [...text.replace(FENCE, " ").matchAll(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g)].map((m) => (m[1] ?? m[2] ?? "").trim());
+	const unfenced = text.replace(FENCE, " ");
+	const bodies = [...unfenced.matchAll(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g)].map((m) => (m[1] ?? m[2] ?? "").trim());
 	for (const body of bodies) {
 		// An arrow from one matrix to the next is a row operation, a step
 		// of the work, not a limit.
 		const steps = body.replace(/\\begin\{([pbvBV]?matrix)\}[\s\S]*?\\end\{\1\}/g, "@M@").replace(/@M@\s*(?:\\xrightarrow\{[^}]*\}|\\(?:to|rightarrow|longrightarrow)(?![A-Za-z])|→|⟶|\\sim(?![A-Za-z]))\s*(?=@M@)/g, "@M@ ");
 		for (const line of steps.split(/\\\\/)) {
-			if (new Set(lineRelations(line)).size > 1) return body;
+			const kinds = lineRelations(line);
+			if (new Set(kinds).size > 1) return body;
+			// Two steps joined by words in one line, "… = 1, so c = e^{-3}"
+			// (round 10, 3 m5): each is its own display.
+			if (kinds.length > 1 && STEP_WORDS.test(line)) return body;
 		}
 	}
-	return null;
+	// Inline maths in a line of prose states one relation of one kind
+	// (round 10, 3 m5: "3n ln(1 + 2/n) ≈ 3n · 2/n = 6" inside feedback).
+	const inline = [...unfenced.replace(/\$\$[\s\S]*?\$\$/g, " ").matchAll(/(?<![\\$])\$([^$\n]+)\$(?!\$)/g)].map((m) => m[1]!.trim());
+	return inline.find((body) => new Set(lineRelations(body)).size > 1) ?? null;
 }
+
+/** Words inside a display that join a second step to the first. */
+const STEP_WORDS = /\\text\{[^}]*\b(?:so|hence|thus|therefore|giving|which gives)\b[^}]*\}|\\(?:therefore|implies|Rightarrow|Longrightarrow)(?![A-Za-z])/;
 
 const SHINGLE = 6;
 
@@ -475,6 +488,17 @@ export function repeatedPoint(text: string, earlier: readonly string[]): { said:
 	return null;
 }
 
+/** A callout ("> …") that makes again a point the same message's prose
+ *  made above it (round 10, 3 m9: "A square matrix A is invertible exactly
+ *  when det A ≠ 0." boxed under the paragraph that said so): the callout's
+ *  sentence and the one it restates, or null. */
+export function restatingCallout(text: string): { said: string; before: string } | null {
+	const lines = text.split("\n");
+	const callout = lines.filter((l) => /^\s*>/.test(l)).map((l) => l.replace(/^\s*>\s?/, "")).join(" ").trim();
+	const rest = lines.filter((l) => !/^\s*>/.test(l)).join("\n").trim();
+	return callout && rest ? repeatedPoint(callout, [rest]) : null;
+}
+
 /** A direct answer's last sentence that draws a lesson from it instead of
  *  answering: it opens "So …" or ends "…, which is why …", and what it draws
  *  holds no maths or number, so it states no step (round 9: "So checking for independent,
@@ -484,6 +508,30 @@ export function closingMoral(text: string): string | null {
 	if (!last || last.endsWith("?")) return null;
 	const tail = /^(?:so|that(?:'s| is) why|this is why|which is why)\b.*|,\s*which is why\b.*$/i.exec(last)?.[0];
 	return tail && !/\bX\b|\d/.test(tail) ? last : null;
+}
+
+/** Each matrix a text names with a capital letter, "A = \begin{pmatrix}…",
+ *  as the letter and its entries without spacing. */
+function namedMatrices(text: string): { letter: string; entries: string; written: string }[] {
+	return [...text.matchAll(/(?<![\\A-Za-z])([A-Z])\s*=\s*\\begin\{([pbBvV]?matrix)\}([\s\S]*?)\\end\{\2\}/g)].map((m) => ({ letter: m[1]!, entries: m[3]!.replace(/\s+/g, ""), written: m[0] }));
+}
+
+/** A letter the text gives a matrix that the session already gave another
+ *  (round 10, 3 m7: seven matrices named A in one lesson, and B both a
+ *  rank-2 matrix and the undoing matrix), so he cannot tell which A a later
+ *  step means. The first such naming, or null. */
+export function reusedLetter(text: string, earlier: readonly string[]): { letter: string; written: string } | null {
+	const before = new Map<string, string>();
+	for (const e of earlier) for (const m of namedMatrices(e)) before.set(m.letter, m.entries);
+	const reused = namedMatrices(text).find((m) => before.has(m.letter) && before.get(m.letter) !== m.entries);
+	return reused ? { letter: reused.letter, written: reused.written } : null;
+}
+
+/** A sentence that tells him how sure he was ("You were sure the kernel
+ *  came from the number of rows."): his card shows his confidence, so it
+ *  only narrates (round 10, 3 m3: practice's closing words). */
+export function narratedConfidence(text: string): string | null {
+	return sentences(prose(text).text).find((s) => /^\s*you (?:were|felt|seemed|sounded) (?:so |very |quite )?(?:sure|confident|certain)\b/i.test(s))?.trim() ?? null;
 }
 
 /** The prose sentences after a message's last question: what sits under

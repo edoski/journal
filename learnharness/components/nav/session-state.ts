@@ -50,18 +50,25 @@ const PICK_UP_ORDER: readonly SessionState[] = ["your-turn", "working", "paused"
 /** The sessions still current among some: each but one a later session of
  *  its kind started after he last touched it, which moved past it (round
  *  9, 2 m7: a preview whose turn failed on 6 Nov stayed Diagonalization's
- *  Now over the lesson he left on 8 Nov). A turn running now stays. Pure. */
-export function currentSessions(sessions: readonly ChatListItem[]): ChatListItem[] {
+ *  Now over the lesson he left on 8 Nov), and one whose reply was cut
+ *  before he said anything in it once he has started another session in
+ *  its course (`course`, any sessions: those of its course are read), as
+ *  that study moved past it (round 10, 2 m4: the same preview, with no
+ *  later session on its own topic). A turn running now stays. Pure. */
+export function currentSessions(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): ChatListItem[] {
 	const started = (kind: ChatListItem["kind"]) => sessions.reduce((last, chat) => (chat.kind === kind && chat.createdAt > last ? chat.createdAt : last), "");
-	return sessions.filter((chat) => chat.busy || chat.updatedAt >= started(chat.kind));
+	const movedOn = (chat: ChatListItem) =>
+		chat.untouched === true && chat.ended === "cut" && course.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && other.createdAt > chat.updatedAt);
+	return sessions.filter((chat) => chat.busy || (chat.updatedAt >= started(chat.kind) && !movedOn(chat)));
 }
 
 /** The session to pick up among some: of the current ones
- *  (`currentSessions`), one that waits on the learner, else one the tutor
- *  writes in, else one the tutor stopped in, else one left for next time;
- *  the first in the order given (newest first) within each. */
-export function resumableSession(sessions: readonly ChatListItem[]): ChatListItem | null {
-	const current = currentSessions(sessions);
+ *  (`currentSessions`, against the sessions of their `course`), one that
+ *  waits on the learner, else one the tutor writes in, else one the tutor
+ *  stopped in, else one left for next time; the first in the order given
+ *  (newest first) within each. */
+export function resumableSession(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): ChatListItem | null {
+	const current = currentSessions(sessions, course);
 	for (const state of PICK_UP_ORDER) {
 		const found = current.find((chat) => sessionState(chat) === state);
 		if (found) return found;

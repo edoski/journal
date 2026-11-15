@@ -17,6 +17,9 @@ export type Shelf = "learning" | "review" | "known";
 export interface UnitCourse {
 	workspace: string;
 	title: string;
+	/** The engine's study day (`CourseMap.today`), against which a press
+	 *  reads whether memory asks for the topic's review (`topicOpening`). */
+	today: string;
 }
 
 /** What a unit's sessions are doing now: one waits on the learner, the
@@ -99,17 +102,18 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
 
 /** What a topic's own sessions are doing now: those that belong to it
  *  (`ownTopics`), never one that only touched it on the way, so a lesson
- *  is "Your turn" on its own topic alone. Pure. */
-export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNow {
-	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)));
+ *  is "Your turn" on its own topic alone; `course` as `currentSessions`
+ *  reads it. Pure. */
+export function nowOf(sessions: readonly ChatListItem[], handle: string, course: readonly ChatListItem[] = []): UnitNow {
+	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)), course);
 }
 
 /** What any of these sessions is doing now: one waits on the learner, the
  *  tutor writes in one, or one was left for next time. A topic read with
  *  every session tied to it (`topicSessions`) says what its page's Now and
  *  the session's card on Today's top say. Pure. */
-export function sessionsNow(sessions: readonly ChatListItem[]): UnitNow {
-	const states = currentSessions(sessions).map(sessionState);
+export function sessionsNow(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): UnitNow {
+	const states = currentSessions(sessions, course).map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	if (states.includes("working")) return "working";
 	return states.includes("left") ? "left" : null;
@@ -135,10 +139,10 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 	const scoped = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const units: Unit[] = [];
 	for (const { map } of scoped) {
-		const course = { workspace: map.workspace, title: map.title };
+		const course = { workspace: map.workspace, title: map.title, today: map.today };
 		for (const topic of map.topics) {
 			const sessions = topicSessions(chats, map.workspace, topic.handle);
-			const now = nowOf(sessions, topic.handle);
+			const now = nowOf(sessions, topic.handle, chats);
 			const shelf = shelfOf(topic, now);
 			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic), slip: slipOf(map, topic) });
 		}

@@ -169,7 +169,7 @@ export const explainInputObject = Type.Object({
 			"The lesson's position on the map derives from these tags (the node the latest tagged question is about is " +
 			"where the map stands; earlier ones count as visited). A node takes as many questions as it deserves: stay on " +
 			"one node for as many turns as the understanding needs — one reasoning step at a time, never rush forward. " +
-			"For off-map checks use ask_user_question.",
+			"A question off the plan with a right answer (a guess, a side check) is still this tool, tagged with the node it grows from; ask_user_question never asks one.",
 	}),
 	...explainInputBase.properties,
 });
@@ -470,7 +470,7 @@ export const LEFT_FOR_TONIGHT_TEXT =
  *  rule to conclude). It names no action: the prober hands over to the
  *  teacher, the teacher teaches. */
 export const ASKED_INSTEAD_TEXT =
-	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message, then ask this question again, word for word, with a fresh call. When his message asks to be taught or told instead of asked (\"stop quizzing me\", \"just explain it\"), the question is set aside: do what your instructions say for that request, and never ask it again.";
+	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message without working the open question for him (no step, value or factor of its answer, since a reply that gives any of them away costs him his answer on his own), then ask this question again, word for word, with a fresh call. When his message asks to be taught or told instead of asked (\"stop quizzing me\", \"just explain it\"), the question is set aside: do what your instructions say for that request, and never ask it again. When his message asks nothing and only answers the question (a guess, a value, a choice), it is his answer to it: save it as his attempt naming \"his-message\", a prediction when the question asked for one, and reply to it as to an answer.";
 
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):

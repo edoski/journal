@@ -9,6 +9,8 @@
  * after he started it). Pure and browser-safe.
  */
 
+import type { TopicReview } from "./contracts/course-map.ts";
+
 /** The opening a review is started with: "Review " and the titles. */
 const REVIEW_OPENING = /^Review\s+\S/;
 
@@ -78,4 +80,19 @@ export function reviewRecord(record: { title: string; topics?: readonly string[]
  *  or a session opened on no topic, keeps its words. */
 export function openingTitle(opening: string, topics: readonly string[]): string {
 	return topics.length > 0 ? opening.replace(LESSON_VERB, "") : opening;
+}
+
+/** Whether memory asks for the topic's review by `today`, the engine's
+ *  study day: the plan has it today (`due`), or holds it past the day
+ *  memory asked for it ("Due since 6 Nov, back 11 Nov"). */
+export function reviewAsked(review: TopicReview | null | undefined, today: string): boolean {
+	return review?.kind === "due" || (review?.kind === "scheduled" && review.held !== undefined && review.held.since <= today);
+}
+
+/** What a press on one topic opens with: its review when memory asks for
+ *  it (`reviewAsked`), so the session is that review whichever button
+ *  started it (round 10, 2 M1: Study on a held review opened a lesson),
+ *  else the topic's name, a lesson on it. */
+export function topicOpening(topic: { title: string; review: TopicReview | null | undefined }, today: string): string {
+	return reviewAsked(topic.review, today) ? `Review ${topic.title}` : topic.title;
 }

@@ -8,7 +8,8 @@ import { MISTAKE_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { MathLine } from "@/components/ui/math-line";
-import { MathText, mathPlain } from "@/components/ui/math-text";
+import { mathPlain } from "@/components/ui/math-text";
+import { LineText } from "@/components/line-text";
 import { useStartSession } from "@/components/unit-inbox/start-unit";
 import type { MistakeRow } from "@/components/course-page/standing/standing-model";
 import { cn } from "@/lib/utils";
@@ -34,7 +35,7 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 				</span>
 				<span className="flex min-w-0 items-start gap-3 text-callout system-current:text-label text-muted-foreground">
 					<span data-slot="mistake-words" className="line-clamp-2 min-w-0 flex-1">
-						<MathText>{row.words}</MathText>
+						<LineText>{row.words}</LineText>
 					</span>
 					<span className="inline-flex shrink-0 items-center gap-1.5">
 						{row.helped && <HandHelpingIcon role="img" aria-label={MISTAKE_WORDS.helped} className="size-3.5" />}

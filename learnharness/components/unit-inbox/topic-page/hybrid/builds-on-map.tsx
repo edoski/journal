@@ -19,7 +19,7 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
 export function BuildsOnMap({ map, said, topic, pointed }: { map: CourseMap; said: ReadonlyMap<TopicHandle, Said>; topic: TopicHandle; pointed: TopicHandle | null }) {
 	return (
 		<div data-slot="topic-builds-map" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
-			<TopicMap map={map} said={said} margin={FADE} marked={pointed ?? topic} />
+			<TopicMap map={map} said={said} margin={FADE} marked={pointed ?? topic} opensOn={topic} />
 		</div>
 	);
 }

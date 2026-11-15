@@ -7,6 +7,17 @@ import type { ChatListItem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
 
+/** The sidebar's snapshot as a turn starts or settles in this window: a
+ *  start marks the session busy at once; a settle leaves the snapshot as
+ *  it is until the server's fresh one lands, since the one it holds was
+ *  read mid-turn and reads the reply as cut off (round 10, 2 m5: "Reply
+ *  cut off" flashed on the card at the end of the opener, then "Your
+ *  turn"). Pure. */
+export function turnStatePatch(chats: ChatListItem[] | null, id: string, running: boolean): ChatListItem[] | null {
+	if (!running || !chats) return chats;
+	return chats.map((c) => (c.id === id ? { ...c, busy: true } : c));
+}
+
 /** The items whose title matches the query, best first, by cmdk's own
  *  ranking (a subsequence match where a prefix beats a word start beats
  *  scattered letters). An empty query keeps the list's own order. */
@@ -102,16 +113,13 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	useEffect(() => {
 		const onTurnState = (e: Event) => {
 			const { id, running } = (e as CustomEvent<{ id: string; running: boolean }>).detail;
-			if (running) {
-				if (chatsRef.current?.some((c) => c.id === id)) {
-					setChats((prev) => (prev ? prev.map((c) => (c.id === id ? { ...c, busy: true } : c)) : prev));
-				} else {
-					void refresh(); // the brand-new session: it isn't in the snapshot yet
-				}
+			if (running && !chatsRef.current?.some((c) => c.id === id)) {
+				void refresh(); // the brand-new session: it isn't in the snapshot yet
 				return;
 			}
-			setChats((prev) => (prev ? prev.map((c) => (c.id === id ? { ...c, busy: false } : c)) : prev));
-			void refresh(); // settle: the server snapshot is now truthful — land it now
+			setChats((prev) => turnStatePatch(prev, id, running));
+			// Settle: the server snapshot is now truthful — land it now.
+			if (!running) void refresh();
 		};
 		window.addEventListener("lh:turn-state", onTurnState);
 		return () => window.removeEventListener("lh:turn-state", onTurnState);

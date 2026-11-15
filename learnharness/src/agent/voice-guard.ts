@@ -24,8 +24,8 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, problemAdvice, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
+import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -254,6 +254,7 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `A question is its own words with nothing under them: no advice on how to answer it, ${quoted(b.excerpt)}.`;
 		case "repeat":
 			if (b.excerpt.startsWith("display ")) return `He has already seen ${b.excerpt.slice("display ".length)} earlier in the session, and what he was told is said once: build on it with a new case, never show or explain it again.`;
+			if (b.excerpt.startsWith("callout ")) return `A callout holds what the message has not said, and this one says again what the paragraph above it said: ${b.excerpt.slice("callout ".length)}. Drop the callout, or the sentence it restates.`;
 			if (b.excerpt.startsWith("point ")) return `He was already told this earlier in the session, and a point is made once: ${b.excerpt.slice("point ".length)}. Leave it out; say only what is new.`;
 			return `This advice was given earlier in the session, and advice is said once: ${b.excerpt}. Leave it out.`;
 		case "colon":
@@ -270,6 +271,10 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `Start with the content, never by handing his answer back or grading a right one: ${quoted(b.excerpt)}.`;
 		case "feedback":
 			return `A right answer gets no feedback sentence: ${quoted(b.excerpt)}.`;
+		case "confidence":
+			return `Closing words never tell him how sure he was, which his card already shows, and never restate the break your feedback named: drop ${quoted(b.excerpt)} and keep only the one move that was not obvious.`;
+		case "letter":
+			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -340,6 +345,24 @@ const NEXT_ACTION_NOTE = "He has nothing to do next. End this turn on one questi
 /** A reply to his work that leaves the problem open with nothing for him
  *  to do (round 8: "It breaks at the line −3x + 2y = 0" and nothing after). */
 const NUDGE_NOTE = "His work broke and the problem is still open, but your reply gives him no way on. Send one more message with send_to_user: the smallest nudge toward his next move, as one question or instruction he can act on, never the correction.";
+/** A call that would end the turn before his answer this turn was saved
+ *  (round 10, 1 m1: a wrong prediction got a rebuttal and the same
+ *  question again, and only his right retry was ever saved). */
+const UNSAVED = (tool: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not done: his answer to your last question is not saved yet. Save it with course_save first, as it was, a wrong prediction included, since every attempt is kept; then call ${tool} again. If it only asked you something and holds no attempt, call ${tool} again as it is.` }],
+	isError: true,
+	details: { withheld: "unsaved" },
+});
+const UNSAVED_NOTE = "His answer to your last question is not saved. Save it with course_save now, as it was, a wrong prediction included, since every attempt is kept; if it only asked you something, it holds no attempt.";
+
+/** The graded question his answer opening this turn replies to, while no
+ *  save has kept it yet; null for any other turn. */
+function unsavedAnswerOf(messages: readonly LhMessage[]): string | null {
+	const input = messages[messages.findLastIndex(opensTurn)];
+	if (input?.role !== "toolResult" || input.isError || !GRADED_QUESTION_TOOLS.includes(input.toolName) || !isRealAnswer(input.details)) return null;
+	return answeredQuestionsOf(messages).get(input.toolCallId)?.recorded === false ? input.toolCallId : null;
+}
+
 /** A question posed straight after an unsure answer, with no words. */
 const UNSURE = (why: string): AgentToolResult<unknown> => ({
 	content: [
@@ -419,14 +442,22 @@ export class VoiceGuard {
 	private savedPartial = false;
 	private toldWrong = false;
 	private readonly noted = new Set<string>();
+	/** His answer this turn that no save has named yet, in a session with
+	 *  a course record to save it to, and whether a turn-ending call was
+	 *  held back for it (once a turn). */
+	private unsaved: string | null;
+	private heldUnsaved = false;
 
 	constructor(
 		messages: readonly LhMessage[],
 		private readonly endsTurn: (toolName: string) => boolean = (name) => (QUESTION_TOOLS as readonly string[]).includes(name),
 		/** The session is his review (session-opening.ts `reviewRecord`). */
 		private readonly review = false,
+		/** The session saves his answers to a course record (`course_save`). */
+		saves = false,
 	) {
 		this.input = turnInputOf(messages);
+		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
 		const earlier = earlierTexts(messages);
 		this.earlier = earlier.map((e) => e.text);
 		this.told = earlier.filter((e) => !e.asked).map((e) => e.text);
@@ -467,6 +498,10 @@ export class VoiceGuard {
 	 *  handed the session back, nothing to do. Each once a turn; nothing
 	 *  after the probe ends, where the teacher speaks next. */
 	beforeEnd(): string | undefined {
+		if (this.unsaved && !this.noted.has(UNSAVED_NOTE)) {
+			this.noted.add(UNSAVED_NOTE);
+			return UNSAVED_NOTE;
+		}
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
@@ -502,6 +537,13 @@ export class VoiceGuard {
 	}
 
 	private judge(call: ToolCall): AgentToolResult<unknown> | null {
+		// A save read as it streams, before the calls after it: one that
+		// names his answer keeps it, so the question after it goes through.
+		if (call.name === SAVE_TOOL && this.unsaved && savedQuestionsOf(call.arguments).includes(this.unsaved)) this.unsaved = null;
+		if (this.unsaved && !this.heldUnsaved && (this.endsTurn(call.name) || call.name === PROBE_DONE_TOOL)) {
+			this.heldUnsaved = true;
+			return UNSAVED(call.name);
+		}
 		if (call.name === SEND_TO_USER_TOOL) {
 			const text = sendToUserText(call);
 			if (!text) return null;
@@ -606,6 +648,8 @@ export class VoiceGuard {
 		if (unsureEcho && !echo) out.push({ rule: "reason", excerpt: unsureEcho });
 		const moral = kind === "direct" ? closingMoral(text) : null;
 		if (moral) out.push({ rule: "moral", excerpt: moral });
+		const sure = kind === "close" ? narratedConfidence(text) : null;
+		if (sure) out.push({ rule: "confidence", excerpt: sure });
 		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
 			const { words } = lengthOf(text);
 			if (words > this.lengthDraft.allowed) out.push({ rule: "length", excerpt: `${words} words where the draft had ${this.lengthDraft.words}, so no whole sentence was cut` });
@@ -614,7 +658,9 @@ export class VoiceGuard {
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
-		return [...out, ...this.repeats(text, true)];
+		const boxed = restatingCallout(text);
+		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
+		return [...out, ...this.letters(text), ...this.repeats(text, true)];
 	}
 
 	private questionBreaks(text: string): VoiceBreak[] {
@@ -623,7 +669,13 @@ export class VoiceGuard {
 		if (compound) out.push(compound);
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
-		return [...out, ...this.repeats(text)];
+		return [...out, ...this.letters(text), ...this.repeats(text)];
+	}
+
+	/** A matrix named with a letter an earlier one of the session has. */
+	private letters(text: string): VoiceBreak[] {
+		const reused = reusedLetter(text, [...this.earlier, ...this.said]);
+		return reused ? [{ rule: "letter", excerpt: `${reused.letter} ${reused.written}` }] : [];
 	}
 
 	/** A matrix or display of a teaching step that he already read earlier

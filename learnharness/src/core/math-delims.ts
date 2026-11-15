@@ -88,7 +88,7 @@ function sumAtTop(tex: string): boolean {
  *  "k!", "x_1", "\sqrt{x}"). */
 const ATOM = /^(?:-?[0-9.]+|[A-Za-z]|\\[A-Za-z]+(?:\{[^{}]*\})*)(?:[!']|[_^](?:\{[^{}]*\}|[A-Za-z0-9]))*$/;
 
-/** An inline fraction set as a slash: `\frac` shrinks a fraction inside a
+/** An inline fraction set as a slash: `\frac` and `\dfrac` shrink or stack a fraction inside a
  *  line of prose to two thirds of the text (round 9: "−15/n", "1/n" and the
  *  binomial expansion too small to read), and a slash keeps the line's
  *  height and size. Parentheses only where the slash would misread. */
@@ -96,7 +96,9 @@ function slashFractions(body: string): string {
 	let out = "";
 	let i = 0;
 	while (i < body.length) {
-		const frac = /^\\t?frac(?![A-Za-z])/.exec(body.slice(i));
+		// `\dfrac` too, which inline stacked a full-size fraction and
+		// doubled the line (round 10, 3 m5: P(X = k) = c·3ᵏ/k!).
+		const frac = /^\\[td]?frac(?![A-Za-z])/.exec(body.slice(i));
 		if (!frac) {
 			out += body[i];
 			i++;
@@ -152,6 +154,11 @@ function trailing(markdown: string, end: number): { punct: string; swallow: numb
 	return { punct: match?.[1] ?? "", swallow: match?.[0].length ?? 0, after: rest === markdown.length || markdown[rest] === "\n" ? "" : "\n\n" };
 }
 
+/** A word joined to inline maths by a hyphen ("$x$-axis"): it goes into
+ *  the formula as text, so the line never breaks between "x" and "-axis"
+ *  (round 10, 2 m6). */
+const JOINED_WORD = /^-[A-Za-z]+(?:-[A-Za-z]+)*/;
+
 function transformDelimiters(markdown: string): string {
 	let offset = 0;
 	let swallow = 0;
@@ -159,7 +166,11 @@ function transformDelimiters(markdown: string): string {
 		const start = offset; offset += span.raw.length;
 		const skip = swallow; swallow = 0;
 		if (span.kind !== "math") return span.raw.slice(skip);
-		if (span.open === "$" && MATRIX_ENV.test(span.body) && !indented(markdown, start) && !inListOrTable(markdown, start)) {
+		// A matrix inside a sentence, however it was written ($…$, $$…$$ or
+		// \(…\)), stands on its own line with its punctuation (round 10,
+		// 2 m6: "Take B = (2 1; 0 3) . Which…" from a one-line $$…$$).
+		const inSentence = span.open === "$" || span.open === "\\(" || (span.open === "$$" && !span.display && lonePrefix(markdown, start, start + span.raw.length) === null);
+		if (inSentence && MATRIX_ENV.test(span.body) && !indented(markdown, start) && !inListOrTable(markdown, start)) {
 			const { punct, swallow: taken, after } = trailing(markdown, start + span.raw.length);
 			swallow = taken;
 			const before = blockPosition(markdown, start) ? "" : "\n\n";
@@ -171,7 +182,11 @@ function transformDelimiters(markdown: string): string {
 			swallow = taken;
 			return `$$${span.body.trimEnd()}${punct}\n${span.close}${after}`;
 		}
-		if (span.open === "$") return "$" + inlineSized(replaceEscapedDollars(span.body)) + span.close;
+		if (span.open === "$") {
+			const joined = JOINED_WORD.exec(markdown.slice(start + span.raw.length))?.[0];
+			if (joined) swallow = joined.length;
+			return "$" + inlineSized(replaceEscapedDollars(span.body)) + (joined ? `\\text{${joined}}` : "") + span.close;
+		}
 		if (span.open === "$$" && !span.display) {
 			// A formula alone on its line is a display, though written as
 			// $$…$$ on one line, which remark-math reads as inline.

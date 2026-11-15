@@ -90,7 +90,8 @@ export interface LhMarkerMessage {
 		| "compaction"
 		| "session-resume"
 		| "ungraded-answer"
-		| "asked";
+		| "asked"
+		| "left-question";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -529,6 +530,21 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
 	};
 }
 
+/** The note riding his first message after Done for today left a question
+ *  open (`questionLeftForToday`): it picks the lesson up at that question.
+ *  Model-facing only. */
+export function newLeftQuestionMessage(question: string): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "left-question",
+		content: `[PICKED UP] He is back on this lesson, which he left for today with your question "${question}" open; the box he answers in held it. If his message answers it, it is his answer: grade it and save it as his attempt naming "his-message", a prediction when the question asked for one. If it only asks you something, answer that, then ask the question again, word for word, with a fresh call.`,
+		display: false,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
 /** The note riding a message he sent from Ask (round 5: an answer typed
  *  while Ask stayed on was graded, with an earlier note's confidence):
  *  what follows is a question to the tutor, never an answer. Model-facing
@@ -539,7 +555,7 @@ export function newAskedMessage(open: "question" | "problem"): LhMarkerMessage {
 		id: newMessageId(),
 		role: "custom",
 		customType: "asked",
-		content: `[ASKED] He sent his next message from Ask, ${beside}: a question to you, not his answer. Answer it. Never grade it, save it as an attempt or conclude a problem from it as solved; his answer comes as his work.`,
+		content: `[ASKED] He sent his next message from Ask, ${beside}: a question to you, not his answer. Answer it. Never grade it, save it as an attempt or conclude a problem from it as solved; his answer comes as his work. Only when it asks nothing and only answers the open question (a guess, a value, a choice) is it his answer to it: save it as his attempt naming "his-message", a prediction when the question asked for one.`,
 		display: false,
 		details: {},
 		timestamp: Date.now(),

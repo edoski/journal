@@ -1,4 +1,4 @@
-import { isReviewSession, markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
+import { isReviewSession, markHow, topicOpening, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { cardLine, slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
@@ -227,7 +227,8 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  * (a new review session, never an old lesson), continue the open task that
  * holds it, start a topic not started, continue one being learned that has
  * no review set, else study (the engine has set the next review in the
- * future, so nothing needs him). Continue picks up the lesson that holds
+ * future, so nothing needs him; when the plan holds a review memory asked
+ * for already, Study opens that review, `topicOpening`). Continue picks up the lesson that holds
  * the task, or the topic's newest lesson, as the session model says
  * (`continueMove`). `chats` are every session; the topic's are those that
  * belong to it (`ownsTopic`), never one that only touched it on the way
@@ -237,7 +238,7 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
 	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
-	const active = resumableSession(sessions.filter((chat) => !closedReview(chat)));
+	const active = resumableSession(sessions.filter((chat) => !closedReview(chat)), chats);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
 	if (topic.review?.kind === "due") {
 		const left = sessions.find(closedReview);
@@ -247,7 +248,7 @@ export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readon
 	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), continueWords(task.title), task);
 	if (topic.level === "new") return { kind: "start", opening: topic.title };
 	if (shelfOf(topic, null) === "learning" && !topic.review) return continueAction(sessions, `Continue ${topic.title}`, null);
-	return { kind: "study", opening: topic.title };
+	return { kind: "study", opening: topicOpening(topic, map.today) };
 }
 
 const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
@@ -289,7 +290,7 @@ export function lastStudiedDay(topic: CourseMapTopic, sessions: readonly Session
 /** What went wrong, when the engine can say: the mistake it diagnosed,
  *  else, for a topic it calls weak, the newest attempt that counts (never
  *  a prediction) in the tutor's words when it was not right. Nothing once
- *  he has fixed it on his own: the head says "Fixed, check again later",
+ *  he has fixed it on his own: the head says "Check again another day",
  *  and the mistake under it read as one still open (round 5). */
 export function mistakeOf(topic: CourseMapTopic, attempts: readonly TopicAttempt[]): string | null {
 	const { gap, repaired, repairedWithHelp } = topic.signals;
@@ -342,7 +343,7 @@ function whereOf(entry: SessionEntry): string {
  * that session holds. A task's press continues the lesson that holds it.
  */
 export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
-	const active = resumableSession(entries.filter((entry) => entry.own && !closedReview(entry.chat)).map((entry) => entry.chat));
+	const active = resumableSession(entries.filter((entry) => entry.own && !closedReview(entry.chat)).map((entry) => entry.chat), chats);
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
