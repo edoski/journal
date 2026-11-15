@@ -59,10 +59,13 @@ describe("the cheat sheet groups them in plain words", () => {
 		]);
 	});
 
-	it("Home: the map's course and its enlarge (Edo's notes, N2)", () => {
+	it("Home: the map's course and its enlarge, and Today's rows (Edo's notes, N2 and N3)", () => {
 		assert.deepEqual(rows("Home"), [
 			["The course left or right on the map", "← →"],
 			["Enlarge the map, and back", "F"],
+			["Move between Today's rows", "↑ ↓"],
+			["Open the row", "O"],
+			["Open the row's course page", "C"],
 		]);
 	});
 

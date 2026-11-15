@@ -53,7 +53,10 @@ export type KeyAction =
 	| "question-pick-digit"
 	| "question-ask-instead"
 	| "home-course"
-	| "home-map-enlarge";
+	| "home-map-enlarge"
+	| "home-rows"
+	| "home-open"
+	| "home-course-page";
 
 /** Where Settings and the cheat sheet group an action (display only —
  *  dispatch is global; a seam that isn't mounted simply no-ops). */
@@ -138,6 +141,9 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// Home owns its keys (components/study-home/home-keys.ts), so they never leak to other pages.
 	{ id: "home-course", label: "The course left or right on the map", scope: "global", binding: "arrows-lr", displayOnly: true, group: "home" },
 	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "f", displayOnly: true, group: "home" },
+	{ id: "home-rows", label: "Move between Today's rows", scope: "global", binding: "arrows-ud", displayOnly: true, group: "home" },
+	{ id: "home-open", label: "Open the row", scope: "global", binding: "o", displayOnly: true, group: "home" },
+	{ id: "home-course-page", label: "Open the row's course page", scope: "global", binding: "c", displayOnly: true, group: "home" },
 ];
 
 const STORAGE_KEY = "lh:keymap";
@@ -269,6 +275,7 @@ const KEY_GLYPH: Record<string, string> = {
 	// Display-only: the four arrows as one cheat-sheet row (page-move).
 	arrows: "↑ ↓ ← →",
 	"arrows-lr": "← →",
+	"arrows-ud": "↑ ↓",
 };
 
 /** Format a binding for display: "mod+shift+f" → "⌘⇧F". */

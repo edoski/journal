@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
 import { neighbourCourse, useHomeKeys } from "@/components/study-home/home-keys";
@@ -8,6 +9,7 @@ import { followedRow, lineKey } from "@/components/study-home/agenda-rows/row-fa
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { TodayRow } from "@/components/study-home/study-facts";
 import { Today } from "@/components/study-home/today";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import type { TopicHandle } from "@/src/core";
 
@@ -45,6 +47,7 @@ type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 
 export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
 	const { rows, courses, chats, done, exam, busy, onContinue } = ready;
+	const router = useRouter();
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	// The line under the pointer or holding focus, if any: only then does the line the map follows wear its fill, so
 	// no row has a card behind it at rest.
@@ -68,6 +71,10 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 			return next !== null;
 		},
 		enlarge: () => onEnlarge(!enlarged),
+		openCoursePage: (line) => {
+			const course = rows.find((row) => lineKey(row) === line)?.course;
+			if (course) router.push(courseHref(course.map.workspace));
+		},
 	});
 
 	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
