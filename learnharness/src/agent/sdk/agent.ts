@@ -37,6 +37,8 @@ export interface SdkAgentConfig {
 	compactionInstructions?: (messages: LhMessage[]) => string;
 	/** Claude Code's own tools that join the app's, by their Claude Code names. */
 	builtins?: readonly ClaudeCodeTool[];
+	/** This turn's effort, when it is not the engine's (`CHAT_EFFORT`). */
+	effort?: "high" | "medium";
 	/** A background job: no session file, at most this many model calls. */
 	ephemeral?: { maxTurns: number };
 	onUsage?: (usage: Usage) => void;
@@ -232,6 +234,7 @@ export class SdkAgent {
 		};
 		const options: Options = {
 			...launch.options,
+			...(this.config.effort ? { effort: this.config.effort } : {}),
 			systemPrompt: { type: "custom", prompt: this.config.systemPrompt, snapshot: false },
 			tools: builtins,
 			allowedTools: [`mcp__${SDK_TOOL_SERVER}`, ...builtins],

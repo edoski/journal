@@ -21,7 +21,8 @@ import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../core/native-messages.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, opensTurn, type LhMessage } from "../core/native-messages.ts";
+import { CHAT_EFFORT, CLAUDE_MODEL } from "../core/contracts/claude.ts";
 
 const PROBE_DONE_TOOL = "probe_done";
 import { VoiceGuard } from "./voice-guard.ts";
@@ -127,6 +128,13 @@ function foldersPrompt(course: CourseToolContext | undefined): string {
 	return [`His home folder: ${homedir()}`, ...(course ? [`This course's folder: ${course.course.workspace}`] : [])].join("\n");
 }
 
+/** A lesson turn's effort: `CHAT_EFFORT`, save the turn the probe's end
+ *  wakes, which writes the lesson's plan at CLAUDE_MODEL's effort. */
+export function turnEffort(messages: readonly LhMessage[]): "high" | "medium" {
+	const input = messages.findLast(opensTurn);
+	return input?.role === "custom" && input.customType === "probe-handoff" ? CLAUDE_MODEL.thinkingLevel : CHAT_EFFORT;
+}
+
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	if (!opts.engine) throw new Error(`no engine injected for the ${kind}`);
 	const engine = opts.engine;
@@ -151,6 +159,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		// Ordinary text never reaches him where send_to_user is his channel.
 		...(opts.tools === undefined ? { screenText: (text: string) => voice.screenText(text), beforeEnd: () => voice.beforeEnd() } : {}),
 		builtins: FILE_TOOLS,
+		effort: turnEffort((opts.messages ?? []) as LhMessage[]),
 		messages: opts.messages ?? [],
 		endsTurn: endsTurnFor(kind),
 		session: opts.session,

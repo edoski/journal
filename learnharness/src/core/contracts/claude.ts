@@ -36,6 +36,12 @@ export interface ClaudeAccountStatus { account: ClaudeAccount; connection: Claud
  * (2026-11-14): there is no model or thinking choice anywhere. */
 export const CLAUDE_MODEL = { id: "claude-opus-5-5", name: "Claude Opus 5.5", thinkingLevel: "high" } as const;
 
+/** The effort of the lesson's own turns, the prober's, the teacher's and
+ *  practice's, save the turn that writes the lesson's plan, which keeps
+ *  CLAUDE_MODEL's, as every other agent does. One line to change: Edo
+ *  decides from the round-10 effort test (16 Nov 2026). */
+export const CHAT_EFFORT: "high" | "medium" = "high";
+
 export const CLAUDE_USAGE_URL = "https://claude.ai/settings/usage";
 
 /** An account whose sign-in can't be read (T3 Code holds no token for it):
