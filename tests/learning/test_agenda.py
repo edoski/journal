@@ -939,3 +939,23 @@ def test_part_of_todays_plan_done_moves_no_estimate() -> None:
     assert after.study_weekdays == before.study_weekdays
     every = save(one, {"observations": [answer(t) for t in proposed[1:]]}, MONDAY)
     assert limits(capacity.of([every], MONDAY)) == limits(before)
+
+
+def test_a_topic_he_must_relearn_is_checked_within_days_like_a_first_review() -> None:
+    """Round 8 (2 M4): a topic missed with confidence on its last two days
+    waited 16 days behind first reviews, another course's final review and
+    weeks-late reviews, though he had just shown he does not know it."""
+    exam = course(3, exam=40)
+    exam = save(exam, {"topics": {"t00": {"introduced": True}}}, on(-10))
+    for offset in (-2, -1):
+        exam = save(exam, {"observations": [answer("t00", "incorrect")]}, on(offset))
+    assert progress.standings(exam)["t00"].get("relearn")
+    backlog = solid(course(6), on(-5))
+    near = solid(course(6, exam=6), on(-1))
+    together = agenda.plan(
+        {"exam": exam, "backlog": backlog, "near": near},
+        MONDAY,
+        14,
+        week(1, 0, EVERY_DAY),
+    )
+    assert together.when("exam", MONDAY, True).reviews["t00"] == MONDAY

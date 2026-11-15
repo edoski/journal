@@ -13,12 +13,15 @@ ladder's next steps; what does not fit stays due. The plan never stores
 anything; the next save and the next plan start again from what happened.
 
 Reviews, when there are more than fit:
-  0. a topic's first review, the day after it was taught: what he has just
-     learned is checked within days, ahead of every older review and of
-     another course's final review, which would otherwise hold it until its
-     exam. Within its own course's final review it is that review's. Among
-     first reviews, those of 2 come first, then the most recently taught: a
-     topic taught weeks ago and never reviewed is no longer just learned.
+  0. a topic's first review, the day after it was taught, and the review of a
+     topic he must learn again (missed on its last two counted days,
+     ``progress``'s ``relearn``): what he has just learned, or has just shown
+     he does not know, is checked within days, ahead of every older review
+     and of another course's final review, which would otherwise hold it
+     until its exam. Within its own course's final review it is that
+     review's. Among these, those of 2 come first, then the most recently
+     worked on: a topic taught weeks ago and never reviewed is no longer just
+     learned.
   1. a course's final review, the one deadline the plan keeps: from its
      final-review day to the exam, its reviews come before every other
      course's but first reviews, nearest exam first. Its solid topics are spread over its study
@@ -416,6 +419,11 @@ class _Course:
             self.replayed[topic].days.values()
         )
 
+    def relearning(self, topic: str) -> bool:
+        """Missed on its last two counted days (``progress`` ``relearn``), as
+        the record stands: he is learning it again."""
+        return bool(self.levels[topic].get("relearn"))
+
     def worked(self, topic: str) -> int:
         """The day he last worked on it, as a day number."""
         last = self.levels[topic].get("last", {}).get("date")
@@ -761,7 +769,7 @@ def _reviews(
             tier = course.tier(topic, day)
             learning = tier == RELEARNING
             gating = learning and topic in gates
-            if course.first(topic):
+            if course.first(topic) or course.relearning(topic):
                 key = (
                     -1,
                     not gating,
