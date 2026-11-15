@@ -58,6 +58,19 @@ test("the box remembers which words were rescued until he makes them his", () =>
 	assert.equal(holdsRescue("c1", "trace is 7, det is"), false);
 });
 
+test("words another window overtook keep their trailing space (round 10, 4 minor 5)", async () => {
+	const { rescuedBox } = await import("../components/lesson/stranded-draft.ts");
+	assert.deepEqual(overtakenDraft("q:1", null, { key: "q:1", text: "Av = 4v, so v = " }, null), { to: "box", words: "Av = 4v, so v = " });
+	assert.deepEqual(overtakenDraft("q:1", null, { key: "q:1", text: "so v = " }, "hint"), { to: "carry", words: "so v = ", why: "hint" });
+	forgetRescue("c10");
+	assert.equal(rescuedBox("c10", "", "so v = "), "so v = ");
+	assert.equal(rescuedBox("c10", "my note ", "so v = "), "my note\n\nso v = ");
+	keepRescue("c10", "so v = ", "q:1");
+	assert.equal(holdsRescue("c10", "so v = "), true, "the box still holds the rescue as it came");
+	assert.equal(holdsRescue("c10", "my note\n\nso v = "), true);
+	forgetRescue("c10");
+});
+
 test("nothing is overtaken when the dock stays, nothing was typed, or the words belong to another dock", () => {
 	assert.equal(overtakenDraft("q:1", "q:1", { key: "q:1", text: "x" }, null), null);
 	assert.equal(overtakenDraft("q:1", null, { key: "q:1", text: "  " }, null), null);

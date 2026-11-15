@@ -758,10 +758,9 @@ export function Chat({
 	const [courseGoneKept, setCourseGoneKept] = useState(false);
 	useEffect(() => {
 		if (!courseGone) return;
-		const words = [draftRef.current, textRef.current].map((w) => w?.trim() ?? "").filter((w, i, all) => w && all.indexOf(w) === i);
+		const kept = keepForNewLesson(draftRef.current, textRef.current);
 		draftRef.current = null;
-		if (words.length === 0) return;
-		keepForNewLesson(words.join("\n\n"));
+		if (!kept) return;
 		applyText("");
 		setCourseGoneKept(true);
 	}, [courseGone, applyText]);

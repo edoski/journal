@@ -33,8 +33,8 @@ export async function sendKeepingWords(
 	box: () => string,
 ): Promise<{ accepted: boolean; back: string | null }> {
 	const text = typed.trim();
-	const accepted = await sendHoldingDraft(held, text, (onAccepted) => go(text, onAccepted));
-	if (accepted || held.current !== text) return { accepted, back: null };
+	const accepted = await sendHoldingDraft(held, typed, (onAccepted) => go(text, onAccepted));
+	if (accepted || held.current !== typed) return { accepted, back: null };
 	held.current = null;
 	return { accepted, back: text && !box().trim() ? typed : null };
 }

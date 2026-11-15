@@ -19,11 +19,23 @@ const PREFIX = "lh.kept.";
 /** The New lesson box's scope. */
 export const NEW_LESSON_BOX = "new";
 
-/** Leaves words for a new lesson: added to what the New lesson box holds
- *  (a deleted course's lesson sends what he wrote there, round 7). */
-export function keepForNewLesson(words: string): void {
-	const held = keptWords(NEW_LESSON_BOX)?.text?.trim();
-	keepWords(NEW_LESSON_BOX, { text: held ? `${held}\n\n${words}` : words });
+/** Pieces of his writing as one text, each as he typed it, trailing space
+ *  too (round 9: "v = " came back as "v ="): only the joint between two
+ *  pieces is tidied, and empty pieces drop. Pure. */
+export function joinAsTyped(pieces: readonly (string | null | undefined)[]): string {
+	const parts = pieces.filter((w): w is string => !!w?.trim());
+	return parts.map((w, i) => (i < parts.length - 1 ? w.trimEnd() : w)).map((w, i) => (i > 0 ? w.trimStart() : w)).join("\n\n");
+}
+
+/** Leaves his words for a new lesson, after what the New lesson box holds
+ *  (a deleted course's lesson sends what he wrote there, round 7). The
+ *  same message twice (sent and refused, and still in the box) is kept
+ *  once. Whether anything was kept. */
+export function keepForNewLesson(...words: readonly (string | null | undefined)[]): boolean {
+	const distinct = words.filter((w, i) => w?.trim() && words.findIndex((o) => o?.trim() === w.trim()) === i);
+	if (distinct.length === 0) return false;
+	keepWords(NEW_LESSON_BOX, { text: joinAsTyped([keptWords(NEW_LESSON_BOX)?.text, ...distinct]) });
+	return true;
 }
 
 /** A question form's words as stored: its selection as plain indexes. */
@@ -285,11 +297,7 @@ export function takeCarry(carryScope: string, question: string, reaskOf?: string
 /** The carried work as the next question's draft: a typed answer goes in
  *  the answer box of a question that takes one, else in Your thinking. */
 export function carriedForm(carry: KeptWords, textMode: boolean): QuestionFormDraft | undefined {
-	const words = carry.form ? [carry.form.text, carry.form.other, carry.form.thinking] : [carry.text];
-	// His words as he typed them (round 9: "v = " came back as "v =");
-	// only the joint between two parts is tidied.
-	const parts = words.filter((w): w is string => !!w?.trim());
-	const text = parts.map((w, i) => (i < parts.length - 1 ? w.trimEnd() : i > 0 ? w.trimStart() : w)).join("\n\n");
+	const text = joinAsTyped(carry.form ? [carry.form.text, carry.form.other, carry.form.thinking] : [carry.text]);
 	if (!text) return undefined;
 	return {
 		selection: { selected: new Set(), otherSelected: false },

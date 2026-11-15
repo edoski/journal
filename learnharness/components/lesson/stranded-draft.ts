@@ -14,7 +14,7 @@
  *   They never fill another question's answer.
  */
 
-import { keepWords, keptWords } from "@/components/lesson/kept-drafts";
+import { joinAsTyped, keepWords, keptWords } from "@/components/lesson/kept-drafts";
 
 /** What he has typed in the open dock, keyed by the question or problem. */
 export interface LiveDraft {
@@ -35,8 +35,9 @@ export type Overtaken = { to: "carry"; words: string; why: LeftOpen } | { to: "b
  *  `leftOpen` says why `before`'s question left, when it is still open. Pure. */
 export function overtakenDraft(before: string | null, after: string | null, draft: LiveDraft | null, leftOpen: LeftOpen | null): Overtaken | null {
 	if (before === null || before === after || draft === null || draft.key !== before) return null;
-	const words = draft.text.trim();
-	if (words === "") return null;
+	// As he typed them, trailing space too (round 10, 4 minor 5).
+	const words = draft.text;
+	if (words.trim() === "") return null;
 	return leftOpen ? { to: "carry", words, why: leftOpen } : { to: "box", words };
 }
 
@@ -58,7 +59,7 @@ export function forgetRescue(chatId: string): void {
  *  then they are another question's answer, never this one's. */
 export function holdsRescue(chatId: string, box: string): boolean {
 	const rescued = keptWords(rescueScope(chatId))?.text;
-	return !!rescued && box.trim().endsWith(rescued);
+	return !!rescued && box.trimEnd().endsWith(rescued.trimEnd());
 }
 
 /** Whether the box holds the rescued words and nothing else of his. */
@@ -72,7 +73,7 @@ function onlyRescue(chatId: string, box: string): boolean {
  *  merged into one block). Pure but for reading the kept rescue. */
 export function rescuedBox(chatId: string, box: string, words: string): string {
 	if (!box.trim() || onlyRescue(chatId, box)) return words;
-	return `${box.trim()}\n\n${words}`;
+	return joinAsTyped([box, words]);
 }
 
 /** A rescue dies with its own question (round 8: it stayed in the box
