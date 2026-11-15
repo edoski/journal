@@ -48,8 +48,8 @@ export interface TopicSignals {
 	/** Every answer that repaired it had help: help may have carried it.
 	 *  Absent: not repaired, or repaired on his own. */
 	repairedWithHelp?: boolean;
-	/** A counted answer not right since his latest right answer on his own
-	 *  (the engine's `mistake`): only then is a gap a mistake; without one
+	/** A counted answer not right since his latest right answer, with help
+	 *  or not (the engine's `mistake`): only then is a gap a mistake; without one
 	 *  it is what is left to check. Absent: none open. */
 	mistake?: boolean;
 }

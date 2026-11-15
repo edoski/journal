@@ -236,7 +236,11 @@ def test_a_repair_only_with_help_says_so_and_one_on_his_own_does_not() -> None:
         ([attempt("rank", "partial")], "partial"),
         ([attempt("rank"), attempt("rank", "partial")], "partial"),
         (
-            [attempt("rank"), attempt("rank", "partial"), attempt("rank", sure="guess")],
+            [
+                attempt("rank"),
+                attempt("rank", "partial"),
+                attempt("rank", sure="guess"),
+            ],
             "guess",
         ),
     ],
