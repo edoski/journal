@@ -1,5 +1,5 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { LESSON_WORDS, leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
+import { leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
@@ -208,12 +208,23 @@ export function studiedWords(at: string, today: string): string {
 	return agoWords(Math.max(0, daysBetween(dayOf(at), day)), day);
 }
 
+/** When a session left for next time was left, in the app's one phrase for
+ *  work left open (round 9, 2 m6: one Eigen lesson read "Left for next
+ *  time" on its topic and "Left off today" on the topic its task holds):
+ *  "Left off today", "Left off 6 Nov". `today` is the engine's day. Pure. */
+export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string): string {
+	return leftOffWords(Math.max(0, daysBetween(dayOf(chat.updatedAt), today)), today);
+}
+
 export function unitStatus(unit: Unit, today: string): UnitStatus {
 	const { topic } = unit;
 	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
 	// A wrong answer still open outranks a lesson left for next time
 	// (round 8: Eigen's mistake hid behind "Left for next time").
-	if (unit.now === "left") return slip && topic.signals.mistake ? slip : { kind: "task", words: LESSON_WORDS.leftForTonight };
+	if (unit.now === "left") {
+		const left = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left");
+		return slip && topic.signals.mistake ? slip : { kind: "task", words: left ? leftWords(left, today) : leftOffWords(null, today) };
+	}
 	if (unit.now) return { kind: unit.now };
 	if (slip) return slip;
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue, today) };

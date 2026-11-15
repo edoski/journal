@@ -1,8 +1,9 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
-import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
+import { TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { pausedWords, sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
-import { taskWords } from "@/components/unit-inbox/units";
+import { leftWords, taskWords } from "@/components/unit-inbox/units";
+import { localDay } from "@/components/day-change";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
@@ -94,12 +95,12 @@ function reviewReason(due: readonly CourseMapTopic[], today: string): Why | null
 }
 
 /** A session's line by where it stands; a finished session has no line. */
-const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
-	"your-turn": { kind: "reply", short: "Your turn" },
-	working: { kind: "working", short: TUTOR_WRITING },
-	paused: { kind: "stopped", short: "Reply cut off" },
-	left: { kind: "task", short: LESSON_WORDS.leftForTonight },
-	finished: null,
+const SESSION_WHY: Record<ReturnType<typeof sessionState>, (row: TodayRow & { kind: "session" }) => Why | null> = {
+	"your-turn": () => ({ kind: "reply", short: "Your turn" }),
+	working: () => ({ kind: "working", short: TUTOR_WRITING }),
+	paused: (row) => ({ kind: "stopped", short: pausedWords(row.chat) }),
+	left: (row) => ({ kind: "task", short: leftWords(row.chat, row.course?.map.today ?? localDay(new Date())) }),
+	finished: () => null,
 };
 
 /**
@@ -116,8 +117,7 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  */
 export function whyOf(row: TodayRow): Why | null {
 	if (row.kind === "session") {
-		const state = sessionState(row.chat);
-		return state === "paused" ? { kind: "stopped", short: pausedWords(row.chat) } : SESSION_WHY[state];
+		return SESSION_WHY[sessionState(row.chat)](row);
 	}
 	const { course, step } = row;
 	switch (step.kind) {
@@ -140,13 +140,15 @@ export function whyOf(row: TodayRow): Why | null {
 }
 
 /** The days since the line's one clock, which only a session's line has:
- *  since he last wrote in that session, so one started minutes ago is 0.
+ *  since he last wrote in that session, so one started minutes ago is 0;
+ *  none for one left for next time, whose reason dates it ("Left off 6
+ *  Nov"), so a row never shows two days.
  *  A course's line has none (round 9, 1 D5: it showed the course's last
  *  study, so "Studied today" sat on "Start Linear maps", a topic never
  *  studied, and every row repeated the same day); its reason says what
  *  the row is about. Null for a line with no clock. Pure. */
 function studiedDays(row: TodayRow): number | null {
-	if (row.kind !== "session") return null;
+	if (row.kind !== "session" || sessionState(row.chat) === "left") return null;
 	const today = row.course?.map.today;
 	if (!today) return null;
 	const at = new Date(row.chat.updatedAt);

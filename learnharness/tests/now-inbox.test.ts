@@ -104,12 +104,12 @@ describe("shelfStatus", () => {
 		assert.deepEqual(shelfStatus(unit({ now: "working" }), TODAY), { kind: "working" });
 	});
 
-	it("never hides a wrong answer still open behind Left for next time; a fixed one, or a gap with none open, lets the lesson say it (round 8, 2 m10)", () => {
+	it("never hides a wrong answer still open behind a lesson left off; a fixed one, or a gap with none open, lets the lesson say it (round 8, 2 m10)", () => {
 		const signals = { gap: "Reads the kernel off with a sign slip", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 		const open = unit({ now: "left", slip: "Mistake to fix", topic: topic("eigen", "Eigen", "assisted", { weak: true, signals: { ...signals, mistake: true } }) });
 		assert.deepEqual(shelfStatus(open, TODAY), { kind: "slip", words: "Mistake to fix", slip: "gap" });
 		const closed = unit({ now: "left", slip: "Check on your own", topic: topic("eigen", "Eigen", "assisted", { weak: true, signals }) });
-		assert.deepEqual(shelfStatus(closed, TODAY), { kind: "task", words: "Left for next time" });
+		assert.deepEqual(shelfStatus(closed, TODAY), { kind: "task", words: "Unfinished" }, "a left lesson its unit does not list has no day to say");
 	});
 });
 

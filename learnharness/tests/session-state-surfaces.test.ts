@@ -27,8 +27,10 @@ const { sessionState } = await import("../components/nav/session-state.ts");
 const { topicAction } = await import("../components/unit-inbox/topic-page/topic-facts.ts");
 const { courseMove, openSessions, todayRows } = await import("../components/study-home/study-facts.ts");
 const { whyOf } = await import("../components/study-home/agenda-rows/row-facts.ts");
-const { buildInbox } = await import("../components/unit-inbox/units.ts");
+const { buildInbox, unitStatus } = await import("../components/unit-inbox/units.ts");
 const { calendarEntries } = await import("../components/calendar/calendar-facts.ts");
+const { topicFacts } = await import("../components/unit-inbox/topic-page/topic-facts.ts");
+const { nowItem } = await import("../components/unit-inbox/topic-page/pickup/pickup-facts.ts");
 
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
@@ -205,7 +207,7 @@ describe("an open task", () => {
 });
 
 describe("a lesson he stopped for today with a check open", () => {
-	it("is left for next time on every surface, days later too, until he picks it up", () => {
+	it("says Left off with its day on every surface, days later too, until he picks it up", () => {
 		const open = lesson(EIGEN_STEPS, ["eigen"], [assistant([call("q3", "explain", { type: "check", nodeId: "compute", question: "Eigenvector for 1?", correctAnswer: "(1,-1)" })])]);
 		const qid = (open.at(-1) as unknown as { content: { id: string }[] }).content[0]!.id;
 		const stopped: LhMessage[] = [
@@ -221,9 +223,13 @@ describe("a lesson he stopped for today with a check open", () => {
 		assert.equal(sessionState(left), "left");
 		const row = todayRows([COURSE], openSessions(chats), TODAY).find((r) => r.kind === "session" && r.chat.id === id);
 		assert.ok(row, "Home keeps its line three days on");
-		assert.deepEqual(whyOf(row!), { kind: "task", short: "Left for next time" });
 		assert.deepEqual(topicAction(EIGEN, MAP, chats), { kind: "resume", chat: left }, "its topic page resumes it, never Nothing due");
-		assert.equal(sidebarRow(chats, "eigen")?.now, "left");
+		const unit = sidebarRow(chats, "eigen")!;
+		assert.equal(unit.now, "left");
+		// round 9, 2 m6: one lesson read "Left for next time" on one surface and "Left off today" on another
+		const status = unitStatus(unit, TODAY);
+		const said = { home: whyOf(row!)?.short, sidebar: "words" in status ? status.words : null, topicPage: nowItem(topicFacts({ course: COURSE as never, topic: EIGEN, chats, read: null })).note };
+		assert.deepEqual(said, { home: "Left off 5 Nov", sidebar: "Left off 5 Nov", topicPage: "Left off 5 Nov" }, "one lesson left open, one phrase with its day, on every surface");
 		chatStore.deleteChat(id);
 	});
 });
