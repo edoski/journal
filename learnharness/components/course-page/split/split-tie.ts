@@ -104,15 +104,6 @@ export function walkTo(key: string, at: number | null, count: number): number | 
 	}
 }
 
-/** The scroll position that brings a row wholly into a pane, moving as
- *  little as it can; null when it is already in view. `room` keeps that
- *  much clear above and below it (the focus ring). */
-export function scrollToShow(row: { top: number; height: number }, view: { scrollTop: number; height: number }, room = 0): number | null {
-	if (row.top - room < view.scrollTop) return Math.max(0, row.top - room);
-	if (row.top + row.height + room > view.scrollTop + view.height) return row.top + row.height + room - view.height;
-	return null;
-}
-
 export interface Size {
 	width: number;
 	height: number;

@@ -22,10 +22,6 @@ const FADE = { x: 48, y: 32 };
 /** The room the map keeps above its drawing for the "You are here" tag
  *  (topic-map.tsx's TAG_ROOM). */
 const TAG_ROOM = 20;
-/** How long the pane takes to bring a topic he points at into view. The
- *  rest before it moves, and before it glides back, are shared with Home's
- *  map (lit-camera.ts). */
-const GLIDE_MS = 200;
 
 function reducedMotion(): boolean {
 	return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -97,7 +93,6 @@ export function SplitMap({
 	revealed.current = reveal;
 	/** The pane moved off its opening view to show a row he pointed at, and has not been scrolled by him since. */
 	const strayed = useRef(false);
-	const glide = useRef(0);
 	const homing = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const [pane, setPane] = useState<Size>({ width: 0, height: 0 });
 
@@ -127,21 +122,11 @@ export function SplitMap({
 	const home = useMemo<Scroll | null>(() => (zoomedOut ? { left: 0, top: 0 } : opening ? scrollOfCamera(layout, surface, pane, opening) : null), [zoomedOut, layout, surface, pane, opening]);
 	const toggleWhole = useCallback(() => setWhole((w) => !w), []);
 
-	/** Glides the pane over 200ms to `to`, at once under reduced motion. */
+	/** Glides the pane to `to` (the browser's smooth scroll), at once under
+	 *  reduced motion. The rests before it moves, and before it glides back,
+	 *  are shared with Home's map (lit-camera.ts). */
 	const glideTo = useCallback((to: Scroll) => {
-		const el = scroller.current;
-		if (!el) return;
-		cancelAnimationFrame(glide.current);
-		if (reducedMotion()) return el.scrollTo(to);
-		const from: Scroll = { left: el.scrollLeft, top: el.scrollTop };
-		const start = performance.now();
-		const step = (now: number) => {
-			const t = Math.min(1, (now - start) / GLIDE_MS);
-			const eased = 1 - (1 - t) ** 3;
-			el.scrollTo(from.left + (to.left - from.left) * eased, from.top + (to.top - from.top) * eased);
-			if (t < 1) glide.current = requestAnimationFrame(step);
-		};
-		glide.current = requestAnimationFrame(step);
+		scroller.current?.scrollTo({ ...to, behavior: reducedMotion() ? "auto" : "smooth" });
 	}, []);
 
 	/** Brings a topic he points at or reaches into view, when it is not already clear of the fade. */
@@ -151,7 +136,6 @@ export function SplitMap({
 			if (!el || el.clientWidth === 0) return false;
 			const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
 			const to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade);
-			cancelAnimationFrame(glide.current);
 			if (!to) return false;
 			glideTo(to);
 			return true;
@@ -186,7 +170,6 @@ export function SplitMap({
 		observer.observe(el);
 		return () => {
 			observer.disconnect();
-			cancelAnimationFrame(glide.current);
 			clearTimeout(homing.current);
 		};
 	}, []);
@@ -195,7 +178,6 @@ export function SplitMap({
 	useEffect(() => {
 		const el = scroller.current;
 		if (!el || !home) return;
-		cancelAnimationFrame(glide.current);
 		strayed.current = false;
 		el.scrollTo(home);
 	}, [home]);
@@ -218,14 +200,12 @@ export function SplitMap({
 		const onWheel = (e: WheelEvent) => {
 			if (e.ctrlKey) return;
 			e.stopPropagation();
-			cancelAnimationFrame(glide.current);
 			strayed.current = false;
 		};
 		let drag: { x: number; y: number; left: number; top: number; id: number } | null = null;
 		const onPointerDown = (e: PointerEvent) => {
 			if (e.button !== 0 || e.pointerType === "touch" || (e.target as Element).closest("[data-slot=course-map-node]")) return;
 			e.stopPropagation();
-			cancelAnimationFrame(glide.current);
 			strayed.current = false;
 			drag = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, id: e.pointerId };
 			el.setPointerCapture(e.pointerId);
