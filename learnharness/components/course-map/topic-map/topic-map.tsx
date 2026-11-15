@@ -1,26 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent } from "@xyflow/react";
+import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent, type Edge, type Node } from "@xyflow/react";
 import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
-import { NeedEdge, type NeedFlowEdge } from "./need-edge";
-import { READABLE_ZOOM, TOPIC_NODE_SIZE as node, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, layoutTopicMap, neighbourOf, slackOf, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
-import { TopicMapContext, TopicNode, type TopicFlowNode, type TopicMapState } from "./topic-node";
+import { READABLE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, slackOf, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
+import { TopicMapContext, type TopicMapState } from "./topic-node";
 import { cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { arcView } from "./arc-view";
 import { litCamera, litFollow } from "./lit-camera";
-
-const nodeTypes = { topic: TopicNode };
-const edgeTypes = { need: NeedEdge };
+import { handleAt, type FrameProps, type MapSkin, type TopicData } from "./map-skin";
+import { useMapSkin } from "./map-skins";
 
 /** Room around the drawing: the least a topic at its edge can be brought
  *  in from the frame's edge, enough to clear a frame that fades. */
 const ROOM = { x: 48, y: 32 };
-/** The current topic's tag sits this far above its node, inside the room. */
-const TAG_ROOM = 20;
 /** How long the camera takes to follow the keyboard to a topic out of view, or a page to the topics it points at. */
 const FOLLOW_MS = 200;
 /** The course page pane's glide (split-map.tsx): fast out, settling in. */
@@ -52,7 +48,16 @@ function reducedMotion(): boolean {
  * whole once the page rests on them, and leaves for its opening view once
  * it points at nothing (`litFollow`); off by default.
  */
-export function TopicMap({
+export function TopicMap(props: TopicMapProps) {
+	// The map's one switch (map-style.ts): each style draws the same course, its own way.
+	const { style, skin } = useMapSkin();
+	return <SkinnedMap key={style} skin={skin} {...props} />;
+}
+
+type TopicMapProps = Parameters<typeof SkinnedMap>[0] extends infer P ? Omit<P, "skin"> : never;
+
+function SkinnedMap({
+	skin,
 	map: course,
 	arc,
 	said,
@@ -65,6 +70,7 @@ export function TopicMap({
 	onOpensWhole,
 	opensOn,
 }: {
+	skin: MapSkin;
 	map: CourseMap;
 	/** The one arc to draw; unset, the whole course. */
 	arc?: ArcHandle;
@@ -97,25 +103,26 @@ export function TopicMap({
 }) {
 	const view = useMemo(() => arcView(course, arc), [course, arc]);
 	const map = view.map;
-	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node, new Set(view.entry.keys())), [map.topics, map.edges, view.entry]);
+	const layout = useMemo(() => skin.layout(map.topics, map.edges, new Set(view.entry.keys())), [skin, map.topics, map.edges, view.entry]);
+	const node = layout.node;
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
-	const nodes = useMemo<TopicFlowNode[]>(
-		() =>
-			map.topics.flatMap((topic) => {
+	const nodes = useMemo<Node[]>(
+		() => [
+			...map.topics.flatMap((topic): Node<TopicData>[] | Node<TopicData> => {
 				const placed = layout.topics.get(topic.handle);
 				if (!placed) return [];
 				const line = cardLine(said.get(topic.handle));
 				const needs = map.edges.flatMap((e) => (e.kind === "needs" && e.topic === topic.handle ? [titleOf(e.prerequisite)] : []));
 				return {
 					id: topic.handle,
-					type: "topic" as const,
+					type: skin.topicType,
 					position: { x: placed.x, y: placed.y },
 					width: node.width,
 					height: node.height,
 					// A server render has no measured handles; these let it draw the needs.
 					handles: [
-						{ type: "target" as const, position: Position.Top, x: node.width / 2, y: 0 },
-						{ type: "source" as const, position: Position.Bottom, x: node.width / 2, y: node.height },
+						{ type: "target" as const, position: skin.handles.target, ...handleAt(skin.handles.target, node) },
+						{ type: "source" as const, position: skin.handles.source, ...handleAt(skin.handles.source, node) },
 					],
 					draggable: false,
 					selectable: false,
@@ -133,31 +140,35 @@ export function TopicMap({
 					},
 				};
 			}),
-		[map, said, layout, titleOf, view.entry],
+			...(skin.decorations?.(map, layout) ?? []),
+		],
+		[skin, map, said, layout, node, titleOf, view.entry],
 	);
-	const edges = useMemo<NeedFlowEdge[]>(
+	const edges = useMemo<Edge[]>(
 		() =>
+			skin.edges?.(map, layout) ??
 			layout.routes.map((route) => ({
 				id: `${route.prerequisite}>${route.topic}`,
 				source: route.prerequisite,
 				target: route.topic,
-				type: "need" as const,
+				type: skin.edgeType,
 				data: { points: route.points },
 				focusable: false,
 				selectable: false,
 				domAttributes: { "aria-hidden": true },
 			})),
-		[layout],
+		[skin, map, layout],
 	);
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} />
+			<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} />
 		</ReactFlowProvider>
 	);
 }
 
 function Flow({
+	skin,
 	map,
 	layout,
 	nodes,
@@ -172,10 +183,11 @@ function Flow({
 	onOpensWhole,
 	opensOn,
 }: {
+	skin: MapSkin;
 	map: CourseMap;
 	layout: TopicMapLayout;
-	nodes: TopicFlowNode[];
-	edges: NeedFlowEdge[];
+	nodes: Node[];
+	edges: Edge[];
 	titleOf: (handle: TopicHandle) => string;
 	margin: { x: number; y: number };
 	highlight: ReadonlySet<TopicHandle> | null;
@@ -187,8 +199,9 @@ function Flow({
 	opensOn: TopicHandle | null;
 }) {
 	const captionId = useId();
-	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y]);
-	const flow = useReactFlow<TopicFlowNode, NeedFlowEdge>();
+	const TAG_ROOM = skin.tagRoom;
+	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y, TAG_ROOM]);
+	const flow = useReactFlow();
 	const frameWidth = useStore((s) => s.width);
 	const frameHeight = useStore((s) => s.height);
 
@@ -237,13 +250,13 @@ function Flow({
 	/** The opening view, where the camera returns once a page points at nothing. */
 	const opening = useRef<Camera | null>(null);
 	/** What the follow reads when it fires, as of the last render. */
-	const now = useRef({ layout, frame, frameMargin, reach, minZoom, current: map.current });
-	now.current = { layout, frame, frameMargin, reach, minZoom, current: map.current };
+	const now = useRef({ layout, frame, frameMargin, reach, minZoom, current: map.current, tag: TAG_ROOM });
+	now.current = { layout, frame, frameMargin, reach, minZoom, current: map.current, tag: TAG_ROOM };
 	const [follower] = useState(() =>
 		litFollow({
 			plan: (lit) => {
-				const { layout, frame, frameMargin, reach, minZoom, current } = now.current;
-				return frame ? litCamera(layout, flow.getViewport(), lit, frame, frameMargin, reach, minZoom, current, TAG_ROOM) : null;
+				const { layout, frame, frameMargin, reach, minZoom, current, tag } = now.current;
+				return frame ? litCamera(layout, flow.getViewport(), lit, frame, frameMargin, reach, minZoom, current, tag) : null;
 			},
 			home: () => {
 				const { x, y, zoom } = flow.getViewport();
@@ -271,7 +284,7 @@ function Flow({
 		follower.stay();
 		void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
 		setPlaced(true);
-	}, [flow, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom]);
+	}, [flow, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, TAG_ROOM]);
 
 	// The topics a page points at on this drawing, which the camera follows; none while it shows the whole course.
 	const pointedAt = useMemo(() => {
@@ -308,7 +321,7 @@ function Flow({
 			},
 			onKeyDown: (handle, event: KeyboardEvent<HTMLAnchorElement>) => {
 				if (!isWalkKey(event.key)) return;
-				const next = neighbourOf(layout, map.edges, handle, event.key);
+				const next = skin.neighbour(layout, map.edges, handle, event.key);
 				if (!next) return;
 				event.preventDefault();
 				setTabStop(next);
@@ -319,7 +332,7 @@ function Flow({
 				else links.current.delete(handle);
 			},
 		}),
-		[lit, marked, tabStop, layout, map.edges, follow],
+		[lit, marked, tabStop, layout, map.edges, follow, skin],
 	);
 
 	const current = map.current ? titleOf(map.current) : null;
@@ -329,36 +342,45 @@ function Flow({
 				{`${map.title}: ${map.topics.length} topics, prerequisites above the topics that need them.`}
 				{current ? ` You are at ${current}.` : ""}
 			</figcaption>
-			<TopicMapContext.Provider value={state}>
-				<ReactFlow
-					nodes={nodes}
-					edges={edges}
-					nodeTypes={nodeTypes}
-					edgeTypes={edgeTypes}
-					// No `colorMode="dark"`: its `dark` class on the wrapper would restate the old theme's tokens inside the map.
-					// Hidden only until the frame is measured and the opening view set, in the same frame.
-					className={cn(!placed && "invisible")}
-					minZoom={minZoom}
-					maxZoom={1}
-					translateExtent={extent}
-					panOnScroll
-					// A pan or zoom of his own (an event; the camera's own moves have none) keeps the map where he leaves it.
-					onMoveStart={(event) => event && follower.stay()}
-					zoomOnDoubleClick={false}
-					nodesDraggable={false}
-					nodesConnectable={false}
-					nodesFocusable={false}
-					edgesFocusable={false}
-					elementsSelectable={false}
-					deleteKeyCode={null}
-					selectionKeyCode={null}
-					multiSelectionKeyCode={null}
-					panActivationKeyCode={null}
-					disableKeyboardA11y
-					// MIT asks for no badge; the maintainers ask organisations that hide it to subscribe (spec: topic-map.md).
-					proOptions={{ hideAttribution: true }}
-				/>
-			</TopicMapContext.Provider>
+			<SkinFrame skin={skin} map={map} layout={layout} nodes={nodes} margin={frameMargin} ownCamera={fixedZoom === undefined}>
+				<TopicMapContext.Provider value={state}>
+					<ReactFlow
+						nodes={nodes}
+						edges={edges}
+						nodeTypes={skin.nodeTypes}
+						edgeTypes={skin.edgeTypes}
+						// No `colorMode="dark"`: its `dark` class on the wrapper would restate the old theme's tokens inside the map.
+						// Hidden only until the frame is measured and the opening view set, in the same frame.
+						className={cn(!placed && "invisible")}
+						minZoom={minZoom}
+						maxZoom={1}
+						translateExtent={extent}
+						panOnScroll={skin.panOnScroll}
+						// A pan or zoom of his own (an event; the camera's own moves have none) keeps the map where he leaves it.
+						onMoveStart={(event) => event && follower.stay()}
+						zoomOnDoubleClick={false}
+						nodesDraggable={false}
+						nodesConnectable={false}
+						nodesFocusable={false}
+						edgesFocusable={false}
+						elementsSelectable={false}
+						deleteKeyCode={null}
+						selectionKeyCode={null}
+						multiSelectionKeyCode={null}
+						panActivationKeyCode={null}
+						disableKeyboardA11y
+						// MIT asks for no badge; the maintainers ask organisations that hide it to subscribe (spec: topic-map.md).
+						proOptions={{ hideAttribution: true }}
+					>
+						{skin.Chrome && <skin.Chrome map={map} layout={layout} margin={frameMargin} ownCamera={fixedZoom === undefined} />}
+					</ReactFlow>
+				</TopicMapContext.Provider>
+			</SkinFrame>
 		</figure>
 	);
+}
+
+/** The style's own frame around the drawing, or the drawing as it is. */
+function SkinFrame({ skin, children, ...props }: Omit<FrameProps, "children"> & { skin: MapSkin; children: React.ReactNode }) {
+	return skin.Frame ? <skin.Frame {...props}>{children}</skin.Frame> : children;
 }

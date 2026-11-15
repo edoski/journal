@@ -60,7 +60,7 @@ export const RECEDED = 0.8;
  *  sidebar's and the course page's, a spinner while the tutor writes),
  *  then its words, on a caption line whose middle is the words' cap
  *  height. */
-function LineMark({ line }: { line: CardFact }) {
+export function LineMark({ line }: { line: CardFact }) {
 	const Icon = factIcon(line);
 	return (
 		<span data-slot="topic-need" data-kind={line.kind} className="flex h-lh min-w-0 items-center gap-1 text-callout text-muted-foreground">

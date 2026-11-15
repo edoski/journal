@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import type { ArcHandle, CourseStanding, TopicHandle } from "@/src/core";
-import { TOPIC_NODE_SIZE, layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
+import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
 import { arcView } from "@/components/course-map/topic-map/arc-view";
 import { ArcStrip } from "@/components/course-map/arc-strip";
 import { useStartArcCheck } from "@/components/unit-inbox/start-unit";
@@ -53,12 +53,14 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 		}
 	}
 	const shown = arcs?.find((a) => a.arc.handle === shownArc) ?? null;
-	const wholeLayout = useMemo(() => layoutTopicMap(map.topics, map.edges, TOPIC_NODE_SIZE), [map.topics, map.edges]);
+	// The map style's own drawing (map-style.ts), which sizes the pane's surface.
+	const { skin } = useMapSkin();
+	const wholeLayout = useMemo(() => skin.layout(map.topics, map.edges), [skin, map.topics, map.edges]);
 	const layout = useMemo(() => {
 		if (!shown) return wholeLayout;
 		const drawn = arcView(map, shown.arc.handle);
-		return layoutTopicMap(drawn.map.topics, drawn.map.edges, TOPIC_NODE_SIZE, new Set(drawn.entry.keys()));
-	}, [shown, map, wholeLayout]);
+		return skin.layout(drawn.map.topics, drawn.map.edges, new Set(drawn.entry.keys()));
+	}, [skin, shown, map, wholeLayout]);
 	const aim = useMemo(() => aimOf(map.current, view.next.lesson.topics, shown ? [{ id: shown.arc.handle, topics: shown.topics }] : groups, layout), [map.current, view.next.lesson.topics, shown, groups, layout]);
 	const { startArcCheck, starting } = useStartArcCheck();
 	const onCheck = (section: CourseArcSection) =>
