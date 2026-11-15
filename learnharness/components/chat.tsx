@@ -87,7 +87,7 @@ import { LESSON_WORDS } from "@/components/study-words";
 import { carryBox, carryWords, forgetClosedBoxes, keepForNewLesson, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
-import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
+import { DoneTonightButton, DoneTonightLine, doneTonightGone } from "@/components/lesson/done-tonight";
 import { CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
@@ -1516,7 +1516,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={<DoneTonightButton onDone={sendTonight} gone={closedForToday} disabled={doneTonight || gone || courseGone} />}
+						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, courseGone, lessonGone: gone })} disabled={doneTonight} />}
 					/>
 				</TopBar>
 
