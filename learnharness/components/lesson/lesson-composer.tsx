@@ -94,11 +94,13 @@ export function LessonComposer({
 		else if (action === "next") next?.run();
 		else if (action === "empty-action") onEmptyEnter?.();
 	};
-	// The square stops a turn only while the field is empty: typed text
-	// keeps the send, which steers.
-	const stopping = !answer && busy && !canSend;
-	const sendLabel = answer ? (answer.label ?? "Submit answer") : stopping ? "Stop" : "Send";
-	const sendDisabled = answer ? !answer.ready : !busy && !canSend;
+	// The square stops a turn while nothing can go: an empty message field
+	// (typed text keeps the send, which steers), or an answer that waits for
+	// the turn to end (round 10, 4 minor 6: a dead send arrow showed while
+	// the tutor was still writing, and Enter seemed to do nothing).
+	const stopping = busy && (answer ? !answer.ready : !canSend);
+	const sendLabel = stopping ? "Stop" : answer ? (answer.label ?? "Submit answer") : "Send";
+	const sendDisabled = stopping ? false : answer ? !answer.ready : !busy && !canSend;
 	return (
 		<form
 			data-testid="composer"
