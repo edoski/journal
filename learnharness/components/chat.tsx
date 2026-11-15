@@ -49,7 +49,6 @@ import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, Photo, JobRecord, LessonPlace, PracticeRequest, PracticeRequestDetails, QuestionAnswerData } from "@/src/core";
 import type { AnswerMark, CourseLink, DisputeDetails, LhViewMessage, SessionMode } from "@/src/core";
-import { CompactionCutDivider } from "@/components/compaction-divider";
 import {
 	activeProblemOf,
 	pendingQuestionOf,
@@ -81,7 +80,7 @@ import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
-import { showsWorking } from "@/components/lesson/working-sign";
+import { waitingLine } from "@/components/lesson/working-sign";
 import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
@@ -796,6 +795,7 @@ export function Chat({
 	// until the compaction ends, so his Enter goes through and the line
 	// below the transcript says why the reply waits (round 6).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
+	const waiting = waitingLine(messages, { busy, compacting });
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -1560,8 +1560,6 @@ export function Chat({
 										switch (part.type) {
 											case "data-graph-context":
 												return <GraphContextCard key={pi} data={part.data as GraphContextData} />;
-											case "data-compaction-cut":
-												return <CompactionCutDivider key={pi} />;
 											case "data-practice-thinking":
 												return <ThinkingBubble key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-request":
@@ -1573,8 +1571,8 @@ export function Chat({
 												return <DoneTonightLine key={pi} />;
 											case "data-dispute":
 												return <DisputeBubble key={pi} data={part.data as DisputeDetails} />;
-											// data-compaction (the moment the summary ran) stays
-											// unmarked: the cut's hairline is enough.
+											// Compaction (the moment and the cut) is the tutor's
+											// bookkeeping and draws nothing (round 8).
 											default:
 												return null;
 										}
@@ -1715,8 +1713,8 @@ export function Chat({
 						    thinking placeholder, a visible session-wide state while
 						    the summarizer holds the model gate. It stands in for
 						    Thinking while his sent input waits on it (round 6). */}
-							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{!compacting && showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{waiting === "compacting" && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
+							{waiting === "thinking" && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}

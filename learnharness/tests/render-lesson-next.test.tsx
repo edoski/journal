@@ -15,7 +15,6 @@ import { derivePlanStatuses } from "../src/core/index.ts";
 import { rowDot, rowWord, stripDot } from "../components/lesson/lesson-roadmap.tsx";
 import { LiveToolCard } from "../components/artifacts/live-tool-card.tsx";
 import { artifactRenderers } from "../components/artifacts/index.ts";
-import { CompactionCutDivider } from "../components/compaction-divider.tsx";
 import { ProseConclude, ProseProblem, ThinkingBubble } from "../components/lesson/prose/prose-practice.tsx";
 import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
 import { CourseLinkBody } from "../components/course-link-banner.tsx";
@@ -109,11 +108,6 @@ describe("agent chrome out of the lesson", () => {
 		assert.doesNotMatch(document.body.textContent!, /secret\/notes\.md/);
 	});
 
-	it("compaction leaves only a hairline, no token count", () => {
-		const cut = documentFor(<CompactionCutDivider />);
-		assert.equal(cut.body.textContent, "");
-		assert.ok(cut.querySelector('[data-slot="section-break"]'));
-	});
 });
 
 describe("lesson cards", () => {
