@@ -263,17 +263,28 @@ function lineRelations(line: string): string[] {
  *  TeX, or null. A matrix's rows and an aligned derivation's lines are read
  *  one by one. */
 export function chainedDisplay(text: string): string | null {
-	const bodies = [...text.replace(FENCE, " ").matchAll(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g)].map((m) => (m[1] ?? m[2] ?? "").trim());
+	const unfenced = text.replace(FENCE, " ");
+	const bodies = [...unfenced.matchAll(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g)].map((m) => (m[1] ?? m[2] ?? "").trim());
 	for (const body of bodies) {
 		// An arrow from one matrix to the next is a row operation, a step
 		// of the work, not a limit.
 		const steps = body.replace(/\\begin\{([pbvBV]?matrix)\}[\s\S]*?\\end\{\1\}/g, "@M@").replace(/@M@\s*(?:\\xrightarrow\{[^}]*\}|\\(?:to|rightarrow|longrightarrow)(?![A-Za-z])|→|⟶|\\sim(?![A-Za-z]))\s*(?=@M@)/g, "@M@ ");
 		for (const line of steps.split(/\\\\/)) {
-			if (new Set(lineRelations(line)).size > 1) return body;
+			const kinds = lineRelations(line);
+			if (new Set(kinds).size > 1) return body;
+			// Two steps joined by words in one line, "… = 1, so c = e^{-3}"
+			// (round 10, 3 m5): each is its own display.
+			if (kinds.length > 1 && STEP_WORDS.test(line)) return body;
 		}
 	}
-	return null;
+	// Inline maths in a line of prose states one relation of one kind
+	// (round 10, 3 m5: "3n ln(1 + 2/n) ≈ 3n · 2/n = 6" inside feedback).
+	const inline = [...unfenced.replace(/\$\$[\s\S]*?\$\$/g, " ").matchAll(/(?<![\\$])\$([^$\n]+)\$(?!\$)/g)].map((m) => m[1]!.trim());
+	return inline.find((body) => new Set(lineRelations(body)).size > 1) ?? null;
 }
+
+/** Words inside a display that join a second step to the first. */
+const STEP_WORDS = /\\text\{[^}]*\b(?:so|hence|thus|therefore|giving|which gives)\b[^}]*\}|\\(?:therefore|implies|Rightarrow|Longrightarrow)(?![A-Za-z])/;
 
 const SHINGLE = 6;
 
