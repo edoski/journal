@@ -85,11 +85,11 @@ describe("todayTop", () => {
 		const { needs, top } = topOf([EMPTY, PROB], []);
 		assert.deepEqual(
 			needs.lines.map((l) => l.key),
-			["/s/prob"],
+			["/s/prob#review:rv,total,bayes"],
 		);
 		assert.deepEqual(
 			top.map((i) => i.line.key),
-			["/s/prob"],
+			["/s/prob#review:rv,total,bayes"],
 		);
 	});
 
@@ -125,7 +125,7 @@ describe("todayTop", () => {
 			[
 				["a", sessionKey("a")],
 				["b", sessionKey("b")],
-				["/s/linalg", "/s/linalg#independence"],
+				["/s/linalg#review:independence", "/s/linalg#independence"],
 			],
 		);
 	});
@@ -243,7 +243,7 @@ describe("steadyTop", () => {
 		const alone = CHATS.filter((c) => c.id !== "chat_rank");
 		const { top } = topOf(COURSES, alone);
 		assert.equal(itemKey(top[0]!), sessionKey("chat_eigen"));
-		assert.ok(top.some((i) => i.line.key === "/s/linalg"), "the eigen lesson does not hide Linear Algebra's review");
+		assert.ok(top.some((i) => i.line.key.startsWith("/s/linalg#review")), "the eigen lesson does not hide Linear Algebra's review");
 		const during = turn(COURSES, top, writing(alone, "chat_eigen"));
 		assert.deepEqual(keysOf(during), keysOf(top));
 	});

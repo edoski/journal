@@ -26,7 +26,7 @@ import {
 	type QuestionFormDraft,
 } from "@/src/core";
 import type { ProseAnswer } from "@/components/lesson/prose/prose-answer";
-import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
+import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec, proseShowMeRequest, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
 import { ChoiceRows, QuestionWords } from "@/components/lesson/prose/prose-question";
 
 /** What waits for his answer: a question the tutor asked, or a problem. */
@@ -241,13 +241,19 @@ function AnswerComposer({
 		forgetBox();
 		onSubmitAnswer(proseHintRequest(spec, text));
 	};
+	// Show me on a check: he gives up, his words going with it as his work.
+	const showMe = () => {
+		if (!spec?.showsAnswer || waiting) return;
+		forgetBox();
+		onSubmitAnswer(proseShowMeRequest(spec, text));
+	};
 	// A request on a problem carries the work so far and leaves it in the field.
 	const request = (kind: PracticeRequest) => {
 		if (waiting) return;
 		onRequest(kind, text.trim());
 	};
-	const actRef = useRef({ hint, request });
-	actRef.current = { hint, request };
+	const actRef = useRef({ hint, showMe, request });
+	actRef.current = { hint, showMe, request };
 	useEffect(() => {
 		const binds: [KeyAction, () => void][] = problem
 			? [
@@ -255,7 +261,10 @@ function AnswerComposer({
 					["practice-show", () => actRef.current.request("show")],
 					["practice-explain", () => actRef.current.request("explain")],
 				]
-			: [["practice-hint", () => actRef.current.hint()]];
+			: [
+					["practice-hint", () => actRef.current.hint()],
+					["practice-show", () => actRef.current.showMe()],
+				];
 		const offs = binds.map(([action, run]) => {
 			window.addEventListener(kbdEventForAction(action), run);
 			return () => window.removeEventListener(kbdEventForAction(action), run);
@@ -288,7 +297,12 @@ function AnswerComposer({
 			<RequestIcon icon={BookOpenIcon} label="Explain instead" hint="Explain instead: leave this problem and be taught the idea" action="practice-explain" testId="practice-request-explain" disabled={waiting} onClick={() => request("explain")} />
 		</>
 	) : (
-		spec?.kind === "explain" && <RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={waiting} onClick={hint} />
+		spec?.kind === "explain" && (
+			<>
+				<RequestIcon icon={LightbulbIcon} label="Hint" hint="Hint: a nudge, not the answer" action="practice-hint" testId="question-hint" disabled={waiting} onClick={hint} />
+				{spec.showsAnswer && <RequestIcon icon={EyeIcon} label="Show me" hint="Show me: stop here and see the answer" action="practice-show" testId="question-show" disabled={waiting} onClick={showMe} />}
+			</>
+		)
 	);
 	const toolbar = (
 		<>

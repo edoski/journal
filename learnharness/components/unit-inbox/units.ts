@@ -99,7 +99,7 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
  *  (`ownTopics`), never one that only touched it on the way, so a lesson
  *  is "Your turn" on its own topic alone. Pure. */
 export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNow {
-	return sessionsNow(sessions.filter((c) => (c.ownTopics ?? []).includes(handle)));
+	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)));
 }
 
 /** What any of these sessions is doing now: one waits on the learner, the
@@ -250,6 +250,12 @@ export function monogram(title: string): string {
  *  Pure. */
 export function topicSessions(chats: readonly ChatListItem[], workspace: string, handle: string): ChatListItem[] {
 	return chats.filter((c) => c.course?.workspace === workspace && (c.topics ?? []).includes(handle)).sort(newestFirst);
+}
+
+/** Whether a session belongs to a topic (`ownTopics`): started on it or
+ *  named after it, never one that only touched it on the way. Pure. */
+export function ownsTopic(chat: ChatListItem, handle: string): boolean {
+	return (chat.ownTopics ?? []).includes(handle);
 }
 
 /** The sessions in a course that hold an open task, newest first. Pure. */

@@ -39,6 +39,12 @@ export interface SdkAgentConfig {
 	/** Reads each call as it finishes streaming, before any view sees it
 	 *  (the voice guard, voice-guard.ts). */
 	screen?: (call: ToolCall) => void;
+	/** Reads each block of ordinary text as it ends; true takes its text out
+	 *  of the reply, so the record and every view keep none of it. */
+	screenText?: (text: string) => boolean;
+	/** Asked when the model ends a turn no tool ended: words it must read
+	 *  first, which keep the turn going (the voice guard's `beforeEnd`). */
+	beforeEnd?: () => string | undefined;
 }
 
 type Listener = (event: AgentEvent) => void;
@@ -256,6 +262,10 @@ export class SdkAgent {
 						this.config.screen?.(event.toolCall);
 						calls.set(event.toolCall.id, { call: event.toolCall, assistant: stream.message });
 					}
+					if (event.type === "text_end" && this.config.screenText?.(event.content)) {
+						const block = stream.message.content[event.contentIndex];
+						if (block?.type === "text") block.text = "";
+					}
 					this.emit({ type: "message_update", message: stream.message, assistantMessageEvent: event });
 				}
 			}
@@ -343,6 +353,8 @@ export class SdkAgent {
 						// run goes on with it. A turn a question ended waits for the
 						// learner instead, and the steer goes back to its queue.
 						if (!endedByTool && this.inFlight.size > 0 && !this.aborted) return true;
+						const note = !endedByTool && !this.aborted ? this.config.beforeEnd?.() : undefined;
+						if (note && this.push) { this.push(userMessage([{ type: "text", text: note }], randomUUID())); return true; }
 						if (stream && !stream.finished) endStream(stream.fail(`Claude Code ended the reply midway. Retry.${NO_KEY}`));
 						recordClaudeModelMissing(provider, false);
 						return false;

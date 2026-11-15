@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { createFauxCore, fauxAssistantMessage, fauxText, type Context, type Message } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
-import { fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { fakeFor, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-resume-in-place-"));
 process.env.LH_DATA_DIR = TMP_DATA;
@@ -149,13 +149,12 @@ describe("a lesson waiting on his typed answer", () => {
 		assert.equal(first?.kind === "session" ? first.chat.id : null, id);
 
 		const action = topicAction(RANK, MAP, listed());
-		assert.equal(action.kind, "resume", "the page of the topic it worked on resumes the lesson");
-		assert.equal("chat" in action ? action.chat.id : null, id);
+		assert.notEqual("chat" in action ? action.chat.id : null, id, "the page of a topic it only worked on never resumes it: the lesson belongs to no topic (round 7)");
 		const inbox = buildInbox([COURSE], listed(), WS);
 		const unit = inbox.active.find((u) => u.topic.handle === RANK.handle);
 		assert.equal(unit?.now, null, "a topic the lesson only worked on is not its turn: the lesson belongs to no topic until its plan names one");
 		assert.ok(inbox.other.some((c) => c.id === id), "so the lesson is a session of its own in the sidebar");
-		assert.equal(resumableSession(unit!.sessions)?.id, id, "and the topic's action resumes it");
+		assert.equal(resumableSession(unit!.sessions)?.id, id, "the topic's row still lists it among the sessions tied to it");
 
 		const held = topicAction(KERNEL, MAP, listed());
 		assert.ok(held.kind === "continue" && "chat" in held && held.chat.id === id, "a topic its task holds continues the task in that lesson");
@@ -173,16 +172,17 @@ describe("a lesson waiting on his typed answer", () => {
 
 // ─── Continue, end to end ───────────────────────────────────────────────────
 
-/** One scripted model; records which agent each turn ran and what it saw. */
+/** One scripted model; records which agent each turn ran and what it saw.
+ *  Each turn sends the reply with send_to_user, then ends. */
 function scripted(reply: string) {
 	const seen: { agent: AgentKind; prompt: string; tools: string[] }[] = [];
 	let agent: AgentKind = "prober";
 	const faux = createFauxCore({});
 	faux.setResponses(
-		Array.from({ length: 4 }, () => (context: Context) => {
+		Array.from({ length: 4 }, () => [(context: Context) => {
 			seen.push({ agent, prompt: context.systemPrompt ?? "", tools: (context.tools ?? []).map((t) => t.name) });
-			return fauxAssistantMessage([fauxText(reply)]);
-		}),
+			return sendToUser(reply);
+		}, fauxAssistantMessage("")]).flat(),
 	);
 	const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
 	const deliver = (steer: SteerMessage) => void deliverJobResult(steer);

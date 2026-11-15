@@ -1,8 +1,8 @@
 import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_SAID_BY, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
-import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
+import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
@@ -50,6 +50,9 @@ export type Pickup =
 
 export interface SessionEntry {
 	chat: ChatListItem;
+	/** It belongs to the topic (`ownsTopic`), rather than only touching it:
+	 *  only such a session is the page's Now, Next or first map. */
+	own: boolean;
 	state: SessionState;
 	/** The day of its last message, YYYY-MM-DD. */
 	day: string;
@@ -118,7 +121,8 @@ export interface TopicFacts {
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
-	/** Every session of the topic, newest first. */
+	/** Every session tied to the topic, newest first: its own and those
+	 *  that only touched it (`SessionEntry.own`). */
 	sessions: readonly SessionEntry[];
 	/** The sessions not already shown as a pick-up row. */
 	listed: readonly SessionEntry[];
@@ -171,11 +175,15 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 /** Why the review waits past the day memory asked for it, after from
  *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
  *  from 9 Nov, earlier days are full". */
-/** `TopicFacts.startsWhy`: the exam's scope first, since a topic it leaves
- *  out waits for the exam whatever else it waits on. */
+/** What the exam ahead means for the topic: it leaves it out, or its plan
+ *  has no room to start or review it; null otherwise. */
+const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam);
+
+/** `TopicFacts.startsWhy`: the exam first, since a topic it leaves out, or
+ *  has no room for, waits for the exam whatever else it waits on. */
 function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | null {
-	const leftOut = leftOutWords(topic, map.exam);
-	if (leftOut) return { kind: "after", words: leftOut };
+	const exam = examWords(topic, map);
+	if (exam) return { kind: "after", words: exam };
 	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null;
 }
 
@@ -201,11 +209,12 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  * no review set, else study (the engine has set the next review in the
  * future, so nothing needs him). Continue picks up the lesson that holds
  * the task, or the topic's newest lesson, as the session model says
- * (`continueMove`). `chats` are every session; the topic's are those the
- * engine's records tie to it (`topicSessions`).
+ * (`continueMove`). `chats` are every session; the topic's are those that
+ * belong to it (`ownsTopic`), never one that only touched it on the way
+ * (round 7: Kernel's page resumed the Eigen lesson).
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
-	const sessions = topicSessions(chats, map.workspace, topic.handle);
+	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
 	const active = resumableSession(sessions);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
 	if (topic.review?.kind === "due") return { kind: "review", opening: `Review ${topic.title}` };
@@ -235,12 +244,14 @@ export { agoWords, studiedDaysWords as studiedWords };
 /**
  * What the head says beside the pie, in the app's words (study-words.ts),
  * each drawn as an icon and a few words: why the engine calls the topic
- * weak, then its review, due ("3d overdue"), held past memory's day ("Due
+ * weak, unless the standing beside it already says so (`SLIP_SAID_BY`;
+ * the sidebar keeps it as the row's reason), then its review, due ("3d overdue"), held past memory's day ("Due
  * since 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
  * say it (`reviewWords`). `today` is the engine's study day.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {
-	const slip = topic.weak ? slipMark(topic.signals, titleOf) : null;
+	const found = topic.weak ? slipMark(topic.signals, titleOf) : null;
+	const slip = found && SLIP_SAID_BY[found.key] !== standingOf(topic).words ? found : null;
 	const review = topic.review ? reviewWords(topic.review, today) : null;
 	return [...(slip ? [{ kind: "slip" as const, words: slip.words, slip: slip.key }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }
@@ -253,15 +264,15 @@ export function lastStudiedDay(topic: CourseMapTopic, sessions: readonly Session
 }
 
 /** What went wrong, when the engine can say: the mistake it diagnosed,
- *  else, for a topic it calls weak, the newest attempt in the tutor's
- *  words when that attempt was not right. Nothing once he has fixed it on
- *  his own: the head says "Fixed, check again later", and the mistake
- *  under it read as one still open (round 5). */
+ *  else, for a topic it calls weak, the newest attempt that counts (never
+ *  a prediction) in the tutor's words when it was not right. Nothing once
+ *  he has fixed it on his own: the head says "Fixed, check again later",
+ *  and the mistake under it read as one still open (round 5). */
 export function mistakeOf(topic: CourseMapTopic, attempts: readonly TopicAttempt[]): string | null {
 	const { gap, repaired, repairedWithHelp } = topic.signals;
 	if (repaired && !repairedWithHelp) return null;
 	if (gap) return gap;
-	const [last] = attempts;
+	const last = attempts.find((attempt) => !attempt.predicted);
 	return topic.weak && last && last.result !== "correct" ? last.text : null;
 }
 
@@ -273,13 +284,14 @@ export function localDay(iso: string): string {
 }
 
 /** The topic's sessions as the page lists them, in the order given
- *  (newest first), each with its plan when the read holds one. A session
- *  dated after the engine's day counts as that day. */
-export function sessionEntries(sessions: readonly ChatListItem[], plans: readonly SessionPlan[], today: string): SessionEntry[] {
+ *  (newest first), each with whether it belongs to `handle` and its plan
+ *  when the read holds one. A session dated after the engine's day counts
+ *  as that day. */
+export function sessionEntries(sessions: readonly ChatListItem[], plans: readonly SessionPlan[], today: string, handle: string): SessionEntry[] {
 	return sessions.map((chat) => {
 		const local = localDay(chat.updatedAt);
 		const day = local > today ? today : local;
-		return { chat, state: sessionState(chat), day, when: agoWords(daysBetween(day, today)), plan: plans.find((plan) => plan.id === chat.id) ?? null };
+		return { chat, own: ownsTopic(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today)), plan: plans.find((plan) => plan.id === chat.id) ?? null };
 	});
 }
 
@@ -304,13 +316,13 @@ function whereOf(entry: SessionEntry): string {
 }
 
 /**
- * The places to pick the topic back up: the session that waits on him, is
- * being written or stopped, if any, then each open task that holds the
+ * The places to pick the topic back up: the topic's own session that
+ * waits on him, is being written or stopped, if any, then each open task that holds the
  * topic at the step it was left on, the focused one first, except a task
  * that session holds. A task's press continues the lesson that holds it.
  */
 export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
-	const active = resumableSession(entries.map((entry) => entry.chat));
+	const active = resumableSession(entries.filter((entry) => entry.own).map((entry) => entry.chat));
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
@@ -370,7 +382,7 @@ export function topicFacts({
 	const sessions = topicSessions(chats, map.workspace, topic.handle);
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const attempts = read?.record?.attempts ?? [];
-	const entries = sessionEntries(sessions, read?.plans ?? [], map.today);
+	const entries = sessionEntries(sessions, read?.plans ?? [], map.today, topic.handle);
 	const pickups = pickupsOf(topic, map, entries, chats, read?.record ?? null, map.today);
 	const picked = new Set(pickups.flatMap((pickup) => (pickup.kind === "session" ? [pickup.chat.id] : [])));
 	const silent = topic.level === "new" && sessions.length > 0;
@@ -384,8 +396,8 @@ export function topicFacts({
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
-		waits: waitsWords(topic.review, map.today),
-		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,
+		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam) : null) ?? waitsWords(topic.review, map.today),
+		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : startsAfterWords(topic.startsAfter) } : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		action: topicAction(topic, map, chats),
 		pickups,

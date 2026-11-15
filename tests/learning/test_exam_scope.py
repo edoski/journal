@@ -1,7 +1,7 @@
 """One exam scope for every course: ``exam.leaves_out`` names the topics the
 next exam does not examine, in a course with or without arcs. A topic it
-leaves out stays on the path and starts after the exam's own; an excluded
-topic never starts."""
+leaves out stays on the path and starts once the exam's day has passed; an
+excluded topic never starts."""
 
 from datetime import date, timedelta
 from pathlib import Path
@@ -73,13 +73,13 @@ def test_without_arcs_the_exam_examines_the_course_less_what_it_leaves_out() -> 
 def test_a_topic_the_exam_leaves_out_starts_after_it() -> None:
     planned = starts(course(exam(3, leaves_out=["left"])), MONDAY, 20)
     assert {"a", "b", "c"} <= set(planned)
-    assert planned["left"] >= on(3).isoformat(), "it waits for the exam"
+    assert planned["left"] > on(3).isoformat(), "it waits for the exam's day to pass"
 
 
-def test_it_starts_before_the_exam_only_once_nothing_examined_waits() -> None:
-    planned = starts(course(exam(20, leaves_out=["left"])), MONDAY, 20)
-    assert planned["left"] < on(20).isoformat()
-    assert planned["left"] > max(planned[key] for key in ("a", "b", "c"))
+def test_it_waits_for_the_exam_even_with_room_before_it() -> None:
+    planned = starts(course(exam(20, leaves_out=["left"])), MONDAY, 30)
+    assert max(planned[key] for key in ("a", "b", "c")) < on(20).isoformat()
+    assert planned["left"] > on(20).isoformat()
 
 
 def test_an_excluded_topic_never_starts_before_or_after_the_exam() -> None:

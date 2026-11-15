@@ -8,7 +8,7 @@ import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { doneToday } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
-import { courseMove, todayCourses, type TodayRow } from "@/components/study-home/study-facts";
+import { courseMove, todayCourses, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { ChatListItem, StudyCourse } from "@/src/core";
@@ -27,8 +27,8 @@ export interface HomeReady {
 	/** What he finished today, by title, oldest first (`doneToday`). */
 	done: readonly string[];
 	busy: boolean;
-	/** Take up a course's next step (`courseMove`). */
-	onContinue: (workspace: string) => void;
+	/** Take up a course line's step, else the course's next (`courseMove`). */
+	onContinue: (workspace: string, step?: NextStep) => void;
 }
 
 /**
@@ -115,10 +115,10 @@ function HomeBody({
 						chats: state.chats,
 						done: doneToday(state.chats, new Date()),
 						busy,
-						onContinue: (workspace) => {
+						onContinue: (workspace, step) => {
 							const course = state.courses.find((c) => c.map.workspace === workspace);
 							if (!course) return;
-							const move = courseMove(course, state.chats);
+							const move = courseMove(course, state.chats, step);
 							if (move.kind === "open") router.push(`/chat/${move.chat.id}`);
 							else onStart(move.opening, workspace, { topics: move.topics, from: move.from });
 						},

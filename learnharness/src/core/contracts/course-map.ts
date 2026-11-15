@@ -48,15 +48,16 @@ export interface TopicSignals {
 	/** Every answer that repaired it had help: help may have carried it.
 	 *  Absent: not repaired, or repaired on his own. */
 	repairedWithHelp?: boolean;
-	/** A counted answer not right since his latest right answer on his own
-	 *  (the engine's `mistake`): only then is a gap a mistake; without one
+	/** A counted answer not right since his latest right answer, with help
+	 *  or not (the engine's `mistake`): only then is a gap a mistake; without one
 	 *  it is what is left to check. Absent: none open. */
 	mistake?: boolean;
 }
 
-/** How he has best answered a topic he cannot yet do on his own (the
- *  engine's `right`): right with no help (on the day it was learned), with
- *  help, as a guess, on doubtful evidence, or partly. */
+/** How he answered a topic he cannot yet do on his own since his newest
+ *  counted answer that was not right (the engine's `right`): right with no
+ *  help, with help, as a guess, or on doubtful evidence; `partial` when that
+ *  newest answer was partly right. */
 export type RightAnswer = "unaided" | "helped" | "guess" | "uncertain" | "partial";
 
 /** Why the plan starts an untaught topic when it does, in the material's
@@ -83,8 +84,9 @@ export interface CourseMapTopic {
 	review: TopicReview | null;
 	/** The engine's weak verdict. */
 	weak: boolean;
-	/** At the `assisted` level, how he has best answered it; absent at
-	 *  every other level. */
+	/** At the `attempted` and `assisted` levels, how he answered it since
+	 *  his newest answer that was not right; absent when that newest answer
+	 *  was wrong, and at every other level. */
 	right?: RightAnswer;
 	signals: TopicSignals;
 	/** Keys of open tasks that hold this topic. */

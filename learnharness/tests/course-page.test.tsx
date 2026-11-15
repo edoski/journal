@@ -43,7 +43,7 @@ const TOPICS = [
 	topic("span", { title: "Span", level: "retained", introduced: "2026-09-05", review: due(10) }),
 	topic("independence", { title: "Linear independence", level: "assisted", introduced: "2026-09-10", weak: true, review: due(16), signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent" } }),
 	topic("basis", { title: "Basis and dimension", level: "independent", introduced: "2026-09-12", review: later("2026-11-20") }),
-	topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-10-20", weak: true, review: due(1), signals: { ...QUIET, confidentErrors: 1 } }),
+	topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-10-20", weak: true, review: due(1), signals: { ...QUIET, confidentErrors: 1, mistake: true } }),
 	topic("determinant", { title: "Determinants", level: "assisted", introduced: "2026-10-01", review: due(4) }),
 	topic("rank", { title: "Rank", level: "introduced", introduced: "2026-10-25", review: due(2), tasks: ["sheet-4"] }),
 	topic("cramer", { title: "Cramer's rule", level: "introduced", introduced: "2026-10-28", review: due(2) }),
@@ -265,10 +265,11 @@ describe("the header's facts and next lesson", () => {
 
 	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
 		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
-		const next = courseNext(course(), [left]);
+		const next = courseNext(course({ tasks: [], focus: null }), [left]);
 		assert.equal(next.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
+		assert.equal(courseNext(course(), [left]).lesson.title, `Continue ${course().map.tasks[0]!.title}`, "with an open task, the line Home still has for the course");
 	});
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {

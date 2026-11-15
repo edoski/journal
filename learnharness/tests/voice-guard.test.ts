@@ -84,14 +84,14 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 
 	it("two questions in one question", () => {
 		const q = "Suppose row operations $E_1, \\dots, E_k$ reduce $A$ all the way to $I$, so $E_k \\cdots E_1 A = I$. What is the product $E_k \\cdots E_1$? And how could you get that product written down while you reduce $A$, without ever multiplying the $E_i$ together?";
-		assert.deepEqual(rules(new VoiceGuard(answering("E^{-1}")), ask(q)), ["questions"]);
+		assert.deepEqual(rules(new VoiceGuard(answering("E^{-1}")), ask(q)), ["questions", "compound"]);
 	});
 
 	it("advice under a question", () => {
 		const q = "Show that\n$$\nN = \\begin{pmatrix} 1 & 2 & 0 \\\\ 0 & 1 & -1 \\\\ 2 & 1 & 3 \\end{pmatrix}\n$$\nis not invertible by finding a nonzero vector $v$ with $Nv = 0$. Check your $v$ by multiplying it out.";
 		assert.deepEqual(rules(new VoiceGuard(answering("v = (1,1,1)")), ask(q)), ["advice"]);
 		const invite = "Phone calls reach a help desk at an average rate of $3$ per hour, independently of each other. What distribution would you use for the number of calls in one hour, and what is the probability of exactly $2$ calls in an hour? Say whatever you know or suspect, even if it's partial.";
-		assert.deepEqual(rules(new VoiceGuard(answering("Binomial, n=10, p=1/4")), ask(invite, "recall")), ["advice"], "a probe's invitation under its question, from a real run");
+		assert.deepEqual(rules(new VoiceGuard(answering("Binomial, n=10, p=1/4")), ask(invite, "recall")), ["compound", "advice"], "a probe's invitation under a question that asks two things, from a real run");
 		const message = "Here $AB$ sends $x$ to $A(Bx)$. In $ABx$, which map acts on $x$ first? Think of $AB$ as a composition of maps.";
 		assert.deepEqual(rules(new VoiceGuard(answering("A first")), send(message)), ["advice"]);
 	});
@@ -128,7 +128,7 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 
 describe("turns within the voice pass untouched", () => {
 	const good: Array<[string, LhMessage[], ToolCall]> = [
-		["a hint, one question", [newUserMessage("Graphs"), assistant([ask("Build the transpose.", "recall")]), hinted("x")], send("When you meet $v$ in the list of $u$, which edge of $G$ is that, and which edge does it become in $G^T$?")],
+		["a hint, one question", [newUserMessage("Graphs"), assistant([ask("Build the transpose.", "recall")]), hinted("x")], send("When you meet $v$ in the list of $u$, which edge of $G^T$ does that edge of $G$ become?")],
 		[
 			"a wrong answer, where it broke and the correct move",
 			answering("No row is a multiple of another, so rank 3"),
@@ -168,12 +168,20 @@ describe("the guard's turn", () => {
 		assert.ok(!JSON.stringify(view).includes("You got it right"));
 	});
 
-	it("refuses once a turn for each kind of call: a rewrite that still slips is shown", () => {
+	it("refuses once a turn for each kind of call: a rewrite that still slips is shown, unless it asks more than one thing", () => {
 		const guard = new VoiceGuard(answering("rank 2"));
 		assert.deepEqual(rules(guard, send("You got it right: rank 2.")), ["echo"]);
 		assert.deepEqual(rules(guard, send("Yes, rank 2.")), []);
 		assert.deepEqual(rules(guard, ask("What is $A^2$? Why?")), ["questions"]);
-		assert.deepEqual(rules(guard, ask("What is $A^3$? Why?")), []);
+		assert.deepEqual(rules(guard, ask("What is $A^2$, and is it invertible?")), ["compound"], "a rewrite never passes by asking two things");
+		assert.deepEqual(rules(guard, ask("What is $A^2$? Check it by multiplying.")), [], "a rewrite's other slips are shown rather than looped");
+	});
+
+	it("a rewrite that fixes the advice by adding a second question is refused (round 7)", () => {
+		const guard = new VoiceGuard(answering("Binomial"));
+		assert.deepEqual(rules(guard, ask("You answer 10 questions, each right with probability $1/4$. What is the probability you get exactly 3 right? Say why the count of right answers has the distribution you use.", "recall")), ["advice"]);
+		assert.deepEqual(rules(guard, ask("Which distribution does the number of right answers have, and why? What is the probability you get exactly 3 right?", "recall")), ["questions", "compound"]);
+		assert.deepEqual(rules(guard, ask("You answer 10 questions, each right with probability $1/4$. What is the probability you get exactly 3 right?", "recall")), []);
 	});
 
 	it("holds back the turn's question while a refused message is owed, so he gets the rewrite before it", () => {
@@ -201,6 +209,29 @@ describe("the guard's turn", () => {
 		const guard = new VoiceGuard(answering("the sum of 3^k/k! is e^3"));
 		await probeDone(guard, true);
 		assert.deepEqual(rules(guard, send("What you built from the minutes model is the **Poisson distribution**.")), ["after-probe"]);
+	});
+
+	it("poses no question after the probe ends: its teaching was withheld, so it would reach him cold (round 7)", async () => {
+		const guard = new VoiceGuard(answering("(AB)^{-1} = B^{-1}A^{-1}"));
+		await probeDone(guard, true);
+		assert.deepEqual(rules(guard, send("Multiplying $A$ by $x$ is the same as taking a combination of the columns of $A$.")), ["after-probe"]);
+		assert.deepEqual(rules(guard, ask("Find a nonzero vector in $\\ker A$ without doing elimination.", "explain")), ["after-probe"]);
+		assert.deepEqual(rules(guard, ask("Find a nonzero vector in $\\ker B$.", "recall")), ["after-probe"], "never, however often it is tried");
+	});
+
+	it("the mark and the words agree: a partly right answer is never called not right (round 7)", async () => {
+		const save = (result: string) => guard.wrap({ name: "course_save", label: "course_save", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: "{}" }], details: {} }) } as AgentTool<any>).execute(`s-${++n}`, { changes: { observations: [{ kind: "attempt", question: "q", result, topics: ["poisson"] }] } });
+		let guard = new VoiceGuard(answering("e^\\lambda"));
+		assert.equal((await save("partial")).isError, undefined);
+		assert.deepEqual(rules(guard, send("That's not right. The sum is $\\lambda e^\\lambda$.")), ["verdict"]);
+		assert.deepEqual(rules(guard, send("The $e^\\lambda$ is right, but the sum is $\\lambda e^\\lambda$.")), []);
+		guard = new VoiceGuard(answering("e^\\lambda"));
+		assert.deepEqual(rules(guard, send("That's not right. The sum is $\\lambda e^\\lambda$.")), []);
+		const refused = await save("partial");
+		assert.equal(refused.isError, true);
+		assert.match((refused.content[0] as { text: string }).text, /Save it with result incorrect/);
+		assert.equal((await save("incorrect")).isError, undefined);
+		assert.deepEqual(rules(new VoiceGuard(answering("x")), send("No two columns are parallel here, yet the rank is $2$.")), [], "\"No two\" is not a verdict");
 	});
 
 	it("a probe_done the tool refused ends nothing", async () => {
@@ -286,5 +317,79 @@ describe("a real turn on the Agent SDK", () => {
 		assert.ok(shown.includes("The pivots sit in columns 1 and 3.") && !shown.includes("You got it right"));
 		const results = agent.state.messages.slice(3).filter((m) => m.role === "toolResult").map((m) => [(m as { toolCallId: string }).toolCallId, (m as { isError: boolean }).isError]);
 		assert.deepEqual(results, [["m1", true], ["q1", true], ["m2", false], ["q2", false]], "the held question is posed again after the rewrite, and waits for his answer");
+	});
+	it("ordinary text never reaches him: the tutor is told, and sends its answer through the guard", async () => {
+		// Round 7: after Explain instead the tutor answered his question in plain text, 9 sentences, a recap and a menu.
+		const plain = "Because row reduction changes the column space itself. It keeps only the relations among the columns. Want to go back to the rank problems?";
+		const answer = "Row reduction keeps the relations among the columns but moves the column space, so the basis is the pivot columns of the original $A$.";
+		let told = "";
+		const { engine, faux } = scripted([
+			fauxAssistantMessage(plain),
+			(context) => {
+				const last = context.messages.at(-1);
+				told = last && last.role === "user" ? JSON.stringify(last.content) : "";
+				return fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: answer }, { id: "a1" })], { stopReason: "toolUse" });
+			},
+			fauxAssistantMessage(""),
+		]);
+		const record = asAgentMessages([newUserMessage("Rank"), assistant([send("A step.")]), newUserMessage("why can't I just use the columns of the echelon form?")]);
+		const agent = createTeacherAgent(undefined, { engine, messages: record });
+		const views: string[] = [];
+		agent.subscribe((event) => {
+			if (event.type === "message_update") views.push(JSON.stringify(projectView(agent.state.messages.concat(event.message) as LhMessage[], { executions: new Map(), inFlight: true, streamingIds: new Set([(event.message as LhMessage).id]) })));
+		});
+		await agent.continue();
+		assert.equal(faux.state.callCount, 3);
+		assert.match(told, /he never sees ordinary text, only what you send with send_to_user/);
+		const shown = visible(agent.state.messages);
+		assert.ok(shown.includes("pivot columns of the original"), "the answer sent with send_to_user shows");
+		assert.ok(!shown.includes("Want to go back"), "the plain text never shows");
+		assert.ok(views.every((v) => !v.includes("Want to go back")), "not even while the reply streams");
+	});
+
+	it("ordinary text before a question: the question waits once, so the teaching it was written for can be sent", async () => {
+		const question = { question: "What is $\\dim \\ker A$?", type: "check", nodeId: "rank", correctAnswer: "1, by rank-nullity." };
+		const { engine, faux } = scripted([
+			fauxAssistantMessage([{ type: "text", text: "Rank-nullity says the dimensions add up to the number of columns." }, fauxToolCall("explain", question, { id: "q1" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: "Rank and nullity add up to the number of columns." }, { id: "m1" }), fauxToolCall("explain", question, { id: "q2" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage("A third reply must not run."),
+		]);
+		const agent = createTeacherAgent(undefined, { engine, messages: asAgentMessages(answering("rank 2")) });
+		await agent.continue();
+		assert.equal(faux.state.callCount, 2);
+		const shown = visible(agent.state.messages);
+		assert.ok(shown.includes("Rank and nullity add up") && !shown.includes("dimensions add up"));
+		const results = agent.state.messages.slice(3).filter((m) => m.role === "toolResult").map((m) => [(m as { toolCallId: string }).toolCallId, (m as { isError: boolean }).isError]);
+		assert.deepEqual(results, [["q1", true], ["m1", false], ["q2", false]]);
+	});
+	it("after Explain instead, his answer to the check still owes him a way on, until he writes or practice resumes (round 7)", () => {
+		const handBack = { id: "steer_mode_t2", role: "custom", customType: "mode-handoff", content: "[TEACHING]", display: true, details: { chatId: "c", mode: "teach" }, timestamp: 1 } as LhMessage;
+		const q = ask("What is $\\operatorname{rank} B$?", "recall");
+		assert.equal(turnInputOf([newUserMessage("Rank practice"), handBack, assistant([q]), answered(q.id, "2")]).handedBack, true);
+		assert.equal(turnInputOf([newUserMessage("Rank practice"), handBack, newUserMessage("ok"), assistant([q]), answered(q.id, "2")]).handedBack, undefined);
+		assert.equal(turnInputOf(answering("rank 2")).handedBack, undefined);
+	});
+
+	it("after Explain instead, the explanation always leaves him a next action (round 7)", async () => {
+		const handBack = { id: "steer_mode_t1", role: "custom", customType: "mode-handoff", content: "[TEACHING]", display: true, details: { chatId: "c", mode: "teach" }, timestamp: 1 } as LhMessage;
+		const check = { question: "Which columns of $A$ form a basis of $\\operatorname{im} A$?", type: "check", nodeId: "rank", correctAnswer: "The pivot columns of A." };
+		let told = "";
+		const { engine, faux } = scripted([
+			fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: "Row reduction keeps the relations among the columns, so the pivot columns of the original $A$ are a basis of its image." }, { id: "e1" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage(""),
+			(context) => {
+				const last = context.messages.at(-1);
+				told = last && last.role === "user" ? JSON.stringify(last.content) : "";
+				return fauxAssistantMessage([fauxToolCall("explain", check, { id: "c1" })], { stopReason: "toolUse" });
+			},
+			fauxAssistantMessage("A fourth reply must not run: the check ends the turn."),
+		]);
+		const record = asAgentMessages([newUserMessage("Rank practice"), assistant([send("A step.")]), handBack]);
+		const agent = createTeacherAgent(undefined, { engine, messages: record });
+		await agent.continue();
+		assert.equal(faux.state.callCount, 3);
+		assert.match(told, /He has nothing to do next/);
+		const last = agent.state.messages.at(-1) as { role: string; toolName?: string; isError?: boolean };
+		assert.deepEqual([last.role, last.toolName, last.isError], ["toolResult", "explain", false], "the turn ends on the check, waiting for his answer");
 	});
 });

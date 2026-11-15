@@ -271,7 +271,7 @@ const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {
  *  already counts as your own work, with no help" sat on a card that said
  *  otherwise). */
 const CARD_WORDS_FOR_RULING =
-	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it. In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
+	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; a right answer recorded as uncertain reads "Not yet confirmed"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it. In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
 
 /** The longest question excerpt a dispute quotes. */
 const DISPUTE_QUOTE = 400;
@@ -280,8 +280,15 @@ const DISPUTE_QUOTE = 400;
  *  dispute marker's content. The rules for judging it live in the course
  *  record's doctrine; this names the answer, its attempts and what he
  *  said. Pure. */
+/** How he thinks a disputed answer should count, in the card's words and
+ *  the record's. */
+const PROPOSED_HOW_WORDS: Readonly<Record<"ownWork" | "withHelp", string>> = {
+	ownWork: 'on his own ("On your own": help "none")',
+	withHelp: 'with help ("With help": the help he had)',
+};
+
 export function disputeText(
-	dispute: { observations: readonly string[]; said?: string; proposed?: MarkResult },
+	dispute: { observations: readonly string[]; said?: string; proposed?: MarkResult; proposedHow?: "ownWork" | "withHelp" },
 	question: string,
 ): string {
 	const quoted = question.length > DISPUTE_QUOTE ? `${question.slice(0, DISPUTE_QUOTE)}…` : question;
@@ -290,6 +297,7 @@ export function disputeText(
 		`The attempts that stand for it: ${dispute.observations.join(", ")}.`,
 		dispute.said ? `What he says is wrong with the mark: "${dispute.said}"` : null,
 		dispute.proposed ? `The mark he thinks is right: ${PROPOSED_WORDS[dispute.proposed]}.` : null,
+		dispute.proposedHow ? `How he thinks it should count: ${PROPOSED_HOW_WORDS[dispute.proposedHow]}.` : null,
 		"Re-judge it now, as the course record says for a disputed mark: read those attempts whole, judge his response against the question and its committed answer, record the re-marked attempt with `course_save` whether you agree or not, then give him your ruling in one or two lines.",
 		CARD_WORDS_FOR_RULING,
 		"A question he had open when he disputed was set aside unanswered, its answer not shown: after your ruling, ask it again as it was. An active problem stays active.",

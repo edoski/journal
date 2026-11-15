@@ -20,9 +20,9 @@ export const STANDING_WORDS: Record<Fill, string> = {
 	1: "On your own",
 };
 
-/** A topic he cannot yet do on his own, by how he has best answered it
- *  (the engine's `right`): the 3/4 pie's words when help is what kept it
- *  there. Right unaided only on the day it was taught says what is left, a
+/** A topic he cannot yet do on his own, by how he answered it since his
+ *  newest answer that was not right (the engine's `right`): the 3/4 pie's
+ *  words when help is what kept it there. Right unaided only on the day it was taught says what is left, a
  *  check on another day, never a count: "once" read false after three
  *  unaided answers that day (round 5). */
 export const RIGHT_WORDS: Record<RightAnswer, string> = {
@@ -34,12 +34,16 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
 };
 
 /** Where he stands in words true to the engine's record: the pie step's
- *  words, except at the `assisted` level, which says how he has best
- *  answered the topic, so an unaided or a partial answer never reads
- *  "Right with help". A weak topic he could do on his own keeps its 3/4
- *  pie's words. Pure. */
+ *  words, except on a topic not yet solid, which says how he answered it
+ *  since his newest answer that was not right (the engine's `right`), so
+ *  an unaided or a partial answer never reads "Right with help", and right
+ *  answers after a review day's wrong first try never read "Tried, not
+ *  right yet" (round 7). `attempted` with no right answer since keeps its
+ *  pie's words; a weak topic he could do on his own keeps its 3/4 pie's
+ *  words. Pure. */
 export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right">): string {
-	return topic.level === "assisted" ? RIGHT_WORDS[topic.right ?? "helped"] : STANDING_WORDS[fill];
+	if (topic.level === "assisted") return RIGHT_WORDS[topic.right ?? "helped"];
+	return topic.level === "attempted" && topic.right ? RIGHT_WORDS[topic.right] : STANDING_WORDS[fill];
 }
 
 /** A slip's words for each of the engine's signals but a mixed-up method,
@@ -54,7 +58,6 @@ export const SLIP_WORDS = {
 	// "still to check on your own" (round 6), never a mistake he made.
 	check: "Check on your own",
 	confident: "Sure, but wrong",
-	none: "Look again",
 } as const;
 
 /** Which slip a topic shows: one per `SLIP_WORDS` entry, and a method
@@ -62,29 +65,43 @@ export const SLIP_WORDS = {
 export type SlipKey = keyof typeof SLIP_WORDS | "mixed";
 
 /** Why the engine calls a topic weak, its first signal: a mistake he has
- *  answered right on his own since, a miss after he had it, a diagnosed
- *  mistake, a method chosen in its place, a wrong answer he was sure of,
- *  else none of those. A repair made only with help is not shown fixed,
- *  since help may have carried it, and is still a mistake to fix: the
- *  signals under it describe answers before that right one, so "Not right
- *  last time" or "Sure, but wrong" would contradict it (round 5). A gap or
- *  a repair is a mistake only while a wrong answer is open (`mistake`);
- *  else it is what is left to check on his own (round 6). */
+ *  answered right on his own since; else, with no wrong answer open (the
+ *  engine's `mistake`, closed by any right answer), what is left to check
+ *  on his own; else a miss after he had it, a diagnosed mistake, a method
+ *  chosen in its place, a wrong answer he was sure of, else the mistake to
+ *  fix. The signals that describe a wrong answer show only while one is
+ *  open, so a right last try never reads "Not right last time" (round 7),
+ *  and a repair made only with help is not shown fixed, since help may
+ *  have carried it (round 5). */
 export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } {
-	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp } = signals;
-	const toFix = signals.mistake ? ({ key: "gap", words: SLIP_WORDS.gap } as const) : ({ key: "check", words: SLIP_WORDS.check } as const);
-	if (repaired) return repairedWithHelp ? toFix : { key: "repaired", words: SLIP_WORDS.repaired };
+	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp, mistake } = signals;
+	if (repaired && !repairedWithHelp) return { key: "repaired", words: SLIP_WORDS.repaired };
+	if (!mistake) return { key: "check", words: SLIP_WORDS.check };
 	if (lapsed) return { key: "lapsed", words: SLIP_WORDS.lapsed };
-	if (gap) return toFix;
+	if (gap) return { key: "gap", words: SLIP_WORDS.gap };
 	const [method] = Object.keys(choiceErrors);
 	if (method) return { key: "mixed", words: `Mixed up with ${titleOf(method as TopicHandle)}` };
 	if (confidentErrors > 0) return { key: "confident", words: SLIP_WORDS.confident };
-	return { key: "none", words: SLIP_WORDS.none };
+	return { key: "gap", words: SLIP_WORDS.gap };
 }
+
+/** The standing words that already say a slip, where a head would say it
+ *  twice: right on his own beside a mistake fixed on his own both say a
+ *  check on another day (round 7). */
+export const SLIP_SAID_BY: Readonly<Partial<Record<SlipKey, string>>> = {
+	repaired: RIGHT_WORDS.unaided,
+};
 
 /** The slip's words alone (`slipMark`). */
 export function slipWords(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): string {
 	return slipMark(signals, titleOf).words;
+}
+
+/** Whether a topic's slip is a lapse (`slipMark`), the one rule every
+ *  line that names a lapse reads, so none says "Not right last time" once
+ *  a right answer closed it (round 7). Pure. */
+export function lapsedNow(signals: TopicSignals): boolean {
+	return slipMark(signals, (handle) => handle).key === "lapsed";
 }
 
 /** A lapse on a line about another topic, naming the lapsed one: "Not
@@ -103,12 +120,15 @@ export const ATTEMPT_WORDS = {
 
 /** How an attempt went (`markHow`), in the words the answer card and the
  *  topic page's Earlier both say: a prediction before its step was taught
- *  never counts; he gave up without an answer; help was given; or no help,
- *  a guess or a partly right answer included. */
+ *  never counts; he gave up without an answer; help was given; a right
+ *  answer the engine doubts is not his own yet, as `RIGHT_WORDS.uncertain`
+ *  says of the topic; or no help, a guess or a partly right answer
+ *  included. */
 export const MARK_HOW_WORDS: Record<MarkHow, string> = {
 	predicted: "Prediction, not counted",
 	gaveUp: "Gave up",
 	withHelp: "With help",
+	unconfirmed: "Not yet confirmed",
 	ownWork: "On your own",
 };
 
@@ -290,7 +310,7 @@ export const EXAM_GAP_WHY: {
 	},
 	review: {
 		no_study_day: "No study day is left in the final review",
-		too_late: "Started too close to the exam for a review",
+		too_late: "Starts too close to the exam for a review",
 		full: "Every day of the final review is full at your pace",
 	},
 };
@@ -320,6 +340,38 @@ export function examGapAsk(titles: readonly string[]): string {
 export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, exam: Pick<CourseExam, "date" | "daysLeft" | "leavesOut"> | null): string | null {
 	if (!exam || exam.daysLeft < 0 || !exam.leavesOut?.includes(topic.handle)) return null;
 	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
+}
+
+/** What the exam's plan means for a topic it leaves out (`examGaps`), on
+ *  the topic's own page, in the engine's reason (`exam.reasons`). */
+export const EXAM_GAP_TOPIC_WORDS: {
+	start: Readonly<Record<ExamGapReason | "none", string>>;
+	review: Readonly<Record<ExamGapReason | "none", string>>;
+} = {
+	start: {
+		none: "Not before the exam",
+		no_study_day: "Not before the exam, no study day is left",
+		not_ready: "Not before the exam, what it needs won’t be solid in time",
+		full: "Not before the exam, every study day is full at your pace",
+		too_late: "Not before the exam",
+	},
+	review: {
+		none: "No review before the exam",
+		no_study_day: "No review before the exam, no study day is left in the final review",
+		not_ready: "No review before the exam",
+		full: "No review before the exam, the final review is full at your pace",
+		too_late: "No review before the exam, it starts too close to it",
+	},
+};
+
+/** The words for `topic` when the exam ahead has no room to start it
+ *  (`doesNotFit`) or to review it (`unreviewed`); null otherwise. Pure. */
+export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "daysLeft" | "doesNotFit" | "unreviewed" | "reasons"> | null): string | null {
+	if (!exam || exam.daysLeft < 0) return null;
+	const reason = exam.reasons?.[topic.handle] ?? "none";
+	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.start[reason];
+	if (exam.unreviewed?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.review[reason];
+	return null;
 }
 
 /** The map's fields the words of a start read: its arcs' names and
@@ -443,7 +495,7 @@ export const MARK_WORDS = {
 	disputed: "Disputed",
 	dispute: "Dispute",
 	disputeTitle: "Dispute this mark",
-	disputeLine: "Say what's wrong, or pick the mark you think is right. The tutor looks at your answer again.",
+	disputeLine: "Say what's wrong, or pick the mark or how it should count. The tutor looks at your answer again.",
 	disputePlaceholder: "What's wrong with the mark?",
 	disputeSend: "Send to the tutor",
 	youDisputed: "You disputed the mark",

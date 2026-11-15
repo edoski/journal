@@ -12,6 +12,7 @@ import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contrac
 import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { SessionPlan, TopicAttempt, TopicRecord } from "../src/core/contracts/topic.ts";
 import { studiedAgo } from "../components/study-home/agenda-rows/row-facts.ts";
+import { slipOf } from "../components/unit-inbox/units.ts";
 import type { TodayRow } from "../components/study-home/study-facts.ts";
 import {
 	agoWords,
@@ -51,8 +52,8 @@ const TOPICS = {
 		signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent; misses a third vector in their span", mistake: true, confidentErrors: 1 },
 	}),
 	basis: topic("basis", { title: "Basis and dimension", level: "independent", introduced: "2026-10-20", review: due("2026-10-30", 9), tasks: ["sheet-4"] }),
-	matmul: topic("matmul", { title: "Matrix multiplication as composition", level: "independent", introduced: "2026-10-27", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, lapsed: true } }),
-	elimination: topic("elimination", { title: "Gaussian elimination", level: "assisted", introduced: "2026-10-20", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 } } }),
+	matmul: topic("matmul", { title: "Matrix multiplication as composition", level: "independent", introduced: "2026-10-27", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, lapsed: true, mistake: true } }),
+	elimination: topic("elimination", { title: "Gaussian elimination", level: "assisted", introduced: "2026-10-20", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 }, mistake: true } }),
 	rank: topic("rank", {
 		title: "Rank and the column space",
 		level: "assisted",
@@ -62,12 +63,12 @@ const TOPICS = {
 		signals: { ...QUIET, gap: "Counts nonzero entries instead of pivots; confuses rank with the number of rows", mistake: true, stale: true },
 		tasks: ["sheet-4"],
 	}),
-	kernel: topic("kernel", { title: "Kernel and rank-nullity", level: "attempted", introduced: "2026-11-06", review: due("2026-11-07", 1), weak: true, signals: { ...QUIET, confidentErrors: 1 }, tasks: ["sheet-4"] }),
+	kernel: topic("kernel", { title: "Kernel and rank-nullity", level: "attempted", introduced: "2026-11-06", review: due("2026-11-07", 1), weak: true, signals: { ...QUIET, confidentErrors: 1, mistake: true }, tasks: ["sheet-4"] }),
 	determinant: topic("determinant", { title: "Determinants as volume scaling", level: "assisted", introduced: "2026-11-03", review: due("2026-11-04", 4) }),
 	cramer: topic("cramer", { title: "Cramer's rule", level: "introduced", introduced: "2026-11-05", review: due("2026-11-06", 2) }),
 	eigen: topic("eigen", { title: "Eigenvalues and eigenvectors" }),
-	riemann: topic("riemann-sums", { title: "Riemann sums", level: "retained", introduced: "2026-10-11", review: due("2026-11-08", 0), weak: true, signals: { ...QUIET, lapsed: true } }),
-	chain: topic("chain-rule", { title: "Chain rule", level: "retained", introduced: "2026-09-11", review: due("2026-10-09", 30), weak: true, signals: { ...QUIET, lapsed: true } }),
+	riemann: topic("riemann-sums", { title: "Riemann sums", level: "retained", introduced: "2026-10-11", review: due("2026-11-08", 0), weak: true, signals: { ...QUIET, lapsed: true, mistake: true } }),
+	chain: topic("chain-rule", { title: "Chain rule", level: "retained", introduced: "2026-09-11", review: due("2026-10-09", 30), weak: true, signals: { ...QUIET, lapsed: true, mistake: true } }),
 };
 const SHEET = { key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A", updated: null };
 const MAP: CourseMap = {
@@ -100,6 +101,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 		pendingProblem: false,
 		course: { workspace: WORKSPACE, title: "Linear Algebra" },
 		topics: [],
+		ownTopics: over.topics ?? [],
 		busy: false,
 		compacting: false,
 		...over,
@@ -107,7 +109,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 }
 
 function attempt(over: Partial<TopicAttempt> = {}): TopicAttempt {
-	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, grade: null, gaveUp: false, predicted: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", ...over };
+	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, grade: null, gaveUp: false, predicted: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", session: null, uncertain: false, ...over };
 }
 
 const EIGEN_PLAN: SessionPlan = {
@@ -210,6 +212,15 @@ describe("where he stands, in the app's one wording", () => {
 		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);
 	});
 
+	it("drops the slip when the standing already says it, which the sidebar keeps as the row's reason (round 7)", () => {
+		const kernel = { ...TOPICS.kernel, right: "unaided" as const, review: null, signals: { ...QUIET, confidentErrors: 2, repaired: true } };
+		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
+		assert.equal(said(kernel), "Right on your own, check another day");
+		assert.equal(slipOf(MAP, kernel), "Fixed, check again later");
+		const helped = { ...kernel, right: "helped" as const };
+		assert.equal(said(helped), "Right with help. Fixed, check again later", "a fix the standing does not say stays");
+	});
+
 	it("is silent for a topic not started that already has a session", () => {
 		const facts = topicFacts({ course: COURSE, topic: TOPICS.eigen, chats: [chat({ topics: ["eigen"], pendingQuestion: true })], read: null });
 		assert.deepEqual([facts.standing, facts.marks], [null, []]);
@@ -243,7 +254,7 @@ describe("the page's words for time", () => {
 });
 
 describe("when he last studied the topic", () => {
-	const entries = (...days: string[]) => sessionEntries(days.map((day) => chat({ updatedAt: `${day}T10:00:00.000Z` })), [], TODAY);
+	const entries = (...days: string[]) => sessionEntries(days.map((day) => chat({ updatedAt: `${day}T10:00:00.000Z` })), [], TODAY, "rank");
 
 	it("is the latest of its newest attempt, its newest session and the day it was first taught", () => {
 		const taught = { ...TOPICS.cramer, introduced: "2026-11-01" };
@@ -262,9 +273,9 @@ describe("when he last studied the topic", () => {
 	it("dates a session by its local day, never after the engine's", () => {
 		const late = new Date(2026, 10, 6, 23, 30).toISOString();
 		assert.equal(localDay(late), "2026-11-06");
-		const [entry] = sessionEntries([chat({ updatedAt: late })], [], TODAY);
+		const [entry] = sessionEntries([chat({ updatedAt: late })], [], TODAY, "rank");
 		assert.deepEqual([entry!.day, entry!.when], ["2026-11-06", "2d ago"]);
-		const [later] = sessionEntries([chat({ updatedAt: "2026-11-12T10:00:00.000Z" })], [], TODAY);
+		const [later] = sessionEntries([chat({ updatedAt: "2026-11-12T10:00:00.000Z" })], [], TODAY, "rank");
 		assert.deepEqual([later!.day, later!.when], [TODAY, "Today"]);
 	});
 });
@@ -281,6 +292,12 @@ describe("what went wrong", () => {
 		assert.equal(mistakeOf(TOPICS.matmul, [attempt({ result: "partial", text: "Half right" })]), "Half right");
 		assert.equal(mistakeOf(TOPICS.matmul, [attempt(), missed]), null, "the newest attempt was right");
 		assert.equal(mistakeOf(TOPICS.matmul, []), null);
+	});
+
+	it("never quotes a prediction, which counts for nothing (round 7: a wrong guess before the teaching read as the mistake)", () => {
+		const guess = attempt({ id: "o12", result: "incorrect", predicted: true, text: "Read the eigenvalues off the diagonal" });
+		assert.equal(mistakeOf(TOPICS.matmul, [guess, missed]), "Multiplied a 2x3 by a 3x2 matrix and gave a 3x3 result", "the newest answer that counts");
+		assert.equal(mistakeOf(TOPICS.matmul, [guess, attempt()]), null, "the newest answer that counts was right");
 	});
 
 	it("is nothing for a topic the engine does not call weak, even after a miss", () => {
@@ -313,6 +330,17 @@ describe("when a topic comes up", () => {
 		assert.equal(factsOf(next).startsWhy, null);
 	});
 
+	it("says what the exam means for a topic its plan has no room for, before any other reason (round 7: Variance, Poisson and Random variables never mentioned the exam)", () => {
+		const exam = { date: "2026-11-19", daysLeft: 2, doesNotFit: [h("variance")], unreviewed: [h("poisson"), h("bayes")], reasons: { variance: "not_ready", poisson: "too_late", bayes: "full" } as const };
+		const examOf = (t: CourseMapTopic) => topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, t] } }, topic: t, chats: [], read: null });
+		const variance = examOf(topic("variance", { starts: "2026-12-13", startsAfter: ["Linear Algebra"], startsWhy: { kind: "after", needs: [h("expectation")], partners: [] } }));
+		assert.equal(variance.startsWhy?.words, "Not before the exam, what it needs won’t be solid in time");
+		assert.equal(variance.starts?.waits, null, "the exam is why, not another course");
+		assert.equal(examOf(topic("poisson", { starts: "2026-11-18", startsWhy: { kind: "next" } })).startsWhy?.words, "No review before the exam, it starts too close to it");
+		const bayes = topic("bayes", { level: "independent", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-12-15", held: { exam: null, since: "2026-11-11" } } });
+		assert.equal(examOf(bayes).waits, "No review before the exam, the final review is full at your pace");
+	});
+
 	it("says from when a review moved past the day memory asked for it, and why", () => {
 		const moved = topic("series", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-22", held: { exam: null, since: "2026-11-09" } } });
 		assert.equal(factsOf(moved).waits, "Moved from 9 Nov, earlier days are full");
@@ -323,10 +351,13 @@ describe("when a topic comes up", () => {
 
 describe("where to pick the topic back up", () => {
 	const record: TopicRecord = { attempts: [], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] };
-	const pickups = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[] = []) => pickupsOf(t, MAP, sessionEntries(sessions, plans, TODAY), sessions, record, TODAY);
+	const pickups = (t: CourseMapTopic, chats: ChatListItem[], plans: SessionPlan[] = []) => {
+		const sessions = chats.map((c) => (c.ownTopics?.includes(t.handle) ? c : { ...c, ownTopics: [...(c.ownTopics ?? []), t.handle] }));
+		return pickupsOf(t, MAP, sessionEntries(sessions, plans, TODAY, t.handle), sessions, record, TODAY);
+	};
 
 	it("puts a lesson waiting on a step at that step", () => {
-		const lesson = chat({ id: "chat_eigen", title: "Eigenvalues and eigenvectors", pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z" });
+		const lesson = chat({ id: "chat_eigen", title: "Eigenvalues and eigenvectors", pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z", ownTopics: ["eigen"] });
 		assert.deepEqual(pickups(TOPICS.eigen, [lesson], [EIGEN_PLAN]), [
 			{ kind: "session", chat: lesson, waits: true, title: "Eigenvalues and eigenvectors", where: "Computing a 2×2 spectrum", when: "Today" },
 		]);
@@ -392,8 +423,8 @@ describe("the topic's sessions", () => {
 
 	it("carry the plan their tutor authored", () => {
 		const lesson = chat({ id: "chat_eigen" });
-		assert.equal(sessionEntries([lesson, chat()], [EIGEN_PLAN], TODAY)[0]!.plan, EIGEN_PLAN);
-		assert.equal(sessionEntries([chat()], [EIGEN_PLAN], TODAY)[0]!.plan, null);
+		assert.equal(sessionEntries([lesson, chat()], [EIGEN_PLAN], TODAY, "rank")[0]!.plan, EIGEN_PLAN);
+		assert.equal(sessionEntries([chat()], [EIGEN_PLAN], TODAY, "rank")[0]!.plan, null);
 	});
 });
 
@@ -403,6 +434,7 @@ describe("how an attempt went", () => {
 		assert.deepEqual(attemptMark(attempt({ result: "partial", unaided: false }), titleOf), { result: "partly", words: "With help" });
 		assert.deepEqual(attemptMark(attempt({ grade: "helped", sure: "guess" }), titleOf), { result: "right", words: null }, "a guess with no help was his own answer");
 		assert.deepEqual(attemptMark(attempt({ grade: "solid" }), titleOf), { result: "right", words: null });
+		assert.deepEqual(attemptMark(attempt({ grade: "helped", uncertain: true }), titleOf), { result: "right", words: "Not yet confirmed" }, "the engine doubts it: not his own yet (round 7)");
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", gaveUp: true, unaided: false }), titleOf), { result: "wrong", words: "Gave up" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", predicted: true, sure: "confident" }), titleOf), { result: "wrong", words: "Prediction, not counted" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", unaided: false }), titleOf), { result: "wrong", words: null });

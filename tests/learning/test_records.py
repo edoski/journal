@@ -462,6 +462,33 @@ def test_a_save_whose_only_answer_on_a_taught_topic_is_a_prediction_sets_no_gap(
     assert records.load(workspace)["topics"]["rank"]["gap"] == "Misreads it"
 
 
+def test_a_gap_beside_a_wrong_prediction_and_only_right_answers_is_refused(
+    workspace: Workspace,
+) -> None:
+    """Round 7: a save held a right answer and a wrong prediction on eigen,
+    and the gap it set was the prediction's miss, which then read as a
+    mistake to fix."""
+    records.save(workspace, {**COURSE, "observations": [attempt(result="incorrect")]})
+    prediction = attempt(
+        text="Read it off the diagonal", result="incorrect", predicted=True
+    )
+    right = attempt(text="Found both eigenvalues")
+    with pytest.raises(
+        ValueError, match=r"the only miss on rank in this save is a prediction"
+    ):
+        records.save(
+            workspace,
+            {
+                "observations": [prediction, right],
+                "topics": {"rank": {"gap": "Reads eigenvalues off the diagonal"}},
+            },
+        )
+    assert records.load(workspace)["topics"]["rank"]["gap"] == "Counts vectors"
+    records.save(workspace, {"observations": [prediction, right]})
+    records.save(workspace, {"topics": {"rank": {"gap": "Misreads the rank"}}})
+    assert records.load(workspace)["topics"]["rank"]["gap"] == "Misreads the rank"
+
+
 def test_a_topic_taught_without_any_question_is_still_introduced(
     workspace: Workspace,
 ) -> None:

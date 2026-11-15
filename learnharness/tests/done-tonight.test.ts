@@ -10,9 +10,9 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
-import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
+import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
-import { onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { signInTestClaude } from "./claude-fixture.ts";
 
@@ -191,7 +191,8 @@ describe("Done for today on the server", () => {
 	it("withholds a pending check's answer, never grades it, and runs the closing turn", async () => {
 		const { engine, histories } = scripted([
 			() => fauxAssistantMessage([fauxToolCall("explain", CHECK, { id: "call-1" })], { stopReason: "toolUse" }),
-			() => fauxAssistantMessage([fauxText("Good place to stop. Next time we start from Mercury's orbit.")]),
+			() => sendToUser("Good place to stop. Next time we start from Mercury's orbit."),
+			() => fauxAssistantMessage(""),
 		]);
 		const chat = chatStore.createChat("Test: done for today");
 		chatStore.saveTree(chat.id, { nodes: [{ id: "planet-order", title: "Planet order" }], edges: [], version: 1 });
@@ -205,8 +206,8 @@ describe("Done for today on the server", () => {
 		assert.equal(withheld[0]!.details.reason, "tonight");
 		assert.equal(withheld[0]!.details.committed, undefined, "the answer stays hidden in the record");
 		assert.ok(saved.some((m) => m.role === "custom" && m.customType === "done-tonight"), "the marker is saved");
-		assert.match(JSON.stringify(saved.at(-1)), /Good place to stop/, "the closing turn ran");
-		assert.equal(histories.length, 2);
+		assert.match(JSON.stringify(saved.at(-3)), /Good place to stop/, "the closing turn ran");
+		assert.equal(histories.length, 3, "the check, then the closing words and the request after their send_to_user");
 		assert.match(histories[1]!, /stopped for today/, "the model reads the check as left, not answered");
 		assert.match(histories[1]!, /DONE FOR TODAY/);
 		assert.equal(doneTonightAtEnd(saved), true);

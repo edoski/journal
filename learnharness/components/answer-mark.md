@@ -13,7 +13,7 @@ The card's foot, under a hairline, 13px muted, icons with a few words:
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right (the result in `foreground`) |
-| counted | `markHow`, the rule Earlier reads too, so both say the same: Prediction, not counted (`predicted`); Gave up (`gave_up`); With help (the attempt records help); On your own (no help, a guess or a partly right answer included: the result and the confidence beside it say the rest) |
+| counted | `markHow`, the rule Earlier reads too, so both say the same: Prediction, not counted (`predicted`); Gave up (`gave_up`); With help (the attempt records help); Not yet confirmed (a right answer the record marks `uncertain`, such as one answered straight after Explain instead); On your own (no help, a guess or a partly right answer included: the result and the confidence beside it say the rest) |
 | confidence he chose | Guessing, Confident (`chosenSure`); a recorded `neutral` is the meter left alone and shows nothing. Once a mark is shown the card's label row drops the confidence he picked: a dispute may have corrected it |
 | disputed | Disputed: and the tutor's ruling, math rendered |
 

@@ -421,6 +421,23 @@ describe("the plan's reasons and gaps in the calendar", () => {
 		const fresh = entries.find((e) => e.kind === "new");
 		assert.equal(fresh?.kind === "new" && fresh.waits, "After Probability's new topics");
 	});
+
+	it("says a topic the exam leaves out waits for the exam, whatever other course started first", () => {
+		const COURSE = course(
+			"/study/prob",
+			"Probability",
+			{
+				exam: { date: "2026-11-19", daysLeft: 11, leavesOut: ["covariance" as TopicHandle] },
+				topics: [topic("covariance", { title: "Covariance", level: "new", starts: "2026-11-21", startsAfter: ["Linear Algebra"] })],
+			},
+			{ planned: [{ date: "2026-11-21", reviews: [], new: ["covariance" as TopicHandle] }], finalReview: "2026-11-14" },
+		);
+		const entries = calendarEntries({ courses: [COURSE], chats: [], scope: null });
+		const fresh = entries.find((e) => e.kind === "new");
+		assert.equal(fresh?.kind === "new" && fresh.waits, "Not on the exam; after it");
+		const exam = entries.find((e) => e.kind === "exam");
+		assert.deepEqual(exam?.kind === "exam" && exam.road, []);
+	});
 });
 
 describe("an overdue review's due day", () => {

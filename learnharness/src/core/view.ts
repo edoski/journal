@@ -307,7 +307,9 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
-					if (afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
+					// Ordinary text shows only from a settled reply: the voice guard
+					// takes the tutor's out as each block ends (an empty block).
+					if (streamingMessage || !block.text || afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });

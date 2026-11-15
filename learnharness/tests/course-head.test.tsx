@@ -156,9 +156,12 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		const one = gapLine(gapped(["variance"], [], { variance: "full" }))!;
 		assert.equal(one.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WHY.start.full}.`);
 		assert.deepEqual([...one.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask]);
-		const review = gapLine(gapped([], ["binomial"], { binomial: "too_late" }))!;
-		assert.equal(review.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WHY.review.too_late}.`);
+		const review = gapLine(gapped([], ["binomial"], { binomial: "full" }))!;
+		assert.equal(review.querySelector("[data-slot=exam-gaps-why]")?.textContent, `${EXAM_GAP_WHY.review.full}.`);
 		assert.deepEqual([...review.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.review, EXAM_GAP_WORDS.ask]);
+		const late = gapLine(gapped([], ["poisson"], { poisson: "too_late" }))!;
+		assert.equal(late.querySelector("[data-slot=exam-gaps-why]")?.textContent, "Starts too close to the exam for a review.");
+		assert.deepEqual([...late.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.start, EXAM_GAP_WORDS.ask], "a topic never taught is started, never reviewed");
 		const both = gapLine(gapped(["variance", "geometric"], ["binomial"], { variance: "not_ready", geometric: "not_ready", binomial: "full" }))!;
 		assert.equal(
 			both.querySelector("[data-slot=exam-gaps-why]")?.textContent,
@@ -167,6 +170,16 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		);
 		assert.deepEqual([...both.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.startOne, EXAM_GAP_WORDS.ask], "one press picks which, from a menu");
 		assert.doesNotMatch(both.textContent ?? "", /\d/, "no counts");
+	});
+
+	it("offers only what he can do today: review what is taught, start what has its prerequisites taught, nothing for the rest (round 7: Review Poisson, Start Variance before Expectation)", () => {
+		const needs = (topic: string, prerequisite: string) => ({ kind: "needs" as const, topic: h(topic), prerequisite: h(prerequisite) });
+		const c = gapped(["geometric", "expectation", "variance"], ["binomial", "poisson"]);
+		const map = { ...c.map, topics: [...c.map.topics, topic("geometric"), topic("expectation")], edges: [needs("variance", "expectation"), needs("poisson", "binomial"), needs("geometric", "binomial")] };
+		const ways = examGaps(map)!.ways.map((w) => `${w.starts ? "Start" : "Review"} ${w.topic.handle}`);
+		assert.deepEqual(ways, ["Start geometric", "Start expectation", "Review binomial", "Start poisson"]);
+		const stuck = gapLine({ ...c, map: { ...map, exam: { ...map.exam!, doesNotFit: [h("variance")], unreviewed: [] } } })!;
+		assert.deepEqual([...stuck.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.ask], "named, with only the tutor to ask");
 	});
 
 	it("shows under either candidate's first line, and nothing when every topic fits", () => {

@@ -74,10 +74,10 @@ const STANDINGS: Record<string, Partial<CourseMapTopic>> = {
 	span: { title: "Span", level: "retained", review: due(10) },
 	independence: { title: "Linear independence", level: "assisted", weak: true, review: due(16), signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent", mistake: true, confidentErrors: 1 } },
 	basis: { title: "Basis and dimension", level: "independent", review: due(0), tasks: ["sheet-4"] },
-	matmul: { title: "Matrix multiplication", level: "independent", weak: true, review: due(2), signals: { ...QUIET, lapsed: true } },
-	elimination: { title: "Gaussian elimination", level: "assisted", weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 } } },
+	matmul: { title: "Matrix multiplication", level: "independent", weak: true, review: due(2), signals: { ...QUIET, lapsed: true, mistake: true } },
+	elimination: { title: "Gaussian elimination", level: "assisted", weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 }, mistake: true } },
 	rank: { title: "Rank", level: "assisted", weak: true, review: due(3), signals: { ...QUIET, stale: true } },
-	kernel: { title: "Kernel", level: "attempted", weak: true, signals: { ...QUIET, confidentErrors: 2 } },
+	kernel: { title: "Kernel", level: "attempted", weak: true, signals: { ...QUIET, confidentErrors: 2, mistake: true } },
 	determinant: { title: "Determinants", level: "assisted", review: due(4) },
 	cramer: { title: "Cramer's rule", level: "introduced", review: due(2) },
 };
@@ -149,7 +149,7 @@ describe("why a topic needs him", () => {
 		assert.equal(words("independence"), "Mistake to fix");
 		assert.equal(words("elimination"), "Mixed up with Cramer's rule");
 		assert.equal(words("kernel"), "Sure, but wrong");
-		assert.equal(words("rank"), "Look again");
+		assert.equal(words("rank"), "Check on your own", "no wrong answer open");
 	});
 
 	it("says a mistake he has answered right since is fixed, to be checked again", () => {
@@ -421,7 +421,7 @@ describe("topic map drawing", () => {
 		assert.equal(nodes.length, 16);
 		assert.ok(nodes.every((n) => n.tagName === "A"));
 		assert.equal(node("rank").getAttribute("href"), unitHref(MAP.workspace, "rank"));
-		assert.equal(node("rank").getAttribute("aria-label"), "Rank, You are here, Right with help, Look again");
+		assert.equal(node("rank").getAttribute("aria-label"), "Rank, You are here, Right with help, Check on your own");
 		assert.equal(node("rank").getAttribute("aria-description"), "Needs Basis and dimension, Matrix multiplication, Gaussian elimination");
 		assert.equal(node("eigen").getAttribute("aria-label"), "eigen, Not started");
 	});
@@ -430,7 +430,7 @@ describe("topic map drawing", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
-			["10d overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Look again", "Sure, but wrong"],
+			["10d overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Check on your own", "Sure, but wrong"],
 		);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-need"]'), null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");

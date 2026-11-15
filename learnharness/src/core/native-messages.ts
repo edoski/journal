@@ -588,7 +588,13 @@ export interface DisputeDetails {
 	observations: string[];
 	said?: string;
 	proposed?: MarkResult;
+	/** How he thinks it should count: as his own work, or with help. */
+	proposedHow?: DisputedHow;
 }
+
+/** How a disputed answer should count, as his answer card says it. */
+export type DisputedHow = "ownWork" | "withHelp";
+export const DISPUTED_HOWS: readonly DisputedHow[] = ["ownWork", "withHelp"];
 
 /** His dispute, as its own message to the tutor: the content names the
  *  answer and its attempts, so the agent re-judges them as the course
@@ -757,6 +763,23 @@ export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
 		}
 	}
 	return [...topics];
+}
+
+/** The topics a practice session's first problem is on. A practice session
+ *  with no topic of its own (one the naming rule never reached) belongs to
+ *  them, so it stays with its topic while open (round 6 N10); a lesson
+ *  still belongs to none until its plan names one. */
+export function firstProblemTopicsOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	for (const m of messages) {
+		if ((m as { role?: string }).role !== "assistant") continue;
+		for (const block of (m as AssistantMessage).content) {
+			if (block.type === "toolCall" && clean.has(block.id) && block.name === PRACTICE_PROBLEM_TOOL && strings((block.arguments as Record<string, unknown>).topics).length > 0) {
+				return strings((block.arguments as Record<string, unknown>).topics);
+			}
+		}
+	}
+	return [];
 }
 
 /** A JSON array the tutor may send as its text, as a list of strings. */
