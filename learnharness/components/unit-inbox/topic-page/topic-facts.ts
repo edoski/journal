@@ -1,4 +1,4 @@
-import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
+import { markHow, topicOpening, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { cardLine, slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
@@ -217,7 +217,8 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  * (a new review session, never an old lesson), continue the open task that
  * holds it, start a topic not started, continue one being learned that has
  * no review set, else study (the engine has set the next review in the
- * future, so nothing needs him). Continue picks up the lesson that holds
+ * future, so nothing needs him; when the plan holds a review memory asked
+ * for already, Study opens that review, `topicOpening`). Continue picks up the lesson that holds
  * the task, or the topic's newest lesson, as the session model says
  * (`continueMove`). `chats` are every session; the topic's are those that
  * belong to it (`ownsTopic`), never one that only touched it on the way
@@ -232,7 +233,7 @@ export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readon
 	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), `Continue ${task.title}`, task);
 	if (topic.level === "new") return { kind: "start", opening: topic.title };
 	if (shelfOf(topic, null) === "learning" && !topic.review) return continueAction(sessions, `Continue ${topic.title}`, null);
-	return { kind: "study", opening: topic.title };
+	return { kind: "study", opening: topicOpening(topic, map.today) };
 }
 
 const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });

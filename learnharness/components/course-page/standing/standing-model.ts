@@ -100,6 +100,9 @@ export interface MistakeRow {
 	arc: StripArc | null;
 	resume: ChatListItem | null;
 	workspace: string;
+	/** The engine's study day, against which a press reads the topic's
+	 *  review (`topicCreation`). */
+	today: string;
 	href: string;
 }
 
@@ -137,6 +140,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
 				resume: resumableSession(topicSessions(chats, map.workspace, topic.handle)),
 				workspace: map.workspace,
+				today: map.today,
 				href: unitHref(map.workspace, topic.handle),
 			},
 		];

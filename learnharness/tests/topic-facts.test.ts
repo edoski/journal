@@ -166,6 +166,17 @@ describe("the page's one action", () => {
 		const slippedLater = { ...TOPICS.matmul, review: { kind: "scheduled" as const, date: "2026-11-12" } };
 		assert.equal(topicAction(slippedLater, MAP, []).kind, "study");
 	});
+
+	// Round 10, 2 M1: Now read "Due since 6 Nov, back 11 Nov · Study", and
+	// Study posted the bare title, so the review became a lesson.
+	it("opens a review memory asked for, held by the plan to a later day, as that review", () => {
+		const held = { ...TOPICS.vectors, review: { kind: "scheduled" as const, date: "2026-11-11", held: { exam: null, since: "2026-11-06" } } };
+		assert.deepEqual(topicAction(held, MAP, []), { kind: "study", opening: "Review Vectors and linear combinations" });
+		const heldFromToday = { ...held, review: { ...held.review, held: { exam: null, since: TODAY } } };
+		assert.deepEqual(topicAction(heldFromToday, MAP, []), { kind: "study", opening: "Review Vectors and linear combinations" });
+		const notYet = { ...held, review: { ...held.review, held: { exam: null, since: "2026-11-09" } } };
+		assert.deepEqual(topicAction(notYet, MAP, []), { kind: "study", opening: "Vectors and linear combinations" }, "memory's day still ahead: a lesson");
+	});
 });
 
 describe("the open tasks that hold a topic", () => {

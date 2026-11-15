@@ -55,7 +55,7 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 			data-slot="mistake-row"
 			aria-label={label}
 			disabled={starting !== null}
-			onClick={() => start({ key, topic: row.topic, course: { workspace: row.workspace } })}
+			onClick={() => start({ key, topic: row.topic, course: { workspace: row.workspace, today: row.today } })}
 			className={ROW}
 		>
 			{body}

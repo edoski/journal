@@ -4,12 +4,13 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SessionStarter, type SessionCreation } from "@/components/start-session";
 import type { Unit } from "@/components/unit-inbox/units";
+import { topicOpening } from "@/src/core";
 
 /** The row action that starts a session on a unit, worded as the course map's. */
 export const STUDY_WORDS = "Study";
 
 /** What a start needs of a unit: its key, its topic and its course. */
-export type StartableUnit = Pick<Unit, "key"> & { topic: Pick<Unit["topic"], "title" | "handle">; course: Pick<Unit["course"], "workspace"> };
+export type StartableUnit = Pick<Unit, "key"> & { topic: Pick<Unit["topic"], "title" | "handle" | "review">; course: Pick<Unit["course"], "workspace" | "today"> };
 
 /** Starts a session (`creation`) and opens it; when it cannot start (no
  *  models set up), the composer opens instead. `starting` is the key of
@@ -33,17 +34,18 @@ export function useStartSession(): { start: (key: string, creation: SessionCreat
 	return { start, starting };
 }
 
-/** The session a start on one topic creates: opened on the topic's title,
- *  as the course map's Study this does, so the tutor routes it (a due
- *  review is tried first), and linked to the topic from its first turn. */
-export function topicCreation(workspace: string, topic: { title: string; handle: string }): SessionCreation {
-	return { title: topic.title, course: { workspace }, topics: [topic.handle] };
+/** The session a start on one topic creates, linked to the topic from its
+ *  first turn: its review when memory asks for it by `today`, else a
+ *  lesson on its title, as the topic page's Study opens it
+ *  (`topicOpening`). */
+export function topicCreation(workspace: string, topic: Pick<Unit["topic"], "title" | "handle" | "review">, today: string): SessionCreation {
+	return { title: topicOpening(topic, today), course: { workspace }, topics: [topic.handle] };
 }
 
 /** Starts a session on a unit in its course (`topicCreation`). */
 export function useStartUnit(): { start: (unit: StartableUnit) => void; starting: string | null } {
 	const { start, starting } = useStartSession();
-	return { start: useCallback((unit: StartableUnit) => start(unit.key, topicCreation(unit.course.workspace, unit.topic)), [start]), starting };
+	return { start: useCallback((unit: StartableUnit) => start(unit.key, topicCreation(unit.course.workspace, unit.topic, unit.course.today)), [start]), starting };
 }
 
 /** The session a Check it press creates (spec: course-page.md, "Arcs"):

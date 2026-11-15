@@ -30,7 +30,7 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 	const why = examGapWhyWords(reasoned(gaps.start), reasoned(gaps.review)) ?? "";
 	const { ways } = gaps;
 	const named = [...gaps.start, ...gaps.review];
-	const open = (topic: CourseMapTopic) => start(`gap:${topic.handle}`, topicCreation(workspace, topic));
+	const open = (topic: CourseMapTopic) => start(`gap:${topic.handle}`, topicCreation(workspace, topic, course.map.today));
 	const only = ways.length === 1 ? ways[0]! : null;
 	// The pick: the first way, an exam topic never started before a review,
 	// in the engine's order (round 8: eight options and no pick).

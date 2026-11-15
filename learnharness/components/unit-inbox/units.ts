@@ -16,6 +16,9 @@ export type Shelf = "learning" | "review" | "known";
 export interface UnitCourse {
 	workspace: string;
 	title: string;
+	/** The engine's study day (`CourseMap.today`), against which a press
+	 *  reads whether memory asks for the topic's review (`topicOpening`). */
+	today: string;
 }
 
 /** What a unit's sessions are doing now: one waits on the learner, the
@@ -135,7 +138,7 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 	const scoped = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const units: Unit[] = [];
 	for (const { map } of scoped) {
-		const course = { workspace: map.workspace, title: map.title };
+		const course = { workspace: map.workspace, title: map.title, today: map.today };
 		for (const topic of map.topics) {
 			const sessions = topicSessions(chats, map.workspace, topic.handle);
 			const now = nowOf(sessions, topic.handle);
