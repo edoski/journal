@@ -271,7 +271,7 @@ const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {
  *  already counts as your own work, with no help" sat on a card that said
  *  otherwise). */
 const CARD_WORDS_FOR_RULING =
-	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it. In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
+	'His card says how each attempt went: help given reads "With help"; a prediction before its step was taught reads "Prediction, not counted"; an answer he gave up on reads "Gave up"; a right answer recorded as uncertain reads "Not yet confirmed"; any other attempt with no help reads "On your own", a guess or a partly right one included, with his confidence beside it. In your ruling and in `ruling`, say how it went in the card\'s words for the attempt as you re-mark it.';
 
 /** The longest question excerpt a dispute quotes. */
 const DISPUTE_QUOTE = 400;

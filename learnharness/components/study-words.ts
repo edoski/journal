@@ -458,7 +458,7 @@ export const MARK_WORDS = {
 	disputed: "Disputed",
 	dispute: "Dispute",
 	disputeTitle: "Dispute this mark",
-	disputeLine: "Say what's wrong, or pick the mark you think is right. The tutor looks at your answer again.",
+	disputeLine: "Say what's wrong, or pick the mark or how it should count. The tutor looks at your answer again.",
 	disputePlaceholder: "What's wrong with the mark?",
 	disputeSend: "Send to the tutor",
 	youDisputed: "You disputed the mark",

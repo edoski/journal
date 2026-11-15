@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useRef, useState, type KeyboardEvent } from "react";
-import { CircleCheckIcon, CircleDashedIcon, CircleMinusIcon, CircleXIcon, FlagIcon, FlagOffIcon, GaugeIcon, HandHelpingIcon, ScaleIcon, UserIcon, type LucideIcon } from "lucide-react";
+import { CircleCheckIcon, CircleDashedIcon, CircleHelpIcon, CircleMinusIcon, CircleXIcon, FlagIcon, FlagOffIcon, GaugeIcon, HandHelpingIcon, ScaleIcon, UserIcon, type LucideIcon } from "lucide-react";
 import { markHow, type AnswerMark, type DisputeDetails, type DisputedHow, type MarkHow, type MarkResult, type MarkRow } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -45,6 +45,7 @@ const HOW_ICON: Record<MarkHow, LucideIcon> = {
 	predicted: CircleDashedIcon,
 	gaveUp: FlagOffIcon,
 	withHelp: HandHelpingIcon,
+	unconfirmed: CircleHelpIcon,
 	ownWork: UserIcon,
 };
 
