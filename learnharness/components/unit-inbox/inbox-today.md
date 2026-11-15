@@ -44,7 +44,7 @@ The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowS
 | no courses | the waiting sessions' cards, "No courses yet", Other sessions |
 | engine down | the waiting sessions as session cards, "Couldn’t read your courses", Other sessions |
 | one course unreadable | after Today's cards, a card per unreadable course (under every course, not under the filter): its mark and name on line 1, "Couldn't read this course's record" on line 2, opening its course page, which says why; its sessions stay on Other sessions; "No courses yet" only when no course is listed at all |
-| long titles | the course name truncates first, the reason past 60% of the line, the title on its own line; the slot keeps its right edge |
+| long titles | the course name gives way first, whole, never cut (the mark names the course), the reason past 60% of the line, the title on its own line; the slot keeps its right edge |
 | 208px to the widest sidebar | the same anatomy |
 | open page | the topic's card (its page or one of its sessions) holds `fill-selected` and `aria-current` |
 

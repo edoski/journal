@@ -70,8 +70,8 @@ export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";
  * The sidebar's card (spec: row-card.md), the shell every card shares,
  * under the one row rule (`ROW_FRAME`): line 1 the course's mark and name
  * with the status slot, on one line always: the status keeps its words and
- * the name gives way to an ellipsis when both do not fit (the mark still
- * names the course). Then the title at 14/500 on the name's edge, where a
+ * the name gives way, whole, when both do not fit (the mark still names
+ * the course), never cut to "Linear Alg…". Then the title at 14/500 on the name's edge, where a
  * shelf row's title starts, two lines at most; the whole card one link,
  * its action (if any) over the status slot. `recede` dims a card the tutor
  * writes in to 70% until its row is hovered or anything in it (the card or
@@ -110,8 +110,10 @@ export function RowCard({
 		<>
 			<span className="flex h-5 items-center gap-2">
 					<span className="flex h-5 shrink-0 items-center">{mark}</span>
-					<span data-slot="unit-card-course" className="min-w-0 flex-1 truncate text-callout system-current:text-label text-muted-foreground">
-						{course}
+					{/* The name whole or not at all: too long for the room beside the status, it wraps onto a second line the 20px line hides, after an empty first item, and the badge names the course (round 10, 1 m8: "Linear Alg…"). */}
+					<span data-slot="unit-card-course" className="flex h-5 min-w-0 flex-1 flex-wrap overflow-hidden text-callout system-current:text-label text-muted-foreground">
+						<span aria-hidden="true" className="h-5 w-0" />
+						<span className="whitespace-nowrap leading-5">{course}</span>
 					</span>
 					<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, STATUS_LINE)}>
 						{status}

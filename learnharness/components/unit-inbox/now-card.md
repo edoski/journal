@@ -29,6 +29,6 @@ A waiting session whose transcript holds no topic of its course's map, or that h
 | keyboard focus | a 2px inset ring; Right moves to the action (`sidebar-tree.ts`), which shows with its own ring, and Left goes back |
 | open page | `fill-selected`, `aria-current="page"` |
 | tutor writing | spinner and Tutor writing in the slot, 70% until its row is hovered or focused |
-| long titles | the course name truncates and the title stops at two lines, ending in an ellipsis; the slot keeps its words and its right edge |
+| long titles | the course name gives way, whole, and the title stops at two lines, ending in an ellipsis; the slot keeps its words and its right edge |
 
 Sources: T3 Code's sidebar thread row (status label `size-3` at 12px, hover action over it); today.md, "Needs you now" (the line, its reason and its action are Home's).
