@@ -81,3 +81,16 @@ test("a stop after the tutor only saved progress, or wrote plain text the voice 
 	assert.equal(replyCutOf([reply, message, saved, ack, stoppedEmpty]), "stopped");
 	assert.equal(replyCutOf([reply, message, saved, ack, guarded, stoppedEmpty]), "stopped");
 });
+
+test("a stop after the tutor had marked his work or shown a model solution reads as a stop mid-reply (round 9, 4 #4)", () => {
+	// "You stopped the tutor before it replied." stood under marks and a
+	// Model solution that had already arrived in practice.
+	const concluded = { id: "a8", role: "assistant", content: [{ type: "toolCall", id: "k1", name: "conclude", arguments: { outcome: "solved", solution: "rank 2, so nullity 1" } }], stopReason: "toolUse", timestamp: 6 } as unknown as LhMessage;
+	const concludedAck = { id: "r8", role: "toolResult", toolCallId: "k1", toolName: "conclude", isError: false, timestamp: 7, content: [{ type: "text", text: "Concluded." }] } as unknown as LhMessage;
+	assert.equal(replyCutOf([reply, thinking, concluded, concludedAck, stoppedEmpty]), "stopped-mid");
+	const marked = { id: "a9", role: "assistant", content: [{ type: "toolCall", id: "s9", name: "course_save", arguments: { observations: [{ topic: "rank", outcome: "correct" }] } }], stopReason: "toolUse", timestamp: 6 } as unknown as LhMessage;
+	const markedAck = { id: "r9", role: "toolResult", toolCallId: "s9", toolName: "course_save", isError: false, timestamp: 7, content: [{ type: "text", text: "Saved o33." }] } as unknown as LhMessage;
+	assert.equal(replyCutOf([reply, message, marked, markedAck, stoppedEmpty]), "stopped-mid");
+	const posed = { id: "a10", role: "assistant", content: [{ type: "toolCall", id: "p10", name: "problem", arguments: { statement: "Find the rank of A." } }], stopReason: "toolUse", timestamp: 6 } as unknown as LhMessage;
+	assert.equal(replyCutOf([reply, message, posed, stoppedEmpty]), "stopped-mid");
+});
