@@ -4,7 +4,7 @@
 
 | When | What happens |
 |---|---|
-| A reload or a restart | Every box opens with what he had typed and the photos waiting in it: the New lesson box, a lesson's message box, a check or question, a practice problem. |
+| A reload or a restart | Every box opens with what he had typed, how sure he said he was, and the photos waiting in it: the New lesson box, a lesson's message box, a check or question, a practice problem. |
 | Hint on a check | His answer so far goes to the course's carry; the check asked again opens with it. The question asked right after a hint or a side question is that question again, in whatever words (round 7: a re-ask that dropped "Say why." lost his work). |
 | Done for today with a check open | His answer so far goes to the course's carry; the answer is never shown. When the tutor asks the question again it opens with his words: in this lesson, the next question of its kind (the same tool and form, and the same plan step when both name one) in whatever words (round 8: a re-ask in other words left his words unused); in the next lesson of the course, the same words. |
 | Another question opens while the carry waits | It opens empty, and the carry keeps waiting for its own question (round 6: the Done-for-today draft filled an unrelated Yes/No question). A newer carry replaces it. |
@@ -20,7 +20,7 @@
 | `new` | the New lesson box |
 | `<chat>:composer` | a lesson's message box |
 | `<chat>:q:<question key>` | an open check or question (its whole form: choice, thinking, answer, confidence) |
-| `<chat>:p:<problem call id>` | an open practice problem's thinking |
+| `<chat>:p:<problem call id>` | an open practice problem's thinking and confidence |
 | `<chat>:opening` | photos for a new lesson's first message, taken once |
 | `carry:<course workspace>` | his words for one question, with that question's words (`question`) and call (`from`); taken once, by that question asked again word for word, spacing aside, by the question asked right after that call when a hint or a side question left it open, or by the next question of its kind after Done for today set it aside |
 

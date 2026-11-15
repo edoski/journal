@@ -150,6 +150,8 @@ function AnswerComposer({
 	const { selection, confidence, setConfidence, toggle: pick } = answer;
 	const waiting = problem && busy;
 	const [text, setText] = useState(() => (initialDraft ? initialDraft.text || initialDraft.other || initialDraft.thinking : ""));
+	const textRef = useRef(text);
+	textRef.current = text;
 	const photos = usePhotoDraft(initialDraft?.photos, textMode ? box : undefined);
 	const restorePhotos = photos.restore;
 
@@ -168,7 +170,11 @@ function AnswerComposer({
 			const carried = carry ? carriedForm(carry.words, true) : undefined;
 			if (keptText) setText(keptText);
 			else if (carried) setText(carried.text);
-			if (carried) setConfidence(carried.confidence);
+			// How sure he was comes back with his words (round 8: a reload
+			// and a refused send reset the meter to Neutral).
+			const keptSure = kept?.form?.confidence ?? kept?.confidence;
+			if (keptText && keptSure) setConfidence(keptSure);
+			else if (carried) setConfidence(carried.confidence);
 			void carry?.photos.then((list) => {
 				if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
 			});
@@ -186,8 +192,8 @@ function AnswerComposer({
 	);
 	useEffect(() => {
 		if (!restored || sentRef.current) return;
-		keepWords(box, problem ? { text } : { form: keptForm(text, selection) });
-	}, [restored, box, problem, text, selection, keptForm]);
+		keepWords(box, problem ? { text, confidence } : { form: keptForm(text, selection) });
+	}, [restored, box, problem, text, confidence, selection, keptForm]);
 	const draftChangeRef = useRef(onDraftChange);
 	draftChangeRef.current = onDraftChange;
 	const dockKey = problem ? `p:${open.toolCallId}` : `q:${open.kind === "question" ? open.key : ""}`;
@@ -211,10 +217,13 @@ function AnswerComposer({
 			const taken = photos.take();
 			// A send refused at once gives his work back, words and photos,
 			// unless he has started writing again.
-			void onSubmitThinking(words, confidence, sentPhotos(taken)).then((accepted) => {
+			const sure = confidence;
+			void onSubmitThinking(words, sure, sentPhotos(taken)).then((accepted) => {
 				if (accepted) return;
 				restorePhotos(taken);
-				setText((now) => (now.trim() ? now : words));
+				if (textRef.current.trim()) return;
+				setText(words);
+				setConfidence(sure);
 			});
 			return;
 		}
