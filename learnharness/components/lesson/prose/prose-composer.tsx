@@ -7,11 +7,11 @@ import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Hint } from "@/components/ui/hint";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEnterSubmits } from "@/components/enter-submits";
+import { ShowMeConfirm } from "@/components/abort-turn-dialog";
 import { stepConfidence } from "@/components/confidence-choice";
 import { usePhotoDraft, sentPhotos } from "@/components/photos";
 import { ComposerIcon, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
 import { carriedForm, carryWords, formToKept, keepPhotos, keepWords, keptWords, takeCarry } from "@/components/lesson/kept-drafts";
-import { holdsRescue } from "@/components/lesson/stranded-draft";
 import {
 	CONFIDENCE_CHOICES,
 	DEFAULT_CONFIDENCE,
@@ -52,8 +52,6 @@ export interface ProseComposerProps {
 	answer: ProseAnswer;
 	/** The lesson's own composer, as it is with nothing open. */
 	message: MessageComposerProps;
-	/** The message draft, read and written outside a render, for Esc's carry. */
-	messageText: { read: () => string; write: (text: string) => void };
 	/** Sends the message draft while a question or problem is open. */
 	onAskInstead: () => void;
 	/** Esc lands here while something is open: the lesson binds the switch. */
@@ -80,31 +78,17 @@ export interface ProseComposerProps {
  *  Send answers. Esc or the toggle turns it into a message to the tutor
  *  until Esc or the toggle again. */
 export function ProseComposer(props: ProseComposerProps) {
-	const { open, answer, message, messageText, onAskInstead, toggleRef, chatId } = props;
+	const { open, answer, message, onAskInstead, toggleRef, chatId } = props;
 	const box = proseBox(chatId, open);
 	const asking = open !== null && answer.mode === "ask";
-	// Esc carries his words to the other side when that side holds none.
+	// Answer and Ask each keep their own draft (round 8: Esc carried the
+	// half answer into Ask, and the side question sent over it destroyed
+	// it). The switch only switches: the answer stays in its box, kept
+	// across the switch, and the side question in the message box.
 	const toggle = useCallback(() => {
-		if (!open || !box) return;
-		const kept = keptWords(box);
-		const answerText = kept?.form ? kept.form.text || kept.form.other || kept.form.thinking : (kept?.text ?? "");
-		const messageWords = messageText.read();
-		if (answer.mode === "answer") {
-			if (!messageWords.trim() && answerText.trim()) {
-				messageText.write(answerText);
-				keepWords(box, kept?.form ? { form: { ...kept.form, text: "", other: "", thinking: "" } } : null);
-			}
-			answer.setMode("ask");
-		} else {
-			// Words another window's answer left in the box belong to that
-			// question (stranded-draft.ts): never this one's answer.
-			if (!answerText.trim() && messageWords.trim() && !holdsRescue(chatId, messageWords)) {
-				keepWords(box, open.kind === "question" ? { form: { ...(kept?.form ?? formToKept({ selection: answer.selection, thinking: "", other: "", text: "", confidence: answer.confidence })), text: messageWords } } : { text: messageWords });
-				messageText.write("");
-			}
-			answer.setMode("answer");
-		}
-	}, [open, box, answer, messageText, chatId]);
+		if (!open) return;
+		answer.setMode(answer.mode === "answer" ? "ask" : "answer");
+	}, [open, answer]);
 	toggleRef.current = open ? toggle : null;
 
 	if (!open || asking) {
@@ -150,6 +134,8 @@ function AnswerComposer({
 	const { selection, confidence, setConfidence, toggle: pick } = answer;
 	const waiting = problem && busy;
 	const [text, setText] = useState(() => (initialDraft ? initialDraft.text || initialDraft.other || initialDraft.thinking : ""));
+	const textRef = useRef(text);
+	textRef.current = text;
 	const photos = usePhotoDraft(initialDraft?.photos, textMode ? box : undefined);
 	const restorePhotos = photos.restore;
 
@@ -168,7 +154,11 @@ function AnswerComposer({
 			const carried = carry ? carriedForm(carry.words, true) : undefined;
 			if (keptText) setText(keptText);
 			else if (carried) setText(carried.text);
-			if (carried) setConfidence(carried.confidence);
+			// How sure he was comes back with his words (round 8: a reload
+			// and a refused send reset the meter to Neutral).
+			const keptSure = kept?.form?.confidence ?? kept?.confidence;
+			if (keptText && keptSure) setConfidence(keptSure);
+			else if (carried) setConfidence(carried.confidence);
 			void carry?.photos.then((list) => {
 				if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
 			});
@@ -186,8 +176,8 @@ function AnswerComposer({
 	);
 	useEffect(() => {
 		if (!restored || sentRef.current) return;
-		keepWords(box, problem ? { text } : { form: keptForm(text, selection) });
-	}, [restored, box, problem, text, selection, keptForm]);
+		keepWords(box, problem ? { text, confidence } : { form: keptForm(text, selection) });
+	}, [restored, box, problem, text, confidence, selection, keptForm]);
 	const draftChangeRef = useRef(onDraftChange);
 	draftChangeRef.current = onDraftChange;
 	const dockKey = problem ? `p:${open.toolCallId}` : `q:${open.kind === "question" ? open.key : ""}`;
@@ -211,10 +201,13 @@ function AnswerComposer({
 			const taken = photos.take();
 			// A send refused at once gives his work back, words and photos,
 			// unless he has started writing again.
-			void onSubmitThinking(words, confidence, sentPhotos(taken)).then((accepted) => {
+			const sure = confidence;
+			void onSubmitThinking(words, sure, sentPhotos(taken)).then((accepted) => {
 				if (accepted) return;
 				restorePhotos(taken);
-				setText((now) => (now.trim() ? now : words));
+				if (textRef.current.trim()) return;
+				setText(words);
+				setConfidence(sure);
 			});
 			return;
 		}
@@ -232,6 +225,17 @@ function AnswerComposer({
 		onSubmitAnswer(proseAnswer(spec, selection, text, confidence), textMode ? sentPhotos(photos.photos) : undefined);
 	};
 	useEnterSubmits(submit);
+	// A single choice picked with nothing typed is his answer: it sends at
+	// once, with no second press (round 8: "Anything to add?" waited on a
+	// second send). Typed words first keep the pick for Send.
+	const picks = answer.picks ?? 0;
+	const picksSeen = useRef(picks);
+	useEffect(() => {
+		const picked = picks > picksSeen.current;
+		picksSeen.current = picks;
+		if (picked && spec?.mode === "single-select" && selection.selected.size === 1 && !text.trim()) submit();
+		// Only a new pick decides.
+	}, [picks]);
 
 	// Hint on a check: a request, never an answer. The check comes back
 	// as a new question, and his work waits in the carry to fill it.
@@ -241,8 +245,18 @@ function AnswerComposer({
 		forgetBox();
 		onSubmitAnswer(proseHintRequest(spec, text));
 	};
+	// Show me gives the check or problem up, so it asks first: once the
+	// answer is on screen nothing can take the give-up back (round 8).
+	const [confirmShow, setConfirmShow] = useState<"question" | "problem" | null>(null);
 	// Show me on a check: he gives up, his words going with it as his work.
 	const showMe = () => {
+		if (!spec?.showsAnswer || waiting) return;
+		setConfirmShow("question");
+	};
+	const shown = () => {
+		const what = confirmShow;
+		setConfirmShow(null);
+		if (what === "problem") return onRequest("show", text.trim());
 		if (!spec?.showsAnswer || waiting) return;
 		forgetBox();
 		onSubmitAnswer(proseShowMeRequest(spec, text));
@@ -250,6 +264,7 @@ function AnswerComposer({
 	// A request on a problem carries the work so far and leaves it in the field.
 	const request = (kind: PracticeRequest) => {
 		if (waiting) return;
+		if (kind === "show") return setConfirmShow("problem");
 		onRequest(kind, text.trim());
 	};
 	const actRef = useRef({ hint, showMe, request });
@@ -312,20 +327,23 @@ function AnswerComposer({
 	);
 	const placeholder = problem ? "Work here, think out loud." : spec ? prosePlaceholder(spec, open.kind === "question" ? open.input : null, selection.selected.size > 0) : undefined;
 	return (
-		<LessonComposer
-			busy={busy}
-			value={text}
-			onChange={setText}
-			onSend={submit}
-			onStop={message.onStop}
-			canSend={ready}
-			placeholder={placeholder}
-			leading={leading}
-			toolbar={toolbar}
-			answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
-			head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
-			photos={textMode ? photos : undefined}
-		/>
+		<>
+			<LessonComposer
+				busy={busy}
+					value={text}
+				onChange={setText}
+				onSend={submit}
+				onStop={message.onStop}
+				canSend={ready}
+				placeholder={placeholder}
+				leading={leading}
+				toolbar={toolbar}
+				answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
+				head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
+				photos={textMode ? photos : undefined}
+			/>
+			{confirmShow && typeof document !== "undefined" && <ShowMeConfirm what={confirmShow} onClose={() => setConfirmShow(null)} onConfirm={shown} />}
+		</>
 	);
 }
 

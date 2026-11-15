@@ -160,7 +160,7 @@ describe("the open mistakes", () => {
 		assert.deepEqual(
 			rows.map((r) => [r.topic.handle, r.slip, r.words, r.when, r.helped, r.arc?.title, r.hint]),
 			[
-				["basis", "confident", "Called three vectors in a plane a basis", "2d ago", false, "Vector spaces", "Sheet 3. You answered a basis"],
+				["basis", "confident", "Called three vectors in a plane a basis", "6 Nov", false, "Vector spaces", "Sheet 3. You answered a basis"],
 				["rank", "gap", "You count the vectors, not the dimension of their span", "Today", true, "Linear maps", null],
 			],
 		);

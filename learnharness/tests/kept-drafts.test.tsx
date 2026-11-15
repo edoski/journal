@@ -136,7 +136,6 @@ async function mount(key: string, carryScope?: string, input: unknown = check, t
 				open={{ kind: "question", key, tool, toolCallId: "q2", input }}
 				answer={answer}
 				message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
-				messageText={{ read: () => "", write: noop }}
 				onAskInstead={noop}
 				toggleRef={{ current: null }}
 				busy={false}

@@ -3,8 +3,11 @@
  * Each message the tutor sends with `send_to_user`, and each question it
  * poses, is read with the voice checker before he sees it. One that breaks
  * the voice is refused with what to fix, and the tutor rewrites it in the
- * same turn; he sees only the rewrite. Each kind of call is refused once a
- * turn at most, so a rewrite that still slips is shown rather than looped.
+ * same turn; he sees only the rewrite. Each kind of call is refused twice a
+ * turn at most (a rewrite is read against every rule again, round 8: a
+ * length rewrite glued sentences, a verdict rewrite opened on a formula),
+ * then only the hard rules hold, so a rewrite that still slips is shown
+ * rather than looped.
  *
  * A refused message never shows: `screen` runs as the call finishes
  * streaming, before any view reads it, and takes its text out of the live
@@ -22,7 +25,7 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { opensTurn, PRACTICE_CONCLUDE_TOOL, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, compoundAsk, echoOf, repeatedAdvice, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, compoundAsk, echoOf, leavesAWayOn, repeatedAdvice, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -42,6 +45,23 @@ export interface TurnInput {
 	/** Practice handed the session back to teaching (Explain instead, or a
 	 *  request to be taught): the turn must leave him something to do. */
 	handedBack?: boolean;
+	/** He answered unsure (marked it a guess, or said he doesn't see why):
+	 *  the reply owes him words before any next question (round 8: a right
+	 *  guess and "Not sure why I'm allowed to split T" got none). */
+	unsure?: string;
+	/** His work on a problem, which a reply leaves open: the reply ends on
+	 *  a way on (round 8: photo feedback stopped on the faulty line). */
+	work?: boolean;
+}
+
+/** Words in his answer that say he is not sure of it or of its reason. */
+const DOUBT = /\b(?:not sure|unsure|no idea|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
+
+/** Why his answer reads unsure, or undefined. */
+function unsureOf(details: Record<string, unknown>, words: string | null): string | undefined {
+	const said = words ? DOUBT.exec(words) : null;
+	if (said) return `he wrote "${said[0]}"`;
+	return details.confidence === "guessing" ? "he marked his answer a guess" : undefined;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -83,7 +103,9 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 		if (details.hintRequested === true) return { kind: "hint", answers: false, words: null };
 		// A shown answer sets its own length, as a shown solution does.
 		if (details.showMe === true) return { kind: undefined, answers: false, words: null };
-		return { kind: "wrong", answers: true, words: typeof details.text === "string" ? details.text : textOf(input.content), ...handedBack };
+		const words = typeof details.text === "string" ? details.text : textOf(input.content);
+		const unsure = unsureOf(details, words);
+		return { kind: "wrong", answers: true, words, ...handedBack, ...(unsure ? { unsure } : {}) };
 	}
 	if (input.role !== "custom") return none;
 	switch (input.customType) {
@@ -91,7 +113,7 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 		case "practice-next":
 			return { kind: "close", answers: false, words: null };
 		case "practice-thinking":
-			return { kind: "wrong", answers: true, words: textOf(input.content) };
+			return { kind: "wrong", answers: true, words: textOf(input.content), work: true };
 		case "practice-request": {
 			// A hint's rung and a shown solution set their own length.
 			const request = isRecord(input.details) ? input.details.request : undefined;
@@ -173,6 +195,10 @@ const SAVED_AGAINST_WORDS: AgentToolResult<unknown> = {
 	details: { withheld: "verdict" },
 };
 
+/** An ask for the reason of the answer beside it: "explain why…", "say how
+ *  you got it", "justify it". */
+const REASON_ASK = /^(?:explain|say|justify|give|state)\b[^.?!]*\b(?:why|how|reason)\b|^(?:explain|justify) (?:it|this|that|your)\b/i;
+
 const quoted = (text: string) => `"${text.length > 160 ? `${text.slice(0, 157)}…` : text}"`;
 
 /** What to fix for each break, in the voice's own terms. */
@@ -200,16 +226,29 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `One question per turn, and this turn asks more: ${quoted(b.excerpt)}. Ask the first alone; the rest waits for his answer.`;
 		case "verdict":
 			return `You saved his answer as partly right, so never call it not right: open with the part that is right, then where it broke: ${quoted(b.excerpt)}.`;
-		case "compound":
-			return `One question asks one thing, and this one asks more: ${b.excerpt.split(" / ").map(quoted).join(", ")}. Ask the first alone; the rest waits for his answer.`;
+		case "compound": {
+			const asks = b.excerpt.split(" / ");
+			// A reason asked beside the answer is one ask, said "…, and why?"
+			// (round 8: the rewrite read "with the reason the formula counts it?").
+			const reason = asks.slice(1).every((a) => REASON_ASK.test(a));
+			return reason
+				? `One question asks one thing, and this one asks more: ${asks.map(quoted).join(", ")}. A reason asked with the answer is part of it: end the first ask with ", and why?".`
+				: `One question asks one thing, and this one asks more: ${asks.map(quoted).join(", ")}. Ask the first alone; the rest waits for his answer.`;
+		}
 		case "length":
-			return `It is too long for ${kind ? KIND_WORDS[kind] : "one turn"} (${b.excerpt}). Keep the one idea and cut the rest.`;
+			return `It is too long for ${kind ? KIND_WORDS[kind] : "one turn"} (${b.excerpt}). Keep the one idea and cut whole sentences; a clause joined by a colon, a semicolon or a run of commas still counts as a sentence.`;
+		case "options":
+			return `An option that joins others is a choice of several: drop ${quoted(b.excerpt)} and set multiSelect, so he picks each he wants.`;
+		case "symbol":
+			return `Never start a sentence with a symbol or a formula; open it with words: ${quoted(b.excerpt)}.`;
 		case "displays":
 			return `Too many displays for ${kind ? KIND_WORDS[kind] : "one turn"} (${b.excerpt}).`;
 		case "advice":
 			return `A question is its own words with nothing under them: no advice on how to answer it, ${quoted(b.excerpt)}.`;
 		case "repeat":
-			return `This advice was given earlier in the session, and advice is said once: ${b.excerpt}. Leave it out.`;
+			return b.excerpt.startsWith("display ")
+				? `He has already seen ${b.excerpt.slice("display ".length)} earlier in the session, and what he was told is said once: build on it with a new case, never show or explain it again.`
+				: `This advice was given earlier in the session, and advice is said once: ${b.excerpt}. Leave it out.`;
 		case "echo":
 			return `Start with the content, never by handing his answer back or grading a right one: ${quoted(b.excerpt)}.`;
 		case "feedback":
@@ -279,14 +318,58 @@ const OWED_NOTE = "Not shown to him: your message was refused and you sent no re
 /** A turn after practice handed back that would end with nothing for him
  *  to do (round 7: Explain instead ended on an explanation and no action). */
 const NEXT_ACTION_NOTE = "He has nothing to do next. End this turn on one question for him with your question tool, or, once he has answered your check, hand the session back to the problems with practice.";
+/** A reply to his work that leaves the problem open with nothing for him
+ *  to do (round 8: "It breaks at the line −3x + 2y = 0" and nothing after). */
+const NUDGE_NOTE = "His work broke and the problem is still open, but your reply gives him no way on. Send one more message with send_to_user: the smallest nudge toward his next move, as one question or instruction he can act on, never the correction.";
+/** A question posed straight after an unsure answer, with no words. */
+const UNSURE = (why: string): AgentToolResult<unknown> => ({
+	content: [
+		{
+			type: "text",
+			text: `Not posed: he was unsure of his answer (${why}), and you gave him no words on it. First send him with send_to_user, in one or two sentences, why his answer holds or where it broke, starting with the content; then ask this again.`,
+		},
+	],
+	isError: true,
+	details: { withheld: "unsure" },
+});
+
+/** An option of a choice that stands for several others ("Both: …", "All
+ *  of the above"): the question is a choice of several (round 8: the goal
+ *  question's "Both" option). */
+function joinedOptions(call: Pick<ToolCall, "arguments">): VoiceBreak[] {
+	const options = isRecord(call.arguments) && Array.isArray(call.arguments.options) ? call.arguments.options : [];
+	return options.flatMap((o) => {
+		const label = isRecord(o) && typeof o.label === "string" ? o.label : typeof o === "string" ? o : "";
+		return /^(?:both|all of (?:these|them|the above)|all (?:three|four)|any of (?:these|them))\b/i.test(label.trim()) ? [{ rule: "options" as const, excerpt: label }] : [];
+	});
+}
+
+const MATRIX = /\\begin\{([pbvBV]?matrix)\}[\s\S]*?\\end\{\1\}/g;
+const DISPLAY = /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g;
+const squash = (tex: string) => tex.replace(/\s+/g, "");
+
+/** The matrices and displays of a text, each by a key that ignores
+ *  spacing. `displaysOnly` reads the matrices inside displays alone (what
+ *  a teaching step shows), else every matrix (a question's inline one too). */
+function mathsShown(text: string, displaysOnly: boolean): Array<{ key: string; label: string }> {
+	const out: Array<{ key: string; label: string }> = [];
+	const displays = [...text.matchAll(DISPLAY)].map((m) => (m[1] ?? m[2] ?? "").trim()).filter(Boolean);
+	for (const d of displays) out.push({ key: `d:${squash(d)}`, label: "this display" });
+	for (const source of displaysOnly ? displays : [text]) {
+		for (const m of source.matchAll(MATRIX)) out.push({ key: `d:${squash(m[0])}`, label: "this matrix" });
+	}
+	return out;
+}
 
 /** One turn's guard, built from the record the turn runs on. `endsTurn`
  *  names the calls that end the turn (a question, a pose, a handoff). */
 export class VoiceGuard {
 	private readonly input: TurnInput;
 	private readonly earlier: string[];
+	private readonly answeredAt: number;
 	private readonly decisions = new Map<string, AgentToolResult<unknown> | null>();
-	private readonly refused = new Set<Family>();
+	/** How many times each kind of call was refused this turn. */
+	private readonly refused = new Map<Family, number>();
 	private readonly said: string[] = [];
 	private readonly asked: string[] = [];
 	private concluded = false;
@@ -297,7 +380,8 @@ export class VoiceGuard {
 	/** A refused message not yet rewritten, and whether a turn-ending call
 	 *  was already held back for it (once a turn). */
 	private owed = false;
-	private heldForOwed = false;
+	private heldForOwed = 0;
+	private heldUnsure = false;
 	/** Ordinary text this turn took out of a reply, and whether the turn
 	 *  posed a question he can answer, and was already told at its end. */
 	private plain = false;
@@ -314,6 +398,9 @@ export class VoiceGuard {
 	) {
 		this.input = turnInputOf(messages);
 		this.earlier = earlierTexts(messages);
+		// The question his answer replies to is the last one he read: a reply
+		// works on its matrix, so only what came before it counts as shown.
+		this.answeredAt = this.input.answers ? Math.max(0, this.earlier.length - 1) : this.earlier.length;
 	}
 
 	/** Whether a tool's calls pass through the guard: the probe's end too,
@@ -350,7 +437,8 @@ export class VoiceGuard {
 	beforeEnd(): string | undefined {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : undefined;
+		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
+		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -395,7 +483,7 @@ export class VoiceGuard {
 			const kind = this.messageKind();
 			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
-				this.refused.add("message");
+				this.refused.set("message", (this.refused.get("message") ?? 0) + 1);
 				this.owed = true;
 				return refusal("message", call.name, text, breaks, kind);
 			}
@@ -407,16 +495,22 @@ export class VoiceGuard {
 			return null;
 		}
 		if (this.probeEnded && (QUESTION_TOOLS as readonly string[]).includes(call.name)) return ASKED_AFTER_PROBE(questionText(call) ?? "");
-		if ((this.owed || (this.plain && this.sent === 0)) && !this.heldForOwed && this.endsTurn(call.name)) {
-			this.heldForOwed = true;
+		// Held once for each refused message (a rewrite may be refused again),
+		// or once for ordinary text.
+		if ((this.owed || (this.plain && this.sent === 0)) && this.heldForOwed < Math.max(1, this.refused.get("message") ?? 0) && this.endsTurn(call.name)) {
+			this.heldForOwed++;
 			return this.owed ? OWED(call.name) : PLAIN_OWED(call.name);
 		}
 		if (!(QUESTION_TOOLS as readonly string[]).includes(call.name)) return null;
 		const text = questionText(call);
 		if (!text) return null;
-		const breaks = this.held("question", this.questionBreaks(text));
+		if (this.input.unsure && this.sent === 0 && !this.heldUnsure) {
+			this.heldUnsure = true;
+			return UNSURE(this.input.unsure);
+		}
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call)]);
 		if (breaks.length > 0) {
-			this.refused.add("question");
+			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
 		}
 		this.said.push(text);
@@ -424,11 +518,11 @@ export class VoiceGuard {
 		return null;
 	}
 
-	/** The breaks a call is refused for: all of them the first time its
-	 *  kind of call is refused in a turn, then only the hard rules, so a
-	 *  rewrite that still slips elsewhere is shown rather than looped. */
+	/** The breaks a call is refused for: all of them for the draft and its
+	 *  first rewrite, then only the hard rules, so a rewrite that still
+	 *  slips elsewhere is shown rather than looped. */
 	private held(family: Family, breaks: VoiceBreak[]): VoiceBreak[] {
-		return this.refused.has(family) ? breaks.filter((b) => HARD.has(b.rule)) : breaks;
+		return (this.refused.get(family) ?? 0) >= 2 ? breaks.filter((b) => HARD.has(b.rule)) : breaks;
 	}
 
 	/** The kind of turn this message is: the input's for the turn's first
@@ -457,6 +551,8 @@ export class VoiceGuard {
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;
 		if (echo) out.push({ rule: "echo", excerpt: echo });
+		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
+		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
 		return [...out, ...this.repeats(text)];
 	}
 
@@ -467,6 +563,19 @@ export class VoiceGuard {
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
 		return [...out, ...this.repeats(text)];
+	}
+
+	/** A matrix or display of a teaching step that he already read earlier
+	 *  in the session, outside the question this turn answers: the step says
+	 *  again what he was shown (round 8: the first teaching step re-taught
+	 *  the probe's feedback on the same matrix). */
+	private shownBefore(text: string): string | null {
+		const mine = mathsShown(text, true);
+		if (mine.length === 0) return null;
+		const before = this.earlier.slice(0, this.answeredAt);
+		const seen = new Set(before.flatMap((t) => mathsShown(t, false).map((m) => m.key)));
+		const hit = mine.find((m) => seen.has(m.key));
+		return hit ? hit.label : null;
 	}
 
 	private repeats(text: string): VoiceBreak[] {

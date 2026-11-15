@@ -25,7 +25,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 | engine unavailable | `CoursesUnavailable` with its fix |
 | read failed | "Couldn't read your courses." with Try again |
 | no courses | "No courses yet. Start a lesson from New lesson and pick a course there." |
-| one course unreadable | the others, then one line per unreadable course under Today: its name (the title a linked session carries, else its folder's), then "Couldn't read this course's record." and why in plain words: "Its file is damaged.", "The app isn't allowed to open its files." or "Its file can't be opened." (`unreadable-course.tsx`); with no readable course, only those lines |
+| one course unreadable | the others, then one line per unreadable course under Today: its name (the title a linked session carries, else its folder's), then "Couldn't read this course's record." and why in plain words: "Its file is damaged.", "macOS won't let the app open its files: Get Info on the course folder in Finder shows who can read it." or "Its file can't be opened." (`unreadable-course.tsx`); with no readable course, only those lines |
 | a start failed | "Couldn't open the session. Try again." under the home |
 
 `DayHeading` is a home's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). `LessonButton` opens a lesson: a link to the session that waits, or a button that takes up the course's next step; it takes the shadcn button's props for its look. `mapFade` frames an embedded topic map with faded edges.

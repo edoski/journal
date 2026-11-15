@@ -489,6 +489,35 @@ def test_a_gap_beside_a_wrong_prediction_and_only_right_answers_is_refused(
     assert records.load(workspace)["topics"]["rank"]["gap"] == "Misreads the rank"
 
 
+def test_a_wrong_prediction_never_becomes_another_topics_gap(
+    workspace: Workspace,
+) -> None:
+    """Round 8 (2 M2): a wrong prediction saved on rank wrote the gap of
+    diag, a topic never answered, in the same save and in a later one."""
+    records.save(
+        workspace,
+        {**COURSE, "topics": {**COURSE["topics"], **DIAGONAL}},
+    )
+    prediction = attempt(
+        text="Guess which matrices diagonalise", result="incorrect", predicted=True
+    )
+    gap = {"topics": {"diag": {"gap": "Thinks only symmetric ones diagonalise"}}}
+    with pytest.raises(ValueError, match=r"topics\.diag\.gap: a prediction missed"):
+        records.save(workspace, {"observations": [prediction], **gap})
+    records.save(workspace, {"observations": [prediction]})
+    with pytest.raises(ValueError, match=r"topics\.diag\.gap: a prediction missed"):
+        records.save(workspace, gap)
+    assert "gap" not in records.load(workspace)["topics"]["diag"]
+    records.save(
+        workspace,
+        {"observations": [attempt("diag", text="Diagonalise B", result="partial")]},
+    )
+    records.save(workspace, gap)
+    assert records.load(workspace)["topics"]["diag"]["gap"] == (
+        "Thinks only symmetric ones diagonalise"
+    )
+
+
 def test_a_topic_taught_without_any_question_is_still_introduced(
     workspace: Workspace,
 ) -> None:

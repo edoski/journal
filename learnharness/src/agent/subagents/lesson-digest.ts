@@ -15,6 +15,7 @@ import { Type, type Static } from "typebox";
 import type { ChatRecord, DigestLedger } from "../../core/contracts/chat.ts";
 import type { CourseMap } from "../../core/contracts/course-map.ts";
 import { recordHasArcs } from "../../core/contracts/course.ts";
+import { isReviewSession, openedAsReview } from "../../core/session-opening.ts";
 import type { ChatStore, CourseRecords } from "../../core/ports.ts";
 import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/plan.ts";
 import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
@@ -91,6 +92,7 @@ Rules:
 - Judge from the whole lesson, to its end. A later answer that went wrong outweighs an earlier one that went right: never call a step smooth when a later turn showed a gap in it.
 - Every topic and knowledge entry names its \`step\`: a plan step the lesson reached (marked current or visited under "The lesson's plan"), or "${WARM_UP}" for the part before the plan. Record nothing about a step the lesson did not reach, even when the plan or the tutor described it in advance.
 - Graded answers are already recorded. Never restate an attempt; judge from the learner's questions, confusions, explanations and self-corrections.
+- A prediction (a \`Prediction\` in the lesson, saved with \`predicted\`) is a guess before the teaching: a wrong one is expected. Never write what a prediction got wrong as a \`gap\`, on its topic or any other, not even beside a later miss.
 - Leave out what the saves made during the lesson already hold, and anything the lesson did not show.
 - Write to the learner, in plain words they understand days later: "you", never "he" or "the learner"; no dates or ids; math in $…$.
 - When nothing is worth recording, submit empty lists.`;
@@ -220,6 +222,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 		if (!whole.ok) throw new Error(`course record: ${whole.message}`);
 		const { notes, knowledge } = recordOf(whole.json);
 		const arcs = digestArcs(whole.json, record.topics ?? []);
+		const tasks = sessionTasksOf(record.messages).filter((key) => map.tasks.some((t) => t.key === key));
 		const view: DigestCourseView = {
 			topics: map.topics.map((t) => ({
 				handle: t.handle,
@@ -229,7 +232,9 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 				note: notes.get(t.handle) ?? null,
 			})),
 			current: map.current,
-			tasks: sessionTasksOf(record.messages).filter((key) => map.tasks.some((t) => t.key === key)),
+			tasks,
+			movesPath: !openedAsReview(record) && !isReviewSession(record) && tasks.length === 0,
+			own: record.topics ?? [],
 			planFinished: planFinished(record.tree, record.messages),
 			knowledge,
 			reached: reachedSteps(record.tree, record.messages),

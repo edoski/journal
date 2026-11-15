@@ -106,6 +106,7 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 		const { text } = projectCourseBrief(RESUME, "teach");
 		assert.match(text, /^\[Course record\] Linear Algebra · today 2026-11-07 \(Saturday\) · exam in 10 days/);
 		assert.match(text, /Path, current rank: systems \(independent\), pivots \(new\), rank \(attempted\)/);
+		assert.match(text, /^Not started yet \(never taught, whatever their planned day\): pivots, eigen$/m, "round 8 (1 D10): the tutor misread which topics are started; eigen has a gap but was never taught");
 		assert.match(text, /- rank \(attempted\)\n/);
 		assert.doesNotMatch(text, /prompt:|points:/, "the teacher fetches review keys on demand");
 		assert.match(text, /- rank \(attempted\): counts vectors, not independent ones; sure but wrong ×1/, "the current topic keeps its gap");
@@ -371,7 +372,7 @@ describe("the daily plan of every course", () => {
 		const { text } = projectCourseBrief(TODAY, "teach", { plan: { workspace: "/study/probability", courses: [{ map: late, days: days["/study/linalg"] }], unread: [] } });
 		assert.match(text, /\nLinear Algebra\nOverdue: 3 reviews: Matrix multiplication \(12 days, planned today\), Eigenvalues \(11 days, planned Thu 26 Nov\), Rank \(2 days, planned Sat 21 Nov\)\n/);
 		assert.match(text, /- Sat 21 Nov: review Rank \(due since Fri 6 Nov, earlier days are full\)/);
-		assert.match(text, /- Mon 9 Nov: review Basis \(moved from Mon 9 Nov, earlier days are full\)/, "a review held from today or later is not overdue");
+		assert.match(text, /- Mon 9 Nov: review Basis \(earlier days are full\)/, "a review held from today or later is not overdue, and names no day he was never told (round 8)");
 	});
 
 	it("says a day he was told moved, from which day and what of his study moved it, so the tutor never names it in silence", () => {

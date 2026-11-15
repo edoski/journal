@@ -51,7 +51,7 @@ function lesson(): LhMessage[] {
 
 describe("which attempts mark which answer", () => {
 	it("an attempt marks the answer it names; a hint request is no answer", () => {
-		assert.deepEqual(markLinks(lesson()), { q1: ["o4"] });
+		assert.deepEqual(markLinks({ messages: lesson() }), { q1: ["o4"] });
 	});
 
 	it("a late save of an earlier check marks that check, not the prediction answered since (round 4)", () => {
@@ -63,7 +63,7 @@ describe("which attempts mark which answer", () => {
 			call("s1", "course_save", { changes: JSON.stringify({ observations: [named("q1", "the check")] }) }),
 			result("s1", "course_save", receipt("o37")),
 		];
-		assert.deepEqual(markLinks(messages), { q1: ["o37"] });
+		assert.deepEqual(markLinks({ messages: messages }), { q1: ["o37"] });
 	});
 
 	it("pairs by each observation's place in the save, a repeated one by the stored id", () => {
@@ -75,7 +75,7 @@ describe("which attempts mark which answer", () => {
 			call("s1", "course_save", { changes: { observations: [named(null, "said in words"), named("q2"), named("q1")] } }),
 			result("s1", "course_save", JSON.stringify({ observations: ["o8", "o9"], duplicates: ["o3"], saved: ["o8", "o3", "o9"] })),
 		];
-		assert.deepEqual(markLinks(messages), { q2: ["o3"], q1: ["o9"] });
+		assert.deepEqual(markLinks({ messages: messages }), { q2: ["o3"], q1: ["o9"] });
 	});
 
 	it("a practice problem's marks are its conclude receipt and any save that names the conclude", () => {
@@ -87,7 +87,7 @@ describe("which attempts mark which answer", () => {
 			call("s3", "course_save", { changes: { observations: [named("c1")] } }),
 			result("s3", "course_save", receipt("o9")),
 		];
-		assert.deepEqual(markLinks(messages), { c1: ["o7", "o8", "o9"] });
+		assert.deepEqual(markLinks({ messages: messages }), { c1: ["o7", "o8", "o9"] });
 	});
 
 	it("an answer he gave in words marks his message when the save names his-message (round 5)", () => {
@@ -104,11 +104,19 @@ describe("which attempts mark which answer", () => {
 			result("s1", "course_save", receipt("o38")),
 			later,
 		];
-		assert.deepEqual(markLinks(messages), { [first.id]: ["o38"] }, "the message the save answered, never one sent after it");
+		assert.deepEqual(markLinks({ messages: messages }), { [first.id]: ["o38"] }, "the message the save answered, never one sent after it");
 		assert.equal(answeredQuestionsOf(messages).has("his-message"), true, "the course tool accepts the name");
 		assert.equal(answeredQuestionsOf(messages.slice(0, 4)).has("his-message"), false, "with no message of his there is nothing to name");
 		const disputed = inputAppends({ messages }, { type: "dispute", answerId: first.id, observations: ["o38"], said: "both parts are right" });
 		assert.match(String((disputed.at(-1) as { content: string }).content), /\[MARK DISPUTED\]/, "its mark can be disputed like any other");
+	});
+
+	it("a save the transcript links is never copied onto another answer by the links kept with the lesson (a message he sent while the turn ran)", () => {
+		const said = (text: string) => ({ id: id(), role: "user", content: text, timestamp: 0 }) as LhMessage;
+		const before = said("rank 3");
+		const during = said("wait, nullity 1 too");
+		const messages = [before, during, call("s1", "course_save", { changes: { observations: [named("his-message")] } }), result("s1", "course_save", receipt("o38"))];
+		assert.deepEqual(markLinks({ messages, answerSaves: { [before.id]: ["o38"] } }), { [during.id]: ["o38"] });
 	});
 
 	it("an attempt that names no answer, or a refused save, marks nothing", () => {
@@ -120,7 +128,7 @@ describe("which attempts mark which answer", () => {
 			call("s10", "course_save", { changes: { observations: [named("q1")] } }),
 			result("s10", "course_save", "refused", null, true),
 		];
-		assert.deepEqual(markLinks(messages), {});
+		assert.deepEqual(markLinks({ messages: messages }), {});
 	});
 });
 
@@ -185,6 +193,8 @@ describe("the mark that stands", () => {
 		const marks = answerMarksOf({ q1: ["o4"] }, shown);
 		assert.equal(latestMarkedAnswer(lesson(), marks), "q1");
 		assert.equal(latestMarkedAnswer(lesson(), {}), null);
+		const both = answerMarksOf({ q2: ["o5"], q1: ["o4"] }, { ...shown, o5: shown.o4 });
+		assert.equal(latestMarkedAnswer(lesson(), both), "q2", "the newest in the lesson, whatever order the marks came in");
 	});
 });
 

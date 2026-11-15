@@ -134,7 +134,7 @@ describe("turns within the voice pass untouched", () => {
 			answering("No row is a multiple of another, so rank 3"),
 			send("That's not right. \"No row is a multiple of another\" only rules out dependence between pairs, and here $R_3 = R_1 + R_2$. Row reducing gives two pivots, so the rank is $2$, and $A$ is not invertible."),
 		],
-		["a lesson's first step", [newUserMessage("Poisson")], send("Today: the exact probability of $k$ events when they arrive independently at an average rate, derived by taking your slot model to its limit.")],
+		["a lesson's first step", [newUserMessage("Poisson")], send("Split the hour into $n$ slots, each holding an email with probability $4/n$. The count of emails is then binomial, whatever $n$ is.")],
 		["a two-sentence close", [newUserMessage("Rank"), assistant([send("A step.")]), newDoneTonightMessage("practice") as LhMessage], send("Next time you pick up with part (c) of sheet 4. Your rank review comes back on Friday 13 November.")],
 		[
 			"a planned day, in answer to his question about the plan",
@@ -168,11 +168,13 @@ describe("the guard's turn", () => {
 		assert.ok(!JSON.stringify(view).includes("You got it right"));
 	});
 
-	it("refuses once a turn for each kind of call: a rewrite that still slips is shown, unless it asks more than one thing", () => {
+	it("refuses twice a turn for each kind of call: a rewrite is read again, and one that still slips is shown, unless it asks more than one thing (round 8)", () => {
 		const guard = new VoiceGuard(answering("rank 2"));
 		assert.deepEqual(rules(guard, send("You got it right: rank 2.")), ["echo"]);
-		assert.deepEqual(rules(guard, send("Yes, rank 2.")), []);
+		assert.deepEqual(rules(guard, send("Yes, rank 2.")), ["echo"], "the first rewrite is read against every rule again");
+		assert.deepEqual(rules(guard, send("Right, rank 2.")), [], "the second rewrite's slips are shown rather than looped");
 		assert.deepEqual(rules(guard, ask("What is $A^2$? Why?")), ["questions"]);
+		assert.deepEqual(rules(guard, ask("What is $A^2$? Check it by multiplying.")), ["advice"]);
 		assert.deepEqual(rules(guard, ask("What is $A^2$, and is it invertible?")), ["compound"], "a rewrite never passes by asking two things");
 		assert.deepEqual(rules(guard, ask("What is $A^2$? Check it by multiplying.")), [], "a rewrite's other slips are shown rather than looped");
 	});

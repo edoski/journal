@@ -1,4 +1,4 @@
-import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
+import { isReviewSession, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
 import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords } from "@/components/study-words";
@@ -19,9 +19,9 @@ export interface CourseRef {
 	title: string;
 }
 
-/** What a session is, from its transcript: practice, or a teaching
- *  session at its phase (the prober's questions, the plan, the lesson). */
-export type SessionType = "lesson" | "practice";
+/** What a session is: practice, a review of course topics, or a lesson
+ *  (a teaching session at any phase). */
+export type SessionType = "lesson" | "practice" | "review";
 
 export type CalendarEntry =
 	| {
@@ -204,11 +204,14 @@ export function rankOf(entry: CalendarEntry): number {
 	return entry.kind === "session" && entry.waits ? 0.5 : LOOKS[lookOf(entry)].rank;
 }
 
-/** A session as the calendar names it: practice, else a lesson, whatever
- *  step it reached (a lesson still asking its opening questions is not a
- *  quiz, round 3). */
+/** A session as the calendar names it: practice, a review (opened on
+ *  topics with a review's words, `isReviewSession`; round 8: "Review
+ *  Binomial distribution · Lesson"), else a lesson, whatever step it
+ *  reached (a lesson still asking its opening questions is not a quiz,
+ *  round 3). */
 export function sessionType(chat: ChatListItem): SessionType {
-	return chat.kind === "practice" ? "practice" : "lesson";
+	if (chat.kind === "practice") return "practice";
+	return isReviewSession(chat) ? "review" : "lesson";
 }
 
 /** The topics a session worked on that its course's map lists. */
@@ -334,7 +337,12 @@ export function calendarEntries({
 				heldBy.set(lesson.id, task);
 				continue;
 			}
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
+			// One piece of work, one name: an unfinished session that holds the
+			// task names it, as Home and the sidebar do (round 8: "Eigenvalues
+			// and eigenvectors" on Home, "Eigenvalues lesson: eigenspaces and
+			// diagonalising" here).
+			const holder = chats.find((chat) => chat.course?.workspace === map.workspace && !chat.courseDeleted && sessionState(chat) !== "finished" && holdsTask(chat, task, holders.map((t) => t.handle)));
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
 		}
 	}
 	for (const chat of chats) {

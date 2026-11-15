@@ -8,12 +8,13 @@ import { courseTitle } from "@/components/study-home/agenda-rows/row-facts";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { NowLine } from "@/components/study-home/needs-you";
-import type { NextStep } from "@/components/study-home/study-facts";
+import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import type { ChatListItem } from "@/src/core";
 import { useContinueCourse } from "@/components/unit-inbox/continue-course";
 import { CARD_ACTION_PLACE, ROW_ACTION, RowCard } from "@/components/unit-inbox/row-card";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { courseKey, sessionKey } from "@/components/unit-inbox/now-inbox";
-import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
+import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
 import type { Unit } from "@/components/unit-inbox/units";
 import { Button } from "@/components/ui/button";
@@ -28,10 +29,19 @@ export function nowActionOf(line: NowLine): { label: string; href: string } | { 
 	return { label: lessonOf(row).action, workspace: row.course.map.workspace, step: row.step };
 }
 
+/** Where a course line's card goes, as Home's line goes (`courseMove`): the
+ *  session that holds its step, else a lesson started on it. Never the
+ *  course page (round 8: "Continue Problem sheet 4" opened the course page;
+ *  only its small Continue continued the work). Pure. */
+export function courseCardMove(line: NowLine, chats: readonly ChatListItem[]): CourseMove | null {
+	const { row } = line;
+	return row.kind === "course" ? courseMove(row.course, chats, row.step) : null;
+}
+
 /** The line's action over the card's status slot, shown on hover and on
  *  keyboard focus. */
-export function NowAction({ line, title, className }: { line: NowLine; title: string; className?: string }) {
-	const { start, starting } = useContinueCourse();
+export function NowAction({ line, title, className, chats = [] }: { line: NowLine; title: string; className?: string; chats?: readonly ChatListItem[] }) {
+	const { take, starting } = useContinueCourse();
 	const action = nowActionOf(line);
 	const props = {
 		"data-slot": "row-action",
@@ -54,7 +64,8 @@ export function NowAction({ line, title, className }: { line: NowLine; title: st
 			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
-				start(action.workspace, action.step);
+				const move = courseCardMove(line, chats);
+				if (move) take(action.workspace, move);
 				blurAfterPointerClick(e);
 			}}
 			{...props}
@@ -74,11 +85,13 @@ export function NowAction({ line, title, className }: { line: NowLine; title: st
  * on no course): its course or "No course", Your turn (or Working at 70%
  * while the tutor writes in it), and a click opens the session; or a
  * course's line with no topic to lead with (a task that holds none): the
- * line's action, and a click opens the course's page.
+ * line's action, and a click takes it up as Home's line does
+ * (`courseCardMove`).
  */
-export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: Unit | null; active: boolean; parent?: string }) {
+export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowLine; unit: Unit | null; active: boolean; parent?: string; chats?: readonly ChatListItem[] }) {
 	const reason = <WhyMark why={line.why} size="slot" words={line.slot} />;
 	const { row } = line;
+	const { take } = useContinueCourse();
 	if (unit) {
 		const working = unit.now === "working";
 		return (
@@ -91,16 +104,17 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 				course={unit.course.title}
 				status={working ? <UnitStatusText status={{ kind: "working" }} /> : reason}
 				title={line.title}
-				action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} />}
+				action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} chats={chats} />}
 				recede={working}
 			/>
 		);
 	}
 	if (row.kind === "course") {
 		const { workspace, title } = row.course.map;
+		const move = courseCardMove(line, chats)!;
 		return (
 			<RowCard
-				href={courseHref(workspace)}
+				{...(move.kind === "open" ? { href: `/chat/${move.chat.id}` } : { onSelect: () => take(workspace, move) })}
 				active={active}
 				rowKey={courseKey(workspace)}
 				parent={parent}
@@ -108,7 +122,7 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 				course={title}
 				status={reason}
 				title={line.title}
-				action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} />}
+				action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} chats={chats} />}
 			/>
 		);
 	}

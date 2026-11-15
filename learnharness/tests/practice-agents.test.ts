@@ -322,7 +322,7 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.match(prober, /Enter near the top, not the bottom/);
 		assert.match(prober, /Strands inform each other/);
 		assert.match(prober, /never descending into already-bracketed territory/);
-		assert.match(prober, /A strand that never breaks is not done — escalate until it does/);
+		assert.match(prober, /A strand that never breaks escalates, up to the height the goal needs; holding there, it is done/);
 		// the bracketing itself, with confidence wired into question selection,
 		// is the engine's Finding the edge (pinned in tests/engine-doctrine.test.ts)
 		assert.match(prober, /Find each strand's edge as \*Finding the edge\* in the course doctrine says/);

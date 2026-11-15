@@ -49,7 +49,7 @@ export function TodayList(props: NowListProps) {
 	return (
 		<>
 			{top.map((item) => (
-				<NowCard key={item.line.key} line={item.line} unit={item.kind === "topic" ? item.unit : null} active={isOpen(item)} />
+				<NowCard key={item.line.key} line={item.line} unit={item.kind === "topic" ? item.unit : null} active={isOpen(item)} chats={chats} />
 			))}
 			{unreadable.map((course) => (
 				<UnreadableCard key={course.workspace} course={course} active={pathname === courseHref(course.workspace)} />

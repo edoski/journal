@@ -113,6 +113,16 @@ export interface DigestCourseView {
 	topics: ReadonlyArray<{ handle: string; title: string; introduced: boolean; gap: string | null; note: string | null }>;
 	/** The topic the course path stands on. */
 	current: string | null;
+	/** Whether this session may move the path: a lesson may; a review, or a
+	 *  session working on an open task (a problem sheet), never does, since
+	 *  "You are here" moves only when he moves on in the course (round 8: a
+	 *  problem sheet's session moved it from Eigenvalues to Rank). Absent
+	 *  reads as a lesson. */
+	movesPath?: boolean;
+	/** The session's own topics (the record's `topics`): a lesson moves the
+	 *  path only onto one of them or onto a topic not introduced yet, never
+	 *  back onto an older topic it merely touched. Absent allows any. */
+	own?: readonly string[];
 	/** The open tasks this session holds. */
 	tasks: readonly string[];
 	/** Whether the lesson's plan has nothing left. */
@@ -252,6 +262,14 @@ function folded(submit: DigestSubmit, view: DigestCourseView): DigestSubmit {
 	};
 }
 
+/** Whether a lesson may move the path onto a topic: one of its own, or one
+ *  not introduced yet (moving on in the course), never back onto an older
+ *  topic it only touched. Pure. */
+function movesOnto(handle: string, view: DigestCourseView): boolean {
+	if (!view.own) return true;
+	return view.own.includes(handle) || !view.topics.some((t) => t.handle === handle && t.introduced);
+}
+
 /** The engine patch for an answer, and one line saying what it changes;
  *  null when it changes nothing. It drops whatever names a step the lesson
  *  did not reach. A topic the course lacks is created only with a title,
@@ -352,7 +370,7 @@ export function digestChanges(input: DigestSubmit, view: DigestCourseView): { ch
 		}
 	}
 	const path: Record<string, unknown> = {};
-	if (submit.current && submit.current !== view.current && exists(submit.current)) {
+	if (view.movesPath !== false && submit.current && submit.current !== view.current && exists(submit.current) && movesOnto(submit.current, view)) {
 		path.current = submit.current;
 		said.push(`path at ${submit.current}`);
 	}

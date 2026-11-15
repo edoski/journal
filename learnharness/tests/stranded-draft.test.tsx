@@ -85,7 +85,6 @@ test("Esc back to the answer never moves rescued words into the next question's 
 					open={{ kind: "question", key: "k2", tool: "explain", toolCallId: "q2", input: { question: "What is det A?", correctAnswer: "3", type: "check" } }}
 					answer={{ openKey: "k2", selection: emptyDockSelection(), confidence: "neutral", mode, toggle: noop, setConfidence: noop, setMode: (m: "answer" | "ask") => { mode = m; } }}
 					message={{ busy: false, value: box, revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
-					messageText={{ read: () => box, write: (v: string) => { box = v; } }}
 					onAskInstead={noop}
 					toggleRef={toggleRef}
 					busy={false}
@@ -120,7 +119,6 @@ test("the composer answering a question reports what he types as he types it", a
 					open={{ kind: "question", key: "k1", tool: "explain", toolCallId: "q1", input: { question: "Which directions stay on their line?", correctAnswer: "(1,1) and (1,-1)", type: "check" } }}
 					answer={{ openKey: "k1", selection: emptyDockSelection(), confidence: "neutral", mode: "answer", toggle: noop, setConfidence: noop, setMode: noop }}
 					message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
-					messageText={{ read: () => "", write: noop }}
 					onAskInstead={noop}
 					toggleRef={{ current: null }}
 					busy={false}
@@ -140,4 +138,25 @@ test("the composer answering a question reports what he types as he types it", a
 		field.dispatchEvent(new window.Event("input", { bubbles: true }));
 	});
 	assert.deepEqual(seen.at(-1), ["q:k1", "(1,1) by 3"]);
+});
+
+// Round 8 (4 #5): a rescued draft dies with its own question. After a
+// restart the draft rescued for one question stayed in the message box, came
+// back during a later hint with a live Send, and merged ahead of the next
+// rescue ("w2 draft: so 2x + y = 0… ⏎⏎ W2 DRAFT: char poly of C…").
+test("a new rescue replaces an untouched older one instead of merging with it", async () => {
+	const { rescuedBox } = await import("../components/lesson/stranded-draft.ts");
+	keepRescue("c9", "w2 draft: so 2x + y = 0", "q:k1");
+	assert.equal(rescuedBox("c9", "w2 draft: so 2x + y = 0", "W2 DRAFT: char poly of C"), "W2 DRAFT: char poly of C");
+	assert.equal(rescuedBox("c9", "my own note", "W2 DRAFT: char poly of C"), "my own note\n\nW2 DRAFT: char poly of C", "words of his own stay");
+});
+
+test("the rescue leaves the box once the question after it closes, unless he made it his", async () => {
+	const { boxAfterClose } = await import("../components/lesson/stranded-draft.ts");
+	keepRescue("c8", "so 2x + y = 0", "q:k1");
+	assert.equal(boxAfterClose("c8", "so 2x + y = 0", "q:k1"), null, "its own question leaving is the rescue itself");
+	assert.equal(boxAfterClose("c8", "so 2x + y = 0", "q:k2"), "", "the next question closing takes it away");
+	assert.equal(keptWords("c8:rescued"), undefined, "and forgets it");
+	keepRescue("c8", "so 2x + y = 0", "q:k1");
+	assert.equal(boxAfterClose("c8", "so 2x + y = 0, so v = (1, −2)", "q:k2"), null, "words he typed on are his message");
 });

@@ -41,3 +41,11 @@ export function DoneTonightButton({ onDone, disabled, gone = false }: { onDone: 
 export function DoneTonightLine() {
 	return <SectionBreak testId="done-tonight-line" label={LESSON_WORDS.doneTonight} />;
 }
+
+/** Whether Done for today is out of sight: the lesson is closed for today,
+ *  or its course or the lesson itself was deleted, where there is nothing
+ *  left to stop (round 8: a deleted course's lesson kept a greyed-out
+ *  Done for today). */
+export function doneTonightGone({ closedForToday, courseGone, lessonGone }: { closedForToday: boolean; courseGone: boolean; lessonGone: boolean }): boolean {
+	return closedForToday || courseGone || lessonGone;
+}

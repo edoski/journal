@@ -71,6 +71,12 @@ export interface ChatRecord {
 	/** The lesson digest's ledger: what the background digest already carried
 	 *  into the course record from this session. */
 	digest?: DigestLedger;
+	/** The attempts each answer's saves recorded, kept the moment the
+	 *  engine took the save (round 8: the app died between the engine's
+	 *  write and the transcript's, so the answer showed no mark and the
+	 *  resumed tutor could save it again). Keyed as the marks key an
+	 *  answer: a graded question's call, or his message's id. */
+	answerSaves?: AnswerSaves;
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
 	 *  existing records stay unstamped (absence reads as v1); every write
 	 *  stamps the current version. A record stamped NEWER than this build
@@ -96,6 +102,9 @@ export interface DigestLedger {
 	done: LessonDigest[];
 	pending?: { fingerprint: string; throughMessageId: string };
 }
+
+/** Answer key → the observation ids its saves recorded, in save order. */
+export type AnswerSaves = Readonly<Record<string, readonly string[]>>;
 
 /** The chat record format this build writes and understands. */
 export const CURRENT_CHAT_VERSION = 1;
@@ -169,15 +178,18 @@ export interface TurnUsage {
  *  fragment asks for. So the wake paces it: reason out the optimal way to
  *  teach THIS person THIS thing BEFORE plan_init. Honest to the machinery
  *  — plan_init is still the first tool and the plan map the first
- *  artifact; then the goal in one line and the first step, in the same
- *  turn (Edo, 14 Nov 2026: no approval of a map of material he doesn't
- *  know yet; he interrupts when he wants). */
+ *  artifact; then the first step, in the same turn (Edo, 14 Nov 2026: no
+ *  approval of a map of material he doesn't know yet; he interrupts when
+ *  he wants). No goal line (round 8: "Today: …" previewed the lesson), and
+ *  the step builds on the probe's feedback, which he already read (round
+ *  8: the first step re-taught it on the same matrix). */
 export const HANDOFF_TEXT =
 	"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else.";
+	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
+	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans
@@ -417,9 +429,16 @@ export interface ChatSummary {
 	/** How the tutor's last turn left the session (sessionEndOf); a summary
 	 *  made elsewhere may leave it out, which reads as closed. */
 	ended?: SessionEnd;
+	/** The tutor's last turn ended because he stopped it (`stoppedByHim`),
+	 *  not because the app restarted: a cut session then says he stopped it. */
+	stopped?: true;
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];
+	/** It is a review of course topics: opened on topics with a review's
+	 *  words (`openedAsReview`), whatever it is named now. The list always
+	 *  sets it; a summary made elsewhere may leave it out. */
+	review?: boolean;
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list

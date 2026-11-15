@@ -33,7 +33,7 @@ States: hover lifts the row to `fill-hover`, the open row (its page, or one of i
 
 ## Width
 
-The right edge resizes the sidebar, as T3 Code's rail does (`sidebar-width.ts`, `sidebar-resize-handle.tsx`, `data-slot="sidebar-resize"`).
+The right edge resizes the sidebar, as T3 Code's rail does (`sidebar-width.ts`, `sidebar-resize-handle.tsx`, `data-slot="sidebar-resize"`). Its open state and width are kept in cookies as well as local storage (`sidebar-cookies.ts`), which the root layout reads on the server, so the page's first frame is the settled layout and nothing slides in on load (round 8 measured a layout shift of 0.12 on every load, the sidebar starting folded and opening after mount); hydration draws the server's width, and motion starts only after mount.
 
 | | Value | T3 Code's |
 |---|---|---|

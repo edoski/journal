@@ -35,7 +35,8 @@ import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
-import { answeredQuestionsOf, hasUnresolvedQuestion, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
+import { answeredQuestionsOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
+import { remarkableOf } from "../core/answer-marks.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { PATHS } from "../../config.ts";
@@ -455,6 +456,20 @@ export async function handleChatInput(
 	// request builds a fresh one off the record — the factory mirrors that
 	// seam exactly. Wave B: the record IS the agent state (native messages;
 	// the record's id field strips at the wire in toLlmMessages).
+	// His newest message: the one an answer in words names (HIS_MESSAGE).
+	const lastSaidId = merged.findLast((m) => m.role === "user")?.id ?? null;
+	const keepSaves = (links: { question: string; observation: string }[]) => {
+		const keyed: Record<string, string[]> = {};
+		for (const { question, observation } of links) {
+			const key = question === HIS_MESSAGE ? lastSaidId : question;
+			if (key) keyed[key] = [...(keyed[key] ?? []), observation];
+		}
+		try {
+			stores.chatStore.saveAnswerSaves(chatId, keyed);
+		} catch {
+			// The lesson was deleted mid-turn: nothing to keep the links with.
+		}
+	};
 	const agentOpts: AgentBuildOptions = {
 		engine,
 		messages: asAgentMessages(agentMessages),
@@ -466,7 +481,11 @@ export async function handleChatInput(
 		// record through the engine, whatever the agent kind, with the
 		// answers a save may name (answeredQuestionsOf), read from the
 		// whole record.
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: answeredQuestionsOf(merged) } } : {}),
+		// The save links kept with the lesson count as saved, and each new
+		// save's links are kept the moment the engine takes it, so a restart
+		// before the transcript's write loses neither the mark nor the
+		// "already saved" (round 8).
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged, stores.chatStore.getChat(chatId)?.answerSaves), onSaved: keepSaves } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the

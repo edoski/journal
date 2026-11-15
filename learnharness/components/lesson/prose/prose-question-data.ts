@@ -118,8 +118,17 @@ export function digitOption(key: string, optionCount: number): number | null {
 interface QuestionPart {
 	type: string;
 	toolCallId?: string;
+	state?: string;
 	input?: unknown;
 	output?: unknown;
+}
+
+/** A question call he was asked: a question tool's part that the guard
+ *  did not refuse (a refused call never showed, so the re-ask after it is
+ *  the one that asks again; round 8: the refused call took the mark and
+ *  the real re-ask printed in full). */
+function asked(part: QuestionPart): boolean {
+	return part.type.startsWith("tool-") && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length)) && part.state !== "output-error";
 }
 
 /** Why a question's answer left it still open: he pressed Hint on it, or
@@ -136,14 +145,51 @@ export function leftOpen(output: unknown): LeftOpen | null {
  *  re-ask after a hint dropped "Say why." and lost his carried work). */
 export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>, toolCallId: string): string | null {
 	let previous: QuestionPart | null = null;
+	const lastOfKind = new Map<string, QuestionPart>();
 	for (const message of messages) {
 		for (const part of message.parts) {
-			if (!part.type.startsWith("tool-") || !(QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) continue;
-			if (part.toolCallId === toolCallId) return previous?.toolCallId && leftOpen(previous.output) ? previous.toolCallId : null;
+			if (!asked(part)) continue;
+			if (part.toolCallId === toolCallId) {
+				if (previous?.toolCallId && leftOpen(previous.output)) return asksAgain(previous, part) ? previous.toolCallId : null;
+				const same = lastOfKind.get(questionKindOf(part));
+				return same?.toolCallId && leftForToday(same.output) && sameStep(same, part) ? same.toolCallId : null;
+			}
 			previous = part;
+			lastOfKind.set(questionKindOf(part), part);
 		}
 	}
 	return null;
+}
+
+/** A question's kind as a re-ask keeps it: its tool and its form (his
+ *  words, one pick or several). */
+function questionKindOf(part: QuestionPart): string {
+	const input = part.input as { options?: unknown; multiSelect?: unknown } | undefined;
+	const form = Array.isArray(input?.options) && input.options.length > 0 ? (input.multiSelect === true ? "multi" : "single") : "text";
+	return `${part.type}:${form}`;
+}
+
+/** Done for today set the question aside unanswered (round 8: the tutor
+ *  asked it again in other words, and the half answer kept for it never
+ *  came back). The next question of its kind asks it again, unless the two
+ *  name different plan steps. */
+function leftForToday(output: unknown): boolean {
+	const left = output as Partial<QuestionAnswerData> | undefined;
+	return left?.dismissed === true && left.reason === "tonight";
+}
+
+/** Whether `next` asks `left` again, in whatever words: the same kind of
+ *  question on the same plan step. A question of another form or step
+ *  after a hint or a side question is a new one, and draws its words. */
+function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
+	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next);
+}
+
+function sameStep(a: QuestionPart, b: QuestionPart): boolean {
+	const step = (part: QuestionPart) => (part.input as { nodeId?: unknown } | undefined)?.nodeId;
+	const x = step(a);
+	const y = step(b);
+	return typeof x !== "string" || typeof y !== "string" || x === y;
 }
 
 /** How the question call `toolCallId` left, when it is still open. */
@@ -154,25 +200,21 @@ export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPar
 	return null;
 }
 
-/** The question calls that ask again, word for word, the question he just
- *  pressed Hint on or set aside to ask the tutor something. The tutor asks
- *  it again after either (neither is an answer, so the question must come
- *  back open), and the transcript draws those words once, above the hint or
- *  his side question, so the re-ask draws nothing of its own (round 5: the
- *  whole question printed twice after a hint; round 6: after a side
- *  question). A re-ask in new words is a rephrasing and draws them. */
+/** The question calls that ask again the question he just pressed Hint on
+ *  or set aside to ask the tutor something, in whatever words (the same
+ *  identity `reaskedFrom` and the carry read). The tutor asks it again after
+ *  either (neither is an answer, so the question must come back open), and
+ *  the transcript draws its words once, above the hint or his side
+ *  question, so the re-ask draws only the mark that it is his turn again
+ *  (round 5: the whole question printed twice after a hint; round 6: after
+ *  a side question; round 8: twice again whenever the re-ask was reworded). */
 export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
 	const reasked = new Set<string>();
-	const words = (part: QuestionPart) => {
-		const question = (part.input as { question?: unknown } | undefined)?.question;
-		return typeof question === "string" ? question.replace(/\s+/g, " ").trim() : null;
-	};
 	let previous: QuestionPart | null = null;
 	for (const message of messages) {
 		for (const part of message.parts) {
-			if (!part.type.startsWith("tool-") || !(QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) continue;
-			const open = leftOpen(previous?.output) !== null;
-			if (previous && open && part.toolCallId && words(part) !== null && words(part) === words(previous)) reasked.add(part.toolCallId);
+			if (!asked(part)) continue;
+			if (previous && part.toolCallId && leftOpen(previous.output) !== null && asksAgain(previous, part)) reasked.add(part.toolCallId);
 			previous = part;
 		}
 	}

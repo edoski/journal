@@ -45,7 +45,8 @@ describe("the mark on the card and in Earlier", () => {
 
 	it("says Gave up on both for an answer he gave up on", () => {
 		assert.equal(earlier("gaveUp").words, "Gave up");
-		assert.match(card("gaveUp"), /Not right Gave up/);
+		assert.match(card("gaveUp"), /Gave up/);
+		assert.doesNotMatch(card("gaveUp"), /Not right/, "one chip for one fact (round 8: Not right · Gave up)");
 		assert.doesNotMatch(card("gaveUp"), /With help/);
 	});
 

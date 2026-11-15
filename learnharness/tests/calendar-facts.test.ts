@@ -139,7 +139,7 @@ describe("calendar entries", () => {
 		);
 	});
 
-	it("says from when a review moved when the day memory asked for is still ahead, so a day the tutor named never moves in silence", () => {
+	it("names no day a review moved from while the day memory asked for is still ahead: he was never told that day (round 8)", () => {
 		const MOVED = course(
 			"/study/calc",
 			"Calculus",
@@ -147,7 +147,7 @@ describe("calendar entries", () => {
 			{ planned: [{ date: "2026-11-11", reviews: ["eigen" as TopicHandle], new: [] }] },
 		);
 		const [review] = calendarEntries({ courses: [MOVED], chats: [], scope: null }).filter((e) => e.kind === "review");
-		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", "Moved from 9 Nov", "Earlier days are full"]);
+		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", null, "Earlier days are full"]);
 	});
 
 	it("says from which told day a review or a start moved and what of his study moved it", () => {

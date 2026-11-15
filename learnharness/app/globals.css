@@ -332,6 +332,10 @@ body {
    never could. Tested in tests/katex-size.test.ts. */
 .katex { font-size: 1.1em; }
 
+/* An inline formula never breaks across lines: KaTeX allows a break after
+   each relation, which split "R₃ = / R₂ − R₁" over two lines (round 8). */
+.katex { white-space: nowrap; }
+
 /* Display math: long equations scroll instead of overflowing the column. */
 .katex-display {
 	overflow-x: auto;
