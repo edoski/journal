@@ -31,7 +31,10 @@ export function TurnError({ message, onRetry, retryLabel = "Retry", onOpenSettin
 	const detailsId = useId();
 	return (
 		<div role="alert" data-testid="turn-error" data-kind={text.kind} className="flex flex-wrap items-center gap-1 text-row">
-			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">{text.sentence}</span>
+			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">
+				{text.sentence}
+				{text.then === "sign-in-retry" && (onRetry ? " Sign in, then press Retry." : " Sign in, then send again.")}
+			</span>
 			{children}
 			{onRetry && text.kind !== "gone" && (
 				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "font-medium text-foreground")}>

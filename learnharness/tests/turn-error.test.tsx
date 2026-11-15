@@ -28,7 +28,7 @@ describe("turnErrorText", () => {
 	});
 
 	it("shows prose already written for people as it is, with no details", () => {
-		const curated = "Claude Code is not signed in to your Claude plan. Run `claude` in a terminal and sign in, then press Refresh in Settings, Accounts.";
+		const curated = "Claude Code ended the reply midway. Retry. No API key was used.";
 		assert.deepEqual(turnErrorText(curated), { kind: "written", sentence: curated, details: null });
 		const claude = "Claude is limiting requests right now. Wait a minute, then retry. See https://claude.ai/settings/usage. No API key was used.";
 		assert.equal(turnErrorText(claude).kind, "written");
@@ -40,6 +40,20 @@ describe("turnErrorText", () => {
 		const html = renderToStaticMarkup(<TurnError message={refusal} onOpenSettings={() => {}} onSignIn={() => {}} />);
 		const { document } = parseHTML(html);
 		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in");
+	});
+
+	it("reads a turn that failed because Claude was signed out as signed out, naming the buttons beside it", () => {
+		// Round 7: "LearnHarness could not read T3 Code's setup token for E.
+		// Check the account in T3 Code, then press Refresh." beside a lone Retry.
+		for (const raw of ["Claude isn't signed in on this account. No API key was used.", "Claude Code is not signed in. Run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts. No API key was used."]) {
+			const text = turnErrorText(raw);
+			assert.equal(text.kind, "signed-out", raw);
+			const { document } = parseHTML(renderToStaticMarkup(<TurnError message={raw} onRetry={() => {}} onOpenSettings={() => {}} onSignIn={() => {}} />));
+			assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "Claude isn't signed in, so the tutor couldn't reply. Sign in, then press Retry.");
+			assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in");
+			assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Retry");
+			assert.doesNotMatch(document.body.textContent ?? "", /Refresh|token|T3 Code/);
+		}
 	});
 
 	it("a dropped connection offers Try again, the words the line for a reply that never came uses", () => {

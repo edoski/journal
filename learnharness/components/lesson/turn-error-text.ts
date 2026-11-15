@@ -11,6 +11,10 @@ export type TurnErrorKind = "signed-out" | "key" | "busy" | "offline" | "gone" |
 export interface TurnErrorText {
 	kind: TurnErrorKind;
 	sentence: string;
+	/** What to do next names a button: Sign in, then Retry when the line
+	 *  offers it (round 7: a token failure said "press Refresh" beside a
+	 *  lone Retry). */
+	then?: "sign-in-retry";
 	/** The raw text, shown on demand; null when the sentence is the whole message. */
 	details: string | null;
 }
@@ -20,13 +24,13 @@ const KEY_REJECTED = /invalid[ _-]?(x-)?api[ _-]?key|incorrect api key|api key n
 const BUSY = /rate[ _-]?limit|overloaded|too many requests/i;
 const KEY_STATUSES = new Set([401, 403]);
 const BUSY_STATUSES = new Set([429, 529]);
-/** The browser's own words when the request never reached the app: Chrome, Safari, Firefox. */
-const UNREACHABLE = /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?)$/i;
-import { isProviderKeyRefusal, PROVIDER_KEY_MISSING_CODE } from "@/src/core";
-
 /** Chrome's words for a request that never reached the app: the line a
  *  Try again that could not reach it shows. */
 export const UNREACHABLE_APP = "Failed to fetch";
+
+/** The browser's own words when the request never reached the app: Chrome, Safari, Firefox. */
+const UNREACHABLE = /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?)$/i;
+import { CLAUDE_SIGNED_OUT_STARTS, isProviderKeyRefusal, PROVIDER_KEY_MISSING_CODE } from "@/src/core";
 
 /** The chat routes' answer for a session that no longer exists. */
 const UNKNOWN_CHAT = "Unknown chat";
@@ -78,6 +82,9 @@ export function turnErrorText(message: string): TurnErrorText {
 	}
 	if (parseProviderKeyRefusal(raw)) {
 		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null };
+	}
+	if (CLAUDE_SIGNED_OUT_STARTS.some((start) => raw.startsWith(start))) {
+		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply.", then: "sign-in-retry", details: null };
 	}
 	const route = routeError(raw);
 	if (route === UNKNOWN_CHAT) return { kind: "gone", sentence: "This lesson was deleted.", details: null };

@@ -130,12 +130,12 @@ test("a profile account's child gets its own config dir and no token; the T3 def
 });
 
 test("a token that cannot be read fails the turn without starting Claude Code", async () => {
-	const account = tokenAccount(() => { throw new Error("LearnHarness could not read T3 Code's setup token for Work."); });
-	assert.throws(() => claudeSdkLaunch(account, { binary: BINARY, env: PARENT_ENV }), /setup token for Work.*No API key was used\.$/);
+	const account = tokenAccount(() => { throw new Error("Claude isn't signed in on this account."); });
+	assert.throws(() => claudeSdkLaunch(account, { binary: BINARY, env: PARENT_ENV }), /^Error: Claude isn't signed in on this account\. No API key was used\.$/);
 	const { engine, ran } = scripted(textReply, () => claudeSdkLaunch(account, { binary: BINARY, env: PARENT_ENV }));
 	const messages = await turn(engine);
 	assert.equal(messages.length, 1);
-	assert.match(failureOf(messages), /setup token for Work.*No API key was used\.$/);
+	assert.match(failureOf(messages), /^Claude isn't signed in on this account\. No API key was used\.$/);
 	assert.equal(ran.count, 0, "no Claude Code ran");
 });
 

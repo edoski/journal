@@ -50,7 +50,7 @@ export function claudeConnectionSentence(connection: ClaudeConnection | null, ac
 			return "Claude Code is not installed. Install Claude Code, run `claude` in a terminal and sign in, then press Refresh.";
 		case "signed-out":
 			return account?.auth === "token"
-				? "Claude Code did not accept T3 Code's setup token for this account. Renew it in T3 Code, then press Refresh."
+				? "This account isn't signed in. Sign in to it again in T3 Code, then press Refresh."
 				: "Run `claude` in a terminal and sign in with your Claude account, then press Refresh.";
 		case "not-subscription":
 			return `Claude Code is signed in with ${METHOD_LABELS[connection.authMethod] ?? connection.authMethod}, which would not use your Claude plan. Run \`claude\`, then \`/login\` with your Claude account, then press Refresh.`;

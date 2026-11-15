@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import type { ClaudeConnection } from "../core/contracts/claude.ts";
+import { CLAUDE_ACCOUNT_SIGNED_OUT, type ClaudeConnection } from "../core/contracts/claude.ts";
 import { claudeLaunch, loadClaudeAccounts, type LoadedClaudeAccount } from "./claude-accounts.ts";
 import { claudeChildEnv, claudeWorkDir, resolveClaudeBinary, type ClaudeEnv } from "./claude-cli.ts";
 
@@ -53,7 +53,10 @@ function cache(): ConnectionCache {
 async function check(account: LoadedClaudeAccount, run: ClaudeRunner, bin: string | null, env: ClaudeEnv): Promise<ClaudeConnection> {
 	if (!bin) return { state: "missing" };
 	let launch;
-	try { launch = claudeLaunch(account, claudeWorkDir()); } catch (error) { return { state: "error", message: (error as Error).message }; }
+	try { launch = claudeLaunch(account, claudeWorkDir()); } catch (error) {
+		const message = (error as Error).message;
+		return message === CLAUDE_ACCOUNT_SIGNED_OUT ? { state: "signed-out" } : { state: "error", message };
+	}
 	const result = await run(bin, ["auth", "status", "--json"], claudeChildEnv(env, { binary: bin, launch }));
 	if (result.error) return { state: "error", message: "Claude Code could not report its sign-in status. Check that `claude` runs in a terminal, then press Refresh." };
 	return parseClaudeAuthStatus(result.stdout);

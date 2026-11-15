@@ -81,12 +81,12 @@ test("without T3 Code, with unreadable settings, or with no default-home account
 	assert.equal(claudeLaunch(plain!, root), undefined, "the synthetic default inherits the environment untouched");
 });
 
-test("a missing or empty token file reads as an error naming the account, never as an empty token", () => {
+test("a missing or empty token file reads as an account not signed in, in plain words, never as an empty token", () => {
 	const home = fakeHome({ instances: { claude_2: FOUR.claude_2 }, secrets: { claude_2: "  \n" } });
 	const [, second] = loadClaudeAccounts({ home });
-	assert.throws(() => claudeLaunch(second!, root), /setup token for Second/);
+	assert.throws(() => claudeLaunch(second!, root), /^Error: Claude isn't signed in on this account\.$/);
 	const none = fakeHome({ instances: { claude_2: FOUR.claude_2 } });
-	assert.throws(() => claudeLaunch(loadClaudeAccounts({ home: none })[1]!, root), /setup token for Second/);
+	assert.throws(() => claudeLaunch(loadClaudeAccounts({ home: none })[1]!, root), /^Error: Claude isn't signed in on this account\.$/);
 });
 
 test("child environments: each account's own credential only, never a parent's", () => {

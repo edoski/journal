@@ -100,7 +100,7 @@ test("the account checks run in parallel, one per account, each with its own env
 	const accounts: LoadedClaudeAccount[] = [
 		DEFAULT,
 		{ providerId: "claude-subscription-work", label: "Work", email: null, auth: "profile", instanceId: "work", configDir: "/fake/.claude-work" },
-		{ providerId: "claude-subscription-spare", label: "Spare", email: null, auth: "token", instanceId: "spare", token: () => { throw new Error("LearnHarness could not read T3 Code's setup token for Spare."); } },
+		{ providerId: "claude-subscription-spare", label: "Spare", email: null, auth: "token", instanceId: "spare", token: () => { throw new Error("Claude isn't signed in on this account."); } },
 	];
 	let active = 0, peak = 0;
 	const dirs: (string | undefined)[] = [];
@@ -113,9 +113,8 @@ test("the account checks run in parallel, one per account, each with its own env
 	const result = await refreshClaudeConnections({ force: true, load: () => accounts, run, binary: () => "/fake/claude", env: { CLAUDE_CONFIG_DIR: "/parent/dir" } });
 	assert.equal(peak, 2, "both runnable accounts were checked at once");
 	assert.deepEqual(dirs.sort(), ["/fake/.claude-work", "/parent/dir"], "the synthetic default keeps the inherited config dir; the profile gets its own");
-	assert.deepEqual(result.map((entry) => entry.connection.state), ["connected", "connected", "error"]);
+	assert.deepEqual(result.map((entry) => entry.connection.state), ["connected", "connected", "signed-out"], "an unreadable token is an account not signed in");
 	assert.equal(claudeConnected("claude-subscription-work"), true);
-	assert.match((claudeConnection("claude-subscription-spare") as { message: string }).message, /setup token for Spare/);
 	assert.equal(claudeConnected("claude-subscription-gone"), false);
 });
 

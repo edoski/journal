@@ -38,6 +38,14 @@ export const CLAUDE_MODEL = { id: "claude-opus-5-5", name: "Claude Opus 5.5", th
 
 export const CLAUDE_USAGE_URL = "https://claude.ai/settings/usage";
 
+/** An account whose sign-in can't be read (T3 Code holds no token for it):
+ *  plain words, no account letter or file (round 7). */
+export const CLAUDE_ACCOUNT_SIGNED_OUT = "Claude isn't signed in on this account.";
+
+/** How a failed turn's text starts when Claude was signed out: the lesson
+ *  reads every one as signed out, with Sign in and Retry beside it. */
+export const CLAUDE_SIGNED_OUT_STARTS = [CLAUDE_ACCOUNT_SIGNED_OUT, "Claude Code is not signed in"] as const;
+
 /** The lead of the curated plan-limit failure; the matcher below is the only way to detect it. */
 export const CLAUDE_LIMIT_TEXT = "Your Claude plan's usage limit is reached.";
 
