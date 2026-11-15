@@ -187,3 +187,10 @@ describe("plan_init's first draft passes when it names its steps (round 10)", ()
 		for (const text of [description, guidance]) assert.match(text, /never "Solving \$Ax = b\$ with \$A\^\{-1\}\$"/);
 	});
 });
+
+describe("the probe-to-teaching wait says what is happening (round 10, 3 m4)", () => {
+	it("the probe's end reads \"Planning the lesson…\", never \"Concluding the assessment…\"", async () => {
+		const { toolActivityLabel } = await import("../src/core/pending.ts");
+		assert.equal(toolActivityLabel("probe_done"), "Planning the lesson…");
+	});
+});
