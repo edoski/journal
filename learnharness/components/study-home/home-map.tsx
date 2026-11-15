@@ -7,6 +7,7 @@ import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type T
 import { ArcStrip } from "@/components/course-map/arc-strip";
 import { arcShare, shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
+import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -77,6 +78,8 @@ export function HomeMap({
 	const [opensWhole, setOpensWhole] = useState<ReadonlyMap<string, boolean>>(new Map());
 	const chosenCourse = courses.find((c) => c.map.workspace === chosen)!;
 	const arcs = shownArcs(chosenCourse.map);
+	// A map style that marks the arcs off on the map itself names them there, in order; the strip gives way.
+	const groupedMap = useMapSkin().skin.grouped === true;
 	// The arc he picked on the strip, per course, for the visit.
 	const [picked, setPicked] = useState<ReadonlyMap<string, ArcHandle>>(new Map());
 	const follow = (followed === undefined ? litArc(chosenCourse, highlight) : followed) ?? null;
@@ -130,7 +133,7 @@ export function HomeMap({
 					</Hint>
 				</div>
 			</div>
-			{arcs && (
+			{arcs && !groupedMap && (
 				<ArcStrip
 					quiet
 					className="shrink-0"

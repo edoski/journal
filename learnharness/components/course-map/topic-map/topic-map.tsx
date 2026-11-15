@@ -9,9 +9,9 @@ import { READABLE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, sl
 import { TopicMapContext, type TopicMapState } from "./topic-node";
 import { cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
-import { arcView } from "./arc-view";
 import { litCamera, litFollow } from "./lit-camera";
-import { handleAt, type FrameProps, type MapSkin, type TopicData } from "./map-skin";
+import { drawingOf, handleAt, type FrameProps, type MapSkin, type TopicData } from "./map-skin";
+import { ArcOpenContext, type ArcOpen } from "./arcs/arc-open";
 import { useMapSkin } from "./map-skins";
 
 /** Room around the drawing: the least a topic at its edge can be brought
@@ -101,10 +101,19 @@ function SkinnedMap({
 	 *  without it). */
 	opensOn?: TopicHandle | null;
 }) {
-	const view = useMemo(() => arcView(course, arc), [course, arc]);
+	// An arc he opens on the map (a `grouped` style's folded arc), until the page shows another.
+	const [opened, setOpened] = useState<ArcHandle | null>(null);
+	const [shownArc, setShownArc] = useState(arc);
+	if (shownArc !== arc) {
+		setShownArc(arc);
+		setOpened(null);
+	}
+	const drawing = useMemo(() => drawingOf(skin, course, arc, opened), [skin, course, arc, opened]);
+	const { view, layout, framedArc } = drawing;
 	const map = view.map;
-	const layout = useMemo(() => skin.layout(map.topics, map.edges, new Set(view.entry.keys())), [skin, map.topics, map.edges, view.entry]);
 	const node = layout.node;
+	const arcFramed = useMemo(() => (framedArc ? new Set(map.topics.filter((t) => t.arc === framedArc).map((t) => t.handle)) : null), [framedArc, map.topics]);
+	const arcOpen = useMemo<ArcOpen>(() => ({ opened, open: setOpened, ownCamera: zoom === undefined, workspace: course.workspace }), [opened, zoom, course.workspace]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
 	const nodes = useMemo<Node[]>(
 		() => [
@@ -162,7 +171,9 @@ function SkinnedMap({
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} />
+			<ArcOpenContext.Provider value={arcOpen}>
+				<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed ?? arcFramed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} />
+			</ArcOpenContext.Provider>
 		</ReactFlowProvider>
 	);
 }

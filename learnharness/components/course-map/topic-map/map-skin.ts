@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { Position, type Edge, type EdgeTypes, type Node, type NodeTypes } from "@xyflow/react";
-import type { CourseMap, CourseMapEdge, CourseMapTopic, TopicHandle } from "@/src/core";
+import { currentArc, type ArcHandle, type CourseMap, type CourseMapArc, type CourseMapEdge, type CourseMapTopic, type TopicHandle } from "@/src/core";
+import { arcView, type ArcView } from "./arc-view";
 import { layoutTopicMap, neighbourOf, TOPIC_NODE_SIZE, type TopicMapLayout, type WalkKey } from "./topic-map-layout";
 import type { TopicFlowNode } from "./topic-node";
 import { TopicNode } from "./topic-node";
@@ -9,6 +10,15 @@ import { NeedEdge } from "./need-edge";
 /** What every topic node carries, whatever draws it: the topic, what its
  *  card says and where a click goes (`TopicMap` builds it once). */
 export type TopicData = TopicFlowNode["data"];
+
+/** What a style that marks a course's arcs lays out with its topics: the
+ *  arcs in study order, the ones drawn open (`grouped` styles that fold an
+ *  arc to one card), and the arc of "You are here". */
+export interface ArcsShown {
+	arcs: readonly CourseMapArc[];
+	open: ReadonlySet<ArcHandle>;
+	current: ArcHandle | null;
+}
 
 /** What a map style draws inside React Flow, beside its topics. */
 export interface ChromeProps {
@@ -33,8 +43,12 @@ export interface FrameProps extends ChromeProps {
  * opens on "You are here" with its next topics whole, on every page.
  */
 export interface MapSkin {
-	/** The drawing of a course's needs, `top` held in the first layer (an arc's entry topics). */
-	layout: (topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], top?: ReadonlySet<TopicHandle>) => TopicMapLayout;
+	/** The drawing of a course's needs, `top` held in the first layer (an arc's entry topics); a `grouped` style
+	 *  gets the course's arcs. */
+	layout: (topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], top?: ReadonlySet<TopicHandle>, arcs?: ArcsShown) => TopicMapLayout;
+	/** It draws the whole course with its arcs marked off, never one arc alone: the arc a page shows is framed (and
+	 *  opened, where the style folds arcs), and the arc strip gives way to the map. */
+	grouped?: boolean;
 	nodeTypes: NodeTypes;
 	edgeTypes: EdgeTypes;
 	/** The node type each topic is drawn with, and the edge type each route. */
@@ -79,3 +93,23 @@ export const CURRENT_SKIN: MapSkin = {
 	neighbour: neighbourOf,
 	panOnScroll: true,
 };
+
+/** What a map draws for a page: one arc of the course (`arcView`), or, for
+ *  a `grouped` style in a course with arcs, the whole course with the arc
+ *  of "You are here" and the arc the page shows (or `opened` on the map)
+ *  open; `framedArc` is that arc when it is not where he is, which the
+ *  camera brings into view. Pure. */
+export function drawingOf(skin: MapSkin, course: CourseMap, arc: ArcHandle | undefined, opened: ArcHandle | null = null): { view: ArcView; layout: TopicMapLayout; framedArc: ArcHandle | null } {
+	if (!skin.grouped || !course.arcs || course.arcs.length < 2) {
+		const view = arcView(course, arc);
+		return { view, layout: skin.layout(view.map.topics, view.map.edges, new Set(view.entry.keys())), framedArc: null };
+	}
+	const current = currentArc(course);
+	const shown = opened ?? (arc && course.arcs.some((a) => a.handle === arc) ? arc : null);
+	const open = new Set([current, shown].filter((a): a is ArcHandle => a !== null));
+	return {
+		view: { map: course, entry: new Map() },
+		layout: skin.layout(course.topics, course.edges, new Set(), { arcs: course.arcs, open, current }),
+		framedArc: shown !== current ? shown : null,
+	};
+}
