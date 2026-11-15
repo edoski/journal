@@ -1018,7 +1018,7 @@ describe("tool + renderer registry wiring", () => {
 		// sources v0 — pdf maps to its dispatch card (the live-smoke gap)
 		assert.equal(artifactRenderers.pdf, PdfJobCard);
 		// The agent's own tools render nothing in the lesson column (agent chrome out).
-		for (const t of ["read", "ls", "find", "grep", "list_sessions", "list_propositions"]) {
+		for (const t of ["Read", "Grep", "Glob", "list_sessions", "list_propositions"]) {
 			assert.equal(artifactRenderers[t], undefined, `${t} has no transcript card`);
 		}
 	});

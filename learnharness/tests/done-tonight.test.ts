@@ -19,7 +19,6 @@ import { signInTestClaude } from "./claude-fixture.ts";
 assert.equal(process.env.NODE_ENV, "test", "Run with NODE_ENV=test; these tests must not invoke real providers.");
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-done-tonight-"));
 process.env.LH_DATA_DIR = path.join(scratch, "data");
-process.env.LH_CREDENTIALS_DIR = scratch;
 await signInTestClaude();
 
 const { createTeacherAgent } = await import("../src/agent/teacher-agent.ts");

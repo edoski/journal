@@ -16,7 +16,7 @@ import type { LhMessage } from "../src/core/native-messages.ts";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-voice-guard-"));
 const originalEnv = process.env;
-process.env = { ...originalEnv, NODE_ENV: "test", LH_DATA_DIR: path.join(scratch, "data"), LH_CREDENTIALS_DIR: scratch, HOME: path.join(scratch, "home") };
+process.env = { ...originalEnv, NODE_ENV: "test", LH_DATA_DIR: path.join(scratch, "data"), HOME: path.join(scratch, "home") };
 after(() => {
 	process.env = originalEnv;
 	fs.rmSync(scratch, { recursive: true, force: true });

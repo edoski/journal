@@ -41,7 +41,6 @@ Machine-specific paths only. The app runs only on the user's Claude plan, throug
 | Variable | Purpose |
 |---|---|
 | `CHROME_PATH` | optional system Chrome fallback for demo verification; the app's own browser helper is primary (nothing is downloaded) |
-| `LH_CREDENTIALS_DIR` | optional: where older versions kept sign-in files (default: the project directory); nothing reads them now, and the agent's file tools refuse any copy left there |
 
 PDFs render natively with pdfjs/Skia; SVGs use resvg.
 
@@ -173,7 +172,7 @@ All deterministic, no LLM, no network (engines are injected — pi-ai's faux pro
 4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage via React server-side rendering.
 5. **Golden fixtures** (`tests/fixtures/golden-data/`) — a REAL data dir (real records produced by the app, never hand-edited), copied to a temp dir and read through the production paths via the `LH_DATA_DIR` seam. Pins that real data parses, flattens to a legal LLM wire, derives the graph end-to-end, covers every custom-marker kind, and that reads never write. **The fixture law:** an intentional on-disk format change updates the fixtures in the same commit — see the fixture README.
 
-Tests never touch the repo's `data/` or any sign-in file left in it. `config.ts` treats a process as a test when `NODE_ENV=test` (set by `npm test`) or when `NODE_TEST_CONTEXT` is set (node's test runner sets it in every test file, so `npx tsx --test tests/x.test.ts` counts too). In a test process, an unset `LH_DATA_DIR` resolves to `data/` inside a fresh temporary directory, and an unset `LH_CREDENTIALS_DIR` resolves to that directory. Each test process gets its own directory and removes it on exit. A test that needs to know the path, or to seed it before the stores load, sets `LH_DATA_DIR` before its first import of `config.ts`.
+Tests never touch the repo's `data/`. `config.ts` treats a process as a test when `NODE_ENV=test` (set by `npm test`) or when `NODE_TEST_CONTEXT` is set (node's test runner sets it in every test file, so `npx tsx --test tests/x.test.ts` counts too). In a test process, an unset `LH_DATA_DIR` resolves to `data/` inside a fresh temporary directory. Each test process gets its own directory and removes it on exit. A test that needs to know the path, or to seed it before the stores load, sets `LH_DATA_DIR` before its first import of `config.ts`.
 
 ## Lineage
 

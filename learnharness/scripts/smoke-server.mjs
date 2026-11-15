@@ -15,8 +15,8 @@
  * Electron shell does (electron/main.cjs) — with --electron it uses
  * Electron's bundled Node via ELECTRON_RUN_AS_NODE, otherwise host Node —
  * 127.0.0.1 on a kernel-assigned
- * free port, NODE_ENV=production, a THROWAWAY LH_DATA_DIR and
- * LH_CREDENTIALS_DIR under os.tmpdir() (no real sign-in or data ever touch it) —
+ * free port, NODE_ENV=production, a THROWAWAY LH_DATA_DIR under
+ * os.tmpdir() (no real sign-in or data ever touch it) —
  * polls GET / until 200, then probes the GET-only API surface (chats /
  * models / settings — no side effects). Any non-200, an early server
  * exit, or a 30s boot timeout fails the gate and prints the server's own
@@ -121,7 +121,6 @@ async function main() {
 			PORT: String(port),
 			HOSTNAME: "127.0.0.1",
 			LH_DATA_DIR: dataDir,
-			LH_CREDENTIALS_DIR: home,
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});

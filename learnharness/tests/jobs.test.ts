@@ -808,7 +808,7 @@ describe("pdf runner (sources v0)", () => {
 			assert.equal(done.status, "done");
 			assert.deepEqual(done.delivery, { kind: "result", status: "delivered" });
 			const result = done.result as PdfResult;
-			assert.equal(result.path, fs.realpathSync.native(path.join(home, relativePath)));
+			assert.equal(result.path, path.join(homeAlias, relativePath));
 			assert.match(result.brief, /integral rule/);
 			assert.deepEqual(result.pagesRead, [1, 2]);
 			assert.deepEqual(result.pagesConsulted, [1, 2]);
@@ -1631,21 +1631,21 @@ describe("prompt composition", () => {
 		assert.ok(!prober.includes('type: "predict"'), "the question types stay out of the prober");
 	});
 
-	it("the sources-v0 prompt lines compose: read/pdf doctrine in the teacher, the read line in the prober", () => {
+	it("the sources-v0 prompt lines compose: Read/pdf doctrine in the teacher, the Read line in the prober", () => {
 		const teacher = composeInstructions("teacher");
 		assert.ok(teacher.includes("Learner source files"), "the teacher carries the source-files section");
 		assert.ok(teacher.includes("brief with page citations"), "the pdf brief's citation duty is stated");
 		const prober = composeInstructions("prober");
-		assert.ok(prober.includes("the `read` tool can inspect it directly"), "the prober knows it can read learner files");
+		assert.ok(prober.includes("`Read` can inspect it directly"), "the prober knows it can read learner files");
 	});
 
-	it("the sources-v1 shared fragment composes into BOTH agents (find/ls/grep doctrine)", () => {
+	it("the sources-v1 shared fragment composes into BOTH agents (Glob/Grep/Read doctrine)", () => {
 		for (const kind of ["teacher", "prober"] as const) {
 			const instructions = composeInstructions(kind);
 			assert.ok(instructions.includes("## Learner files"), `${kind} carries the shared learner-files fragment`);
 			assert.ok(instructions.includes("find it yourself in the course folder"), `${kind} knows to locate files itself`);
 			assert.ok(instructions.includes("ask him where it is before searching anywhere else in his home"), `${kind} asks before searching the rest of his home`);
-			assert.ok(instructions.includes("home directory"), `${kind} knows the home-anchored path rule`);
+			assert.ok(instructions.includes("his home folder, and in a course the course folder, are named at the end of this prompt"), `${kind} knows where the folders its paths start from are named`);
 		}
 		// the agent's OWN fragments compose before the shared appendix
 		// (the reorder's order rule, 2026-09-27: job and method lead)

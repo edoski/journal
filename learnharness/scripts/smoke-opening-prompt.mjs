@@ -23,7 +23,7 @@ await new Promise(resolve => listener.close(resolve));
 const origin = `http://127.0.0.1:${port}`;
 const env = {
 	PATH: process.env.PATH, HOME: home, TMPDIR: home, NODE_ENV: "development",
-	LH_DATA_DIR: path.join(home, "data"), LH_CREDENTIALS_DIR: home,
+	LH_DATA_DIR: path.join(home, "data"),
 	NEXT_TELEMETRY_DISABLED: "1",
 };
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {

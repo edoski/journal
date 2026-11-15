@@ -28,10 +28,9 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 	});
 
 	it("local tools name their actual activity", () => {
-		assert.equal(streamingToolActivity([msg("assistant", [toolPart("grep", "input-streaming")])]), "Searching file contents…");
-		assert.equal(streamingToolActivity([msg("assistant", [toolPart("read", "input-streaming")])]), "Reading a file…");
-		assert.equal(streamingToolActivity([msg("assistant", [toolPart("find", "input-streaming")])]), "Finding files…");
-		assert.equal(streamingToolActivity([msg("assistant", [toolPart("ls", "input-streaming")])]), "Listing a directory…");
+		assert.equal(streamingToolActivity([msg("assistant", [toolPart("Grep", "input-streaming")])]), "Searching file contents…");
+		assert.equal(streamingToolActivity([msg("assistant", [toolPart("Read", "input-streaming")])]), "Reading a file…");
+		assert.equal(streamingToolActivity([msg("assistant", [toolPart("Glob", "input-streaming")])]), "Finding files…");
 	});
 
 	it("job dispatch tools get their own labels; unknown tools stay generic", () => {
@@ -45,7 +44,7 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 	it("no activity once the call settles or the turn ends", () => {
 		// output-available = done executing → no shimmer (the transcript
 		// shows the settled card instead).
-		assert.equal(streamingToolActivity([msg("assistant", [toolPart("grep", "output-available")])]), null);
+		assert.equal(streamingToolActivity([msg("assistant", [toolPart("Grep", "output-available")])]), null);
 		// the last message being the user's = nothing running.
 		assert.equal(streamingToolActivity([msg("user", [{ type: "text", text: "hi" }])]), null);
 		assert.equal(streamingToolActivity([]), null);
@@ -53,7 +52,7 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 
 	it("the SECOND streaming part wins only if the first settles — parts scan forward", () => {
 		// A settled call followed by a live one: the live one is the activity.
-		const parts = [toolPart("read", "output-available"), toolPart("grep", "input-streaming")];
+		const parts = [toolPart("Read", "output-available"), toolPart("Grep", "input-streaming")];
 		assert.equal(streamingToolActivity([msg("assistant", parts)]), "Searching file contents…");
 	});
 });

@@ -2,7 +2,8 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ImageContent, TextContent, Usage } from "@earendil-works/pi-ai";
 import { processImage } from "../image-processing/index.ts";
 import { Type } from "typebox";
-import { resolveSourcePath } from "../tools/fs-shared.ts";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import type { SdkEngine } from "../models.ts";
 import { runSubagent } from "../sdk/task.ts";
 import type { PdfResult, PdfToolInput } from "../../core/contracts.ts";
@@ -173,16 +174,9 @@ export async function runPdfReaderAgent(
 	opts: PdfReaderOptions,
 ): Promise<PdfResult> {
 	const maxIterations = opts.maxIterations ?? MAX_ITERATIONS;
-	let pdfPath = input.path;
-	let openError: string | null;
-	// Source denial is an ordinary upfront PDF failure, before parsing,
-	// rendering or any model request (including direct reader invocations).
-	try {
-		pdfPath = resolveSourcePath(input.path);
-		openError = await probeReadable(pdfPath);
-	} catch (err) {
-		openError = err instanceof Error ? err.message : String(err);
-	}
+	// A path resolves against his home, `~` included.
+	const pdfPath = input.path === "~" || input.path.startsWith("~/") ? join(homedir(), input.path.slice(1)) : resolve(homedir(), input.path);
+	const openError = await probeReadable(pdfPath);
 	if (openError) {
 		return { path: pdfPath, question: input.question, brief: `PDF failed: ${openError}`, pagesRead: [], pagesConsulted: [] };
 	}

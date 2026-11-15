@@ -125,6 +125,12 @@ export function claudeEngine(providerId: string): SdkEngine {
 	};
 }
 
+/** Claude Code's own tools an agent may carry: they keep their names in the
+ *  record and in a seeded session. */
+export const CLAUDE_CODE_TOOLS = ["Read", "Grep", "Glob", "WebSearch"] as const;
+export type ClaudeCodeTool = (typeof CLAUDE_CODE_TOOLS)[number];
+export const isClaudeCodeTool = (name: string): name is ClaudeCodeTool => (CLAUDE_CODE_TOOLS as readonly string[]).includes(name);
+
 /** App tools reach the model as MCP tools of this in-process server. */
 export const SDK_TOOL_SERVER = "lh";
 export const SDK_TOOL_PREFIX = `mcp__${SDK_TOOL_SERVER}__`;
