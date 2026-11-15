@@ -38,7 +38,7 @@ Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights 
 
 ## Width (Proposed, behind the polish switch)
 
-Edo's notes, 15 Nov 2026, N1: a wider Home gives the map more room, "but also the rows below would get wider … is there any super useful info at all that we could cleanly fit into it". The switch (`components/design-variant.ts`, group `home`, dev only; production draws Current) offers Current and Proposed. Proposed widens Home's column to the course page's frame (`HOME_WIDTH`, 80rem, as `PageFrame`) and gives each Today row on one topic where he stands on it (`agenda-rows/row-aside.ts`), in its own column before the row's ends, so the facts line up. He looked at it beside a candidate with the course's exam day on its first row and picked the standing the same day; the exam candidate is deleted.
+Edo's notes, 15 Nov 2026, N1: a wider Home gives the map more room, "but also the rows below would get wider … is there any super useful info at all that we could cleanly fit into it". The switch (`components/design-variant.ts`, group `home`, dev only; production draws Current) offers Current and Proposed. Proposed widens Home's column to the course page's frame (`HOME_WIDTH`, 80rem, as `PageFrame`) and gives each Today row on one topic where he stands on it (`agenda-rows/row-standing.ts`), in its own column before the row's ends (hybrid.md, "Standing"). He looked at it beside a candidate with the course's exam day on its first row and picked the standing the same day; the exam candidate is deleted.
 
 Shipping it means deleting Current and the switch.
 

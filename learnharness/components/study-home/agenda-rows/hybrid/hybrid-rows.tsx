@@ -3,9 +3,12 @@ import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring"
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedLabel, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
-import { rowStandings } from "@/components/study-home/agenda-rows/row-aside";
+import { rowStanding, type RowStanding } from "@/components/study-home/agenda-rows/row-standing";
+import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
+import { SLIP_ICON } from "@/components/slip-icons";
 import { cn } from "@/lib/utils";
 import { MathLine } from "@/components/ui/math-line";
+import { MathText } from "@/components/ui/math-text";
 
 /** The pie beside both lines; the course line with when he last studied
  *  it at its end, then the lesson line with why now at its end. The ends
@@ -13,9 +16,15 @@ import { MathLine } from "@/components/ui/math-line";
 const ROW =
 	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-lg px-3 text-left font-normal whitespace-normal data-[pointed]:bg-fill-hover";
 const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_auto]";
-/** With the standing: its own column before the ends, as wide on every
- *  row, so the facts line up down the list. */
-const COLUMNS_ASIDE = "grid-cols-[1rem_minmax(0,1fr)_10rem_auto]";
+/** With the standing: its own column before the ends, its marks on the
+ *  column's left edge, as wide as the longest standing words ("Right on
+ *  your own, check another day"); the ends' column as wide as the reason's
+ *  most (`WhyMark`'s 224), not each row's own words, so the standing starts
+ *  at one edge down the list and its marks stack. */
+const COLUMNS_STANDING = "grid-cols-[1rem_minmax(0,1fr)_14rem_14rem]";
+
+/** A standing fact: a 14px mark, as the reason's, then its words. */
+const FACT = "flex min-w-0 items-center gap-1.5 text-label text-muted-foreground";
 
 /** A hairline above every row but the first, inset to the text's edges. */
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
@@ -28,24 +37,22 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  */
 export function HybridRows({ rows, busy, onContinue, standing = false, ...point }: RowsProps & { standing?: boolean }) {
 	const { shown, also } = foldLines(rows);
-	const asides = standing ? rowStandings(rows) : null;
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
-			{shown.map((row, i) => {
-				// A standing is the lesson's, on the lesson line.
-				const fact = asides && <AsideCell words={asides[i] ?? null} />;
-				const blank = asides && <span />;
+			{shown.map((row) => {
+				// The slip sits on the course line, the standing on the lesson line, so it reads beside its topic.
+				const facts = standing ? rowStanding(row) : undefined;
 				return (
 					<li key={lineKey(row)} className={HAIRLINE}>
-						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, asides ? COLUMNS_ASIDE : COLUMNS)} {...pointProps(row, point)}>
+						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? COLUMNS_STANDING : COLUMNS)} {...pointProps(row, point)}>
 							<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
 							<MathLine className="text-label text-muted-foreground">{courseTitle(row)}</MathLine>
-							{blank}
+							{facts !== undefined && <SlipFact facts={facts} />}
 							<span data-slot="today-when" className="justify-self-end text-label text-muted-foreground tabular-nums">
 								{studiedLabel(row)}
 							</span>
 							<MathLine className="text-control font-medium text-foreground">{lessonTitle(row)}</MathLine>
-							{fact}
+							{facts !== undefined && <StandingFact facts={facts} />}
 							<WhyMark why={whyOf(row)} />
 						</LineTarget>
 					</li>
@@ -56,11 +63,30 @@ export function HybridRows({ rows, busy, onContinue, standing = false, ...point 
 	);
 }
 
-/** The standing's cell; empty where the row has none. */
-function AsideCell({ words }: { words: string | null }) {
+/** Why the engine calls the row's topic weak, with the slip's own icon,
+ *  as the topic page's head says it; empty where it has none. */
+export function SlipFact({ facts }: { facts: RowStanding | null }) {
+	const slip = facts?.slip;
+	if (!slip) return <span />;
+	const Icon = SLIP_ICON[slip.key];
 	return (
-		<span data-slot={words ? "today-aside" : undefined} className="truncate text-label text-muted-foreground">
-			{words}
+		<span data-slot="today-slip" data-slip={slip.key} className={FACT}>
+			<Icon aria-hidden="true" className="size-3.5 shrink-0" />
+			<span className="truncate">
+				<MathText>{slip.words}</MathText>
+			</span>
+		</span>
+	);
+}
+
+/** Where he stands on the row's topic: the map's pie and its words;
+ *  empty on a row of several topics. */
+export function StandingFact({ facts }: { facts: RowStanding | null }) {
+	if (!facts) return <span />;
+	return (
+		<span data-slot="today-standing" className={FACT}>
+			<TopicGlyph standing={facts.standing} className="size-3.5" />
+			<span className="truncate">{facts.standing.words}</span>
 		</span>
 	);
 }

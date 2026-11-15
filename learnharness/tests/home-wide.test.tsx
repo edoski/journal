@@ -14,12 +14,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { foldLines } from "../components/study-home/agenda-rows/row-facts.ts";
-import { rowStandings } from "../components/study-home/agenda-rows/row-aside.ts";
+import { rowStanding } from "../components/study-home/agenda-rows/row-standing.ts";
+import { whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
+import type { TodayRow } from "../components/study-home/study-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
-import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { lineTopics } from "../components/study-home/needs-you.ts";
+import { lineTopics, needsYouNow } from "../components/study-home/needs-you.ts";
 import { HOME_WIDTH } from "../components/study-home/study-home.tsx";
-import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
+import { slipBeside, standingOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { CHATS, COURSES, TODAY } from "./fixtures/now-demo.ts";
 
 const { rows } = needsYouNow(COURSES, CHATS, TODAY);
@@ -40,24 +41,47 @@ describe("Home's width (N1)", () => {
 	});
 });
 
+const topicOf = (row: TodayRow) => {
+	const topics = lineTopics(row);
+	return topics.length === 1 ? row.course?.map.topics.find((t) => t.handle === topics[0]) : undefined;
+};
+const titleOf = (row: TodayRow) => (h: string) => row.course?.map.topics.find((t) => t.handle === h)?.title ?? h;
+
 describe("the standing", () => {
-	it("says where he stands on a row's one topic in the map's words, and nothing on a row of several or none", () => {
-		const asides = rowStandings(rows);
+	it("says where he stands on a row's one topic as the map does, and nothing on a row of several or none", () => {
 		rows.forEach((row, i) => {
-			const topics = lineTopics(row);
-			const topic = topics.length === 1 ? row.course?.map.topics.find((t) => t.handle === topics[0]) : undefined;
-			assert.equal(asides[i], topic ? standingOf(topic).words : null, `row ${i}`);
+			const topic = topicOf(row);
+			assert.deepEqual(rowStanding(row)?.standing ?? null, topic ? standingOf(topic) : null, `row ${i}`);
 		});
-		assert.ok(asides.some((a) => a !== null));
+		assert.ok(rows.some((row) => rowStanding(row) !== null));
+	});
+
+	it("adds why the engine calls the topic weak, as the topic page's head does, unless the row's reason is the miss", () => {
+		rows.forEach((row, i) => {
+			const topic = topicOf(row);
+			const slip = topic && whyOf(row)?.kind !== "missed" ? slipBeside(topic, titleOf(row) as never) : null;
+			assert.deepEqual(rowStanding(row)?.slip ?? null, slip, `row ${i}`);
+		});
+		assert.ok(rows.some((row) => rowStanding(row)?.slip), "the demo day has a row on a weak topic");
 	});
 });
 
 describe("the rows drawn", () => {
-	it("draw the standing in its own column, and Current draws none", () => {
-		assert.equal(draw().querySelectorAll('[data-slot="today-aside"]').length, 0);
-		const words = [...draw(true).querySelectorAll('[data-slot="today-aside"]')].map((el) => el.textContent);
-		const shown = foldLines(rows).shown.length;
-		assert.deepEqual(words, rowStandings(rows).slice(0, shown).filter((a) => a !== null));
-		assert.ok(words.length > 0);
+	it("draw the pie and the standing words on the lesson line, the slip with its own icon on the course line, and Current draws none", () => {
+		const current = draw();
+		assert.equal(current.querySelectorAll('[data-slot="today-standing"], [data-slot="today-slip"]').length, 0);
+		const proposed = draw(true);
+		const lines = [...proposed.querySelectorAll('[data-slot="today-line"]')];
+		const shown = foldLines(rows).shown;
+		assert.equal(lines.length, shown.length);
+		shown.forEach((row, i) => {
+			const facts = rowStanding(row);
+			const cell = lines[i]!.querySelector('[data-slot="today-standing"]');
+			assert.equal(cell?.textContent ?? null, facts?.standing.words ?? null, `row ${i}`);
+			if (facts) assert.equal(cell!.querySelector('[data-slot="topic-glyph"]')?.getAttribute("data-fill"), String(facts.standing.fill), `row ${i}`);
+			const slip = lines[i]!.querySelector('[data-slot="today-slip"]');
+			assert.equal(slip?.textContent ?? null, facts?.slip?.words ?? null, `row ${i}`);
+			if (facts?.slip) assert.equal(slip!.getAttribute("data-slip"), facts.slip.key, `row ${i}`);
+		});
 	});
 });

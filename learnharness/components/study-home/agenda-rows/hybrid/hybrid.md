@@ -13,6 +13,18 @@ Thesis: Edo liked progress, recency and reason (13 Nov 2026) and asked for one r
 | reason icons | `WhyMark` at size `row` (`../why-mark.md`), one per kind (`WHY_ICON`): a turn that waits, the sidebar's question bubble and "Your turn" in `link` at 500; the tutor writing, a pen and "Tutor writing"; a turn cut off mid-reply, a pause mark and "Reply cut off" after a restart, "You stopped the tutor" after his stop; a review, the sidebar's History icon and "Due today" or "Due since 5 Nov"; a miss, a crossed circle and "Not right last time: Chain rule"; an open task, a bookmark and "At part (c)" or "Unfinished"; the next topic, an arrow and "Next up"; a new topic, why the plan starts it now, cut to fit (`startsWhyShort`): an arrow and "Next in Matrices", a turn-down arrow and "After Expectation", a fast-forward and "Early, from Orthogonality" (`STARTS_ICON`) only off today's plan, since on the plan's own start it read as a warning (round 9: "Planned today" instead), only while it fits on one line; cut, the row says "Planned today" or "Next up" with the arrow as before, and the topic page keeps the whole sentence. Never on the course line |
 | right edge | both ends sit flush right, so recency and reason each line up down the list (Edo, 13 Nov 2026: "aligned across the rows") |
 
+## Standing (Home's Proposed)
+
+Edo, 15 Nov 2026, on the first Standing column (its words alone): "feels a bit barebones, needs maybe a standard icon set for it … a bit more detailed somehow but without too much verbosity". On Home's Proposed (study-home.md, "Width") a row on one topic gets a standing column, 224 wide, before the ends; a row of several topics (a problem sheet) leaves it empty, since no one standing is the row's.
+
+| Part | Notes |
+|---|---|
+| standing, on the lesson line | `today-standing`: the topic map's pie (`TopicGlyph`, the same fill and warning ink as the topic's card) at 14, as the reason's icon, 6px, then its standing words (`standingOf`), 12 muted: exactly what the map card and the topic page's head say beside the same pie |
+| slip, on the course line | `today-slip`: why the engine calls the topic weak, with the slip's own icon (`SLIP_ICON`) at 14 and its words ("Check on your own", "Mistake to fix", "Mixed up with Gaussian elimination"), from `slipBeside`, the rule the topic page's head reads: none when the standing words already say it, and none when the row's reason is the miss, so a row never says a thing twice |
+| alignment | both marks on the column's left edge, so the pies and slip icons stack down the list; the ends' column is held at the reason's most (224), so the standing column starts at one edge on every row |
+
+What was left off, by the signal test: the review's day (the reason says "Due since" when it is due today; a later day changes nothing he picks now), the day it was first taught, counts of answers, and anything the engine does not record. The research behind it (15 Nov 2026): Linear's issue rows (a status icon set, trailing properties as icons with colour only beside words), Things' project pie, Anki's deck columns, Math Academy's topic states, Primer's ActionList grid, Apple's lists and SF Symbols guidance.
+
 ## What each fact means
 
 - **Progress** (`courseProgress`): the topics he can do on his own, of all the course's topics. "On his own" is the engine's level `independent` or better (`retained`, `transferred`), and not marked weak by the engine. It is what he could do in the exam today. Topics only taught, tried or done with help do not count; a topic he could do but now slips (weak) leaves the pie until he wins it back. The pie drew "topics past new" before; that counted a topic he had only been shown as progress.

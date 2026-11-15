@@ -1,6 +1,6 @@
-import type { CourseMapTopic, TopicLevel } from "@/src/core";
+import type { CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
 import { mathPlain } from "@/components/ui/math-text";
-import { standingWords, type Fill } from "@/components/study-words";
+import { SLIP_SAID_BY, slipMark, standingWords, type Fill, type SlipKey } from "@/components/study-words";
 import type { Said, TopicFact } from "@/components/unit-inbox/sidebar-says";
 
 /** Where the learner stands on a topic, as the map draws and says it. */
@@ -29,6 +29,16 @@ export function standingOf(topic: CourseMapTopic): Standing {
 	const full = ON_HIS_OWN.has(topic.level);
 	const fill = full && topic.weak ? 0.75 : FILL[topic.level];
 	return { fill, slipping: topic.weak, words: standingWords(fill, topic) };
+}
+
+/** Why the engine calls a topic weak, beside its standing: the slip's key,
+ *  which picks its icon (`SLIP_ICON`), and its words; null when the engine
+ *  does not call it weak, or when the standing already says it
+ *  (`SLIP_SAID_BY`). The topic page's head and Home's rows say it so. Pure. */
+export function slipBeside(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } | null {
+	if (!topic.weak) return null;
+	const slip = slipMark(topic.signals, titleOf);
+	return SLIP_SAID_BY[slip.key] !== standingOf(topic).words ? slip : null;
 }
 
 /** What a card can say under its title in place of where he stands: a
