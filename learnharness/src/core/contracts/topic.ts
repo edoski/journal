@@ -31,6 +31,10 @@ export interface TopicAttempt {
 	chose: string | null;
 	/** The tutor's sentence: what happened, or the question asked. */
 	text: string;
+	/** The session that saved it (its save receipt or practice conclude,
+	 *  `markLinks`), among the sessions the read named; null when none of
+	 *  them did. */
+	session: string | null;
 }
 
 /** Where the topic is in his material, as the engine's record points to

@@ -109,7 +109,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 }
 
 function attempt(over: Partial<TopicAttempt> = {}): TopicAttempt {
-	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, grade: null, gaveUp: false, predicted: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", ...over };
+	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, grade: null, gaveUp: false, predicted: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", session: null, ...over };
 }
 
 const EIGEN_PLAN: SessionPlan = {

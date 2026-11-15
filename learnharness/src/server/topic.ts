@@ -1,11 +1,13 @@
 /**
  * The topic page's server seam: the engine's `show` for one topic and the
- * open tasks that hold it, and the plan of each of its sessions. The
+ * open tasks that hold it, the plan of each of its sessions, and which of
+ * them saved each attempt. The
  * engine's JSON and the stored sessions are parsed here, so the page gets
  * only the contract (core/contracts/topic.ts) and nothing else of a
  * transcript leaves the server.
  */
 
+import { markLinks } from "../core/answer-marks.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { chosenSure } from "../core/contracts/marks.ts";
 import { derivePlanStatusesLh } from "../core/contracts/plan.ts";
@@ -54,6 +56,7 @@ function attemptOf(id: string, entry: unknown): { attempt: TopicAttempt; correct
 			sure: chosenSure(e.sure),
 			chose: str(e.chose),
 			text,
+			session: null,
 		},
 		corrects: strings(e.corrects),
 	};
@@ -72,23 +75,33 @@ function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>
 	});
 }
 
+/** Which session saved each observation, from the sessions' transcripts:
+ *  every attempt their answers' marks link (`markLinks`). Pure. */
+export function savedBy(chats: readonly ChatRecord[]): Map<string, string> {
+	const saved = new Map<string, string>();
+	for (const chat of chats) for (const ids of Object.values(markLinks(chat.messages))) for (const id of ids) saved.set(id, chat.id);
+	return saved;
+}
+
 /**
  * The page's view of the engine's `show <topic> <task>…` output, or null
  * when it does not hold the topic. Attempts keep the engine's order,
  * and the topic's refs name the places in his material it points to,
  * newest first; a self-report is not an attempt, and an attempt a later
  * one corrects is left out, as the engine leaves it out of the standing.
- * Pure.
+ * Each attempt names the session that saved it (`saved`, from `savedBy`),
+ * or saved an attempt it corrects. Pure.
  */
-export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly string[]): TopicRecord | null {
+export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly string[], saved: ReadonlyMap<string, string> = new Map()): TopicRecord | null {
 	const items = record(record(show)?.items);
 	const topic = record(items?.[handle]);
 	if (!items || !topic || topic.kind !== "topic") return null;
 	const evidence = record(record(show)?.evidence) ?? {};
 	const scored = strings(topic.observations).flatMap((id) => attemptOf(id, evidence[id]) ?? []);
 	const corrected = new Set(scored.flatMap((s) => s.corrects));
+	const sessionOf = (id: string, corrects: readonly string[]) => saved.get(id) ?? corrects.map((c) => saved.get(c)).find((s) => s !== undefined) ?? null;
 	return {
-		attempts: scored.map((s) => s.attempt).filter((a) => !corrected.has(a.id)),
+		attempts: scored.filter((s) => !corrected.has(s.attempt.id)).map((s) => ({ ...s.attempt, session: sessionOf(s.attempt.id, s.corrects) })),
 		refs: refsOf(topic, record(record(show)?.sources) ?? {}),
 		tasks: taskKeys.flatMap((key) => {
 			const task = record(items[key]);
@@ -135,9 +148,10 @@ export async function topicRead(
 		return { status: 404, body: { ok: false, code: "unknown_course", error: "No registered course has this folder" } };
 	}
 	const shown = await stores.courseRecords.run(workspace, { verb: "show", handles: [handle, ...taskKeys] });
-	const plans = sessionIds.flatMap((id) => {
+	const chats = sessionIds.flatMap((id) => {
 		const chat = stores.chatStore.getChat(id);
-		return chat && chat.course?.workspace === workspace ? (sessionPlanOf(chat) ?? []) : [];
+		return chat && chat.course?.workspace === workspace ? [chat] : [];
 	});
-	return { status: 200, body: { ok: true, record: shown.ok ? topicRecordOf(shown.json, handle, taskKeys) : null, plans } };
+	const plans = chats.flatMap((chat) => sessionPlanOf(chat) ?? []);
+	return { status: 200, body: { ok: true, record: shown.ok ? topicRecordOf(shown.json, handle, taskKeys, savedBy(chats)) : null, plans } };
 }

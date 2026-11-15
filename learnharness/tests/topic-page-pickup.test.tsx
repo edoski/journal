@@ -147,8 +147,8 @@ describe("the sections' order", () => {
 			["chat_question", "chat_writing", "Due today", "sheet-4", "sheet-5"],
 		);
 		assert.equal(scheduled, null);
-		assert.deepEqual(earlier.flatMap((day) => day.sessions.map((entry) => entry.chat.id)), ["chat_done"]);
-		assert.ok(earlier.some((day) => day.attempts.length > 0));
+		assert.deepEqual(earlier.flatMap((day) => day.rows.flatMap((row) => (row.kind === "session" ? [row.entry.chat.id] : []))), ["chat_done"]);
+		assert.ok(earlier.some((day) => day.rows.some((row) => row.kind === "attempt")));
 	});
 
 	it("never offers the task Now continues again in Next", () => {
@@ -246,7 +246,7 @@ describe("a session that only touched the topic", () => {
 		const { now, next, earlier } = pickupSections(facts);
 		assert.notEqual(now.words, EIGEN_PLAN.tree.nodes.find((node) => node.id === EIGEN_PLAN.current)!.title);
 		assert.deepEqual(next.flatMap((item) => (item.kind === "session" ? [item.entry.chat.id] : [])), []);
-		assert.ok(earlier.some((day) => day.sessions.some((entry) => entry.chat.id === touched.id)), "Earlier lists it");
+		assert.ok(earlier.some((day) => day.rows.some((row) => row.kind === "session" && row.entry.chat.id === touched.id)), "Earlier lists it");
 	});
 });
 

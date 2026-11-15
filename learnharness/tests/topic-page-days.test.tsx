@@ -15,7 +15,7 @@ import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { TopicAttempt } from "../src/core/contracts/topic.ts";
 import { topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
-import { trailDays } from "../components/unit-inbox/topic-page/trail/trail-facts.ts";
+import { trailDays, type TrailDay } from "../components/unit-inbox/topic-page/trail/trail-facts.ts";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
 const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), "utf-8"));
@@ -94,6 +94,7 @@ const attempt = (id: string, date: string, over: Partial<TopicAttempt> = {}): To
 	sure: null,
 	chose: null,
 	text: `Attempt ${id}`,
+	session: null,
 	...over,
 });
 
@@ -101,15 +102,39 @@ const factsOf = (t: CourseMapTopic, sessions: ChatListItem[] = [], read: Paramet
 	topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read });
 const line = (facts: TopicFacts) => trailDays(facts.sessions, facts.attempts, facts.today);
 
+const rowsOf = (day: TrailDay) => day.rows.map((row) => (row.kind === "session" ? `session ${row.entry.chat.title}` : `attempt ${row.attempt.text}`));
+
 describe("the trail's days", () => {
-	it("put Rank's sessions and attempts on three days, newest first, each session before the attempts of its day", () => {
+	it("put Rank's sessions and attempts on three days, newest first, an attempt no session listed is known to have saved before the sessions of its day", () => {
 		const days = line(factsOf(RANK, RANK_SESSIONS, { record: RANK_RECORD, plans: [] }));
 		assert.deepEqual(
-			days.map((day) => [day.label, day.sessions.map((entry) => entry.chat.title), day.attempts.map((a) => a.text)]),
+			days.map((day) => [day.label, rowsOf(day)]),
 			[
-				["Today", ["Rank practice"], []],
-				["Tue 3 Nov", ["Rank, second pass"], ["Row-reduced a 3x3 matrix and counted pivots, slipping once on a sign"]],
-				["Fri 30 Oct", ["Rank and the column space"], ["Gave rank 3 for a 3x4 matrix whose third row is the sum of the first two"]],
+				["Today", ["session Rank practice"]],
+				["Tue 3 Nov", ["attempt Row-reduced a 3x3 matrix and counted pivots, slipping once on a sign", "session Rank, second pass"]],
+				["Fri 30 Oct", ["attempt Gave rank 3 for a 3x4 matrix whose third row is the sum of the first two", "session Rank and the column space"]],
+			],
+		);
+	});
+
+	it("put each attempt under the session that saved it, and one from a session Now or Next holds first in its day (round 7)", () => {
+		const sessions = [
+			chat("chat_rank", "Rank practice", "2026-11-08T09:00:00.000Z", { topics: ["span"] }),
+			chat("chat_eigen", "Eigenvalues and eigenvectors", "2026-11-08T10:00:00.000Z", { topics: ["span"] }),
+		];
+		const attempts = [
+			attempt("o38", TODAY, { recorded: `${TODAY}T08:50:00.000Z`, session: "chat_rank", text: "Rank's" }),
+			attempt("o44", TODAY, { recorded: `${TODAY}T09:50:00.000Z`, session: "chat_eigen", text: "Eigen's" }),
+			attempt("o48", TODAY, { recorded: `${TODAY}T11:00:00.000Z`, session: "chat_sheet", text: "the sheet's, in Now" }),
+			attempt("o39", TODAY, { recorded: `${TODAY}T08:55:00.000Z`, session: "chat_rank", text: "Rank's again" }),
+			attempt("o2", "2026-11-05", { text: "an older one, no session known" }),
+		];
+		const days = trailDays(factsOf(SPAN, sessions).sessions, attempts, TODAY);
+		assert.deepEqual(
+			days.map((day) => [day.label, rowsOf(day)]),
+			[
+				["Today", ["attempt the sheet's, in Now", "session Eigenvalues and eigenvectors", "attempt Eigen's", "session Rank practice", "attempt Rank's again", "attempt Rank's"]],
+				["Thu 5 Nov", ["attempt an older one, no session known"]],
 			],
 		);
 	});
@@ -118,10 +143,10 @@ describe("the trail's days", () => {
 		const sessions = [chat("chat_a", "A lesson", "2026-11-07T10:00:00.000Z", { topics: ["span"] })];
 		const days = line(factsOf(SPAN, sessions, { record: { attempts: [attempt("o9", "2026-11-05")], tasks: [] }, plans: [] }));
 		assert.deepEqual(
-			days.map((day) => [day.label, day.sessions.length, day.attempts.length]),
+			days.map((day) => [day.label, rowsOf(day)]),
 			[
-				["Yesterday", 1, 0],
-				["Thu 5 Nov", 0, 1],
+				["Yesterday", ["session A lesson"]],
+				["Thu 5 Nov", ["attempt Attempt o9"]],
 			],
 		);
 	});
@@ -137,8 +162,6 @@ describe("the trail's days", () => {
 			attempt("o10", "2026-11-06", { recorded: "2026-11-06T09:00:00.000Z" }),
 		];
 		const [day] = trailDays(factsOf(SPAN, sessions).sessions, attempts, TODAY);
-		assert.deepEqual(day!.sessions.map((entry) => entry.chat.title), ["Late", "Early"]);
-		assert.deepEqual(day!.attempts.map((a) => a.id), ["o12", "o10", "o9"]);
+		assert.deepEqual(rowsOf(day!), ["attempt Attempt o12", "attempt Attempt o10", "attempt Attempt o9", "session Late", "session Early"]);
 	});
-
 });
