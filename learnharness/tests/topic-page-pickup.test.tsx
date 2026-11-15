@@ -306,7 +306,7 @@ describe("the sections drawn", () => {
 		const now = document.querySelector('[data-slot="pickup-now"]')!;
 		assert.equal(now.getAttribute("data-shown"), "true");
 		assert.doesNotMatch(now.className, /bg-fill-selected|ring-1/, "no box around Now");
-		assert.equal(now.querySelector('[data-slot="topic-map-toggle"]'), null);
+		assert.ok(now.querySelector('[data-slot="topic-map-toggle"]') === null, "no map button on Now");
 		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]'));
 	});
 });

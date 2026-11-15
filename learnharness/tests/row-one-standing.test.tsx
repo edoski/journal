@@ -52,7 +52,7 @@ describe("one status word per row (round 10, 1 m4)", () => {
 			const text = line.textContent ?? "";
 			assert.equal(text.split(words).length - 1, 1, `"${words}" once: ${text}`);
 			assert.doesNotMatch(text, /Slipping/);
-			assert.equal(line.querySelector('[data-slot="today-slip"]'), null, "no slip on the course line");
+			assert.ok(line.querySelector('[data-slot="today-slip"]') === null, "no slip on the course line");
 			const standing = line.querySelector('[data-slot="today-standing"]')!;
 			assert.equal(standing.textContent, words);
 			assert.equal(standing.getAttribute("data-slip"), signals.mistake ? "gap" : "check");

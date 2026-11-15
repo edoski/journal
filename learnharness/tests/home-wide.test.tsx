@@ -82,7 +82,7 @@ describe("the rows drawn", () => {
 			assert.equal(cell?.textContent ?? null, facts ? rowWords(facts) : null, `row ${i}`);
 			if (facts) assert.equal(cell!.querySelector('[data-slot="topic-glyph"]')?.getAttribute("data-fill"), String(facts.standing.fill), `row ${i}`);
 			if (facts?.slip) assert.equal(cell!.getAttribute("data-slip"), facts.slip.key, `row ${i}`);
-			assert.equal(lines[i]!.querySelector('[data-slot="today-slip"]'), null, `row ${i}: no second status`);
+			assert.ok(lines[i]!.querySelector('[data-slot="today-slip"]') === null, `row ${i}: no second status`);
 		});
 	});
 });
