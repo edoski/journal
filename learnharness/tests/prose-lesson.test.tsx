@@ -68,7 +68,7 @@ describe("the Prose question in the tutor's message", () => {
 		assert.match(html, />2</);
 	});
 
-	it("turns his answer into his bubble with the mark under it, and keeps the committed answer behind The answer", () => {
+	it("turns his answer into his bubble with the mark under it, and never draws the committed answer (round 8: the unguarded card stated a false fact)", () => {
 		const spec = proseQuestionSpec("explain", "c1", check)!;
 		const output = buildAnswer(spec.data, { text: "Along (1,1)", confidence: "confident" }, "explain");
 		const html = withMarks(<ProseQuestion tool="explain" toolCallId="c1" input={check} output={output} open={false} />);
@@ -76,7 +76,7 @@ describe("the Prose question in the tutor's message", () => {
 		assert.match(html, /data-testid="prose-answer"/);
 		assert.match(html, /ms-auto flex w-fit max-w-\[80%\]/);
 		assert.match(html, /data-testid="mark-line"/);
-		assert.match(html, /data-testid="prose-disclosure"[^>]*>.*The answer/);
+		assert.doesNotMatch(html, /data-testid="prose-disclosure"|The answer|by 3/);
 	});
 
 	it("shows a hint request as his bubble with no mark and no committed answer", () => {

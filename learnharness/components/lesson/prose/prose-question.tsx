@@ -28,8 +28,11 @@ export function YourTurn() {
 /** A question in the tutor's message (spec: prose.md). Open, it ends the
  *  message under "Your turn", its choices plain rows he picks by click or
  *  digit while the composer takes his words. Answered, the question stays
- *  as the tutor asked it, his answer becomes his bubble with the record's
- *  mark under it, and the committed answer waits behind "The answer". */
+ *  as the tutor asked it, and his answer becomes his bubble with the
+ *  record's mark under it. The tutor's committed answer is never drawn:
+ *  its reply is the one guarded voice he reads (round 8: the unguarded
+ *  card stated a false fact, opened above a stop marker before any reply,
+ *  and named the same thing as practice's "Model solution"). */
 export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false }: {
 	tool: string;
 	toolCallId: string;
@@ -183,7 +186,6 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 					<LearnerBubble testId="prose-answer" text={words} photos={photos} markId={toolCallId}>
 						{added && <LearnerWords className={cn(words && "mt-1", SMALL)}>{added}</LearnerWords>}
 					</LearnerBubble>
-					{answer.kind === "explain" && answer.committed && <Disclosure label="The answer">{answer.committed}</Disclosure>}
 				</>
 			)}
 		</>
@@ -191,7 +193,7 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 }
 
 /** A quiet disclosure for what the record keeps but the tutor's reply
- *  usually says: the committed answer, a model solution. */
+ *  usually says: a problem's model solution. */
 export function Disclosure({ label, children, defaultOpen = false }: { label: string; children: ReactNode; defaultOpen?: boolean }) {
 	const [open, setOpen] = useState(defaultOpen);
 	return (
