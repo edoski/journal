@@ -85,7 +85,6 @@ test("Esc back to the answer never moves rescued words into the next question's 
 					open={{ kind: "question", key: "k2", tool: "explain", toolCallId: "q2", input: { question: "What is det A?", correctAnswer: "3", type: "check" } }}
 					answer={{ openKey: "k2", selection: emptyDockSelection(), confidence: "neutral", mode, toggle: noop, setConfidence: noop, setMode: (m: "answer" | "ask") => { mode = m; } }}
 					message={{ busy: false, value: box, revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
-					messageText={{ read: () => box, write: (v: string) => { box = v; } }}
 					onAskInstead={noop}
 					toggleRef={toggleRef}
 					busy={false}
@@ -120,7 +119,6 @@ test("the composer answering a question reports what he types as he types it", a
 					open={{ kind: "question", key: "k1", tool: "explain", toolCallId: "q1", input: { question: "Which directions stay on their line?", correctAnswer: "(1,1) and (1,-1)", type: "check" } }}
 					answer={{ openKey: "k1", selection: emptyDockSelection(), confidence: "neutral", mode: "answer", toggle: noop, setConfidence: noop, setMode: noop }}
 					message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
-					messageText={{ read: () => "", write: noop }}
 					onAskInstead={noop}
 					toggleRef={{ current: null }}
 					busy={false}

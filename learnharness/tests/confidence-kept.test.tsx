@@ -52,7 +52,6 @@ function Lesson({ open, submit }: { open: Open; submit: (text: string, confidenc
 				open={open}
 				answer={answer}
 				message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
-				messageText={{ read: () => "", write: noop }}
 				onAskInstead={noop}
 				toggleRef={{ current: null }}
 				busy={false}

@@ -1753,7 +1753,6 @@ export function Chat({
 								placeholder: nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined,
 								photos: composerPhotos,
 							}}
-							messageText={{ read: () => textRef.current, write: applyText }}
 							onAskInstead={() => void askInstead()}
 							toggleRef={proseToggleRef}
 							busy={busy}
