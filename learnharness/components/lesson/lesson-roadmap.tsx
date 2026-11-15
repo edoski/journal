@@ -137,7 +137,7 @@ export function LessonRoadmap({
 								<span aria-hidden className="flex size-4 shrink-0 items-center justify-center">
 									<span className={cn("size-2 rounded-full", rowDot(s))} />
 								</span>
-								<span className={cn("min-w-0 flex-1 truncate", s.status === "current" && !s.held ? "text-foreground" : "text-muted-foreground")}>
+								<span className={cn("min-w-0 flex-1 break-words", s.status === "current" && !s.held ? "text-foreground" : "text-muted-foreground")}>
 									{s.held ? HELD_TITLE : <MathText>{s.title}</MathText>}
 								</span>
 								{word && <span className="shrink-0 text-muted-foreground">{word}</span>}
@@ -154,12 +154,12 @@ export function LessonRoadmap({
 											onOpenChange(false);
 											onJump(s.id);
 										}}
-										className="flex h-8 w-full items-center gap-3 rounded-md px-2 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+										className="flex min-h-8 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 									>
 										{inner}
 									</button>
 								) : (
-									<div data-slot="roadmap-step" data-status={s.status} className="flex h-8 items-center gap-3 rounded-md px-2 text-row">
+									<div data-slot="roadmap-step" data-status={s.status} className="flex min-h-8 items-center gap-3 rounded-md px-2 py-1.5 text-row">
 										{inner}
 									</div>
 								)}

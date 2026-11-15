@@ -94,3 +94,17 @@ describe("a step's title never answers its own open prediction (round 9 M1)", ()
 		assert.equal(planTitlesGiveAway({ nodes: [{ id: "a", title: "What the echelon form needs" }, { id: "b", title: "One-to-one against onto for square matrices" }] }), null);
 	});
 });
+
+/** Round 9 (lesson reading m10): the panel cut "One-to-one against onto for
+ *  square matri…" at its 320px width. A step's title wraps, whole. */
+describe("the steps panel shows each title whole (round 9 m10)", () => {
+	it("a long title wraps instead of being cut", async () => {
+		const steps = roadmapSteps(TREE, ON_PIVOTS, new Set(["kernel", "pivots"]));
+		await mount(<LessonRoadmap steps={steps} open onOpenChange={() => {}} onJump={() => {}} />);
+		const row = element('[data-testid="roadmap-step-square"] [data-slot="roadmap-step"]');
+		const title = [...row.querySelectorAll("span")].find((s) => /One-to-one against onto/.test(s.textContent ?? "") && s.className.includes("flex-1"));
+		assert.ok(title, "the title's cell");
+		assert.doesNotMatch(title.className, /\btruncate\b/, "never cut with an ellipsis");
+		assert.doesNotMatch(row.className, /(^|\s)h-8(\s|$)/, "the row grows to a second line");
+	});
+});
