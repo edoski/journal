@@ -42,9 +42,15 @@ describe("turnErrorText", () => {
 		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in");
 	});
 
+	it("a dropped connection offers Try again, the words the line for a reply that never came uses", () => {
+		// Round 7: after a restart the dropped line stood ~26 s with nothing to press.
+		const { document } = parseHTML(renderToStaticMarkup(<TurnError message="The connection dropped before the tutor finished replying." onRetry={() => {}} retryLabel="Try again" onOpenSettings={() => {}} />));
+		assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Try again");
+	});
+
 	it("says the app could not be reached when the browser's request never left, with no raw text", () => {
 		for (const raw of ["Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource."]) {
-			assert.deepEqual(turnErrorText(raw), { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then send again.", details: null }, raw);
+			assert.deepEqual(turnErrorText(raw), { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then try again.", details: null }, raw);
 		}
 	});
 

@@ -13,10 +13,13 @@ const ACTION = "h-8 px-2 text-row";
  *  Claude, Open Settings for a rejected
  *  key, Home for a lesson deleted elsewhere, and Details for the provider's
  *  own text. */
-export function TurnError({ message, onRetry, onOpenSettings, onSignIn, children }: {
+export function TurnError({ message, onRetry, retryLabel = "Retry", onOpenSettings, onSignIn, children }: {
 	message: string;
 	/** Present while the failed turn can be retried. */
 	onRetry?: () => void;
+	/** The retry's words: Try again for a dropped connection, as the line
+	 *  for a reply that never came says it. */
+	retryLabel?: string;
 	onOpenSettings: () => void;
 	/** Opens the sign-in dialog, for a turn refused because Claude is signed out. */
 	onSignIn?: () => void;
@@ -32,7 +35,7 @@ export function TurnError({ message, onRetry, onOpenSettings, onSignIn, children
 			{children}
 			{onRetry && text.kind !== "gone" && (
 				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "font-medium text-foreground")}>
-					Retry
+					{retryLabel}
 				</Button>
 			)}
 			{text.kind === "signed-out" && onSignIn && (

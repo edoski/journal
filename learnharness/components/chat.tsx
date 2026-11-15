@@ -75,7 +75,7 @@ import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, parseProviderKeyRefusal } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, parseProviderKeyRefusal, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
@@ -791,7 +791,11 @@ export function Chat({
 	// Try again's key (round 3): Enter on the empty composer, from the field
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
-	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : retryable && !claudeLimit ? retryFailedTurn : undefined;
+	// A dropped connection: Try again asks the app what became of the reply.
+	const dropped = status === "error" && error?.message === STREAM_DROPPED;
+	const [healFailed, setHealFailed] = useState(false);
+	useEffect(() => setHealFailed(false), [error]);
+	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : dropped ? () => healDroppedStreamRef.current().then((healed) => setHealFailed(!healed)) : retryable && !claudeLimit ? retryFailedTurn : undefined;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1161,22 +1165,28 @@ export function Chat({
 	statusRef.current = status;
 	const errorMessageRef = useRef(error?.message);
 	errorMessageRef.current = error?.message;
-	const healDroppedStreamRef = useRef(async () => {});
+	// Also Try again on the dropped line (round 7: after a restart the line
+	// sat ~26 s with nothing to press): false while the app can't be reached.
+	const healDroppedStreamRef = useRef(async (): Promise<boolean> => false);
 	healDroppedStreamRef.current = async () => {
 		try {
 			const res = await fetch(`/api/chats/${chatId}`);
-			if (!res.ok) return;
+			if (!res.ok) return false;
 			const record = (await res.json()) as { turnInFlight?: boolean };
+			setHealFailed(false);
 			if (record.turnInFlight === true) {
 				attachToRunningTurn();
-				return;
+				return true;
 			}
 			recoverDroppedStream();
 			void syncFromServer();
+			return true;
 		} catch {
 			/* still unreachable: the next resync asks again */
+			return false;
 		}
 	};
+	const healDroppedStream = () => void healDroppedStreamRef.current().then((healed) => setHealFailed(!healed));
 	/** Fix B (2026-10-02): turn-settled arrived for OUR OWN turn — the
 	 * record is durable (endTurn fires only after persistTurn); the ready
 	 * flip consumes this flag to canonize the view onto the record. See the
@@ -1693,7 +1703,7 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={() => setSetupOpen(true)}>
+								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={() => setSetupOpen(true)}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}
