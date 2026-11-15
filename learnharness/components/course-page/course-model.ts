@@ -266,7 +266,7 @@ export function courseFacts(course: StudyCourse, chats: readonly ChatListItem[] 
 	};
 }
 
-/** Everything a course page candidate draws: the engine's course, its
+/** Everything the course page draws: the engine's course, its
  *  topics in their groups, what the sidebar says for each (the map's
  *  cards), the header's facts and its next lesson. */
 export interface CourseView {

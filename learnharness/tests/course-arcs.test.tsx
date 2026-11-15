@@ -24,7 +24,7 @@ import { PICK_UP_WORDS, THEN_WORDS, WhatNextRows } from "../components/course-pa
 import { arcLineWords, CHECK_WORDS } from "../components/course-page/course-arc.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { OPEN_AT_FIRST, shownGroups, walkStops } from "../components/course-page/split/split-tie.ts";
-import { PaceHead } from "../components/course-page/course-head/pace-head.tsx";
+import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 import { ArcPill, ArcStrip } from "../components/course-map/arc-strip.tsx";
 import { courseHref } from "../components/unit-inbox/unit-href.ts";
@@ -206,14 +206,14 @@ describe("the course head", () => {
 	};
 
 	it("names the arc he is in first on its quiet row, and nothing for a course the page shows without arcs", () => {
-		const head = render(<PaceHead view={viewOf(ARCS)} busy={false} onContinue={noop} />);
+		const head = render(<CourseHead view={viewOf(ARCS)} busy={false} onContinue={noop} />);
 		const standing = head.querySelector('[data-slot="page-standing"]')!;
 		assert.equal(text(standing.firstElementChild), "Linear systems");
 		assert.equal(standing.firstElementChild?.getAttribute("data-slot"), "course-arc-here");
 		const pill = standing.firstElementChild!.querySelector('[data-slot="arc-pill"]')!;
 		assert.ok(pill, "the arc is a pill, never text beside the facts");
 		assert.equal(pill.getAttribute("href"), `${courseHref(ARCS.map.workspace)}?arc=systems`, "it shows that arc on the page");
-		for (const c of [noArcs, oneArc]) assert.equal(render(<PaceHead view={viewOf(c)} busy={false} onContinue={noop} />).querySelector('[data-slot="course-arc-here"]'), null);
+		for (const c of [noArcs, oneArc]) assert.equal(render(<CourseHead view={viewOf(c)} busy={false} onContinue={noop} />).querySelector('[data-slot="course-arc-here"]'), null);
 	});
 });
 

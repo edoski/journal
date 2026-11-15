@@ -1,10 +1,10 @@
-import type { ArcHandle, ChatListItem, CourseMap, CourseMapTopic, CourseReadiness, CourseStanding, ReadinessPart, StudyCourse } from "@/src/core";
+import type { ChatListItem, CourseMap, CourseMapTopic, CourseReadiness, CourseStanding, ReadinessPart, StudyCourse } from "@/src/core";
 import type { StripArc } from "@/components/course-map/arc-strip";
 import { misfitWords } from "@/components/calendar/calendar-facts";
 import { resumableSession } from "@/components/nav/session-state";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { agoWords, finalReviewMissWords, notReadyWords, PART_WORDS, READY_WORDS, slipMark, type SlipKey } from "@/components/study-words";
+import { agoWords, finalReviewMissWords, notReadyWords, READY_WORDS, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -53,12 +53,6 @@ export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topi
 	const kind = notYet.length > 0 ? "notYet" : "toStart";
 	const names = namesWords((kind === "notYet" ? notYet : notReady.flatMap((p) => p.toStart)).map(titleOf));
 	return { kind: "notYet", words: notReadyWords(kind, names), arcs: [] };
-}
-
-/** Each arc's words for the exam, by arc: absent for an arc the exam does
- *  not examine. */
-export function partWordsByArc(readiness: CourseReadiness | null): ReadonlyMap<ArcHandle, { state: PartState; words: string }> {
-	return new Map((readiness?.parts ?? []).flatMap((p) => (p.arc ? [[p.arc, { state: partState(p), words: PART_WORDS[partState(p)] }] as const] : [])));
 }
 
 /** One open mistake as a row: the topic, what went wrong in the tutor's

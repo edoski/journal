@@ -513,14 +513,6 @@ export const READY_WORDS = {
 	notYetIn: "Not ready yet in",
 } as const;
 
-/** Where one arc stands for the exam, on its line beside its name, so a
- *  few words: never "ready", which its check's state already says. */
-export const PART_WORDS = {
-	ready: "Solid for the exam",
-	notYet: "Not solid yet",
-	short: "Won't all fit",
-} as const;
-
 /** A course without arcs, not ready: the topics not yet solid, else those
  *  still to start. "Not yet solid for the exam: Basis and Rank". */
 export function notReadyWords(kind: "notYet" | "toStart", names: string): string {

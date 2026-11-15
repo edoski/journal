@@ -15,7 +15,7 @@ import { CourseHeaderSkeleton } from "@/components/course-page/course-header-ske
 import type { CourseRead, CourseView } from "@/components/course-page/course-model";
 import { useCourse } from "@/components/course-page/use-course";
 
-/** What a candidate draws once its course is read. */
+/** What the page draws once its course is read. */
 export interface CourseReady {
 	view: CourseView;
 	busy: boolean;
