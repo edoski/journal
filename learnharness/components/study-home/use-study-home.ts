@@ -60,7 +60,6 @@ export function useStudyHome(): { state: StudyHomeState; retry: () => void } {
 	useServerEvent("turn-settled", reread);
 	useServerEvent("record-changed", reread);
 	useServerEvent("chats-changed", reread);
-	useServerEvent("compaction-changed", reread);
 	useServerEvent("course-changed", reread);
 	useServerResync(reread);
 	useDayChange(reread);

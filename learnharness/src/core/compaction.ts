@@ -1,10 +1,10 @@
 /**
- * COMPACTION. Claude Code compacts a lesson's session itself: the summary
- * replaces the conversation in the model's memory, while the record keeps
- * full history for every page. The app keeps only its policy: once a
- * settled turn's context reaches the trigger, it asks Claude Code to compact
- * with the lesson's instructions (`compactionInstructions`), and it records
- * each compaction as a marker the transcript shows.
+ * COMPACTION. Claude Code compacts a lesson's session itself, at its own
+ * point (its automatic compaction): the summary replaces the conversation in
+ * the model's memory, while the record keeps full history for every page.
+ * The app gives that summary the lesson's instructions
+ * (`compactionInstructions`, through Claude Code's PreCompact hook), and
+ * records each compaction as a marker the transcript shows.
  */
 
 import type { PlanTree } from "./contracts/plan.ts";
@@ -12,33 +12,6 @@ import { derivePlanStatusesLh, derivedNodeStatus } from "./contracts/plan.ts";
 import { COMPACTED_HISTORY_HEADER } from "./contracts/chat.ts";
 import type { LhMessage, LhMarkerMessage } from "./native-messages.ts";
 import { newMessageId } from "./native-messages.ts";
-
-/** The reserve subtracted from the model's contextWindow when the window
- * is the binding constraint. */
-export const COMPACTION_RESERVE_TOKENS = 16_384;
-
-/** The trigger's bound (owner ruling: 150k): it caps what each reply of a
- *  long lesson draws, well inside every window. */
-export const DEFAULT_COMPACTION_THRESHOLD_TOKENS = 150_000;
-
-/** The most context a request may carry in a model window: the window less
- *  its reserve, or the bound with no known window. A lesson past it waits
- *  for its compaction; under it, a turn never does. Pure. */
-export function compactionLimitTokens(contextWindowTokens: number | undefined | null): number {
-	if (contextWindowTokens == null) return DEFAULT_COMPACTION_THRESHOLD_TOKENS;
-	return Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1);
-}
-
-/** Where compaction triggers for a model window: the bound, or the limit
- *  when that is smaller. Pure. */
-export function compactionTriggerTokens(contextWindowTokens: number | undefined | null): number {
-	return Math.min(DEFAULT_COMPACTION_THRESHOLD_TOKENS, compactionLimitTokens(contextWindowTokens));
-}
-
-/** The context one request carried: every input token, cached or not. */
-export function contextTokensOf(usage: { input: number; cacheRead: number; cacheWrite: number }): number {
-	return usage.input + usage.cacheRead + usage.cacheWrite;
-}
 
 // ─── the marker ──────────────────────────────────────────────────────────────
 

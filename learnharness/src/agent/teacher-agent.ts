@@ -91,6 +91,8 @@ export interface AgentBuildOptions {
 	session?: ChatSession;
 	/** Where the app keeps its copy of that session. */
 	sessionStore?: SessionStore;
+	/** What the summary keeps when Claude Code compacts the session. */
+	compactionInstructions?: (messages: LhMessage[]) => string;
 	/** The session's course link: present = the course-record tools join
 	 *  the registry and the course doctrine joins the prompt, for every
 	 *  agent kind. Absent = no course (nothing changes). */
@@ -160,6 +162,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		endsTurn: endsTurnFor(kind),
 		session: opts.session,
 		sessionStore: opts.sessionStore,
+		compactionInstructions: opts.compactionInstructions,
 		onUsage: opts.onUsage,
 	});
 }

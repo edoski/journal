@@ -118,7 +118,7 @@ test("the account checks run in parallel, one per account, each with its own env
 	assert.equal(claudeConnected("claude-subscription-gone"), false);
 });
 
-const ALL_CLAUDE_FILES = ["src/agent/claude-accounts.ts", "src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-errors.ts", "src/agent/sdk/engine.ts", "src/agent/sdk/agent.ts", "src/agent/sdk/session-files.ts", "src/agent/sdk/compact.ts", "src/agent/claude-usage.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "components/claude-limit-prompt.tsx", "src/core/contracts/claude.ts"];
+const ALL_CLAUDE_FILES = ["src/agent/claude-accounts.ts", "src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-errors.ts", "src/agent/sdk/engine.ts", "src/agent/sdk/agent.ts", "src/agent/sdk/session-files.ts", "src/agent/claude-usage.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "components/claude-limit-prompt.tsx", "src/core/contracts/claude.ts"];
 
 test("no Claude file reads the keychain or Claude Code's credential files, runs setup-token, or passes --bare", async () => {
 	const { readFileSync } = await import("node:fs");

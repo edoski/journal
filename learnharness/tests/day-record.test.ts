@@ -21,7 +21,6 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 		pendingProblem: false,
 		ended: "closed",
 		busy: false,
-		compacting: false,
 		...over,
 	} as ChatListItem;
 }

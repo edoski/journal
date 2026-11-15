@@ -51,17 +51,11 @@ export interface ServerEvents {
 	 *  Same notify-then-fetch contract as the turn events: open views of
 	 *  the chat refetch and adopt the durable record. */
 	"record-changed": { chatId: string };
-	/** A compaction started/finished for the chat (owner round 14,
-	 *  2026-10-05). running=true is the SEND GATE: while a compaction is
-	 *  in flight the server structurally refuses model interaction for
-	 *  the chat; the client mirrors it by disabling the composer/dock
-	 *  submit. */
-	"compaction-changed": { chatId: string; running: boolean };
 	/** The server is setting up a turn it starts itself (a handoff to
-	 *  practice, a job's result): waking=true before its compaction gate and
-	 *  course brief, false once the turn is running or was refused. The
-	 *  lesson shows its working line meanwhile (round 8: about 10 s of
-	 *  nothing before practice woke). */
+	 *  practice, a job's result): waking=true before its course brief,
+	 *  false once the turn is running or was refused. The lesson shows
+	 *  its working line meanwhile (round 8: about 10 s of nothing before
+	 *  practice woke). */
 	"turn-waking": { chatId: string; waking: boolean };
 }
 
@@ -84,7 +78,6 @@ export const SERVER_EVENT_TYPES = [
 	"courses-changed",
 	"course-changed",
 	"record-changed",
-	"compaction-changed",
 	"turn-waking",
 ] as const satisfies readonly ServerEventType[];
 

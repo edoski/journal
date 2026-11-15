@@ -37,12 +37,10 @@ import { forgetStop, registerTurn, rememberTurnFailure, stopTurn, unregisterTurn
 import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { answeredQuestionsOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
-import type { ChatRecord } from "../core/contracts/chat.ts";
-import { ensureCompacted, kickCompaction, effectiveLimitTokens, effectiveThresholdTokens } from "./compaction.ts";
+import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
 import { PATHS } from "../../config.ts";
 import { nextChatSession } from "../core/sdk-session.ts";
 import type { SessionStore } from "../agent/sdk/session-files.ts";
-import { catalogContextLimits } from "./model-catalog.ts";
 import { refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { emit, subscribe } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
@@ -156,27 +154,9 @@ export function agentEngine(): SdkEngine {
 	return claudeEngine(effectiveSettings().claude.account);
 }
 
-function compactionKind(record: ChatRecord): "teach" | "practice" | "probe" {
-	const agent = respondingAgentOf(record.messages, record.kind);
-	return agent === "practice" ? "practice" : agent === "teacher" ? "teach" : "probe";
-}
-
 /** Where the app keeps its copy of a lesson's Claude Code session: beside the record. */
 function sessionStoreFor(chatId: string): SessionStore {
 	return { dir: PATHS.chats, chatId };
-}
-
-function compactionDeps(chatId: string, record: ChatRecord, engine: SdkEngine, account: string) {
-	const window = catalogContextLimits().get(`${engine.model.provider}:${engine.model.id}`);
-	return {
-		chatStore: stores.chatStore,
-		engine,
-		canStart: () => connectionBackgroundAllowed(account),
-		kind: compactionKind(record),
-		thresholdTokens: effectiveThresholdTokens(window),
-		limitTokens: effectiveLimitTokens(window),
-		sessionStore: sessionStoreFor(chatId),
-	};
 }
 
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
@@ -290,17 +270,9 @@ export async function handleChatInput(
 		return Response.json(envelope, { status: 503 });
 	}
 
-	// THE COMPACTION GATE: nothing model-facing for this chat writes the
-	// session a compaction reads, because a compaction works on a copy.
-	// Under the limit the turn goes ahead at once; a lesson at the limit
-	// waits for its compaction (round 9: 30 to 43 s of waiting on a
-	// summary he never needed yet). Placement mirrors the connection gate:
-	// BEFORE appends and beginTurn, and the record re-reads after because
-	// compaction appends the marker.
 	let conversationEngine: SdkEngine;
 	try { conversationEngine = claudeEngine(account); }
 	catch { return Response.json({ error: CLAUDE_MODEL_MISSING }, { status: 503 }); }
-	await ensureCompacted(compactionDeps(chatId, record, conversationEngine, account), chatId);
 	// The course brief rides learner input only, fetched before the record
 	// is re-read below. A question recovery is a retry: its results must stay
 	// adjacent to their calls and end the record, so it carries no brief.
@@ -311,11 +283,11 @@ export async function handleChatInput(
 		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
 		fetchCourseArcs(record),
 	]);
-	const compactedRecord = stores.chatStore.getChat(chatId);
-	if (!compactedRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
-	record = compactedRecord;
+	const freshRecord = stores.chatStore.getChat(chatId);
+	if (!freshRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
+	record = freshRecord;
 	// Recompute Retry eligibility on current truth, still before beginTurn.
-	// A compaction marker or another writer may have landed during awaits.
+	// Another writer may have landed during awaits.
 	// These omissions affect ONLY the agent context, never the saved record.
 	if (input.type === "continue" && !continuationOwed(record.messages)) return settledTurnResponse(chatId);
 	let retryOmissions = new Set<string>();
@@ -447,7 +419,7 @@ export async function handleChatInput(
 	// agent differs.
 	const agentKind = respondingAgentOf(agentMessages, record.kind);
 	const teaching = agentKind === "teacher";
-	// Built once above the compaction gate; reused verbatim.
+	// Built once above, on the account the connection gate read.
 	const engine = conversationEngine;
 	// Provider-qualified stamp: matches the price table's
 	// provider:id keys.
@@ -477,6 +449,9 @@ export async function handleChatInput(
 		// The lesson's Claude Code session: the model's memory of it.
 		session: record.session,
 		sessionStore: sessionStoreFor(chatId),
+		// What Claude Code's summary keeps when it compacts the session,
+		// with the plan tree as it stands then.
+		compactionInstructions: (messages) => compactionInstructions(agentKind === "practice" ? "practice" : agentKind === "teacher" ? "teach" : "probe", planTreeToText(stores.chatStore.getChat(chatId)?.tree ?? record.tree, messages)),
 		// A course-linked session reads and writes the learner's course
 		// record through the engine, whatever the agent kind, with the
 		// answers a save may name (answeredQuestionsOf), read from the
@@ -635,24 +610,6 @@ export async function handleChatInput(
 				// ones stay parked for the chat's next run (the registry is the
 				// stranding safety net — the agent's undrained copy died above).
 				reconcileUserSteers(chatId, stamped);
-				// THE SETTLE KICK (owner round 14): the turn settled — if the
-				// projection is now over threshold, the summary starts in the
-				// background, INSIDE the learner's reading/answering pause
-				// (question/problem poses end runs, so this moment is always a
-				// between-runs window). A turn that comes before it ends runs
-				// past it, and the summary is redone after; a lost engine or a
-				// beneath-threshold record is a silent no-op. Skipped under
-				// tests (scripted chats are fixtures; the service itself is
-				// pinned directly).
-				if (process.env.NODE_ENV !== "test")
-					kickCompaction(() => {
-						const kickAccount = effectiveSettings().claude.account;
-						if (!connectionBackgroundAllowed(kickAccount)) return null;
-						let kickEngine: SdkEngine;
-						try { kickEngine = claudeEngine(kickAccount); } catch { return null; }
-						const freshRecord = stores.chatStore.getChat(chatId);
-						return freshRecord ? compactionDeps(chatId, freshRecord, kickEngine, kickAccount) : null;
-					}, chatId);
 			},
 		});
 		// The turn is now a live background object: register it so any view

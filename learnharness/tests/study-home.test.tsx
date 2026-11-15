@@ -117,7 +117,6 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 		pendingQuestion: false,
 		pendingProblem: false,
 		busy: false,
-		compacting: false,
 		...over,
 	};
 }

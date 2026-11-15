@@ -104,7 +104,6 @@ const WAITING: ChatListItem = {
 	pendingQuestion: true,
 	pendingProblem: false,
 	busy: false,
-	compacting: false,
 	course: { workspace: WS, title: "Linear Algebra" },
 	topics: [h("span")],
 	ownTopics: [h("span")],

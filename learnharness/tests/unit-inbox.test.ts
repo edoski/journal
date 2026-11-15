@@ -44,7 +44,6 @@ const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({
 	pendingQuestion: false,
 	pendingProblem: false,
 	busy: false,
-	compacting: false,
 	course: { workspace: "la", title: "LA" },
 	ownTopics: over.topics ?? [],
 	...over,

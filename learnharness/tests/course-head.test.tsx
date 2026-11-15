@@ -58,7 +58,7 @@ describe("a list of topics", () => {
 });
 
 const chat = (id: string, updatedAt: string, workspace = WS): ChatListItem =>
-	({ id, title: `Session ${id}`, kind: "teach", createdAt: updatedAt, updatedAt, messageCount: 2, phase: "teach", pendingQuestion: false, pendingProblem: false, busy: false, compacting: false, course: { workspace, title: "Probability" } }) as ChatListItem;
+	({ id, title: `Session ${id}`, kind: "teach", createdAt: updatedAt, updatedAt, messageCount: 2, phase: "teach", pendingQuestion: false, pendingProblem: false, busy: false, course: { workspace, title: "Probability" } }) as ChatListItem;
 
 describe("his last session", () => {
 	it("is the course's latest, never another course's", () => {

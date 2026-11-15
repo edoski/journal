@@ -2,7 +2,7 @@
 
 ## Retention
 
-Claude Code compacts a lesson's session; the app keeps only the trigger and the lesson's instructions. See [sessions and compaction](sessions-and-compaction.md).
+Claude Code compacts a lesson's session at its own point; the app gives it only the lesson's instructions. See [sessions and compaction](sessions-and-compaction.md).
 
 ## Conversation meter
 

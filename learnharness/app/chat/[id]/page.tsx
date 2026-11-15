@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
-import { compactionHoldsTurn, courseDeleted, getChat, isTurnRunning, lessonPlace, turnFailure } from "@/src/server";
+import { courseDeleted, getChat, isTurnRunning, lessonPlace, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,6 @@ export default async function ChatPage({
 			// A teacher turn that outlived its client: the remounted view must
 			// attach (busy shimmer + poll), never resurrect the stale record.
 			initiallyInFlight={isTurnRunning(chat.id)}
-			initiallyCompacting={compactionHoldsTurn(chat.id)}
 		/>
 	);
 }

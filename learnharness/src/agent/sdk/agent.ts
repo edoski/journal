@@ -31,6 +31,10 @@ export interface SdkAgentConfig {
 	session?: ChatSession;
 	/** Where the app keeps its copy of the session; absent: no copy. */
 	sessionStore?: SessionStore;
+	/** What the summary keeps when Claude Code compacts the session at its
+	 *  own point (its automatic compaction): given to it as the compaction's
+	 *  instructions through its PreCompact hook. */
+	compactionInstructions?: (messages: LhMessage[]) => string;
 	/** Claude Code's own web search joins the app's tools. */
 	webSearch?: boolean;
 	/** A background job: no session file, at most this many model calls. */
@@ -215,12 +219,14 @@ export class SdkAgent {
 		};
 
 		const webSearch = this.config.webSearch === true;
+		const instructions = this.config.compactionInstructions;
 		const options: Options = {
 			...launch.options,
 			systemPrompt: { type: "custom", prompt: this.config.systemPrompt, snapshot: false },
 			tools: webSearch ? ["WebSearch"] : [],
 			allowedTools: [`mcp__${SDK_TOOL_SERVER}`, ...(webSearch ? ["WebSearch"] : [])],
 			mcpServers: { [SDK_TOOL_SERVER]: server },
+			...(instructions ? { hooks: { PreCompact: [{ hooks: [async () => ({ systemMessage: instructions(this.state.messages as LhMessage[]) })] }] } } : {}),
 			abortController: this.controller,
 			...(this.config.ephemeral ? { persistSession: false, maxTurns: this.config.ephemeral.maxTurns } : {}),
 			...(resume.resume ? { resume: resume.resume } : {}),

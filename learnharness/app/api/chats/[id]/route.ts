@@ -1,4 +1,4 @@
-import { compactionHoldsTurn, deleteChatSession, getChat, isTurnRunning, sessionCost, stores, turnFailure } from "@/src/server";
+import { deleteChatSession, getChat, isTurnRunning, sessionCost, stores, turnFailure } from "@/src/server";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
@@ -17,7 +17,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 		turnInFlight: isTurnRunning(id),
 		// Also reaches idle views that missed the failing turn's stream.
 		turnError: turnFailure(id),
-		compacting: compactionHoldsTurn(id),
 	});
 }
 
