@@ -16,11 +16,14 @@ const SMALL_SIZE = "[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]";
 const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
 
 /** The quiet mark that ends the tutor's message when it hands him the turn,
- *  over the question's words or choices; never over nothing. */
-export function YourTurn() {
+ *  over the question's words or choices; never over nothing. A question
+ *  asked again after a hint or his side question has its words above, so
+ *  its mark says where they are (round 8: after a direct answer the open
+ *  question had no mark at all). */
+export function YourTurn({ above = false }: { above?: boolean }) {
 	return (
 		<p data-slot="your-turn" className="mb-1 text-row text-muted-foreground">
-			Your turn
+			{above ? "Your turn, on the question above" : "Your turn"}
 		</p>
 	);
 }
@@ -73,7 +76,7 @@ function OpenQuestion({ spec, stepAnchor, repeat }: { spec: ProseQuestionSpec; s
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
 		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			{(!repeat || spec.mode !== "text") && <YourTurn />}
+			<YourTurn above={repeat && spec.mode === "text"} />
 			{!repeat && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows

@@ -96,9 +96,19 @@ describe("a question asked again after a hint", () => {
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, skipped)] }, { parts: [hint, ask("q2", check)] }])], [], "a skip is not set aside");
 	});
 
-	it("draws a rephrasing, and a question that follows an answer", () => {
+	it("is drawn once when reworded too: a re-ask is the same question (round 8: the question printed twice after a hint and after an Ask)", () => {
 		const reworded = { ...check, question: "Along which line does $A$ stretch vectors?" };
-		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), ask("q2", reworded)] }])], []);
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), ask("q2", reworded)] }])], ["q2"]);
+		const aside = dismissedAnswer("explain", check.question, "asked");
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, aside)] }, { parts: [hint, ask("q2", reworded)] }])], ["q2"]);
+	});
+
+	it("skips a re-ask the guard refused: the call after it is the one he reads (round 8, this fix's live run)", () => {
+		const refused = { type: "tool-explain", toolCallId: "q2", state: "output-error", input: check };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), hint, refused, ask("q3", check)] }])], ["q3"]);
+	});
+
+	it("draws a question that follows an answer", () => {
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], []);
 	});
 });

@@ -42,9 +42,9 @@ describe("the Prose question in the tutor's message", () => {
 		assert.doesNotMatch(html, /The answer|by 3/, "the committed answer never shows before he answers");
 	});
 
-	it("asks again after a hint with nothing under it, its words already above the hint", () => {
+	it("asks again after a hint or a side question with only its mark, its words already above (round 8: no mark after a direct answer)", () => {
 		const open = renderToStaticMarkup(<ProseQuestion tool="explain" toolCallId="c1" input={check} open repeat />);
-		assert.doesNotMatch(open, /Your turn/, "no label heads nothing");
+		assert.match(open, /data-slot="your-turn"[^>]*>Your turn, on the question above</, "the open question is marked as his turn");
 		assert.match(open, /data-repeat=""/);
 		const choices = renderToStaticMarkup(<ProseQuestion tool="ask_user_question" toolCallId="c2" input={choice} open repeat />);
 		assert.match(choices, /data-slot="your-turn"[^>]*>Your turn</, "a repeated choice still heads its rows");
