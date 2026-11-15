@@ -29,7 +29,8 @@ export const BANDS_SKIN: MapSkin = {
 				position: { x: 0, y: band.top },
 				width: layout.width,
 				height: band.bottom - band.top,
-				zIndex: -1,
+				// Over the lines, so a chapter's name reads where a line passes through its header strip.
+				zIndex: 1,
 				handles: [{ type: "source", position: Position.Bottom, x: 0, y: 0 }],
 				draggable: false,
 				selectable: false,

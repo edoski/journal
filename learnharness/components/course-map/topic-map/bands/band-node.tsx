@@ -13,10 +13,11 @@ const STICK_IN = 24;
 
 /**
  * One chapter of the course (bands.md): a hairline across the drawing over
- * every chapter but the first, and its number and pill on the line of its
- * first cards, in the margin, or held at the frame's left edge while the
- * margin is out of view, as a sticky section header is, so every chapter
- * on screen is named.
+ * every chapter but the first, and its number and pill in its header strip,
+ * in the margin, or held at the frame's left edge while the margin is out
+ * of view, as a sticky section header is, so every chapter on screen is
+ * named. The strip holds no card, so the name never covers one; a line
+ * passing through runs under it.
  */
 export function BandNode({ data }: NodeProps<BandFlowNode>) {
 	const { band, share, margin } = data;
@@ -28,8 +29,8 @@ export function BandNode({ data }: NodeProps<BandFlowNode>) {
 		<div data-slot="arc-band" data-arc={band.arc.handle} data-here={band.here || undefined} className={cn("size-full", band.number > 1 && "border-t", lit ? "border-white/20" : "border-white/10")}>
 			<div
 				data-slot="arc-band-label"
-				className={cn("absolute flex h-6 items-center rounded-full", left > 0 && "bg-background pr-1")}
-				style={{ left, top: band.number > 1 ? 32 + 22 : 22, maxWidth: margin - 32 }}
+				className="absolute flex h-6 items-center rounded-full bg-background pr-1"
+				style={{ left, top: 8, maxWidth: margin - 32 }}
 			>
 				<ArcMark number={band.number} handle={band.arc.handle} title={band.arc.title} share={share} />
 			</div>

@@ -12,8 +12,9 @@ import type { ArcsShown } from "../map-skin";
 import { CANVAS_NODE, layeredDrawing, layoutCanvas, transitiveReduction, type Need } from "../canvas/canvas-layout";
 import { arcsOfTopics } from "../arcs/arc-layout";
 
-/** The room between two chapters, under the lines that leave the earlier one: the hairline sits at its top. */
-export const BAND_HEAD = 32;
+/** A chapter's header strip, above its first cards: the hairline at its top, its number and pill 8 under it, and
+ *  room under the pill for "You are here" over a card in its first layer. */
+export const BAND_HEAD = 56;
 /** The margin's room for a chapter's number and pill beside the cards, and the space before the cards. */
 const MARGIN_GAP = 32;
 /** A margin wide enough for the widest arc's pill, its name whole (SF Pro at the pill's 12px averages under
@@ -62,7 +63,7 @@ export function layoutBands(topics: readonly CourseMapTopic[], edges: readonly C
 		next += own.length ? 1 + Math.max(...own.map((t) => local(t.handle))) : 0;
 	}
 	const layerOf = new Map(topics.map((t) => [t.handle as string, firstLayer[order.get(arcOf.get(t.handle)!)!]! + local(t.handle)]));
-	const starts = new Set(firstLayer.slice(1));
+	const starts = new Set(firstLayer);
 	const drawing = layeredDrawing(
 		topics.map((t) => ({ id: t.handle, ...CANVAS_NODE })),
 		drawn.map((n) => ({ source: n.prerequisite, target: n.topic })),
@@ -75,7 +76,7 @@ export function layoutBands(topics: readonly CourseMapTopic[], edges: readonly C
 	const routes: Route[] = needs.map((n) => ({ prerequisite: n.prerequisite, topic: n.topic, points: shift(drawing.lines.get(`${n.prerequisite}>${n.topic}`) ?? []) }));
 	const height = drawing.height;
 	// A chapter starts at the hairline over its first layer, so the room above its cards is its own.
-	const tops = shown.arcs.map((_, i) => (i === 0 ? 0 : drawing.layerTops[firstLayer[i]!]! - BAND_HEAD));
+	const tops = shown.arcs.map((_, i) => drawing.layerTops[firstLayer[i]!]! - BAND_HEAD);
 	const bands: Band[] = shown.arcs.map((arc, i) => ({
 		arc,
 		number: i + 1,
