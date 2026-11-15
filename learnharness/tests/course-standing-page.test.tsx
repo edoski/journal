@@ -181,6 +181,6 @@ describe("the open mistakes", () => {
 	});
 
 	it("shows no press in the head when nothing is open", () => {
-		assert.equal(render(<MistakesPress rows={[]} />).querySelector("[data-slot=course-mistakes]"), null);
+		assert.ok(render(<MistakesPress rows={[]} />).querySelector("[data-slot=course-mistakes]") === null);
 	});
 });

@@ -180,7 +180,7 @@ describe("activity section render", () => {
 		assert.match(detail.text, /Reading the course's material to build its topic map/);
 		assert.match(detail.text, /Open the course/);
 		assert.equal(detail.href, courseHref("algebra"), "a map build's key is its course, not a chat");
-		assert.equal(detail.totalCost, null, "no running total in the header");
+		assert.ok(detail.totalCost === null, "no running total in the header");
 	});
 
 	it("a grouping run names its course on the row, and its detail says what it does and opens the course page", async () => {

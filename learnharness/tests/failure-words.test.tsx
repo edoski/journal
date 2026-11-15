@@ -52,7 +52,7 @@ test("the background save of what he learned has no Stop; a figure being made ke
 	const root = createRoot(host);
 	try {
 		await act(async () => root.render(<ActivitySection feed={feed} />));
-		assert.equal(host.querySelector('[data-testid="activity-abort"]'), null);
+		assert.ok(host.querySelector('[data-testid="activity-abort"]') === null);
 		const withJob: ActivityFeed = { ...feed, jobs: [{ id: "j1", kind: "visual", chatId: "c1", toolCallId: "t", status: "running", activity: "", createdAt: new Date(2).toISOString(), updatedAt: new Date(2).toISOString(), title: "Eigen lesson", contextLimit: null, costUsd: null }] };
 		await act(async () => root.render(<ActivitySection feed={withJob} />));
 		assert.equal(host.querySelectorAll('[data-testid="activity-abort"]').length, 1);

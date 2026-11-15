@@ -313,7 +313,7 @@ describe("dispatch card rendering (the tool-call ack box)", () => {
 	it("marks a failed job with one plain failure line", () => {
 		const doc = inJobs([mkJob("error")], <JobCard part={ackPart as never} />);
 		assert.equal(doc.querySelector('[data-testid="dispatch-settled"]')?.textContent, "The sources couldn't be checked");
-		assert.equal(doc.querySelector('[data-testid="dispatch-card"]'), null, "no working line once it failed");
+		assert.ok(doc.querySelector('[data-testid="dispatch-card"]') === null, "no working line once it failed");
 	});
 
 	it("renders nothing for a still-streaming tool input", () => {

@@ -432,7 +432,7 @@ describe("topic map drawing", () => {
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
 			["10d overdue", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Check on your own", "Sure, but wrong"],
 		);
-		assert.equal(node("determinant").querySelector('[data-slot="topic-need"]'), null);
+		assert.ok(node("determinant").querySelector('[data-slot="topic-need"]') === null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");
 		assert.equal(node("eigen").querySelector('[data-slot="topic-glyph"]')!.getAttribute("data-fill"), "0");
 	});

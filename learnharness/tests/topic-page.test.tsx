@@ -86,7 +86,7 @@ describe("the topic head", () => {
 		const course = document.querySelector('[data-slot="topic-course-link"]')!;
 		assert.equal(course.getAttribute("href"), courseHref(WORKSPACE));
 		assert.equal(course.textContent, "Linear Algebra");
-		assert.equal(document.querySelector("button"), null);
+		assert.ok(document.querySelector("button") === null);
 	});
 
 	it("says where he stands, when he last studied it and what went wrong", () => {
@@ -117,7 +117,7 @@ describe("the topic head", () => {
 
 	it("draws no head line for a topic not started whose lesson waits on him", () => {
 		const document = head(factsOf(EIGEN, [chat({ pendingQuestion: true, topics: ["eigen"] })]));
-		assert.equal(document.querySelector('[data-slot="page-standing"]'), null);
-		assert.equal(document.querySelector('[data-slot="topic-glyph"]'), null);
+		assert.ok(document.querySelector('[data-slot="page-standing"]') === null);
+		assert.ok(document.querySelector('[data-slot="topic-glyph"]') === null);
 	});
 });

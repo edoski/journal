@@ -85,7 +85,7 @@ describe("math on the topic page", () => {
 
 	it("keeps a plain step title plain", () => {
 		const node = step(PLAIN);
-		assert.equal(node.querySelector('[data-slot="math-text"]'), null);
+		assert.ok(node.querySelector('[data-slot="math-text"]') === null);
 		assert.match(node.textContent!, new RegExp(PLAIN));
 	});
 

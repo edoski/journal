@@ -134,7 +134,7 @@ describe("the calendar page", () => {
 	it("shows a busy week by day: the title, then the course mark and the type, or Your turn on a waiting lesson", async () => {
 		const drills = { ...lesson, id: "chat_drills", title: "Span drills", kind: "practice" as const, phase: "probe" as const, pendingQuestion: false, updatedAt: "2026-11-04T18:00:00" };
 		await mount([linalg(null)], [lesson, drills]);
-		assert.equal(document.querySelector("[data-slot=calendar-quiet]"), null);
+		assert.ok(document.querySelector("[data-slot=calendar-quiet]") === null);
 		assert.deepEqual(text("[data-slot=calendar-entry]"), ["Span drillsLAPractice", "Eigenvalues and eigenvectorsLAYour turn", "SpanLA10d overdue"]);
 		assert.deepEqual(text("[data-slot=calendar-day-head][data-today]"), ["Sun8Study 9:00 to 12:30"]);
 		assert.ok(document.querySelector('[data-slot=calendar-entry][data-look=lesson] svg[aria-label="Lesson"]'), "the waiting lesson's icon names its look");

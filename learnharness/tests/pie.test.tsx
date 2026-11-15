@@ -33,7 +33,7 @@ describe("the progress glyphs", () => {
 		});
 
 		it(`${name} shows nothing started as the outline alone`, () => {
-			assert.equal(draw(0).querySelector('[data-part="share"]'), null);
+			assert.ok(draw(0).querySelector('[data-part="share"]') === null);
 			assert.ok(draw(0.3).querySelector('[data-part="share"]'));
 		});
 	}

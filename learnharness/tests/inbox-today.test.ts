@@ -311,8 +311,8 @@ describe("TodayList", () => {
 			["Learning, your turn", "On your own", "Other sessions"],
 		);
 		assert.ok(doc.querySelector('[data-slot="unit-shelf-attention"]'), "Learning's dot: a session from before yesterday waits");
-		assert.equal(doc.querySelector('[data-slot="unit-slim"]'), null, "every shelf folded");
-		assert.equal(doc.querySelector('[data-slot="sidebar-note"]'), null);
+		assert.ok(doc.querySelector('[data-slot="unit-slim"]') === null, "every shelf folded");
+		assert.ok(doc.querySelector('[data-slot="sidebar-note"]') === null);
 	});
 
 	it("marks the open session's card", () => {
@@ -342,6 +342,6 @@ describe("TodayList", () => {
 		assert.match(card.querySelector("a")?.getAttribute("href") ?? "", /^\/unit\//);
 		const alone = renderList({ unreadable: [broken] }, [], []);
 		assert.equal(alone.querySelectorAll('[data-slot="unit-card"]').length, 1);
-		assert.equal(alone.querySelector('[data-slot="sidebar-note"]'), null, "not No courses yet");
+		assert.ok(alone.querySelector('[data-slot="sidebar-note"]') === null, "not No courses yet");
 	});
 });

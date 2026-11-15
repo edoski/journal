@@ -18,7 +18,7 @@ describe("his typed text, as typed", () => {
 	it("keeps his stars as stars and typesets only his LaTeX", () => {
 		const typed = doc(<TypedText>{"0.5*0.10 + 0.3*0.05 + 0.2*0.02, so $P(B) = 0.069$"}</TypedText>);
 		assert.match(typed.body.textContent!, /^0\.5\*0\.10 \+ 0\.3\*0\.05 \+ 0\.2\*0\.02, so /);
-		assert.equal(typed.querySelector("em"), null, "no italics he never asked for");
+		assert.ok(typed.querySelector("em") === null, "no italics he never asked for");
 		assert.equal(typed.querySelectorAll(".katex").length, 1);
 	});
 });

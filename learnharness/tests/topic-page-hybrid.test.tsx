@@ -111,7 +111,7 @@ describe("the hybrid page drawn", () => {
 	it("draws the history and the shown lesson's map side by side, with no button in the head since Now holds the action", () => {
 		const document = page(factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]));
 		assert.equal(document.querySelector('[data-testid="unit-page"]')!.getAttribute("data-topic-candidate"), "hybrid");
-		assert.equal(document.querySelector('[data-testid="topic-action"]'), null);
+		assert.ok(document.querySelector('[data-testid="topic-action"]') === null);
 		const panes = document.querySelector('[data-slot="topic-panes"]')!;
 		assert.deepEqual([...panes.querySelectorAll(":scope > div > [data-slot]")].map((pane) => pane.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
 		const steps = [...document.querySelectorAll('[data-slot="topic-step"]')];
@@ -142,8 +142,8 @@ describe("the hybrid page drawn", () => {
 
 	it("gives the history the whole width when no lesson planned, with no map and no toggle", () => {
 		const document = page(factsOf(RANK, RANK_SESSIONS, [], RANK_RECORD));
-		assert.equal(document.querySelector('[data-slot="topic-panes"]'), null);
-		assert.equal(document.querySelector('[data-slot="topic-lesson-map"]'), null);
+		assert.ok(document.querySelector('[data-slot="topic-panes"]') === null);
+		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]') === null);
 		assert.equal(document.querySelectorAll('[data-slot="topic-map-toggle"]').length, 0);
 		assert.ok(document.querySelector('[data-slot="topic-history"]'));
 	});

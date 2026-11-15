@@ -87,13 +87,13 @@ describe("setup polish interactions", () => {
 	it("the sign-in stage shows the connections, Escape closes setup, and an outside press closes it", async () => {
 		await mount();
 		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] [data-testid="claude-connection"]'));
-		assert.equal(document.querySelector('[data-testid="setup-key-input"]'), null, "no key field");
+		assert.ok(document.querySelector('[data-testid="setup-key-input"]') === null, "no key field");
 		await escape();
 		assert.equal(closed, 1);
 		await mount();
 		await click(element('[data-slot="dialog-overlay"]'));
 		assert.equal(closed, 1, "the overlay closes a fresh setup");
-		assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null);
+		assert.ok(document.querySelector('[data-testid="setup-dialog"]') === null);
 	});
 
 	it("inside press followed by overlay release and ancestor click does not dismiss setup", async () => {
@@ -110,13 +110,13 @@ describe("setup polish interactions", () => {
 		assert.equal(element('[data-slot="dialog-title"]').textContent, "Sign in to Claude");
 		assert.ok(element('[data-testid="setup-dialog"]').textContent!.includes(`Lessons run on ${CLAUDE_MODEL.name} through your Claude plan.`));
 		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] [data-testid="claude-connection"]'));
-		assert.equal(document.querySelector('[data-testid="setup-key-input"]'), null, "no key field");
+		assert.ok(document.querySelector('[data-testid="setup-key-input"]') === null, "no key field");
 	});
 
 	it("closes itself once the account in use is signed in", async () => {
 		connected = true;
 		await mount();
 		assert.equal(closed, 1);
-		assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null);
+		assert.ok(document.querySelector('[data-testid="setup-dialog"]') === null);
 	});
 });

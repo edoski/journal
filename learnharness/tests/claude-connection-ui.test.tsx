@@ -78,8 +78,8 @@ test("one row per account with its email and weekly usage; Use this account swit
 	assert.doesNotMatch(document.body.textContent!, /%|\d+ left/, "no percentages or counts");
 	assert.equal(text(row("claude-subscription-spare"), "claude-usage"), null);
 	assert.equal(text(row("claude-subscription"), "claude-in-use"), "In use");
-	assert.equal(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), null, "the account in use offers no switch");
-	assert.equal(row("claude-subscription-spare").querySelector('[data-testid="claude-use-account"]'), null, "a signed-out account offers no switch");
+	assert.ok(row("claude-subscription").querySelector('[data-testid="claude-use-account"]') === null, "the account in use offers no switch");
+	assert.ok(row("claude-subscription-spare").querySelector('[data-testid="claude-use-account"]') === null, "a signed-out account offers no switch");
 
 	await click(row("claude-subscription-work").querySelector('[data-testid="claude-use-account"]'));
 	const put = calls.find((c) => c.method === "PUT");

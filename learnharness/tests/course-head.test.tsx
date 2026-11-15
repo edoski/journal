@@ -91,8 +91,8 @@ describe("the course head", () => {
 		assert.equal(document.querySelector("[data-slot=course-title]")?.textContent, "Probability");
 		assert.ok(document.querySelector("[data-slot=course-action]"));
 		assert.ok(document.querySelector("[data-slot=course-context]"));
-		assert.equal(document.querySelector("[data-slot=course-add-material]"), null);
-		assert.equal(document.querySelector("[data-slot=course-next]"), null);
+		assert.ok(document.querySelector("[data-slot=course-add-material]") === null);
+		assert.ok(document.querySelector("[data-slot=course-next]") === null);
 		assert.doesNotMatch(text, /on your own/i);
 		assert.equal(document.querySelector("[data-slot=course-studied]")?.getAttribute("href"), "/chat/b");
 		assert.match(document.querySelector("[data-slot=course-exam]")?.textContent ?? "", /Exam in 11 days/);
@@ -107,7 +107,7 @@ describe("a lesson that could not start", () => {
 					<CourseHead view={viewOf(course())} standing={null} busy={false} onContinue={() => {}} />
 				</CourseLessonError>,
 			);
-		assert.equal(head(null).querySelector('[role="alert"]'), null);
+		assert.ok(head(null).querySelector('[role="alert"]') === null);
 		const alert = head("Couldn’t open the session. Try again.").querySelector('[data-slot="page-head"] [role="alert"]');
 		assert.equal(alert?.textContent, "Couldn’t open the session. Try again.");
 	});
@@ -177,7 +177,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 
 	it("shows under the readiness line, and nothing when every topic fits", () => {
 		assert.equal(gapLine(gapped(["variance"], [], { variance: "no_study_day" }))?.previousElementSibling?.getAttribute("data-slot"), "course-ready");
-		assert.equal(gapLine(course()), null);
+		assert.ok(gapLine(course()) === null);
 	});
 
 	it("asks the tutor in his words, naming the topics", () => {
