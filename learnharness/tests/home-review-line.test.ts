@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import { courseMove, openSessions, todayRows, type TodayRow } from "../components/study-home/study-facts.ts";
 import { lessonTitle, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { isReviewSession, type StudyCourse } from "../src/core/index.ts";
+import { isReviewSession, openedAsReview, type StudyCourse } from "../src/core/index.ts";
 import { COURSE, LA, LEFT, TODAY, chat, map, topic } from "./fixtures/round8-home.ts";
 
 describe("a promised review on Home (1 D3)", () => {
@@ -33,5 +33,10 @@ describe("a promised review on Home (1 D3)", () => {
 		assert.equal(isReviewSession({ title: "Review Binomial distribution", ownTopics: ["binomial"] }), true);
 		assert.equal(isReviewSession({ title: "Eigenvalues and eigenvectors", ownTopics: ["eigen"] }), false);
 		assert.equal(isReviewSession({ title: "Review the week", ownTopics: [] }), false, "a review opens on topics");
+		assert.equal(openedAsReview({ topics: ["chain"], messages: [{ role: "user", content: "Review Chain rule" }] }), true, "its opening says so, whatever its name");
+		assert.equal(openedAsReview({ topics: ["chain"], messages: [{ role: "user", content: [{ type: "text", text: "Teach me the chain rule" }] }] }), false);
+		assert.equal(openedAsReview({ topics: ["chain"], messages: [{ role: "user", content: "Review " }] }), true, "Review alone, on its topics");
+		assert.equal(openedAsReview({ topics: ["chain"], messages: [{ role: "user", content: "Reviewing my notes, teach me the chain rule" }] }), false);
+		assert.equal(isReviewSession({ title: "Chain rule review", review: true }), true, "the session list's word wins over the name");
 	});
 });

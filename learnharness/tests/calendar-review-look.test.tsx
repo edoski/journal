@@ -21,6 +21,7 @@ describe("the calendar's words and marks (2 m5, 1 §6)", () => {
 		const entry = calendarEntries({ courses: [course], chats: [review], scope: null }).find((e) => e.kind === "session")!;
 		assert.equal(lookWords(entry, TODAY), "Review");
 		assert.equal(sessionType(LEFT), "lesson");
+		assert.equal(sessionType(chat({ title: "Chain rule review", review: true })), "review", "a review named another way is still one, by its opening");
 	});
 
 	it("draws an overdue review with the review's History icon, muted, as Home and the sidebar do", () => {

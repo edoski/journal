@@ -420,6 +420,10 @@ export interface ChatSummary {
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];
+	/** It is a review of course topics: opened on topics with a review's
+	 *  words (`openedAsReview`), whatever it is named now. The list always
+	 *  sets it; a summary made elsewhere may leave it out. */
+	review?: boolean;
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list

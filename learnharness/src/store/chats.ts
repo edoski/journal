@@ -19,6 +19,7 @@ import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
+import { openedAsReview } from "../core/session-opening.ts";
 import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
@@ -128,6 +129,7 @@ function listChats(): ChatSummary[] {
 						ownTopics: own,
 						ended: sessionEndOf(messages, tree, summary.kind, own),
 						tasks: sessionTasksOf(messages),
+						review: openedAsReview({ topics: summary.topics, messages }),
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);

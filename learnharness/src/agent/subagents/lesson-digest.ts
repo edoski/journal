@@ -15,7 +15,7 @@ import { Type, type Static } from "typebox";
 import type { ChatRecord, DigestLedger } from "../../core/contracts/chat.ts";
 import type { CourseMap } from "../../core/contracts/course-map.ts";
 import { recordHasArcs } from "../../core/contracts/course.ts";
-import { isReviewSession } from "../../core/session-opening.ts";
+import { isReviewSession, openedAsReview } from "../../core/session-opening.ts";
 import type { ChatStore, CourseRecords } from "../../core/ports.ts";
 import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/plan.ts";
 import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
@@ -232,7 +232,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 			})),
 			current: map.current,
 			tasks,
-			movesPath: !isReviewSession(record) && tasks.length === 0,
+			movesPath: !openedAsReview(record) && !isReviewSession(record) && tasks.length === 0,
 			own: record.topics ?? [],
 			planFinished: planFinished(record.tree, record.messages),
 			knowledge,
