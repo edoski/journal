@@ -19,6 +19,7 @@ import type { NowListProps } from "../components/unit-inbox/now-list-props.ts";
 import { TodayList } from "../components/unit-inbox/today/today-list.tsx";
 import { claimedKeys, steadyTop, itemKey, todayTop, type NowItem } from "../components/unit-inbox/today/today-top.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
+import { courseHref } from "../components/unit-inbox/unit-href.ts";
 import { sessionState } from "../components/nav/session-state.ts";
 import type { ChatListItem, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { CHATS, chat, COURSES, LINALG, map, PROB, TODAY, topic } from "./fixtures/now-demo.ts";
@@ -316,6 +317,20 @@ describe("TodayList", () => {
 		assert.ok(doc.querySelector('[data-slot="unit-shelf-attention"]'), "Learning's dot: a session from before yesterday waits");
 		assert.equal(doc.querySelector('[data-slot="unit-slim"]'), null, "every shelf folded");
 		assert.equal(doc.querySelector('[data-slot="sidebar-note"]'), null);
+	});
+
+	it("never marks a course card open on its course page, which it does not open; the session holding its task does (round 10, 2: the selected row stayed on sheet 4 there, 43a)", () => {
+		const exam: StudyCourse = {
+			map: map({ workspace: "/s/exam", title: "Exam prep", tasks: [{ key: "paper", title: "Past paper 2024", step: "Question 3", updated: TODAY }], focus: "paper" }),
+			unready: null,
+			due: [],
+			lastActiveDaysAgo: 0,
+			newToday: [],
+		};
+		const open = (pathname: string, chats: readonly ChatListItem[] = []) => [...renderList({ pathname }, [exam], chats).querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute("data-sidebar-row"));
+		assert.deepEqual(open(courseHref("/s/exam")), [], "the course page is not the card's");
+		const paper = chat("paper", { title: "Past paper 2024", course: { workspace: "/s/exam", title: "Exam prep" }, tasks: ["paper"], ended: "closed", updatedAt: "2026-11-07T09:00:00.000Z" });
+		assert.deepEqual(open("/chat/paper", [paper]), ["course:/s/exam"], "the session that holds its task is");
 	});
 
 	it("marks the open session's card", () => {
