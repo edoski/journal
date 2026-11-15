@@ -150,7 +150,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				"Call once right after the probe concludes, then start teaching the first step in the same turn: he sees the map live and needs to approve nothing. " +
 				"Re-call whenever the map is wrong (the new block replaces the old tree). " +
 				"A mermaid graph block (any direction): one node per line (`slug[Short Title]` — slugs are permanent lowercase ids: a-z, 0-9, hyphens/underscores), " +
-				"each title naming the question the step answers, never its result: he sees it before the step is taught, so no relation in a title (=, ≠, →, ≤, ∈ or their TeX; refused), no condition in words (every, always, never, only if, iff, exactly when; refused), and maths in `$…$` only names a thing. " +
+				"each title naming the question the step answers, never its result: he sees it before the step is taught, so no relation in a title (=, ≠, →, ≤, ∈ or their TeX, an equation that names a problem too: `inverse-solve[Solving a system with the inverse]`, never \"Solving $Ax = b$ with $A^{-1}$\"; refused), no condition in words (in every, for every, always, never, only if, iff, exactly when; refused), and maths in `$…$` only names a thing. " +
 				"A title holding square brackets is quoted: `row-reduce[\"Row reducing $[A \\mid I]$\"]`. " +
 				"The topic itself is never a step: no node is named after the lesson's topic or goal (refused). " +
 				"`-->` edges meaning 'from must be understood before to' (chains fine). " +

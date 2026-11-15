@@ -165,8 +165,10 @@ const RELATION = /[=≠≈≡∼≃≅∝→↦⇒⟹⇔⟺≤≥<>∈⊂⊆~]|-
 /** A condition or a law in words: a title holding one states when
  *  something holds rather than naming the question (round 9: "Pivots in
  *  every column" above the question asking what the echelon form must
- *  look like). */
-const CONDITION = /\b(?:every|always|never|whenever|exactly when|only when|only if|if and only if|iff|precisely when|necessary and sufficient)\b/i;
+ *  look like). "Every" states a law over a place ("in every column", "for
+ *  every $x$"); naming a task's whole object states none (round 10:
+ *  "Finding every eigenvalue" was refused in each Eigen run). */
+const CONDITION = /\b(?:(?:in|for|at|on|of|to) every|always|never|whenever|exactly when|only when|only if|if and only if|iff|precisely when|necessary and sufficient)\b/i;
 
 /** The roadmap shows every title before its step is taught, so a title that
  *  states its step's result shows him the answer to the question on screen.

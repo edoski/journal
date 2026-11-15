@@ -103,7 +103,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
 	pdf: "Reading a PDF…",
 	plan_init: "Drawing up the plan…",
 	lesson_progress: "Marking your progress…",
-	probe_done: "Concluding the assessment…",
+	probe_done: "Planning the lesson…",
 	practice: "Moving to practice…",
 	teach: "Moving to teaching…",
 };

@@ -180,20 +180,38 @@ export const SENTENCE_WORDS = 25;
  *  `SENTENCE_WORDS` words past the first (round 8: length rewrites glued
  *  sentences with colons and commas, and a count of full stops passed them). */
 export function sentenceLoad(said: readonly string[]): number {
-	return said.reduce((sum, s) => {
-		const joins = (s.match(/[:;]\s+(?=\S)/g) ?? []).length;
-		const words = (s.match(/\S+/g) ?? []).length;
-		return sum + 1 + joins + Math.max(0, Math.ceil(words / SENTENCE_WORDS) - 1);
-	}, 0);
+	return said.reduce((sum, s) => sum + costOf(s), 0);
 }
+
+/** A clause joined by a colon or a semicolon inside one sentence. */
+const JOIN = /[:;]\s+(?=\S)/g;
 
 const wordCount = (text: string) => (text.match(/\S+/g) ?? []).length;
 
-/** A turn's prose words, and the words of its shortest sentence: what
- *  cutting one whole sentence takes off it at the least. */
-export function lengthOf(text: string): { words: number; shortest: number } {
+/** What one sentence costs against a budget: one, plus one per joined
+ *  clause, plus one per `SENTENCE_WORDS` words past the first. */
+function costOf(sentence: string): number {
+	const joins = (sentence.match(JOIN) ?? []).length;
+	return 1 + joins + Math.max(0, Math.ceil(wordCount(sentence) / SENTENCE_WORDS) - 1);
+}
+
+/** The sentences of a turn that cost more than one, each with its words
+ *  and joined clauses: what a length refusal names, so the rewrite knows
+ *  which sentence to split or cut (round 10: 15 of 21 refused drafts were
+ *  within their budget by full stops, and the rewrite cut the wrong one). */
+export function heavySentences(text: string): Array<{ sentence: string; words: number; joins: number }> {
+	return sentences(prose(text).text)
+		.filter((s) => costOf(s) > 1)
+		.map((s) => ({ sentence: s, words: wordCount(s), joins: (s.match(JOIN) ?? []).length }));
+}
+
+/** A turn's prose words, its clauses (each sentence split where a colon or
+ *  a semicolon joins one) and the words of its shortest clause: what a
+ *  rewrite that drops clauses must at least cut, or it joined them. */
+export function clausesOf(text: string): { words: number; clauses: number; shortest: number } {
 	const plain = prose(text).text;
-	return { words: wordCount(plain), shortest: Math.min(...sentences(plain).map(wordCount)) };
+	const clauses = sentences(plain).flatMap((s) => s.split(JOIN)).filter((c) => /[A-Za-z]/.test(c));
+	return { words: wordCount(plain), clauses: clauses.length, shortest: Math.min(...clauses.map(wordCount)) };
 }
 
 /** Every rule one tutor turn breaks. `kind` adds its budget and, after a
@@ -352,9 +370,9 @@ const ASK_OPENS =
  *  ("lies in ker A and is nonzero", "why does Ax = b then have…"). */
 const ASK_AFTER_AND =
 	/\s+(?:and\s+then|and|then)\s+(?=(?:what|which|who|whom|whose|when|where|why|how|whether|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b)/i;
-/** "and why", "why or why not", "and how do you know?": a reason asked
- *  for with the answer, part of the one ask. */
-const BARE_WHY = /^(?:why(?:\s+or\s+why\s+not|\s+not)?|how (?:do|can|would) you (?:know|tell)(?: that)?)\s*[?.]?$/i;
+/** "and why", "why or why not", "and how do you know?", "and what makes
+ *  you think so?": a reason asked for with the answer, part of the one ask. */
+const BARE_WHY = /^(?:why(?:\s+or\s+why\s+not|\s+not)?|how (?:do|can|would) you (?:know|tell)(?: that)?|what makes you (?:think|say) so)\s*[?.]?$/i;
 /** "When you meet v…", "Where the curve turns…": a clause that sets the
  *  scene, unless a verb asks next ("When does it converge?"). */
 const SCENE = /^(?:when|where)\b(?!\s+(?:does|do|did|is|are|was|were|will|would|can|could|should|has|have)\b)/i;
@@ -473,13 +491,18 @@ const SHARED_RUN = 3;
 export function repeatedPoint(text: string, earlier: readonly string[]): { said: string; before: string } | null {
 	const before = earlier.flatMap((t) => sentences(prose(t).text)).map((s) => {
 		const run = contentStems(s);
-		return { s, set: new Set(run), runs: new Set(run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "))) };
+		return { s, set: new Set(run), facts: factsOf(s), runs: new Set(run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "))) };
 	});
 	for (const said of sentences(prose(text).text)) {
 		const run = contentStems(said);
 		const mine = new Set(run);
+		const facts = factsOf(said);
 		const runs = run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "));
 		const match = before.find((b) => {
+			// A day or a number the earlier sentence lacks is news, however
+			// alike the words (round 10: a review's new day was refused as
+			// the old day said again).
+			if ([...facts].some((f) => !b.facts.has(f))) return false;
 			const shared = [...mine].filter((w) => b.set.has(w)).length;
 			return (shared >= SHARED_RUN && shared * 2 > mine.size) || runs.some((r) => b.runs.has(r));
 		});
@@ -497,6 +520,11 @@ export function restatingCallout(text: string): { said: string; before: string }
 	const callout = lines.filter((l) => /^\s*>/.test(l)).map((l) => l.replace(/^\s*>\s?/, "")).join(" ").trim();
 	const rest = lines.filter((l) => !/^\s*>/.test(l)).join("\n").trim();
 	return callout && rest ? repeatedPoint(callout, [rest]) : null;
+}
+
+/** The days and numbers a sentence states, each as written in lower case. */
+function factsOf(sentence: string): Set<string> {
+	return new Set((sentence.toLowerCase().match(/\b(?:\d+(?:[.,]\d+)?|today|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)\b/g) ?? []));
 }
 
 /** A direct answer's last sentence that draws a lesson from it instead of

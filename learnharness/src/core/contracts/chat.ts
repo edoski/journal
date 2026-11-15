@@ -222,7 +222,7 @@ export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> =
 	practice:
 		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says and pose the first problem, with no line before it about what you chose or why.",
 	teach:
-		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says.",
+		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says: what you explain is one teaching step, in two to four sentences and at most one display, then its check.",
 };
 
 /** The handoff tools' ack: the turn ends at the handoff, and the next

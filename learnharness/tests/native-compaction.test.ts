@@ -70,12 +70,16 @@ describe("native compaction", () => {
 			);
 			assert.equal(ack.status, 200);
 			const handle = runningTurn(chat.id);
-			if (handle) await new Response(handle.subscribe()).text();
+			return handle ? await new Response(handle.subscribe()).text() : "";
 		};
 
 		await turn("Teach me hash tables.");
 		assert.equal(fake.compactions.length, 0, "a short lesson is not compacted");
-		await turn("What happens on a collision?");
+		const wire = await turn("What happens on a collision?");
+		// The lesson names the wait while Claude Code compacts (round 10, robustness minor 3).
+		const started = wire.indexOf('"type":"compaction","active":true');
+		assert.ok(started >= 0, "the turn's stream says when compaction starts");
+		assert.ok(wire.indexOf('"type":"compaction","active":false') > started, "and when it ends");
 
 		assert.equal(fake.compactions.length, 1, "Claude Code compacted the session once, at its own point");
 		const instructions = fake.compactions[0]!.instructions;

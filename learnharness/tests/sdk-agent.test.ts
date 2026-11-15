@@ -81,7 +81,7 @@ describe("when a lesson turn ends", () => {
 		const { fake } = scripted([fauxAssistantMessage([fauxText("Let me check."), fauxToolCall("lookup", {}, { id: "l1" })], { stopReason: "toolUse" }), fauxAssistantMessage("Done.")]);
 		const agent = agentOn(fake.engine, [user("teach me")]);
 		const events: string[] = [];
-		agent.subscribe((event: AgentEvent) => {
+		agent.subscribe((event) => {
 			if (event.type === "message_end") events.push(`end:${(event.message as { role: string }).role}`);
 			if (event.type === "tool_execution_start" || event.type === "tool_execution_end") events.push(event.type);
 		});

@@ -209,6 +209,9 @@ export interface SessionState {
 	 *  the messages (the drain's verbatim events upsert the real card) —
 	 *  visibleQueuedSteers is the pure fold. */
 	steerQueue: SteerQueueItem[];
+	/** Claude Code is compacting inside the running turn: the working line
+	 *  names that wait (core/compaction.ts `CompactionEvent`). */
+	compacting: boolean;
 }
 
 /** One queued composer steer: the client-minted id (the upsert key) + text. */
@@ -247,6 +250,7 @@ export class SessionModel {
 	fetch: typeof globalThis.fetch;
 	/** Steers sent but not yet drained (the queued indicator's truth). */
 	private steerQueueValue: SteerQueueItem[] = [];
+	private compactingValue = false;
 	private readonly waitMaxMs: number;
 	private turnSettled?: TurnSettledWaiter;
 	private onReattachSettled?: () => void;
@@ -336,6 +340,7 @@ export class SessionModel {
 			status: this.statusValue,
 			error: this.errorValue ?? providerError,
 			steerQueue: this.steerQueueValue,
+			compacting: live !== undefined && this.compactingValue,
 		};
 	}
 
@@ -410,12 +415,19 @@ export class SessionModel {
 			this.setError(String(event.errorText ?? "An error occurred."));
 			return false;
 		}
+		if (event.type === "compaction") {
+			this.mutate(() => {
+				this.compactingValue = event.active === true;
+			});
+			return false;
+		}
 		const agent = event as unknown as AgentEvent;
 		switch (agent.type) {
 			case "agent_start":
 				// Positive evidence of a new/replayed server-owned turn. Any
 				// later failure in that replay blocks continuation again.
 				this.automaticContinuationBlocked = false;
+				this.compactingValue = false;
 				if (this.errorValue !== null) this.setError(null);
 				return false;
 			case "message_start":

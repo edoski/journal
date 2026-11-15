@@ -189,12 +189,15 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 			const hooksOf = (event: "PreCompact" | "PostCompact" | "Stop") => (options.hooks?.[event] ?? []).flatMap((matcher) => matcher.hooks);
 			async function* compact(): AsyncGenerator<SDKMessage> {
 				const base = { session_id: id, transcript_path: sessionFile(configDir, id), cwd: claudeWorkDir(), trigger: "auto" as const };
+				// Claude Code reports the compaction's start and end as its status.
+				yield { type: "system", subtype: "status", status: "compacting", session_id: id, uuid: randomUUID() } as unknown as SDKMessage;
 				const outputs = await Promise.all(hooksOf("PreCompact").map((hook) => hook({ ...base, hook_event_name: "PreCompact", custom_instructions: null }, undefined, { signal: controller.signal })));
 				const instructions = outputs.map((out) => (out as { systemMessage?: string }).systemMessage ?? "").filter(Boolean).join("\n\n");
 				compactions.push({ instructions });
 				const summary = `SUMMARY #${compactions.length}: the learner maps keys to buckets.`;
 				await Promise.all(hooksOf("PostCompact").map((hook) => hook({ ...base, hook_event_name: "PostCompact", compact_summary: `<analysis>\nWhat to keep.\n</analysis>\n\n<summary>\n${summary}\n</summary>` }, undefined, { signal: controller.signal })));
 				yield { type: "system", subtype: "compact_boundary", compact_metadata: { trigger: "auto", pre_tokens: 123_000 }, session_id: id, uuid: randomUUID() } as unknown as SDKMessage;
+				yield { type: "system", subtype: "status", status: null, compact_result: "success", session_id: id, uuid: randomUUID() } as unknown as SDKMessage;
 				const uuid = randomUUID();
 				const text = `This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.\n\nSummary:\n${summary}\n\nIf you need specific details from before compaction, read the full transcript at: ${base.transcript_path}`;
 				// Claude Code's automatic compaction sends its summary message as blocks (2.1.319).
