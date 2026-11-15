@@ -109,6 +109,10 @@ const nextConfig: NextConfig = {
 		"@napi-rs/canvas", // native binding — bundling breaks the .node require
 		"@silvia-odwyer/photon-node", // CJS loads its adjacent WASM from disk
 		"@resvg/resvg-js", // native binding — same
+		// It spawns Claude Code and finds it at run time; bundled, Turbopack
+		// on Windows follows its literal C:/Windows/System32/where.exe path
+		// as a file to include and the build fails.
+		"@anthropic-ai/claude-agent-sdk",
 	],
 };
 
