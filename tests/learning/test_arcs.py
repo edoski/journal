@@ -1364,7 +1364,9 @@ def test_migrating_down_strips_every_arc_field_and_keeps_every_other_save(
     assert down["exam"] == {"date": "2026-12-20"}
     assert not any("arc" in topic for topic in down["topics"].values())
     assert down["observations"]["o1"] == {
-        k: v for k, v in up["observations"]["o1"].items() if k != "checkpoint"
+        k: v
+        for k, v in up["observations"]["o1"].items()
+        if k not in ("checkpoint", "due_topics")
     }
     assert down["preferences"] == {"tone": "Calm"}
     assert set(down["topics"]) == set(up["topics"])
@@ -1373,7 +1375,8 @@ def test_migrating_down_strips_every_arc_field_and_keeps_every_other_save(
     assert json.loads(backup.read_text()) == up
 
 
-# Schema 6's fields, frozen from the engine at 43d4b64c: what --to 6 may write.
+# Schema 6's fields, frozen from main's engine at 70b62f9a, the engine --to 6
+# goes back to: what --to 6 may write.
 V6_FIELDS = {
     "record": (
         *("schema", "title", "goal", "exam", "journal", "sources", "topics"),
@@ -1387,13 +1390,12 @@ V6_FIELDS = {
     "source": ("path", "title"),
     "topic": (
         *("title", "needs", "contrasts", "refs", "aliases", "introduced", "gap"),
-        *("note", "review", "excluded"),
+        *("note", "review"),
     ),
     "review": ("due", "prompt", "points"),
     "observation": (
         *("kind", "topics", "text", "response", "help", "result", "sure", "chose"),
-        *("transfer", "shown", "gave_up", "date", "task", "refs", "corrects"),
-        *("disputed", "ruling", "uncertain"),
+        *("transfer", "date", "task", "refs", "corrects", "uncertain"),
     ),
     "knowledge": ("text", "topics", "refs", "uncertain", "pinned", "aliases"),
     "task": ("title", "topics", "refs", "goal", "step", "help", "note"),
@@ -1401,7 +1403,7 @@ V6_FIELDS = {
     "ref": ("source", "locator"),
 }
 V6_HELPERS = frozenset(
-    "schema revision updated_at next_observation recorded due_topics judged "
+    "schema revision updated_at next_observation recorded judged "
     "updated created by standing level".split()
 )
 
@@ -1449,7 +1451,16 @@ def test_a_record_migrated_down_has_only_schema_6_fields(tmp_path: Path) -> None
     records.save(
         workspace,
         {
-            "observations": [attempt("riemann", checkpoint="integrals")],
+            "observations": [
+                attempt("riemann", checkpoint="integrals"),
+                attempt(
+                    "riemann",
+                    text="Read off the area",
+                    help="Showed the sum",
+                    shown=True,
+                ),
+                attempt("riemann", text="Guessed before the step", predicted=True),
+            ],
             "arcs": {"integrals": {"question": "How much accumulates?"}},
             "arc_change": {"reason": "A sharper focus question"},
         },

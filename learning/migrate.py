@@ -6,7 +6,9 @@ copied byte for byte to ``backups/v<from>-<stamp>/<key>/course.json`` in the
 learning support folder, with ``origin.json`` naming where it came from.
 
 Up (6 to 7) changes only ``schema``, since schema 7 only adds optional fields.
-Down (7 to 6) strips every arc field and keeps everything else. ``restore``
+Down (7 to 6) keeps only what the schema 6 engine reads, so a prediction,
+a shown solution or a disputed mark reads there as the plain answer it
+records, and an excluded topic as one still taught. ``restore``
 puts a backup back, after backing up what it replaces; it loses every save
 made since that backup, so it is the last resort after ``--to 6``. A schema
 number is the record's format, not its content, so the revision moves only
@@ -28,15 +30,68 @@ from learning.workspace import Workspace
 # The two schemas this module moves between. A schema bump writes the next
 # step; it never re-labels this one.
 PREVIOUS, CURRENT = 6, 7
-# The fields schema 7 added, all optional: dropping them is a schema 6 record.
-# The exam's ``final_review`` is the start of one under way, which schema 6
-# reads as six days before the exam.
-_RECORD_ARC_FIELDS = ("arcs", "arc_log")
-_NESTED_ARC_FIELDS = {
-    "path": ("arcs",),
-    "exam": ("arcs", "leaves_out", "final_review"),
+# Schema 6 as the engine that went back to reads it (main at 70b62f9a), helper
+# fields included: every field each object may hold. Fields this engine added
+# while still on schema 6 (``shown``, ``predicted``, ``excluded``,
+# ``due_topics`` and the rest) are in no schema 6 that engine reads, so a
+# downgrade keeps only these. The exam's ``final_review`` is the start of one
+# under way, which schema 6 reads as six days before the exam.
+_V6: dict[str, tuple[str, ...]] = {
+    "record": (
+        *("schema", "title", "goal", "exam", "journal", "sources", "topics"),
+        *("observations", "knowledge", "tasks", "focus", "path", "preferences"),
+        *("next_observation", "revision", "updated_at"),
+    ),
+    "exam": (
+        "date",
+        "format",
+        "coverage",
+        "criteria",
+        "constraints",
+        "unknowns",
+        "refs",
+    ),
+    "path": ("current", "order", "basis"),
+    "source": ("path", "title"),
+    "topic": (
+        *("title", "needs", "contrasts", "refs", "aliases", "introduced", "gap"),
+        *("note", "review", "judged"),
+    ),
+    "review": ("due", "prompt", "points", "by"),
+    "observation": (
+        *("kind", "topics", "text", "response", "help", "result", "sure", "chose"),
+        *("transfer", "date", "task", "refs", "corrects", "uncertain", "recorded"),
+    ),
+    "knowledge": (
+        "text",
+        "topics",
+        "refs",
+        "uncertain",
+        "pinned",
+        "aliases",
+        "updated",
+    ),
+    "task": (
+        "title",
+        "topics",
+        "refs",
+        "goal",
+        "step",
+        "help",
+        "note",
+        "created",
+        "updated",
+    ),
+    "ref": ("source", "locator"),
 }
-_ITEM_ARC_FIELDS = {"topics": "arc", "observations": "checkpoint"}
+_V6_OBJECTS = ("exam", "path")
+_V6_MAPS = {
+    "sources": "source",
+    "topics": "topic",
+    "observations": "observation",
+    "knowledge": "knowledge",
+    "tasks": "task",
+}
 
 
 def backups() -> Path:
@@ -72,20 +127,30 @@ def _strip(item: Any, names: tuple[str, ...]) -> Any:
     return {k: v for k, v in item.items() if k not in names}
 
 
+def _v6(item: dict[str, Any], shape: str) -> dict[str, Any]:
+    """``item`` with only the fields schema 6 gives ``shape``, refs and the
+    review included."""
+    kept = {k: v for k, v in item.items() if k in _V6[shape]}
+    if "refs" in kept:
+        kept["refs"] = [_v6(ref, "ref") for ref in kept["refs"]]
+    if "review" in kept:
+        kept["review"] = _v6(kept["review"], "review")
+    return kept
+
+
 def _down(stored: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for name, value in stored.items():
-        if name in _RECORD_ARC_FIELDS:
+        if name not in _V6["record"]:
             continue
         if name == "schema":
             value = PREVIOUS
-        elif name in _NESTED_ARC_FIELDS:
-            value = _strip(value, _NESTED_ARC_FIELDS[name])
+        elif name in _V6_OBJECTS:
+            value = _v6(value, name)
             if not value:
                 continue
-        elif name in _ITEM_ARC_FIELDS:
-            field = (_ITEM_ARC_FIELDS[name],)
-            value = {k: _strip(item, field) for k, item in value.items()}
+        elif name in _V6_MAPS:
+            value = {k: _v6(item, _V6_MAPS[name]) for k, item in value.items()}
         elif (
             name == "preferences"
             and value.get(preferences.QUESTIONS)
