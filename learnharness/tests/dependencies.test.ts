@@ -35,10 +35,26 @@ function requiredPeers(name: string): string[] {
 	return Object.keys(json.peerDependencies ?? {}).filter((peer) => !json.peerDependenciesMeta?.[peer]?.optional);
 }
 
+/** The package a bare import names: `@scope/name` or `name`, subpath dropped. */
+function packageOf(specifier: string): string | null {
+	if (/^(node:|\.|\/|@\/|#)/.test(specifier)) return null;
+	const parts = specifier.split("/");
+	return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]!;
+}
+
+const BUILTINS = new Set(["assert", "child_process", "crypto", "events", "fs", "module", "os", "path", "process", "readline", "stream", "url", "util", "worker_threads", "zlib", "electron"]);
+
 describe("declared packages", () => {
 	it("every runtime dependency is imported, or is a peer a dependency requires", () => {
 		const peers = new Set(Object.keys(pkg.dependencies).flatMap(requiredPeers));
 		const unused = Object.keys(pkg.dependencies).filter((name) => !imported(name) && !peers.has(name));
 		assert.deepEqual(unused, []);
+	});
+
+	it("every package the code, its tests and scripts import is declared, none only through another's dependencies", () => {
+		const declared = new Set([...Object.keys(pkg.dependencies), ...Object.keys(pkg.devDependencies)]);
+		const specifiers = [...code.matchAll(/(?:^|[\s;])(?:import|export)\s[^"'`;]*?from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|require\(\s*["']([^"']+)["']\s*\)/gm)].map((m) => m[1] ?? m[2] ?? m[3]!);
+		const undeclared = [...new Set(specifiers.map(packageOf).filter((name): name is string => name !== null && !BUILTINS.has(name) && !declared.has(name)))].sort();
+		assert.deepEqual(undeclared, []);
 	});
 });
