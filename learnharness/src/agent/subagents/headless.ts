@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import { createRequire } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { standardFontsDir } from "./pdf-ops";
 
@@ -11,8 +12,8 @@ import { standardFontsDir } from "./pdf-ops";
  * SVGs use resvg (browser fallback); PDFs use pdfjs + Skia (no browser).
  * No extra Chromium is shipped or downloaded.
  *
- * Chrome fallback resolution: CHROME_PATH first, then common macOS,
- * Windows and Linux install paths. `available()` is a cheap executable
+ * Chrome fallback resolution: CHROME_PATH first, then the common macOS
+ * install paths. `available()` is a cheap executable
  * check; the helper must still prove it can launch/connect at job time.
  *
  * Test seam: `headlessOverride.current` replaces the whole API (tests inject
@@ -79,18 +80,9 @@ export function getHeadless(): HeadlessApi {
 // ─── Chrome resolution ───────────────────────────────────────────────────────
 
 const CHROME_CANDIDATES = [
-	...(process.platform === "win32" ? [
-		path.join(process.env.PROGRAMFILES ?? "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
-		path.join(process.env["PROGRAMFILES(X86)"] ?? "C:\\Program Files (x86)", "Google", "Chrome", "Application", "chrome.exe"),
-		...(process.env.LOCALAPPDATA ? [path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe")] : []),
-	] : []),
 	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 	"/Applications/Chromium.app/Contents/MacOS/Chromium",
 	"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-	"/usr/bin/google-chrome",
-	"/usr/bin/google-chrome-stable",
-	"/usr/bin/chromium",
-	"/usr/bin/chromium-browser",
 ];
 
 export function resolveChromeExecutablePath(): string | null {
@@ -114,18 +106,34 @@ const NO_CHROME_MESSAGE =
 
 // ─── The app's own Chromium as a browser service (Wave E stage 3) ────────────
 // Demos execute JS and need a browser. PRIMARY: this very app's binary
-// spawned with --browser-service (main.cjs boots a hidden window with a CDP
-// port and prints "BROWSER_SERVICE_CDP <port>"). FALLBACK: system Chrome.
-// A Node IPC channel owns its lifetime: parent death/disconnect quits the
-// helper on every OS (Windows Electron stdin is synthetic EOF). No orphans.
-// PDFs and SVGs never come here (native now).
+// spawned with --browser-service (main.cjs boots a hidden window with
+// --remote-debugging-port=0, and Chromium prints its endpoint on stderr).
+// FALLBACK: system Chrome. A Node IPC channel owns its lifetime: parent
+// death/disconnect quits the helper. No orphans. PDFs and SVGs never come
+// here (native now).
 
-/** Handshake line parser (pure; exported for tests). */
-export function parseBrowserServiceLine(line: string): number | null {
-	const m = line.match(/^BROWSER_SERVICE_CDP (\d+)$/);
-	if (!m) return null;
-	const port = Number(m[1]);
-	return port >= 1 && port <= 65535 ? port : null;
+const BROWSER_SERVICE_TIMEOUT_MS = 15_000;
+
+/** Chromium's own readiness line, the one Playwright's Electron launcher reads.
+ *  Null when the stream ends or the timeout passes first. */
+export async function devToolsEndpoint(
+	stderr: NodeJS.ReadableStream,
+	timeoutMs = BROWSER_SERVICE_TIMEOUT_MS,
+): Promise<string | null> {
+	const lines = createInterface({ input: stderr, signal: AbortSignal.timeout(timeoutMs) });
+	try {
+		for await (const line of lines) {
+			const endpoint = /^DevTools listening on (ws:\/\/.*)$/.exec(line)?.[1];
+			if (endpoint) return endpoint;
+		}
+	} catch {
+		/* timed out */
+	} finally {
+		lines.close();
+		// Keep draining Chromium's later log lines so the pipe never fills.
+		stderr.resume();
+	}
+	return null;
 }
 
 /** Spawn env sanitizer (pure; exported for tests): the helper must run as a
@@ -157,19 +165,15 @@ export function browserServiceBinary(): string | null {
 	}
 }
 
-const BROWSER_SERVICE_TIMEOUT_MS = 15_000;
-let browserServiceProc: import("node:child_process").ChildProcess | null = null;
+let browserService: { proc: import("node:child_process").ChildProcess; endpoint: string } | null = null;
 
 async function connectBrowserService(): Promise<import("puppeteer-core").Browser | null> {
 	const puppeteer = (await import("puppeteer-core")).default;
 	const { spawn } = await import("node:child_process");
-	let port: number | null = null;
 
-	if (browserServiceProc && browserServiceProc.exitCode === null) {
-		// Helper alive from a previous run — reuse its endpoint.
-		port = (browserServiceProc as { __cdpPort?: number }).__cdpPort ?? null;
-	}
-	if (port === null) {
+	// The IPC channel closes when the helper exits, however it exits.
+	if (!browserService?.proc.connected) {
+		browserService = null;
 		const binary = browserServiceBinary();
 		if (!binary) return null;
 		// Packaged: execPath runs the bundled app (flag reaches main.cjs).
@@ -184,44 +188,21 @@ async function connectBrowserService(): Promise<import("puppeteer-core").Browser
 			// Cast: the sanitizer is pure over a loose record; NODE_ENV is
 			// always present in a real process.env.
 			env: browserServiceSpawnEnv(process.env) as NodeJS.ProcessEnv,
-			stdio: ["ignore", "pipe", "pipe", "ipc"] as const,
+			stdio: ["ignore", "ignore", "pipe", "ipc"] as const,
 		});
-		browserServiceProc = proc;
-		port = await new Promise<number | null>((resolve) => {
-			let buf = "";
-			const timer = setTimeout(() => {
-				proc.kill();
-				resolve(null);
-			}, BROWSER_SERVICE_TIMEOUT_MS);
-			const onData = (chunk: Buffer) => {
-				buf += chunk.toString("utf8");
-				const line = buf.split("\n").find((l) => parseBrowserServiceLine(l) !== null);
-				if (line !== undefined) {
-					clearTimeout(timer);
-					resolve(parseBrowserServiceLine(line));
-				}
-			};
-			proc.stdout!.on("data", onData);
-			proc.once("exit", () => {
-				clearTimeout(timer);
-				resolve(null);
-			});
-		});
-		if (port === null) {
-			browserServiceProc = null;
+		const endpoint = await devToolsEndpoint(proc.stderr!);
+		if (endpoint === null) {
+			proc.kill();
 			return null;
 		}
-		(proc as { __cdpPort?: number }).__cdpPort = port;
+		browserService = { proc, endpoint };
 	}
 
 	try {
-		const version = await fetch(`http://127.0.0.1:${port}/json/version`);
-		const info = (await version.json()) as { webSocketDebuggerUrl?: string };
-		if (!info.webSocketDebuggerUrl) return null;
 		// connect ≠ launch: browser.close() below merely disconnects — the
 		// helper stays resident for the next job (IPC-owned lifetime).
 		return await puppeteer.connect({
-			browserWSEndpoint: info.webSocketDebuggerUrl,
+			browserWSEndpoint: browserService.endpoint,
 			defaultViewport: null,
 		});
 	} catch {
@@ -240,8 +221,8 @@ async function withBrowserPage<T>(fn: (page: import("puppeteer-core").Page) => P
 	const helper = await connectBrowserService();
 	if (helper) {
 		const run = async (): Promise<T> => {
-			const pages = await helper.pages();
-			const page = pages.find((p) => p.target().type() === "page");
+			// Chromium announces CDP before the hidden window's page exists.
+			const page = await (await helper.waitForTarget((t) => t.type() === "page")).page();
 			if (!page) throw new Error("browser service: no page target");
 			try {
 				return await fn(page);

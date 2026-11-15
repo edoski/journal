@@ -25,8 +25,8 @@ body:
   - type: input
     id: operating_system
     attributes:
-      label: Operating system
-      description: For example, Windows, macOS or your Linux distribution. Include the OS version if known.
+      label: macOS version
+      description: For example, macOS 26.1.
     validations:
       required: true
   - type: textarea

@@ -112,7 +112,7 @@ describe("PDF pre-allocation canvas geometry", () => {
 describe("native pdf_render (pdfjs paints, @napi-rs/canvas hosts)", () => {
 	it("the shared font directory ends in pdfjs's required slash on every OS", () => {
 		const fonts = standardFontsDir();
-		assert.ok(fonts.endsWith("/"), "pdfjs rejects a trailing Windows backslash");
+		assert.ok(fonts.endsWith("/"), "pdfjs needs the trailing slash");
 		assert.ok(fs.statSync(fonts).isDirectory(), "the filesystem accepts the shared font path");
 	});
 

@@ -29,22 +29,19 @@ interface SetupDialogProps {
 	onClose: () => void;
 }
 
-export function SetupDialog(props: SetupDialogProps) {
-	return props.open ? <OpenSetupDialog {...props} /> : null;
-}
-
-function OpenSetupDialog({ onClose }: SetupDialogProps) {
+export function SetupDialog({ open, onClose }: SetupDialogProps) {
 	const { status } = useModelStatus();
 	const connected = status?.connected === true;
 	const signedInRef = useRef(false);
 	signedInRef.current = connected;
 	useEffect(() => {
-		if (connected) onClose();
-	}, [connected, onClose]);
+		if (open && connected) onClose();
+	}, [open, connected, onClose]);
 
 	// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim Esc at the
 	// document level so the window chain (abort) never also fires.
 	useEffect(() => {
+		if (!open) return;
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;
 			e.preventDefault();
@@ -53,12 +50,10 @@ function OpenSetupDialog({ onClose }: SetupDialogProps) {
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [onClose]);
-
-	if (connected) return null;
+	}, [open, onClose]);
 
 	return (
-		<Dialog open onOpenChange={(open) => !open && onClose()}>
+		<Dialog open={open && !connected} onOpenChange={(next) => !next && onClose()}>
 			<DialogContent data-testid="setup-dialog" className="max-h-[85vh] max-w-xl gap-6 overflow-y-auto" onCloseAutoFocus={(e) => signedInCloseFocus(signedInRef.current)(e)}>
 				<DialogHeader>
 					<DialogTitle>Sign in to Claude</DialogTitle>

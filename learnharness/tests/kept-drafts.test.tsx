@@ -7,7 +7,7 @@ import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, test } from "node:test";
-import { createRoot } from "react-dom/client";
+import { createRoot } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 
 class MemoryStorage {

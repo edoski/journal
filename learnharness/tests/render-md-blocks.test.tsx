@@ -13,7 +13,7 @@ import React from "react";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { MessageResponse } from "../components/ai-elements/message.tsx";
 import { MermaidOverlay, SessionMermaidContext, chartSize } from "../components/session-overlay.tsx";
 import { MarkdownCode, codeSource } from "../components/md-blocks.tsx";
@@ -31,15 +31,11 @@ describe("md-blocks — code", () => {
 		assert.ok(!html.includes("bg-muted"), "inline code no longer uses the question-card surface");
 	});
 
-	it("inline and fenced code share only the existing block background and border", () => {
+	it("inline code is a tint with no border; a code block is one bordered surface, set in one rule", () => {
 		const css = readFileSync("app/globals.css", "utf8");
-		const surface = css.match(/\[data-streamdown="inline-code"\],\s*\[data-streamdown="code-block"\]\s*\{([^}]+)\}/)?.[1];
-		assert.ok(surface, "both code paths share one surface rule");
-		assert.deepEqual(surface.trim().split(/;\s*/).filter(Boolean), [
-			"border: 1px solid var(--border)",
-			"background: color-mix(in oklab, var(--background) 86%, black)",
-		], "share the existing block surface, not block layout, padding or radius");
-		assert.match(css, /\[data-streamdown="code-block"\]\s*\{\s*border-radius: 0\.75rem;\s*padding: 0\.375rem;\s*\}/, "block geometry stays block-only and unchanged");
+		const rules = (selector: string) => [...css.matchAll(new RegExp(`(?:^|\\})\\s*${selector.replace(/[[\]"]/g, "\\$&")}\\s*\\{([^}]+)\\}`, "g"))].map((m) => m[1]!.trim());
+		assert.deepEqual(rules('[data-streamdown="code-block"]'), ["border: 1px solid var(--border);\n\tborder-radius: 8px;\n\tpadding: 0;\n\tbackground: color-mix(in oklab, var(--background) 70%, black);"]);
+		assert.match(rules('[data-streamdown="inline-code"]').join("\n"), /border: 0;/, "inline code draws no border");
 	});
 
 	it("code fences delegate to streamdown's CodeBlock with a hover copy corner", () => {

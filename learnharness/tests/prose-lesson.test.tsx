@@ -6,7 +6,7 @@ import React from "react";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ProseQuestion } from "../components/lesson/prose/prose-question.tsx";
 import { ProseConclude, ProseProblem, RequestBubble } from "../components/lesson/prose/prose-practice.tsx";

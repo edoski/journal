@@ -4,7 +4,7 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { OVERLAY_ATTRS, OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
+import { OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
 
 /** shadcn popover on the Proposed tokens (spec: popover.md). */
 
@@ -37,7 +37,6 @@ function PopoverContent({
     <PopoverPrimitive.Portal forceMount={props.forceMount}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
-        {...OVERLAY_ATTRS}
         ref={(el) => {
           node.current = el
           if (typeof ref === "function") ref(el)

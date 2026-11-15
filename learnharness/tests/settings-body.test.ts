@@ -8,11 +8,9 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-	parseAppearanceSettingsBody,
-	parseClaudeSettingsBody,
-	SETTINGS_SECTIONS,
-} from "../src/server/settings-body.ts";
+import { SETTINGS_SECTIONS } from "../src/server/settings-body.ts";
+
+const { appearance: parseAppearanceSettingsBody, claude: parseClaudeSettingsBody } = SETTINGS_SECTIONS;
 
 describe("parseAppearanceSettingsBody", () => {
 	it("parses every field; hex-or-null colors; clamps happen at sanitize, rejects here", () => {
@@ -64,6 +62,16 @@ describe("parseAppearanceSettingsBody", () => {
 	it("rejects non-object bodies and non-object mdRendering", () => {
 		assert.equal(parseAppearanceSettingsBody([1]).ok, false);
 		assert.equal(parseAppearanceSettingsBody({ mdRendering: "big" }).ok, false);
+	});
+
+	it("names the first bad field in the 400", () => {
+		assert.deepEqual(parseAppearanceSettingsBody({ mode: "sepia" }), { ok: false, error: "mode must be \"dark\" or \"light\"" });
+		assert.deepEqual(parseAppearanceSettingsBody({ mdRendering: { boldColor: "red" } }), { ok: false, error: "mdRendering.boldColor must be a #hex color or null" });
+		assert.deepEqual(parseAppearanceSettingsBody([1]), { ok: false, error: "Invalid JSON body" });
+	});
+
+	it("an empty mdRendering is an empty override, kept as sent", () => {
+		assert.deepEqual(parseAppearanceSettingsBody({ mdRendering: {} }), { ok: true, settings: { mdRendering: {} } });
 	});
 });
 

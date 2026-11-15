@@ -7,16 +7,13 @@ import { CourseArc } from "@/components/course-page/course-arc";
 import type { CourseArcSection, CourseGroup as Group, CourseTopic } from "@/components/course-page/course-model";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
 import { cn } from "@/lib/utils";
-import { scrollToShow, stopKey, walkStops, walkTo, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
+import { stopKey, walkStops, walkTo, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
 
 /** What the page asks of the list: focus a topic's row, or its first. */
 export interface SplitListHandle {
 	focus: (handle: TopicHandle) => void;
 	focusFirst: () => void;
 }
-
-/** Room kept clear above and below a row brought into view: its focus ring. */
-const RING_ROOM = 4;
 
 function reducedMotion(): boolean {
 	return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -140,11 +137,8 @@ export function SplitList({
 	// The row of the topic he points at on the map comes into view, moving the pane as little as it can.
 	useEffect(() => {
 		const row = marked ? stopsEl.current.get(stopKey({ kind: "row", handle: marked })) : null;
-		const view = viewport.current;
-		if (!row || !view) return;
-		const top = row.getBoundingClientRect().top - view.getBoundingClientRect().top + view.scrollTop;
-		const to = scrollToShow({ top, height: row.offsetHeight }, { scrollTop: view.scrollTop, height: view.clientHeight }, RING_ROOM);
-		if (to !== null) view.scrollTo({ top: to, behavior: reducedMotion() ? "auto" : "smooth" });
+		// Its scroll padding keeps room for the row's focus ring.
+		row?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth", container: "nearest" } as ScrollIntoViewOptions);
 	}, [marked]);
 
 	// With nothing focused, an arrow steps into the list.
@@ -233,7 +227,7 @@ export function SplitList({
 				data-more-above={more.above || undefined}
 				data-more-below={more.below || undefined}
 				className={cn(
-					"-mx-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+					"-mx-3.5 min-h-0 flex-1 scroll-py-1 overflow-y-auto overscroll-contain px-3.5 pb-1",
 					more.below && "mask-b-from-[calc(100%-2.5rem)]",
 					more.above && "mask-t-from-[calc(100%-2.5rem)]",
 				)}

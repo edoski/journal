@@ -25,7 +25,6 @@ process.env = {
 	...(originalEnv.NODE_OPTIONS ? { NODE_OPTIONS: originalEnv.NODE_OPTIONS } : {}),
 	NODE_ENV: "test",
 	LH_DATA_DIR: path.join(scratch, "data"),
-	LH_CREDENTIALS_DIR: scratch,
 	HOME: path.join(scratch, "home"),
 };
 globalThis.fetch = async () => { throw new Error("CLOSED: unexpected network request"); };
@@ -92,7 +91,7 @@ describe("send_to_user registry", () => {
 			assert.ok(output, kind);
 			assert.equal(output.description, sendToUserTool.description);
 			assert.equal(typeof output.prepareArguments, "function", "standard argument healing is wired");
-			assert.equal(agent.state.systemPrompt, composeInstructions(kind as keyof typeof factories));
+			assert.ok(agent.state.systemPrompt.startsWith(composeInstructions(kind as keyof typeof factories)), "the composed prompt, then only where his files are");
 			assert.ok(!agent.state.systemPrompt.includes(SEND_TO_USER_TOOL), "no added prompt instructions");
 		}
 	});

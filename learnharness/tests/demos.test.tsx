@@ -33,8 +33,8 @@ import { after, describe, it } from "node:test";
 import { createCanvas } from "@napi-rs/canvas";
 import { Value } from "typebox/value";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep, type ToolCall } from "@earendil-works/pi-ai";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
+import { createRoot } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { PATHS } from "../config.ts";
 import {
@@ -1018,7 +1018,7 @@ describe("tool + renderer registry wiring", () => {
 		// sources v0 — pdf maps to its dispatch card (the live-smoke gap)
 		assert.equal(artifactRenderers.pdf, PdfJobCard);
 		// The agent's own tools render nothing in the lesson column (agent chrome out).
-		for (const t of ["read", "ls", "find", "grep", "list_sessions", "list_propositions"]) {
+		for (const t of ["Read", "Grep", "Glob", "list_sessions", "list_propositions"]) {
 			assert.equal(artifactRenderers[t], undefined, `${t} has no transcript card`);
 		}
 	});

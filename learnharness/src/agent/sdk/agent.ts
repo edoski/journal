@@ -9,7 +9,7 @@ import { CONTINUE_TEXT, owedMessages, sdkInputBlocks, sessionResume, sessionSeed
 import { CLAUDE_ABORTED, CLAUDE_API_KEY_REFUSAL, CLAUDE_MODEL_MISSING, CLAUDE_TOOLS_MISSING, NO_KEY, claudeErrorMessage, type ClaudeRateLimit } from "../claude-errors.ts";
 import { recordClaudeModelMissing, recordClaudeRateLimit } from "../claude-usage.ts";
 import { AssistantStream } from "./assistant-stream.ts";
-import { SDK_TOOL_PREFIX, SDK_TOOL_SERVER, type SdkEngine, type SdkLaunch, type SdkQuery } from "./engine.ts";
+import { SDK_TOOL_PREFIX, SDK_TOOL_SERVER, isClaudeCodeTool, type ClaudeCodeTool, type SdkEngine, type SdkLaunch, type SdkQuery } from "./engine.ts";
 import { keepSession, restoreSession, seedSession, type SessionStore } from "./session-files.ts";
 import { sdkToolServer } from "./tool-server.ts";
 
@@ -35,8 +35,8 @@ export interface SdkAgentConfig {
 	 *  own point (its automatic compaction): given to it as the compaction's
 	 *  instructions through its PreCompact hook. */
 	compactionInstructions?: (messages: LhMessage[]) => string;
-	/** Claude Code's own web search joins the app's tools. */
-	webSearch?: boolean;
+	/** Claude Code's own tools that join the app's, by their Claude Code names. */
+	builtins?: readonly ClaudeCodeTool[];
 	/** A background job: no session file, at most this many model calls. */
 	ephemeral?: { maxTurns: number };
 	onUsage?: (usage: Usage) => void;
@@ -46,8 +46,9 @@ export interface SdkAgentConfig {
 	/** Reads each block of ordinary text as it ends; true takes its text out
 	 *  of the reply, so the record and every view keep none of it. */
 	screenText?: (text: string) => boolean;
-	/** Asked when the model ends a turn no tool ended: words it must read
-	 *  first, which keep the turn going (the voice guard's `beforeEnd`). */
+	/** Asked by Claude Code's Stop hook when the model ends a turn no tool
+	 *  ended: words it must read first, which keep the turn going (the voice
+	 *  guard's `beforeEnd`). */
 	beforeEnd?: () => string | undefined;
 }
 
@@ -160,7 +161,7 @@ export class SdkAgent {
 			const why = owed === null ? "no session of its own holds its replies" : `its session ${resume.resume} is gone from Claude Code and from the app's copy`;
 			let seeded: ChatSession | undefined;
 			try {
-				const seed = sessionSeed(lesson, (name) => name === "WebSearch" ? name : `${SDK_TOOL_PREFIX}${name}`);
+				const seed = sessionSeed(lesson, (name) => isClaudeCodeTool(name) ? name : `${SDK_TOOL_PREFIX}${name}`);
 				seeded = seed ? seedSession(sessionStore, launch.configDir, seed) : undefined;
 			} catch (error) {
 				console.error(`[sdk] could not seed a session for the lesson (${why}):`, error);
@@ -218,7 +219,7 @@ export class SdkAgent {
 			}
 		};
 
-		const webSearch = this.config.webSearch === true;
+		const builtins = [...(this.config.builtins ?? [])];
 		const instructions = this.config.compactionInstructions;
 		// Claude Code's summary of a compaction, read by its PostCompact hook,
 		// which runs before the compact boundary reaches the stream.
@@ -226,12 +227,18 @@ export class SdkAgent {
 		const options: Options = {
 			...launch.options,
 			systemPrompt: { type: "custom", prompt: this.config.systemPrompt, snapshot: false },
-			tools: webSearch ? ["WebSearch"] : [],
-			allowedTools: [`mcp__${SDK_TOOL_SERVER}`, ...(webSearch ? ["WebSearch"] : [])],
+			tools: builtins,
+			allowedTools: [`mcp__${SDK_TOOL_SERVER}`, ...builtins],
 			mcpServers: { [SDK_TOOL_SERVER]: server },
 			hooks: {
 				...(instructions ? { PreCompact: [{ hooks: [async () => ({ systemMessage: instructions(this.state.messages as LhMessage[]) })] }] } : {}),
 				PostCompact: [{ hooks: [async (input) => { if (input.hook_event_name === "PostCompact") summary = input.compact_summary; return {}; }] }],
+				// A steer Claude Code has not read yet goes on the run by itself; the
+				// note waits for the stop after it.
+				...(this.config.beforeEnd ? { Stop: [{ hooks: [async () => {
+					const note = !endedByTool && !this.aborted && this.inFlight.size === 0 ? this.config.beforeEnd!() : undefined;
+					return note ? { decision: "block" as const, reason: note } : {};
+				}] }] } : {}),
 			},
 			abortController: this.controller,
 			...(this.config.ephemeral ? { persistSession: false, maxTurns: this.config.ephemeral.maxTurns } : {}),
@@ -264,7 +271,7 @@ export class SdkAgent {
 					this.emit({ type: "message_end", message: stream.message });
 					if (event.type === "done") {
 						this.config.onUsage?.(stream.message.usage);
-						// Claude Code's own tools (WebSearch) run outside the tool server.
+						// Claude Code's own tools run outside the tool server.
 						for (const block of stream.message.content) if (block.type === "toolCall" && !appTools.has(block.name)) this.emit({ type: "tool_execution_start", toolCallId: block.id, toolName: block.name, args: block.arguments });
 					}
 					for (const fn of held.splice(0)) fn();
@@ -359,8 +366,6 @@ export class SdkAgent {
 						// run goes on with it. A turn a question ended waits for the
 						// learner instead, and the steer goes back to its queue.
 						if (!endedByTool && this.inFlight.size > 0 && !this.aborted) return true;
-						const note = !endedByTool && !this.aborted ? this.config.beforeEnd?.() : undefined;
-						if (note && this.push) { this.push(userMessage([{ type: "text", text: note }], randomUUID())); return true; }
 						if (stream && !stream.finished) endStream(stream.fail(`Claude Code ended the reply midway. Retry.${NO_KEY}`));
 						recordClaudeModelMissing(provider, false);
 						return false;

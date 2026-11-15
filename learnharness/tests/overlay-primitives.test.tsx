@@ -83,12 +83,12 @@ describe("overlay primitives (overlay.md)", () => {
 		});
 	}
 
-	it("portalled menus count as inside for the hand-rolled outside-click guards", async () => {
+	it("portalled menus sit in Radix's popper wrapper, which the outside-click guards count as inside", async () => {
 		for (const name of ["dropdown-menu", "popover", "select"] as const) {
 			await mountOpen(LAYERS[name]);
 			const content = document.querySelector(`[data-slot="${name}-content"]`);
 			assert.ok(content, `${name} content renders`);
-			assert.ok(content.closest("[data-lh-menu]"), `${name} content carries data-lh-menu`);
+			assert.ok(content.closest("[data-radix-popper-content-wrapper]"), `${name} content sits in the popper wrapper`);
 			await act(async () => { root?.unmount(); });
 			host?.remove();
 		}

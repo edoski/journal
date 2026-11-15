@@ -18,7 +18,6 @@ const COURSE = path.join(scratch, "course");
 fs.mkdirSync(COURSE);
 const engineFake = useFakeEngine(scratch, [{ workspace: COURSE, title: "Fixture course" }]);
 process.env.LH_DATA_DIR = path.join(scratch, "data");
-process.env.LH_CREDENTIALS_DIR = scratch;
 await signInTestClaude();
 after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 

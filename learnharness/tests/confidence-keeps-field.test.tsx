@@ -9,7 +9,7 @@ import React, { act } from "react";
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { ConfidenceIcon } from "../components/lesson/prose/prose-composer.tsx";
 
 let root: Root | null = null;

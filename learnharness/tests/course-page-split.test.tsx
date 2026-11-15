@@ -10,13 +10,13 @@ import React from "react";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap, NODE_WIDTH, slackOf } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { OPEN_AT_FIRST, aimOf, boxesOf, walkStops, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, wholeSurfaceOf, type Box } from "../components/course-page/split/split-tie.ts";
+import { OPEN_AT_FIRST, aimOf, boxesOf, walkStops, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, shownGroups, surfaceOf, topicAt, walkTo, wholeSurfaceOf, type Box } from "../components/course-page/split/split-tie.ts";
 import { WholeCourseButton } from "../components/course-map/topic-map/whole-course-button.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
@@ -219,20 +219,6 @@ describe("what the arrows walk in the list", () => {
 		const opened = keys({ ...OPEN_AT_FIRST, "on-your-own": true });
 		const own = groups.find((g) => g.id === "on-your-own")!;
 		assert.deepEqual(opened.slice(opened.indexOf("[on-your-own]") + 1), own.topics.map((t) => t.topic.handle), "an opened group's rows follow its header");
-	});
-});
-
-describe("bringing a marked row into view", () => {
-	const view = { scrollTop: 100, height: 300 };
-
-	it("leaves a row already in view where it is", () => {
-		assert.equal(scrollToShow({ top: 150, height: 32 }, view, 4), null);
-	});
-
-	it("moves the pane as little as it can, keeping room for the focus ring", () => {
-		assert.equal(scrollToShow({ top: 60, height: 32 }, view, 4), 56, "above: its top just in");
-		assert.equal(scrollToShow({ top: 420, height: 32 }, view, 4), 156, "below: its bottom just in");
-		assert.equal(scrollToShow({ top: 2, height: 32 }, view, 4), 0, "never past the top");
 	});
 });
 

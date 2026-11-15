@@ -53,27 +53,19 @@ function exec(engine: EngineCommand, args: string[], stdin: string): Promise<Exi
 	return new Promise((resolve) => {
 		let stdout = "";
 		let stderr = "";
-		let timedOut = false;
-		let settled = false;
-		const finish = (exit: Exit) => {
-			if (settled) return;
-			settled = true;
-			clearTimeout(timer);
-			resolve(exit);
-		};
 		const child = spawn(engine.python, ["-m", "learning", ...args], {
 			cwd: engine.root,
 			env: { ...(engine.env ?? process.env), PYTHONPATH: engine.root, PYTHONIOENCODING: "utf-8" },
 			stdio: ["pipe", "pipe", "pipe"],
+			timeout: engine.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+			killSignal: "SIGKILL",
 		});
-		const timer = setTimeout(() => {
-			timedOut = true;
-			child.kill("SIGKILL");
-		}, engine.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 		child.stdout.setEncoding("utf-8").on("data", (chunk: string) => (stdout += chunk));
 		child.stderr.setEncoding("utf-8").on("data", (chunk: string) => (stderr += chunk));
-		child.on("error", (error) => finish({ code: null, stdout, stderr, timedOut, spawnError: error.message }));
-		child.on("close", (code) => finish({ code, stdout, stderr, timedOut }));
+		// Only spawn's timeout kills the engine, so a killed child timed out.
+		// A spawn failure may fire close after error; the promise keeps the first.
+		child.on("error", (error) => resolve({ code: null, stdout, stderr, timedOut: child.killed, spawnError: error.message }));
+		child.on("close", (code) => resolve({ code, stdout, stderr, timedOut: child.killed }));
 		child.stdin.on("error", () => {});
 		child.stdin.end(stdin);
 	});
@@ -98,7 +90,7 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 		case "standing":
 			return { args: ["standing"], stdin: "" };
 		case "sources":
-			return { args: "scan" in verb ? ["sources", "--scan"] : ["sources", "--add", ...verb.add], stdin: "" };
+			return { args: "scan" in verb ? ["sources", verb.scan === true ? "--scan" : `--scan=${verb.scan}`] : ["sources", "--add", ...verb.add], stdin: "" };
 		case "forget-course":
 			return { args: ["forget", "--course"], stdin: "" };
 	}

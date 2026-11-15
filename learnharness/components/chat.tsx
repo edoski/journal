@@ -150,7 +150,7 @@ function isSubagentSteer(m: LhViewMessage): boolean {
  *
  * The bottom blob is ONE persistent shell whose contents swap (chat composer ↔
  * question dock ↔ collapsed bar). The shell is sticky INSIDE the scroller —
- * never overlapping the transcript at rest, never covering the scrollbar —
+ * never overlapping the transcript at rest —
  * and DockOverlay animates its height on variant changes.
  */
 export function Chat({
@@ -1521,7 +1521,7 @@ export function Chat({
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef} targetScrollTop={followTargetScrollTop}>
 					<SessionMessageNavigation />
-					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+					<ConversationContent className="min-h-full gap-0 p-0">
 						<div data-session-find-root="" data-transcript-column="" className={`${column} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
@@ -1801,9 +1801,7 @@ export function Chat({
 					/>
 				)}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
-				{disputing && disputeMark && (
-					<DisputeDialog key={disputing} mark={disputeMark} onClose={() => setDisputing(null)} onSend={(draft) => sendDispute(disputing, disputeMark, draft)} />
-				)}
+				<DisputeDialog mark={disputeMark ?? null} onClose={() => setDisputing(null)} onSend={(draft) => disputing && disputeMark && sendDispute(disputing, disputeMark, draft)} />
 				</div>
 			</div>
 		</div>
@@ -1933,9 +1931,8 @@ function DockOverlay({
 }) {
 	const { scrollRef } = useStickToBottomContext();
 	const blockRef = useRef<HTMLDivElement>(null);
-	const [sbInset, setSbInset] = useState(0);
 	const reportHeight = useCallback((h: number) => onReserve(h + GRADIENT_H), [onReserve]);
-	useDockReserve({ scrollRef, blockRef, onHeight: reportHeight, onScrollbarInset: setSbInset });
+	useDockReserve({ scrollRef, blockRef, onHeight: reportHeight });
 
 	// Wheel over the composer still scrolls the transcript (owner, scroll
 	// round 2): the overlay is a SIBLING of the scroller, so the browser's
@@ -1979,7 +1976,7 @@ function DockOverlay({
 	}, [scrollRef, replyAnchorRef]);
 
 	return (
-		<div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ right: sbInset }}>
+		<div className="pointer-events-none absolute inset-x-0 bottom-0">
 			<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 			<div ref={blockRef} className="relative bg-background pb-5">
 				<div className={column}>

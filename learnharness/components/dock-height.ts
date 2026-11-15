@@ -6,23 +6,17 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 
 /** The composer's block overlays the transcript's foot, so the transcript
  *  keeps a spacer as tall as it: the block's height is reported before
- *  paint and on every resize (a growing field, the window, the column),
- *  with the scroller's classic scrollbar gutter, which the overlay leaves
- *  uncovered (zero with macOS overlay scrollbars). */
-export function useDockReserve({ scrollRef, blockRef, onHeight, onScrollbarInset }: {
+ *  paint and on every resize (a growing field, the window, the column). */
+export function useDockReserve({ scrollRef, blockRef, onHeight }: {
 	scrollRef: RefObject<HTMLElement | null>;
 	blockRef: RefObject<HTMLElement | null>;
 	onHeight: (height: number) => void;
-	onScrollbarInset: (inset: number) => void;
 }) {
 	useIsoLayoutEffect(() => {
 		const column = scrollRef.current;
 		const block = blockRef.current;
 		if (!column || !block) return;
-		const measure = () => {
-			onScrollbarInset(Math.round((column.offsetWidth - column.clientWidth) / 2));
-			onHeight(block.getBoundingClientRect().height);
-		};
+		const measure = () => onHeight(block.getBoundingClientRect().height);
 		measure();
 		const observer = new ResizeObserver(measure);
 		observer.observe(column);
@@ -32,7 +26,7 @@ export function useDockReserve({ scrollRef, blockRef, onHeight, onScrollbarInset
 			observer.disconnect();
 			window.removeEventListener("resize", measure);
 		};
-	}, [scrollRef, blockRef, onHeight, onScrollbarInset]);
+	}, [scrollRef, blockRef, onHeight]);
 }
 
 /** Overlay and transcript are siblings. Keep native scrolling in an actual

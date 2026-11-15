@@ -58,55 +58,34 @@ function runWithAbortGuard<T>(
 	run: (signal: AbortSignal) => T | Promise<T>,
 	parent: AbortSignal | undefined,
 ): Promise<T> {
-	const controller = new AbortController();
-	const forwardAbort = () => controller.abort();
-	if (parent) {
-		if (parent.aborted) controller.abort();
-		else parent.addEventListener("abort", forwardAbort, { once: true });
-	}
 	const timeoutMs = toolTimeoutMs.current;
-	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	const timeout = AbortSignal.timeout(timeoutMs);
+	const signal = parent ? AbortSignal.any([parent, timeout]) : timeout;
 	const humanTimeout = timeoutMs >= 1_000 ? `${Math.round(timeoutMs / 1000)}s` : `${timeoutMs}ms`;
-	let graceTimer: ReturnType<typeof setTimeout> | undefined;
-	const cleanup = () => {
-		clearTimeout(timer);
-		if (graceTimer) clearTimeout(graceTimer);
-		parent?.removeEventListener("abort", forwardAbort);
-	};
 	return new Promise<T>((resolve, reject) => {
+		let grace: ReturnType<typeof setTimeout> | undefined;
+		// Cooperative tools poll the signal and settle with partial results
+		// within a tick or two: a brief grace lets them deliver before the
+		// hard reject, so abort kills a stuck tool without racing away a
+		// graceful one's partial result.
+		const onAbort = () => {
+			const timedOut = (signal.reason as Error | undefined)?.name === "TimeoutError";
+			grace = setTimeout(() => reject(new Error(timedOut ? `Tool "${toolName}" timed out after ${humanTimeout} — the result was discarded` : "Operation aborted")), TOOL_ABORT_GRACE_MS);
+		};
 		const settle = (fn: () => void) => {
-			controller.signal.removeEventListener("abort", onAbort);
-			if (graceTimer) clearTimeout(graceTimer);
+			signal.removeEventListener("abort", onAbort);
+			clearTimeout(grace);
 			fn();
 		};
-		const onAbort = () => {
-			// Cooperative tools poll the signal and settle with partial
-			// results within a tick or two (the fs tools check per file) —
-			// give them a brief grace to deliver those before the hard
-			// reject, so abort KILLS a stuck tool without racing away a
-			// graceful one's partial result.
-			graceTimer = setTimeout(
-				() =>
-					reject(
-						new Error(
-							parent?.aborted
-								? "Operation aborted"
-								: `Tool "${toolName}" timed out after ${humanTimeout} — the result was discarded`,
-						),
-					),
-				TOOL_ABORT_GRACE_MS,
-			);
-		};
-		controller.signal.addEventListener("abort", onAbort, { once: true });
-		if (controller.signal.aborted) onAbort(); // an already-aborted signal never fires listeners
+		if (signal.aborted) onAbort();
+		else signal.addEventListener("abort", onAbort, { once: true });
 		Promise.resolve()
-			.then(() => run(controller.signal))
+			.then(() => run(signal))
 			.then(
 				(v) => settle(() => resolve(v)),
 				(e) => settle(() => reject(e)),
 			);
-	})
-		.finally(cleanup);
+	});
 }
 
 /** The 1.0-native authoring-failure result (pi convention, agent-core

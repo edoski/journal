@@ -127,6 +127,12 @@ def test_sources_scan_and_add_register_material(
     }
     _, error = run(capsys, monkeypatch, workspace, "sources")
     assert "--scan" in error["message"]
+    linked = workspace.parent / "linked"
+    linked.mkdir()
+    (linked / "Week 4.pdf").write_bytes(b"%PDF")
+    _, elsewhere = run(capsys, monkeypatch, workspace, "sources", f"--scan={linked}")
+    assert elsewhere["directory"] == str(linked.resolve())
+    assert [item["path"] for item in elsewhere["files"]] == ["Week 4.pdf"]
 
 
 def test_forget_items_and_the_course(

@@ -17,7 +17,6 @@ import {
 	type ImageContent,
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SdkEngine } from "../src/agent/models.ts";
 import { fakeEngine, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import type { ModelImageResizeOptions } from "../src/agent/image-processing/index.ts";
@@ -34,7 +33,6 @@ process.env = {
 	NODE_ENV: "test",
 	HOME: path.join(scratch, "home"),
 	LH_DATA_DIR: path.join(scratch, "data"),
-	LH_CREDENTIALS_DIR: scratch,
 };
 globalThis.fetch = async () => { throw new Error("CLOSED: unexpected network request"); };
 after(() => {
@@ -43,16 +41,10 @@ after(() => {
 	fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-const { readTool } = await import("../src/agent/tools/read.ts");
-const { createTeacherAgent, createProberAgent, createPracticeAgent } = await import("../src/agent/teacher-agent.ts");
 const { runPdfReaderAgent } = await import("../src/agent/subagents/pdf-reader.ts");
 const { runVisualMaker } = await import("../src/agent/subagents/visual-maker.ts");
 
-/** A copy outside the checkout: a checkout under a protected home folder
- *  (an agent worktree in ~/.t3) is itself off-limits to the file tools. */
-const PDF = path.join(fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-src-"))), "sample-3page.pdf");
-fs.copyFileSync(path.join(import.meta.dirname, "fixtures", "sample-3page.pdf"), PDF);
-process.on("exit", () => fs.rmSync(path.dirname(PDF), { recursive: true, force: true }));
+const PDF = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="4800" height="120" viewBox="0 0 4800 120"><rect width="4800" height="120" fill="white"/></svg>';
 const CUSTOM_RESIZE = { maxWidth: 320, maxHeight: 200 };
 
@@ -104,18 +96,6 @@ function scripted(steps: FauxResponseStep[], resize?: ModelImageResizeOptions, v
 	return { engine: fakeEngine(scriptedModel), requests };
 }
 
-/** The record a lesson turn starts from: one learner message. */
-function ask(text: string): AgentMessage[] {
-	return [{ role: "user", content: text, timestamp: Date.now(), id: `ask-${text.length}` } as AgentMessage];
-}
-
-function readSteps(file: string): FauxResponseStep[] {
-	return [
-		fauxAssistantMessage([fauxToolCall("read", { path: file }, { id: "read-1" })], { stopReason: "toolUse" }),
-		fauxAssistantMessage([fauxText("Inspected the supplied source.")]),
-	];
-}
-
 function fakeHeadless(rendered: Buffer | ((page: number) => Buffer)) {
 	const svgCalls: string[] = [];
 	const pdfCalls: number[][] = [];
@@ -142,110 +122,6 @@ function assertProcessedImage(context: TranscriptContext, expected: { width: num
 	assert.ok(Buffer.byteLength(parts[0]!.data, "utf8") < 4.5 * 1024 * 1024);
 	assert.notEqual(parts[0]!.data, raw.toString("base64"), "the oversized raw raster is never sent");
 	assert.match(text(context), /\[Image: original \d+x\d+, displayed at \d+x\d+\. Multiply coordinates by/);
-}
-
-test("shared teacher read detects valid image content under a non-image extension", async () => {
-	const bytes = png(24, 16);
-	const file = path.join(scratch, "lecture-notes.txt");
-	fs.writeFileSync(file, bytes);
-	const { engine, requests } = scripted(readSteps(file));
-	// Pass the actual shared read tool, exercising the teacher's native clone
-	// of read.execute rather than a pre-bound test-only implementation.
-	const agent = createTeacherAgent(undefined, { engine, tools: { read: readTool }, messages: ask("Inspect the supplied local file.") });
-	await agent.continue();
-	assert.equal(requests.length, 2);
-	const visible = requests[1]!;
-	assert.equal(images(visible).length, 1);
-	assert.equal(images(visible)[0]!.mimeType, "image/png");
-	assert.equal(images(visible)[0]!.data, bytes.toString("base64"));
-	assert.deepEqual(dimensions(images(visible)[0]!), { width: 24, height: 16 });
-	assert.match(text(visible), /Read image file \[image\/png\]/);
-});
-
-test("shared read omits corrupt recognized images without exposing a raw image fallback", async () => {
-	// Valid signature/IHDR, missing pixel data: sniff succeeds, decode fails.
-	const bytes = png(24, 16).subarray(0, 33);
-	const file = path.join(scratch, "corrupt.png");
-	fs.writeFileSync(file, bytes);
-	const { engine, requests } = scripted(readSteps(file));
-	await createTeacherAgent(undefined, { engine, tools: { read: readTool }, messages: ask("Inspect the file.") }).continue();
-	assert.equal(requests.length, 2);
-	assert.deepEqual(images(requests[1]!), []);
-	assert.match(text(requests[1]!), /Image omitted: could not be resized below the inline image size limit/);
-	assert.ok(!JSON.stringify(requests[1]).includes(bytes.toString("base64")));
-});
-
-test("shared read supplies the native nonvision-model note", async () => {
-	const file = path.join(scratch, "nonvision.png");
-	fs.writeFileSync(file, png(24, 16));
-	const { engine, requests } = scripted(readSteps(file), undefined, false);
-	await createTeacherAgent(undefined, { engine, tools: { read: readTool }, messages: ask("Inspect the file.") }).continue();
-	assert.equal(requests.length, 2);
-	assert.match(text(requests[1]!), /\[Current model does not support images\. The image will be omitted from this request\.\]/);
-});
-
-test("teacher read binds independent active-model resize limits without mutating the shared tool", async () => {
-	const bytes = png(640, 320);
-	const file = path.join(scratch, "model-bound.png");
-	fs.writeFileSync(file, bytes);
-	const originalExecute = readTool.execute;
-	const a = scripted(readSteps(file), { maxWidth: 96, maxHeight: 64 });
-	const b = scripted(readSteps(file), { maxWidth: 80, maxHeight: 30 });
-	const agentA = createTeacherAgent(undefined, { engine: a.engine, tools: { read: readTool }, messages: ask("Inspect with model A.") });
-	const agentB = createTeacherAgent(undefined, { engine: b.engine, tools: { read: readTool }, messages: ask("Inspect with model B.") });
-	await agentB.continue();
-	await agentA.continue();
-	assertProcessedImage(a.requests[1]!, { width: 96, height: 48 }, bytes);
-	assertProcessedImage(b.requests[1]!, { width: 60, height: 30 }, bytes);
-	assert.equal(readTool.execute, originalExecute);
-});
-
-for (const [role, resize, expected] of [
-	["prober", { maxWidth: 96, maxHeight: 64 }, { width: 96, height: 48 }],
-	["practice", { maxWidth: 80, maxHeight: 30 }, { width: 60, height: 30 }],
-] as const) {
-	test(`${role}'s actual registry retains argument healing and text reads while binding image limits`, async () => {
-		const bytes = png(640, 320);
-		const imageFile = path.join(scratch, `${role}-actual-registry.png`);
-		const textFile = path.join(scratch, `${role}-actual-registry.txt`);
-		fs.writeFileSync(imageFile, bytes);
-		fs.writeFileSync(textFile, "first\nsecond\nthird\nfourth\nfifth");
-		const { engine, requests } = scripted([
-			fauxAssistantMessage([fauxToolCall("read", { path: imageFile }, { id: "registry-image" })], { stopReason: "toolUse" }),
-			// Exact existing heal contract: schema-integer fields encoded as
-			// JSON number strings heal before validation. The path stays intact.
-			fauxAssistantMessage([fauxToolCall("read", { path: textFile, offset: "2", limit: "2" }, { id: "registry-text" })], { stopReason: "toolUse" }),
-			fauxAssistantMessage([fauxToolCall("send_to_user", { message: "Inspected the image and selected text lines." }, { id: "registry-sent" })], { stopReason: "toolUse" }),
-			fauxAssistantMessage(""),
-		], resize);
-		const originalExecute = readTool.execute;
-		const forbidden = () => { throw new Error("unexpected job dispatch or handoff"); };
-		const chatStore = { getChat: () => null };
-		// Only context ports are mocked; no app/store imports or explicit
-		// tool overrides. Job/handoff operations must never execute here.
-		const messages = ask("Inspect the local image, then read the selected text lines.");
-		const agent = role === "prober"
-			? createProberAgent({
-				chatId: "offline-read-prober", chatStore,
-				jobStore: new Proxy({}, { get: forbidden }),
-				spawn: forbidden, deliver: forbidden,
-			} as never, { engine, messages })
-			: createPracticeAgent({ chatId: "offline-read-practice", chatStore }, { engine, messages });
-		const names = agent.state.tools.map((tool) => tool.name);
-		assert.ok(names.includes(role === "prober" ? "probe_done" : "problem"), "real role registry was assembled");
-		const boundRead = agent.state.tools.find((tool) => tool.name === "read");
-		assert.ok(boundRead?.prepareArguments, "model binding preserves the registry's prepareArguments wrapper");
-		assert.notEqual(boundRead.execute, originalExecute, "shared read execute is rebound to the active model");
-		assert.deepEqual(boundRead.prepareArguments({ path: textFile, offset: "2", limit: "2" }), { path: textFile, offset: 2, limit: 2 });
-		await agent.continue();
-		assert.equal(requests.length, 4);
-		assertProcessedImage(requests[1]!, expected, bytes);
-		const selected = requests[2]!.messages.find((message) => message.role === "toolResult" && message.toolCallId === "registry-text");
-		assert.ok(selected && selected.role === "toolResult");
-		assert.equal(selected.isError, false);
-		assert.deepEqual(selected.content, [{ type: "text", text: "second\nthird\n\n[2 more lines in file. Use offset=4 to continue.]" }]);
-		assert.equal(readTool.execute, originalExecute, "role construction did not mutate the shared tool");
-	});
 }
 
 test("PDF reader preserves both processed image outputs from multiple render calls in one batch", async () => {

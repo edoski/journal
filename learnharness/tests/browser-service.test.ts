@@ -1,25 +1,38 @@
 /**
  * Wave E stage 3 (owner 2026-10-10): demos run in the app's own Chromium
- * via a --browser-service helper (main.cjs boots a hidden window with a CDP
- * port), system Chrome as fallback. These pin the pure halves of that
- * chain: the handshake line parser and the spawn-env sanitizer. The live
- * chain (spawn → connect → pages() → run) is exercised on dev machines,
- * not in the suite.
+ * via a --browser-service helper (main.cjs boots a hidden window with
+ * --remote-debugging-port=0), system Chrome as fallback. These pin the pure
+ * halves of that chain: readiness from Chromium's own DevTools line and the
+ * spawn-env sanitizer. The live chain (spawn → connect → page → run) is
+ * exercised on dev machines, not in the suite.
  */
 import assert from "node:assert/strict";
+import { PassThrough } from "node:stream";
 import { describe, it } from "node:test";
-import { browserServiceSpawnEnv, parseBrowserServiceLine } from "../src/agent/subagents/headless.ts";
+import { browserServiceSpawnEnv, devToolsEndpoint } from "../src/agent/subagents/headless.ts";
 
 describe("browser-service helper (pure halves)", () => {
-	it("parses the handshake line into a port", () => {
-		assert.equal(parseBrowserServiceLine("BROWSER_SERVICE_CDP 54321"), 54321);
+	it("is ready when Chromium prints its DevTools endpoint on stderr", async () => {
+		const stderr = new PassThrough();
+		const ready = devToolsEndpoint(stderr, 5_000);
+		stderr.write("[1234:ERROR:gpu_init.cc] unrelated noise\nDevTools listening on ws://127.0.0.1:");
+		stderr.write("57983/devtools/browser/0f3c-41aa\n");
+		assert.equal(await ready, "ws://127.0.0.1:57983/devtools/browser/0f3c-41aa");
 	});
 
-	it("rejects non-handshake lines", () => {
-		assert.equal(parseBrowserServiceLine("DevTools listening on ws://127.0.0.1:57983/devtools/browser/x"), null);
-		assert.equal(parseBrowserServiceLine(""), null);
-		assert.equal(parseBrowserServiceLine("BROWSER_SERVICE_CDP 0"), null);
-		assert.equal(parseBrowserServiceLine("BROWSER_SERVICE_CDP 99999"), null);
+	it("gives up when the helper exits without the DevTools line", async () => {
+		const stderr = new PassThrough();
+		const ready = devToolsEndpoint(stderr, 5_000);
+		stderr.end("browser-service failed: Error: no display\n");
+		assert.equal(await ready, null);
+	});
+
+	it("gives up at the timeout when the line never comes", async () => {
+		const stderr = new PassThrough();
+		const started = Date.now();
+		assert.equal(await devToolsEndpoint(stderr, 100), null);
+		assert.ok(Date.now() - started >= 90, "resolved before the timeout");
+		stderr.destroy();
 	});
 
 	it("spawn env strips ELECTRON_RUN_AS_NODE — the helper must be a full app", () => {

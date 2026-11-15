@@ -28,7 +28,7 @@ Object.defineProperty(dom.window.HTMLTextAreaElement.prototype, "defaultValue", 
 });
 Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
-const { createRoot } = await import("react-dom/client");
+const { createRoot } = await import("./helpers/app-render.tsx");
 const { ProseComposer } = await import("../components/lesson/prose/prose-composer.tsx");
 const { StickToBottom } = await import("use-stick-to-bottom");
 const { emptyDockSelection } = await import("../src/core/index.ts");

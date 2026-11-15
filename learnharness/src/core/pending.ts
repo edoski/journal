@@ -94,10 +94,9 @@ export function findPendingToolCall(messages: UIMessage[], authority: PendingQue
  * renders it as the quiet transcript shimmer.
  */
 const ACTIVITY_LABELS: Record<string, string> = {
-	read: "Reading a file…",
-	ls: "Listing a directory…",
-	find: "Finding files…",
-	grep: "Searching file contents…",
+	Read: "Reading a file…",
+	Glob: "Finding files…",
+	Grep: "Searching file contents…",
 	research: "Dispatching research…",
 	demo: "Building a demo…",
 	visual: "Making a visual…",

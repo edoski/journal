@@ -17,46 +17,10 @@ import type { CourseContext } from "../core/contracts/course-context.ts";
 import { baseName, citedSources, contextOf, freeHandle, isInside, isWebAddress, siteName, takenHandles, webAddress } from "../core/course-context.ts";
 import { subscribe } from "../core/events.ts";
 
-/** The files the engine counts as material (learning/sources.py
- *  `MATERIAL_SUFFIXES`), so a linked folder registers what the course
- *  folder's own scan would list. */
-export const MATERIAL_SUFFIXES = new Set([".pdf", ".md", ".txt", ".tex", ".ipynb", ".py", ".html", ".pptx", ".docx", ".csv", ".org", ".rst"]);
-/** The engine's own ceiling on one scan (sources.py `SCAN_LIMIT`): a
- *  folder holding more is linked with its first 200 files, by name. */
-export const FOLDER_LIMIT = 200;
-/** Folders a walk skips besides hidden ones: dependency trees, never notes. */
-const SKIPPED = new Set(["node_modules", "__pycache__"]);
-
 export type ContextResult<T = CourseContext> = { ok: true; value: T } | { ok: false; status: 400 | 404 | 409 | 502; error: string };
 
 const UNREACHABLE = "The course record could not be read. Try again.";
 const fail = (status: 400 | 404 | 409 | 502, error: string): ContextResult<never> => ({ ok: false, status, error });
-
-/** The readable files in a folder and under it, hidden ones and
- *  dependency trees left out, sorted by path, at most FOLDER_LIMIT. */
-export function folderMaterial(folder: string): string[] {
-	const found: string[] = [];
-	const walk = (dir: string) => {
-		let entries: fs.Dirent[];
-		try {
-			entries = fs.readdirSync(dir, { withFileTypes: true });
-		} catch {
-			return;
-		}
-		for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-			if (found.length >= FOLDER_LIMIT) return;
-			if (entry.name.startsWith(".")) continue;
-			const full = path.join(dir, entry.name);
-			if (entry.isDirectory()) {
-				if (!SKIPPED.has(entry.name)) walk(full);
-			} else if (entry.isFile() && MATERIAL_SUFFIXES.has(path.extname(entry.name).toLowerCase())) {
-				found.push(full);
-			}
-		}
-	};
-	walk(folder);
-	return found;
-}
 
 const isFolder = (absolute: string): boolean => {
 	try {
@@ -130,12 +94,19 @@ export function createCourseContexts(deps: CourseContextDeps): CourseContexts {
 		return read(workspace);
 	}
 
-	/** Register the folder's files no source names yet; the paths added. */
-	async function registerNew(workspace: string, loaded: { record: unknown; directory: string }, folders: readonly string[]): Promise<string[]> {
-		const where = locate(loaded.directory);
-		const sources = Object.values((loaded.record as { sources?: Record<string, { path?: unknown }> }).sources ?? {});
-		const known = new Set(sources.flatMap((s) => (typeof s.path === "string" && !isWebAddress(s.path) ? [path.resolve(where(s.path))] : [])));
-		const fresh = folders.flatMap(folderMaterial).filter((file) => !known.has(path.resolve(file)));
+	/** Register the linked folders' files no source names yet, as the
+	 *  engine's own scan lists them; the paths added. */
+	async function registerNew(workspace: string, folders: readonly string[]): Promise<string[]> {
+		const fresh: string[] = [];
+		for (const folder of folders) {
+			const scanned = await courseRecords.run(workspace, { verb: "sources", scan: folder });
+			if (!scanned.ok) {
+				console.error(`[course-context ${workspace}] sources --scan ${folder}: ${scanned.message}`);
+				continue;
+			}
+			const { directory, files } = scanned.json as { directory: string; files: { path: string; handle?: string }[] };
+			fresh.push(...files.filter((file) => file.handle === undefined).map((file) => path.join(directory, file.path)));
+		}
 		if (fresh.length === 0) return [];
 		await deps.adopt(workspace, fresh);
 		const added = await courseRecords.run(workspace, { verb: "sources", add: fresh });
@@ -175,8 +146,7 @@ export function createCourseContexts(deps: CourseContextDeps): CourseContexts {
 			const handle = freeHandle("folder", baseName(real), takenHandles(loaded.record));
 			const saved = await save(workspace, { sources: { [handle]: { path: real, title: baseName(real) } } }, "The folder could not be linked. Try again.");
 			if (!saved.ok) return saved;
-			const after = await load(workspace);
-			if (after && (await registerNew(workspace, after, [real])).length > 0) return read(workspace);
+			if ((await registerNew(workspace, [real])).length > 0) return read(workspace);
 			return saved;
 		},
 
@@ -232,7 +202,7 @@ export function createCourseContexts(deps: CourseContextDeps): CourseContexts {
 		async syncFolders(workspace) {
 			const loaded = await load(workspace);
 			if (!loaded) return [];
-			return registerNew(workspace, loaded, contextFrom(workspace, loaded).folders.map((f) => f.path));
+			return registerNew(workspace, contextFrom(workspace, loaded).folders.map((f) => f.path));
 		},
 	};
 }

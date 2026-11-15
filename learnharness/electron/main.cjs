@@ -59,41 +59,27 @@ function serverEntry() {
 // (pdfjs+Skia, resvg — no browser); DEMOS execute JS and need one. The
 // app's own Chromium serves that via this helper — the server spawns
 //   <this binary> --browser-service
-// and connects over CDP (system Chrome stays the fallback). Handshake:
-// the helper prints "BROWSER_SERVICE_CDP <port>" on stdout once the CDP
-// endpoint listens. Lifetime: parent IPC disconnect/death = quit.
+// and connects over CDP (system Chrome stays the fallback). Chromium picks
+// the port and prints "DevTools listening on ws://…" on stderr, which the
+// server reads. Lifetime: parent IPC disconnect/death = quit.
 // MUST run before the single-instance lock — a helper is a second
 // instance of this very binary, and before the LH_DEV_URL redirect — the
 // helper owns no user data at all.
 if (process.argv.includes("--browser-service")) {
-	const { waitForBrowserService } = require("./browser-service-readiness.cjs");
-	// Own the helper's entire startup lifetime, including the readiness wait.
-	const lifetime = new AbortController();
-	const parentClosed = () => {
-		lifetime.abort(new Error("browser-service parent IPC disconnected"));
-		app.quit();
-	};
 	(async () => {
 		try {
-			// Full Windows Electron replaces stdin with synthetic EOF. Use the
-			// real Node IPC channel, and refuse to start an unowned helper.
+			// Refuse to start a helper no parent owns.
 			if (!process.channel || !process.connected) throw new Error("browser-service requires connected parent IPC");
-			process.once("disconnect", parentClosed);
+			process.once("disconnect", () => app.quit());
 			app.dock?.hide();
-			const port = await freePort();
 			// Must land before app-ready for Chromium to pick it up.
-			app.commandLine.appendSwitch("remote-debugging-port", String(port));
+			app.commandLine.appendSwitch("remote-debugging-port", "0");
 			await app.whenReady();
-			// A hidden window keeps the app lifecycle ordinary on every
-			// platform (no window-all-closed handler is installed here).
+			// The page target CDP clients drive; hidden, and no
+			// window-all-closed handler is installed here.
 			const win = new BrowserWindow({ show: false });
 			await win.loadURL("about:blank");
-			// Window load is not a DevTools HTTP readiness barrier. Confirm the
-			// endpoint before both production and smoke clients see the handshake.
-			await waitForBrowserService(port, { signal: lifetime.signal });
-			if (!lifetime.signal.aborted) console.log(`BROWSER_SERVICE_CDP ${port}`);
 		} catch (err) {
-			if (lifetime.signal.aborted) return; // Parent disconnect is normal.
 			console.error("browser-service failed:", err);
 			app.exit(1);
 		}
@@ -181,11 +167,9 @@ function startServer(port) {
 	return new Promise((resolve, reject) => {
 		const child = spawn(
 			process.execPath,
-			// Only the macOS backend needs this: Next's native title setter
-			// otherwise checks this Node-mode process in as a foreground app.
-			process.platform === "darwin"
-				? ["--require", path.join(process.resourcesPath, "server-title-guard.cjs"), serverEntry()]
-				: [serverEntry()],
+			// Next's native title setter otherwise checks this Node-mode
+			// process in as a foreground app.
+			["--require", path.join(process.resourcesPath, "server-title-guard.cjs"), serverEntry()],
 			{
 				cwd: path.dirname(serverEntry()),
 				env: {
@@ -247,18 +231,8 @@ function createWindow(url) {
 		// (band 0–59.5, pill box 19–39.5) — y 22.5 lands the circles at
 		// 29.25, exactly on the pill. Wordmark gutter: components/sidebar.tsx.
 		// Dragging comes from the renderer's .lh-drag bands (app/globals.css).
-		...(process.platform === "darwin"
-			? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 22.5 } }
-			: {
-				titleBarStyle: "hidden",
-				// Native min/max/close on the right, at the OS's compact default
-				// height. Do not force the zoom-invariant native overlay to match
-				// the renderer's 60 CSS px bar: zooming out would cover its border.
-				// The renderer reserves the actual width via env(titlebar-area-*).
-				titleBarOverlay: { color: "#141414", symbolColor: "#e5e5e5" },
-				// Keep the custom bar alone; Alt reveals the native menu.
-				autoHideMenuBar: true,
-			}),
+		titleBarStyle: "hiddenInset",
+		trafficLightPosition: { x: 16, y: 22.5 },
 		webPreferences: {
 			contextIsolation: true,
 			sandbox: true,
@@ -422,10 +396,9 @@ function installMenu() {
 }
 
 async function main() {
-	app.on("window-all-closed", () => {
-		// macOS convention: the app stays resident, reactivated from the Dock.
-		if (process.platform !== "darwin") app.quit();
-	});
+	// macOS convention: the app stays resident, reactivated from the Dock.
+	// Without a listener Electron quits when the last window closes.
+	app.on("window-all-closed", () => {});
 
 	// The child must not outlive us — cover every quit path.
 	app.on("before-quit", killServer);

@@ -71,7 +71,6 @@ describe("pdf-reader source paths", () => {
 	let home: string;
 	const relativePath = path.join("Course notes", "sample document.pdf");
 	const originalHome = process.env.HOME;
-	const originalUserProfile = process.env.USERPROFILE;
 
 	before(() => {
 		home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-home-")));
@@ -79,14 +78,11 @@ describe("pdf-reader source paths", () => {
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.copyFileSync(FIXTURE, target);
 		process.env.HOME = home;
-		process.env.USERPROFILE = home;
 	});
 
 	after(() => {
 		if (originalHome === undefined) delete process.env.HOME;
 		else process.env.HOME = originalHome;
-		if (originalUserProfile === undefined) delete process.env.USERPROFILE;
-		else process.env.USERPROFILE = originalUserProfile;
 		fs.rmSync(home, { recursive: true, force: true });
 	});
 

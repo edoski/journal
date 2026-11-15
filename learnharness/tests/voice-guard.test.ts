@@ -16,7 +16,7 @@ import type { LhMessage } from "../src/core/native-messages.ts";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-voice-guard-"));
 const originalEnv = process.env;
-process.env = { ...originalEnv, NODE_ENV: "test", LH_DATA_DIR: path.join(scratch, "data"), LH_CREDENTIALS_DIR: scratch, HOME: path.join(scratch, "home") };
+process.env = { ...originalEnv, NODE_ENV: "test", LH_DATA_DIR: path.join(scratch, "data"), HOME: path.join(scratch, "home") };
 after(() => {
 	process.env = originalEnv;
 	fs.rmSync(scratch, { recursive: true, force: true });
@@ -343,6 +343,7 @@ describe("a real turn on the Agent SDK", () => {
 		await agent.continue();
 		assert.equal(faux.state.callCount, 3);
 		assert.match(told, /he never sees ordinary text, only what you send with send_to_user/);
+		assert.match(told, /Stop hook feedback:/, "the note comes from Claude Code's Stop hook, not a message pushed after the result");
 		const shown = visible(agent.state.messages);
 		assert.ok(shown.includes("pivot columns of the original"), "the answer sent with send_to_user shows");
 		assert.ok(!shown.includes("Want to go back"), "the plain text never shows");

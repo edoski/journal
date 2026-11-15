@@ -6,6 +6,7 @@ import argparse
 from collections.abc import Callable
 from dataclasses import dataclass
 import json
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -123,12 +124,15 @@ def _taken(record: dict[str, Any]) -> set[str]:
 def sources(args: argparse.Namespace) -> dict[str, Any]:
     from learning import sources as material
 
-    if args.scan == bool(args.add):
-        raise ValueError("choose one of sources --scan or sources --add PATH...")
+    if bool(args.scan) == bool(args.add):
+        raise ValueError("choose one of sources --scan [DIR] or sources --add PATH...")
     workspace = _workspace(args)
     record = records.load(workspace)
     if args.scan:
-        return material.scan(workspace.sources, record["sources"], taken=_taken(record))
+        folder = None if args.scan is True else Path(args.scan).expanduser().resolve()
+        return material.scan(
+            workspace.sources, record["sources"], taken=_taken(record), folder=folder
+        )
     new, existing = material.prepare(
         workspace.sources, args.add, record["sources"], taken=_taken(record)
     )
@@ -287,7 +291,13 @@ def _build_migrate(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_sources(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--scan", action="store_true", help="List local material")
+    parser.add_argument(
+        "--scan",
+        nargs="?",
+        const=True,
+        metavar="DIR",
+        help="List local material, or that of DIR (a linked folder)",
+    )
     parser.add_argument("--add", nargs="+", metavar="PATH", help="Register files")
 
 

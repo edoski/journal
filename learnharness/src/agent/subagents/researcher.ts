@@ -93,7 +93,7 @@ export async function runResearcherAgent(prompt: string, opts: ResearcherRunOpti
 		engine: opts.engine,
 		systemPrompt: INSTRUCTIONS,
 		maxTurns: 12,
-		webSearch: true,
+		builtins: ["WebSearch"],
 		abortSignal: opts.abortSignal,
 		onUsage: opts.onUsage,
 		onToolStart: opts.onToolStart,

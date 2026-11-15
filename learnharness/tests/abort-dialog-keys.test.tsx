@@ -20,7 +20,7 @@ async function open(onConfirm: () => void) {
 	host = document.createElement("div");
 	document.body.appendChild(host);
 	root = createRoot(host);
-	await act(async () => { root!.render(<AbortTurnBody mode="turn" onClose={() => {}} onConfirm={onConfirm} />); });
+	await act(async () => { root!.render(<AbortTurnBody open mode="turn" onClose={() => {}} onConfirm={onConfirm} />); });
 	document.querySelector<HTMLElement>('[data-testid="abort-turn-cancel"]')!.focus();
 }
 

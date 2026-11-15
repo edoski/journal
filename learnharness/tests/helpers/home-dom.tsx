@@ -8,7 +8,7 @@ import React, { act } from "react";
 import { dom } from "./radix-dom.ts";
 // next/link reaches for `self` when a link mounts.
 (globalThis as Record<string, unknown>).self = globalThis;
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./app-render.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { HomeBody } from "../../components/study-home/study-home.tsx";
 import { lessonOf } from "../../components/study-home/lesson-facts.ts";

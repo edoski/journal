@@ -39,7 +39,7 @@ export function MistakesPress({ rows }: { rows: readonly MistakeRow[] }) {
 				<PopoverHeader className="px-1 pb-1">
 					<PopoverTitle>{MISTAKE_WORDS.title}</PopoverTitle>
 				</PopoverHeader>
-				<div className="-mx-1 max-h-[28rem] overflow-y-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+				<div className="-mx-1 max-h-[28rem] overflow-y-auto px-1">
 					<MistakeList rows={rows} className="px-3" />
 				</div>
 			</PopoverContent>

@@ -5,7 +5,7 @@ import { CheckIcon, ChevronRightIcon } from "lucide-react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { OVERLAY_ATTRS, OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
+import { OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
 
 /** shadcn dropdown menu drawing the menu anatomy (spec: menu.md,
  *  dropdown-menu.md): radius 12 surface, 32px radius 8 items, fill steps for
@@ -73,7 +73,6 @@ function DropdownMenuContent({
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
-        {...OVERLAY_ATTRS}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
@@ -259,7 +258,6 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.SubContent
         data-slot="dropdown-menu-sub-content"
-        {...OVERLAY_ATTRS}
         className={cn(
           OVERLAY_LAYER,
           OVERLAY_MOTION,

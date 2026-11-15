@@ -12,12 +12,29 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useDialogSubject } from "@/components/ui/overlay";
 import { CourseMapStatus } from "@/components/course-map-status";
 import { MaterialField } from "@/components/new-course-fields";
 import { addMaterialForm, type MaterialPick } from "@/components/new-course-facts";
 import { courseLabel, type CourseSummary } from "@/src/core";
 
 type Course = Pick<CourseSummary, "workspace" | "title">;
+
+interface CourseDialogProps {
+	/** The course it acts on; null = closed. */
+	course: Course | null;
+	onClose: () => void;
+	fetchLike?: typeof fetch;
+}
+
+/** One opening of a course dialog, with its own fields, busy and error, so
+ *  the next opening starts clean. */
+interface OneOpening {
+	open: boolean;
+	course: Course;
+	onClose: () => void;
+	fetchLike?: typeof fetch;
+}
 
 const UNREACHABLE = "LearnHarness could not be reached. Check it is running, then try again.";
 
@@ -36,12 +53,12 @@ async function change(fetchLike: typeof fetch, method: "PATCH" | "DELETE", body:
 
 /** Rename: the title in a field, saved by the engine. The folder keeps its
  *  name, so the course's lessons stay linked. */
-export function RenameCourseDialog({ course, onClose, onRenamed, fetchLike = fetch }: {
-	course: Course;
-	onClose: () => void;
-	onRenamed: (title: string) => void;
-	fetchLike?: typeof fetch;
-}) {
+export function RenameCourseDialog({ course, ...props }: CourseDialogProps & { onRenamed: (title: string) => void }) {
+	const { open, shown, opening } = useDialogSubject(course);
+	return shown && <RenameCourse key={opening} open={open} course={shown} {...props} />;
+}
+
+function RenameCourse({ open, course, onClose, onRenamed, fetchLike = fetch }: OneOpening & { onRenamed: (title: string) => void }) {
 	const [title, setTitle] = useState(courseLabel(course));
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -58,7 +75,7 @@ export function RenameCourseDialog({ course, onClose, onRenamed, fetchLike = fet
 		setBusy(false);
 	};
 	return (
-		<Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && !busy && onClose()}>
 			<DialogContent aria-describedby={undefined} data-testid="rename-course-dialog" className="max-w-md">
 				<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
 					<DialogHeader>
@@ -93,12 +110,12 @@ export function RenameCourseDialog({ course, onClose, onRenamed, fetchLike = fet
 
 /** Delete, after asking: the engine forgets the course, so it leaves every
  *  list. What stays is said in the question. */
-export function DeleteCourseDialog({ course, onClose, onDeleted, fetchLike = fetch }: {
-	course: Course;
-	onClose: () => void;
-	onDeleted: () => void;
-	fetchLike?: typeof fetch;
-}) {
+export function DeleteCourseDialog({ course, ...props }: CourseDialogProps & { onDeleted: () => void }) {
+	const { open, shown, opening } = useDialogSubject(course);
+	return shown && <DeleteCourse key={opening} open={open} course={shown} {...props} />;
+}
+
+function DeleteCourse({ open, course, onClose, onDeleted, fetchLike = fetch }: OneOpening & { onDeleted: () => void }) {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const run = async () => {
@@ -111,7 +128,7 @@ export function DeleteCourseDialog({ course, onClose, onDeleted, fetchLike = fet
 		setBusy(false);
 	};
 	return (
-		<AlertDialog open onOpenChange={(open) => !open && !busy && onClose()}>
+		<AlertDialog open={open} onOpenChange={(next) => !next && !busy && onClose()}>
 			<AlertDialogContent data-testid="delete-course-dialog">
 				<AlertDialogHeader>
 					<AlertDialogTitle>Delete {courseLabel(course)}?</AlertDialogTitle>
@@ -152,7 +169,12 @@ export async function sendMaterial(fetchLike: typeof fetch, workspace: string, p
 /** Add material: New course's material field for a course that exists. The
  *  server copies the files into the course and extends its topic map from
  *  them in the background, which the dialog then follows until Done. */
-export function AddMaterialDialog({ course, onClose, fetchLike = fetch }: { course: Course; onClose: () => void; fetchLike?: typeof fetch }) {
+export function AddMaterialDialog({ course, ...props }: CourseDialogProps) {
+	const { open, shown, opening } = useDialogSubject(course);
+	return shown && <AddMaterial key={opening} open={open} course={shown} {...props} />;
+}
+
+function AddMaterial({ open, course, onClose, fetchLike = fetch }: OneOpening) {
 	const [picks, setPicks] = useState<MaterialPick[]>([]);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -168,7 +190,7 @@ export function AddMaterialDialog({ course, onClose, fetchLike = fetch }: { cour
 		setBusy(false);
 	};
 	return (
-		<Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && !busy && onClose()}>
 			<DialogContent aria-describedby={undefined} data-testid="add-material-dialog" className="max-w-md">
 				{added ? (
 					<CourseMapStatus course={course} title={`Material added to ${courseLabel(course)}`} onClose={onClose} fetchLike={fetchLike} />

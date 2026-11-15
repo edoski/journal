@@ -77,9 +77,7 @@ export function SettingsDialogProvider({
 	return (
 		<DialogContext.Provider value={{ open }}>
 			{children}
-			{show && (
-				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} />
-			)}
+			<SettingsDialog open={show} onClose={() => setShow(false)} initialSection={landOn} />
 		</DialogContext.Provider>
 	);
 }
@@ -89,9 +87,11 @@ export function useSettingsDialog() {
 }
 
 function SettingsDialog({
+	open,
 	onClose,
 	initialSection,
 }: {
+	open: boolean;
 	onClose: () => void;
 	initialSection: SectionId;
 }) {
@@ -99,7 +99,7 @@ function SettingsDialog({
 	// the left, the section's grouped rows on the right. The Radix dialog
 	// owns Esc, the backdrop and focus.
 	return (
-		<Dialog open onOpenChange={(open) => !open && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
 			<DialogContent
 				aria-describedby={undefined}
 				data-testid="settings-dialog"
@@ -283,7 +283,7 @@ export function SettingsDialogBody({
 						<XIcon />
 					</Button>
 				</Hint>
-				<div className="min-w-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="settings-content">
+				<div className="min-w-0 flex-1 overflow-y-auto" data-testid="settings-content">
 					{sections}
 				</div>
 			</TabsContent>

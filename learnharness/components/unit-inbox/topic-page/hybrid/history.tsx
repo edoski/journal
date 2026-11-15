@@ -9,7 +9,6 @@ import { GUTTER } from "@/components/unit-inbox/topic-page/row-classes";
 import { ATTEMPT_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
@@ -183,8 +182,8 @@ export function HistoryPane({ className, children }: { className?: string; child
 		};
 	}, [measure]);
 	return (
-		<ScrollArea bar={false} viewportRef={viewport} viewportClassName="min-h-0" data-slot="topic-history" className={cn("-mx-3 flex min-h-0 flex-col", className)} style={edgeFade(edges.top, edges.bottom)}>
+		<div ref={viewport} data-slot="topic-history" className={cn("-mx-3 min-h-0 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring", className)} style={edgeFade(edges.top, edges.bottom)}>
 			<div className="flex flex-col px-3">{children}</div>
-		</ScrollArea>
+		</div>
 	);
 }

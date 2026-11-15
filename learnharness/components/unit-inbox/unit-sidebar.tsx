@@ -3,9 +3,9 @@
 import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
-import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
+import { KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
-import { filterSessions, opensSearchResult, useSessionsSidebar } from "@/components/sidebar-state";
+import { filterSessions, opensSearchResult, rankByTitle, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, toBlobs, useActivity } from "@/components/activity-dock";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
@@ -25,7 +25,6 @@ import { isUnitOpen, TopicCard } from "@/components/unit-inbox/unit-row";
 import { TodayList } from "@/components/unit-inbox/today/today-list";
 import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
 import { sessionsNow, sessionTwins, unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
@@ -50,12 +49,7 @@ export function searchInbox(
 	query: string,
 	courses: readonly StudyCourse[] = [],
 ): { courses: StudyCourse[]; arcs: FoundArc[]; units: Unit[]; sessions: ChatListItem[] } {
-	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] =>
-		items
-			.map((item) => ({ item, score: fuzzyScore(query.trim(), title(item)) }))
-			.filter((r): r is { item: T; score: number } => r.score !== null)
-			.sort((a, b) => b.score - a.score)
-			.map((r) => r.item);
+	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] => rankByTitle(items, query, title);
 	return {
 		courses: best(courses, (c) => c.map.title),
 		arcs: best(
@@ -247,7 +241,7 @@ export function UnitSidebar() {
 						</Hint>
 					</div>
 
-					<ScrollArea viewportRef={s.listRef} bar={false} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
+					<div ref={s.listRef} className="min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
 						<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} onClick={(e) => { if (found && opensSearchResult(e.target)) s.changeQuery(""); }} className="flex min-h-full flex-col gap-px p-2">
 							{!now ? (
 								<NowSkeleton />
@@ -278,7 +272,7 @@ export function UnitSidebar() {
 								<TodayList {...now} />
 							)}
 						</ul>
-					</ScrollArea>
+					</div>
 
 					{running && <ActivitySection />}
 

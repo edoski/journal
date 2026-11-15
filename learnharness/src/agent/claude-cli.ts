@@ -39,7 +39,6 @@ function isExecutableFile(path: string): boolean {
 /** A macOS GUI app does not inherit the shell PATH, so the usual install
  * locations are searched after PATH. Returns an absolute path or null. */
 export function resolveClaudeBinary({ env = process.env, home = homedir(), executable = isExecutableFile }: { env?: ClaudeEnv; home?: string; executable?: (path: string) => boolean } = {}): string | null {
-	const name = process.platform === "win32" ? "claude.exe" : "claude";
 	const dirs = [
 		...(env.PATH ?? "").split(delimiter).filter((dir) => isAbsolute(dir)),
 		join(home, ".local", "bin"),
@@ -47,7 +46,7 @@ export function resolveClaudeBinary({ env = process.env, home = homedir(), execu
 		"/usr/local/bin",
 	];
 	for (const dir of dirs) {
-		const candidate = join(dir, name);
+		const candidate = join(dir, "claude");
 		if (executable(candidate)) return candidate;
 	}
 	return null;

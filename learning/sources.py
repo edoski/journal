@@ -113,22 +113,29 @@ def suggest_handle(path: Path, taken: Collection[str]) -> str:
 
 
 def scan(
-    material: Path, registered: dict[str, Any], *, taken: Collection[str] = ()
+    material: Path,
+    registered: dict[str, Any],
+    *,
+    taken: Collection[str] = (),
+    folder: Path | None = None,
 ) -> dict[str, Any]:
     """List course material, naming registered handles and suggesting free ones.
 
     ``taken`` holds the course's topic, knowledge and task handles, which share
-    one namespace with sources. Inside a git work tree only files git does not
-    ignore are listed, so dependency and build directories never crowd out the
-    material.
+    one namespace with sources. ``folder`` lists another folder (one linked to
+    the course) instead of ``material``, still against the course's sources;
+    paths are relative to the folder listed. Inside a git work tree only files
+    git does not ignore are listed, so dependency and build directories never
+    crowd out the material.
     """
-    if not material.is_dir():
-        raise ValueError(f"source directory does not exist: {material}")
+    root = material if folder is None else folder
+    if not root.is_dir():
+        raise ValueError(f"source directory does not exist: {root}")
     known = _known(material, registered)
     used = {*taken, *registered}
     found: list[dict[str, Any]] = []
     truncated = False
-    for path in _material(material):
+    for path in _material(root):
         if path.suffix.lower() not in MATERIAL_SUFFIXES:
             continue
         if len(found) >= SCAN_LIMIT:
@@ -139,7 +146,7 @@ def scan(
             size = path.stat().st_size
         except OSError:
             continue
-        item: dict[str, Any] = {"path": os.path.relpath(path, material), "bytes": size}
+        item: dict[str, Any] = {"path": os.path.relpath(path, root), "bytes": size}
         if resolved in known:
             item["handle"] = known[resolved]
         else:
@@ -147,7 +154,7 @@ def scan(
             used.add(item["suggested_handle"])
         found.append(item)
     found.sort(key=lambda item: item["path"])
-    return {"directory": str(material), "files": found, "truncated": truncated}
+    return {"directory": str(root), "files": found, "truncated": truncated}
 
 
 def _missing(value: str, absolute: Path) -> ValueError:

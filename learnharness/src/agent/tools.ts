@@ -17,10 +17,6 @@ import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
 import { nameSessionTool } from "./tools/name-session.ts";
 import { withPracticeHandoff } from "./tools/handoff.ts";
-import { readTool } from "./tools/read.ts";
-import { lsTool } from "./tools/ls.ts";
-import { findTool } from "./tools/find.ts";
-import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
 
 export { jobTools };
@@ -187,13 +183,6 @@ export function createProberTools(ctx: ProberToolContext): Record<string, AgentT
 	// not just the one the latest wobble incident landed on.
 	return withPracticeHandoff(healToolRecord({
 		ask_user_question: askUserQuestionTool,
-		// The learner-filesystem set (sources v1): the prober inspects and
-		// LOCATES learner-referenced files while assessing the edge.
-		// Read-only by construction.
-		read: readTool,
-		ls: lsTool,
-		find: findTool,
-		grep: grepTool,
 		// Job dispatch in the probe phase (owner ruling, 2026-09-20):
 		// research + pdf are available in every phase — the prober can
 		// verify facts or read learner PDFs while assessing. demo/visual
@@ -247,13 +236,6 @@ export function createTeacherTools(ctx: TeacherToolContext): Record<string, Agen
 	// healToolRecord — same standard as the prober's registry (above).
 	const tools = healToolRecord({
 		ask_user_question: askUserQuestionTool,
-		// The learner-filesystem set (sources v1): the teacher locates and
-		// reads learner-referenced files on its own terms — nothing
-		// auto-injects. Read-only by construction (fs-shared.ts).
-		read: readTool,
-		ls: lsTool,
-		find: findTool,
-		grep: grepTool,
 		...planTools(ctx),
 		...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn }),
 		explain: teachExplainToolFor(ctx),

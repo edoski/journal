@@ -1,5 +1,7 @@
 /** The app rules every portalled overlay primitive carries (spec: overlay.md). */
 
+import { useState } from "react"
+
 /** One stack for the app: dialogs at 50, menus, selects and popovers at 70
  *  so one opened inside a dialog draws on top, tooltips at 80 (tooltip.tsx,
  *  Proposed) so a hint inside a popover stays visible. `lh-no-drag` keeps portalled content clickable where
@@ -13,10 +15,6 @@ export const DIALOG_LAYER = "z-50 lh-no-drag"
 /** 150ms fade and 95% zoom from the trigger's side; none under reduced motion. */
 export const OVERLAY_MOTION =
   "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
-
-/** Marks a layer as inside for the hand-rolled outside-click guards that
- *  still check `[data-lh-menu]` (the setup dialog, enter-submits, session find). */
-export const OVERLAY_ATTRS = { "data-lh-menu": "" } as const
 
 /** One Esc closes one layer. Radix hears Esc on document in the capture phase
  *  and lets it run on, so without this the window shortcut would also abort
@@ -80,4 +78,18 @@ export function openerReturn(doc: () => Document | undefined = () => globalThis.
       landFocusAfterClose(undefined, doc)(event)
     },
   }
+}
+
+/** A dialog about something (the lesson to delete, the mark to dispute) is
+ *  open while its subject is set. Radix keeps the content mounted through
+ *  its exit animation, so once the subject goes the dialog keeps showing the
+ *  last one until the content leaves. `opening` counts the openings: as a
+ *  key it gives each one fresh state. */
+export function useDialogSubject<T>(subject: T | null): { open: boolean; shown: T | null; opening: number } {
+  const open = subject !== null
+  const [held, setHeld] = useState({ shown: subject, open, opening: 0 })
+  const shown = subject ?? held.shown
+  const opening = open && !held.open ? held.opening + 1 : held.opening
+  if (open !== held.open || shown !== held.shown) setHeld({ shown, open, opening })
+  return { open, shown, opening }
 }

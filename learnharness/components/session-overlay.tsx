@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { MaximizeIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
 import { renderMermaid } from "@/components/mermaid-render";
@@ -10,6 +11,7 @@ import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { SvgImage } from "@/components/artifacts/svg-image";
 import { FIGURE_ON_DARK } from "@/components/artifacts/figure-on-dark";
+import { claimEscape, openerReturn } from "@/components/ui/overlay";
 
 /**
  * SESSION-SCOPED OVERLAYS (owner wave, 2026-09-19): the "fullscreen"
@@ -141,22 +143,7 @@ export function MermaidOverlay({
 		};
 	}, [rawSvg, chart, attempt]);
 
-	// Esc closes — claimed at the document level (THE ONE-ESC LAW, owner
-	// keyboard round 2026-10-06): one Esc, one action; the window chain
-	// (abort) never fires under a surfaced layer.
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				e.preventDefault();
-				e.stopPropagation();
-				onClose();
-			}
-		};
-		document.addEventListener("keydown", onKey);
-		return () => document.removeEventListener("keydown", onKey);
-	}, [onClose]);
-
-	// ── pan/zoom viewport (same wiring as the plan popup) ──
+	const [focusReturn] = useState(() => openerReturn());
 	const viewportRef = useRef<HTMLDivElement>(null);
 	const [size, setSize] = useState({ w: 0, h: 0 });
 	useEffect(() => {
@@ -241,21 +228,18 @@ export function MermaidOverlay({
 		setView(fitGraphView(box, size, fitZoom));
 	};
 
+	// A Radix Dialog with no portal: it stays absolute inside the chat page's
+	// session area, below the drag bar and right of the sidebar, and brings
+	// the focus trap and Esc. claimEscape keeps the window's turn abort from
+	// hearing the Esc; openerReturn gives focus back to what opened it, as
+	// the app's other dialogs do. 80% + blur: the transcript ghosts through
+	// (owner decision, 2026-09-19).
 	return (
-		<div
-			data-testid="mermaid-overlay"
-			// SESSION-SCOPED (not fixed): mounts absolute inside the chat
-			// page's session-area div — below the drag bar, right of the
-			// sidebar. 80% + blur: the transcript ghosts through (owner
-			// decision, 2026-09-19).
-			className={L.root}
-			role="dialog"
-			aria-modal="true"
-			aria-label={photo !== undefined ? "Photo of your working" : "Diagram focus"}
-		>
+		<DialogPrimitive.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
+		<DialogPrimitive.Content data-testid="mermaid-overlay" className={L.root} onEscapeKeyDown={claimEscape()} onOpenAutoFocus={focusReturn.onOpenAutoFocus} onCloseAutoFocus={focusReturn.onCloseAutoFocus}>
 			<div className="mb-2 flex items-center gap-2">
-				<span className={L.title}>{photo !== undefined ? "Your working" : "Diagram"}</span>
-				<span className={L.sub}>{photo !== undefined ? "the photo you sent" : "from this lesson"}</span>
+				<DialogPrimitive.Title className={L.title}>{photo !== undefined ? "Your working" : "Diagram"}</DialogPrimitive.Title>
+				<DialogPrimitive.Description className={L.sub}>{photo !== undefined ? "the photo you sent" : "from this lesson"}</DialogPrimitive.Description>
 				<Hint label="Close" binding="escape" side="left">
 <Button
 					variant="quiet"
@@ -371,6 +355,7 @@ export function MermaidOverlay({
 					</div>
 				)}
 			</div>
-		</div>
+		</DialogPrimitive.Content>
+		</DialogPrimitive.Root>
 	);
 }

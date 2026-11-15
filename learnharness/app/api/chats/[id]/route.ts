@@ -1,4 +1,4 @@
-import { deleteChatSession, getChat, isTurnRunning, sessionCost, stores, turnFailure } from "@/src/server";
+import { deleteChatSession, getChat, isTurnRunning, stores, turnFailure } from "@/src/server";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
@@ -13,7 +13,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 	return Response.json({
 		...chat,
 		messages: chat.messages,
-		pricing: sessionCost(chat),
 		turnInFlight: isTurnRunning(id),
 		// Also reaches idle views that missed the failing turn's stream.
 		turnError: turnFailure(id),

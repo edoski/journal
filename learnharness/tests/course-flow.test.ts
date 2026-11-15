@@ -24,7 +24,7 @@ import {
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
-import { fakeEngine, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
+import { fakeEngine, fakeFor, onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-flow-")));
@@ -416,20 +416,19 @@ describe("a course-linked turn", () => {
 		assert.equal("sure" in observation!, false, "the Guessing of an earlier note is not this give-up's confidence");
 	});
 
-	it("a course session's file search defaults to the course folder", async () => {
+	it("a course session's agents read his files with Claude Code's tools, told the course folder a search starts in", async () => {
+		const faux = scripted([() => fauxAssistantMessage([fauxText("ok")])]);
+		const fake = fakeFor(faux);
 		const agent = createPracticeAgent(
 			{ chatId: "chat_files", chatStore },
-			{ engine: fakeEngine(scripted([])), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never, arcs: false } },
+			{ engine: fake.engine, course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never, arcs: false } },
 		);
-		for (const name of ["find", "grep", "ls"]) {
-			const tool = agent.state.tools.find((t) => t.name === name)!;
-			const description = (tool.parameters as { properties: { path: { description: string } } }).properties.path.description;
-			assert.match(description, /default: the course folder; a relative path starts from the learner's home/, name);
-		}
-		fs.writeFileSync(path.join(LINALG, "lecture-1.md"), "rank\n");
-		const ls = agent.state.tools.find((t) => t.name === "ls")!;
-		const listing = await ls.execute("ls1", ls.prepareArguments ? ls.prepareArguments({}) : {});
-		assert.equal((listing.content[0] as { text: string }).text, path.join(LINALG, "lecture-1.md"), "ls with no path lists the course folder, as paths read opens");
+		assert.ok(agent.state.systemPrompt.includes(`This course's folder: ${LINALG}`), "the prompt names the course folder");
+		assert.ok(agent.state.systemPrompt.includes(`His home folder: ${os.homedir()}`), "and his home");
+		await agent.continue();
+		assert.deepEqual(fake.calls[0]!.tools, ["Read", "Grep", "Glob"], "his files are Claude Code's Read, Grep and Glob");
+		assert.deepEqual(fake.calls[0]!.allowedTools?.slice(1), ["Read", "Grep", "Glob"], "which run without a permission prompt");
+		assert.deepEqual(agent.state.tools.filter((t) => ["read", "ls", "find", "grep"].includes(t.name)), [], "the app has no file tools of its own");
 	});
 
 	it("each turn reads whether the course has arcs, and only a course with arcs gets the arcs doctrine (round 4)", async () => {

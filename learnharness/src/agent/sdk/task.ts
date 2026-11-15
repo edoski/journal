@@ -1,7 +1,7 @@
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import { SdkAgent } from "./agent.ts";
-import type { SdkEngine } from "./engine.ts";
+import type { ClaudeCodeTool, SdkEngine } from "./engine.ts";
 
 /**
  * The runner every background agent shares (researcher, demo builder, visual
@@ -25,8 +25,8 @@ export interface SubagentRunOptions {
 	onAssistantMessage?: (message: AssistantMessage, step: number) => void;
 	/** A clean call of this tool ends the run (a submit). */
 	endsTurn?: (toolName: string) => boolean;
-	/** Claude Code's own web search joins the tools (the researcher). */
-	webSearch?: boolean;
+	/** Claude Code's own tools that join the app's (the researcher's WebSearch). */
+	builtins?: readonly ClaudeCodeTool[];
 }
 
 export interface SubagentRunResult {
@@ -44,7 +44,7 @@ export async function runSubagent(tools: AgentTool<any, any>[], opts: SubagentRu
 		tools,
 		messages: [{ ...prompt, id: "prompt" } as AgentMessage],
 		endsTurn: opts.endsTurn ?? (() => false),
-		webSearch: opts.webSearch,
+		builtins: opts.builtins,
 		ephemeral: { maxTurns: opts.maxTurns },
 	});
 	const onAbort = () => agent.abort();

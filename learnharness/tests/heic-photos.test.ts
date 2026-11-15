@@ -18,7 +18,7 @@ test("a HEIC photo becomes a JPEG on the Mac", { skip: !existsSync(SIPS) && "mac
 	const dir = mkdtempSync(join(tmpdir(), "lh-heic-test-"));
 	try {
 		const heic = join(dir, "working.heic");
-		execFileSync(SIPS, ["-s", "format", "heic", new URL("../build/icon.png", import.meta.url).pathname, "--out", heic], { stdio: "ignore" });
+		execFileSync(SIPS, ["-s", "format", "heic", new URL("../build/background.png", import.meta.url).pathname, "--out", heic], { stdio: "ignore" });
 		const bytes = new Uint8Array(readFileSync(heic));
 		assert.equal(isHeic(bytes), true);
 		const jpeg = await heicToJpeg(bytes);
@@ -31,7 +31,7 @@ test("a HEIC photo becomes a JPEG on the Mac", { skip: !existsSync(SIPS) && "mac
 });
 
 test("anything that is not HEIC is not converted", async () => {
-	assert.equal(await heicToJpeg(new Uint8Array(readFileSync(new URL("../build/icon.png", import.meta.url)))), null);
+	assert.equal(await heicToJpeg(new Uint8Array(readFileSync(new URL("../build/background.png", import.meta.url)))), null);
 });
 
 test("the photo box sends a photo the browser cannot open to be converted, then reads the JPEG", async () => {

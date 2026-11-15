@@ -48,9 +48,8 @@ async function loadPdfjs() {
 
 /** Standard-font data dir (live-smoke finding 2026-09-19: without it pdfjs
  *  warns and falls back on non-embedded standard fonts — Helvetica, Times…).
- *  The node side takes a plain filesystem path, shared by text and rendering.
- *  pdfjs checks endsWith("/") even on Windows: use a literal trailing slash,
- *  NOT path.sep ("\\" on Windows). Node fs accepts this path on every OS. */
+ *  The node side takes a plain filesystem path, shared by text and rendering;
+ *  pdfjs requires its trailing slash. */
 export function standardFontsDir(): string {
 	return path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "node_modules", "pdfjs-dist", "standard_fonts") + "/";
 }

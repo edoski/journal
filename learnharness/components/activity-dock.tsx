@@ -52,8 +52,6 @@ interface FeedUsage extends NonNullable<JobRecord["usage"]> {
 }
 
 export interface FeedJob extends JobRecord {
-	/** Read-time server estimate; absent on older transport payloads. */
-	costUsd?: number | null;
 	title: string;
 	usage?: FeedUsage;
 	/** Server-joined live catalog limit (owner amendment 2026-09-23) —

@@ -5,7 +5,7 @@ import React from "react";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { buildInlineSrcDoc, demoPageLight, demoThemeStyle, INLINE_BRIDGE_SCRIPT } from "../components/artifacts/inline-figure.tsx";
 import { SubagentSteerCard } from "../components/artifacts/steer-card.tsx";
 import { buildSubagentSteer } from "../src/core/contracts.ts";

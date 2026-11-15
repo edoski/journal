@@ -16,10 +16,6 @@
 
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { readTool } from "./read.ts";
-import { lsTool } from "./ls.ts";
-import { findTool } from "./find.ts";
-import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
 import { teachHandoffTool } from "./handoff.ts";
 import { nameSessionTool } from "./name-session.ts";
@@ -316,11 +312,10 @@ export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording):
 export function practiceTools(ctx: PracticeToolContext, course?: CourseToolContext): Record<string, AgentTool<any>> {
 	// ONE gate per turn, shared by both tools — the intra-turn truth.
 	const gate = createPracticeGate(ctx);
-	// THE RARELY-NEEDED SET (owner round 10): read/ls/find/grep over the
-	// learner's files (always — the same read-only set the teacher and
-	// prober carry), the research + pdf jobs (available without search
-	// keys; demo/visual stay teach-only), and
-	// the prober's map readers when the settings gate opened.
+	// THE RARELY-NEEDED SET (owner round 10): the research + pdf jobs
+	// (available without search keys; demo/visual stay teach-only), and
+	// the prober's map readers when the settings gate opened. His files are
+	// Claude Code's Read, Grep and Glob, as for every tutor agent.
 	// problem/conclude are the session; these are exceptions the doctrine
 	// says to reach for rarely.
 	const jobs = ctx.jobs ? jobTools(ctx.jobs) : null;
@@ -331,10 +326,6 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 	return healToolRecord({
 		problem: problemTool(gate),
 		conclude: concludeTool(gate, course ? { ctx, course } : undefined),
-		read: readTool,
-		ls: lsTool,
-		find: findTool,
-		grep: grepTool,
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
 		...(ctx.deliver ? teachHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }, gate) : {}),

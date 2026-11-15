@@ -102,6 +102,27 @@ describe("researcher pdf tools — download + triage", () => {
 		}
 	});
 
+	it("the download has one limit, the tool's: it stops when the turn stops, with no timer of its own", async () => {
+		const dir = await newDir();
+		const tools = createPdfReadTools(dir);
+		const realFetch = globalThis.fetch;
+		let seen: AbortSignal | undefined;
+		globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+			seen = init?.signal ?? undefined;
+			return pdfResponse();
+		}) as typeof fetch;
+		try {
+			const turn = new AbortController();
+			await tools.web_fetch_pdf!.execute!("t1", { url: "https://arxiv.org/pdf/2406.14058" }, turn.signal);
+			assert.ok(seen, "the download gets a signal");
+			assert.equal(seen!.aborted, false);
+			turn.abort();
+			assert.equal(seen!.aborted, true, "the turn's stop reaches the download");
+		} finally {
+			globalThis.fetch = realFetch;
+		}
+	});
+
 	it("the follow-up tools read the download page-level (extract + search)", async () => {
 		const dir = await newDir();
 		const tools = createPdfReadTools(dir);

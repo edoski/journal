@@ -8,10 +8,10 @@ import { describe, it } from "node:test";
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const TSX_LOADER = path.join(REPO_ROOT, "node_modules", "tsx", "dist", "loader.mjs");
 
-type Resolved = { data: string; chats: string; credentials: string; dataDirExisted: boolean };
+type Resolved = { data: string; chats: string; dataDirExisted: boolean };
 
 function resolveInChild(env: { NODE_ENV?: "test"; NODE_TEST_CONTEXT?: string }): Resolved {
-	const { LH_DATA_DIR: _data, LH_CREDENTIALS_DIR: _credentials, NODE_TEST_CONTEXT: _runner, ...rest } = process.env;
+	const { LH_DATA_DIR: _data, NODE_TEST_CONTEXT: _runner, ...rest } = process.env;
 	const out = execFileSync(
 		process.execPath,
 		[
@@ -20,7 +20,7 @@ function resolveInChild(env: { NODE_ENV?: "test"; NODE_TEST_CONTEXT?: string }):
 			"--eval",
 			`const m = await import(${JSON.stringify(path.join(REPO_ROOT, "config.ts"))});
 			const fs = await import("node:fs");
-			console.log(JSON.stringify({ data: m.PATHS.data, chats: m.PATHS.chats, credentials: m.CREDENTIALS_DIR, dataDirExisted: fs.existsSync(m.PATHS.data) }));`,
+			console.log(JSON.stringify({ data: m.PATHS.data, chats: m.PATHS.chats, dataDirExisted: fs.existsSync(m.PATHS.data) }));`,
 		],
 		{ cwd: REPO_ROOT, encoding: "utf-8", env: { ...rest, NODE_ENV: "development", ...env } },
 	);
@@ -45,11 +45,10 @@ describe("LH_DATA_DIR seam", () => {
 		}
 	});
 
-	it("unset in a plain dev process = the repo data/, and the old sign-in files in the repo root", () => {
+	it("unset in a plain dev process = the repo data/", () => {
 		const parsed = resolveInChild({});
 		assert.equal(parsed.data, path.join(REPO_ROOT, "data"));
 		assert.equal(parsed.chats, path.join(REPO_ROOT, "data", "chats"));
-		assert.equal(parsed.credentials, REPO_ROOT);
 	});
 
 	for (const [runner, env] of [
@@ -61,8 +60,6 @@ describe("LH_DATA_DIR seam", () => {
 			const second = resolveInChild(env);
 			for (const resolved of [first, second]) {
 				assert.ok(!resolved.data.startsWith(REPO_ROOT + path.sep), `${resolved.data} is outside the repo`);
-				assert.ok(!resolved.credentials.startsWith(REPO_ROOT), `${resolved.credentials} is outside the repo`);
-				assert.equal(resolved.credentials, path.dirname(resolved.data), "the credentials dir sits beside data/, like desktop userData");
 				assert.equal(resolved.dataDirExisted, false, "the data dir starts empty: nothing to inherit");
 				assert.equal(fs.existsSync(path.dirname(resolved.data)), false, "the scratch dir is removed when the process exits");
 			}

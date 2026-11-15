@@ -32,7 +32,7 @@ npx tsx --env-file=.env.local scripts/backfill-graph.ts       # wipe + re-extrac
 npx tsx --env-file=.env.local scripts/replay-layout.ts        # re-derive layout from the ledgers
 ```
 
-For Windows/Linux packages and the three-OS CI, see [`docs/desktop-release.md`](desktop-release.md). Native renderer binaries are traced per platform, so packaged builds run on the target OS, not as cross-builds from macOS.
+For the packaged build and its CI, see [`docs/desktop-release.md`](desktop-release.md).
 
 ## Environment (`.env.local`)
 
@@ -41,7 +41,6 @@ Machine-specific paths only. The app runs only on the user's Claude plan, throug
 | Variable | Purpose |
 |---|---|
 | `CHROME_PATH` | optional system Chrome fallback for demo verification; the app's own browser helper is primary (nothing is downloaded) |
-| `LH_CREDENTIALS_DIR` | optional: where older versions kept sign-in files (default: the project directory); nothing reads them now, and the agent's file tools refuse any copy left there |
 
 PDFs render natively with pdfjs/Skia; SVGs use resvg.
 
@@ -134,7 +133,7 @@ src/
                                 (core code depends on these types only)
   core/                         question-core, plan-tree, phases, pending, graph
                                 (merger/derivation), coverage, layout, clusters,
-                                prices, tool-parts — all pure: storage
+                                tool-parts — all pure: storage
                                 arrives as parameters
   store/                        fs adapters implementing the ports: chats · graph
                                 ledgers · jobs (+ render-settings, default-settings)
@@ -150,8 +149,7 @@ data/                           chats/ · graph/ (nodes/chains/sessions/coverage
 ## Key mechanisms
 
 See [sessions and compaction](sessions-and-compaction.md) for how lessons run on the Agent SDK, and
-[compaction and accounting](compaction-accounting.md) for server-side current-catalog pricing. There is no
-pricing-generation step: Pi AI's catalog and public calculator are the authority.
+[compaction and accounting](compaction-accounting.md) for the token counts each turn and job keeps.
 
 **Client-side question tools.** `quiz` and `ask_user_question` have no server `execute`: the tool call streams to the browser, the learner answers in the dock, the client grades via `question-core` and returns the verdict with `addToolOutput` — which fires the SDK continuation so the teacher resumes mid-turn. Options are shuffled deterministically (seeded by toolCallId) so server and client renders match. A pending quiz persisted in the chat record is exactly what makes **resume mid-question free**.
 
@@ -167,13 +165,13 @@ pricing-generation step: Pi AI's catalog and public calculator are the authority
 
 All deterministic, no LLM, no network (engines are injected — pi-ai's faux provider scripted per test; `globalThis.fetch` stubbed where transport matters):
 
-1. **Pure core units** — merger (via the real fs adapters, backup-and-restored), derivation, coverage, question grading, plan tree, phases, clusters, layout, tool-parts, prices.
+1. **Pure core units** — merger (via the real fs adapters, backup-and-restored), derivation, coverage, question grading, plan tree, phases, clusters, layout, tool-parts.
 2. **Server flows** — `handleChatRequest` driven end-to-end with scripted engines: persistence, liveness, steer claiming, the wake pipeline (409 retry, quiz deferral, idempotency), crash recovery, the data-dir seam (including a fresh child process).
 3. **Sub-agent loops** — researcher/demo-builder/visual-maker with fake headless APIs; the extraction pipeline end-to-end (audit drops, failure-checkpoints-nothing, single-flight, abort).
 4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage via React server-side rendering.
 5. **Golden fixtures** (`tests/fixtures/golden-data/`) — a REAL data dir (real records produced by the app, never hand-edited), copied to a temp dir and read through the production paths via the `LH_DATA_DIR` seam. Pins that real data parses, flattens to a legal LLM wire, derives the graph end-to-end, covers every custom-marker kind, and that reads never write. **The fixture law:** an intentional on-disk format change updates the fixtures in the same commit — see the fixture README.
 
-Tests never touch the repo's `data/` or any sign-in file left in it. `config.ts` treats a process as a test when `NODE_ENV=test` (set by `npm test`) or when `NODE_TEST_CONTEXT` is set (node's test runner sets it in every test file, so `npx tsx --test tests/x.test.ts` counts too). In a test process, an unset `LH_DATA_DIR` resolves to `data/` inside a fresh temporary directory, and an unset `LH_CREDENTIALS_DIR` resolves to that directory. Each test process gets its own directory and removes it on exit. A test that needs to know the path, or to seed it before the stores load, sets `LH_DATA_DIR` before its first import of `config.ts`.
+Tests never touch the repo's `data/`. `config.ts` treats a process as a test when `NODE_ENV=test` (set by `npm test`) or when `NODE_TEST_CONTEXT` is set (node's test runner sets it in every test file, so `npx tsx --test tests/x.test.ts` counts too). In a test process, an unset `LH_DATA_DIR` resolves to `data/` inside a fresh temporary directory. Each test process gets its own directory and removes it on exit. A test that needs to know the path, or to seed it before the stores load, sets `LH_DATA_DIR` before its first import of `config.ts`.
 
 ## Lineage
 

@@ -156,11 +156,11 @@ describe("problem poses carry course topic handles", () => {
 // ── the registry + the agent ────────────────────────────────────────────────
 
 describe("the practice agent", () => {
-	it("bare registry: the session pair + the learner-filesystem set — no question, plan, or lesson tools", () => {
+	it("bare registry: the session pair alone — no question, plan, lesson or file tools of the app's", () => {
 		const tools = practiceTools(ctxOf([]));
 		assert.deepEqual(
 			Object.keys(tools).sort(),
-			["conclude", "find", "grep", "ls", "problem", "read"],
+			["conclude", "problem"],
 		);
 	});
 
@@ -169,7 +169,7 @@ describe("the practice agent", () => {
 		const tools = practiceTools({ ...ctxOf([]), jobs });
 		// Both jobs compose in. Practice does not apply the teacher/prober
 		// user tool-toggle filter.
-		assert.deepEqual(Object.keys(tools).sort(), ["conclude", "find", "grep", "ls", "pdf", "problem", "read", "research"]);
+		assert.deepEqual(Object.keys(tools).sort(), ["conclude", "pdf", "problem", "research"]);
 	});
 
 	it("constructs with exactly the practice registry", () => {

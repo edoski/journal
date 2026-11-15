@@ -6,6 +6,7 @@ import { markHow, type AnswerMark, type DisputeDetails, type DisputedHow, type M
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
+import { useDialogSubject } from "@/components/ui/overlay";
 import { MathText } from "@/components/ui/math-text";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -124,7 +125,14 @@ const HOW_PICKS: readonly DisputedHow[] = ["ownWork", "withHelp"];
  *  or how he thinks it should count (round 6: help could be argued only
  *  in words). ↑ from the start of the field reaches the choices, ↑ ↓ move
  *  between them and back, ← → within one, ⌘↵ sends. */
-export function DisputeDialog({ mark, onClose, onSend }: { mark: AnswerMark; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
+export function DisputeDialog({ mark, ...props }: { mark: AnswerMark | null; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
+	const { open, shown, opening } = useDialogSubject(mark);
+	return shown && <DisputeForm key={opening} open={open} mark={shown} {...props} />;
+}
+
+/** One opening of the dispute: its own draft, so the next opening starts
+ *  clean. */
+function DisputeForm({ open, mark, onClose, onSend }: { open: boolean; mark: AnswerMark; onClose: () => void; onSend: (draft: DisputeDraft) => void }) {
 	const [said, setSaid] = useState("");
 	const [proposed, setProposed] = useState<MarkResult | "">("");
 	const [proposedHow, setProposedHow] = useState<DisputedHow | "">("");
@@ -158,7 +166,7 @@ export function DisputeDialog({ mark, onClose, onSend }: { mark: AnswerMark; onC
 		}
 	};
 	return (
-		<Dialog open onOpenChange={(open) => !open && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
 			<DialogContent data-testid="dispute-dialog" className="max-w-md" onKeyDown={onKeyDown} onOpenAutoFocus={(e) => { e.preventDefault(); fieldRef.current?.focus(); }}>
 				<DialogHeader>
 					<DialogTitle>{MARK_WORDS.disputeTitle}</DialogTitle>

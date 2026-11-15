@@ -19,12 +19,11 @@ export function verifyCompressionRuntime(root, runtime = process.execPath) {
 	try {
 		for (const dir of ["data", "tmp"]) fs.mkdirSync(path.join(home, dir));
 		// Allowlist rather than inherit credentials, Node preloads, or app settings.
-		const env = Object.fromEntries(["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT"].flatMap(key =>
-			process.env[key] === undefined ? [] : [[key, process.env[key]]]));
+		const env = process.env.PATH === undefined ? {} : { PATH: process.env.PATH };
 		const result = spawnSync(runtime, [fileURLToPath(import.meta.url), "--probe", path.resolve(root)], {
 			cwd: home,
-			env: { ...env, HOME: home, USERPROFILE: home, TMPDIR: path.join(home, "tmp"), TEMP: path.join(home, "tmp"), TMP: path.join(home, "tmp"),
-				LH_DATA_DIR: path.join(home, "data"), LH_CREDENTIALS_DIR: home, NODE_ENV: "production", ELECTRON_RUN_AS_NODE: "1", NEXT_TELEMETRY_DISABLED: "1" },
+			env: { ...env, HOME: home, TMPDIR: path.join(home, "tmp"),
+				LH_DATA_DIR: path.join(home, "data"), NODE_ENV: "production", ELECTRON_RUN_AS_NODE: "1", NEXT_TELEMETRY_DISABLED: "1" },
 			encoding: "utf8", timeout: 30_000, maxBuffer: 128 * 1024,
 		});
 		assert.equal(result.error, undefined, `compression probe failed: ${result.error?.message}`);
