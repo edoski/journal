@@ -64,6 +64,7 @@ import {
 	doneTonightAtEnd,
 	replyCutOf,
 	latestMarkedAnswer,
+	appOpeningAt,
 } from "@/src/core";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { ActiveProblemContext } from "@/components/lesson/active-problem";
@@ -161,6 +162,7 @@ export function Chat({
 	initiallyInFlight,
 	initiallyCompacting = false,
 	startedIn,
+	appOpening = false,
 	course,
 	place,
 	initiallyCourseDeleted = false,
@@ -182,6 +184,9 @@ export function Chat({
 	 *  over the transcript from it: practice renders a Practice tag in
 	 *  place of the phase chip. */
 	startedIn?: SessionMode;
+	/** Started by a press on its topics: its first message is the app's
+	 *  opening, not his words, and draws no bubble (`appOpeningAt`). */
+	appOpening?: boolean;
 	initialPrompt?: string;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
@@ -979,6 +984,7 @@ export function Chat({
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
+	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
 	const steps = useMemo(() => {
 		if (!planTree) return [];
 		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()), predictionOpenOn(pending));
@@ -1544,7 +1550,12 @@ export function Chat({
 									// PROTOCOL" §4). Key fallback: legacy transcripts (pre id-hygiene)
 									// can still hold empty ids — the index keeps keys unique for them.
 									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} figures="inline" />
-								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
+								) : mi === openingAt ? (
+								// The app's opening words for a pressed start (Start,
+								// Review, a topic's name) are its instruction to the
+								// tutor, not his message: no bubble (round 9).
+								null
+							) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
 								// The seams between the opening questions, planning, teaching
 								// and practice draw nothing: the lesson names no phase (Edo,
 								// 14 Nov 2026), and where he is in the plan is the top bar's

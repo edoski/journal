@@ -45,6 +45,12 @@ export interface ChatRecord {
 	 *  topics), set at creation, else the topic its first plan's goal names
 	 *  (`SessionGoal`). Set once; the step the lesson is on never moves it. */
 	topics?: readonly string[];
+	/** Started by a press on its topics (a topic's page, Home, the
+	 *  calendar), so its first message is the app's instruction to the
+	 *  tutor, never his words: the transcript draws no bubble for it
+	 *  (`appOpeningAt`; round 9: "Poisson distribution" as his first
+	 *  message). Set at creation. */
+	appOpening?: true;
 	/** The arc this session checks, by handle: set at creation when he
 	 *  starts it from an arc's Check it on the course page, so the course
 	 *  brief carries that arc's check (`arcs_ready`). */

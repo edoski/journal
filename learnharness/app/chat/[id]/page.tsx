@@ -22,6 +22,7 @@ export default async function ChatPage({
 			chatId={chat.id}
 			title={chat.title}
 			startedIn={chat.kind}
+			appOpening={chat.appOpening === true}
 			course={chat.course}
 			place={place ?? undefined}
 			// A deleted course's lesson is history (courses.ts courseDeleted).

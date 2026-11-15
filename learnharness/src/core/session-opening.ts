@@ -27,6 +27,16 @@ export function openingText(messages: readonly { role: string; content?: unknown
 	return text?.text ?? null;
 }
 
+/** Where the app's opening sits in the transcript: his first message with
+ *  words, when the session was started by a press on its topics
+ *  (`appOpening`); -1 otherwise. Those words are the app's instruction to
+ *  the tutor, so the transcript draws no bubble for them (round 9: the
+ *  topic's name posted as his first message). */
+export function appOpeningAt(messages: readonly { role: string; parts: readonly { type: string }[] }[], appOpening: boolean): number {
+	if (!appOpening) return -1;
+	return messages.findIndex((m) => m.role === "user" && m.parts.some((p) => p.type === "text"));
+}
+
 /** Whether a session record is a review of course topics: opened on topics
  *  with a review's words ("Review Binomial distribution", or "Review" alone,
  *  the topics it was opened on saying which), whatever it is named now. */
