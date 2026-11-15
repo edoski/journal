@@ -109,7 +109,8 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  * long it is overdue), when an open task was left, that the topic is
  * next on the course's map (why the plan starts a new topic now: "Next in
  * Matrices", "After Expectation, which it needs", cut to "After
- * Expectation", which Home's row shows when it fits),
+ * Expectation", which Home's row shows when it fits; never "Early" on the
+ * plan's own start, which would read as a warning, round 9),
  * or the day the plan dates its next item
  * ("Planned Sun 15 Nov", the course page's line when nothing is today). Engine fields only, never the tutor's prose.
  * Pure.
@@ -132,7 +133,8 @@ export function whyOf(row: TodayRow): Why | null {
 			if (step.on) return { kind: "next", short: `Planned ${planDay(step.on)}` };
 			const short = step.planned ? "Planned today" : "Next up";
 			const why = step.fresh ? course.map.topics.find((t) => t.handle === step.topics[0])?.startsWhy : undefined;
-			return why && startsWhyTells(why) ? { kind: "next", short, starts: { kind: why.kind, words: startsWhyShort(why, course.map) } } : { kind: "next", short };
+			const early = step.planned && why?.kind === "early";
+			return why && startsWhyTells(why) && !early ? { kind: "next", short, starts: { kind: why.kind, words: startsWhyShort(why, course.map) } } : { kind: "next", short };
 		}
 		case "none":
 			return null;
