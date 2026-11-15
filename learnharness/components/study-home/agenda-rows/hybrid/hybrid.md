@@ -15,7 +15,7 @@ Thesis: Edo liked progress, recency and reason (13 Nov 2026) and asked for one r
 
 ## Standing (Home's Proposed)
 
-Edo, 15 Nov 2026, on the first Standing column (its words alone): "feels a bit barebones, needs maybe a standard icon set for it … a bit more detailed somehow but without too much verbosity". On Home's Proposed (study-home.md, "Width") a row on one topic gets a standing column, 240 wide, before the ends; a row of several topics (a problem sheet) leaves it empty, since no one standing is the row's.
+Edo, 15 Nov 2026, on the first Standing column (its words alone): "feels a bit barebones, needs maybe a standard icon set for it … a bit more detailed somehow but without too much verbosity". On Home's Proposed (study-home.md, "Width") a row on one topic gets a standing column, 240 wide, before the ends; a row of several topics (a problem sheet) leaves it empty, since no one standing is the row's, and so does a topic not started: its row reads "Start …", and a cold read took "Not started" beside it for one fact said twice.
 
 | Part | Notes |
 |---|---|

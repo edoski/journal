@@ -41,19 +41,26 @@ describe("Home's width (N1)", () => {
 	});
 });
 
+/** The row's one topic once started; a topic not started has no standing on a row. */
 const topicOf = (row: TodayRow) => {
 	const topics = lineTopics(row);
-	return topics.length === 1 ? row.course?.map.topics.find((t) => t.handle === topics[0]) : undefined;
+	const topic = topics.length === 1 ? row.course?.map.topics.find((t) => t.handle === topics[0]) : undefined;
+	return topic?.level === "new" ? undefined : topic;
 };
 const titleOf = (row: TodayRow) => (h: string) => row.course?.map.topics.find((t) => t.handle === h)?.title ?? h;
 
 describe("the standing", () => {
-	it("says where he stands on a row's one topic as the map does, and nothing on a row of several or none", () => {
+	it("says where he stands on a row's one topic as the map does, and nothing on a row of several, none, or a topic not started", () => {
 		rows.forEach((row, i) => {
 			const topic = topicOf(row);
 			assert.deepEqual(rowStanding(row)?.standing ?? null, topic ? standingOf(topic) : null, `row ${i}`);
 		});
 		assert.ok(rows.some((row) => rowStanding(row) !== null));
+		const row = rows.find((r) => rowStanding(r) !== null)!;
+		const [handle] = lineTopics(row);
+		const map = row.course!.map;
+		const fresh = { ...row, course: { ...row.course!, map: { ...map, topics: map.topics.map((t) => (t.handle === handle ? { ...t, level: "new" as const } : t)) } } };
+		assert.equal(rowStanding(fresh), null, "a topic not started: its row reads Start, never Not started beside it");
 	});
 
 	it("adds why the engine calls the topic weak, as the topic page's head does, unless the row's reason is the miss", () => {

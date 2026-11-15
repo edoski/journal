@@ -14,14 +14,18 @@ export interface RowStanding {
 
 /**
  * The standing Home's Proposed adds to a Today row (Edo's notes, 15 Nov
- * 2026, N1), null on a row of several topics or none. The slip drops when
- * the row's reason is the miss, so the row never says it twice. Pure.
+ * 2026, N1), null on a row of several topics or none, and on a topic not
+ * started: its plan step already reads "Start …", and on a session's row
+ * "Not started" would contradict the lesson, as the topic page's head
+ * goes silent there (the cold read of 15 Nov 2026 read "Not started" beside
+ * "Start Linear maps" as one fact said twice). The slip drops when the
+ * row's reason is the miss, so the row never says it twice. Pure.
  */
 export function rowStanding(row: TodayRow): RowStanding | null {
 	const [handle, ...more] = lineTopics(row);
 	const map = row.course?.map;
 	const topic = handle && more.length === 0 ? map?.topics.find((t) => t.handle === handle) : undefined;
-	if (!map || !topic) return null;
+	if (!map || !topic || topic.level === "new") return null;
 	const slip = whyOf(row)?.kind === "missed" ? null : slipBeside(topic, (h) => map.topics.find((t) => t.handle === h)?.title ?? h);
 	return { standing: standingOf(topic), slip };
 }
