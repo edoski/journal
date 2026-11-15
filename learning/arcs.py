@@ -12,9 +12,10 @@ topic of the lesson in progress, and ``lessons``, every open lesson's topics.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Collection
 from datetime import date
+import re
 from typing import Any, TypedDict
 
 from learning import arc_rules, preferences, progress, schema
@@ -362,10 +363,53 @@ def report(record: dict[str, Any], held_arcs: Collection[str]) -> dict[str, Any]
 # --- the save step ----------------------------------------------------------
 
 
+_UNIT = re.compile(
+    r"\s*(chapter|ch\.|chap\.|section|sect?\.|§|part|unit|module|lecture|week"
+    r"|sheet|worksheet|lab)(?![a-z])\s*(\d+|[a-z]\b)",
+    re.IGNORECASE,
+)
+_UNIT_WORDS = {
+    "ch.": "chapter",
+    "chap.": "chapter",
+    "sec.": "section",
+    "sect.": "section",
+    "§": "section",
+}
+
+Section = tuple[str, str, str]
+
+
+def _section(topic: dict[str, Any]) -> Section | None:
+    """The source and leading unit its first ref with one names: "Section 4.3"
+    and "§4.1" are section 4, "Module 02" is module 2. Pages, slides, lines
+    and exercises name no section."""
+    for ref in topic.get("refs", ()):
+        if match := _UNIT.match(ref.get("locator", "")):
+            word, number = match[1].lower(), match[2].lower()
+            ident = str(int(number)) if number.isdigit() else number
+            return ref.get("source", ""), _UNIT_WORDS.get(word, word), ident
+    return None
+
+
+def _section_arcs(topics: dict[str, Any], keys: Collection[str]) -> dict[Section, str]:
+    """Each section's arc: the one most of its topics in ``keys`` (those with
+    an arc before placement) sit in, and none on a tie."""
+    votes: dict[Section, Counter[str]] = defaultdict(Counter)
+    for key in keys:
+        if section := _section(topics[key]):
+            votes[section][topics[key]["arc"]] += 1
+    homes: dict[Section, str] = {}
+    for section, counts in votes.items():
+        (arc, most), *rest = counts.most_common(2)
+        if not rest or rest[0][1] < most:
+            homes[section] = arc
+    return homes
+
+
 def _place(before: dict[str, Any], record: dict[str, Any]) -> dict[str, str]:
-    """P1: give every topic with no arc the arc nearest the learner that its
-    prerequisites and dependents allow, in prerequisite order, so a placed
-    topic bounds the ones after it."""
+    """P1: give every topic with no arc its section's arc, else the arc nearest
+    the learner, as far as its prerequisites and dependents allow, in
+    prerequisite order, so a placed topic bounds the ones after it."""
     topics = record["topics"]
     if not record["arcs"]:
         return {}
@@ -376,6 +420,7 @@ def _place(before: dict[str, Any], record: dict[str, Any]) -> dict[str, str]:
     moved_on = record.get("path", {}).get("current") in unplaced
     nearest = current(before) if moved_on and before["arcs"] else current(record)
     target = arcs.index(nearest) if nearest in arcs else 0
+    homes = _section_arcs(topics, set(topics) - unplaced)
     placed: dict[str, str] = {}
     for key in progress.path_order(record, everything=True):
         if key not in unplaced:
@@ -398,7 +443,9 @@ def _place(before: dict[str, Any], record: dict[str, Any]) -> dict[str, str]:
                 f'earlier "{arc_rules.title(record, arcs[high])}" needs it; drop the '
                 'need that fails the prerequisite test, or place it with "arc"'
             )
-        arc = arcs[min(max(target, low), high)]
+        home = homes.get(section) if (section := _section(topics[key])) else None
+        index = arcs.index(home) if home in arcs else -1
+        arc = arcs[index if low <= index <= high else min(max(target, low), high)]
         topics[key] = {**topics[key], "arc": arc}
         placed[key] = arc
     return placed

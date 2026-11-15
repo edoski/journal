@@ -4,9 +4,13 @@
  *
  * 1. The edges. An agent that never sees an arc answers the prerequisite test
  *    for every stored `needs` edge and names the true ones the graph misses.
- *    Its verdicts are applied, or only proposed, as per-topic diffs against
- *    the record as it is at save time, so a need a tutor added meanwhile
- *    stays.
+ *    Beside it, one fresh reader per topic reads that topic's own material and
+ *    names every other topic its exercises use. A stored edge is dropped only
+ *    when the judge drops it and the topic's reader found no step using it.
+ *    A use or an add comes in only when a fresh check sorts its step into a
+ *    kind that makes a prerequisite (`ADD_KINDS`). The result is applied, or only
+ *    proposed, as per-topic diffs against the record as it is at save time,
+ *    so a need a tutor added meanwhile stays.
  * 2. The cut. A second agent groups the settled graph into arcs from the
  *    material's units. Its answer has no field for `needs`, and the merge
  *    never sends one: an edge it doubts is kept as a note.
@@ -91,6 +95,8 @@ export interface EdgeVerdict {
 	need: string;
 	keep: boolean;
 	reason: string;
+	/** Dropped by the loop check to let a reversed use in: the two go together. */
+	loop?: true;
 }
 
 /** A true prerequisite the graph misses. */
@@ -112,6 +118,8 @@ export interface EdgeDiff {
 	need: string;
 	change: "drop" | "add";
 	reason: string;
+	/** A drop the loop check made so a reversed use could come in. */
+	loop?: true;
 }
 
 const edgeKey = (topic: string, need: string) => `${topic}\u0000${need}`;
@@ -170,23 +178,321 @@ export function edgeProblems(submit: EdgeSubmit, view: Pick<MapCourseView, "topi
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
 
-/** The edge answer with the missing-prerequisite check's adds joined to its
- *  own, each edge once. Pure. */
-export function withMissing(submit: EdgeSubmit, add: readonly EdgeAdd[]): EdgeSubmit {
-	const listed = new Set(submit.add.map((a) => edgeKey(a.topic, a.need)));
-	return { ...submit, add: [...submit.add, ...add.filter((a) => !listed.has(edgeKey(a.topic, a.need)))] };
+// ─── the readers: each topic's own material ──────────────────────────────────
+
+/** What one topic's reader found: every other topic an exercise on it works
+ *  with, each with the step that uses it. */
+export interface NeedsReading {
+	uses: { need: string; step: string }[];
 }
 
-/** Every topic's needs once an edge answer is applied to the view's, for
- *  the missing-prerequisite check to read. Pure. */
-export function answeredNeeds(view: Pick<MapCourseView, "topics">, submit: EdgeSubmit): Map<string, string[]> {
-	return settledNeeds(view, edgeDiffs(submit));
+/** What is wrong with a reading, for its reader to fix; null when it can be
+ *  used. Pure. */
+export function readingProblems(reading: NeedsReading, topic: string, view: Pick<MapCourseView, "topics">): string | null {
+	const problems: string[] = [];
+	const seen = new Set<string>();
+	for (const u of reading.uses) {
+		if (!(u.need in view.topics)) problems.push(`"${u.need}" is no topic of the course; name topics by their handles as listed.`);
+		else if (u.need === topic) problems.push(`"${topic}" is the topic you read; list only the other topics its exercises use.`);
+		else if (seen.has(u.need)) problems.push(`"${u.need}" is listed twice.`);
+		seen.add(u.need);
+		if (!u.step?.trim()) problems.push(`"${u.need}" gives no step: say which step of an exercise on "${topic}" uses it.`);
+	}
+	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
+}
+
+/** One topic's readers heard as one: every use any of them found, each
+ *  once with the first step given for it; null only when none finished.
+ *  Pure. */
+export function mergeReadings(readings: readonly (NeedsReading | null)[]): NeedsReading | null {
+	const finished = readings.filter((r): r is NeedsReading => r !== null);
+	if (finished.length === 0) return null;
+	const uses = new Map<string, string>();
+	for (const r of finished) for (const u of r.uses) if (!uses.has(u.need)) uses.set(u.need, u.step);
+	return { uses: [...uses].map(([need, step]) => ({ need, step })) };
+}
+
+/** The adds a fresh check sorts, in path order: each use any of a topic's
+ *  readers found and each of the judge's adds that the stored graph lacks,
+ *  once, with every distinct step and reason given for it, so the check
+ *  weighs all the evidence two reads found. Pure. */
+export function addCandidates(submit: EdgeSubmit, readings: ReadonlyMap<string, readonly (NeedsReading | null)[]>, view: Pick<MapCourseView, "topics" | "order">): EdgeAdd[] {
+	const stored = new Set(storedEdges(view).map(([t, n]) => edgeKey(t, n)));
+	const found = new Map<string, { topic: string; need: string; steps: string[] }>();
+	const push = (topic: string, need: string, step: string) => {
+		const key = edgeKey(topic, need);
+		if (stored.has(key) || topic === need || !(topic in view.topics) || !(need in view.topics) || !step.trim()) return;
+		const seen = found.get(key) ?? { topic, need, steps: [] };
+		if (!seen.steps.includes(step.trim())) seen.steps.push(step.trim());
+		found.set(key, seen);
+	};
+	for (const topic of [...view.order.filter((k) => k in view.topics), ...Object.keys(view.topics).filter((k) => !view.order.includes(k))]) {
+		for (const r of readings.get(topic) ?? []) for (const u of r?.uses ?? []) push(topic, u.need, u.step);
+		for (const a of submit.add) if (a.topic === topic) push(topic, a.need, a.reason);
+	}
+	return [...found.values()].map(({ topic, need, steps }) => ({ topic, need, reason: steps.join(" / ") }));
+}
+
+/**
+ * The kinds of step a candidate prerequisite rests on, as the doctrine's
+ * test reads them: B is judged by its definition and the method its
+ * exercises use. Only the first three make "B needs A"; the rest are the
+ * ways a reader finds A in B's material without B needing it.
+ */
+export const ADD_KINDS = {
+	definition: { adds: true, words: "B's definition, statement or central formula is written with A, and working it computes A (∇f(g(x)) = J_gᵀ∇f computes a transpose)." },
+	method: {
+		adds: true,
+		words: "A step towards B's own question, in the method B's material teaches or in an exercise or worked example it sets for B, runs A (a null space's basis is found by row reduction; whether a series converges is settled by the limit of its terms).",
+	},
+	tool: { adds: true, words: "B's work runs on what A teaches: a service, a library, a program or a model it uses (a deploy runbook that ships through a hosting platform)." },
+	property: {
+		adds: false,
+		words: "The step answers A's question about B's object, not B's own question: a side result about B stated through A that no exercise set for B uses to answer B's question, or A's computation carried out on B (the mean of a Binomial answers expectation's question, so it practises expectation, not the Binomial; that a tree has one edge fewer than vertices is counting about trees, which are worked without it).",
+	},
+	application: { adds: false, words: "The step uses B to do A's work: B applied to A's problem (Dijkstra's algorithm run on a road map does not make the algorithm need the maps topic), so A is where B is used, not what B needs." },
+	"other exercise": { adds: false, words: "The step belongs to an exercise the material sets for another topic, not for B." },
+	route: { adds: false, words: "A way of working B that B's material does not teach, such as a lesson's or the reader's own route, or a second method beside the one B's material uses." },
+	wording: { adds: false, words: "B only writes in A's notation or vocabulary, or uses what a learner knows before the course starts." },
+	placement: { adds: false, words: "The reason rests on where the material teaches A (earlier, in the same chapter or section), or on a contrast between the two, and no step of working B uses what A teaches." },
+} as const satisfies Record<string, { adds: boolean; words: string }>;
+
+export type AddKind = keyof typeof ADD_KINDS;
+
+/** The kind check's answer on one candidate. */
+export interface KindVerdict {
+	topic: string;
+	need: string;
+	kind: AddKind;
+	reason: string;
+}
+
+/** What is wrong with the kind check's answer, for it to fix. Pure. */
+export function kindProblems(verdicts: readonly KindVerdict[], candidates: readonly EdgeAdd[]): string | null {
+	const wanted = new Set(candidates.map((c) => edgeKey(c.topic, c.need)));
+	const seen = new Set<string>();
+	const problems: string[] = [];
+	for (const v of verdicts) {
+		const key = edgeKey(v.topic, v.need);
+		if (!wanted.has(key)) problems.push(`"${v.topic}" needs "${v.need}" is no candidate listed; sort only the candidates listed.`);
+		else if (seen.has(key)) problems.push(`"${v.topic}" needs "${v.need}" is sorted twice.`);
+		seen.add(key);
+		if (!(v.kind in ADD_KINDS)) problems.push(`"${v.kind}" is no kind; use one of ${Object.keys(ADD_KINDS).join(", ")}.`);
+		if (!v.reason?.trim()) problems.push(`"${v.topic}" needs "${v.need}" gives no reason: say what in B's material makes it that kind.`);
+	}
+	const missing = candidates.filter((c) => !seen.has(edgeKey(c.topic, c.need)));
+	if (missing.length > 0) problems.push(`sort every candidate: ${missing.map((c) => `"${c.topic}" needs "${c.need}"`).join(", ")} missing.`);
+	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
+}
+
+/** Whether a candidate comes in: with no kind check (it did not finish),
+ *  every one does; with one, only those sorted into a kind that adds. Pure. */
+export function kindAdmits(verdicts: readonly KindVerdict[] | null): (topic: string, need: string) => boolean {
+	if (!verdicts) return () => true;
+	const admitted = new Set(verdicts.filter((v) => ADD_KINDS[v.kind]?.adds).map((v) => edgeKey(v.topic, v.need)));
+	return (topic, need) => admitted.has(edgeKey(topic, need));
+}
+
+/** One edge of a loop, as the readers and the judge left it. */
+export interface LoopEdge {
+	topic: string;
+	need: string;
+	reason: string;
+	/** Stored in the record, rather than added by this pass. */
+	stored: boolean;
+	/** Stored, and its topic's readers found it too: two checks hold it, so
+	 *  a loop never breaks here. */
+	fixed?: true;
+}
+
+/** A loop a reader's use would close: the use, set aside, and the edges
+ *  already kept that lead from its need back to its topic. */
+export interface EdgeLoop {
+	use: EdgeAdd;
+	path: LoopEdge[];
+}
+
+/**
+ * The edge answer once every topic's reader is heard, and the loops its
+ * uses would close.
+ *
+ * - A stored edge the judge drops stays unless its topic's reader read the
+ *   topic's material and found no step that uses it: a drop takes both. A
+ *   reader that did not finish keeps every need of its topic.
+ * - Each use a reader found that the graph lacks is added after the judge's
+ *   own adds, topic by topic in path order, so the same readings always give
+ *   the same answer. One that would close a loop with what is kept and added
+ *   before it is set aside in `loops`, with the edges that close it, for the
+ *   loop check to judge.
+ * - An add, the judge's or a reader's, comes in only when `admits` lets it
+ *   (the kind check's ruling); the rest are returned as `refused`. A
+ *   reader's use still keeps a stored edge, whatever its kind.
+ *
+ * Pure.
+ */
+export function withReadings(
+	submit: EdgeSubmit,
+	readings: ReadonlyMap<string, NeedsReading | null>,
+	view: Pick<MapCourseView, "topics" | "order">,
+	admits: (topic: string, need: string) => boolean = () => true,
+): { submit: EdgeSubmit; loops: EdgeLoop[]; refused: EdgeAdd[] } {
+	const uses = (t: string) => new Map((readings.get(t)?.uses ?? []).map((u) => [u.need, u.step.trim()]));
+	const refused = submit.add.filter((a) => !admits(a.topic, a.need));
+	const verdicts = submit.verdicts.map((v) => {
+		if (v.keep) return v;
+		const reading = readings.get(v.topic);
+		if (!reading) return { ...v, keep: true, reason: `${v.reason.trim()}; kept: the topic's reader did not finish, and a drop takes both checks` };
+		const step = uses(v.topic).get(v.need);
+		return step ? { ...v, keep: true, reason: `kept: the topic's reader found a step that uses it: ${step}` } : v;
+	});
+	const stored = new Set(storedEdges(view).map(([t, n]) => edgeKey(t, n)));
+	const add = submit.add.filter((a) => admits(a.topic, a.need));
+	const added = new Set(add.map((a) => edgeKey(a.topic, a.need)));
+	const turnedAway = new Set(refused.map((a) => edgeKey(a.topic, a.need)));
+	const loops: EdgeLoop[] = [];
+	const ordered = [...view.order.filter((t) => t in view.topics), ...Object.keys(view.topics).filter((t) => !view.order.includes(t))];
+	for (const topic of ordered) {
+		for (const [need, step] of uses(topic)) {
+			const key = edgeKey(topic, need);
+			if (stored.has(key) || added.has(key) || turnedAway.has(key) || !(need in view.topics) || need === topic) continue;
+			const use = { topic, need, reason: step };
+			if (!admits(topic, need)) {
+				refused.push(use);
+				turnedAway.add(key);
+				continue;
+			}
+			const path = loopPath({ verdicts, add }, view, use, (t, n) => uses(t).has(n));
+			if (path) loops.push({ use, path });
+			else {
+				add.push(use);
+				added.add(key);
+			}
+		}
+	}
+	return { submit: { verdicts, add }, loops, refused };
+}
+
+/** The kept edges that lead from `use.need` back to `use.topic`, with their
+ *  reasons, or null when adding the use closes no loop. Pure. */
+function loopPath(submit: EdgeSubmit, view: Pick<MapCourseView, "topics">, use: EdgeAdd, found: (topic: string, need: string) => boolean): LoopEdge[] | null {
+	const needs = settledNeeds(view, edgeDiffs(submit));
+	const from = new Map<string, string>();
+	const queue = [use.need];
+	const seen = new Set(queue);
+	while (queue.length > 0) {
+		const at = queue.shift()!;
+		if (at === use.topic) break;
+		for (const n of needs.get(at) ?? []) {
+			if (seen.has(n)) continue;
+			seen.add(n);
+			from.set(n, at);
+			queue.push(n);
+		}
+	}
+	if (!seen.has(use.topic)) return null;
+	const reasons = new Map([...submit.verdicts.map((v) => [edgeKey(v.topic, v.need), v.reason] as const), ...submit.add.map((a) => [edgeKey(a.topic, a.need), a.reason] as const)]);
+	const added = new Set(submit.add.map((a) => edgeKey(a.topic, a.need)));
+	const path: LoopEdge[] = [];
+	for (let at = use.topic; at !== use.need; at = from.get(at)!) {
+		const topic = from.get(at)!;
+		const stored = !added.has(edgeKey(topic, at));
+		path.unshift({ topic, need: at, reason: reasons.get(edgeKey(topic, at)) ?? "stored", stored, ...(stored && found(topic, at) ? { fixed: true as const } : {}) });
+	}
+	return path;
+}
+
+/** The loop check's answer: for each loop, by its index, the one edge to
+ *  break, with the prerequisite test's reason. */
+export interface LoopRuling {
+	loop: number;
+	topic: string;
+	need: string;
+	reason: string;
+}
+
+/** What is wrong with the loop check's answer, for it to fix. Pure. */
+export function loopRulingProblems(rulings: readonly LoopRuling[], loops: readonly EdgeLoop[]): string | null {
+	const problems: string[] = [];
+	const seen = new Set<number>();
+	for (const r of rulings) {
+		const loop = loops[r.loop - 1];
+		if (!loop) problems.push(`L${r.loop} is no loop listed.`);
+		else if (![loop.use, ...loop.path].some((e) => e.topic === r.topic && e.need === r.need)) problems.push(`L${r.loop} has no edge "${r.topic}" needs "${r.need}": name one of its edges.`);
+		else if (loop.path.some((e) => e.fixed && e.topic === r.topic && e.need === r.need)) problems.push(`L${r.loop}: "${r.topic}" needs "${r.need}" is stored and its topic's readers found it too, so the loop cannot break there: name another of its edges, or the reader's use.`);
+		if (seen.has(r.loop)) problems.push(`L${r.loop} is ruled twice.`);
+		seen.add(r.loop);
+		if (!r.reason?.trim()) problems.push(`L${r.loop} gives no reason: say why "${r.topic}" can be worked without "${r.need}".`);
+	}
+	const missing = loops.map((_, i) => i + 1).filter((i) => !seen.has(i));
+	if (missing.length > 0) problems.push(`rule every loop: ${missing.map((i) => `L${i}`).join(", ")} missing.`);
+	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
+}
+
+/**
+ * The edge answer once each loop is broken where the loop check rules (never
+ * at a fixed edge: `loopRulingProblems` refuses one). A ruling on the
+ * set-aside use leaves it aside. A ruling on another edge of
+ * the loop adds the use and takes that edge out: an add is set aside, a
+ * stored edge is dropped with the ruling's reason. A ruling that would
+ * still leave a loop, as an earlier break may have changed the graph,
+ * leaves the use aside. Loops are taken in their order. Pure.
+ */
+export function breakLoops(submit: EdgeSubmit, loops: readonly EdgeLoop[], rulings: readonly LoopRuling[], view: Pick<MapCourseView, "topics">): { submit: EdgeSubmit; aside: EdgeAdd[] } {
+	let current = submit;
+	const aside: EdgeAdd[] = [];
+	loops.forEach((loop, i) => {
+		const ruling = rulings.find((r) => r.loop === i + 1);
+		const broken = ruling && !(ruling.topic === loop.use.topic && ruling.need === loop.use.need) ? ruling : null;
+		if (!broken) {
+			aside.push(ruling ? { ...loop.use, reason: `${loop.use.reason}; set aside: ${ruling.reason.trim()}` } : loop.use);
+			return;
+		}
+		const key = edgeKey(broken.topic, broken.need);
+		const removed = current.add.filter((a) => edgeKey(a.topic, a.need) === key);
+		const next: EdgeSubmit = {
+			verdicts: current.verdicts.map((v) => (edgeKey(v.topic, v.need) === key ? { ...v, keep: false, loop: true as const, reason: `dropped: it closes a loop, and the loop check found ${broken.reason.trim()}` } : v)),
+			add: [...current.add.filter((a) => edgeKey(a.topic, a.need) !== key), loop.use],
+		};
+		if (cyclic(settledNeeds(view, edgeDiffs(next)))) aside.push(loop.use);
+		else {
+			current = next;
+			aside.push(...removed.map((a) => ({ ...a, reason: `${a.reason}; set aside: ${broken.reason.trim()}` })));
+		}
+	});
+	return { submit: current, aside };
+}
+
+/**
+ * The edge answer without the adds the rest of the settled graph already
+ * implies (each add's need is reached from its topic through other edges):
+ * they order nothing the graph does not. Without loops, which adds are
+ * implied does not depend on the order they are tested in. Pure.
+ */
+export function withoutImplied(submit: EdgeSubmit, view: Pick<MapCourseView, "topics">): { submit: EdgeSubmit; implied: EdgeAdd[] } {
+	const needs = settledNeeds(view, edgeDiffs(submit));
+	const implied = submit.add.filter((a) => reaches(needs, a.topic, a.need, true));
+	return { submit: { ...submit, add: submit.add.filter((a) => !implied.includes(a)) }, implied };
+}
+
+/** Whether `need` is reached from `topic` through its needs; with `around`,
+ *  only through a path other than the direct edge. */
+function reaches(needs: ReadonlyMap<string, readonly string[]>, topic: string, need: string, around = false): boolean {
+	const seen = new Set<string>();
+	const stack = (needs.get(topic) ?? []).filter((n) => !(around && n === need));
+	while (stack.length > 0) {
+		const n = stack.pop()!;
+		if (n === need) return true;
+		if (seen.has(n)) continue;
+		seen.add(n);
+		stack.push(...(needs.get(n) ?? []));
+	}
+	return false;
 }
 
 /** The changes an edge answer makes: each drop, then each add. Pure. */
 export function edgeDiffs(submit: EdgeSubmit): EdgeDiff[] {
 	return [
-		...submit.verdicts.filter((v) => !v.keep).map((v) => ({ topic: v.topic, need: v.need, change: "drop" as const, reason: v.reason.trim() })),
+		...submit.verdicts.filter((v) => !v.keep).map((v) => ({ topic: v.topic, need: v.need, change: "drop" as const, reason: v.reason.trim(), ...(v.loop ? { loop: true as const } : {}) })),
 		...submit.add.map((a) => ({ topic: a.topic, need: a.need, change: "add" as const, reason: a.reason.trim() })),
 	];
 }
@@ -262,13 +568,21 @@ export function againstCut(diffs: readonly EdgeDiff[], topicArc: Readonly<Record
  * The view the cut reads when the edge step only proposes: every stored need
  * plus each edge it proposes to add, listed apart in `proposed`. A cut that
  * holds them holds whichever proposals the learner accepts, since dropping an
- * edge never breaks a cut and adding one can. An add that would close a loop
- * with the stored edges is left out: it can only be accepted with a drop.
- * Pure.
+ * edge never breaks a cut and adding one can. A drop the loop check made so a
+ * reversed use could come in goes with that use, so it is applied here and
+ * the cut holds the use. Any other add that would close a loop with the
+ * stored edges is left out: it can only be accepted with a drop. Pure.
  */
 export function withProposed<V extends Pick<MapCourseView, "topics">>(view: V, diffs: readonly EdgeDiff[]): V & { proposed: Record<string, string[]> } {
 	const needs = new Map(Object.entries(view.topics).map(([k, t]) => [k, [...t.needs]]));
 	const proposed: Record<string, string[]> = {};
+	const dropped = new Set<string>();
+	for (const d of diffs) {
+		const list = needs.get(d.topic);
+		if (d.change !== "drop" || !d.loop || !list?.includes(d.need)) continue;
+		needs.set(d.topic, list.filter((n) => n !== d.need));
+		dropped.add(d.topic);
+	}
 	for (const d of diffs) {
 		const list = needs.get(d.topic);
 		if (d.change !== "add" || !list || !needs.has(d.need) || list.includes(d.need)) continue;
@@ -276,7 +590,7 @@ export function withProposed<V extends Pick<MapCourseView, "topics">>(view: V, d
 		list.push(d.need);
 		(proposed[d.topic] ??= []).push(d.need);
 	}
-	const topics = Object.fromEntries(Object.entries(view.topics).map(([k, t]) => [k, k in proposed ? { ...t, needs: needs.get(k)! } : t]));
+	const topics = Object.fromEntries(Object.entries(view.topics).map(([k, t]) => [k, k in proposed || dropped.has(k) ? { ...t, needs: needs.get(k)! } : t]));
 	return { ...view, topics, proposed };
 }
 
@@ -648,31 +962,42 @@ export function sortProblems(misses: readonly SortMiss[], submit: ArcSubmit): st
 		...lines,
 		misses.length === 1
 			? "One borderline miss may stay only with its reason in the basis, naming the topic. Otherwise move it to the arc it reads as when rule 2 allows, or rename the arcs so it reads as part of its own."
-			: "At most one may stay, explained in the basis. For each, move the topic to the arc it reads as when rule 2 allows; rename only where rule 2 holds it, choosing a name for the arc's one idea that its topics read into. When the material's unit is whole, prefer a name that holds it to moving a topic out of it.",
+			: "At most one may stay, explained in the basis. For each, move the topic to the arc it reads as when rule 2 allows; rename only where rule 2 holds it, choosing a name for the arc's one idea that its topics read into. When the material's unit is whole, prefer a name that holds it to moving a topic out of it: keep the words of the unit's own heading and add what the topics that read elsewhere need (\"Graph search and shortest paths\", never \"Shortest paths\" alone for a unit headed \"Graph search\").",
 	].join("\n");
 }
 
 // ─── the purpose check ───────────────────────────────────────────────────────
 
-/** Rule 8's purpose test, read by a fresh reader: each arc's purpose line
- *  beside its topics' titles, as the learner will see them. */
+/** Rule 8's purpose and name tests, read by a fresh reader: each arc's
+ *  name, the units of the material it cites, and its purpose line beside
+ *  its topics' titles, as the learner will see them. */
 export interface PurposeQuiz {
-	arcs: { title: string; purpose: string; topics: { id: string; handle: string; title: string }[] }[];
+	arcs: { title: string; purpose: string; units: string[]; topics: { id: string; handle: string; title: string }[] }[];
 }
 
-/** What a reader found wrong with the purpose lines: the topics a line is
- *  false of, and lines that fail as sentences (a term no topic title uses,
- *  a promise no topic keeps, or no thing the learner can do). */
+/** What a reader found wrong: the topics a purpose line is false of, lines
+ *  that fail as sentences (a term no topic title uses, a promise no topic
+ *  keeps, or no thing the learner can do), and names that fail to name the
+ *  arc's one idea: a list of three or more, a promise no topic keeps, or
+ *  one that hides the idea its cited unit's heading names. */
 export interface PurposeAnswer {
 	false: { topic: string; why: string }[];
 	lines?: { arc: string; why: string }[];
+	names?: { arc: string; why: string }[];
 }
 
 /** The quiz for a formation. Pure. */
 export function purposeQuiz(submit: ArcSubmit, view: ArcPassView, formation: Formation): PurposeQuiz {
 	const sorted = sortQuiz(submit, view, formation);
 	const id = new Map(sorted.topics.map((t) => [t.handle, t]));
-	return { arcs: submit.arcs.map((a) => ({ title: a.title.trim(), purpose: a.purpose.trim(), topics: a.topics.flatMap((t) => (id.has(t) ? [id.get(t)!] : [])) })) };
+	return {
+		arcs: submit.arcs.map((a) => ({
+			title: a.title.trim(),
+			purpose: a.purpose.trim(),
+			units: (a.refs ?? []).map((r) => (r.locator?.trim() ? `${r.source} ${r.locator.trim()}` : r.source)),
+			topics: a.topics.flatMap((t) => (id.has(t) ? [id.get(t)!] : [])),
+		})),
+	};
 }
 
 /** What is wrong with the reader's answer, for it to fix. Pure. */
@@ -682,6 +1007,7 @@ export function purposeAnswerProblems(answer: PurposeAnswer, quiz: PurposeQuiz):
 	const problems = [
 		...answer.false.flatMap((f) => [...(ids.has(f.topic) ? [] : [`"${f.topic}" is no topic id.`]), ...(f.why?.trim() ? [] : [`say why the purpose line is false of "${f.topic}".`])]),
 		...(answer.lines ?? []).flatMap((l) => [...(names.has(l.arc) ? [] : [`"${l.arc}" is no arc name; use the names exactly as listed.`]), ...(l.why?.trim() ? [] : [`say what is wrong with the purpose line of "${l.arc}".`])]),
+		...(answer.names ?? []).flatMap((n) => [...(names.has(n.arc) ? [] : [`"${n.arc}" is no arc name; use the names exactly as listed.`]), ...(n.why?.trim() ? [] : [`say what fails in the name "${n.arc}".`])]),
 	];
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
@@ -695,11 +1021,14 @@ export function purposeProblems(answer: PurposeAnswer, quiz: PurposeQuiz): strin
 		return arc && topic ? [`- "${arc.title}": its purpose line is not true of "${topic.title}" (${topic.handle}): ${f.why.trim()}`] : [];
 	});
 	for (const l of answer.lines ?? []) if (quiz.arcs.some((a) => a.title === l.arc)) lines.push(`- "${l.arc}": ${l.why.trim()}`);
-	if (lines.length === 0) return null;
+	const named = (answer.names ?? []).filter((n) => quiz.arcs.some((a) => a.title === n.arc)).map((n) => `- "${n.arc}": the name does not name the arc's one idea: ${n.why.trim()}`);
+	if (lines.length === 0 && named.length === 0) return null;
 	return [
-		"A fresh reader read each purpose line against its arc's topics (rule 8) and found these faults:",
+		"A fresh reader read each arc's name and purpose line against its topics (rule 8) and found these faults:",
 		...lines,
-		"Write each such line again: one sentence on the one thing the arc lets the learner do, at the level of the arc's question, true of every topic in it, promising only what its topics teach, in words its topic titles use.",
+		...named,
+		...(lines.length > 0 ? ["Write each such line again: one sentence on the one thing the arc lets the learner do, at the level of the arc's question, true of every topic in it, promising only what its topics teach, in words its topic titles use."] : []),
+		...(named.length > 0 ? ["Name each such arc for the one idea all its topics serve, in the material's words, by its unit's own title when that fits every topic; when no one idea holds them, the arc holds several: cut it (rule 3)."] : []),
 	].join("\n");
 }
 
