@@ -246,7 +246,8 @@ function movedOf(value: unknown): { moved: TopicMoved } | Record<string, never> 
 	const from = str(m?.from);
 	if (!m || !from) return {};
 	if (m.by === "study") return { moved: { from, by: "study", courses: strings(m.courses), day: m.day === "yesterday" ? "yesterday" : "today" } };
-	return m.by === "missed" || m.by === "left" ? { moved: { from, by: m.by } } : {};
+	const on = str(m.on);
+	return m.by === "missed" || m.by === "left" ? { moved: { from, by: m.by, ...(on ? { on } : {}) } } : {};
 }
 
 /** One `map` topic with its raw edges, arc and start reason; null when it

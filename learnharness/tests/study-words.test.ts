@@ -179,6 +179,13 @@ describe("why a review waits", () => {
 		assert.equal(movedWords(null, "2026-11-08", { from: "2026-11-10", by: "study", courses: ["Probability", "Calculus"], day: "today" as const }), "Moved from 10 Nov after your Probability and Calculus study today", "a start moves too");
 		assert.equal(movedWords(behind, "2026-11-08", { ...told, day: "yesterday" }), "Moved from 10 Nov after your Probability study yesterday", "round 9: today's work moves only what it touched, so the rest moves the next morning and says so");
 	});
+	it("names the last day he studied when the cause is days ago, never a 'yesterday' a week back", () => {
+		// Round 10 (1 M3): after a quiet week a close blamed a review he had done for the move.
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-20" }, "2026-11-17", { from: "2026-11-12", by: "missed", on: "2026-11-10" }), "Moved from 12 Nov, no study since 10 Nov");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-20" }, "2026-11-17", { from: "2026-11-18", by: "missed", on: "2026-11-15" }), "Moved from 18 Nov, no study yesterday");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-18" }, "2026-11-16", { from: "2026-11-14", by: "left", on: "2026-11-14" }), "Moved from 14 Nov, the plan of 14 Nov was not finished");
+		assert.equal(movedWords({ kind: "scheduled", date: "2026-11-18" }, "2026-11-16", { from: "2026-11-15", by: "left", on: "2026-11-15" }), "Moved from 15 Nov, yesterday's plan was not finished");
+	});
 	it("says since when a held review was due once memory's day has passed, and names no day he was never told", () => {
 		assert.equal(movedWords(behind, "2026-11-08"), null, "memory's day is still ahead: no 'Moved from' a day he never heard (round 8)");
 		assert.equal(movedWords(late, "2026-11-08"), "Due since 1 Oct");
@@ -233,7 +240,8 @@ describe("why a topic starts then", () => {
 	});
 	it("names the arc an early start comes from, or the exam's pace that took it", () => {
 		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, to keep pace with the exam");
-		assert.equal(why(plain, "inner-product"), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
+		assert.equal(why(plain, "inner-product"), "Early, ahead of its place");
+		assert.equal(startsWhyWords({ kind: "early", waitingOn: ["determinant" as TopicHandle], exam: false }, plain), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
 		const orthogonality = "orthogonality" as ArcHandle;
 		assert.equal(startsWhyWords({ kind: "early", arc: orthogonality, waitingOn: [], exam: false }, arcs), "Early, from Orthogonality");
 	});

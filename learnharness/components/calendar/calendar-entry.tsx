@@ -20,6 +20,7 @@ import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
 import { distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, misfitWords, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { finalReviewGapWords } from "@/components/study-words";
+import { planDay } from "@/components/study-home/study-facts";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
@@ -246,10 +247,10 @@ function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, {
 			<div className="flex flex-col gap-1.5">
 				<p className="text-callout system-current:text-label system-current:font-medium text-muted-foreground">Next step</p>
 				<p data-slot="exam-next-what" className="text-callout system-current:text-label text-foreground">
-					<MathText>{next.what}</MathText>
+					<MathText>{next.on ? `${next.verb} ${next.what}, ${planDay(next.on)}` : next.what}</MathText>
 				</p>
 			</div>
-			<div className="flex items-center gap-2">
+			{next.on ? null : <div className="flex items-center gap-2">
 				{move.kind === "open" ? (
 					<Button asChild size="sm">
 						<Link href={`/chat/${move.chat.id}`}>{next.verb}</Link>
@@ -264,7 +265,7 @@ function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, {
 						{next.verb}
 					</Button>
 				)}
-			</div>
+			</div>}
 		</div>
 	);
 }

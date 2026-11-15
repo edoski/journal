@@ -7,9 +7,9 @@ which items fit. Keys with no content are omitted, so absent means "none".
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Collection, Iterable, Iterator
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 import re
 from typing import Any
@@ -613,8 +613,11 @@ def show(
     wanted = set(located.values())
     levels = progress.standings(record) if wanted & {"topics", "arcs"} else {}
     today = clock.today()
-    planned = when(workspace, record, today) if "topics" in wanted else None
-    moves = moved(workspace, record, planned, today) if planned else {}
+    planned, moves = (
+        _planned_and_moves(workspace, record, today)
+        if "topics" in wanted
+        else (None, {})
+    )
     standings = arcs.standing(record, levels) if "arcs" in wanted else {}
     newest = _newest(observations) if levels else []
     corrected_by: dict[str, list[str]] = defaultdict(list)
@@ -736,8 +739,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     levels = progress.standings(record)
     wrong = progress.open_mistakes(record)
     order = progress.path_order(record, everything=True)
-    planned = when(workspace, record, today)
-    moves = moved(workspace, record, planned, today)
+    planned, moves = _planned_and_moves(workspace, record, today)
     overdue = {
         item["topic"]: item["overdue"]
         for item in progress.due(record, today, levels=levels)
@@ -1208,105 +1210,97 @@ def _readable(workspace: Workspace) -> dict[str, dict[str, Any]]:
     return readable
 
 
+def _replayed(
+    workspace: Workspace, record: dict[str, Any], today: date
+) -> tuple[agenda.Replay, dict[str, dict[str, Any]], bool]:
+    """The daily plan of every course (``agenda.replay``), the records it
+    was made from, and whether he studies on any weekday."""
+    name = str(workspace.directory)
+    readable = capacity.final_reviews({**_readable(workspace), name: record}, today)
+    week = capacity.of(readable.values(), today)
+    replayed = agenda.replay(readable, today, agenda.MAX_DAYS)
+    return replayed, readable, bool(week.study_weekdays)
+
+
 def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
     """When the daily plan, made with every course (``agenda``), next puts
     each of this course's topics: the one day each review and new topic has,
     whichever verb reads it. ``record`` is this course read with the plan
     (``records.load``)."""
+    return _planned_and_moves(workspace, record, today)[0]
+
+
+def _planned_and_moves(
+    workspace: Workspace, record: dict[str, Any], today: date
+) -> tuple[agenda.When, dict[str, dict[str, Any]]]:
+    """``when``, and each of this course's days that moved (``moved``)."""
+    replayed, readable, studies = _replayed(workspace, record, today)
     name = str(workspace.directory)
-    readable = capacity.final_reviews({**_readable(workspace), name: record}, today)
-    week = capacity.of(readable.values(), today)
-    together = agenda.plan(readable, today, agenda.MAX_DAYS, week)
-    return together.when(name, today, bool(week.study_weekdays))
-
-
-def _began(
-    stored: dict[str, dict[str, Any]], day: date, today: date, last: date
-) -> agenda.Plan:
-    """The plan made on ``day`` from every course's record as ``today``
-    began (``agenda.morning``), through ``last``."""
-    read = capacity.final_reviews(stored, day)
-    began = {key: agenda.morning(record, today) for key, record in read.items()}
-    week = capacity.of(began.values(), day)
-    days = (last - day).days + 1
-    return agenda.plan(began, day, days, week)
+    now = replayed.now.when(name, today, studies)
+    return now, moved(name, record, replayed, readable, today)
 
 
 def moved(
-    workspace: Workspace, record: dict[str, Any], planned: agenda.When, today: date
+    name: str,
+    record: dict[str, Any],
+    replayed: agenda.Replay,
+    readable: Mapping[str, dict[str, Any]],
+    today: date,
 ) -> dict[str, dict[str, Any]]:
-    """Each topic whose next day differs from the day the plan gave it as
-    yesterday ended, the day he was last told, with why it moved. Only his
-    study moves a day, and during a day only the topics it touched move
-    (``agenda.plan``): ``study`` with ``day`` today, his answers today made
-    a topic it waited on not ready (a topic he answered or started today
-    has its own new day and is not listed); ``missed``, yesterday went by
-    with no study; ``left``, yesterday ended with work its plan held not
-    done, in any course; ``study`` with ``day`` yesterday, what he did
-    yesterday in ``courses`` (a review answered off the plan, an answer
-    that was not solid, a start) reached the other topics this morning. A
-    day that moved for none of these has no cause in his study, so it is
-    not listed as moved: a told day that moves otherwise is a fault the
-    tests catch, never a reason to give him. Nothing is stored: the plan as
-    yesterday ended is made again from the records without today's work.
-    ``record`` is this course read with the plan."""
-    name = str(workspace.directory)
-    now = {
-        **{("review", key): day for key, day in planned.reviews.items()},
-        **{("starts", key): day for key, day in planned.starts.items()},
-    }
-    if not now:
+    """Each topic of course ``name`` whose next day differs from the day he
+    was last told, the day the plan gave it as the last day he studied
+    before today ended (``agenda.Replay.told``), with why it moved. Only his
+    study moves a day (``agenda.replay``): ``missed``, a day he studies went
+    by with no study since, so today's plan was made afresh; ``left``, he
+    left work owed that day, so the plan spread it, or the day he was told
+    went by with it undone; both with ``on``, the last day he studied; ``study`` with ``day`` today, his answers today
+    in ``courses`` made a topic it waited on not ready (a topic he answered
+    or started today has its own new day and is not listed). A day that moved for none of these has no
+    cause in his study, so it is not listed as moved: a told day that moves
+    otherwise is a fault the tests catch, never a reason to give him.
+    Nothing is stored: the replay makes the days he was told again from the
+    records. ``record`` is this course read with the plan."""
+    told, studied = replayed.told, replayed.studied
+    if told is None or studied is None:
         return {}
-    stored = {**_readable(workspace), name: records.read(workspace)}
+    now = replayed.now.when(name, today, True)
+    was = told.when(name, studied, True)
+    began = replayed.began.when(name, today, True)
     mine = agenda.touched(record, today)
-    yesterday = today - timedelta(days=1)
-    last = max(now.values())
-    ended = _began(stored, yesterday, today, last)
-    told = ended.when(name, yesterday, True)
+    left = replayed.left.get(name, set())
 
     def told_on(when: agenda.When, kind: str, key: str) -> date | None:
         return (when.reviews if kind == "review" else when.starts).get(key)
 
-    changed = {
-        (kind, key): day
-        for (kind, key), day in now.items()
-        if key not in mine
-        and (was := told_on(told, kind, key)) is not None
-        and today <= was != day
-    }
-    if not changed:
-        return {}
-
-    def studied(day: date) -> list[str]:
-        return sorted(
-            str(course.get("title") or Path(key).name)
-            for key, course in stored.items()
-            if _worked_on(course, day)
-        )
-
-    today_ = studied(today)
-    began = (
-        _began(stored, today, today, last).when(name, today, True) if today_ else told
-    )
-    went = studied(yesterday)
-    left = any(
-        planned["reviews"] or planned["new"]
-        for days in ended.days.values()
-        for planned in days[:1]
-    )
     result: dict[str, dict[str, Any]] = {}
-    for kind, key in changed:
-        was = told_on(told, kind, key)
-        assert was is not None
-        if today_ and told_on(began, kind, key) == was:
-            why: dict[str, Any] = {"by": "study", "courses": today_, "day": "today"}
-        elif not went:
-            why = {"by": "missed"}
-        elif left:
-            why = {"by": "left"}
-        else:
-            why = {"by": "study", "courses": went, "day": "yesterday"}
-        result[key] = {"from": was.isoformat(), **why}
+    for kind, days in (("review", now.reviews), ("starts", now.starts)):
+        for key, day in days.items():
+            before = told_on(was, kind, key)
+            if key in mine or before is None or before == day:
+                continue
+            if before < today == day:
+                continue  # a day gone by, and it is today's: due, not moved
+            if told_on(began, kind, key) == before:
+                courses = sorted(
+                    str(course.get("title") or Path(key_).name)
+                    for key_, course in readable.items()
+                    if _worked_on(course, today)
+                )
+                why: dict[str, Any] = {
+                    "by": "study",
+                    "courses": courses,
+                    "day": "today",
+                }
+            elif replayed.afresh:
+                why = {
+                    "by": "missed" if replayed.missed else "left",
+                    "on": studied.isoformat(),
+                }
+            elif key in left:
+                why = {"by": "left", "on": studied.isoformat()}
+            else:
+                continue
+            result[key] = {"from": before.isoformat(), **why}
     return result
 
 

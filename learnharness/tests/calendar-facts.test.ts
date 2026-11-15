@@ -90,6 +90,15 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 
 const summary = (entries: ReturnType<typeof calendarEntries>) => entries.map((e) => `${e.day} ${lookOf(e)} ${e.title}`);
 
+describe("an exam's next step", () => {
+	it("names the later day it is planned for and offers nothing to start today (round 10: 1 m9)", () => {
+		const exam = calendarEntries({ courses: [PROB], chats: [], scope: null }).find((e) => e.kind === "exam");
+		assert.deepEqual(exam?.kind === "exam" && exam.next && [exam.next.verb, exam.next.what, exam.next.on], ["Review", "Bayes' rule", "2026-11-09"]);
+		const today = calendarEntries({ courses: [LINALG], chats: [], scope: null }).find((e) => e.kind === "exam");
+		assert.equal(today?.kind === "exam" && today.next?.on, null, "a step for today is today's");
+	});
+});
+
 describe("calendar entries", () => {
 	it("puts each exam on its date, today's review today, and each later day's reviews and new topics as the daily plan proposes", () => {
 		const entries = calendarEntries({ courses: [LINALG, PROB], chats: [], scope: null });
@@ -248,6 +257,18 @@ describe("calendar entries", () => {
 		assert.deepEqual(summary(done), ["2026-11-08 task Eigenvalues lesson: eigenspaces and diagonalisation", "2026-11-08 lesson Eigenvalues and eigenvectors"], "a finished lesson that only touched the topic leaves the task its own entry");
 		const yesterday = calendarEntries({ courses: [LA_TODAY], chats: [{ ...lesson, updatedAt: "2026-11-07T09:00:00" }], scope: null });
 		assert.equal(yesterday.filter((e) => e.day === TODAY).length, 1, "an older session stays on its own day; today keeps the task");
+	});
+
+	it("lists no Unfinished row for a review he left for next time: it rides with its next review (round 10, 1 m7)", () => {
+		const LA_LATER = course("/study/linalg", "Linear Algebra", {
+			tasks: [{ key: "eigen-review", title: "Eigenvalues review", step: "The eigenvector of B", updated: "2026-11-06" }],
+			topics: [topic("eigen", { title: "Eigenvalues", level: "assisted", tasks: ["eigen-review"], review: { kind: "scheduled", date: "2026-11-12" } })],
+		}, { planned: [{ date: "2026-11-12", reviews: ["eigen" as TopicHandle], new: [] }] });
+		const la = { workspace: "/study/linalg", title: "Linear Algebra" };
+		const review = chat({ id: "eigen-r", title: "Review Eigenvalues", course: la, topics: ["eigen"], ended: "left", updatedAt: "2026-11-06T09:00:00" });
+		const entries = calendarEntries({ courses: [LA_LATER], chats: [review], scope: null });
+		assert.deepEqual(summary(entries).filter((line) => line.includes("task")), []);
+		assert.ok(summary(entries).includes("2026-11-12 review Eigenvalues"), "its review day lists the review");
 	});
 
 	it("keeps one course when scoped, and with it no session outside a course", () => {

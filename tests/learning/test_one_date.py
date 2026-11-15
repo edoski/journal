@@ -234,14 +234,15 @@ def no_new_topics(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.usefixtures("no_new_topics")
-def test_a_told_day_holds_all_day_and_the_next_morning_says_which_study_moved_it(
+def test_a_told_day_holds_all_day_and_overnight(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Round 9 (2 M2, 1 D3): a save in Linear Algebra moved Probability's
     told review from 11 to 9 Nov and back within the day, and a day the
-    tutor had just named moved that afternoon."""
+    tutor had just named moved that afternoon. Round 10 (1 M2): the next
+    morning planned afresh and moved it again, though the day was done."""
     algebra = course(tmp_path / "algebra")
     chance = course(tmp_path / "chance")
     eigen = {"introduced": day(-20), "review": {"due": day(1)}}
@@ -271,15 +272,40 @@ def test_a_told_day_holds_all_day_and_the_next_morning_says_which_study_moved_it
     assert moves(monkeypatch, capsys, chance)["expectation"] == (day(1), None)
 
     monkeypatch.setenv("LEARNING_TODAY", day(1))
-    moved = {
-        "from": day(1),
-        "by": "study",
-        "courses": ["Probability"],
-        "day": "yesterday",
-    }
-    assert moves(monkeypatch, capsys, algebra) == {"eigen": (day(2), moved)}
-    shown = run(monkeypatch, capsys, algebra, "show", "eigen")["items"]["eigen"]
-    assert shown["moved"] == moved
+    assert moves(monkeypatch, capsys, algebra) == {"eigen": (day(1), None)}
+    assert moves(monkeypatch, capsys, chance)["expectation"] == (day(1), None)
+
+
+@pytest.mark.usefixtures("no_new_topics")
+def test_a_told_day_he_did_not_study_moves_from_that_day(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Round 10 (1 M3): after a quiet week a close said the eigenvalue
+    review "moved from Monday 9 November ... because it was missed", though
+    he did it on 9 Nov and was told the 12th: the day it moved from is the
+    day he was last told, and the cause is that day going by unstudied."""
+    root = course(tmp_path / "algebra")
+    late = {"introduced": day(-20), "review": {"due": day(-10)}}
+    topics = {"eigen": {"introduced": day(-20)}, **{f"f{n}": late for n in range(3)}}
+    answers = [checked(key, -17) for key in topics] + [checked("eigen", 0)]
+    run(
+        monkeypatch,
+        capsys,
+        root,
+        "save",
+        stdin={"topics": topics, "observations": answers},
+    )
+    pins = {f"f{n}": {"review": late["review"]} for n in range(3)}
+    run(monkeypatch, capsys, root, "save", stdin={"topics": pins})
+    told, moved = moves(monkeypatch, capsys, root)["eigen"]
+    assert told is not None and told > day(0) and moved is None
+    later = (date.fromisoformat(told) + timedelta(days=3)).isoformat()
+    monkeypatch.setenv("LEARNING_TODAY", later)
+    now, moved = moves(monkeypatch, capsys, root)["eigen"]
+    assert now is not None and now > later, "the reviews more overdue come first"
+    assert moved == {"from": told, "by": "missed", "on": day(0)}
 
 
 @pytest.mark.parametrize("studied", [False, True])
@@ -310,8 +336,14 @@ def test_a_day_yesterdays_end_moves_says_why(
         practice = {"observations": [checked("other", -1)]}
         run(monkeypatch, capsys, root, "save", stdin=practice)
     found = moves(monkeypatch, capsys, root)
-    assert found["late"] == (day(0), None)
-    assert found["told"] == (
-        day(1),
-        {"from": day(0), "by": "left" if studied else "missed"},
-    )
+    if studied:
+        # He studied yesterday and left Late: it takes the first day the
+        # days he was told leave, and Told keeps today.
+        assert found["late"] == (day(1), {"from": day(-1), "by": "left", "on": day(-1)})
+        assert found["told"] == (day(0), None)
+    else:
+        assert found["late"] == (day(0), None)
+        assert found["told"] == (
+            day(1),
+            {"from": day(0), "by": "missed", "on": day(-7)},
+        )

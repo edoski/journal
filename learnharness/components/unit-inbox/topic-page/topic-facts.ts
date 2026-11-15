@@ -1,4 +1,4 @@
-import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
+import { isReviewSession, markHow, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { cardLine, slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
@@ -210,6 +210,14 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
 	return [...held.filter((task) => task.key === map.focus), ...held.filter((task) => task.key !== map.focus)];
 }
 
+/** A review he left for next time waits for its topic's next review day,
+ *  which opens it (Home's rule, `study-home/today.md`): until that day it
+ *  is not the page's Now (round 10, 1 m7: Eigen's page led with the review
+ *  closed on 9 Nov as "Resume · Left off today"). */
+export function heldForReview(chat: ChatListItem, topic: CourseMapTopic): boolean {
+	return isReviewSession(chat) && sessionState(chat) === "left" && topic.review?.kind !== "due";
+}
+
 /**
  * The one thing to do on the topic now, first match: resume the session
  * on the topic that waits on him or that the tutor stopped in, open the one
@@ -225,7 +233,7 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
 	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
-	const active = resumableSession(sessions);
+	const active = resumableSession(sessions.filter((chat) => !heldForReview(chat, topic)));
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
 	if (topic.review?.kind === "due") return { kind: "review", opening: `Review ${topic.title}` };
 	const [task] = heldTasks(topic, map);
@@ -327,7 +335,7 @@ function whereOf(entry: SessionEntry): string {
  * that session holds. A task's press continues the lesson that holds it.
  */
 export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
-	const active = resumableSession(entries.filter((entry) => entry.own).map((entry) => entry.chat));
+	const active = resumableSession(entries.filter((entry) => entry.own && !heldForReview(entry.chat, topic)).map((entry) => entry.chat));
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
