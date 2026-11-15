@@ -20,6 +20,7 @@ describe("a question that asks more than one thing", () => {
 		["Find a nonzero vector in $\\ker A$ without doing elimination, then give two different inputs $u \\neq w$ with $Au = Aw$.", 2],
 		["Which distribution does the number of right answers have, and why? What is the probability you get exactly 3 right?", 2],
 		["Compute the rank and state the nullity.", 2],
+		["Find the pivots and then give the rank.", 2],
 	];
 	for (const [q, n] of compound) it(q, () => assert.equal(count(q), n, JSON.stringify(questionAsks(q))));
 });
@@ -38,6 +39,8 @@ describe("a question that asks one thing", () => {
 		"Is it invertible, or is it singular?",
 		"What happens to $n$ and $p$ when the slots halve?",
 		"Show that $N$ is not invertible by finding a nonzero vector $v$ with $Nv = 0$.",
+		"A $3 \\times 3$ matrix $A$ has $\\ker A = \\{0\\}$. Why does $Ax = b$ then have a solution for every $b$ in $\\mathbb{R}^3$?",
+		"Find $x$ and then $y$.",
 	];
 	for (const q of single) it(q, () => assert.equal(count(q), 1, JSON.stringify(questionAsks(q))));
 });

@@ -223,11 +223,11 @@ export function promptVoiceBreaks(text: string): VoiceBreak[] {
  *  with, or a task. */
 const ASK_OPENS =
 	/^(?:what|which|who|whom|whose|when|where|why|how|whether|is|are|was|were|do|does|did|can|could|would|should|will|has|have|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b/i;
-/** Words that open an ask after a bare "and": a question word or a task,
- *  never a verb like "is", which also joins a description ("lies in ker A
- *  and is nonzero"). */
+/** Words that open an ask after a bare "and" or "then": a question word
+ *  or a task, never a verb like "is", which also joins a description
+ *  ("lies in ker A and is nonzero", "why does Ax = b then have…"). */
 const ASK_AFTER_AND =
-	/\s+and\s+(?=(?:what|which|who|whom|whose|when|where|why|how|whether|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b)/i;
+	/\s+(?:and\s+then|and|then)\s+(?=(?:what|which|who|whom|whose|when|where|why|how|whether|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b)/i;
 /** "and why", "why or why not": a reason asked for with the answer, part
  *  of the one ask. */
 const BARE_WHY = /^why(?:\s+or\s+why\s+not|\s+not)?\s*[?.]?$/i;
@@ -250,7 +250,7 @@ export function questionAsks(text: string): string[] {
 		if (ADVICE.test(sentence)) continue;
 		const clauses = sentence
 			.replace(/^(?:then|and|also|now)\b[,\s]*/i, "")
-			.split(/\s*;\s*|,\s*(?:and\s+|then\s+)?|\s+(?:and\s+)?then\s+/i)
+			.split(/\s*;\s*|,\s*(?:and\s+|then\s+)?/i)
 			.flatMap((c) => c.split(ASK_AFTER_AND))
 			.map((c) => c.trim().replace(/^(?:and|then)\s+/i, ""));
 		for (const clause of clauses) if (ASK_OPENS.test(clause) && !BARE_WHY.test(clause) && !SCENE.test(clause)) out.push(clause);
