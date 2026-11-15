@@ -146,6 +146,36 @@ describe("a re-mark corrects only what this session saved or he disputed (round 
 	});
 });
 
+describe("a not-right answer's text says what went wrong, never the question (round 9, 2 m1)", () => {
+	it("refuses a partly right or wrong answer saved with its question as its text, naming the fix, and saves nothing", async () => {
+		const check = asked("check", { text: "(1, 2)" });
+		const question = `Question ${n}`;
+		const { saves, tools } = savingCourse(check.messages);
+		const refused = await courseSave(tools, [attempt({ question: check.id, text: question, response: "(1, 2)", result: "partial" })]);
+		assert.equal(refused.isError, true);
+		assert.match(refused.text, /observations\[0\]\.text: a not-right answer's text says what went wrong/);
+		assert.equal(saves.length, 0);
+		const asking = await courseSave(tools, [attempt({ question: check.id, text: "Which vectors v satisfy Bv = 5v?", result: "incorrect" })]);
+		assert.equal(asking.isError, true, "a question as text, though not the one asked word for word");
+	});
+
+	it("saves a miss whose text says what went wrong, a right answer with its question, a prediction and a Show me as they come", async () => {
+		const miss = asked("check", { text: "(1, 2)" });
+		const right = asked("check");
+		const guess = asked("predict");
+		const shown = asked("check", { text: "", showMe: true });
+		const { saves, tools } = savingCourse([...miss.messages, ...right.messages, ...guess.messages, ...shown.messages]);
+		const ok = await courseSave(tools, [
+			attempt({ question: miss.id, text: "Took $(1,2)$ as a vector of $E_2$; it gives $2x+y=4$, not $0$", result: "partial" }),
+			attempt({ question: right.id, text: `Question ${n - 2}`, result: "correct" }),
+			attempt({ question: guess.id, text: `Question ${n - 1}`, result: "incorrect" }),
+			attempt({ question: shown.id, text: `Question ${n}`, result: "incorrect" }),
+		]);
+		assert.equal(ok.isError, false, ok.text);
+		assert.equal(saves[0]!.observations!.length, 4);
+	});
+});
+
 describe("his confidence is the one he chose", () => {
 	it("the meter wins over the tutor's reading of his words (round 6: 'gut feeling' saved as a guess over his Confident)", async () => {
 		const check = asked("check", { text: "gut feeling: 2", confidence: "confident" });

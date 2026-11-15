@@ -14,7 +14,7 @@ import { serverExecute } from "../tool-execute.ts";
 import { healToolRecord } from "./heal.ts";
 import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/course.ts";
 import type { CourseRecords } from "../../core/ports.ts";
-import { shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
+import { sameQuestionKey, shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
 import { engineConfidence } from "../../core/engine-confidence.ts";
 import { RUNG_HELP } from "../../core/practice-attempts.ts";
 import type { AnsweredQuestion } from "../../core/native-messages.ts";
@@ -63,6 +63,16 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
  *  re-mark, which names what it corrects. An exam result and his own
  *  report answer no question of the session. */
 const recordsAnAnswer = (o: Record<string, unknown>) => (o.kind ?? "attempt") === "attempt" && !("corrects" in o);
+
+/** A counted answer that was not right, saved with a question as its
+ *  text: the one he answered, or any question. His Mistakes list shows an
+ *  open mistake's text, and round 9 (2 m1) read "Find the eigenspace $E_2$
+ *  of…" there, never the slip. A prediction and a Show me keep theirs. */
+function questionAsText(o: Record<string, unknown>, answer: AnsweredQuestion): boolean {
+	if (answer.predicted || answer.showMe || !recordsAnAnswer(o) || (o.result !== "partial" && o.result !== "incorrect") || o.gave_up) return false;
+	const text = typeof o.text === "string" ? sameQuestionKey(o.text) : "";
+	return text.endsWith("?") || (answer.asked !== undefined && text.toLowerCase() === answer.asked.toLowerCase());
+}
 
 /** The answers each session's saves named in this turn, after they went
  *  through: the session's record holds them only from the next turn. */
@@ -140,6 +150,11 @@ function namedQuestions(
 			refuse(`observations[${i}].question: ${JSON.stringify(named)} is already saved, so it is not saved again. Leave it out and send the rest; a re-mark of it names its attempt with corrects.`);
 		}
 		const ruled: Record<string, unknown> = { ...rest };
+		if (questionAsText(rest, answer)) {
+			refuse(
+				`observations[${i}].text: a not-right answer's text says what went wrong, in a line he reads in his Mistakes list days later ("Took $(1,2)$ as a vector of $E_2$; it gives $2x+y=4$, not $0$"), never the question. Send it again with that text.`,
+			);
+		}
 		if (answer.predicted === true) ruled.predicted = true;
 		else if (answer.predicted === false) delete ruled.predicted;
 		if (answer.showMe && !("corrects" in rest)) {

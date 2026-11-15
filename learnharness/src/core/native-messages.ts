@@ -814,6 +814,9 @@ export interface AnsweredQuestion {
 	confidence?: Exclude<Confidence, "neutral"> | null;
 	/** He pressed Show me on it: he gave up and was shown its answer. */
 	showMe?: boolean;
+	/** The question he answered, as `sameQuestionKey` reads it; absent for
+	 *  an answer in words or a problem's conclude. */
+	asked?: string;
 	/** A save that went through already recorded it, or its problem's
 	 *  conclude did. */
 	recorded: boolean;
@@ -902,7 +905,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			revealed.add(asked.key);
 			const details = m.details as { confidence?: unknown; showMe?: unknown };
 			const confidence = chosenConfidence(details.confidence) ?? null;
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), recorded: false });
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, recorded: false });
 		}
 	}
 	for (const [key, answer] of answered) answer.recorded = recorded.has(key);
