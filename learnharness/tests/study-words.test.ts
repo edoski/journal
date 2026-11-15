@@ -189,8 +189,8 @@ describe("why a topic starts then", () => {
 		assert.equal(why(plain, "invertibility"), "After Rank and the column space and Determinants as volume scaling, which it needs");
 	});
 	it("names the arc an early start comes from, or the exam's pace that took it", () => {
-		assert.equal(why(arcs, "inner-product"), "Next in Orthogonality");
-		assert.equal(why(plain, "inner-product"), "Next in Linear Algebra");
+		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, to keep pace with the exam");
+		assert.equal(why(plain, "inner-product"), "Early, ahead of its place, while earlier topics wait on Rank and the column space and Determinants as volume scaling");
 		const orthogonality = "orthogonality" as ArcHandle;
 		assert.equal(startsWhyWords({ kind: "early", arc: orthogonality, waitingOn: [], exam: false }, arcs), "Early, from Orthogonality");
 	});

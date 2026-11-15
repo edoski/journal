@@ -283,7 +283,7 @@ describe("course map arcs (E2's goldens)", () => {
 		assert.equal(map.topics.some((t) => "arc" in t), false, "no topic names an arc");
 		assert.equal(currentArc(map), null);
 		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["rank", "determinant"], partners: [] });
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "next" });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["rank", "determinant"], exam: false });
 		assert.deepEqual(
 			map.topics.filter((t) => t.startsWhy).map((t) => t.handle),
 			map.topics.filter((t) => t.starts).map((t) => t.handle),
@@ -310,7 +310,7 @@ describe("course map arcs (E2's goldens)", () => {
 			"every topic in one arc",
 		);
 		assert.equal(map.currentArc, "eigenvalues");
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "next", arc: "orthogonality" });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", arc: "orthogonality", waitingOn: ["rank", "determinant"], exam: true });
 		assert.deepEqual(topicOf(map, "change-basis").startsWhy, { kind: "after", arc: "eigenvalues", needs: ["invertibility"], partners: [] });
 	});
 

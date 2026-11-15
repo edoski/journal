@@ -116,7 +116,7 @@
       "contrasts": [],
       "level": "independent",
       "introduced": "2026-10-05",
-      "review": "2026-11-14",
+      "review": "2026-11-16",
       "held": true,
       "due": "2026-10-28",
       "weak": true,
@@ -157,8 +157,9 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-08",
-      "overdue": 2,
+      "review": "2026-11-12",
+      "held": true,
+      "due": "2026-11-06",
       "weak": true,
       "mistake": true,
       "lapsed": true,
@@ -174,7 +175,7 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-16",
+      "review": "2026-11-18",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -198,7 +199,7 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-03",
-      "review": "2026-11-09",
+      "review": "2026-11-14",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -222,7 +223,7 @@
       "contrasts": [],
       "level": "attempted",
       "introduced": "2026-11-06",
-      "review": "2026-11-14",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-11-07",
       "weak": true,
@@ -244,7 +245,9 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-04",
-      "review": "2026-11-09",
+      "review": "2026-11-14",
+      "held": true,
+      "due": "2026-11-09",
       "weak": false,
       "right": "helped",
       "tasks": []
@@ -261,9 +264,8 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-16",
-      "held": true,
-      "due": "2026-11-06",
+      "review": "2026-11-08",
+      "overdue": 2,
       "weak": false,
       "tasks": []
     },
@@ -277,7 +279,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-09",
+      "starts": "2026-11-14",
       "starts_why": {
         "arc": "determinants",
         "kind": "after",
@@ -300,7 +302,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-12",
+      "starts": "2026-11-15",
       "starts_why": {
         "arc": "eigenvalues",
         "kind": "after",
@@ -324,9 +326,7 @@
       "contrasts": [],
       "level": "assisted",
       "introduced": "2026-11-08",
-      "review": "2026-11-11",
-      "held": true,
-      "due": "2026-11-09",
+      "review": "2026-11-09",
       "weak": false,
       "right": "partial",
       "mistake": true,
@@ -343,7 +343,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-13",
+      "starts": "2026-11-16",
       "starts_why": {
         "arc": "eigenvalues",
         "kind": "after",
@@ -363,10 +363,16 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-14",
+      "starts": "2026-11-09",
       "starts_why": {
         "arc": "orthogonality",
-        "kind": "next"
+        "kind": "early",
+        "behind": "determinants",
+        "waiting_on": [
+          "rank",
+          "determinant"
+        ],
+        "exam": true
       },
       "weak": false,
       "tasks": []
@@ -381,13 +387,16 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-15",
+      "starts": "2026-11-12",
       "starts_why": {
         "arc": "orthogonality",
-        "kind": "after",
-        "needs": [
-          "inner-product"
-        ]
+        "kind": "early",
+        "behind": "determinants",
+        "waiting_on": [
+          "rank",
+          "determinant"
+        ],
+        "exam": true
       },
       "weak": false,
       "tasks": []

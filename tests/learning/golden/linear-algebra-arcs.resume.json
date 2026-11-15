@@ -18,44 +18,64 @@
   },
   "due": [
     {
-      "topic": "matmul",
-      "title": "Matrix multiplication as composition",
+      "topic": "cramer",
+      "title": "Cramer's rule",
       "due": "2026-11-06",
       "overdue": 2,
-      "level": "retained"
+      "level": "introduced"
     }
   ],
   "due_later": [
     {
-      "topic": "rank",
+      "topic": "kernel",
       "planned": "2026-11-09"
     },
     {
-      "topic": "independence",
+      "topic": "matmul",
+      "planned": "2026-11-12"
+    },
+    {
+      "topic": "rank",
       "planned": "2026-11-14"
     },
     {
-      "topic": "kernel",
-      "planned": "2026-11-14"
+      "topic": "independence",
+      "planned": "2026-11-16"
     },
     {
       "topic": "elimination",
-      "planned": "2026-11-16"
-    },
-    {
-      "topic": "cramer",
-      "planned": "2026-11-16"
+      "planned": "2026-11-18"
     }
   ],
   "due_later_more": 3,
   "starts": {
-    "invertibility": "2026-11-09",
-    "change-basis": "2026-11-12",
-    "diagonalization": "2026-11-13",
-    "inner-product": "2026-11-14",
-    "projection": "2026-11-15"
+    "inner-product": "2026-11-09",
+    "projection": "2026-11-12",
+    "invertibility": "2026-11-14",
+    "change-basis": "2026-11-15",
+    "diagonalization": "2026-11-16"
   },
   "starts_why": {
+    "inner-product": {
+      "arc": "orthogonality",
+      "kind": "early",
+      "behind": "determinants",
+      "waiting_on": [
+        "rank",
+        "determinant"
+      ],
+      "exam": true
+    },
+    "projection": {
+      "arc": "orthogonality",
+      "kind": "early",
+      "behind": "determinants",
+      "waiting_on": [
+        "rank",
+        "determinant"
+      ],
+      "exam": true
+    },
     "invertibility": {
       "arc": "determinants",
       "kind": "after",
@@ -76,17 +96,6 @@
       "kind": "after",
       "needs": [
         "change-basis"
-      ]
-    },
-    "inner-product": {
-      "arc": "orthogonality",
-      "kind": "next"
-    },
-    "projection": {
-      "arc": "orthogonality",
-      "kind": "after",
-      "needs": [
-        "inner-product"
       ]
     }
   },
@@ -313,7 +322,7 @@
       "review": {
         "due": "2026-10-28",
         "by": "engine",
-        "planned": "2026-11-14"
+        "planned": "2026-11-16"
       },
       "judged": "2026-10-22",
       "standing": {
@@ -384,7 +393,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-16"
+        "planned": "2026-11-18"
       },
       "standing": {
         "level": "retained",
@@ -424,7 +433,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-09"
+        "planned": "2026-11-14"
       },
       "judged": "2026-10-30",
       "standing": {
@@ -463,7 +472,7 @@
       "review": {
         "due": "2026-11-07",
         "by": "engine",
-        "planned": "2026-11-14"
+        "planned": "2026-11-09"
       },
       "standing": {
         "level": "attempted",

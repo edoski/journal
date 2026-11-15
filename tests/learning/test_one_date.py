@@ -162,7 +162,14 @@ def test_the_map_says_why_a_review_waits_and_since_when(
             "preferences": {"final_review_days": "6"},
         },
     )
-    run(monkeypatch, capsys, free, "save", stdin={"topics": due})
+    checked = {"topics": ["topic"], "text": "q", "help": "none", "result": "correct"}
+    run(
+        monkeypatch,
+        capsys,
+        free,
+        "save",
+        stdin={"topics": due, "observations": [{**checked, "date": day(-17)}]},
+    )
 
     exams = run(monkeypatch, capsys, exam, "map")
     assert [(item["review"], "held" in item) for item in exams["topics"]] == [
