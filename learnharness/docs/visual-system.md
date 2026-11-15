@@ -56,6 +56,8 @@ The older `text-xs`…`text-3xl` names resolve to the same sizes (`--lh-text-*`)
 
 Lucide, as shadcn uses it. 16 for navigation and a page head's facts, 14 for marks inside a row (Today's reason, standing and slip), 12 in a sidebar card's status slot and on a map card (drawn at 80% on Home's map). Lucide draws a 2px stroke on its 24px grid, so the stroke scales with the size: 1.33 at 16, 1.17 at 14.
 
+**Proposed (the Visual system switch): one line weight.** Every lucide icon keeps lucide's own 2px stroke and draws it at 2px on screen at every size (`vector-effect: non-scaling-stroke`), set once by `IconDefaults` (`components/icon-defaults.tsx`, lucide's `LucideProvider`), never per icon. Lucide's `absoluteStrokeWidth` reads only the `size` prop, and the app sizes icons in CSS, so it would change nothing. The pie (`ui/pie.tsx`) is a glyph of its own, not a line icon.
+
 ## The standing legend
 
 One mark, one ink and one phrase per state, on Home's Today rows, the topic map's cards, the course page's rows and the topic page's head (`tests/standing-legend.test.tsx` holds them equal).
@@ -76,7 +78,3 @@ Words come from `study-words.ts` and `topic-standing.ts` (`standingOf`, `slipBes
 - **Page column** (`PAGE_COLUMN`, `page-frame/page-frame.tsx`): centred, up to 80rem, 24 sides, 24 under the band and above the foot. At 1512 with the sidebar open it is 1256 wide and its content runs from x=280 to 1488; a page's first line sits at y=76, its title at y=99. The course page, the topic page and Home's Proposed sit on it.
 - **Lesson column:** centred, about 736 wide, as T3 Code's and Claude Desktop's (Edo, 14 Nov 2026).
 - **Settings:** a dialog, 880 wide, its own nav column.
-
-## Open (Edo's call)
-
-- The research's budget of one icon stroke would mean lucide's `absoluteStrokeWidth` everywhere.

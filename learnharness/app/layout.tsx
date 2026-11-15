@@ -9,6 +9,7 @@ import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
 import { PolishHost } from "@/components/dev/polish-host";
+import { IconDefaults } from "@/components/icon-defaults";
 
 export const metadata: Metadata = {
 	title: "Learning Harness",
@@ -27,11 +28,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 				 and pages all subscribe as the polls retire (push S3, 2026-10-02). */}
 			<ServerEventsProvider>
 				<AppearanceProvider>
-					<SidebarProvider initial={sidebar}>
-						<ActivityProvider>
-							<AppShell>{children}</AppShell>
-						</ActivityProvider>
-					</SidebarProvider>
+					<IconDefaults>
+						<SidebarProvider initial={sidebar}>
+							<ActivityProvider>
+								<AppShell>{children}</AppShell>
+							</ActivityProvider>
+						</SidebarProvider>
+					</IconDefaults>
 				</AppearanceProvider>
 			</ServerEventsProvider>
 			{process.env.NODE_ENV === "development" && <PolishHost />}
