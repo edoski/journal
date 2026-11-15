@@ -52,7 +52,9 @@ const ARROW_RE = /-->|==>|-\.->/;
 // with a generic parse error. The muscle-protein post-mortem: underscores
 // failed HERE, the actionable message never fired, and the teacher spent
 // four attempts hunting punctuation the parser didn't care about.
-const ENDPOINT_RE = /^([^\s()\[\]]+)\s*(?:\[([^\[\]]*)\]|\(\s*"([^"]*)"\s*\)|\(([^()]*)\))?$/;
+// A quoted label may hold brackets (`row-reduce["Row reducing $[A \mid I]$"]`,
+// round 8: refused as unparseable, costing the probe-to-teaching turn a retry).
+const ENDPOINT_RE = /^([^\s()\[\]]+)\s*(?:\[\s*"([^"]*)"\s*\]|\[([^\[\]]*)\]|\(\s*"([^"]*)"\s*\)|\(([^()]*)\))?$/;
 
 interface Endpoint {
 	id: string;
@@ -62,7 +64,7 @@ interface Endpoint {
 function parseEndpoint(text: string): Endpoint | null {
 	const m = text.trim().match(ENDPOINT_RE);
 	if (!m || !m[1]) return null;
-	let label = (m[2] ?? m[3] ?? m[4] ?? "").trim();
+	let label = (m[2] ?? m[3] ?? m[4] ?? m[5] ?? "").trim();
 	// `id["title"]` is idiomatic mermaid — don't keep the quote pair in the title.
 	if (
 		label.length >= 2 &&

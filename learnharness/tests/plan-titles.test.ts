@@ -53,3 +53,49 @@ describe("plan_init refuses a title that gives a result away", () => {
 		assert.equal(saved.length, 0);
 	});
 });
+
+/** Round 8 (lesson reading M2, m8): the probe-to-teaching turn spent 46 s on
+ *  three plan_init attempts, a quoted title with brackets the parser refused
+ *  and titles the planning guidance itself modelled; and the Invertible map
+ *  ended on a step named after the lesson. */
+describe("plan_init passes on the first try when the tutor follows its guidance (round 8)", () => {
+	const store = (title?: string) => {
+		const saved: PlanTree[] = [];
+		return { saved, chatStore: { getChat: () => ({ messages: [], title }), saveTree: (_id: string, tree: PlanTree) => saved.push(tree), nameSession: () => {} } };
+	};
+
+	it("reads a quoted title that holds square brackets", async () => {
+		const { saved, chatStore } = store();
+		const tool = planTools({ chatId: "c1", chatStore: chatStore as never }).plan_init!;
+		const res = await tool.execute("t1", { mermaid: 'graph TD\n  columns[Finding the inverse one column at a time]\n  row-reduce["Row reducing $[A \\mid I]$"]\n  columns --> row-reduce' });
+		assert.equal(saved.length, 1, JSON.stringify(res.content));
+		assert.equal(saved[0]!.nodes.find((n) => n.id === "row-reduce")?.title, "Row reducing $[A \\mid I]$");
+	});
+
+	it("refuses a step named after the lesson's topic, with every other problem in the same reply", async () => {
+		const { saved, chatStore } = store("Invertible matrices");
+		const tool = planTools({ chatId: "c1", chatStore: chatStore as never }).plan_init!;
+		const res = await tool.execute("t1", {
+			goal: { title: "Invertible matrices", topic: "invertibility" },
+			mermaid: "graph TD\n  undo[When a map can be undone] --> det-link[$\\det A \\neq 0$ and collapsed dimensions] --> invertibility[Invertible matrices: test and compute]",
+		});
+		const text = JSON.stringify(res.content);
+		assert.match(text, /Invertible matrices: test and compute/);
+		assert.match(text, /collapsed dimensions/);
+		assert.equal(saved.length, 0);
+	});
+
+	it("every example title in the planning guidance and the tool's description parses and passes", async () => {
+		const fs = await import("node:fs");
+		const guidance = fs.readFileSync(new URL("../src/agent/prompts/teacher/10-planning.md", import.meta.url), "utf8");
+		const description = planTools({ chatId: "c1", chatStore: store().chatStore as never }).plan_init!.description;
+		const examples = [...`${guidance}\n${description}`.matchAll(/`([a-z0-9-]+(?:\[[^`]*\]|\("[^`]*"\)))`/g)].map((m) => m[1]!.replace(/\\"/g, '"'));
+		assert.ok(examples.length >= 4, `found ${examples.join(" | ")}`);
+		const { parseMermaidPlan } = await import("../src/agent/tools/mermaid-plan.ts");
+		for (const example of examples) {
+			const parsed = parseMermaidPlan(`graph TD\n  ${example}`);
+			assert.ok(parsed.ok, `${example}: ${parsed.problems.join("; ")}`);
+			assert.equal(planTitlesGiveAway(parsed.plan!), null, example);
+		}
+	});
+});

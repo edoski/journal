@@ -3,7 +3,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_MAP_CAP, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
-import { createTree, planMapTooBig, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
+import { createTree, planMapTooBig, planStepIsTheTopic, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
 import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
@@ -70,10 +70,9 @@ async function lessonDays(course: CourseToolContext, candidates: readonly string
  * WRITES the map and never tracks progress. One tool, plan_init, takes the
  * whole dependency map as a mermaid `graph TD` block:
  *
- *   - call it ONCE right after the probe concludes; the tutor states the
- *     lesson's goal in one line and starts teaching in the same turn (Edo,
- *     14 Nov 2026: no approval of a map of material he doesn't know yet —
- *     he interrupts when he wants)
+ *   - call it ONCE right after the probe concludes; the tutor teaches the
+ *     first step in the same turn (Edo, 14 Nov 2026: no approval of a map
+ *     of material he doesn't know yet — he interrupts when he wants)
  *   - the map fits his lesson map on one screen (PLAN_MAP_CAP); a bigger
  *     one is refused with what to prune or split
  *   - statuses (current / visited / upcoming) are DERIVED from the quiz
@@ -148,10 +147,12 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 			label: "plan_init",
 			description:
 				"Write or REWRITE this session's plan map — the dependency graph the learner follows live in the plan window. " +
-				"Call once right after the probe concludes, then state the lesson's goal in one line and start teaching in the same turn: he sees the map live and needs to approve nothing. " +
+				"Call once right after the probe concludes, then start teaching the first step in the same turn: he sees the map live and needs to approve nothing. " +
 				"Re-call whenever the map is wrong (the new block replaces the old tree). " +
 				"A mermaid graph block (any direction): one node per line (`slug[Short Title]` — slugs are permanent lowercase ids: a-z, 0-9, hyphens/underscores), " +
-				"each title naming what the step teaches, never its result: he sees it before the step is taught. " +
+				"each title naming the question the step answers, never its result: he sees it before the step is taught, so no relation in a title (=, ≠, →, ≤, ∈ or their TeX; refused), and maths in `$…$` only names a thing. " +
+				"A title holding square brackets is quoted: `row-reduce[\"Row reducing $[A \\mid I]$\"]`. " +
+				"The topic itself is never a step: no node is named after the lesson's topic or goal (refused). " +
 				"`-->` edges meaning 'from must be understood before to' (chains fine). " +
 				`One idea per step, and the map fits his lesson map on one screen: at most ${PLAN_MAP_CAP.steps} steps, no chain longer than ${PLAN_MAP_CAP.deep}; a bigger map is refused. ` +
 				"Every check you fire names the node it assesses via `nodeId`; where the lesson stands derives from those tags.",
@@ -172,8 +173,10 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					// createTree validates the structure (duplicate ids, missing
 					// edge endpoints, self-loops, cycles → PlanTreeError).
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
-					const tooBig = planMapTooBig(next) ?? planTitlesGiveAway(next);
-					if (tooBig) return { ok: false, error: tooBig };
+					// Every problem at once, so one rewrite fixes them all.
+					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title].filter((t): t is string => typeof t === "string") };
+					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson)].filter((p): p is string => p !== null);
+					if (problems.length > 0) return { ok: false, error: problems.join("\n") };
 					chatStore.saveTree(chatId, next);
 					if (goal && !record.tree) chatStore.nameSession(chatId, goal);
 					// Context diet: content = the validated nodeIds + the reminder (the
