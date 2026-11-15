@@ -46,7 +46,28 @@ function savedIds(json: string): string[] {
 /** Each answer's recorded attempt ids, keyed by the answer's tool call: a
  *  graded question's call, or a practice problem's conclude. In
  *  transcript order. */
-export function markLinks(messages: readonly LhMessage[]): Record<string, string[]> {
+export function markLinks(messages: readonly LhMessage[], saves: Readonly<Record<string, readonly string[]>> = {}): Record<string, string[]> {
+	const links = transcriptLinks(messages);
+	const answered = answeredQuestionsOf(messages);
+	// Where each answer sits: a question's call, or his message.
+	const place = new Map<string, number>();
+	messages.forEach((message, i) => {
+		if (message.role === "user") place.set(message.id, i);
+		else if (message.role === "assistant") for (const block of message.content) if (block.type === "toolCall") place.set(block.id, i);
+	});
+	for (const [key, ids] of Object.entries(saves)) {
+		if (!(answered.has(key) || messages.some((m) => m.role === "user" && m.id === key))) continue;
+		const seen = links[key] ?? [];
+		const found = ids.filter((id) => typeof id === "string" && !seen.includes(id));
+		if (found.length) links[key] = [...seen, ...found];
+	}
+	if (Object.keys(saves).length === 0) return links;
+	const order = (key: string) => place.get(key) ?? Number.MAX_SAFE_INTEGER;
+	return Object.fromEntries(Object.entries(links).sort(([a], [b]) => order(a) - order(b)));
+}
+
+/** The links the transcript's saves and concludes make. */
+function transcriptLinks(messages: readonly LhMessage[]): Record<string, string[]> {
 	const links: Record<string, string[]> = {};
 	const answered = answeredQuestionsOf(messages);
 	const named = new Map<string, (string | null)[]>();

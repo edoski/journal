@@ -174,6 +174,20 @@ function saveDigestLedger(id: string, ledger: DigestLedger): void {
 	writeChat(record);
 }
 
+/** Add a save's links to the record's kept answer saves. Silent, and not
+ * conversation activity: updatedAt stays put. */
+function saveAnswerSaves(id: string, links: Readonly<Record<string, readonly string[]>>): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	const saves: Record<string, readonly string[]> = { ...(record.answerSaves ?? {}) };
+	for (const [key, ids] of Object.entries(links)) {
+		const seen = saves[key] ?? [];
+		saves[key] = [...seen, ...ids.filter((o) => !seen.includes(o))];
+	}
+	record.answerSaves = saves;
+	writeChat(record);
+}
+
 /** Link the session to a course. Not conversation activity, and not a
  * list-shape change: updatedAt stays put and nothing is announced. */
 function linkCourse(id: string, course: CourseLink): void {
@@ -263,4 +277,5 @@ export const chatStore: ChatStore = {
 	deleteChat,
 	appendTurnUsage,
 	saveDigestLedger,
+	saveAnswerSaves,
 };

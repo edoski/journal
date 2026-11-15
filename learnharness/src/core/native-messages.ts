@@ -907,6 +907,19 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 	return { posed, answered };
 }
 
+/** The answers with the ones the lesson's kept save links name read as
+ *  saved (`ChatRecord.answerSaves`): a save the transcript never got still
+ *  saved them. `lastSaid` is his newest message's id, the one an answer in
+ *  words names. Pure; the map is copied. */
+export function recordedBySaves(answers: ReadonlyMap<string, AnsweredQuestion>, saves: Readonly<Record<string, readonly string[]>> | undefined, lastSaid: string | null): Map<string, AnsweredQuestion> {
+	const out = new Map<string, AnsweredQuestion>();
+	for (const [key, answer] of answers) {
+		const kept = (saves?.[key === HIS_MESSAGE ? (lastSaid ?? "") : key]?.length ?? 0) > 0;
+		out.set(key, kept && !answer.recorded ? { ...answer, recorded: true } : answer);
+	}
+	return out;
+}
+
 function resultText(m: ToolResultMessage): string {
 	return m.content.map((part) => (part.type === "text" ? part.text : "")).join("");
 }

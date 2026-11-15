@@ -32,6 +32,11 @@ export interface CourseToolContext {
 	 *  record when the turn starts: an answer always arrives before the turn
 	 *  that records it. Absent: none yet. */
 	answers?: ReadonlyMap<string, AnsweredQuestion>;
+	/** Keeps a save's links with the lesson the moment the engine took it:
+	 *  each answer it named and the observation that records it (round 8:
+	 *  a restart between the engine's write and the transcript's lost the
+	 *  answer's mark). */
+	onSaved?: (links: { question: string; observation: string }[]) => void;
 }
 
 /** A patch as the engine reads it: the object, or its JSON text, which the
@@ -113,6 +118,15 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
 	return { observations, questions, refused };
 }
 
+/** Hands the lesson each named answer's observation id, from the
+ *  receipt's `saved` (one id per observation, in the save's order). */
+function keepLinks(ctx: CourseToolContext, questions: readonly (string | null)[], json: unknown): void {
+	const saved = (json as { saved?: unknown } | null)?.saved;
+	if (!ctx.onSaved || !Array.isArray(saved)) return;
+	const links = questions.flatMap((question, i) => (question && typeof saved[i] === "string" ? [{ question, observation: saved[i] as string }] : []));
+	if (links.length) ctx.onSaved(links);
+}
+
 /**
  * Save one patch with the record's rules applied. Each attempt names the
  * answer it records (`question`); the field is the app's, so it is checked
@@ -141,6 +155,7 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	});
 	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
+	if (result.ok && !problem) keepLinks(ctx, named.questions, result.json);
 	const note = shownHelpNote(ruled.helped);
 	if (!result.ok || !note || typeof result.json !== "object" || result.json === null) return result;
 	const receipt = result.json as Record<string, unknown>;
