@@ -129,13 +129,11 @@ describe("setup polish interactions", () => {
 		connected = false; // the account signed out since that read
 		await mount();
 		assert.equal(closed, 0, "the dialog waits for a read taken since it opened");
-		assert.equal(document.querySelector('[data-testid="setup-dialog"]') !== null, true, "Sign in opens the dialog");
+		assert.ok(document.querySelector('[data-testid="setup-dialog"]') !== null, "Sign in opens the dialog");
 	});
 
 	it("names Claude once: no group heading repeats the row's name (round 10, 4 minor 7)", async () => {
 		await mount();
-		// A boolean, never the node: a failing assert would print the node
-		// and every React fiber hanging off it.
-		assert.equal(document.querySelector('[data-testid="setup-stage-keys"] h3') !== null, false);
+		assert.ok(document.querySelector('[data-testid="setup-stage-keys"] h3') === null, "no group heading");
 	});
 });
