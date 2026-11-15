@@ -19,3 +19,11 @@ test("closed for today, Done for today still holds its room, unseen and out of r
 	assert.match(html, /tabindex="-1"/);
 	assert.match(html, /disabled=""/);
 });
+
+test("Done for today is a button with the lesson bar's rounded corners, not a pill (Edo, 15 Nov 2026)", () => {
+	const html = renderToStaticMarkup(<DoneTonightButton onDone={() => {}} />);
+	assert.match(html, /data-variant="outline"/, "an outlined button");
+	assert.match(html, /\brounded-md\b/, "the corners of the bar's other buttons");
+	assert.doesNotMatch(html, /\brounded-full\b/, "no pill");
+	assert.match(html, />Done for today</);
+});
