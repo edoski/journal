@@ -417,3 +417,34 @@ describe("a topic row's title with room (round 10, 1 m8)", () => {
 		assert.match(fact.className, /\bmin-w-0\b/);
 	});
 });
+
+describe("a topic row's status whole (round 10, integration)", () => {
+	// After 1 m8 the course page's rows cut the status instead: "Due since 6 Nov, ba…", "No…", "Planned …".
+	const held = topic("matmul", { title: "Matrix multiplication as composition", level: "assisted", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-11-20", held: { exam: null, since: "2026-11-06" } } });
+	const rowOf = (handle: string, c: StudyCourse) => courseGroups(c).flatMap((g) => g.topics).find((t) => t.topic.handle === handle)!;
+
+	it("shows a review that came due by its day alone, the sidebar's whole sentence kept as its fact for the hint", () => {
+		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
+		assert.deepEqual(row.fact, { kind: "review", words: "Due since 6 Nov, back 20 Nov" }, "the fact stays the sidebar's");
+		assert.equal(row.factWords, "Due 6 Nov");
+		const span = rowOf("span", course());
+		assert.deepEqual([span.fact?.words, span.factWords], ["Due since 29 Oct", "Due 29 Oct"]);
+		const later = rowOf("vectors", course());
+		assert.equal(later.factWords, later.fact?.words, "any other fact as the sidebar says it");
+	});
+
+	it("shows the status's words whole or not at all, its icon staying with the full sentence in its hint", () => {
+		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
+		const document = render(<ul><CourseTopicRow row={row} /></ul>);
+		const fact = document.querySelector('[data-slot="course-topic-fact"]')!;
+		const words = fact.querySelector('[data-slot="course-topic-fact-words"]')!;
+		assert.equal(words.textContent, "Due 6 Nov");
+		assert.doesNotMatch(words.className, /\btruncate\b/, "never cut mid-word");
+		assert.match(words.className, /\bwhitespace-nowrap\b/);
+		assert.match(fact.className, /\bflex-wrap\b/, "words that do not fit beside the icon drop to a second line…");
+		assert.match(fact.className, /\boverflow-hidden\b/, "…which the 20px slot hides");
+		assert.match(fact.className, /\bjustify-end\b/, "the icon alone stays flush right");
+		assert.match(fact.querySelector("svg")!.getAttribute("class")!, /\bbox-content\b.*\bpy-\[3px\]/, "the icon's line is the slot's 20px, so the wrapped words start below it");
+		assert.equal(fact.getAttribute("data-state"), "closed", "the slot is the trigger of its hint, which says the whole sentence");
+	});
+});

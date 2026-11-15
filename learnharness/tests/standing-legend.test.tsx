@@ -69,7 +69,7 @@ function drawn(t: CourseMapTopic) {
 	const slip = slipBeside(t, titleOf);
 	const home = render(<StandingFact facts={{ standing, slip }} />);
 	const card = render(<NodeBody topic={t} standing={standing} line={null} />);
-	const row = render(<ul><CourseTopicRow row={{ topic: t, group: "learning" as never, standing, current: false, fact: null, href: "/" }} /></ul>);
+	const row = render(<ul><CourseTopicRow row={{ topic: t, group: "learning" as never, standing, current: false, fact: null, factWords: null, href: "/" }} /></ul>);
 	const head = render(<TopicHead facts={topicFacts({ course: COURSE, topic: t, chats: [], read: null })} />);
 	const headStanding = head.querySelector('[data-slot="page-fact"][data-kind="standing"]');
 	const headSlip = head.querySelector('[data-slot="page-fact"][data-kind="slip"]');

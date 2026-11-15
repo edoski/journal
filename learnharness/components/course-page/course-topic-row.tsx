@@ -16,31 +16,33 @@ import { MathLine } from "@/components/ui/math-line";
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
 
 /** The row's fact: its icon, then its words; a turn that waits wears the
- *  accent, as in the sidebar and on Today. `iconOnly` keeps the words for
- *  the hint and a screen reader. */
-function Fact({ fact, iconOnly: compact }: { fact: TopicFact; iconOnly: boolean }) {
+ *  accent, as in the sidebar and on Today. Its words show whole or not at
+ *  all, never cut mid-word: words that do not fit beside the icon wrap to
+ *  a second line the 20px slot hides, so the icon stays flush right
+ *  alone. The row shows `words` ("Due 6 Nov"); the hint always holds the
+ *  whole sentence (`fact.words`, "Due since 6 Nov, back 20 Nov").
+ *  `iconOnly` keeps the words for the hint and a screen reader. */
+function Fact({ fact, words, iconOnly: compact }: { fact: TopicFact; words: string; iconOnly: boolean }) {
 	const Icon = factIcon(fact);
 	// A fact with no mark (how long ago) keeps its words even on a compact row.
 	const iconOnly = compact && fact.kind !== "studied";
-	const mark = (
-		<span
-			data-slot="course-topic-fact"
-			data-kind={fact.kind}
-			className={cn(
-				"inline-flex h-5 max-w-56 min-w-0 items-center gap-1.5 text-callout system-current:text-label",
-				fact.kind === "your-turn" ? "system-current:font-medium text-link" : "text-muted-foreground",
-			)}
-		>
-			{Icon ? <Icon aria-hidden className="size-3.5 shrink-0" /> : fact.kind === "working" && <BrailleSpinner />}
-			<span className={iconOnly ? "sr-only" : "truncate"}>{fact.words}</span>
-		</span>
-	);
-	return iconOnly ? (
+	return (
 		<Hint label={fact.words} side="left">
-			{mark}
+			<span
+				data-slot="course-topic-fact"
+				data-kind={fact.kind}
+				className={cn(
+					"inline-flex h-5 max-w-56 min-w-0 flex-wrap items-center justify-end gap-x-1.5 overflow-hidden text-callout system-current:text-label",
+					fact.kind === "your-turn" ? "system-current:font-medium text-link" : "text-muted-foreground",
+				)}
+			>
+				{/* The icon's line is the slot's 20px, so words that wrap start below it, hidden. */}
+				{Icon ? <Icon aria-hidden className="box-content size-3.5 shrink-0 py-[3px]" /> : fact.kind === "working" && <BrailleSpinner />}
+				<span data-slot="course-topic-fact-words" className={iconOnly ? "sr-only" : "h-5 leading-5 whitespace-nowrap"}>
+					{words}
+				</span>
+			</span>
 		</Hint>
-	) : (
-		mark
 	);
 }
 
@@ -99,7 +101,7 @@ export function CourseTopicRow({
 						</span>
 					)}
 				</span>
-				{row.fact && <Fact fact={row.fact} iconOnly={compact} />}
+				{row.fact && <Fact fact={row.fact} words={row.factWords ?? row.fact.words} iconOnly={compact} />}
 			</Link>
 		</li>
 	);

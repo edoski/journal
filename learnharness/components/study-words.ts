@@ -255,6 +255,16 @@ export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today
 	return returnWords(review.date);
 }
 
+/** A review that came due by its day alone, for a row too narrow for the
+ *  sentence (`reviewWords` stays its hint): "Due 6 Nov" for "Due since 6
+ *  Nov" and "Due since 6 Nov, back 20 Nov"; "Due today" and any other
+ *  dated review as `reviewWords`. */
+export function shortReviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
+	if (review.kind === "due" && review.overdue > 0) return `Due ${shortDay(dayBefore(today, review.overdue))}`;
+	if (review.kind === "scheduled" && review.held && review.held.since < today) return `Due ${shortDay(review.held.since)}`;
+	return reviewWords(review, today);
+}
+
 /** "A", "A and B", "A, B and C". */
 function listWords(names: readonly string[]): string {
 	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
