@@ -1,6 +1,6 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
 import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
-import { sessionState } from "@/components/nav/session-state";
+import { pausedWords, sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
 
@@ -115,7 +115,10 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  * Pure.
  */
 export function whyOf(row: TodayRow): Why | null {
-	if (row.kind === "session") return SESSION_WHY[sessionState(row.chat)];
+	if (row.kind === "session") {
+		const state = sessionState(row.chat);
+		return state === "paused" ? { kind: "stopped", short: pausedWords(row.chat) } : SESSION_WHY[state];
+	}
 	const { course, step } = row;
 	switch (step.kind) {
 		case "review": {

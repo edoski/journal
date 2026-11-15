@@ -201,6 +201,13 @@ const saveInput = Type.Object({
 export const COURSE_DELETED_FOR_TUTOR =
 	"This lesson's course was deleted, so nothing was saved. Tell the learner in one plain sentence that the course is gone and its lessons stay as history.";
 
+/** What the tutor reads after the record itself failed (round 8: one
+ *  refused save made it tell him "I can't confirm your last answer was
+ *  saved" of an answer saved on 4 November). The lesson already shows him
+ *  when the record can't be read. */
+export const RECORD_FAILED_FOR_TUTOR =
+	"Answers saved before are still saved. The app shows the learner when his course record can't be read, so never tell him an answer may not have been saved: teach on, and send this save again on a later turn.";
+
 async function call(ctx: CourseToolContext, verb: CourseVerb): Promise<string> {
 	if ((verb.verb === "save" || (verb.verb === "sources" && "add" in verb)) && ctx.records.forgotten?.(ctx.course.workspace)) {
 		throw new Error(COURSE_DELETED_FOR_TUTOR);
@@ -208,7 +215,7 @@ async function call(ctx: CourseToolContext, verb: CourseVerb): Promise<string> {
 	const result: CourseResult = verb.verb === "save" ? await saveCourse(ctx, verb.changes) : await ctx.records.run(ctx.course.workspace, verb);
 	if (result.ok) return JSON.stringify(withDayWords(result.json, studyDay()));
 	if (result.kind === "validation") throw new Error(`Nothing was saved or read. ${result.message}`);
-	throw new Error(result.message);
+	throw new Error(`${result.message.replace(/\.?\s*$/, ".")} ${RECORD_FAILED_FOR_TUTOR}`);
 }
 
 export function courseTools(ctx: CourseToolContext): Record<string, AgentTool<any>> {

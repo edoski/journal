@@ -426,6 +426,9 @@ export interface ChatSummary {
 	/** How the tutor's last turn left the session (sessionEndOf); a summary
 	 *  made elsewhere may leave it out, which reads as closed. */
 	ended?: SessionEnd;
+	/** The tutor's last turn ended because he stopped it (`stoppedByHim`),
+	 *  not because the app restarted: a cut session then says he stopped it. */
+	stopped?: true;
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];

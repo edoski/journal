@@ -67,3 +67,9 @@ export function continueMove(sessions: readonly ChatListItem[], finished: typeof
 	const chat = resumableSession(sessions) ?? sessions.find((c) => c.kind !== "practice" && sessionState(c) === "finished");
 	return chat ? CONTINUE[sessionState(chat)](chat, finished) : null;
 }
+
+/** What a paused session says (round 8): his own stop in his words, a
+ *  turn a restart cut as cut off. */
+export function pausedWords(chat: Pick<ChatListItem, "stopped">): string {
+	return chat.stopped ? "You stopped the tutor" : "Reply cut off";
+}

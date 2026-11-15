@@ -19,6 +19,7 @@ import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
+import { stoppedByHim } from "../core/turn-cut.ts";
 import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
@@ -127,6 +128,7 @@ function listChats(): ChatSummary[] {
 						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
 						ownTopics: own,
 						ended: sessionEndOf(messages, tree, summary.kind, own),
+						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 					};
 				} catch (err) {

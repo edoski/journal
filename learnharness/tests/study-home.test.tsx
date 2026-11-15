@@ -461,7 +461,7 @@ describe("a course whose record can't be read", () => {
 			lines.map((p) => p.textContent),
 			[
 				"Real Analysis Couldn't read this course's record. Its file is damaged.",
-				"Probability Couldn't read this course's record. The app isn't allowed to open its files.",
+				"Probability Couldn't read this course's record. macOS won't let the app open its files: Get Info on the course folder in Finder shows who can read it.",
 			],
 		);
 	});
