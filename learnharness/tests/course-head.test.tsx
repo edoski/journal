@@ -162,7 +162,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		const map = { ...c.map, topics: [...c.map.topics, topic("expectation")], edges: [needs("poisson", "binomial")] };
 		const line = gapLine({ ...c, map })!;
 		const presses = [...line.querySelectorAll("button")].map((b) => b.textContent);
-		assert.deepEqual(presses, ["Start Expectation today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask], "the exam topic never started is the pick");
+		assert.deepEqual(presses, ["Review Binomial today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask], "a review of a taught topic is the pick, as the tutor orders it (round 10, 1 m6)");
 	});
 
 	it("offers only what he can do today: review what is taught, start what has its prerequisites taught, nothing for the rest (round 7: Review Poisson, Start Variance before Expectation)", () => {
@@ -170,7 +170,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		const c = gapped(["geometric", "expectation", "variance"], ["binomial", "poisson"]);
 		const map = { ...c.map, topics: [...c.map.topics, topic("geometric"), topic("expectation")], edges: [needs("variance", "expectation"), needs("poisson", "binomial"), needs("geometric", "binomial")] };
 		const ways = examGaps(map)!.ways.map((w) => `${w.starts ? "Start" : "Review"} ${w.topic.handle}`);
-		assert.deepEqual(ways, ["Start geometric", "Start expectation", "Review binomial", "Start poisson"]);
+		assert.deepEqual(ways, ["Review binomial", "Start geometric", "Start expectation", "Start poisson"]);
 		const stuck = gapLine({ ...c, map: { ...map, exam: { ...map.exam!, doesNotFit: [h("variance")], unreviewed: [] } } })!;
 		assert.deepEqual([...stuck.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.ask], "named, with only the tutor to ask");
 	});

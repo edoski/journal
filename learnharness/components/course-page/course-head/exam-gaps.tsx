@@ -16,7 +16,7 @@ const PRESS = "text-body system-current:text-row text-link hover:text-link";
  * the topics the final review leaves out that the first line does not,
  * then a way in (`ways`). Start it (or Review it) today opens a lesson on
  * the topic; with several, the first is the pick, named on its press
- * ("Start Expectation and linearity today"), and Or another opens a menu of
+ * ("Review Binomial distribution today"), and Or another opens a menu of
  * the rest; with none he can take today, Ask alone. Ask the tutor opens a lesson that asks, in his
  * words, how to fit them in. Engine facts only; nothing otherwise.
  */
@@ -32,8 +32,9 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 	const named = [...gaps.start, ...gaps.review];
 	const open = (topic: CourseMapTopic) => start(`gap:${topic.handle}`, topicCreation(workspace, topic));
 	const only = ways.length === 1 ? ways[0]! : null;
-	// The pick: the first way, an exam topic never started before a review,
-	// in the engine's order (round 8: eight options and no pick).
+	// The pick: the first way, a review of a taught topic before a start, in
+	// the engine's order (round 8: eight options and no pick; round 10: the
+	// tutor's order).
 	const [pick, ...others] = ways;
 	return (
 		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-body system-current:text-row font-normal system-current:font-normal text-muted-foreground">

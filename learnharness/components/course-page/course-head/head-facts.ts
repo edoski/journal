@@ -18,7 +18,11 @@ export function namesWords(names: readonly string[]): string {
  *  too late for a review), and the engine's reasons for each list, each
  *  once, in topic order (`why`). `ways` is what he can do about each today:
  *  review a taught topic, start one whose prerequisites are all taught; a
- *  topic that needs one not taught yet offers nothing. Null with no exam
+ *  topic that needs one not taught yet offers nothing. Reviews come first,
+ *  as the tutor orders them: a taught topic checked before the exam counts
+ *  there, a start that does not fit will not be solid in time (round 10,
+ *  1 m6: the head picked "Start Poisson distribution today" while the
+ *  tutor put Poisson last). Null with no exam
  *  ahead or nothing left out. Pure. */
 export interface ExamGaps {
 	start: readonly CourseMapTopic[];
@@ -40,7 +44,7 @@ export function examGaps(map: Pick<CourseMap, "exam" | "topics" | "edges">): Exa
 	const why = (topics: readonly CourseMapTopic[]) => [...new Set(topics.flatMap((t) => exam.reasons?.[t.handle] ?? []))];
 	const taught = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.introduced != null;
 	const startable = (topic: CourseMapTopic) => map.edges.every((edge) => edge.kind !== "needs" || edge.topic !== topic.handle || taught(edge.prerequisite));
-	const ways = [...start, ...review].flatMap((topic) => (topic.introduced !== null ? [{ topic, starts: false }] : startable(topic) ? [{ topic, starts: true }] : []));
+	const ways = [...start, ...review].flatMap((topic) => (topic.introduced !== null ? [{ topic, starts: false }] : startable(topic) ? [{ topic, starts: true }] : [])).sort((a, b) => Number(a.starts) - Number(b.starts));
 	return start.length > 0 || review.length > 0 ? { start, review, why: { start: why(start), review: why(review) }, ways } : null;
 }
 
