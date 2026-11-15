@@ -228,9 +228,9 @@ const ASK_OPENS =
  *  ("lies in ker A and is nonzero", "why does Ax = b then have…"). */
 const ASK_AFTER_AND =
 	/\s+(?:and\s+then|and|then)\s+(?=(?:what|which|who|whom|whose|when|where|why|how|whether|find|compute|give|name|write|show|prove|say|explain|state|list|turn|confirm|check|verify|determine|decide|describe|sketch|draw|derive|calculate|evaluate|solve|identify|predict|construct)\b)/i;
-/** "and why", "why or why not": a reason asked for with the answer, part
- *  of the one ask. */
-const BARE_WHY = /^why(?:\s+or\s+why\s+not|\s+not)?\s*[?.]?$/i;
+/** "and why", "why or why not", "and how do you know?": a reason asked
+ *  for with the answer, part of the one ask. */
+const BARE_WHY = /^(?:why(?:\s+or\s+why\s+not|\s+not)?|how (?:do|can|would) you (?:know|tell)(?: that)?)\s*[?.]?$/i;
 /** "When you meet v…", "Where the curve turns…": a clause that sets the
  *  scene, unless a verb asks next ("When does it converge?"). */
 const SCENE = /^(?:when|where)\b(?!\s+(?:does|do|did|is|are|was|were|will|would|can|could|should|has|have)\b)/i;

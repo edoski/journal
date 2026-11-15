@@ -41,6 +41,7 @@ describe("a question that asks one thing", () => {
 		"Show that $N$ is not invertible by finding a nonzero vector $v$ with $Nv = 0$.",
 		"A $3 \\times 3$ matrix $A$ has $\\ker A = \\{0\\}$. Why does $Ax = b$ then have a solution for every $b$ in $\\mathbb{R}^3$?",
 		"Find $x$ and then $y$.",
+		"Is $B$ the inverse of $A$, and how do you know?",
 	];
 	for (const q of single) it(q, () => assert.equal(count(q), 1, JSON.stringify(questionAsks(q))));
 });
