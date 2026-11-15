@@ -286,7 +286,10 @@ export function takeCarry(carryScope: string, question: string, reaskOf?: string
  *  the answer box of a question that takes one, else in Your thinking. */
 export function carriedForm(carry: KeptWords, textMode: boolean): QuestionFormDraft | undefined {
 	const words = carry.form ? [carry.form.text, carry.form.other, carry.form.thinking] : [carry.text];
-	const text = words.map((w) => w?.trim() ?? "").filter(Boolean).join("\n\n");
+	// His words as he typed them (round 9: "v = " came back as "v =");
+	// only the joint between two parts is tidied.
+	const parts = words.filter((w): w is string => !!w?.trim());
+	const text = parts.map((w, i) => (i < parts.length - 1 ? w.trimEnd() : i > 0 ? w.trimStart() : w)).join("\n\n");
 	if (!text) return undefined;
 	return {
 		selection: { selected: new Set(), otherSelected: false },

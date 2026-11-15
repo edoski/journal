@@ -13,8 +13,11 @@ const ACTION = "h-8 px-2 text-row";
  *  Claude, Open Settings for a rejected
  *  key, Home for a lesson deleted elsewhere, and Details for the provider's
  *  own text. */
-export function TurnError({ message, onRetry, retryLabel = "Retry", onOpenSettings, onSignIn, children }: {
+export function TurnError({ message, again = false, onRetry, retryLabel = "Retry", onOpenSettings, onSignIn, children }: {
 	message: string;
+	/** The press before failed the same way: the line says so and enters
+	 *  again, so every press shows (round 9). */
+	again?: boolean;
 	/** Present while the failed turn can be retried. */
 	onRetry?: () => void;
 	/** The retry's words: Try again for a dropped connection, as the line
@@ -26,11 +29,11 @@ export function TurnError({ message, onRetry, retryLabel = "Retry", onOpenSettin
 	/** A provider-specific prompt shown beside the sentence (the Claude plan limit). */
 	children?: ReactNode;
 }) {
-	const text = turnErrorText(message);
+	const text = turnErrorText(message, again);
 	const [open, setOpen] = useState(false);
 	const detailsId = useId();
 	return (
-		<div role="alert" data-testid="turn-error" data-kind={text.kind} className="flex flex-wrap items-center gap-1 text-row">
+		<div role="alert" data-testid="turn-error" data-kind={text.kind} className={cn("flex flex-wrap items-center gap-1 text-row", again && "lh-card-enter")}>
 			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">
 				{text.sentence}
 				{text.then === "sign-in-retry" && (onRetry ? " Sign in, then press Retry." : " Sign in, then send again.")}

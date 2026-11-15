@@ -30,7 +30,7 @@ The lesson screen, picked by Edo over Current and Slot on 14 Nov 2026. **Thesis:
 
 ## Keys
 
-Enter or Send answers; ⇧Enter is a newline. 1 to 9 pick a choice from anywhere but a field holding words. Esc turns the composer between answering and asking, as does a click on the toggle (← → move between its two halves when it has focus). ⌘⇧H, ⌘⇧S, ⌘⇧E are Hint, Show me, Explain instead; ⌥↑ ⌥↓ move confidence, as does a press on its meter; ⌘⇧P attaches a photo; ⌘⇧D is Done for today; ⌘⇧M disputes the newest mark. The cheat sheet lists the digits and Esc under Question.
+Enter or Send answers; ⇧Enter is a newline. 1 to 9 pick a choice from anywhere but a field holding words. Esc turns the composer between answering and asking while the tutor waits on him, and asks to stop the tutor's reply while it replies (round 9: Esc mid-reply switched to Ask and nothing stopped it); a click on the toggle switches either way (← → move between its two halves when it has focus). ⌘⇧H, ⌘⇧S, ⌘⇧E are Hint, Show me, Explain instead; ⌥↑ ⌥↓ move confidence, as does a press on its meter; ⌘⇧P attaches a photo; ⌘⇧D is Done for today; ⌘⇧M disputes the newest mark. The cheat sheet lists the digits and Esc under Question.
 
 ## Kept
 

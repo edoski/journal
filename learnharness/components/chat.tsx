@@ -405,9 +405,10 @@ export function Chat({
 				setupOpen: setupOpenRef.current,
 				pending: pendingRef.current !== null,
 				problem: activeProblemRef.current !== null,
+				askToggle: proseToggleRef.current !== null,
 				busy: busyRef.current,
 			});
-			if ((target === "question" || target === "problem") && proseToggleRef.current) proseToggleRef.current();
+			if (target === "ask") proseToggleRef.current?.();
 			else if (target === "question") setAbortAsk("question");
 			else if (target === "problem") setAbortAsk("problem");
 			else if (target === "turn") setAbortAsk("turn");
@@ -795,12 +796,15 @@ export function Chat({
 	// a pending question still owns the interaction (the dock replaces the
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
-	// Compaction (owner round 14): the RUNNING state, flipped by
-	// compaction-changed. Nothing gates on it: the server holds any turn
-	// until the compaction ends, so his Enter goes through and the line
-	// below the transcript says why the reply waits (round 6).
+	// Compaction: a turn held for it, flipped by compaction-changed (only a
+	// lesson at its limit waits; round 9). Nothing gates on it: his Enter
+	// goes through and the line below the transcript says why the reply
+	// waits (round 6).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
-	const waiting = waitingLine(messages, { busy, compacting });
+	// A turn the server is setting up itself (turn-waking): the line shows
+	// from the start of its setup, not only once it runs.
+	const [waking, setWaking] = useState(false);
+	const waiting = waitingLine(messages, { busy, compacting, waking });
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -1257,11 +1261,13 @@ export function Chat({
 		// Fully idle — a turn we never saw (every window missed): adopt now.
 		void syncFromServer();
 	});
+	useServerEvent("turn-waking", (p) => {
+		if (p.chatId === chatId) setWaking(p.waking);
+	});
 	useServerEvent("compaction-changed", (p) => {
-		// The settle-kick's background summary: while it runs, sends gate
-		// (the next turn's server-side ensureCompacted awaits it anyway —
-		// this only keeps the affordance honest). On finish, record-changed
-		// (emitted by the compaction write itself) carries the marker in.
+		// A turn of this lesson waits on its compaction (the lesson is at
+		// its limit). On finish, record-changed (emitted by the compaction
+		// write itself) carries the marker in.
 		if (p.chatId !== chatId) return;
 		setCompacting(p.running);
 	});
@@ -1735,7 +1741,7 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}
@@ -1847,7 +1853,7 @@ export function Chat({
  *  then the session overlays (mermaid paints above plan — later in DOM),
  *  then setup (self-closing — the gate only must not fire), then the
  *  2026-10-02 abort chain proper (question before turn). */
-export type EscAbortTarget = "mermaid" | "plan" | "setup" | "question" | "problem" | "turn" | null;
+export type EscAbortTarget = "mermaid" | "plan" | "setup" | "ask" | "question" | "problem" | "turn" | null;
 
 /**
  * Does the opening topic still owe its first send? The topic is the
@@ -1875,12 +1881,17 @@ export function escAbortTarget(s: {
 	 *  abort (a live turn can be running BEHIND an idle problem only in
 	 *  teaching sessions — practice problems end their pose turns). */
 	problem: boolean;
+	/** The answer box's Answer or Ask switch is there: Esc switches it while
+	 *  the tutor waits on him, and stops the tutor while it replies
+	 *  (round 9: Esc mid-reply switched to Ask and nothing stopped it). */
+	askToggle: boolean;
 	busy: boolean;
 }): EscAbortTarget {
 	if (s.abortAsk) return null; // the popup's own Esc — claimed by the dialog
 	if (s.mermaidFocus) return "mermaid";
 	if (s.planOpen) return "plan";
 	if (s.setupOpen) return "setup";
+	if (s.askToggle) return s.busy ? "turn" : "ask";
 	if (s.pending) return "question";
 	if (s.problem) return "problem";
 	if (s.busy) return "turn";

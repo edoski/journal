@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
 import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
-import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
+import { filterSessions, opensSearchResult, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, toBlobs, useActivity } from "@/components/activity-dock";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
@@ -248,7 +248,7 @@ export function UnitSidebar() {
 					</div>
 
 					<ScrollArea viewportRef={s.listRef} bar={false} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
-						<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} className="flex min-h-full flex-col gap-px p-2">
+						<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} onClick={(e) => { if (found && opensSearchResult(e.target)) s.changeQuery(""); }} className="flex min-h-full flex-col gap-px p-2">
 							{!now ? (
 								<NowSkeleton />
 							) : found ? (

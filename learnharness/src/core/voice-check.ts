@@ -46,6 +46,7 @@ export type VoiceRule =
 	| "chain"
 	| "moral"
 	| "reason"
+	| "machinery"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -76,6 +77,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// A pointer back instead of the thing itself, which he must check against
 	// the screen (round 9: "The base is the same as before" when it was not).
 	{ rule: "backref", re: /\b(?:the )?same as (?:before|last time|above|earlier|the last (?:one|question|problem))\b|\bas (?:before|last time)\b/i },
+	// The app's own parts are nothing he talks about (round 9: "Your message
+	// arrived in the answer field…, so that question is now closed").
+	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
 ];
 
 /** Requests in an instruction text for a form the voice bans: each names

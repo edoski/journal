@@ -22,3 +22,10 @@ test("the compaction cut draws nothing in the lesson", () => {
 	const lesson = readFileSync(new URL("../components/chat.tsx", import.meta.url), "utf8");
 	assert.doesNotMatch(lesson, /case "data-compaction-cut"/);
 });
+
+test("a wake the server is setting up shows its line too: the handoff to practice was silent for about 10 s (round 8/9)", () => {
+	const handedOff = [{ id: "a2", role: "assistant" as const, parts: [{ type: "tool-practice", state: "output-available", toolCallId: "h1" }] }];
+	assert.equal(waitingLine(handedOff as never, { busy: false, compacting: false, waking: true }), "thinking");
+	assert.equal(waitingLine(handedOff as never, { busy: false, compacting: true, waking: true }), "compacting", "the wake waits on the compaction");
+	assert.equal(waitingLine(handedOff as never, { busy: false, compacting: false, waking: false }), null);
+});

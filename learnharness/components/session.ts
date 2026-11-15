@@ -83,8 +83,11 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 	// component. Enough leaked views starved every NEW request (navigation
 	// RSC fetches included) — the multi-session navigation freeze. Aborting
 	// costs nothing: navigating back replays the compacted log + live tail.
+	// Not in flight: one record read, because Back mounts the page as the
+	// router cached it (round 9: an empty session after Done for today).
 	useEffect(() => {
 		if (initiallyInFlight) void model.resumeStream(false);
+		else void model.refreshFromRecord();
 		return () => {
 			model.stop();
 		};

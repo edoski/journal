@@ -1,5 +1,5 @@
 import { derivePlanStatusesLh, newSessionModeMessage, openingTitle, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
-import { compactionInFlight, courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
+import { compactionHoldsTurn, courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
 /** The session picker's list: record-derived summaries (phase, pending
@@ -14,7 +14,7 @@ export async function GET() {
 	const chats: ChatListItem[] = listChats().map((c) => ({
 		...c,
 		busy: isTurnRunning(c.id),
-		compacting: compactionInFlight(c.id),
+		compacting: compactionHoldsTurn(c.id),
 		courseDeleted: courseGone(c.course),
 	}));
 	return Response.json({ chats });

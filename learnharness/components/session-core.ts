@@ -194,7 +194,9 @@ export interface SessionState {
 	/** Completed conversation usage; null after compaction or before first usage. */
 	contextTokens: number | null;
 	status: SessionStatus;
-	error: { message: string } | null;
+	/** `repeat` counts the failures just before it that failed the same
+	 *  way, so a press that fails again still shows (round 9). */
+	error: { message: string; repeat?: number } | null;
 	/** Steers sent but not yet drained (composer steering, 2026-10-03):
 	 *  the queued indicator's truth. An entry dies when its id lands in
 	 *  the messages (the drain's verbatim events upsert the real card) —
@@ -260,7 +262,12 @@ export class SessionModel {
 	private streamingMessageId: string | null = null;
 	private statusValue: SessionStatus = "ready";
 	/** Request/loop failures are transient; provider failures derive from messages. */
-	private errorValue: { message: string } | null = null;
+	private errorValue: { message: string; repeat?: number } | null = null;
+	/** The failure the send under way tries again after, and how many
+	 *  times it had already repeated: failing the same way again is a
+	 *  repeat (round 9: a second Enter while the app was down changed
+	 *  nothing on screen). */
+	private retrying: { message: string; repeat: number } | null = null;
 	/** Dismissing a banner must not authorize an automatic replacement turn. */
 	private automaticContinuationBlocked = false;
 	/** A completed failure from THIS consume, not the previous attempt's record. */
@@ -344,7 +351,9 @@ export class SessionModel {
 	}
 
 	private setError(message: string | null): void {
-		this.errorValue = message === null ? null : { message };
+		const repeat = message !== null && this.retrying?.message === message ? this.retrying.repeat + 1 : 0;
+		this.errorValue = message === null ? null : repeat > 0 ? { message, repeat } : { message };
+		if (message !== null) this.retrying = null;
 		if (message !== null) this.automaticContinuationBlocked = true;
 		this.onChange?.();
 	}
@@ -683,6 +692,7 @@ export class SessionModel {
 		const controller = new AbortController();
 		this.consumeAbort = controller;
 		this.latestRequest = controller;
+		this.retrying = recovering && this.errorValue ? { message: this.errorValue.message, repeat: this.errorValue.repeat ?? 0 } : null;
 		this.setError(null);
 		this.setStatus("submitted");
 		if (recovering && input.type === "answer") {
@@ -967,6 +977,27 @@ export class SessionModel {
 		for (const [id, key] of this.unconfirmedAnswers) {
 			if (key !== pendingKey) this.unconfirmedAnswers.delete(id);
 		}
+	}
+
+	/** The page a lesson mounts from can be old: Back restores it from the
+	 *  router's cache as first rendered, maybe before the lesson had a word
+	 *  (round 9: an empty "New session" page after Done for today). Once per
+	 *  mount the lesson reads the record and takes it if it moved, unless
+	 *  something happened here meanwhile; a turn running now is attached. */
+	async refreshFromRecord(): Promise<void> {
+		const base = this.base;
+		let record: { messages?: LhMessage[]; turnInFlight?: boolean; turnError?: string };
+		try {
+			const res = await this.fetch(`/api/chats/${encodeURIComponent(this.chatId)}`);
+			if (!res.ok) return;
+			record = await res.json();
+		} catch {
+			return;
+		}
+		if (!Array.isArray(record.messages) || this.base !== base || this.tail.length > 0 || this.statusValue !== "ready") return;
+		const ids = (messages: readonly LhMessage[]) => messages.map((m) => m.id).join("\n");
+		if (ids(record.messages) !== ids(base)) this.setMessages(record.messages, record.turnError);
+		if (record.turnInFlight === true) await this.resumeStream(false);
 	}
 
 	/** Full snapshot swap (the idle settle sync — server canon). */

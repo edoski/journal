@@ -217,6 +217,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `No offer here: ${quoted(b.excerpt)}.`;
 		case "comprehension":
 			return `Never ask whether it makes sense: ${quoted(b.excerpt)}.`;
+		case "machinery":
+			return `Never name the app's parts or how his words reached you: ${quoted(b.excerpt)}. Speak to what he wrote.`;
 		case "exclamation":
 			return "No exclamation marks.";
 		case "dash":

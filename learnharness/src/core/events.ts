@@ -57,6 +57,12 @@ export interface ServerEvents {
 	 *  the chat; the client mirrors it by disabling the composer/dock
 	 *  submit. */
 	"compaction-changed": { chatId: string; running: boolean };
+	/** The server is setting up a turn it starts itself (a handoff to
+	 *  practice, a job's result): waking=true before its compaction gate and
+	 *  course brief, false once the turn is running or was refused. The
+	 *  lesson shows its working line meanwhile (round 8: about 10 s of
+	 *  nothing before practice woke). */
+	"turn-waking": { chatId: string; waking: boolean };
 }
 
 export type ServerEventType = keyof ServerEvents;
@@ -79,6 +85,7 @@ export const SERVER_EVENT_TYPES = [
 	"course-changed",
 	"record-changed",
 	"compaction-changed",
+	"turn-waking",
 ] as const satisfies readonly ServerEventType[];
 
 /** One notification: the type discriminates the payload (distributed over

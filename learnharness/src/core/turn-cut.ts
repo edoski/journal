@@ -1,4 +1,4 @@
-import { nativeInputCause, needsContinuation, NEUTRAL_MARKERS, SEND_TO_USER_TOOL, type LhMessage } from "./native-messages.ts";
+import { nativeInputCause, needsContinuation, NEUTRAL_MARKERS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, type LhMessage } from "./native-messages.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 
 /**
@@ -24,8 +24,11 @@ function isEmptyStop(m: LhMessage): boolean {
 }
 
 /** What of a reply he reads: text the voice guard kept, a message sent
- *  to him, a question. A save or a lookup shows him nothing. */
-const SHOWN_TOOLS: readonly string[] = [SEND_TO_USER_TOOL, ...QUESTION_TOOLS];
+ *  to him, a question, a problem, a problem's close (its marks and model
+ *  solution), and a save of his work (the mark under his answer; round 9:
+ *  "before it replied" stood under marks and a Model solution). Lesson
+ *  progress or a lookup shows him nothing. */
+const SHOWN_TOOLS: readonly string[] = [SEND_TO_USER_TOOL, ...QUESTION_TOOLS, PRACTICE_PROBLEM_TOOL, PRACTICE_CONCLUDE_TOOL, "course_save"];
 
 /** Whether the tutor wrote to him after his latest input: a reply in the
  *  turn that was then stopped. */

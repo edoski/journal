@@ -92,7 +92,7 @@ export function ProseComposer(props: ProseComposerProps) {
 	toggleRef.current = open ? toggle : null;
 
 	if (!open || asking) {
-		const back = open && <ModeToggle mode="ask" kind={open.kind} onToggle={toggle} />;
+		const back = open && <ModeToggle mode="ask" kind={open.kind} onToggle={toggle} busy={props.busy} />;
 		return (
 			<LessonSessionComposer
 				{...message}
@@ -195,7 +195,8 @@ function AnswerComposer({
 	const submit = () => {
 		if (!ready) return;
 		if (problem) {
-			const words = text.trim();
+			const typed = text;
+			const words = typed.trim();
 			setText("");
 			setConfidence(DEFAULT_CONFIDENCE);
 			const taken = photos.take();
@@ -206,7 +207,7 @@ function AnswerComposer({
 				if (accepted) return;
 				restorePhotos(taken);
 				if (textRef.current.trim()) return;
-				setText(words);
+				setText(typed);
 				setConfidence(sure);
 			});
 			return;
@@ -322,7 +323,7 @@ function AnswerComposer({
 	const toolbar = (
 		<>
 			{takesConfidence && <ConfidenceIcon value={confidence} onChange={setConfidence} />}
-			<ModeToggle mode="answer" kind={open.kind} onToggle={onAsk} />
+			<ModeToggle mode="answer" kind={open.kind} onToggle={onAsk} busy={busy} />
 		</>
 	);
 	const placeholder = problem ? "Work here, think out loud." : spec ? prosePlaceholder(spec, open.kind === "question" ? open.input : null, selection.selected.size > 0) : undefined;
@@ -361,9 +362,11 @@ function RequestIcon({ icon: Icon, label, hint, action, testId, disabled, onClic
 
 /** Answering or asking, as one two-state control beside Send (spec:
  *  prose.md): the pen while his words answer, the question bubble while
- *  they go to the tutor as a message. A click or Esc switches; ← → move
+ *  they go to the tutor as a message. A click or Esc switches, Esc only
+ *  while the tutor isn't replying (then it stops the reply); ← → move
  *  between the two when it has focus. */
-export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; kind: ProseOpen["kind"]; onToggle: () => void }) {
+export function ModeToggle({ mode, kind, onToggle, busy }: { mode: "answer" | "ask"; kind: ProseOpen["kind"]; onToggle: () => void; busy: boolean }) {
+	const esc = busy ? undefined : "escape";
 	const answerWords = kind === "question" ? "Answer the question" : "Work on the problem";
 	const askWords = `Ask the tutor instead. The ${kind} stays open`;
 	return (
@@ -379,12 +382,12 @@ export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; k
 			data-testid="prose-mode"
 			data-mode={mode}
 		>
-			<Hint label={answerWords} binding="escape">
+			<Hint label={answerWords} binding={esc}>
 				<ToggleGroupItem value="answer" aria-label={answerWords} data-testid="prose-answer-mode" className="h-[26px] px-2">
 					<PenLineIcon />
 				</ToggleGroupItem>
 			</Hint>
-			<Hint label={askWords} binding="escape">
+			<Hint label={askWords} binding={esc}>
 				<ToggleGroupItem value="ask" aria-label="Ask the tutor instead" data-testid="prose-ask" className="h-[26px] px-2">
 					<MessageCircleQuestionIcon />
 				</ToggleGroupItem>
