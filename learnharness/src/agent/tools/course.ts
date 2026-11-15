@@ -16,6 +16,7 @@ import type { CourseLink, CourseResult, CourseVerb } from "../../core/contracts/
 import type { CourseRecords } from "../../core/ports.ts";
 import { shownHelpNote, withShownHelp } from "../../core/shown-help.ts";
 import { engineConfidence } from "../../core/engine-confidence.ts";
+import { RUNG_HELP } from "../../core/practice-attempts.ts";
 import type { AnsweredQuestion } from "../../core/native-messages.ts";
 import { studyDay, withDayWords } from "../../core/day-words.ts";
 
@@ -32,6 +33,9 @@ export interface CourseToolContext {
 	 *  record when the turn starts: an answer always arrives before the turn
 	 *  that records it. Absent: none yet. */
 	answers?: ReadonlyMap<string, AnsweredQuestion>;
+	/** What a re-mark may correct (answer-marks.ts `remarkableOf`), read
+	 *  with `answers`. Absent: the rule is not applied. */
+	remarkable?: { saved: ReadonlySet<string>; disputed: ReadonlySet<string> };
 }
 
 /** A patch as the engine reads it: the object, or its JSON text, which the
@@ -59,6 +63,27 @@ const recordsAnAnswer = (o: Record<string, unknown>) => (o.kind ?? "attempt") ==
  *  through: the session's record holds them only from the next turn. */
 const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
 
+/** The help a Show me gave, in the words practice's Show me saves (its
+ *  R5 rung): one rule for a shown answer, in a lesson as in practice
+ *  (round 8, 2 M3: a lesson's Show me was saved as no help). */
+export const SHOW_ME_HELP = RUNG_HELP.R5;
+
+/** Why a re-mark is refused: it corrects an attempt this session did not
+ *  save and he did not dispute (round 8, 2 m1: the tutor silently re-marked
+ *  an older answer to a different question). A dispute's ruling corrects
+ *  only an attempt he disputed; his own statement (a self_report) may
+ *  correct any. Null when it may stand. */
+function remarkRefused(o: Record<string, unknown>, i: number, remarkable: CourseToolContext["remarkable"]): string | null {
+	if (!remarkable || (o.kind ?? "attempt") === "self_report" || !Array.isArray(o.corrects)) return null;
+	const disputed = "disputed" in o;
+	const allowed = disputed ? remarkable.disputed : remarkable.saved;
+	const outside = o.corrects.filter((id): id is string => typeof id === "string" && !allowed.has(id));
+	if (outside.length === 0) return null;
+	return disputed
+		? `observations[${i}].corrects: he disputed no mark of ${outside.join(", ")}. A ruling re-marks only the attempts his dispute named.`
+		: `observations[${i}].corrects: ${outside.join(", ")} ${outside.length > 1 ? "were" : "was"} not saved in this session, and he did not dispute ${outside.length > 1 ? "them" : "it"}, so ${outside.length > 1 ? "they stand" : "it stands"} as recorded: never re-mark an answer on your own. Leave the re-mark out; a new answer is simply a new attempt.`;
+}
+
 /** What a save's observations say, ruled by the answers they name: each
  *  observation as the engine reads it, without `question`, never a
  *  prediction unless he was asked to predict, and its confidence as he
@@ -67,7 +92,12 @@ const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
  *  attempt that names no answer, a name that is no answer of this session,
  *  and an answer already saved (round 6: once an unreadable course read
  *  again, a 4 Nov answer was saved a second time, dated today). */
-function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string, AnsweredQuestion>, saved: ReadonlySet<string>): { observations: unknown[]; questions: (string | null)[]; refused: string | null } {
+function namedQuestions(
+	listed: readonly unknown[],
+	answers: ReadonlyMap<string, AnsweredQuestion>,
+	saved: ReadonlySet<string>,
+	remarkable?: CourseToolContext["remarkable"],
+): { observations: unknown[]; questions: (string | null)[]; refused: string | null } {
 	const questions: (string | null)[] = [];
 	let refused: string | null = null;
 	const refuse = (why: string) => {
@@ -79,6 +109,8 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
 			return o;
 		}
 		const { question, ...rest } = o;
+		const remark = remarkRefused(rest, i, remarkable);
+		if (remark) refuse(remark);
 		if (!("question" in o)) {
 			if (recordsAnAnswer(rest)) {
 				refuse(
@@ -103,7 +135,12 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
 			refuse(`observations[${i}].question: ${JSON.stringify(named)} is already saved, so it is not saved again. Leave it out and send the rest; a re-mark of it names its attempt with corrects.`);
 		}
 		const ruled: Record<string, unknown> = { ...rest };
-		if (answer.predicted === false) delete ruled.predicted;
+		if (answer.predicted === true) ruled.predicted = true;
+		else if (answer.predicted === false) delete ruled.predicted;
+		if (answer.showMe && !("corrects" in rest)) {
+			Object.assign(ruled, { result: "incorrect", gave_up: true, shown: true });
+			if (typeof ruled.help !== "string" || ruled.help.trim().toLowerCase() === "none") ruled.help = SHOW_ME_HELP;
+		}
 		if (answer.confidence !== undefined) {
 			delete ruled.sure;
 			Object.assign(ruled, engineConfidence(answer.confidence ?? undefined));
@@ -120,8 +157,11 @@ function namedQuestions(listed: readonly unknown[], answers: ReadonlyMap<string,
  * patch. The answer then sets what only he and the question can say: it is
  * never a prediction unless he was asked to predict, and its confidence is
  * the one he chose, none when he chose none (round 6: a check saved as a
- * prediction, "gut feeling" saved as a guess over his Confident). An answer
- * already saved is refused. The shown-solution rule (shown-help.ts) saves
+ * prediction, "gut feeling" saved as a guess over his Confident); an
+ * answer to a question asked as a prediction is always one (round 8); and
+ * a Show me is an attempt he gave up after its answer was shown, as in
+ * practice (round 8). An answer already saved is refused, and so is a
+ * re-mark of an attempt this session did not save and he did not dispute. The shown-solution rule (shown-help.ts) saves
  * an attempt as helped when he saw its question solved before it was
  * asked. A concluded problem's attempts name its conclude (`problem`), the
  * answer they record. Every save of a session's answers comes through here.
@@ -133,7 +173,7 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	const answers = ctx.answers ?? new Map<string, AnsweredQuestion>();
 	const saved = savedThisTurn.get(ctx) ?? new Set<string>();
 	savedThisTurn.set(ctx, saved);
-	const named = problem ? { observations: listed, questions: listed.map(() => null), refused: null } : namedQuestions(listed, answers, saved);
+	const named = problem ? { observations: listed, questions: listed.map(() => null), refused: null } : namedQuestions(listed, answers, saved, ctx.remarkable);
 	if (named.refused) return { ok: false, kind: "validation", message: named.refused };
 	const ruled = withShownHelp(named.observations, (_o, i) => {
 		const question = named.questions[i];

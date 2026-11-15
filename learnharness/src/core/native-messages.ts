@@ -802,16 +802,18 @@ export interface AnsweredQuestion {
 	 *  were asked earlier in the session and answered, or posed as a
 	 *  problem that ended (shown-help.ts). */
 	seenBefore: boolean;
-	/** Asked as a prediction (an `explain` with `type` predict): only such
-	 *  an answer may be saved `predicted`, and only when the tutor judges it
-	 *  was not answerable from what was taught. Absent for an answer in
-	 *  words, which no question declared. */
+	/** Asked as a prediction (an `explain` with `type` predict): such an
+	 *  answer is saved `predicted`, and no other is (round 8, 4 #12: the box
+	 *  said "Your prediction" and the answer counted). Absent for an answer
+	 *  in words, which no question declared. */
 	predicted?: boolean;
 	/** The confidence he chose with this answer, null for none (the meter
 	 *  left alone, or a message, which has no meter). Absent for a
 	 *  problem's conclude, whose attempts carry the confidence of each
 	 *  submission. */
 	confidence?: Exclude<Confidence, "neutral"> | null;
+	/** He pressed Show me on it: he gave up and was shown its answer. */
+	showMe?: boolean;
 	/** A save that went through already recorded it, or its problem's
 	 *  conclude did. */
 	recorded: boolean;
@@ -898,8 +900,9 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			const asked = posed.get(m.toolCallId);
 			if (!asked) continue;
 			revealed.add(asked.key);
-			const confidence = chosenConfidence((m.details as { confidence?: unknown }).confidence) ?? null;
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, recorded: false });
+			const details = m.details as { confidence?: unknown; showMe?: unknown };
+			const confidence = chosenConfidence(details.confidence) ?? null;
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), recorded: false });
 		}
 	}
 	for (const [key, answer] of answered) answer.recorded = recorded.has(key);

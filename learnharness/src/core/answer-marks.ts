@@ -82,6 +82,29 @@ export function markLinks(messages: readonly LhMessage[]): Record<string, string
 	return links;
 }
 
+/** What a re-mark in this session may correct (round 8, 2 m1: the tutor
+ *  silently re-marked an older answer to a different question): `saved`,
+ *  every attempt this session's saves and problems recorded, which it may
+ *  set right on its own; `disputed`, every attempt a dispute of his named,
+ *  which only a ruling on that dispute re-marks. Pure. */
+export function remarkableOf(messages: readonly LhMessage[]): { saved: Set<string>; disputed: Set<string> } {
+	const saved = new Set<string>();
+	const disputed = new Set<string>();
+	for (const message of messages) {
+		if (message.role === "custom" && message.customType === "dispute") {
+			for (const id of ids((message.details as { observations?: unknown } | null)?.observations)) disputed.add(id);
+		} else if (message.role === "toolResult" && !message.isError) {
+			if (message.toolName === "conclude") {
+				const receipt = CONCLUDE_RECEIPT.exec(textOf(message.content));
+				if (receipt) for (const id of savedIds(receipt[1]!)) saved.add(id);
+			} else if (message.toolName === "course_save") {
+				for (const id of savedIds(textOf(message.content))) saved.add(id);
+			}
+		}
+	}
+	return { saved, disputed };
+}
+
 /** The answer whose mark ⌘⇧M disputes: the newest one with a mark. */
 export function latestMarkedAnswer(messages: readonly LhMessage[], marks: Readonly<Record<string, AnswerMark>>): string | null {
 	const keys = Object.keys(markLinks(messages)).filter((key) => marks[key]);
