@@ -1146,3 +1146,21 @@ def test_a_night_after_a_finished_day_keeps_every_day_he_was_told() -> None:
     tomorrow = agenda.plan(records, on(1), 9, capacity_)
     assert tomorrow.days == {name: days[1:] for name, days in tonight.days.items()}
 
+
+def test_inside_a_final_review_the_review_its_next_topic_waits_on_comes_first() -> None:
+    """Round 10 (1 M4): two days before the Probability exam, its final
+    review checked Total probability first, so Expectation, waiting on
+    Random variables, started the day before the exam, too late for a
+    review, and Linear Algebra took the day's new topic."""
+    exam = course(3, exam=3, needs={"t02": ["t00"]})
+    exam = save(
+        exam,
+        {"topics": {"t00": {"introduced": True}, "t01": {"introduced": True}}},
+        on(-12),
+    )
+    exam = save(exam, {"observations": [answer("t01", "partial")]}, on(-6))
+    exam = save(exam, {"observations": [answer("t00", "partial")]}, on(-2))
+    together = agenda.afresh({"exam": planned(exam)}, MONDAY, 6, week(1, 1, EVERY_DAY))
+    assert together.days["exam"][0]["reviews"] == ["t00"]
+    assert started(together.days["exam"]) == {"t02": MONDAY.isoformat()}
+    assert reviewed_on(together, "exam", "t02")[0] < on(3).isoformat()

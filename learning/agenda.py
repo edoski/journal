@@ -27,7 +27,10 @@ Reviews, when there are more than fit:
      course's final review the day before its exam).
   1. a course's final review, the one deadline the plan keeps: from its
      final-review day to the exam, its reviews come before every other
-     course's but first reviews, nearest exam first. Its solid topics are spread over its study
+     course's but first reviews, nearest exam first; within it, one its
+     untaught topics wait on comes first (as in 2), so the next topic can
+     start while a review of it still fits (round 10: Expectation, waiting
+     on Random variables, started the day before its exam). Its solid topics are spread over its study
      days to the exam in proportion to the reviews he completes on each, so a
      lighter day takes less of it and a day off none; its not-yet-solid
      topics come back as their short intervals ask. Every taught topic is due
@@ -837,7 +840,13 @@ def _candidates(
             topic = item["topic"]
             examined = course.exam_of(topic) is not None
             if reviewing and examined:
-                key: tuple[Any, ...] = (0, distance, *course.oldest(topic, day), rank)
+                key: tuple[Any, ...] = (
+                    0,
+                    distance,
+                    topic not in gates,
+                    *course.oldest(topic, day),
+                    rank,
+                )
                 candidates.append((key, course.name, course, topic))
                 continue
             tier = course.tier(topic, day)
