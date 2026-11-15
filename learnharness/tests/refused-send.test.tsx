@@ -62,7 +62,7 @@ test("work on a problem refused at once comes back into the box", async () => {
 	const field = () => host.querySelector<HTMLTextAreaElement>("textarea")!;
 	try {
 		await act(async () => {
-			Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, "value")!.set!.call(field(), "rank 2, so nullity 3");
+			Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, "value")!.set!.call(field(), "rank 2, so nullity = ");
 			field().dispatchEvent(new dom.window.Event("input", { bubbles: true }));
 		});
 		await act(async () => {
@@ -70,7 +70,7 @@ test("work on a problem refused at once comes back into the box", async () => {
 		});
 		assert.equal(field().value, "", "the box empties while the work is on its way");
 		await act(async () => refuse(false));
-		assert.equal(field().value, "rank 2, so nullity 3", "a refused send puts his work back");
+		assert.equal(field().value, "rank 2, so nullity = ", "a refused send puts his work back as he typed it, its trailing space too (round 9, 4 #7)");
 	} finally {
 		await act(async () => root.unmount());
 		host.remove();

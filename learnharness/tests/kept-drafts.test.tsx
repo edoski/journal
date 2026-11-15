@@ -118,6 +118,13 @@ describe("carriedForm", () => {
 		assert.equal(carriedForm(carry, false)?.thinking, "v is in the kernel");
 		assert.equal(carriedForm({ text: " " }, true), undefined);
 	});
+
+	it("carried words come back as he typed them, so typing on after \"v = \" never gives \"v =(1, -2)\" (round 9, 4 #7)", () => {
+		const form = (text: string, thinking = "") => ({ form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking, other: "", text, confidence: "neutral" }) });
+		assert.equal(carriedForm(form("v = "), true)?.text, "v = ");
+		assert.equal(carriedForm({ text: "  indented\n" }, true)?.text, "  indented\n");
+		assert.equal(carriedForm(form("A v = 2v  ", "so v = "), true)?.text, "A v = 2v\n\nso v = ", "two parts still join at one paragraph break");
+	});
 });
 
 const noop = () => {};

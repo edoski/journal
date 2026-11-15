@@ -195,7 +195,8 @@ function AnswerComposer({
 	const submit = () => {
 		if (!ready) return;
 		if (problem) {
-			const words = text.trim();
+			const typed = text;
+			const words = typed.trim();
 			setText("");
 			setConfidence(DEFAULT_CONFIDENCE);
 			const taken = photos.take();
@@ -206,7 +207,7 @@ function AnswerComposer({
 				if (accepted) return;
 				restorePhotos(taken);
 				if (textRef.current.trim()) return;
-				setText(words);
+				setText(typed);
 				setConfidence(sure);
 			});
 			return;
