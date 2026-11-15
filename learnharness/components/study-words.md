@@ -26,7 +26,7 @@ One form each, wherever it shows.
 | a review come due | Due today, 3d overdue, 16d overdue (always days, round 4) |
 | a review dated ahead | Back in 5d, Back in 21d, Back in 60d |
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 20d ago; Unfinished when no day is known. Never the tutor's step text. |
-| a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first (`reviewWords`): Due since 21 Oct |
+| a review the plan holds back | the engine's held words (`heldWords`, from the plan's `held`): Waits for your Probability exam when another course's final review came first, else Earlier days are full; once memory's day has passed, since when it was due first and the day the plan brings it back (`reviewWords`): Due since 21 Oct, back 4 Dec; never "Moved from" a memory day still ahead, which nobody told him |
 | a topic not started, on its page's Now row | First lesson (`FIRST_LESSON`): the head already says Not started; under it the day the plan starts it, once (Planned today, Planned Wed 11 Nov) |
 
 ### Which one a topic says
