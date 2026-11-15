@@ -5,6 +5,7 @@ import { continueMove, pausedWords, resumableSession, sessionState, type Continu
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
+import { continueWords } from "@/components/study-home/study-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
@@ -22,6 +23,7 @@ export type TopicAction =
 	| { kind: "resume" | "open"; chat: ChatListItem }
 	| { kind: "continue"; chat: ChatListItem; task: CourseMapTask | null }
 	| { kind: "review" | "start" | "study"; opening: string }
+	| { kind: "review"; opening: string; chat: ChatListItem }
 	| { kind: "continue"; opening: string; task: CourseMapTask | null; from?: string };
 
 /** What a press on an open task does: open the session Continue picks up,
@@ -32,6 +34,14 @@ export type Press = { open: ChatListItem } | { opening: string; from?: string };
 export function pressOf(move: ContinueMove | null, opening: string): Press {
 	if (move?.kind === "open") return { open: move.chat };
 	return move ? { opening, from: move.from.id } : { opening };
+}
+
+/** A review he closed with Done for today on an open question: it rides
+ *  with the topic's next review rather than leading the page as a session
+ *  to resume (round 10, 1 m7: Eigen's page read "Now · Resume · Left off
+ *  today" on the review that had just dated the next one). Pure. */
+export function closedReview(chat: ChatListItem): boolean {
+	return isReviewSession(chat) && sessionState(chat) === "left";
 }
 
 /** Continue on a task or a topic, as the page's action. */
@@ -210,14 +220,6 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
 	return [...held.filter((task) => task.key === map.focus), ...held.filter((task) => task.key !== map.focus)];
 }
 
-/** A review he left for next time waits for its topic's next review day,
- *  which opens it (Home's rule, `study-home/today.md`): until that day it
- *  is not the page's Now (round 10, 1 m7: Eigen's page led with the review
- *  closed on 9 Nov as "Resume · Left off today"). */
-export function heldForReview(chat: ChatListItem, topic: CourseMapTopic): boolean {
-	return isReviewSession(chat) && sessionState(chat) === "left" && topic.review?.kind !== "due";
-}
-
 /**
  * The one thing to do on the topic now, first match: resume the session
  * on the topic that waits on him or that the tutor stopped in, open the one
@@ -229,15 +231,20 @@ export function heldForReview(chat: ChatListItem, topic: CourseMapTopic): boolea
  * the task, or the topic's newest lesson, as the session model says
  * (`continueMove`). `chats` are every session; the topic's are those that
  * belong to it (`ownsTopic`), never one that only touched it on the way
- * (round 7: Kernel's page resumed the Eigen lesson).
+ * (round 7: Kernel's page resumed the Eigen lesson). A review he closed
+ * with Done for today is no session to resume (`closedReview`): it waits
+ * for the topic's next review, whose press opens it (round 10, 1 m7).
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
 	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
-	const active = resumableSession(sessions.filter((chat) => !heldForReview(chat, topic)));
+	const active = resumableSession(sessions.filter((chat) => !closedReview(chat)));
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
-	if (topic.review?.kind === "due") return { kind: "review", opening: `Review ${topic.title}` };
+	if (topic.review?.kind === "due") {
+		const left = sessions.find(closedReview);
+		return { kind: "review", opening: `Review ${topic.title}`, ...(left ? { chat: left } : {}) };
+	}
 	const [task] = heldTasks(topic, map);
-	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), `Continue ${task.title}`, task);
+	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), continueWords(task.title), task);
 	if (topic.level === "new") return { kind: "start", opening: topic.title };
 	if (shelfOf(topic, null) === "learning" && !topic.review) return continueAction(sessions, `Continue ${topic.title}`, null);
 	return { kind: "study", opening: topic.title };
@@ -335,14 +342,14 @@ function whereOf(entry: SessionEntry): string {
  * that session holds. A task's press continues the lesson that holds it.
  */
 export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
-	const active = resumableSession(entries.filter((entry) => entry.own && !heldForReview(entry.chat, topic)).map((entry) => entry.chat));
+	const active = resumableSession(entries.filter((entry) => entry.own && !closedReview(entry.chat)).map((entry) => entry.chat));
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
 		.filter((task) => !active?.tasks?.includes(task.key))
 		.map((task): Pickup => {
 			const updated = record?.tasks.find((t) => t.key === task.key)?.updated;
-			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), `Continue ${task.title}`);
+			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), continueWords(task.title));
 			return { kind: "task", task, title: task.title, where: task.step ?? "Unfinished", when: updated ? agoWords(daysBetween(updated, today), today) : null, press };
 		});
 	return [...session, ...tasks];

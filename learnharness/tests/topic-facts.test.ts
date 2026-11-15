@@ -141,7 +141,7 @@ describe("the page's one action", () => {
 		assert.equal(topicAction(TOPICS.vectors, MAP, [closedReview]).kind, "study", "a review left for next time waits for its review day");
 		const left = chat({ title: "Review Span", topics: ["span"], ended: "left" });
 		const back = topicAction(TOPICS.span, MAP, [left]);
-		assert.ok(back.kind === "resume" && back.chat === left, "on its review day the review he left is the one it opens");
+		assert.ok(back.kind === "review" && "chat" in back && back.chat === left, "on its review day the review he left is the one it opens");
 		assert.deepEqual(topicAction(TOPICS.span, MAP, []), { kind: "review", opening: "Review Span" });
 		assert.deepEqual(topicAction(TOPICS.basis, MAP, []), { kind: "review", opening: "Review Basis and dimension" });
 		assert.deepEqual(topicAction(TOPICS.matmul, MAP, []), { kind: "review", opening: "Review Matrix multiplication as composition" });

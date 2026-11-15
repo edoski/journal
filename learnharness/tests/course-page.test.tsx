@@ -17,6 +17,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../
 import { courseFacts, courseGroups, courseNext, courseRead, GROUP_IDS, type CourseGroup as Group } from "../components/course-page/course-model.ts";
 import { CourseHeaderSkeleton } from "../components/course-page/course-header-skeleton.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
+import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { CourseGroup } from "../components/course-page/course-group.tsx";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { courseHref, unitHref, workspaceOf } from "../components/unit-inbox/unit-href.ts";
@@ -200,8 +201,8 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const waiting = chat("c1", { pendingQuestion: true, topics: [h("determinant")], updatedAt: "2026-11-08T08:00:00.000Z" });
 		const withChat = courseGroups(course(), [waiting]);
 		const needs = groupOf(withChat, "needs-you");
-		assert.equal(needs.topics[0]!.topic.handle, "determinant");
-		assert.deepEqual(needs.topics[0]!.fact, { kind: "your-turn", words: "Your turn" });
+		const det = needs.topics.find((t) => t.topic.handle === "determinant");
+		assert.deepEqual(det?.fact, { kind: "your-turn", words: "Your turn" });
 		assert.equal(sidebar(course(), [waiting]).get(`${WS}#determinant`), "Today: Your turn");
 	});
 
@@ -253,10 +254,11 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(next.why?.short, "Due since 29 Oct");
 	});
 
-	it("resumes a session in this course that has waited on him since yesterday, and ignores one in another course", () => {
+	it("resumes a session in this course that has waited on him since yesterday, once nothing is planned before it, and ignores one in another course", () => {
 		const mine = chat("c1", { title: "Rank practice", pendingQuestion: true, updatedAt: "2026-11-08T08:00:00.000Z" });
 		const other = chat("c2", { pendingQuestion: true, course: { workspace: "/study/prob", title: "Probability" }, updatedAt: "2026-11-08T09:00:00.000Z" });
-		const next = courseNext(course(), [other, mine]);
+		assert.equal(courseNext(course(), [other, mine]).action, "Review", "today's review comes first, as on Home (round 10, 1 m2)");
+		const next = courseNext(course({}, { due: [] }), [other, mine]);
 		assert.equal(next.action, "Resume");
 		assert.equal(next.lesson.title, "Rank practice");
 		assert.deepEqual(next.lesson.open, { kind: "session", href: "/chat/c1" });
@@ -398,5 +400,20 @@ describe("the sidebar's search", () => {
 		const [eigen] = searchInbox(inbox, [], "eigen", [course()]).units;
 		assert.equal(eigen!.topic.level, "new");
 		assert.deepEqual(unitStatus(eigen!, "2026-11-08"), { kind: "none", words: "Not started" });
+	});
+});
+
+describe("a topic row's title with room (round 10, 1 m8)", () => {
+	// Shot 56b: "Binomial distribut…" and "Expectation and line…" cut beside a status that kept its whole width.
+	it("keeps the title at its own width and lets the status give way first, the title cut only past what leaves the status's icon", () => {
+		const row = { topic: topic("binomial", { title: "Binomial distribution", level: "assisted" }), group: "learning" as const, standing: standingOf(topic("binomial", { level: "assisted" })), current: false, fact: { kind: "review" as const, words: "Due since 6 Nov, back 11 Nov" }, href: "/" };
+		const document = render(<ul><CourseTopicRow row={row as never} /></ul>);
+		const title = document.querySelector('[data-slot="course-topic-title"]')!.parentElement!;
+		const fact = document.querySelector('[data-slot="course-topic-fact"]')!;
+		assert.doesNotMatch(title.className, /\bflex-1\b/, "a zero basis gave the title only what the status left");
+		assert.match(title.className, /\bshrink-0\b/);
+		assert.match(title.className, /max-w-\[calc\(100%-4rem\)\]/, "room kept for the pie, the gaps and the status's icon");
+		assert.doesNotMatch(fact.className, /\bshrink-0\b/, "the status shrinks, its words cut");
+		assert.match(fact.className, /\bmin-w-0\b/);
 	});
 });

@@ -301,12 +301,12 @@ describe("the sections drawn", () => {
 		assert.ok(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]') === null);
 	});
 
-	it("keeps the lesson Now opens on the map, its map button pressed, Now itself a plain row with no fill", () => {
+	it("keeps the lesson Now opens on the map, Now itself a plain row with no fill and no map button", () => {
 		const document = page(ROWS[0]![1]);
 		const now = document.querySelector('[data-slot="pickup-now"]')!;
 		assert.equal(now.getAttribute("data-shown"), "true");
 		assert.doesNotMatch(now.className, /bg-fill-selected|ring-1/, "no box around Now");
-		assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true");
+		assert.ok(now.querySelector('[data-slot="topic-map-toggle"]') === null, "no map button on Now");
 		assert.ok(document.querySelector('[data-slot="topic-lesson-map"]'));
 	});
 });

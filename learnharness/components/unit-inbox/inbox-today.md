@@ -44,7 +44,7 @@ The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowS
 | no courses | the waiting sessions' cards, "No courses yet", Other sessions |
 | engine down | the waiting sessions as session cards, "Couldn’t read your courses", Other sessions |
 | one course unreadable | after Today's cards, a card per unreadable course (under every course, not under the filter): its mark and name on line 1, "Couldn't read this course's record" on line 2, opening its course page, which says why; its sessions stay on Other sessions; "No courses yet" only when no course is listed at all |
-| long titles | the course name truncates first, the reason past 60% of the line, the title on its own line; the slot keeps its right edge |
+| long titles | the course name gives way first, whole, never cut (the mark names the course), the reason past 60% of the line, the title on its own line; the slot keeps its right edge |
 | 208px to the widest sidebar | the same anatomy |
 | open page | the topic's card (its page or one of its sessions) holds `fill-selected` and `aria-current` |
 
@@ -54,7 +54,7 @@ Keyboard: the app keeps Tab dead (`keyboard-shortcuts.tsx`, the owner's ruling o
 
 - The system picks: the top is `needsYouNow`, with no sort control (the owner's "taking care of the selection process").
 - A short top and a little choice: at most five cards, row 1 next, rows 2 to 5 in any order.
-- Open loops lead: each session waiting on him since yesterday is its own card, first.
+- The plan leads, open loops next: each course's review and new topics for today first, then each session waiting on him since yesterday as its own card (round 10, 1 m2: only opening Problem sheet 4 put it above the exam's review). A session folded past the fifth line stays on its shelf with the shelf's dot.
 - Due but bounded: the top follows the engine's day plan, never every topic whose review is due.
 - Interleave: Review on a course card starts that course's mixed review, as Home's line does (`useContinueCourse`).
 - Fold with a plan: shelves fold by default, and every shelf row says when it comes back (how overdue for a topic in today's plan, "Back in 5d"), else when he last studied it; a topic returns to the top by itself when the engine plans it.

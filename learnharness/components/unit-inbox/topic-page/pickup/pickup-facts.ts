@@ -117,7 +117,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 			};
 		}
 		case "review":
-			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today) };
+			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), chat: "chat" in action ? action.chat.id : null };
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
@@ -142,7 +142,9 @@ export function nowItem(facts: TopicFacts): NowItem {
  *  left for next time (a session that only touched the topic stays in
  *  Earlier),
  *  a due review the action does not already start, then each open task
- *  the action does not continue. */
+ *  the action does not continue and no session listed holds, so a lesson
+ *  is listed once (round 10, 1 m5: "Eigenvalues and eigenvectors" beside
+ *  its task "Eigenvalues and eigenvectors lesson"). */
 export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	const sessions = facts.sessions.filter((entry) => entry.own && entry.chat.id !== now.chat && entry.state !== "finished");
 	const waiting = (["your-turn", "working", "left"] as const).flatMap((state) => sessions.filter((entry) => entry.state === state));
@@ -150,9 +152,10 @@ export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 		facts.action.kind !== "review" && facts.topic.review?.kind === "due"
 			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), press: { opening: `Review ${facts.topic.title}` } }]
 			: [];
-	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;
+	const listed = [...waiting.map((entry) => entry.chat), ...facts.sessions.filter((entry) => entry.chat.id === now.chat).map((entry) => entry.chat)];
+	const taken = new Set([...(facts.action.kind === "continue" && facts.action.task ? [facts.action.task.key] : []), ...listed.flatMap((chat) => chat.tasks ?? [])]);
 	const tasks = facts.pickups.flatMap((pickup): NextItem[] =>
-		pickup.kind === "task" && pickup.task.key !== taken ? [{ kind: "task", key: pickup.task.key, title: pickup.title, step: pickup.task.step, press: pickup.press }] : [],
+		pickup.kind === "task" && !taken.has(pickup.task.key) ? [{ kind: "task", key: pickup.task.key, title: pickup.title, step: pickup.task.step, press: pickup.press }] : [],
 	);
 	return [...waiting.map((entry): NextItem => ({ kind: "session", entry })), ...review, ...tasks];
 }

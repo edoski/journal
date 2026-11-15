@@ -202,17 +202,17 @@ describe("study facts", () => {
 describe("today's lines", () => {
 	const eigen = chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } });
 
-	it("gives each recent session to pick up a line first, and keeps every course's next step that no such session works on", () => {
+	it("gives each recent session to pick up a line after the plan (round 10, 1 m2), and keeps every course's next step that no such session works on", () => {
 		const writing = chat({ id: "w", busy: true, course: { workspace: "/s/prob", title: "Probability" }, updatedAt: "2026-11-08T08:00:00.000Z" });
 		const open = openSessions([chat({ id: "idle" }), writing, eigen]);
 		assert.deepEqual(open.map((c) => c.id), ["q", "w"], "a session waiting on him and one the tutor writes in, never a finished one");
 		const rows = todayRows([ANALYSIS, LINALG, PROB], open, TODAY);
 		assert.deepEqual(
 			rows.map((r) => (r.kind === "session" ? `session ${r.chat.id}` : `${r.course.map.title}: ${stepWords(r.step)}`)),
-			["session q", "session w", "Probability: Continue Bayes' rule", "Linear Algebra: Review Linear independence, Rank, Span", "Linear Algebra: Continue Problem sheet 4", "Real Analysis: Review Sequences"],
-			"Linear Algebra's due review keeps its line beside the waiting lesson on another topic, and its open task its own, as the calendar lists both",
+			["Linear Algebra: Review Linear independence, Rank, Span", "Real Analysis: Review Sequences", "session q", "session w", "Probability: Continue Bayes' rule", "Linear Algebra: Continue Problem sheet 4"],
+			"each course's review first; Linear Algebra's due review keeps its line beside the waiting lesson on another topic, and its open task its own, as the calendar lists both",
 		);
-		assert.deepEqual(todayCourses(rows).map((c) => c.map.title), ["Linear Algebra", "Probability", "Real Analysis"], "each course once for the map's tabs");
+		assert.deepEqual(todayCourses(rows).map((c) => c.map.title), ["Linear Algebra", "Real Analysis", "Probability"], "each course once for the map's tabs");
 	});
 
 	it("lets a session that works on the step stand for it", () => {
@@ -220,17 +220,17 @@ describe("today's lines", () => {
 		const rows = todayRows([LINALG], [review], TODAY);
 		assert.deepEqual(rows.map((r) => r.kind), ["session"], "a review of those topics stands for today's review");
 		const lesson = chat({ id: "l", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"], ownTopics: ["rank"] });
-		assert.deepEqual(todayRows([LINALG], [lesson], TODAY).map((r) => r.kind), ["session", "course"], "a lesson on the topics never stands for their review (round 8, 1 D3)");
+		assert.deepEqual(todayRows([LINALG], [lesson], TODAY).map((r) => r.kind), ["course", "session"], "a lesson on the topics never stands for their review (round 8, 1 D3)");
 		const sheet = chat({ id: "s", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, tasks: ["sheet-4"] });
 		assert.deepEqual(todayRows([{ ...LINALG, due: [] }], [sheet], TODAY).map((r) => r.kind), ["session"], "the open task's lesson");
 	});
 
-	it("gives a second session waiting in the same course its own line too, the newest first, and keeps the course's line for the step neither works on", () => {
+	it("gives a second session waiting in the same course its own line too, the newest first, and keeps the course's lines for the steps neither works on", () => {
 		const rank = chat({ id: "r", title: "Rank practice", pendingProblem: true, updatedAt: "2026-11-08T08:30:00.000Z", course: { workspace: "/s/linalg", title: "Linear Algebra" } });
 		const rows = todayRows([ANALYSIS, LINALG, PROB], openSessions([rank, eigen]), TODAY);
 		assert.deepEqual(
 			rows.map((r) => (r.kind === "session" ? `session ${r.chat.id}` : r.course.map.title)),
-			["session q", "session r", "Probability", "Linear Algebra", "Linear Algebra", "Real Analysis"],
+			["Linear Algebra", "Real Analysis", "session q", "session r", "Probability", "Linear Algebra"],
 		);
 	});
 
@@ -282,7 +282,7 @@ describe("lessons", () => {
 
 	it("words a waiting session from the course topics its transcript worked on", () => {
 		const waiting = chat({ id: "q", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
-		const reply = lessonOf(todayRows([LINALG], [waiting], TODAY)[0]!);
+		const reply = lessonOf(todayRows([LINALG], [waiting], TODAY).find((r) => r.kind === "session")!);
 		assert.deepEqual([reply.kind, reply.title, reply.detail, reply.action], ["reply", "Eigen lesson", "Waiting for your reply", "Open"]);
 		assert.deepEqual(reply.open, { kind: "session", href: "/chat/q" });
 		assert.deepEqual(reply.topics, ["eigen"]);
@@ -323,11 +323,11 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last timeNext up", "Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Linear AlgebraCheck on your ownContinue Problem sheet 4SlippingLeft off 5 Nov", "Real AnalysisReview SequencesOn your ownDue since 7 Nov"],
+			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesOn your ownDue since 7 Nov", "Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last timeNext up", "Linear AlgebraContinue Problem sheet 4Check on your ownLeft off 5 Nov"],
 		);
-		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
+		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["task", 1], ["review", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["next", 1], ["task", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|today)\?$/);
@@ -368,7 +368,7 @@ describe("what a line of Today reads", () => {
 			const why = whyOf(row);
 			return why && [why.kind, why.short];
 		};
-		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY)[0]!), ["reply", "Your turn"]);
+		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY).find((r) => r.kind === "session")!), ["reply", "Your turn"]);
 		assert.deepEqual(short(rowOf(LINALG)), ["review", "Due since 23 Oct"]);
 		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "Due since 7 Nov"]);
 		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time: Sequences"]);
@@ -402,7 +402,7 @@ describe("what a line of Today reads", () => {
 
 	it("gives each row one clock: a session its own last turn, an open task none beside its Left off", () => {
 		const started = chat({ id: "new", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, updatedAt: new Date(2026, 10, 8, 9, 30).toISOString() });
-		const [row] = todayRows([{ ...LINALG, lastActiveDaysAgo: 3 }], [started], TODAY);
+		const row = todayRows([{ ...LINALG, lastActiveDaysAgo: 3 }], [started], TODAY).find((r) => r.kind === "session");
 		assert.equal(studiedAgo(row!), "Today", "a session started minutes ago never reads 3d ago");
 		const task = rowOf({ ...LINALG, due: [], lastActiveDaysAgo: 0 });
 		assert.deepEqual([studiedAgo(task), whyOf(task)?.short], [null, "Left off 5 Nov"], "no Today above Left off 5 Nov");
@@ -434,14 +434,14 @@ describe("what a line of Today reads", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
+			"Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
+			"Real AnalysisReview SequencesOn your ownDue since 7 Nov",
 			"Linear AlgebraStudied todayEigen lessonYour turn",
 			"ProbabilityContinue Bayes' ruleNot right last timeNext up",
-			"Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
-			"Linear AlgebraCheck on your ownContinue Problem sheet 4SlippingLeft off 5 Nov",
-			"Real AnalysisReview SequencesOn your ownDue since 7 Nov",
+			"Linear AlgebraContinue Problem sheet 4Check on your ownLeft off 5 Nov",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["task", 1], ["review", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["next", 1], ["task", 1]]);
 		plain(doc);
 	});
 });

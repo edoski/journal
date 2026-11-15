@@ -12,7 +12,7 @@ Every sidebar row, card or shelf row, is its title, two lines at most, and one 2
 |---|---|---|
 | item | `li`, `data-slot="unit-card"` | `ROW_ITEM`: 2px above and below |
 | card | the link, `data-testid="unit-row"` | `ROW_FRAME`: 60px, or 80px with a two-line title; padding 8 × 10, radius 8, no surface; `data-sidebar-row` (`rowKey`) and `data-sidebar-parent` (`parent`) for the keyboard walk (`sidebar-tree.ts`) |
-| line 1 | `mark`, course name, status slot | 20px: the 16px mark, the course name 12/400 muted (`data-slot="unit-card-course"`), then `data-slot="unit-status-slot"`, right-aligned, 12px tabular muted (`STATUS_SLOT`). The line never wraps: the status keeps every word and the name gives way to an ellipsis when the two do not fit (the mark still names the course) |
+| line 1 | `mark`, course name, status slot | 20px: the 16px mark, the course name 12/400 muted (`data-slot="unit-card-course"`), then `data-slot="unit-status-slot"`, right-aligned, 12px tabular muted (`STATUS_SLOT`). The line never wraps: the status keeps every word and the name gives way, whole, when the two do not fit, never cut to "Linear Alg…" (round 10, 1 m8; the mark still names the course) |
 | line 2 | title, `data-slot="unit-row-title"` | 14/500 on 20, full ink, 4px below line 1, two lines at most (`ROW_TITLE`): it wraps onto a second line and ends in an ellipsis only past it |
 | action | `action`, over the slot | `ROW_ACTION` placed by `CARD_ACTION_PLACE`; the slot fades while the row is hovered or the action has keyboard focus |
 
@@ -25,6 +25,6 @@ Every sidebar row, card or shelf row, is its title, two lines at most, and one 2
 
 ## States
 
-Rest (no fill), hover (`fill-hover`, the action shows), keyboard focus (a 2px inset ring), open page (`fill-selected`), receding (70%). Long titles wrap to two lines; the course name stays on one line and gives way first; the status keeps its words and its right edge on line 1. Shelf and session rows (`unit-row.tsx`) put the course mark and the title on their first line (`ROW_BODY`) and the status on a 20px line of its own under it, where the row's action shows on hover (`SLIM_ACTION_PLACE`).
+Rest (no fill), hover (`fill-hover`, the action shows), keyboard focus (a 2px inset ring), open page (`fill-selected`), receding (70%). Long titles wrap to two lines; the course name stays on one line and gives way first, whole; the status keeps its words and its right edge on line 1. Shelf and session rows (`unit-row.tsx`) put the course mark and the title on their first line (`ROW_BODY`) and the status on a 20px line of its own under it, where the row's action shows on hover (`SLIM_ACTION_PLACE`).
 
 Sources: T3 Code's sidebar thread row; unit-inbox.md, "Anatomy".

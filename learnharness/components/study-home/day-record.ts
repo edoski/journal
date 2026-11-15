@@ -8,7 +8,9 @@ import { localDay } from "@/components/day-change";
  * rule `useDayChange` rereads Home on), oldest first, whatever it stands at
  * now: one he closed, one he ended with Done for today, one still waiting
  * on him. Round 4 found a 40-minute lesson missing because it ended with
- * Done for today. Each is named as the sidebar names it, by its title;
+ * Done for today. A session he only opened, with no answer and nothing he
+ * wrote after its opening, is not study (`studied`; round 10, 1 m2: a
+ * plan question and Problem sheet 4's opening were listed). Each is named as the sidebar names it, by its title;
  * a title another session shares ("Review") carries its course too
  * ("Review in Linear Algebra"), the way the sidebar's row carries its
  * course's mark. Pure.
@@ -19,7 +21,7 @@ export function doneToday(chats: readonly ChatListItem[], now: Date): string[] {
 	const shared = new Map<string, number>();
 	for (const chat of chats) shared.set(name(chat), (shared.get(name(chat)) ?? 0) + 1);
 	return chats
-		.filter((chat) => chat.messageCount > 0 && localDay(new Date(chat.updatedAt)) === today)
+		.filter((chat) => chat.studied === true && localDay(new Date(chat.updatedAt)) === today)
 		.sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0))
 		.map((chat) => (shared.get(name(chat))! > 1 && chat.course ? `${chat.title} in ${courseLabel(chat.course)}` : chat.title));
 }

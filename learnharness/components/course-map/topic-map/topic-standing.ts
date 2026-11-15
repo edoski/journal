@@ -32,12 +32,14 @@ export function standingOf(topic: CourseMapTopic): Standing {
 	return { fill, slipping: topic.weak, words: topic.weak ? SLIPPING_WORDS : standingWords(fill, topic) };
 }
 
-/** Why the engine calls a topic weak, beside its Slipping: the slip's key,
- *  which picks its icon (`SLIP_ICON`), and its words; null when the engine
- *  does not call it weak. The topic page's head and Home's rows say it so.
- *  Pure. */
+/** Why the engine calls a topic weak, beside its Slipping, or the open
+ *  mistake on a topic it does not call weak (a partly right answer): the
+ *  slip's key, which picks its icon (`SLIP_ICON`), and its words; null when
+ *  neither. The sidebar (`slipOf`), the topic page's head and Home's rows
+ *  say it so (round 10, 1 m4: the sidebar said "Mistake to fix" while the
+ *  head said only "Partly right"). Pure. */
 export function slipBeside(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } | null {
-	return topic.weak ? slipMark(topic.signals, titleOf) : null;
+	return topic.weak || topic.signals.mistake ? slipMark(topic.signals, titleOf) : null;
 }
 
 /** What a card can say under its title in place of where he stands: a

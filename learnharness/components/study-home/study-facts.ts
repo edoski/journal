@@ -121,6 +121,12 @@ const PLAN_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "nume
 /** A plan day as the app writes it: "Sun 15 Nov". Pure. */
 export const planDay = (date: string) => PLAN_DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
 
+/** "Continue" and a title, never twice for a task titled with it
+ *  ("Continue Eigenvalues: the full 2×2 computation"). Pure. */
+export function continueWords(title: string): string {
+	return /^Continue\s/.test(title) ? title : `Continue ${title}`;
+}
+
 /** The step as a short instruction: "Review Linear independence, Rank",
  *  "Continue Problem sheet 4", "Start Poisson distribution" for a topic not
  *  started. Pure. */
@@ -129,7 +135,7 @@ export function stepWords(step: NextStep): string {
 		case "review":
 			return `Review ${titleList(step.titles)}`;
 		case "task":
-			return `Continue ${step.title}`;
+			return continueWords(step.title);
 		case "topic":
 			return `${step.fresh ? "Start" : "Continue"} ${step.title}`;
 		case "none":
@@ -195,23 +201,36 @@ function yieldsToReview(chat: ChatListItem, course: StudyCourse | null): boolean
 	return own.length > 0 && own.every((h) => reviewing.has(h));
 }
 
+/** Whether a step is the engine's plan for today: today's review, or the
+ *  new topics the plan starts today. An open task, the current topic taken
+ *  up with nothing planned, or an item on a later day is not. Pure. */
+const planned = (step: NextStep) => !laterOnly(step) && (step.kind === "review" || (step.kind === "topic" && step.planned));
+
 /** The learner's own calendar day of a session's last turn. Pure. */
 const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
 
 /**
  * Today's lines, the day's plan first (round 9, 1 D1: every session closed
  * with Done for today came back to the top, due or not, and pushed the
- * plan into "Also today"):
- *   1. each session waiting on him since yesterday (it waits on the
+ * plan into "Also today"; round 10, 1 m2: only opening Problem sheet 4 put
+ * it above the exam's review, and lessons left on the course's tasks
+ * pushed the plan's new topic into "Also today"):
+ *   1. each course's plan for today (`planned`: its review, then the new
+ *      topics the plan starts today), most urgent course first, so the
+ *      exam's course leads; a step a waiting session, or a lesson left for
+ *      next time, works on is that session's line, in the step's place;
+ *   2. each other session waiting on him since yesterday (it waits on the
  *      learner, the tutor writes in it, or stopped mid-reply), most recent
  *      first;
- *   2. each course's steps for today (`todaySteps`), most urgent course
- *      first, so the exam's course leads; a step a lesson left for next
- *      time works on is that lesson's line, in the step's place, and a step
- *      a waiting session, or one he ended today, works on has no line;
- *   3. each other lesson left for next time on an earlier day, however long
+ *   3. each course's other steps for today, in the same course order: its
+ *      open tasks, or the current topic with nothing planned; a step a
+ *      lesson left for next time works on is that lesson's line, in its
+ *      place;
+ *   4. each other lesson left for next time on an earlier day, however long
  *      ago, most recent first;
- *   4. the lines with nothing for today (`laterOnly`).
+ *   5. the lines with nothing for today (`laterOnly`).
+ * A step a session he ended today works on has no line, nor does a task a
+ * waiting session holds, since that session has its own line.
  * A review left for next time has no line of its own: it waits for its
  * topics' next review day, when the review's line opens it (`courseMove`),
  * and its topic page keeps it meanwhile. A session he ended with Done for
@@ -230,25 +249,38 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const courseOf = (chat: ChatListItem) => (chat.course && byWorkspace.get(chat.course.workspace)) ?? null;
 	const waiting = open.filter((c) => !left(c) && lastDay(c) >= since);
 	const leftovers = open.filter((c) => left(c) && !leftToday(c) && !isReviewSession(c) && !yieldsToReview(c, courseOf(c)));
-	const quiet = open.filter((c) => waiting.includes(c) || leftToday(c));
+	const ended = open.filter(leftToday);
 	const session = (chat: ChatListItem): TodayRow => ({ kind: "session", chat, course: courseOf(chat) });
 	const placed = new Set<ChatListItem>();
 	const plan: TodayRow[] = [];
+	const tasks: TodayRow[] = [];
 	const later: TodayRow[] = [];
 	for (const course of ordered) {
 		const own = (chats: readonly ChatListItem[], step: NextStep) => chats.find((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
 		for (const step of todaySteps(course)) {
-			if (own(quiet, step)) continue;
-			const lesson = laterOnly(step) ? undefined : own(leftovers, step);
-			if (lesson && !placed.has(lesson)) {
+			const rows = planned(step) ? plan : tasks;
+			if (own(ended, step)) continue;
+			const active = own(waiting, step);
+			if (active) {
+				if (planned(step) && !placed.has(active)) {
+					placed.add(active);
+					rows.push(session(active));
+				}
+				continue;
+			}
+			const lesson = own(leftovers, step);
+			if (laterOnly(step)) {
+				if (!lesson) later.push({ kind: "course", course, step });
+			} else if (!lesson) {
+				rows.push({ kind: "course", course, step });
+			} else if (!placed.has(lesson)) {
 				placed.add(lesson);
-				plan.push(session(lesson));
-			} else if (!lesson && !(laterOnly(step) && own(leftovers, step))) {
-				(laterOnly(step) ? later : plan).push({ kind: "course", course, step });
+				rows.push(session(lesson));
 			}
 		}
 	}
-	return [...waiting.map(session), ...plan, ...leftovers.filter((c) => !placed.has(c)).map(session), ...later];
+	const unplaced = (chats: readonly ChatListItem[]) => chats.filter((c) => !placed.has(c)).map(session);
+	return [...plan, ...unplaced(waiting), ...tasks, ...unplaced(leftovers), ...later];
 }
 
 /** The courses of Today's lines, each once, in the lines' order: a course

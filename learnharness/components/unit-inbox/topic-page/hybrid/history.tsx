@@ -2,13 +2,12 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon, WaypointsIcon } from "lucide-react";
+import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon } from "lucide-react";
 import type { TopicAttempt } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { GUTTER } from "@/components/unit-inbox/topic-page/row-classes";
 import { ATTEMPT_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
-import { Hint } from "@/components/ui/hint";
 import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
@@ -85,8 +84,10 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 }
 
 /** One session: a link to it, its title, and whether it waits on him or
- *  the tutor is writing. A lesson that planned carries the button that
- *  puts its steps on the map; the lesson on the map has its row filled.
+ *  the tutor is writing. A lesson that planned puts its steps on the map
+ *  when he points at it (pointer or focus), as Home's map follows the row
+ *  he points at; the lesson on the map has its row filled. Round 10, 1 m8:
+ *  the button that did it was a glyph with no words.
  *  Given `date`, it carries the date column; `writing` is what it says
  *  while the tutor writes. */
 export function SessionItem({
@@ -108,7 +109,7 @@ export function SessionItem({
 	const planned = isPlanned(entry);
 	const why = state === "your-turn" ? <WhyMark kind="reply" words="Your turn" /> : state === "working" ? <WhyMark kind="writing" words={writing} /> : null;
 	return (
-		<li data-slot="topic-history-session" data-shown={shown || undefined} className={cn("grid gap-x-4", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
+		<li data-slot="topic-history-session" data-shown={shown || undefined} data-on-map={planned ? "point" : undefined} className={cn("grid gap-x-4", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
 			<Button
 				variant="quiet"
 				asChild
@@ -119,35 +120,15 @@ export function SessionItem({
 					shown && "bg-fill-selected hover:bg-fill-selected",
 				)}
 			>
-				<Link href={`/chat/${chat.id}`}>
+				<Link href={`/chat/${chat.id}`} onPointerEnter={planned ? () => onShow(chat.id) : undefined} onFocus={planned ? () => onShow(chat.id) : undefined}>
 					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />}
 					<span className="truncate text-body system-current:text-row text-foreground">
 						<LineText>{chat.title}</LineText>
 					</span>
-					{(planned || why) && (
-						<span className="flex items-center gap-2 justify-self-end">
-							{why}
-							{planned && <span aria-hidden className="size-6" />}
-						</span>
-					)}
+					{why && <span className="flex items-center gap-2 justify-self-end">{why}</span>}
 					{date !== undefined && <DateCell date={date} />}
 				</Link>
 			</Button>
-			{planned && (
-				<Hint label={shown ? "Its steps are on the map" : "Show its steps on the map"} side="left">
-					<Button
-						variant="quiet"
-						size="icon-inline"
-						data-slot="topic-map-toggle"
-						aria-label="Show its steps on the map"
-						aria-pressed={shown}
-						onClick={() => onShow(chat.id)}
-						className={cn("relative z-10 col-start-3 row-start-1 self-center justify-self-end", shown && "text-foreground")}
-					>
-						<WaypointsIcon aria-hidden />
-					</Button>
-				</Hint>
-			)}
 		</li>
 	);
 }

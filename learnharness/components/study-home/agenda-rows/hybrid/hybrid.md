@@ -19,9 +19,9 @@ Edo, 15 Nov 2026, on the first Standing column (its words alone): "feels a bit b
 
 | Part | Notes |
 |---|---|
-| standing, on the lesson line | `today-standing`: the topic map's pie (`TopicGlyph`, the same fill and warning ink as the topic's card) at 14, as the reason's icon, 6px, then its standing words (`standingOf`), 12 muted: exactly what the map card and the topic page's head say beside the same pie |
-| slip, on the course line | `today-slip`: why the engine calls the topic weak, with the slip's own icon (`SLIP_ICON`) at 14 and its words ("Check on your own", "Mistake to fix", "Mixed up with Gaussian elimination"), from `slipBeside`, the rule the topic page's head reads, beside the standing's Slipping: none when the row's reason is the miss, so a row never says a thing twice |
-| alignment | both marks on the column's left edge, so the pies and slip icons stack down the list; the ends' column is held at the reason's most (224), so the standing column starts at one edge on every row |
+| standing, on the lesson line | `today-standing`: the topic map's pie (`TopicGlyph`, the same fill and warning ink as the topic's card) at 14, as the reason's icon, 6px, then one status, 12 muted (`rowWords`): the slip he would act on when the topic has one ("Check on your own", "Mistake to fix", "Mixed up with Gaussian elimination", from `slipBeside`, the rule the sidebar and the topic page's head read: why the engine calls it weak, or the open mistake on a topic it does not), else its standing words (`standingOf`), exactly what the map card and the topic page's head say beside the same pie. The warning ink says the topic slips, so the row never adds "Slipping" beside its slip (round 10, 1 m4: "Check on your own · Slipping", "Mistake to fix · Slipping"). With the row's reason the miss, the slip is left to the reason and the words are the standing's |
+| course line | nothing in the standing column: one status per row |
+| alignment | the marks on the column's left edge, so the pies stack down the list; the ends' column is held at the reason's most (224), so the standing column starts at one edge on every row |
 
 What was left off, by the signal test: the review's day (the reason says "Due since" when it is due today; a later day changes nothing he picks now), the day it was first taught, counts of answers, and anything the engine does not record. The research behind it (15 Nov 2026): Linear's issue rows (a status icon set, trailing properties as icons with colour only beside words), Things' project pie, Anki's deck columns, Math Academy's topic states, Primer's ActionList grid, Apple's lists and SF Symbols guidance.
 
@@ -33,6 +33,6 @@ What was left off, by the signal test: the review's day (the reason says "Due si
 
 ## Order
 
-As today.md says: a reply waiting on him first, then the plan, courses in the exam run-up first, nearest exam first, then the most recently studied; lessons left for next time after the plan.
+As today.md says: the plan first (each course's review and new topics for today), courses in the exam run-up first, nearest exam first, then the most recently studied; then the sessions waiting on him, then open tasks and lessons left for next time.
 
 Trade-offs: the richest row of the candidates, at 64px against the old line's 52; four courses still fit 1024×700 with no page scroll. The pie has no number: its words are for a screen reader, and the definition lives here.

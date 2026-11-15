@@ -33,7 +33,10 @@ describe("the sidebar's one row rule", () => {
 		const line = slot.parentElement!;
 		assert.ok(line.querySelector('[data-slot="unit-card-course"]'), "the status shares the course line");
 		assert.ok(!classes(line).includes("flex-wrap"), "the course line never wraps the status under the name");
-		assert.ok(classes(doc.querySelector('[data-slot="unit-card-course"]')).includes("truncate"), "the name gives way");
+		const name = doc.querySelector('[data-slot="unit-card-course"]');
+		assert.ok(!classes(name).includes("truncate"), "never a cut name, \"Linear Alg…\" (round 10, 1 m8)");
+		assert.ok(["flex-wrap", "overflow-hidden", "h-5"].every((c) => classes(name).includes(c)), "a name too long for the room wraps out of sight whole; the badge still names the course");
+		assert.equal(name?.textContent, unit.course.title, "a screen reader still reads it");
 		assert.ok(classes(doc.querySelector('[data-slot="unit-row-title"]')).includes("line-clamp-2"), "two title lines at most");
 	});
 

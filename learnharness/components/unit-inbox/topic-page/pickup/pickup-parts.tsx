@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon, WaypointsIcon } from "lucide-react";
+import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FIRST_LESSON } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
-import { Hint } from "@/components/ui/hint";
 import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
@@ -97,25 +96,6 @@ export function NowIconMark({ icon, facts, className = "size-4" }: { icon: NowIc
 /** The icon Now leads with. */
 export function NowIcon({ now, facts }: { now: NowItem; facts: HybridPaneProps["facts"] }) {
 	return <NowIconMark icon={now.icon} facts={facts} />;
-}
-
-/** The map button of a lesson that planned, above a stretched press. */
-export function MapToggle({ chat, shown, onShow, className }: { chat: string; shown: boolean; onShow: (id: string) => void; className?: string }) {
-	return (
-		<Hint label={shown ? "Its steps are on the map" : "Show its steps on the map"} side="left">
-			<Button
-				variant="quiet"
-				size="icon-inline"
-				data-slot="topic-map-toggle"
-				aria-label="Show its steps on the map"
-				aria-pressed={shown}
-				onClick={() => onShow(chat)}
-				className={cn("relative z-10", shown && "text-foreground", className)}
-			>
-				<WaypointsIcon aria-hidden />
-			</Button>
-		</Hint>
-	);
 }
 
 /** Next: each other place that waits, in Home's one-line row. A session
@@ -263,9 +243,15 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
  */
 export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now: NowItem; marked: boolean } & Pick<HybridPaneProps, "facts" | "busy" | "onAct" | "shown" | "onShow">) {
 	const onMap = now.chat !== null && now.chat === shown;
+	// Pointing at Now puts its lesson's steps back on the map, as pointing at any lesson row does (round 10, 1 m8).
+	const planned = now.chat !== null && facts.sessions.some((entry) => entry.chat.id === now.chat && entry.plan?.tree.nodes.length);
+	const point = planned && now.chat ? () => onShow(now.chat!) : undefined;
 	return (
 		<div
 			data-slot="pickup-now"
+			data-on-map={planned ? "point" : undefined}
+			onPointerEnter={point}
+			onFocus={point}
 			data-action={now.kind}
 			data-shown={onMap || undefined}
 			className={cn(
@@ -285,9 +271,6 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 				</span>
 			)}
 			{now.why && <StartsWhyLine why={now.why} className="col-start-2" />}
-			{now.chat && facts.sessions.some((entry) => entry.chat.id === now.chat && entry.plan?.tree.nodes.length) && (
-				<MapToggle chat={now.chat} shown={onMap} onShow={onShow} className="col-start-3 self-end justify-self-end" />
-			)}
 		</div>
 	);
 }

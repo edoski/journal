@@ -1,7 +1,7 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
 import { TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { pausedWords, sessionState } from "@/components/nav/session-state";
-import { planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
+import { continueWords, planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { leftWords, taskWords } from "@/components/unit-inbox/units";
 import { localDay } from "@/components/day-change";
 
@@ -66,9 +66,18 @@ export function courseTitle(row: TodayRow): string {
 }
 
 /** A line's lesson in words: the waiting session's title, or the course's
- *  next step ("Review A, B and more"). Pure. */
+ *  next step ("Review A, B"). A lesson left for next time reads as the step
+ *  it takes up: "Continue" and the title of the task it holds, the words
+ *  that task's own line reads, else "Continue" and its own title (round
+ *  10, 1 m5: "Continue Eigenvalues and eigenvectors lesson" became
+ *  "Eigenvalues and eigenvectors" once the lesson took the task's line,
+ *  and "Also today: Continuity" had no verb). Pure. */
 export function lessonTitle(row: TodayRow): string {
-	return row.kind === "session" ? row.chat.title : stepWords(row.step);
+	if (row.kind === "course") return stepWords(row.step);
+	if (sessionState(row.chat) !== "left") return row.chat.title;
+	const held = new Set(row.chat.tasks ?? []);
+	const task = row.course?.map.tasks.find((t) => held.has(t.key));
+	return continueWords(task?.title ?? row.chat.title);
 }
 
 /** Why a line is on Today: its kind (which picks its icon) and the few

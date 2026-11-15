@@ -27,7 +27,7 @@ function Fact({ fact, iconOnly: compact }: { fact: TopicFact; iconOnly: boolean 
 			data-slot="course-topic-fact"
 			data-kind={fact.kind}
 			className={cn(
-				"inline-flex h-5 max-w-56 shrink-0 items-center gap-1.5 text-callout system-current:text-label",
+				"inline-flex h-5 max-w-56 min-w-0 items-center gap-1.5 text-callout system-current:text-label",
 				fact.kind === "your-turn" ? "system-current:font-medium text-link" : "text-muted-foreground",
 			)}
 		>
@@ -87,7 +87,8 @@ export function CourseTopicRow({
 				{...link}
 			>
 				<TopicGlyph standing={row.standing} className={detail ? "mt-px" : undefined} />
-				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+				{/* The title keeps its own width while it fits beside the pie, the gaps and the status's icon (4rem); the status gives way first (round 10, 1 m8: "Binomial distribut…" beside a whole "Fixed, check again later"). */}
+				<span className={cn("flex min-w-0 flex-col gap-0.5", detail ? "flex-1" : "max-w-[calc(100%-4rem)] flex-auto shrink-0")}>
 					<span data-slot="course-topic-title" className={cn("flex min-w-0 text-body system-current:text-row system-current:font-medium", started ? "text-foreground" : "text-muted-foreground")}>
 						<MathLine className="min-w-0">{row.topic.title}</MathLine>
 						<span className="sr-only">, {row.standing.words}</span>

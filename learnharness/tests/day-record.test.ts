@@ -21,6 +21,7 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 		pendingProblem: false,
 		ended: "closed",
 		busy: false,
+		studied: true,
 		...over,
 	} as ChatListItem;
 }
@@ -48,7 +49,7 @@ describe("what he studied today", () => {
 	});
 
 	it("leaves out a session last worked in before today's midnight, and an empty one", () => {
-		const chats = [chat({ title: "Yesterday", updatedAt: "2026-11-07T23:59:00" }), chat({ title: "Empty", messageCount: 0 })];
+		const chats = [chat({ title: "Yesterday", updatedAt: "2026-11-07T23:59:00" }), chat({ title: "Empty", messageCount: 0, studied: false })];
 		assert.deepEqual(doneToday(chats, NOW), []);
 	});
 

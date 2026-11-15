@@ -6,7 +6,9 @@
  * topic page's head; a slip wears the same icon there and on the sidebar,
  * and a review due the same History icon. Same tsx classic-JSX shim as
  * the other render tests. A pie in the warning ink says Slipping, the one
- * word for that state, with the slip beside it (Edo, 15 Nov 2026).
+ * word for that state, with the slip beside it (Edo, 15 Nov 2026); on
+ * Home's row, where one status fits, the slip takes the words beside the
+ * same pie (round 10, 1 m4).
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -22,7 +24,7 @@ import { NodeBody } from "../components/course-map/topic-map/topic-node.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
 import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
-import { SlipFact, StandingFact } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
+import { StandingFact } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { WHY_ICON } from "../components/study-home/agenda-rows/why-mark.tsx";
 import { FACT_ICON, factIcon } from "../components/unit-inbox/fact-icon.ts";
 import { SLIP_ICON } from "../components/slip-icons.ts";
@@ -65,12 +67,7 @@ const lucideName = (Icon: (typeof SLIP_ICON)[SlipKey]) => icon(render(<Icon />))
 function drawn(t: CourseMapTopic) {
 	const standing = standingOf(t);
 	const slip = slipBeside(t, titleOf);
-	const home = render(
-		<>
-			<SlipFact facts={{ standing, slip }} />
-			<StandingFact facts={{ standing, slip }} />
-		</>,
-	);
+	const home = render(<StandingFact facts={{ standing, slip }} />);
 	const card = render(<NodeBody topic={t} standing={standing} line={null} />);
 	const row = render(<ul><CourseTopicRow row={{ topic: t, group: "learning" as never, standing, current: false, fact: null, href: "/" }} /></ul>);
 	const head = render(<TopicHead facts={topicFacts({ course: COURSE, topic: t, chats: [], read: null })} />);
@@ -85,8 +82,9 @@ function drawn(t: CourseMapTopic) {
 			head: headStanding?.textContent ?? null,
 		},
 		slips: {
-			home: home.querySelector('[data-slot="today-slip"]') && { icon: icon(home.querySelector('[data-slot="today-slip"]')), words: home.querySelector('[data-slot="today-slip"]')!.textContent },
+			home: slip && { key: home.querySelector('[data-slot="today-standing"]')!.getAttribute("data-slip"), words: home.querySelector('[data-slot="today-standing"]')!.textContent },
 			head: headSlip && { icon: icon(headSlip), words: headSlip.textContent!.replace(/^\. /, "") },
+			standing: standing.words,
 		},
 		head,
 	};
@@ -94,7 +92,7 @@ function drawn(t: CourseMapTopic) {
 
 describe("one standing legend on every surface", () => {
 	const table = TOPICS.map((t) => ({ t, ...drawn(t) }));
-	console.log(["topic | words | slip", ...table.map((r) => `${r.t.handle} | ${r.words.home} | ${r.slips.home ? `${r.slips.home.icon} ${r.slips.home.words}` : "-"}`)].join("\n"));
+	console.log(["topic | words | slip", ...table.map((r) => `${r.t.handle} | ${r.words.home} | ${r.slips.home ? `${r.slips.home.key} ${r.slips.home.words}` : "-"}`)].join("\n"));
 
 	it("draws each standing with one pie, in one ink, on Home, the map, the course page and the topic page", () => {
 		for (const { t, pies } of table) {
@@ -105,23 +103,28 @@ describe("one standing legend on every surface", () => {
 		assert.equal(new Set(table.map((r) => r.pies.home)).size >= 6, true, "the states draw apart: each pie step, and the warning ink");
 	});
 
-	it("says each standing in the same words on every surface", () => {
-		for (const { t, words } of table) assert.deepEqual([words.card, words.row, words.head], [words.home, words.home, words.home], t.handle);
+	it("says each standing in the same words on every surface, Home's row saying the slip in their place", () => {
+		for (const { t, words, slips } of table) {
+			assert.deepEqual([words.card, words.row, words.head], [slips.standing, slips.standing, slips.standing], t.handle);
+			assert.equal(words.home, slips.home?.words ?? slips.standing, `${t.handle}: one status on Home's row`);
+		}
 	});
 
 	it("says Slipping beside every pie in the warning ink, and only there, on every surface", () => {
 		for (const { t, words } of table) {
-			assert.equal(words.home === "Slipping", t.weak, `${t.handle}: Slipping exactly when the engine calls it weak`);
-			assert.deepEqual([words.card, words.row, words.head], [words.home, words.home, words.home], t.handle);
+			assert.equal(words.card === "Slipping", t.weak, `${t.handle}: Slipping exactly when the engine calls it weak`);
+			assert.deepEqual([words.row, words.head], [words.card, words.card], t.handle);
+			assert.notEqual(words.home, "Slipping", `${t.handle}: Home's row says why it slips instead`);
 		}
 		assert.ok(table.some((r) => r.t.weak && r.t.level === "independent") && table.some((r) => r.t.weak && r.t.level === "assisted"), "Slipping on a pie short of full and on one he could do on his own");
 	});
 
-	it("draws a slip with the same icon and words on Home and the topic page, and that icon is the sidebar's and the map's", () => {
+	it("says a slip in the same words on Home and the topic page, the head with the sidebar's and the map's icon", () => {
 		for (const { t, slips } of table) {
-			assert.deepEqual(slips.home, slips.head, t.handle);
+			assert.equal(slips.home?.words ?? null, slips.head?.words ?? null, t.handle);
 			const slip = slipBeside(t, titleOf);
-			if (slip) assert.equal(slips.home?.icon, lucideName(factIcon({ kind: "slip", words: slip.words, slip: slip.key })!), `${t.handle}: the sidebar's and the map's icon`);
+			if (slip) assert.equal(slips.home?.key, slip.key, t.handle);
+			if (slip) assert.equal(slips.head?.icon, lucideName(factIcon({ kind: "slip", words: slip.words, slip: slip.key })!), `${t.handle}: the sidebar's and the map's icon`);
 		}
 		const keys = new Set(table.flatMap((r) => (r.slips.home ? [slipBeside(r.t, titleOf)!.key] : [])));
 		assert.deepEqual([...keys].sort(), ["check", "confident", "gap", "lapsed", "mixed", "repaired"], "every slip, beside Slipping");

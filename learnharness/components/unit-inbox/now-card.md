@@ -14,7 +14,7 @@ One of Today's lines as a sidebar card (`unit-inbox.md`, "Today on top"). `now-c
 
 ## The course card
 
-A course's line with no topic to lead with (an open task that holds no topic of the map, on a course with no current topic): line 1 is its course's mark and name and the line's reason ("Left off today"); line 2 the line's name ("Continue Past exam paper 2024"); the action is the line's Home word, as on a topic card. A click takes the line up as Home's line does (`courseCardMove`, `courseMove`): it opens the session that holds the step, else starts the lesson on it; never the course page (round 8: "Continue Problem sheet 4" opened the course page). `data-sidebar-row` is `course:<workspace>`.
+A course's line with no topic to lead with (an open task that holds no topic of the map, on a course with no current topic): line 1 is its course's mark and name and the line's reason ("Left off today"); line 2 the line's name ("Continue Past exam paper 2024"); the action is the line's Home word, as on a topic card. A click takes the line up as Home's line does (`courseCardMove`, `courseMove`): it opens the session that holds the step, else starts the lesson on it; never the course page (round 8: "Continue Problem sheet 4" opened the course page). It is the open card in a session that holds its task, never on the course page, which it does not open (round 10, 2: it stayed selected there). `data-sidebar-row` is `course:<workspace>`.
 
 ## The session card
 
@@ -29,6 +29,6 @@ A waiting session whose transcript holds no topic of its course's map, or that h
 | keyboard focus | a 2px inset ring; Right moves to the action (`sidebar-tree.ts`), which shows with its own ring, and Left goes back |
 | open page | `fill-selected`, `aria-current="page"` |
 | tutor writing | spinner and Tutor writing in the slot, 70% until its row is hovered or focused |
-| long titles | the course name truncates and the title stops at two lines, ending in an ellipsis; the slot keeps its words and its right edge |
+| long titles | the course name gives way, whole, and the title stops at two lines, ending in an ellipsis; the slot keeps its words and its right edge |
 
 Sources: T3 Code's sidebar thread row (status label `size-3` at 12px, hover action over it); today.md, "Needs you now" (the line, its reason and its action are Home's).

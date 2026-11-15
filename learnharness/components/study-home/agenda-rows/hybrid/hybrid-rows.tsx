@@ -4,9 +4,8 @@ import { useSystemVariant } from "@/components/design-variant";
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedLabel, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
-import { rowStanding, type RowStanding } from "@/components/study-home/agenda-rows/row-standing";
+import { rowStanding, rowWords, type RowStanding } from "@/components/study-home/agenda-rows/row-standing";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { SLIP_ICON } from "@/components/slip-icons";
 import { cn } from "@/lib/utils";
 import { MathLine } from "@/components/ui/math-line";
 import { MathText } from "@/components/ui/math-text";
@@ -48,7 +47,7 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
 			{shown.map((row) => {
-				// The slip sits on the course line, the standing on the lesson line, so it reads beside its topic.
+				// One status on the lesson line, beside its topic: the slip, else where he stands.
 				const facts = rowStanding(row);
 				return (
 					<li key={lineKey(row)} className={HAIRLINE}>
@@ -59,7 +58,7 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 								<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
 							)}
 							<MathLine className="text-callout system-current:text-label text-muted-foreground">{courseTitle(row)}</MathLine>
-							<SlipFact facts={facts} />
+							<span />
 							<span data-slot="today-when" className="justify-self-end text-callout system-current:text-label text-muted-foreground tabular-nums">
 								{studiedLabel(row)}
 							</span>
@@ -75,30 +74,17 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 	);
 }
 
-/** Why the engine calls the row's topic weak, with the slip's own icon,
- *  as the topic page's head says it; empty where it has none. */
-export function SlipFact({ facts }: { facts: RowStanding | null }) {
-	const slip = facts?.slip;
-	if (!slip) return <span />;
-	const Icon = SLIP_ICON[slip.key];
-	return (
-		<span data-slot="today-slip" data-slip={slip.key} className={FACT}>
-			<Icon aria-hidden="true" className="size-3.5 shrink-0" />
-			<span className="truncate">
-				<MathText>{slip.words}</MathText>
-			</span>
-		</span>
-	);
-}
-
-/** Where he stands on the row's topic: the map's pie and its words;
- *  empty on a row of several topics. */
+/** The row's one status on its topic: the map's pie, then the slip he
+ *  would act on, else where he stands (`rowWords`); empty on a row of
+ *  several topics. */
 export function StandingFact({ facts }: { facts: RowStanding | null }) {
 	if (!facts) return <span />;
 	return (
-		<span data-slot="today-standing" className={FACT}>
+		<span data-slot="today-standing" data-slip={facts.slip?.key} className={FACT}>
 			<TopicGlyph standing={facts.standing} className="size-3.5" />
-			<span className="truncate">{facts.standing.words}</span>
+			<span className="truncate">
+				<MathText>{rowWords(facts)}</MathText>
+			</span>
 		</span>
 	);
 }

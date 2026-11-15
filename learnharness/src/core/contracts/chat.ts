@@ -454,6 +454,10 @@ export interface ChatSummary {
 	 *  words (`openedAsReview`), whatever it is named now. The list always
 	 *  sets it; a summary made elsewhere may leave it out. */
 	review?: boolean;
+	/** He studied in it (`studiedIn`): he answered something, or wrote
+	 *  after its opening. The list always sets it; a summary made elsewhere
+	 *  may leave it out, which reads as not studied. */
+	studied?: boolean;
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list

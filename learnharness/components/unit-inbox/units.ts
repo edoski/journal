@@ -1,5 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
+import { leftOffWords, overdueWords, reviewWords, slipMark, STANDING_WORDS, type SlipKey } from "@/components/study-words";
+import { slipBeside } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { currentSessions, sessionState } from "@/components/nav/session-state";
 
@@ -93,8 +94,7 @@ export function taskOf(map: Pick<CourseMap, "tasks" | "focus">, topic: CourseMap
  *  call weak (a partly right answer) still reads as one, as the course's
  *  Mistakes list holds it (round 9, 2 m1). Pure. */
 export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): string | null {
-	if (!topic.weak && !topic.signals.mistake) return null;
-	return slipWords(topic.signals, (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle);
+	return slipBeside(topic, (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle)?.words ?? null;
 }
 
 /** What a topic's own sessions are doing now: those that belong to it

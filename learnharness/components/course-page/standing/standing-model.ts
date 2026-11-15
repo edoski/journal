@@ -1,8 +1,9 @@
 import { TOPIC_LEVELS, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
 import type { StripArc } from "@/components/course-map/arc-strip";
 import { misfitWords } from "@/components/calendar/calendar-facts";
-import { resumableSession } from "@/components/nav/session-state";
-import { topicSessions } from "@/components/unit-inbox/units";
+import { topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
+import { topicCreation } from "@/components/unit-inbox/start-unit";
+import type { SessionCreation } from "@/components/start-session";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { finalReviewMissWords, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
@@ -98,9 +99,23 @@ export interface MistakeRow {
 	/** What it was on, with his answer: the row's hint. */
 	hint: string | null;
 	arc: StripArc | null;
+	/** The session its press opens: the one the topic's page would. */
 	resume: ChatListItem | null;
+	/** What its press starts when it opens none: the open task continued
+	 *  from the lesson that holds it, as the topic's page does, else a
+	 *  session on the topic. */
+	creation: SessionCreation;
 	workspace: string;
 	href: string;
+}
+
+/** A row's press from its topic's action: the session to open, else what
+ *  to start, a continued task as the page starts it. Pure. */
+function pressOf(action: ReturnType<typeof topicAction>, workspace: string, topic: CourseMapTopic): Pick<MistakeRow, "resume" | "creation"> {
+	const creation = topicCreation(workspace, topic);
+	if ("chat" in action) return { resume: action.chat, creation };
+	if (action.kind !== "continue") return { resume: null, creation };
+	return { resume: null, creation: { title: action.opening, course: { workspace }, topics: [topic.handle], ...(action.from ? { resume: { from: action.from } } : {}) } };
 }
 
 const days = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
@@ -114,7 +129,11 @@ function mistakeDayWords(day: string, today: string): string {
 
 /** The open mistakes in the engine's order, newest first, as rows; a
  *  topic the map no longer lists is left out. `arcs` are the arcs the page
- *  shows, whose bubbles the rows wear. */
+ *  shows, whose bubbles the rows wear. A row's press is its topic page's
+ *  action (`topicAction`): the session waiting on the topic, else the open
+ *  task continued from the lesson that holds it, else a session on the
+ *  topic (round 10, 2 m1: the Eigen row started a fresh session while the
+ *  lesson's task waited). */
 export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats: readonly ChatListItem[], arcs: readonly CourseArcSection[] | null): MistakeRow[] {
 	const { map } = course;
 	return standing.mistakes.flatMap((m) => {
@@ -135,7 +154,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
 				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
-				resume: resumableSession(topicSessions(chats, map.workspace, topic.handle)),
+				...pressOf(topicAction(topic, map, chats), map.workspace, topic),
 				workspace: map.workspace,
 				href: unitHref(map.workspace, topic.handle),
 			},
