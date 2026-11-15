@@ -177,6 +177,26 @@ describe("unitStatus", () => {
 	});
 });
 
+describe("an open mistake on a topic row (round 9, 2 m1 and 3 m13)", () => {
+	const open = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false, mistake: true };
+	// Eigen after a partly right answer: an open mistake the Mistakes list
+	// shows, though the engine does not call the topic weak.
+	const eigen = { ...topic("eigen", "assisted"), right: "partial" as const, signals: open };
+	// Determinants with an open confident mistake and a question waiting.
+	const det = { ...topic("det", "assisted", null, true), signals: { ...open, confidentErrors: 1 } };
+	const la = course("la", [eigen, det]);
+	const inbox = buildInbox([la], [chat("e", { topics: ["eigen"], ended: "left" } as Partial<ChatListItem>), chat("d", { topics: ["det"], pendingQuestion: true } as Partial<ChatListItem>)], null);
+	const by = (h: string) => inbox.active.find((u) => u.topic.handle === h)!;
+
+	it("names the mistake, never Left for next time, on a topic its Mistakes list holds", () => {
+		assert.deepEqual(unitStatus(by("eigen"), inbox.today), { kind: "slip", words: "Mistake to fix", slip: "gap" });
+	});
+
+	it("names the mistake before Your turn, as the map names it on a topic with no question waiting", () => {
+		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "slip", words: "Sure, but wrong", slip: "confident" });
+	});
+});
+
 describe("sessionTwins", () => {
 	it("dates only the sessions whose title another listed session shares", () => {
 		const twins = sessionTwins([

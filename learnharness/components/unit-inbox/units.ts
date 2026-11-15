@@ -87,11 +87,13 @@ export function taskOf(map: Pick<CourseMap, "tasks" | "focus">, topic: CourseMap
 	return held.find((task) => task.key === map.focus) ?? held[0] ?? null;
 }
 
-/** Why the engine calls a topic weak, in the app's words, a method he
- *  mixed it up with named by its title on the course's map; null when it
- *  does not. Pure. */
+/** Why the engine calls a topic weak, or what its open mistake is, in the
+ *  app's words, a method he mixed it up with named by its title on the
+ *  course's map; null when neither. An open mistake the engine does not
+ *  call weak (a partly right answer) still reads as one, as the course's
+ *  Mistakes list holds it (round 9, 2 m1). Pure. */
 export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): string | null {
-	if (!topic.weak) return null;
+	if (!topic.weak && !topic.signals.mistake) return null;
 	return slipWords(topic.signals, (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle);
 }
 
@@ -210,9 +212,11 @@ export function studiedWords(at: string, today: string): string {
 export function unitStatus(unit: Unit, today: string): UnitStatus {
 	const { topic } = unit;
 	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
-	// A wrong answer still open outranks a lesson left for next time
-	// (round 8: Eigen's mistake hid behind "Left for next time").
-	if (unit.now === "left") return slip && topic.signals.mistake ? slip : { kind: "task", words: LESSON_WORDS.leftForTonight };
+	// A wrong answer still open outranks a session that waits on him or
+	// was left for next time (round 8: Eigen's mistake hid behind "Left for
+	// next time"; round 9, 3 m13: Determinants' behind "Your turn").
+	if (slip && topic.signals.mistake && unit.now !== "working") return slip;
+	if (unit.now === "left") return { kind: "task", words: LESSON_WORDS.leftForTonight };
 	if (unit.now) return { kind: unit.now };
 	if (slip) return slip;
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
