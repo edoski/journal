@@ -67,13 +67,17 @@ const fail = (message: string): never => {
 };
 const write = (dir: string, name: string, value: unknown) => fs.writeFileSync(path.join(dir, name), `${JSON.stringify(value, null, "\t")}\n`);
 
-/** The real registry's courses, read only, so a copy run can refuse them. */
+/** The real registry's courses, read only, so a copy run can refuse them.
+ *  No registry means no real courses; one that cannot be read refuses the
+ *  run, since then no course could be told apart from a copy. */
 function realCourses(): string[] {
+	const file = path.join(os.userInfo().homedir, "Library/Application Support/Learning/workspaces.json");
+	if (!fs.existsSync(file)) return [];
 	try {
-		const registry = JSON.parse(fs.readFileSync(path.join(os.userInfo().homedir, "Library/Application Support/Learning/workspaces.json"), "utf-8")) as Json;
+		const registry = JSON.parse(fs.readFileSync(file, "utf-8")) as Json;
 		return Object.keys(obj(registry.workspaces)).map((w) => path.resolve(w));
-	} catch {
-		return [];
+	} catch (error) {
+		return fail(`the real registry ${file} cannot be read (${(error as Error).message}), so this run cannot tell a real course from a copy`);
 	}
 }
 
