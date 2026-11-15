@@ -7,7 +7,11 @@
  * tool server over an in-memory MCP link. A tool result carrying
  * `claude/endTurn` ends the turn after its batch, as Claude Code does. A
  * session it never ran but whose file holds Claude Code's transcript format
- * (a seeded one) resumes from that file's turns.
+ * (a seeded one) resumes from that file's turns. Given `compactWhen`, it
+ * compacts as Claude Code's automatic compaction does before a request: its
+ * PreCompact hooks' `systemMessage`s become the summary's instructions, its
+ * PostCompact hooks read the summary, and the stream carries the compact
+ * boundary and the summary message.
  */
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync, existsSync } from "node:fs";
@@ -33,7 +37,13 @@ export interface FakeSdk {
 	configDir: string;
 	/** Deletes a session the way Claude Code's 30-day sweep would. */
 	forget(id: string): void;
+	/** The instructions each compaction was given, in order. */
+	compactions: { instructions: string }[];
 }
+
+/** Where Claude Code's automatic compaction would fire: before a request
+ *  on this history. */
+export type CompactWhen = (history: readonly { message: Message }[]) => boolean;
 
 const sessionFile = (configDir: string, id: string) => join(configDir, "projects", realpathSync(claudeWorkDir()).replace(/[^a-zA-Z0-9]/g, "-"), `${id}.jsonl`);
 
@@ -106,9 +116,10 @@ async function finalMessage(stream: AsyncIterable<AssistantMessageEvent>): Promi
 }
 
 /** An engine whose `query()` plays the scripted model. */
-export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(tmpdir(), "lh-fake-claude-")) }: { configDir?: string } = {}): FakeSdk {
+export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(tmpdir(), "lh-fake-claude-")), compactWhen }: { configDir?: string; compactWhen?: CompactWhen } = {}): FakeSdk {
 	const sessions = new Map<string, Entry[]>();
 	const calls: Options[] = [];
+	const compactions: { instructions: string }[] = [];
 
 	const query = ({ prompt, options }: { prompt: SdkPrompt; options: Options }): SdkQuery => {
 		calls.push(options);
@@ -173,6 +184,21 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 			if (firstReplay) yield firstReplay;
 			const systemPrompt = typeof options.systemPrompt === "object" && !Array.isArray(options.systemPrompt) && "prompt" in options.systemPrompt ? String(options.systemPrompt.prompt) : typeof options.systemPrompt === "string" ? options.systemPrompt : undefined;
 			const maxTurns = options.maxTurns ?? Infinity;
+			const hooksOf = (event: "PreCompact" | "PostCompact") => (options.hooks?.[event] ?? []).flatMap((matcher) => matcher.hooks);
+			async function* compact(): AsyncGenerator<SDKMessage> {
+				const base = { session_id: id, transcript_path: sessionFile(configDir, id), cwd: claudeWorkDir(), trigger: "auto" as const };
+				const outputs = await Promise.all(hooksOf("PreCompact").map((hook) => hook({ ...base, hook_event_name: "PreCompact", custom_instructions: null }, undefined, { signal: controller.signal })));
+				const instructions = outputs.map((out) => (out as { systemMessage?: string }).systemMessage ?? "").filter(Boolean).join("\n\n");
+				compactions.push({ instructions });
+				const summary = `SUMMARY #${compactions.length}: the learner maps keys to buckets.`;
+				await Promise.all(hooksOf("PostCompact").map((hook) => hook({ ...base, hook_event_name: "PostCompact", compact_summary: `<analysis>\nWhat to keep.\n</analysis>\n\n<summary>\n${summary}\n</summary>` }, undefined, { signal: controller.signal })));
+				yield { type: "system", subtype: "compact_boundary", compact_metadata: { trigger: "auto", pre_tokens: 123_000 }, session_id: id, uuid: randomUUID() } as unknown as SDKMessage;
+				const uuid = randomUUID();
+				const text = `This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.\n\nSummary:\n${summary}\n\nIf you need specific details from before compaction, read the full transcript at: ${base.transcript_path}`;
+				// Claude Code's automatic compaction sends its summary message as blocks (2.1.319).
+				yield { type: "user", isSynthetic: true, message: { role: "user", content: [{ type: "text", text }] }, parent_tool_use_id: null, session_id: id, uuid } as unknown as SDKMessage;
+				history = [{ uuid, message: { role: "user", content: [{ type: "text", text }], timestamp: Date.now() } }, ...history.slice(-1)];
+			}
 			let requests = 0;
 			try {
 				for (;;) {
@@ -180,6 +206,7 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 					for (;;) {
 						if (requests++ >= maxTurns) { save(); yield result("error_max_turns"); return; }
 						if (interrupted) { save(); yield result("error_during_execution", ["interrupted"]); return; }
+						if (compactWhen?.(history)) yield* compact();
 						const reply = await finalMessage(scripted.streamFn(scripted.model, normalizeContext({ systemPrompt, messages: history.map((e) => e.message), tools }), { signal: controller.signal }) as AsyncIterable<AssistantMessageEvent>);
 						if (interrupted || reply.stopReason === "aborted") { save(); yield result("error_during_execution", ["interrupted"]); return; }
 						if (reply.stopReason === "error") { save(); yield result("error_during_execution", [reply.errorMessage ?? "error"]); return; }
@@ -229,6 +256,7 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 		calls,
 		configDir,
 		forget: (id) => { sessions.delete(id); },
+		compactions,
 	};
 }
 
@@ -249,12 +277,13 @@ export function fakeEngine(scripted: ScriptedModel): SdkEngine {
 
 /** A turn's build options on the fake: the handler's record, session map and
  *  session store, with the scripted model as the engine. */
-export function onFake(scripted: ScriptedModel, opts: { messages?: unknown[]; session?: unknown; sessionStore?: unknown }) {
-	return { engine: fakeEngine(scripted), messages: opts.messages, session: opts.session, sessionStore: opts.sessionStore } as {
+export function onFake(scripted: ScriptedModel, opts: { messages?: unknown[]; session?: unknown; sessionStore?: unknown; compactionInstructions?: unknown }, engine = fakeEngine(scripted)) {
+	return { engine, messages: opts.messages, session: opts.session, sessionStore: opts.sessionStore, compactionInstructions: opts.compactionInstructions } as {
 		engine: SdkEngine;
 		messages: import("@earendil-works/pi-agent-core").AgentMessage[] | undefined;
 		session: import("../../src/core/sdk-session.ts").ChatSession | undefined;
 		sessionStore: import("../../src/agent/sdk/session-files.ts").SessionStore | undefined;
+		compactionInstructions: ((messages: import("../../src/core/native-messages.ts").LhMessage[]) => string) | undefined;
 	};
 }
 

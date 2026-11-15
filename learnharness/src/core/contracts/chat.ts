@@ -460,11 +460,6 @@ export interface ChatSummary {
  *  split at exactly the record/liveness seam. */
 export interface ChatListItem extends ChatSummary {
 	busy: boolean;
-	/** Live compaction liveness (turn-liveness's twin): true while a turn
-	 *  of the chat waits on its compaction (the lesson is at its limit). The
-	 *  route attaches it from the compaction registry — never
-	 *  record-derived (the marker persists, the RUN is ephemeral). */
-	compacting: boolean;
 	/** Its course was deleted (the record is gone, `courseDeleted` on the
 	 *  server): the session is history, off Today, kept in search and the
 	 *  calendar. The route attaches it; absent reads as not deleted. */

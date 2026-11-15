@@ -3,34 +3,21 @@ import { describe, it } from "node:test";
 import {
 	activeCompactionOf,
 	compactionInstructions,
-	compactionTriggerTokens,
 	newCompactionMarker,
 	newUserMessage,
 	planTreeToText,
 	COMPACTED_HISTORY_HEADER,
-	COMPACTION_RESERVE_TOKENS,
-	DEFAULT_COMPACTION_THRESHOLD_TOKENS,
 	type LhMessage,
 } from "../src/core/index.ts";
 import { projectView } from "../src/core/view.ts";
 
 /**
- * COMPACTION: Claude Code compacts a lesson's session itself; the app keeps
- * the trigger, the lesson's instructions, and the marker the transcript
- * shows. The laws pinned here:
- * - the trigger is the 150k bound, or the window less its reserve;
+ * COMPACTION: Claude Code compacts a lesson's session itself, at its own
+ * point; the app keeps the lesson's instructions and the marker the
+ * transcript shows. The laws pinned here:
  * - the active marker is the NEWEST one (chained compactions rule last);
  * - the instructions demand the four sections in order, plan tree included.
  */
-
-describe("compactionTriggerTokens", () => {
-	it("the 150k bound rules big windows; the window rule binds small ones", () => {
-		assert.equal(compactionTriggerTokens(1_000_000), DEFAULT_COMPACTION_THRESHOLD_TOKENS);
-		assert.equal(compactionTriggerTokens(200_000), 150_000);
-		assert.equal(compactionTriggerTokens(100_000), 100_000 - COMPACTION_RESERVE_TOKENS);
-		assert.equal(compactionTriggerTokens(undefined), 150_000);
-	});
-});
 
 // ─── the marker + the active scan ───────────────────────────────────────────
 

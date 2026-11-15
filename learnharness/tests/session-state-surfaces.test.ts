@@ -123,7 +123,7 @@ const focus = call("focus", "course_save", { changes: { focus: "sheet-4", tasks:
 sheetMessages.splice(-1, 0, assistant([focus]), result(focus.id, "course_save"));
 const sheet = seed("Problem sheet 4", sheetMessages, ["sheet-a", "sheet-b"], "2026-11-07T19:00:00.000Z");
 
-const listed = (busy: string[] = []): ChatListItem[] => chatStore.listChats().map((c) => ({ ...c, busy: busy.includes(c.id), compacting: false }));
+const listed = (busy: string[] = []): ChatListItem[] => chatStore.listChats().map((c) => ({ ...c, busy: busy.includes(c.id) }));
 const sidebarRow = (chats: ChatListItem[], handle: string) => {
 	const inbox = buildInbox([COURSE], chats, null);
 	return [...inbox.active, ...inbox.working, ...inbox.known].find((u) => u.topic.handle === handle) ?? null;

@@ -196,7 +196,7 @@ describe("the open mistakes", () => {
 	});
 
 	it("without arcs the rows wear no bubble; a press resumes the session that waits on the topic, else starts one", () => {
-		const waiting = { id: "c1", title: "Rank", kind: "teach", createdAt: "2026-11-08T09:00:00Z", updatedAt: "2026-11-08T09:00:00Z", messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false, compacting: false, course: { workspace: WS, title: "Linear Algebra" }, topics: ["rank"] } as ChatListItem;
+		const waiting = { id: "c1", title: "Rank", kind: "teach", createdAt: "2026-11-08T09:00:00Z", updatedAt: "2026-11-08T09:00:00Z", messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false, course: { workspace: WS, title: "Linear Algebra" }, topics: ["rank"] } as ChatListItem;
 		const rows = mistakeRows(STANDING, course(false), [waiting], null);
 		assert.ok(rows.every((r) => r.arc === null));
 		const doc = render(<MistakeList rows={rows} />);

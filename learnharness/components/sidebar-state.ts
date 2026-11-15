@@ -136,7 +136,6 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	useServerEvent("turn-started", scheduleEventRefresh);
 	useServerEvent("turn-settled", scheduleEventRefresh);
 	useServerEvent("record-changed", scheduleEventRefresh);
-	useServerEvent("compaction-changed", scheduleEventRefresh);
 	useServerResync(() => void refreshRef.current());
 	useEffect(
 		() => () => {

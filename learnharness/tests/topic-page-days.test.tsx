@@ -69,7 +69,6 @@ function chat(id: string, title: string, updatedAt: string, over: Partial<ChatLi
 		course: { workspace: WORKSPACE, title: "Linear Algebra" },
 		topics: [],
 		busy: false,
-		compacting: false,
 		...over,
 	};
 }

@@ -68,7 +68,6 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 		course: { workspace: WORKSPACE, title: "Linear Algebra" },
 		topics: [],
 		busy: false,
-		compacting: false,
 		...over,
 	};
 }

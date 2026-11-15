@@ -20,7 +20,7 @@ export function enterAction(state: {
 	busy: boolean;
 	canSend: boolean;
 	/** The between-problems pause is live: practice session, nothing
-	 *  active, no turn/compaction in flight (the caller's fold). */
+	 *  active, no turn in flight (the caller's fold). */
 	nextProblem?: boolean;
 	/** The empty field's own go-ahead (Try again), when the host has one. */
 	emptyAction?: boolean;

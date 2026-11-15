@@ -588,7 +588,7 @@ async function pump(chatId: string): Promise<void> {
 			// Fire the wake with cargo still registered. A 409 releases its
 			// vehicle flag and retries after the existing backoff, without
 			// appending another registry entry.
-			// The turn's setup (compaction gate, course brief) runs before it
+			// The turn's setup (the course brief) runs before it
 			// counts as running: say a wake is coming, so the lesson is never
 			// silent meanwhile (round 8).
 			emit("turn-waking", { chatId, waking: true });

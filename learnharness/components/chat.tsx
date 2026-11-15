@@ -81,7 +81,7 @@ import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
-import { waitingLine } from "@/components/lesson/working-sign";
+import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
@@ -160,7 +160,6 @@ export function Chat({
 	initialError,
 	initialPrompt,
 	initiallyInFlight,
-	initiallyCompacting = false,
 	startedIn,
 	appOpening = false,
 	course,
@@ -191,11 +190,6 @@ export function Chat({
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
 	initiallyInFlight?: boolean;
-	/** A compaction holds the chat's model gate at mount (navigated away
-	 * mid-compaction — the registry is live server state, the
-	 * compaction-changed event already fired). The transcript spinner
-	 * and send gates key on it. */
-	initiallyCompacting?: boolean;
 }) {
 	// Reattach plumbing (background-turn runner wave): the hook holds the
 	// settled terminal's callback — a stable ref assigned below, once
@@ -209,7 +203,7 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
@@ -796,15 +790,10 @@ export function Chat({
 	// a pending question still owns the interaction (the dock replaces the
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
-	// Compaction: a turn held for it, flipped by compaction-changed (only a
-	// lesson at its limit waits; round 9). Nothing gates on it: his Enter
-	// goes through and the line below the transcript says why the reply
-	// waits (round 6).
-	const [compacting, setCompacting] = useState(initiallyCompacting);
 	// A turn the server is setting up itself (turn-waking): the line shows
 	// from the start of its setup, not only once it runs.
 	const [waking, setWaking] = useState(false);
-	const waiting = waitingLine(messages, { busy, compacting, waking });
+	const thinking = showsWorking(messages, busy || waking);
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -1264,13 +1253,6 @@ export function Chat({
 	useServerEvent("turn-waking", (p) => {
 		if (p.chatId === chatId) setWaking(p.waking);
 	});
-	useServerEvent("compaction-changed", (p) => {
-		// A turn of this lesson waits on its compaction (the lesson is at
-		// its limit). On finish, record-changed (emitted by the compaction
-		// write itself) carries the marker in.
-		if (p.chatId !== chatId) return;
-		setCompacting(p.running);
-	});
 	useServerEvent("chats-changed", (p) => {
 		// The first plan named this session (ChatStore.nameSession): the
 		// header takes the name the list now shows.
@@ -1729,12 +1711,7 @@ export function Chat({
 							    provider-connect gap. turnInFlight: the same state
 							    entered by external discovery (wake) / the poll
 							    fallback. Never collapsible itself. */}
-							{/* Compaction (owner round 15): the same register as the
-						    thinking placeholder, a visible session-wide state while
-						    the summarizer holds the model gate. It stands in for
-						    Thinking while his sent input waits on it (round 6). */}
-							{waiting === "compacting" && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{waiting === "thinking" && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{thinking && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}

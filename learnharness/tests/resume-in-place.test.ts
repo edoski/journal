@@ -133,7 +133,7 @@ function seedSession(chatId: string, engine: ScriptedModel): void {
 	chatStore.saveSession(chatId, { id, synced: messages.at(-1)!.id, anchor: entries.at(-1)!.uuid });
 }
 
-const listed = (): ChatListItem[] => chatStore.listChats().map((c) => ({ ...c, busy: false, compacting: false }));
+const listed = (): ChatListItem[] => chatStore.listChats().map((c) => ({ ...c, busy: false }));
 const item = (id: string) => listed().find((c) => c.id === id)!;
 
 // ─── a waiting lesson is offered as itself ──────────────────────────────────

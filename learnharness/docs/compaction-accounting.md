@@ -2,20 +2,7 @@
 
 ## Retention
 
-Claude Code compacts a lesson's session; the app keeps only the trigger and the lesson's instructions. See [sessions and compaction](sessions-and-compaction.md).
-
-## Conversation meter
-
-The numerator is the latest qualifying completed conversation response's native
-Pi `input + output + cacheRead + cacheWrite`. Reasoning is already inside output;
-`totalTokens` is not an override. Partial stream updates, errors, aborts, invalid
-counts, and all-zero usage do not replace the last measurement. A successful
-compaction marker invalidates earlier measurements: show `? / maximum` until a
-new qualifying response completes.
-
-The denominator follows the selected model's catalog limit, independently of the
-last numeric measurement. Changing models preserves that numerator. No catalog
-limit means no invented denominator; no percentage display is added.
+Claude Code compacts a lesson's session at its own point; the app gives it only the lesson's instructions. See [sessions and compaction](sessions-and-compaction.md).
 
 ## Spending
 

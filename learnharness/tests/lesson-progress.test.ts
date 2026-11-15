@@ -53,7 +53,7 @@ function evening(): LhMessage[] {
 }
 
 const listItem = (messages: LhMessage[]) =>
-	({ id: "chat_eigen", title: "Eigenvalues", kind: "teach", busy: false, compacting: false, pendingQuestion: null, pendingProblem: null, ended: sessionEndOf(messages, TREE) }) as unknown as ChatListItem;
+	({ id: "chat_eigen", title: "Eigenvalues", kind: "teach", busy: false, pendingQuestion: null, pendingProblem: null, ended: sessionEndOf(messages, TREE) }) as unknown as ChatListItem;
 
 describe("steps the tutor's turn marks done", () => {
 	it("show as done on the map even with no check tagged to them", () => {

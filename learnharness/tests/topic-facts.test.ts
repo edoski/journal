@@ -103,7 +103,6 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 		topics: [],
 		ownTopics: over.topics ?? [],
 		busy: false,
-		compacting: false,
 		...over,
 	};
 }
@@ -125,7 +124,6 @@ describe("the page's one action", () => {
 		const writing = chat({ topics: ["rank"], busy: true, updatedAt: "2026-11-08T09:00:00.000Z" });
 		assert.deepEqual(topicAction(TOPICS.rank, MAP, [writing, waiting]), { kind: "resume", chat: waiting }, "a waiting session beats one being written");
 		assert.deepEqual(topicAction(TOPICS.rank, MAP, [writing]), { kind: "open", chat: writing });
-		assert.deepEqual(topicAction(TOPICS.eigen, MAP, [chat({ topics: ["eigen"], compacting: true, pendingQuestion: true })]).kind, "resume", "a compaction is not writing: the question waiting through it is his");
 	});
 
 	it("never resumes a session the engine's records do not tie to the topic", () => {
@@ -238,7 +236,7 @@ describe("the page's words for time", () => {
 	const row = (days: number): TodayRow => {
 		const at = new Date(`${COURSE.map.today}T12:00:00`);
 		at.setDate(at.getDate() - days);
-		return { kind: "session", course: COURSE, chat: { id: "c", title: "Lesson", kind: "teach", createdAt: at.toISOString(), updatedAt: at.toISOString(), messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false, compacting: false } };
+		return { kind: "session", course: COURSE, chat: { id: "c", title: "Lesson", kind: "teach", createdAt: at.toISOString(), updatedAt: at.toISOString(), messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false } };
 	};
 
 	it("are Home's, for every day from today to more than a year back", () => {

@@ -10,7 +10,7 @@ export interface ModelStatus {
 	account: string;
 	/** That account's Claude Code is signed in to its Claude plan. */
 	connected: boolean;
-	/** CLAUDE_MODEL's context window, the context meters' denominator;
+	/** CLAUDE_MODEL's context window;
 	 *  null when the account is not set up in T3 Code. */
 	contextWindow: number | null;
 }
