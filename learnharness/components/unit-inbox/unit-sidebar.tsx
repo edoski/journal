@@ -3,9 +3,9 @@
 import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
-import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
+import { KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
-import { filterSessions, opensSearchResult, useSessionsSidebar } from "@/components/sidebar-state";
+import { filterSessions, opensSearchResult, rankByTitle, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, toBlobs, useActivity } from "@/components/activity-dock";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
@@ -49,12 +49,7 @@ export function searchInbox(
 	query: string,
 	courses: readonly StudyCourse[] = [],
 ): { courses: StudyCourse[]; arcs: FoundArc[]; units: Unit[]; sessions: ChatListItem[] } {
-	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] =>
-		items
-			.map((item) => ({ item, score: fuzzyScore(query.trim(), title(item)) }))
-			.filter((r): r is { item: T; score: number } => r.score !== null)
-			.sort((a, b) => b.score - a.score)
-			.map((r) => r.item);
+	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] => rankByTitle(items, query, title);
 	return {
 		courses: best(courses, (c) => c.map.title),
 		arcs: best(

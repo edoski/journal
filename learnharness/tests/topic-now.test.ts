@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { nowOf, unitStatus } from "../components/unit-inbox/units.ts";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
+import { filterSessions } from "../components/sidebar-state.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
 import { chat, LINALG, TODAY } from "./fixtures/now-demo.ts";
 
@@ -27,7 +28,16 @@ describe("search's sessions", () => {
 	it("come newest first, however closely each title matches", () => {
 		const older = chat("chat_a", { title: "Total probability practice", updatedAt: "2026-10-10T09:00:00.000Z" });
 		const newer = chat("chat_b", { title: "Probability review, total", updatedAt: "2026-10-25T09:00:00.000Z" });
-		const found = searchInbox(buildInbox([], [older, newer], null), [older, newer], "total prob", []);
+		const found = searchInbox(buildInbox([], [older, newer], null), [older, newer], "prob", []);
 		assert.deepEqual(found.sessions.map((c) => c.id), ["chat_b", "chat_a"]);
+	});
+});
+
+describe("search's ranking", () => {
+	it("is cmdk's: a title that starts with the query outranks a later word that does", () => {
+		const scattered = chat("chat_s", { title: "Rank practice" });
+		const start = chat("chat_p", { title: "Probability" });
+		assert.deepEqual(filterSessions([scattered, start], "pr").map((c) => c.id), ["chat_p", "chat_s"]);
+		assert.deepEqual(filterSessions([scattered, start], "rnk").map((c) => c.id), ["chat_s"], "letters in order match, as cmdk's command list does");
 	});
 });

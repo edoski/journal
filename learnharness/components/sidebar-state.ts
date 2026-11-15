@@ -2,21 +2,27 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { fuzzyScore, type ChatListItem } from "@/src/core";
+import { defaultFilter } from "cmdk";
+import type { ChatListItem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { focusWhereHeTypes } from "@/components/ui/overlay";
 
-/** The search over the list (owner round 8, 2026-10-05): a fuzzy
- *  subsequence match ranked by fuzzyScore — prefix beats word-boundary
- *  beats scattered. An empty query keeps the list's own order. */
-export function filterSessions(list: ChatListItem[], query: string): ChatListItem[] {
+/** The items whose title matches the query, best first, by cmdk's own
+ *  ranking (a subsequence match where a prefix beats a word start beats
+ *  scattered letters). An empty query keeps the list's own order. */
+export function rankByTitle<T>(items: readonly T[], query: string, title: (item: T) => string): T[] {
 	const q = query.trim();
-	if (!q) return list;
-	return list
-		.map((c) => ({ c, score: fuzzyScore(q, c.title) }))
-		.filter((r): r is { c: ChatListItem; score: number } => r.score !== null)
+	if (!q) return [...items];
+	return items
+		.map((item) => ({ item, score: defaultFilter(title(item), q) }))
+		.filter((r) => r.score > 0)
 		.sort((a, b) => b.score - a.score)
-		.map((r) => r.c);
+		.map((r) => r.item);
+}
+
+/** The search over the sessions (owner round 8, 2026-10-05), by title. */
+export function filterSessions(list: ChatListItem[], query: string): ChatListItem[] {
+	return rankByTitle(list, query, (c) => c.title);
 }
 
 /**
