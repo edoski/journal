@@ -20,7 +20,6 @@ import {
 	pendingQuestionOf,
 	failedResponseAtEnd,
 	isQuestionTool,
-	measuredContextTokens,
 	newAnswerResult,
 	newNextMessage,
 	newProblemDismissedMarker,
@@ -191,8 +190,6 @@ export interface SessionState {
 	nativeMessages: LhMessage[];
 	/** Server-read history only; optimistic bubbles are not delivery proof. */
 	hasConfirmedConversation: boolean;
-	/** Completed conversation usage; null after compaction or before first usage. */
-	contextTokens: number | null;
 	status: SessionStatus;
 	/** `repeat` counts the failures just before it that failed the same
 	 *  way, so a press that fails again still shows (round 9). */
@@ -326,7 +323,6 @@ export class SessionModel {
 			messages: projectView(messages, live),
 			nativeMessages: messages,
 			hasConfirmedConversation: this.base.some(m => m.role === "user" || m.role === "assistant"),
-			contextTokens: measuredContextTokens(messages, this.incompleteUsageIds),
 			status: this.statusValue,
 			error: this.errorValue ?? providerError,
 			steerQueue: this.steerQueueValue,

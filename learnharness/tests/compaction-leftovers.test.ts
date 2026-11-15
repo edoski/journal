@@ -19,3 +19,9 @@ test("the compaction cut draws nothing in the lesson", () => {
 	const lesson = readFileSync(new URL("../components/chat.tsx", import.meta.url), "utf8");
 	assert.doesNotMatch(lesson, /case "data-compaction-cut"/);
 });
+
+test("the lesson counts no context of its own: when to compact is Claude Code's call", async () => {
+	const { SessionModel } = await import("../components/session-core.ts");
+	const state = new SessionModel({ chatId: "fixture", initialMessages: [] }).getState();
+	assert.equal("contextTokens" in state, false);
+});
