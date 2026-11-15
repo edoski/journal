@@ -26,8 +26,8 @@ export function ReadyLine({ course, readiness, arcs }: { course: StudyCourse; re
 	const Icon = ready ? ICON[ready.kind] : null;
 	const bubbles = ready?.kind === "notYet" ? ready.arcs : [];
 	return (
-		<p data-slot="course-ready" data-kind={ready?.kind} className={cn("flex min-h-5 min-w-0 items-center gap-1.5", ready?.kind === "short" && "text-warning")}>
-			{Icon && <Icon aria-hidden className={cn("size-4 shrink-0", ready?.kind !== "short" && "text-muted-foreground")} />}
+		<p data-slot="course-ready" data-kind={ready?.kind} className={cn("flex min-h-5 min-w-0 items-start gap-1.5", ready?.kind === "short" && "text-warning")}>
+			{Icon && <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", ready?.kind !== "short" && "text-muted-foreground")} />}
 			{ready ? <MathText>{ready.words}</MathText> : !map.exam && <span className="font-normal text-muted-foreground">{noExamWords(map.topics)}</span>}
 			{bubbles.length > 0 && (
 				<span className="ml-0.5 flex min-w-0 items-center gap-1">

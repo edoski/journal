@@ -96,6 +96,14 @@ describe("exam readiness, from the engine's sorting", () => {
 		assert.deepEqual(examReady(readiness(part({ solid: [h("span")], toStart: [h("kernel")] })), map, null), { kind: "notYet", words: "Still to start before the exam: Kernel", arcs: [] });
 	});
 
+	it("in a course without arcs, names every topic not yet solid, however many", () => {
+		const { map } = course(false);
+		const many = { ...map, topics: [...map.topics, ...["det", "cramer", "eigen", "diag"].map((t) => topic(t))] };
+		const words = examReady(readiness(part({ notYet: ["basis", "rank", "kernel", "det", "cramer", "eigen", "diag"].map(h) })), many, null).words;
+		assert.equal(words, "Not yet solid for the exam: Basis, Rank, Kernel, Det, Cramer, Eigen and Diag");
+		assert.doesNotMatch(words, /others/);
+	});
+
 	it("names what has no room first, and says ready when every part is solid", () => {
 		const { map } = course(false);
 		assert.deepEqual(examReady(readiness(part({ notYet: [h("rank")], wontFit: [h("kernel")] })), map, null), { kind: "short", words: "No room before the exam to start Kernel" });

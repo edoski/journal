@@ -70,8 +70,10 @@ describe("pace, from the engine's plan", () => {
 		assert.equal(paceOf(course(), null), null);
 	});
 
-	it("names four or more topics as three and others, never a count", () => {
-		assert.equal(namesWords(["A", "B", "C", "D", "E"]), "A, B, C and others");
+	it("names every topic, never \"and others\" and never a count", () => {
+		assert.equal(namesWords(["A", "B", "C", "D", "E"]), "A, B, C, D and E");
+		assert.equal(namesWords(["A", "B"]), "A and B");
+		assert.equal(namesWords(["A"]), "A");
 	});
 });
 

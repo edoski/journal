@@ -9,9 +9,9 @@ import { finalReviewMissWords } from "@/components/study-words";
  * standing. Pure.
  */
 
-/** "A, B and C"; past three names, "A, B, C and others". */
+/** "A, B and C": every name, never "and others", so a line says every
+ *  topic it means (round 6: "and others" hid five not-yet-solid topics). */
 export function namesWords(names: readonly string[]): string {
-	if (names.length > 3) return `${names.slice(0, 3).join(", ")} and others`;
 	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
