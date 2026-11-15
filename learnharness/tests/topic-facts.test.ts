@@ -235,7 +235,11 @@ describe("where he stands, in the app's one wording", () => {
 });
 
 describe("the page's words for time", () => {
-	const row = (days: number): TodayRow => ({ kind: "course", course: { ...COURSE, lastActiveDaysAgo: days }, step: { kind: "none" } });
+	const row = (days: number): TodayRow => {
+		const at = new Date(`${COURSE.map.today}T12:00:00`);
+		at.setDate(at.getDate() - days);
+		return { kind: "session", course: COURSE, chat: { id: "c", title: "Lesson", kind: "teach", createdAt: at.toISOString(), updatedAt: at.toISOString(), messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false, compacting: false } };
+	};
 
 	it("are Home's, for every day from today to more than a year back", () => {
 		for (let days = 0; days <= 400; days++) assert.equal(agoWords(days), studiedAgo(row(days)), `ago ${days}`);

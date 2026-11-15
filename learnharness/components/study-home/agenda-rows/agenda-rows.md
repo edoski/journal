@@ -6,7 +6,7 @@ Four candidates ran behind a Rows switch: `reason` (every row says why it is the
 
 ## Shared
 
-`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` (a session waiting on him; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `studiedAgo` (`lastActiveDaysAgo`) and its sentence `lastStudied` (the course page's), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `progress-ring.tsx` draws `courseProgress` as the course's ring (`../../ui/pie.md`), never a topic's pie. `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
+`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` (a session waiting on him; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `studiedAgo` (a session line's last turn; none on a course's line), `lastStudied` (`lastActiveDaysAgo`, the course page's), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `progress-ring.tsx` draws `courseProgress` as the course's ring (`../../ui/pie.md`), never a topic's pie. `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
 
 ## The signal test
 

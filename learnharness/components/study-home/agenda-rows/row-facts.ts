@@ -139,22 +139,19 @@ export function whyOf(row: TodayRow): Why | null {
 	}
 }
 
-/** The days since the line's one clock: a session's line, since he last
- *  wrote in that session, so one started minutes ago is 0; a course's
- *  line, since he last studied the course; an open task's line has none,
- *  since its reason already dates it ("Left off 2d ago"), so a row never
- *  shows two days at once. Null for a course never studied or a line with
- *  no course. Pure. */
+/** The days since the line's one clock, which only a session's line has:
+ *  since he last wrote in that session, so one started minutes ago is 0.
+ *  A course's line has none (round 9, 1 D5: it showed the course's last
+ *  study, so "Studied today" sat on "Start Linear maps", a topic never
+ *  studied, and every row repeated the same day); its reason says what
+ *  the row is about. Null for a line with no clock. Pure. */
 function studiedDays(row: TodayRow): number | null {
-	if (row.kind === "session") {
-		const today = row.course?.map.today;
-		if (!today) return null;
-		const at = new Date(row.chat.updatedAt);
-		const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
-		return Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000));
-	}
-	if (row.step.kind === "task") return null;
-	return row.course.lastActiveDaysAgo;
+	if (row.kind !== "session") return null;
+	const today = row.course?.map.today;
+	if (!today) return null;
+	const at = new Date(row.chat.updatedAt);
+	const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+	return Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000));
 }
 
 /** The line's one clock, short enough for a trailing column: "Today",
