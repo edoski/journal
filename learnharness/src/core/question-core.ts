@@ -283,6 +283,9 @@ export interface QuestionAnswerData {
 	/** explain: he pressed Hint instead of answering. Not an answer, so no
 	 *  committed answer is revealed and no confidence is read. */
 	hintRequested?: boolean;
+	/** explain: he pressed Show me: he gives up on it and sees its answer.
+	 *  An attempt he gave up, never a grade on his words. */
+	showMe?: boolean;
 	dismissed?: boolean;
 	/** Why a dismissal happened: "tonight" when Done for today closed the
 	 *  session with this question open, "asked" when he asked the tutor
@@ -304,6 +307,7 @@ export interface AnswerRequest {
 	readingThinking?: string; // the thinking-while-reading channel (check answers)
 	confidence?: Confidence; // explain only; sent only when he chose one (chosenConfidence)
 	hint?: boolean; // explain only: a hint request, never an answer
+	showMe?: boolean; // explain only: he gives up and sees the answer
 }
 
 // ─── dock selection (the client state machine, pure for tests) ─────────────
@@ -420,6 +424,10 @@ export function buildAnswer(qd: QuestionData, req: AnswerRequest, tool?: string)
 	if (qd.kind === "explain" && req.hint) {
 		// A hint request: the committed answer stays hidden.
 		base.hintRequested = true;
+	} else if (qd.kind === "explain" && req.showMe) {
+		// He gives up: the committed answer shows, and no confidence is read.
+		base.showMe = true;
+		base.committed = qd.committedAnswer;
 	} else if (qd.kind === "explain") {
 		// The commitment snapshots for the reveal + rendering.
 		base.committed = qd.committedAnswer;
@@ -445,6 +453,10 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string, reason
 		answeredAt: new Date().toISOString(),
 	};
 }
+
+/** What the agent reads when he pressed Show me on a check. */
+export const SHOW_ME_TEXT =
+	"He pressed Show me: he gives up on this question, with the work below if he wrote any. Save it as an attempt he gave up (result incorrect, gave_up true, his work as the response). Then show him the worked answer: where his work stopped, when he wrote some, then the steps. Ask nothing more about it.";
 
 /** What the agent reads for a question left open by Done for today. */
 export const LEFT_FOR_TONIGHT_TEXT =
@@ -475,6 +487,7 @@ export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, un
 	if (ad.hintRequested) {
 		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";
 	}
+	if (ad.showMe) out.showMe = SHOW_ME_TEXT;
 	// Array.isArray: the seam is called with `unknown` answers (test
 	// fixtures, foreign records) — degrade to omission, never crash.
 	if (Array.isArray(ad.answers) && ad.answers.length > 0)

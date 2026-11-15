@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronRightIcon, LightbulbIcon } from "lucide-react";
+import { ChevronRightIcon, EyeIcon, LightbulbIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { answerForPresentation, type Photo, type QuestionAnswerData, type QuestionOption } from "@/src/core";
@@ -175,6 +175,8 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 			{answer.readingThinking && <LearnerBubble testId="reading-thinking-bubble" text={answer.readingThinking} />}
 			{answer.hintRequested ? (
 				<LearnerBubble testId="prose-answer" icon={LightbulbIcon} label="Hint" text={[words, added].filter(Boolean).join("\n\n")} photos={photos} />
+			) : answer.showMe ? (
+				<LearnerBubble testId="prose-answer" icon={EyeIcon} label="Show me" text={[words, added].filter(Boolean).join("\n\n")} photos={photos} markId={toolCallId} />
 			) : (
 				<>
 					<LearnerBubble testId="prose-answer" text={words} photos={photos} markId={toolCallId}>
