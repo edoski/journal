@@ -169,6 +169,14 @@ export function agoWords(days: number): string {
 	return `${days}d ago`;
 }
 
+/** Home's clock beside a course or a session, labelled so it never reads
+ *  as the line's reason: "Studied today", "Studied yesterday", "Studied 7d
+ *  ago" (round 8: "7d ago" above "Planned today" read as a contradiction).
+ *  The short days are `agoWords`'. */
+export function studiedAgoWords(days: number): string {
+	return days <= 1 ? studiedDaysWords(days) : `Studied ${agoWords(days)}`;
+}
+
 /** When he last studied something, as a phrase: "Studied today",
  *  "Studied yesterday", "Studied 3 days ago", "Studied 40 days ago". */
 export function studiedDaysWords(days: number): string {
