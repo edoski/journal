@@ -130,6 +130,7 @@ function rowOf(observations: Shown, id: string): MarkRow | null {
 		helped: o.kind === "attempt" && typeof o.help === "string" && o.help !== "none",
 		predicted: o.predicted === true,
 		gaveUp: o.gave_up === true,
+		uncertain: typeof o.uncertain === "string",
 		sure: chosenSure(o.sure),
 	};
 }

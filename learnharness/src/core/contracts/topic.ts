@@ -25,6 +25,9 @@ export interface TopicAttempt {
 	/** A prediction made before its step was taught: kept as what happened,
 	 *  never counted. */
 	predicted: boolean;
+	/** The engine doubts the evidence (`uncertain`: given straight after an
+	 *  explanation, or with its solution in view). */
+	uncertain: boolean;
 	/** The confidence he chose (`chosenSure`: never the meter left alone). */
 	sure: "guess" | "confident" | null;
 	/** The method he reached for in its place (a topic handle), when the tutor recorded one. */

@@ -53,6 +53,7 @@ function attemptOf(id: string, entry: unknown): { attempt: TopicAttempt; correct
 			grade: GRADES.find((g) => g === e.grade) ?? null,
 			gaveUp: e.gave_up === true,
 			predicted: e.predicted === true,
+			uncertain: typeof e.uncertain === "string",
 			sure: chosenSure(e.sure),
 			chose: str(e.chose),
 			text,

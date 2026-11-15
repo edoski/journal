@@ -101,7 +101,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 | Fact | Words |
 |---|---|
 | result | Right, Partly right, Not right |
-| counted | Prediction, not counted; Gave up; With help; On your own (no help, a guess or a partly right answer included) |
+| counted | Prediction, not counted; Gave up; With help; Not yet confirmed (a right answer the engine doubts, `uncertain`, such as one given straight after Explain instead: not his own yet, as Right, not yet confirmed says of the topic); On your own (no help, a guess or a partly right answer included) |
 | confidence he chose | Guessing, Confident; none when he left the meter alone (Neutral is never shown as his choice) |
 | a dispute | Dispute; Disputed: and the tutor's ruling; in the transcript, You disputed the mark, You think: Partly right |
 

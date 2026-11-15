@@ -109,7 +109,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 }
 
 function attempt(over: Partial<TopicAttempt> = {}): TopicAttempt {
-	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, grade: null, gaveUp: false, predicted: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", session: null, ...over };
+	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, grade: null, gaveUp: false, predicted: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", session: null, uncertain: false, ...over };
 }
 
 const EIGEN_PLAN: SessionPlan = {
@@ -417,6 +417,7 @@ describe("how an attempt went", () => {
 		assert.deepEqual(attemptMark(attempt({ result: "partial", unaided: false }), titleOf), { result: "partly", words: "With help" });
 		assert.deepEqual(attemptMark(attempt({ grade: "helped", sure: "guess" }), titleOf), { result: "right", words: null }, "a guess with no help was his own answer");
 		assert.deepEqual(attemptMark(attempt({ grade: "solid" }), titleOf), { result: "right", words: null });
+		assert.deepEqual(attemptMark(attempt({ grade: "helped", uncertain: true }), titleOf), { result: "right", words: "Not yet confirmed" }, "the engine doubts it: not his own yet (round 7)");
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", gaveUp: true, unaided: false }), titleOf), { result: "wrong", words: "Gave up" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", predicted: true, sure: "confident" }), titleOf), { result: "wrong", words: "Prediction, not counted" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", unaided: false }), titleOf), { result: "wrong", words: null });

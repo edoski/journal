@@ -95,6 +95,7 @@ const attempt = (id: string, date: string, over: Partial<TopicAttempt> = {}): To
 	chose: null,
 	text: `Attempt ${id}`,
 	session: null,
+	uncertain: false,
 	...over,
 });
 

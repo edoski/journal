@@ -30,15 +30,19 @@ export function chosenSure(value: unknown): Exclude<MarkSure, "neutral"> | null 
  *  page's Earlier both read (round 5: a prediction's card said "Counted as
  *  helped" where Earlier said it never counts, and a give-up's card said
  *  "With help" where Earlier said "Gave up"). */
-export type MarkHow = "predicted" | "gaveUp" | "withHelp" | "ownWork";
+export type MarkHow = "predicted" | "gaveUp" | "withHelp" | "unconfirmed" | "ownWork";
 
 /** Help given is the only help it names (round 6: "Counted as helped" on
  *  an unaided guess or a partly right answer named help he never got; the
- *  result and his confidence beside it already say how it went). */
-export function markHow(attempt: { predicted: boolean; gaveUp: boolean; helped: boolean }): MarkHow {
+ *  result and his confidence beside it already say how it went). A right
+ *  answer the engine doubts (`uncertain`: given straight after an
+ *  explanation, or with its solution in view) is not yet confirmed as his
+ *  own, as the engine does not count it solid (round 7). */
+export function markHow(attempt: { predicted: boolean; gaveUp: boolean; helped: boolean; uncertain: boolean; result: MarkResult }): MarkHow {
 	if (attempt.predicted) return "predicted";
 	if (attempt.gaveUp) return "gaveUp";
-	return attempt.helped ? "withHelp" : "ownWork";
+	if (attempt.helped) return "withHelp";
+	return attempt.uncertain && attempt.result === "correct" ? "unconfirmed" : "ownWork";
 }
 
 /** One attempt that stands for an answer. An answer usually has one; a
@@ -59,6 +63,8 @@ export interface MarkRow {
 	predicted: boolean;
 	/** He gave up on it without an answer. */
 	gaveUp: boolean;
+	/** The engine doubts the evidence (`uncertain`). */
+	uncertain: boolean;
 	/** The confidence he chose (`chosenSure`). */
 	sure: Exclude<MarkSure, "neutral"> | null;
 }
