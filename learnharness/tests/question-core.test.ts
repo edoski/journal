@@ -3,6 +3,7 @@
  */
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { describe, it } from "node:test";
 import { Value } from "typebox/value";
 import type { TSchema } from "typebox";
@@ -338,5 +339,15 @@ describe("the role field (predict | check)", () => {
 		const cleaned = Value.Clean(explainDisplayInputSchema, { ...valid }) as Record<string, unknown>;
 		assert.equal(cleaned.type, "check");
 		assert.equal("nodeId" in cleaned, false);
+	});
+});
+
+describe("a question he set aside to ask something", () => {
+	it("comes back word for word, unless he asked to be taught instead (round 9: a review re-asked its question after three \"stop quizzing me and teach me\")", () => {
+		const reason = String(compactAnswerForModel({ kind: "explain", dismissed: true, reason: "asked" } as never).reason);
+		assert.match(reason, /ask this question again, word for word/);
+		assert.match(reason, /When his message asks to be taught or told instead of asked[^.]*the question is set aside[^.]*never ask it again/);
+		const prober = fs.readFileSync(new URL("../src/agent/prompts/prober/05-opening.md", import.meta.url), "utf8");
+		assert.match(prober, /stop quizzing me and explain"\): the probe ends there/, "the prober's rule that this text yields to");
 	});
 });

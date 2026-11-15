@@ -464,9 +464,12 @@ export const LEFT_FOR_TONIGHT_TEXT =
 
 /** What the agent reads for a question he set aside to ask something
  *  (round 6: the question stays open, so it comes back as it was and the
- *  transcript draws it once). */
+ *  transcript draws it once). A message asking to be taught instead sets
+ *  it aside for good (round 9: a review re-asked its question after three
+ *  "stop quizzing me and teach me", since this text outranked the probe's
+ *  rule to explain and conclude). */
 export const ASKED_INSTEAD_TEXT =
-	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message, then ask this question again, word for word, with a fresh call.";
+	"He asked you something before answering: his message follows. Not an answer: no grade, no attempt recorded, its answer never shown. The question is still open: answer his message, then ask this question again, word for word, with a fresh call. When his message asks to be taught or told instead of asked (\"stop quizzing me\", \"just explain it\"), the question is set aside: teach what he asked as your instructions say for that request, and never ask it again.";
 
 /**
  * The MODEL-VISIBLE answer record (owner, tool-result diet 2026-10-02):
