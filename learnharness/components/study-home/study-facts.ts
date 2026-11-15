@@ -121,6 +121,12 @@ const PLAN_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "nume
 /** A plan day as the app writes it: "Sun 15 Nov". Pure. */
 export const planDay = (date: string) => PLAN_DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
 
+/** "Continue" and a title, never twice for a task titled with it
+ *  ("Continue Eigenvalues: the full 2×2 computation"). Pure. */
+export function continueWords(title: string): string {
+	return /^Continue\s/.test(title) ? title : `Continue ${title}`;
+}
+
 /** The step as a short instruction: "Review Linear independence, Rank",
  *  "Continue Problem sheet 4", "Start Poisson distribution" for a topic not
  *  started. Pure. */
@@ -129,7 +135,7 @@ export function stepWords(step: NextStep): string {
 		case "review":
 			return `Review ${titleList(step.titles)}`;
 		case "task":
-			return `Continue ${step.title}`;
+			return continueWords(step.title);
 		case "topic":
 			return `${step.fresh ? "Start" : "Continue"} ${step.title}`;
 		case "none":
