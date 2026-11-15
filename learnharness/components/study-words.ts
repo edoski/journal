@@ -606,7 +606,7 @@ export const STOP_WORDS = {
 /** What stops a course's record being read, after
  *  `LESSON_WORDS.unreadableCourse`, in a student's words. */
 export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {
-	denied: "The app isn't allowed to open its files.",
+	denied: "macOS won't let the app open its files: Get Info on the course folder in Finder shows who can read it.",
 	damaged: "Its file is damaged.",
 	unreadable: "Its file can't be opened.",
 };

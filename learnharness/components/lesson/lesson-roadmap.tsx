@@ -144,6 +144,7 @@ export function LessonRoadmap({
 									<button
 										type="button"
 										data-slot="roadmap-step"
+										data-status={s.status}
 										onClick={() => {
 											onOpenChange(false);
 											onJump(s.id);
@@ -153,7 +154,7 @@ export function LessonRoadmap({
 										{inner}
 									</button>
 								) : (
-									<div data-slot="roadmap-step" className="flex h-8 items-center gap-3 rounded-md px-2 text-row">
+									<div data-slot="roadmap-step" data-status={s.status} className="flex h-8 items-center gap-3 rounded-md px-2 text-row">
 										{inner}
 									</div>
 								)}
@@ -181,6 +182,17 @@ function RoadmapPanel({ children }: { children: ReactNode }) {
 			data-testid="roadmap-panel"
 			className="p-1"
 			onKeyDown={walkStops}
+			// Opens on Now (round 8: ⌘K opened on the first done step): the
+			// step he is on, else the last one taught before it.
+			onOpenAutoFocus={(e) => {
+				const panel = e.currentTarget as HTMLElement | null;
+				const steps = Array.from(panel?.querySelectorAll<HTMLElement>('[data-slot="roadmap-step"]') ?? []);
+				const now = steps.findIndex((step) => step.dataset.status === "current");
+				const target = steps.slice(0, now < 0 ? steps.length : now + 1).reverse().find((step) => step.tagName === "BUTTON");
+				if (!target) return;
+				e.preventDefault();
+				target.focus();
+			}}
 			// Closed by Esc, a jump or a link: his next key goes to the
 			// box he answers in, not back to the strip.
 			onCloseAutoFocus={(e) => {

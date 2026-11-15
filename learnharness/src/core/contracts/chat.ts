@@ -71,6 +71,12 @@ export interface ChatRecord {
 	/** The lesson digest's ledger: what the background digest already carried
 	 *  into the course record from this session. */
 	digest?: DigestLedger;
+	/** The attempts each answer's saves recorded, kept the moment the
+	 *  engine took the save (round 8: the app died between the engine's
+	 *  write and the transcript's, so the answer showed no mark and the
+	 *  resumed tutor could save it again). Keyed as the marks key an
+	 *  answer: a graded question's call, or his message's id. */
+	answerSaves?: AnswerSaves;
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
 	 *  existing records stay unstamped (absence reads as v1); every write
 	 *  stamps the current version. A record stamped NEWER than this build
@@ -96,6 +102,9 @@ export interface DigestLedger {
 	done: LessonDigest[];
 	pending?: { fingerprint: string; throughMessageId: string };
 }
+
+/** Answer key → the observation ids its saves recorded, in save order. */
+export type AnswerSaves = Readonly<Record<string, readonly string[]>>;
 
 /** The chat record format this build writes and understands. */
 export const CURRENT_CHAT_VERSION = 1;
@@ -417,6 +426,9 @@ export interface ChatSummary {
 	/** How the tutor's last turn left the session (sessionEndOf); a summary
 	 *  made elsewhere may leave it out, which reads as closed. */
 	ended?: SessionEnd;
+	/** The tutor's last turn ended because he stopped it (`stoppedByHim`),
+	 *  not because the app restarted: a cut session then says he stopped it. */
+	stopped?: true;
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];

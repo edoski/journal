@@ -13,7 +13,7 @@ The session's top bar, rendered in the shared `TopBar` at `size="slim"` (52px, p
 | roadmap | where the lesson is in its plan (`LessonRoadmap`, lesson-roadmap.md), right-aligned |
 | done for today | outlined 32px pill with a circle-check icon and "Done for today" at 13/400 (`LESSON_WORDS.doneTonight`), its tooltip "Stop here for today" with ⌘⇧D; stops the session whatever is open: a waiting check is left unanswered with its answer hidden, an open problem is dropped, and the tutor closes (done-tonight.tsx). While the tutor is writing it stops that reply, keeping what it wrote, and closes, and the server does the same for a turn it started itself, such as the switch from practice to teaching (round 7: Done was refused there and the lesson went on); once the session stopped for the day it is unseen and out of reach but keeps its room, so the roadmap beside it never moves (round 6: the strip jumped 146px under the pointer) |
 
-The agent's machinery (tutor, room left before the tutor sums up, cost) is not in the lesson. Compaction still announces itself where it happens: a line under the transcript says "Compacting the conversation…" while it runs (he can still answer, and the reply waits for it), and the cut leaves a hairline in the transcript.
+The agent's machinery (tutor, room left before the tutor sums up, cost) is not in the lesson. Compaction shows only while it holds him up: a line under the transcript says "Compacting the conversation…" while a message of his waits on it, never under a question waiting on him, and the cut draws nothing in the transcript (round 8).
 
 ## Sources
 

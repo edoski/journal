@@ -39,6 +39,8 @@ export interface KeptForm {
 /** What a box keeps: plain text (a composer, a problem) or a question form. */
 export interface KeptWords {
 	text?: string;
+	/** How sure he was, beside a problem's words (a form keeps its own). */
+	confidence?: Confidence;
 	form?: KeptForm;
 	/** A carry's question, its words as `sameQuestionKey` reads them: only
 	 *  that question asked again takes the carry. */

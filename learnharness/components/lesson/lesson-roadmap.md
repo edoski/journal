@@ -36,3 +36,5 @@ The steps and statuses come from the transcript, live (`latestTree`, `derivePlan
 ## Sources
 
 Linear's and GitHub's breadcrumb with a disclosure, Apple's step indicators; the plan list's marks (topic page, `steps/step-node.tsx`); Edo's ruling above.
+
+The panel opens with focus on Now, the step he is on (else the last step taught before it), never the first done step (round 8).

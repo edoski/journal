@@ -9,8 +9,9 @@
  * whole trick — see src/core/events.ts and server/events-stream.ts).
  *
  * This file is the ONE place in the app that knows EventSource exists.
- * Auto-reconnect is EventSource's own — never fought, always exploited:
- * every (re)open fires the resync callbacks, so a reconnect heals with
+ * Auto-reconnect is EventSource's own, and where it gives up for good (an
+ * answer that is not its stream) the channel opens a new one
+ * (openEventsChannel): every (re)open fires the resync callbacks, so a reconnect heals with
  * one ordinary fetch per consumer (a dev-server restart self-heals here).
  *
  * Shape: the provider holds a hub (window-local fan-out — the client twin
@@ -25,7 +26,7 @@
  * precedent, components/session.ts).
  */
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
-import { SERVER_EVENT_TYPES, type ServerEventType, type ServerEvents } from "@/src/core";
+import { EVENTS_RETRY_MS, SERVER_EVENT_TYPES, type ServerEventType, type ServerEvents } from "@/src/core";
 
 /** The minimal source surface the provider consumes — EventSource behind
  *  this in production, fakes in tests. */
@@ -35,14 +36,50 @@ export interface NotifySource {
 	onEvent(name: string, cb: (data: string) => void): void;
 }
 
-export function openEventsChannel(): NotifySource {
-	const es = new EventSource("/api/events");
+/** The minimal EventSource surface the channel drives (a fake in tests). */
+export interface EventStream {
+	readonly readyState: number;
+	onopen: ((ev: Event) => void) | null;
+	onerror: ((ev: Event) => void) | null;
+	addEventListener(name: string, cb: (ev: Event) => void): void;
+	close(): void;
+}
+
+/** EventSource's CLOSED state: it gave up and will not reconnect. */
+const CLOSED = 2;
+
+/**
+ * The window's channel. EventSource reconnects by itself after a dropped
+ * connection, but gives up for good on any answer that is not its stream (a
+ * restarting app answering an error, a proxy's 502): round 8 found the
+ * lesson sitting about 29 s after a restart before it resumed. So when it
+ * gives up, the channel opens a new one after the server's `retry` wait,
+ * once per failure, until one opens; every open fires the resyncs as any
+ * reconnect does.
+ */
+export function openEventsChannel(open: () => EventStream = () => new EventSource("/api/events"), later: (run: () => void, ms: number) => unknown = setTimeout): NotifySource {
+	const opens: (() => void)[] = [];
+	const events: [string, (data: string) => void][] = [];
+	let closed = false;
+	let es: EventStream;
+	const connect = () => {
+		if (closed) return;
+		es = open();
+		es.onopen = () => opens.forEach((cb) => cb());
+		es.onerror = () => {
+			if (es.readyState === CLOSED && !closed) later(connect, EVENTS_RETRY_MS);
+		};
+		for (const [name, cb] of events) es.addEventListener(name, (ev) => cb((ev as MessageEvent).data));
+	};
+	connect();
 	return {
-		close: () => es.close(),
-		onOpen: (cb) => {
-			es.onopen = () => cb();
+		close: () => {
+			closed = true;
+			es.close();
 		},
+		onOpen: (cb) => void opens.push(cb),
 		onEvent: (name, cb) => {
+			events.push([name, cb]);
 			es.addEventListener(name, (ev) => cb((ev as MessageEvent).data));
 		},
 	};

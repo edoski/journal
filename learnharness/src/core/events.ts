@@ -64,6 +64,11 @@ export type ServerEventType = keyof ServerEvents;
 /** The vocabulary's runtime names — the client wires one listener per
  *  name (types are erased; this list is the single source of truth for
  *  what the SSE channel can carry). */
+/** The reconnect wait of the events channel: the `retry` the server sends
+ *  and the wait before a window opens a channel EventSource gave up on
+ *  (round 8). */
+export const EVENTS_RETRY_MS = 1000;
+
 export const SERVER_EVENT_TYPES = [
 	"turn-started",
 	"turn-settled",

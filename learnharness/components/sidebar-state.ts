@@ -25,6 +25,16 @@ export function filterSessions(list: ChatListItem[], query: string): ChatListIte
  * and delete, and the search walk. The rationale for each piece lives
  * beside it; the sidebar only draws.
  */
+/** Esc out of the sidebar's search: the search empties, so the sidebar
+ *  shows its agenda again (round 8: the filter stayed after Esc, on every
+ *  page), and focus goes back to the box he types in where there is one
+ *  (round 7: Esc left focus on the page). */
+export function leaveSearch(field: { blur(): void }, changeQuery: (next: string) => void, doc: Document | undefined): void {
+	changeQuery("");
+	field.blur();
+	focusWhereHeTypes(doc, false);
+}
+
 export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: () => void }) {
 	const [chats, setChats] = useState<ChatListItem[] | null>(null);
 	const [query, setQuery] = useState("");
@@ -156,11 +166,8 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	// window Esc chain (abort) doesn't also fire.
 	const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, shown: readonly ChatListItem[] | null) => {
 		if (e.key === "Escape") {
-			// Out of the search, back to the box he types in where there is
-			// one (round 7: Esc left focus on the page).
 			e.stopPropagation();
-			e.currentTarget.blur();
-			focusWhereHeTypes(document, false);
+			leaveSearch(e.currentTarget, changeQuery, document);
 			return;
 		}
 		// Modified keys belong to the surface (⇧↵ etc.).

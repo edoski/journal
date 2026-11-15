@@ -11,7 +11,6 @@ import { stepConfidence } from "@/components/confidence-choice";
 import { usePhotoDraft, sentPhotos } from "@/components/photos";
 import { ComposerIcon, LessonComposer, LessonSessionComposer } from "@/components/lesson/lesson-composer";
 import { carriedForm, carryWords, formToKept, keepPhotos, keepWords, keptWords, takeCarry } from "@/components/lesson/kept-drafts";
-import { holdsRescue } from "@/components/lesson/stranded-draft";
 import {
 	CONFIDENCE_CHOICES,
 	DEFAULT_CONFIDENCE,
@@ -52,8 +51,6 @@ export interface ProseComposerProps {
 	answer: ProseAnswer;
 	/** The lesson's own composer, as it is with nothing open. */
 	message: MessageComposerProps;
-	/** The message draft, read and written outside a render, for Esc's carry. */
-	messageText: { read: () => string; write: (text: string) => void };
 	/** Sends the message draft while a question or problem is open. */
 	onAskInstead: () => void;
 	/** Esc lands here while something is open: the lesson binds the switch. */
@@ -80,31 +77,17 @@ export interface ProseComposerProps {
  *  Send answers. Esc or the toggle turns it into a message to the tutor
  *  until Esc or the toggle again. */
 export function ProseComposer(props: ProseComposerProps) {
-	const { open, answer, message, messageText, onAskInstead, toggleRef, chatId } = props;
+	const { open, answer, message, onAskInstead, toggleRef, chatId } = props;
 	const box = proseBox(chatId, open);
 	const asking = open !== null && answer.mode === "ask";
-	// Esc carries his words to the other side when that side holds none.
+	// Answer and Ask each keep their own draft (round 8: Esc carried the
+	// half answer into Ask, and the side question sent over it destroyed
+	// it). The switch only switches: the answer stays in its box, kept
+	// across the switch, and the side question in the message box.
 	const toggle = useCallback(() => {
-		if (!open || !box) return;
-		const kept = keptWords(box);
-		const answerText = kept?.form ? kept.form.text || kept.form.other || kept.form.thinking : (kept?.text ?? "");
-		const messageWords = messageText.read();
-		if (answer.mode === "answer") {
-			if (!messageWords.trim() && answerText.trim()) {
-				messageText.write(answerText);
-				keepWords(box, kept?.form ? { form: { ...kept.form, text: "", other: "", thinking: "" } } : null);
-			}
-			answer.setMode("ask");
-		} else {
-			// Words another window's answer left in the box belong to that
-			// question (stranded-draft.ts): never this one's answer.
-			if (!answerText.trim() && messageWords.trim() && !holdsRescue(chatId, messageWords)) {
-				keepWords(box, open.kind === "question" ? { form: { ...(kept?.form ?? formToKept({ selection: answer.selection, thinking: "", other: "", text: "", confidence: answer.confidence })), text: messageWords } } : { text: messageWords });
-				messageText.write("");
-			}
-			answer.setMode("answer");
-		}
-	}, [open, box, answer, messageText, chatId]);
+		if (!open) return;
+		answer.setMode(answer.mode === "answer" ? "ask" : "answer");
+	}, [open, answer]);
 	toggleRef.current = open ? toggle : null;
 
 	if (!open || asking) {
@@ -150,6 +133,8 @@ function AnswerComposer({
 	const { selection, confidence, setConfidence, toggle: pick } = answer;
 	const waiting = problem && busy;
 	const [text, setText] = useState(() => (initialDraft ? initialDraft.text || initialDraft.other || initialDraft.thinking : ""));
+	const textRef = useRef(text);
+	textRef.current = text;
 	const photos = usePhotoDraft(initialDraft?.photos, textMode ? box : undefined);
 	const restorePhotos = photos.restore;
 
@@ -168,7 +153,11 @@ function AnswerComposer({
 			const carried = carry ? carriedForm(carry.words, true) : undefined;
 			if (keptText) setText(keptText);
 			else if (carried) setText(carried.text);
-			if (carried) setConfidence(carried.confidence);
+			// How sure he was comes back with his words (round 8: a reload
+			// and a refused send reset the meter to Neutral).
+			const keptSure = kept?.form?.confidence ?? kept?.confidence;
+			if (keptText && keptSure) setConfidence(keptSure);
+			else if (carried) setConfidence(carried.confidence);
 			void carry?.photos.then((list) => {
 				if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
 			});
@@ -186,8 +175,8 @@ function AnswerComposer({
 	);
 	useEffect(() => {
 		if (!restored || sentRef.current) return;
-		keepWords(box, problem ? { text } : { form: keptForm(text, selection) });
-	}, [restored, box, problem, text, selection, keptForm]);
+		keepWords(box, problem ? { text, confidence } : { form: keptForm(text, selection) });
+	}, [restored, box, problem, text, confidence, selection, keptForm]);
 	const draftChangeRef = useRef(onDraftChange);
 	draftChangeRef.current = onDraftChange;
 	const dockKey = problem ? `p:${open.toolCallId}` : `q:${open.kind === "question" ? open.key : ""}`;
@@ -211,10 +200,13 @@ function AnswerComposer({
 			const taken = photos.take();
 			// A send refused at once gives his work back, words and photos,
 			// unless he has started writing again.
-			void onSubmitThinking(words, confidence, sentPhotos(taken)).then((accepted) => {
+			const sure = confidence;
+			void onSubmitThinking(words, sure, sentPhotos(taken)).then((accepted) => {
 				if (accepted) return;
 				restorePhotos(taken);
-				setText((now) => (now.trim() ? now : words));
+				if (textRef.current.trim()) return;
+				setText(words);
+				setConfidence(sure);
 			});
 			return;
 		}

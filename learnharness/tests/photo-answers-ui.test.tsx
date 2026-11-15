@@ -32,7 +32,6 @@ const composer = (open: ProseComposerProps["open"], initialDraft?: QuestionFormD
 			open={open}
 			answer={{ openKey: "k", selection: emptyDockSelection(), confidence: "neutral", mode: "answer", toggle: noop, setConfidence: noop, setMode: noop }}
 			message={{ busy: false, value: "", revision: 0, onChange: noop, onSend: noop, onStop: noop, sendAllowed: true }}
-			messageText={{ read: () => "", write: noop }}
 			onAskInstead={noop}
 			toggleRef={{ current: null }}
 			busy={false}

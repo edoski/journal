@@ -83,3 +83,14 @@ export function stoppedReplyIds(messages: readonly LhMessage[]): Set<string> {
 	}
 	return ids;
 }
+
+/** Whether the tutor's last turn ended because he stopped it (round 8: a
+ *  reply he stopped read "Reply cut off", the words for a restart): the
+ *  record ends at a reply someone stopped, with only neutral markers
+ *  after. Only a stop press, his, aborts a turn. Pure. */
+export function stoppedByHim(messages: readonly LhMessage[]): boolean {
+	let i = messages.length - 1;
+	while (i >= 0 && isNeutral(messages[i]!)) i--;
+	const last = messages[i];
+	return last?.role === "assistant" && last.stopReason === "aborted";
+}

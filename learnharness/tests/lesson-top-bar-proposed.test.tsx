@@ -136,6 +136,12 @@ describe("where the lesson is", () => {
 		assert.equal(element('[data-testid="roadmap"]').getAttribute("aria-label"), "Where this lesson is: Computing a 2 × 2 spectrum");
 	});
 
+	it("⌘K opens the steps with focus on Now, not the first done step (round 8)", async () => {
+		await mount(<Roadmap />);
+		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
+		assert.equal(document.activeElement, element('[data-testid="roadmap-step-equation"] button'));
+	});
+
 	it("arrows walk the panel's taught steps and links, Home and End jump to its ends", async () => {
 		await mount(<Roadmap />);
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });

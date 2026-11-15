@@ -13,9 +13,10 @@
  * settings kit (components/settings/settings.md) inside the shared Dialog.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CLAUDE_MODEL } from "@/src/core";
 import { useModelStatus } from "@/components/model-status";
+import { signedInCloseFocus } from "@/components/setup-dialog-focus";
 import { Hint } from "@/components/ui/hint";
 import { SettingsGroup } from "@/components/settings/controls";
 import { ClaudeConnectionRow } from "@/components/settings/claude-connection";
@@ -35,6 +36,8 @@ export function SetupDialog(props: SetupDialogProps) {
 function OpenSetupDialog({ onClose }: SetupDialogProps) {
 	const { status } = useModelStatus();
 	const connected = status?.connected === true;
+	const signedInRef = useRef(false);
+	signedInRef.current = connected;
 	useEffect(() => {
 		if (connected) onClose();
 	}, [connected, onClose]);
@@ -56,7 +59,7 @@ function OpenSetupDialog({ onClose }: SetupDialogProps) {
 
 	return (
 		<Dialog open onOpenChange={(open) => !open && onClose()}>
-			<DialogContent data-testid="setup-dialog" className="max-h-[85vh] max-w-xl gap-6 overflow-y-auto">
+			<DialogContent data-testid="setup-dialog" className="max-h-[85vh] max-w-xl gap-6 overflow-y-auto" onCloseAutoFocus={(e) => signedInCloseFocus(signedInRef.current)(e)}>
 				<DialogHeader>
 					<DialogTitle>Sign in to Claude</DialogTitle>
 					<DialogDescription>{SETUP_LINE}</DialogDescription>

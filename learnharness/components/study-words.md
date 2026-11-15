@@ -83,7 +83,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 | he stops for the day | Done for today; a question he left reads Left for next time, in full; a problem he left reads Left for next time. |
 | he skips | a question: Skipped, then the question; a problem: You skipped this problem. |
 | the lesson's course was deleted | This course was deleted. Its lessons stay as history. (with what he had written: What you wrote here is in the new lesson box.) Start a new lesson |
-| a course's record can't be read | Couldn't read this course's record, then why (`UNREADABLE_WORDS`): The app isn't allowed to open its files. / Its file is damaged. / Its file can't be opened. |
+| a course's record can't be read | Couldn't read this course's record, then why (`UNREADABLE_WORDS`): macOS won't let the app open its files: Get Info on the course folder in Finder shows who can read it. / Its file is damaged. / Its file can't be opened. |
 
 ## Labels in a lesson
 
