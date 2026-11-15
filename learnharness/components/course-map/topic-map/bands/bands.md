@@ -5,6 +5,7 @@ The `bands` option of the Course map switch (shared parts: `../arcs/arcs.md`).
 Thesis: the course reads like a book's chapters. Each arc is a full-width band in study order, top to bottom; its number and pill sit in the margin on the line of its first cards; a hairline separates one chapter from the next. Within and across bands it is Canvas tree: one drawing, so a need from an earlier chapter runs straight down into a later one.
 
 - Layers: each topic's layer is its chapter's first layer plus the longest chain of its own chapter's needs above it (`layoutBands`), so every chapter starts below the last one ends; d3-dag then orders and places them as Canvas tree does.
+- Label: while the margin is out of view (the camera frames "You are here"), a chapter's number and pill stay 24 in from the frame's left edge on the page's own surface, as a sticky section header does, so every chapter on screen is named.
 - Margin: wide enough for the widest pill with its name whole (7px a character at 12px, plus 60 for the number, ring and padding), and 32 before the cards.
 - Between chapters: the lanes of the lines leaving the earlier one, then 32 more under a hairline (white 10%; 20% while the chapter holds the topic in focus).
 - A course whose needs run from a later arc to an earlier one draws as Canvas tree.
