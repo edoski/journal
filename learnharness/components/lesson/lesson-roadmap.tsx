@@ -13,6 +13,9 @@ import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { kbdEventForAction, type LessonPlace } from "@/src/core";
 import { roadmapLabel, type RoadmapStep } from "@/components/lesson/roadmap-facts";
 
+/** The panel's words for a step whose title waits on his prediction. */
+export const HELD_TITLE = "Your prediction first";
+
 /** A step behind him: one he reached, or one before Now he never did. */
 const behind = (step: RoadmapStep) => step.status === "visited" || step.status === "passed";
 
@@ -109,7 +112,7 @@ export function LessonRoadmap({
 						size="row"
 						data-slot="lesson-roadmap-trigger"
 						data-testid="roadmap"
-						aria-label={`Where this lesson is: ${mathPlain(label)}`}
+						aria-label={label ? `Where this lesson is: ${mathPlain(label)}` : "Where this lesson is"}
 						className="min-w-0 shrink gap-2.5 font-normal"
 					>
 						<span data-slot="roadmap-strip" aria-hidden className="flex shrink-0 items-center gap-1">
@@ -117,9 +120,11 @@ export function LessonRoadmap({
 								<span key={s.id} data-status={s.status} className={cn("shrink-0 rounded-full", stripDot(s))} />
 							))}
 						</span>
-						<span className="min-w-0 truncate">
-							<MathText>{label}</MathText>
-						</span>
+						{label && (
+							<span className="min-w-0 truncate">
+								<MathText>{label}</MathText>
+							</span>
+						)}
 					</Button>
 				</PopoverTrigger>
 			</Hint>
@@ -132,8 +137,8 @@ export function LessonRoadmap({
 								<span aria-hidden className="flex size-4 shrink-0 items-center justify-center">
 									<span className={cn("size-2 rounded-full", rowDot(s))} />
 								</span>
-								<span className={cn("min-w-0 flex-1 truncate", s.status === "current" ? "text-foreground" : "text-muted-foreground")}>
-									<MathText>{s.title}</MathText>
+								<span className={cn("min-w-0 flex-1 truncate", s.status === "current" && !s.held ? "text-foreground" : "text-muted-foreground")}>
+									{s.held ? HELD_TITLE : <MathText>{s.title}</MathText>}
 								</span>
 								{word && <span className="shrink-0 text-muted-foreground">{word}</span>}
 							</>

@@ -70,7 +70,7 @@ import { ActiveProblemContext } from "@/components/lesson/active-problem";
 import { LessonTopBar, topicCrumbShown } from "@/components/lesson/lesson-top-bar";
 import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { LessonRoadmap } from "@/components/lesson/lesson-roadmap";
-import { partKey, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-facts";
+import { partKey, predictionOpenOn, roadmapSteps, stepAnchors } from "@/components/lesson/roadmap-facts";
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
@@ -981,8 +981,8 @@ export function Chat({
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
 	const steps = useMemo(() => {
 		if (!planTree) return [];
-		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()));
-	}, [planTree, messages, anchors]);
+		return roadmapSteps(planTree, derivePlanStatuses(planTree, messages as Parameters<typeof derivePlanStatuses>[1]), new Set(anchors.values()), predictionOpenOn(pending));
+	}, [planTree, messages, anchors, pending]);
 	// A step's place in the transcript: scroll to where it was first taught
 	// and mark it as a passage link lands (session-navigation.tsx).
 	const jumpToStep = useCallback((stepId: string) => {

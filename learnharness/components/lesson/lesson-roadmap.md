@@ -12,7 +12,7 @@ A quiet 32px button (`data-slot="lesson-roadmap-trigger"`, `data-testid="roadmap
 | 6px dot, `muted-foreground` | a step behind him: asked about, or marked done |
 | 6px dot, `muted-foreground` at 35% | a step ahead |
 
-Its words: the current step's title (its spoken name reads the maths as words, never TeX); between steps "Next: <title>"; past the last "Every step taught". A lesson with no plan draws no strip, and ⌘K there opens the panel with its topic page and course map alone. The tooltip is "Where this lesson is" with ⌘K; ⌘K opens the panel from anywhere in the lesson (the `open-model-picker` id, kept for saved rebinds).
+Its words: the current step's title (its spoken name reads the maths as words, never TeX), none while his prediction on that step is open, since a title can read as its answer (round 9: "Pivots in every column" above the question asking what the echelon form must look like; the panel's row then reads "Your prediction first"); between steps "Next: <title>"; past the last "Every step taught". A lesson with no plan draws no strip, and ⌘K there opens the panel with its topic page and course map alone. The tooltip is "Where this lesson is" with ⌘K; ⌘K opens the panel from anywhere in the lesson (the `open-model-picker` id, kept for saved rebinds).
 
 ## The panel
 

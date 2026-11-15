@@ -162,16 +162,22 @@ export function planMapTooBig(tree: Pick<PlanTree, "nodes" | "edges">): string |
  *  one states a result rather than naming an idea. */
 const RELATION = /[=≠≈≡∼≃≅∝→↦⇒⟹⇔⟺≤≥<>∈⊂⊆~]|->|\\(?:to|rightarrow|Rightarrow|longrightarrow|Longrightarrow|implies|iff|Leftrightarrow|mapsto|leq?|geq?|neq?|approx|sim|simeq|cong|equiv|propto|in|subset|subseteq|lt|gt)(?![A-Za-z])/;
 
+/** A condition or a law in words: a title holding one states when
+ *  something holds rather than naming the question (round 9: "Pivots in
+ *  every column" above the question asking what the echelon form must
+ *  look like). */
+const CONDITION = /\b(?:every|always|never|whenever|exactly when|only when|only if|if and only if|iff|precisely when|necessary and sufficient)\b/i;
+
 /** The roadmap shows every title before its step is taught, so a title that
  *  states its step's result shows him the answer to the question on screen.
  *  Returns words the tutor can act on, or null when every title names an idea. */
 export function planTitlesGiveAway(tree: Pick<PlanTree, "nodes">): string | null {
-	const spoilers = tree.nodes.filter((n) => RELATION.test(n.title)).map((n) => JSON.stringify(n.title));
+	const spoilers = tree.nodes.filter((n) => RELATION.test(n.title) || CONDITION.test(n.title)).map((n) => JSON.stringify(n.title));
 	if (spoilers.length === 0) return null;
 	return (
 		`These titles state their step's result: ${spoilers.join(", ")}. ` +
-		"He sees every title before the step is taught, so a title names what the step teaches, never its result or formula: " +
-		"\"The no-event case\", not \"P(no event) = e^{-λ}\"."
+		"He sees every title before the step is taught, so a title names what the step teaches, never its result, formula or condition: " +
+		"\"The no-event case\", not \"P(no event) = e^{-λ}\"; \"What the echelon form needs\", not \"Pivots in every column\"."
 	);
 }
 
