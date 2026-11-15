@@ -4,6 +4,7 @@ import { CURRENT_SKIN, type MapSkin } from "./map-skin";
 import { useMapStyle, type MapStyle } from "./map-style";
 import { TREE_SKIN } from "./canvas/canvas-skin";
 import { REGIONS_SKIN } from "./regions/regions-skin";
+import { OVERVIEW_SKIN } from "./overview/overview-skin";
 import { BANDS_SKIN } from "./bands/bands-skin";
 
 /** Every map style's drawing, Current first. */
@@ -12,6 +13,7 @@ const SKINS: Record<MapStyle, MapSkin> = {
 	tree: TREE_SKIN,
 	regions: REGIONS_SKIN,
 	bands: BANDS_SKIN,
+	overview: OVERVIEW_SKIN,
 };
 
 /** The drawing every course map uses, from the map's switch (map-style.ts). */

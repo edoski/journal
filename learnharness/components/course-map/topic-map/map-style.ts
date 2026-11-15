@@ -11,8 +11,10 @@ import { onPolishChange, polishVariant } from "@/components/dev/polish-variant.j
  *  - `regions`: Canvas tree with each arc a numbered, tinted region holding
  *    its topics, one line between arcs (regions/regions.md);
  *  - `bands`: the arcs as chapters top to bottom in study order, each
- *    numbered in the margin, a hairline between (bands/bands.md). */
-export const MAP_STYLE_OPTIONS = ["tree", "regions", "bands"] as const;
+ *    numbered in the margin, a hairline between (bands/bands.md);
+ *  - `overview`: each arc one card, the one he is in open in place to its
+ *    topics (overview/overview.md). */
+export const MAP_STYLE_OPTIONS = ["tree", "regions", "bands", "overview"] as const;
 export type MapStyle = "current" | (typeof MAP_STYLE_OPTIONS)[number];
 
 const DEV = process.env.NODE_ENV === "development";
