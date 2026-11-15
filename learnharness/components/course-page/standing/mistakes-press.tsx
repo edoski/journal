@@ -7,7 +7,7 @@ import { MISTAKE_WORDS } from "@/components/study-words";
 import { MistakeList } from "@/components/course-page/standing/mistake-list";
 import type { MistakeRow } from "@/components/course-page/standing/standing-model";
 
-/** Mistakes, in the head's actions (the `head` candidate): a quiet press
+/** Mistakes, in the head's actions: a quiet press
  *  that opens the open mistakes, newest first, each a row that starts
  *  fixing it. Absent when none is open. */
 export function MistakesPress({ rows }: { rows: readonly MistakeRow[] }) {

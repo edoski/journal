@@ -10,13 +10,11 @@ import { ArcStrip } from "@/components/course-map/arc-strip";
 import { useStartArcCheck } from "@/components/unit-inbox/start-unit";
 import { CourseFrame } from "@/components/course-page/course-frame";
 import { PageFrame } from "@/components/page-frame/page-frame";
-import { PaceHead, arcOnPage } from "@/components/course-page/course-head/pace-head";
+import { CourseHead, arcOnPage } from "@/components/course-page/course-head/course-head";
 import { openingArc, type CourseArcSection, type CourseView } from "@/components/course-page/course-model";
 import { WhatNextRows } from "@/components/course-page/what-next";
 import { SplitList, type SplitListHandle } from "@/components/course-page/split/split-list";
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
-import { useStandingVariant } from "@/components/course-page/standing-variant";
-import { StandingBody } from "@/components/course-page/standing/standing-body";
 import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Pointed } from "@/components/course-page/split/split-tie";
 
 /**
@@ -32,37 +30,11 @@ import { OPEN_AT_FIRST, aimOf, litOf, markedOf, revealOf, shownGroups, type Poin
  * Above its arcs, where he picks up and what comes next (`WhatNextRows`).
  */
 export function SplitCourse({ workspace }: { workspace: string }) {
-	const standing = useStandingVariant();
-	return (
-		<CourseFrame workspace={workspace}>
-			{({ view, busy, onContinue }) =>
-				standing === "current" ? (
-					<SplitBody view={view} busy={busy} onContinue={onContinue} header={<PaceHead view={view} busy={busy} onContinue={onContinue} />} />
-				) : (
-					<StandingBody variant={standing} view={view} busy={busy} onContinue={onContinue} />
-				)
-			}
-		</CourseFrame>
-	);
+	return <CourseFrame workspace={workspace}>{({ view, busy, onContinue }) => <SplitBody view={view} busy={busy} onContinue={onContinue} />}</CourseFrame>;
 }
 
-/** The page under its head; `arcExam` and `after` are the Exam & mistakes
- *  candidates' (standing/standing.md). */
-export function SplitBody({
-	view,
-	busy,
-	onContinue,
-	header,
-	arcExam,
-	after,
-}: {
-	view: CourseView;
-	busy: boolean;
-	onContinue: (workspace: string) => void;
-	header: React.ReactNode;
-	arcExam?: (section: CourseArcSection) => React.ReactNode;
-	after?: React.ReactNode;
-}) {
+/** The page under its head. */
+function SplitBody({ view, busy, onContinue }: { view: CourseView; busy: boolean; onContinue: (workspace: string) => void }) {
 	const { map } = view.course;
 	const { arcs } = view;
 	const [pointed, setPointed] = useState<Pointed | null>(null);
@@ -136,7 +108,7 @@ export function SplitBody({
 	return (
 		<PageFrame className="h-full">
 			<div ref={headerBox} className="contents" onKeyDown={onHeaderKeyDown}>
-				{header}
+				<CourseHead view={view} busy={busy} onContinue={onContinue} />
 			</div>
 			{map.topics.length === 0 ? (
 				<p data-slot="course-notice" className="flex min-h-8 items-center text-row text-muted-foreground">
@@ -160,8 +132,6 @@ export function SplitBody({
 							onPoint={pointFrom("list")}
 							onEnterMap={(to) => drawing.current?.focus(to)}
 							onExitTop={() => action()?.focus()}
-							arcExam={arcExam}
-							after={after}
 						/>
 						</>
 					}

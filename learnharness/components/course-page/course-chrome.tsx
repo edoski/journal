@@ -1,7 +1,7 @@
 "use client";
 
 /** The page's chrome with nothing in it: the 52px band, the window's drag
- *  region, before the page knows which candidate it draws. */
+ *  region, before the course is read. */
 export function CourseChrome({ children }: { children?: React.ReactNode }) {
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">

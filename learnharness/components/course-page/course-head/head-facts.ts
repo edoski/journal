@@ -1,36 +1,15 @@
-import type { CalendarCourse, ChatListItem, CourseMap, CourseMapTopic, ExamGapReason, StudyCourse, TopicHandle } from "@/src/core";
-import { misfitWords } from "@/components/calendar/calendar-facts";
-import { finalReviewMissWords } from "@/components/study-words";
+import type { ChatListItem, CourseMap, CourseMapTopic, ExamGapReason, TopicHandle } from "@/src/core";
 
 /**
  * The course page head's facts (spec: course-head.md), each a
- * few words from the engine's own fields: its daily plan (`plan`, read
- * with the calendar), its run-up, its course map. The app computes no
- * standing. Pure.
+ * few words from the engine's own fields: its course map and the
+ * sessions. The app computes no standing. Pure.
  */
 
-/** "A, B and C"; past three names, "A, B, C and others". */
+/** "A, B and C": every name, never "and others", so a line says every
+ *  topic it means (round 6: "and others" hid five not-yet-solid topics). */
 export function namesWords(names: readonly string[]): string {
-	if (names.length > 3) return `${names.slice(0, 3).join(", ")} and others`;
 	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-}
-
-/** Whether the course is on course for its exam, from the engine's plan:
- *  topics it has no room to start before the exam, else taught topics its
- *  final review has no room for (`short`), inside the
- *  run-up the topics it counts not recently solid (`unready`), every
- *  topic already started (`started`), or every topic placed before the
- *  exam (`fits`). Null with no exam ahead or before the plan is read. */
-export type Pace = { kind: "short" | "unready" | "started" | "fits"; words: string };
-
-export function paceOf(course: StudyCourse, planned: Pick<CalendarCourse, "doesNotFit"> | null): Pace | null {
-	const { map } = course;
-	if (!map.exam || map.exam.daysLeft < 0 || !planned) return null;
-	const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
-	if (planned.doesNotFit.length > 0) return { kind: "short", words: misfitWords(planned.doesNotFit.map(titleOf))! };
-	if (map.exam.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf)) };
-	if (course.unready && course.unready.length > 0) return { kind: "unready", words: `Not yet solid for the exam: ${namesWords(course.unready.map(titleOf))}` };
-	return untaughtLeft(course) ? { kind: "fits", words: "Every topic fits before the exam" } : { kind: "started", words: "Every topic started" };
 }
 
 /** What the exam's plan leaves out, as the engine's `map` says it: the
@@ -64,9 +43,6 @@ export function examGaps(map: Pick<CourseMap, "exam" | "topics" | "edges">): Exa
 	const ways = [...start, ...review].flatMap((topic) => (topic.introduced !== null ? [{ topic, starts: false }] : startable(topic) ? [{ topic, starts: true }] : []));
 	return start.length > 0 || review.length > 0 ? { start, review, why: { start: why(start), review: why(review) }, ways } : null;
 }
-
-/** Whether a topic the course keeps is still untaught. */
-export const untaughtLeft = (course: StudyCourse): boolean => course.map.topics.some((t) => t.introduced === null && !t.excluded);
 
 /** His latest session in the course, the one "Studied" opens. */
 export function lastSessionOf(workspace: string, chats: readonly ChatListItem[]): { id: string; title: string } | null {

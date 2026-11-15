@@ -1,6 +1,6 @@
 /**
  * The course page's exam readiness and open mistakes (components/
- * course-page/standing/): the words each candidate says from the engine's
+ * course-page/standing/): the words the head says from the engine's
  * `standing`, with and without an exam, with and without arcs, and the
  * mistake rows with what a press does.
  */
@@ -13,10 +13,9 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ArcHandle, ChatListItem, CourseMapTopic, CourseReadiness, CourseStanding, ReadinessPart, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
-import { examReady, mistakeRows, partState, partWordsByArc } from "../components/course-page/standing/standing-model.ts";
+import { examReady, mistakeRows, partState } from "../components/course-page/standing/standing-model.ts";
 import { ReadyLine } from "../components/course-page/standing/ready-line.tsx";
 import { MistakeList } from "../components/course-page/standing/mistake-list.tsx";
-import { MistakesSection } from "../components/course-page/standing/mistakes-section.tsx";
 import { MistakesPress } from "../components/course-page/standing/mistakes-press.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 
@@ -97,6 +96,14 @@ describe("exam readiness, from the engine's sorting", () => {
 		assert.deepEqual(examReady(readiness(part({ solid: [h("span")], toStart: [h("kernel")] })), map, null), { kind: "notYet", words: "Still to start before the exam: Kernel", arcs: [] });
 	});
 
+	it("in a course without arcs, names every topic not yet solid, however many", () => {
+		const { map } = course(false);
+		const many = { ...map, topics: [...map.topics, ...["det", "cramer", "eigen", "diag"].map((t) => topic(t))] };
+		const words = examReady(readiness(part({ notYet: ["basis", "rank", "kernel", "det", "cramer", "eigen", "diag"].map(h) })), many, null).words;
+		assert.equal(words, "Not yet solid for the exam: Basis, Rank, Kernel, Det, Cramer, Eigen and Diag");
+		assert.doesNotMatch(words, /others/);
+	});
+
 	it("names what has no room first, and says ready when every part is solid", () => {
 		const { map } = course(false);
 		assert.deepEqual(examReady(readiness(part({ notYet: [h("rank")], wontFit: [h("kernel")] })), map, null), { kind: "short", words: "No room before the exam to start Kernel" });
@@ -110,18 +117,12 @@ describe("exam readiness, from the engine's sorting", () => {
 		assert.deepEqual(examReady(readiness(part({ wontFit: [h("kernel")] })), left, null), { kind: "short", words: "No room before the exam to start Kernel" }, "what has no room to start first");
 	});
 
-	it("gives each examined arc its few words, and an arc off the exam none", () => {
-		const words = partWordsByArc(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), wontFit: [h("kernel")] })));
-		assert.deepEqual(words.get(a("spaces")), { state: "ready", words: "Solid for the exam" });
-		assert.deepEqual(words.get(a("maps")), { state: "short", words: "Won't all fit" });
-		assert.equal(partWordsByArc(null).size, 0);
-	});
 });
 
 describe("the head's readiness line", () => {
-	it("with arcs, the head candidate shows the arcs not ready as bubbles that show them on the page", () => {
+	it("with arcs, shows the arcs not ready as bubbles that show them on the page", () => {
 		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} readiness={readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] }))} arcs={view.arcs} mode="where" />);
+		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs)} />);
 		const line = doc.querySelector("[data-slot=course-ready]")!;
 		assert.match(line.textContent ?? "", /Not ready yet in/);
 		const pills = [...line.querySelectorAll("[data-slot=arc-pill]")];
@@ -129,17 +130,17 @@ describe("the head's readiness line", () => {
 		assert.match(pills[0]!.getAttribute("href") ?? "", /\?arc=maps$/);
 	});
 
-	it("with arcs, the arcs candidate says only whether he is ready", () => {
+	it("with arcs, says only that he is not ready when no arc is", () => {
 		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} readiness={readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] }))} arcs={view.arcs} mode="verdict" />);
+		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), notYet: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs)} />);
 		assert.equal(doc.querySelector("[data-slot=course-ready]")?.textContent, "Not ready for the exam yet");
 		assert.equal(doc.querySelectorAll("[data-slot=arc-pill]").length, 0);
 	});
 
 	it("without an exam says what the plan does with its reviews, and while the engine is read says nothing", () => {
 		const plain = course(false, false);
-		assert.match(render(<ReadyLine course={plain} readiness={null} arcs={null} mode="where" />).querySelector("[data-slot=course-ready]")?.textContent ?? "", /^No exam: reviews /);
-		assert.equal(render(<ReadyLine course={course(false)} readiness={undefined} arcs={null} mode="where" />).querySelector("[data-slot=course-ready]")?.textContent, "");
+		assert.match(render(<ReadyLine course={plain} ready={null} />).querySelector("[data-slot=course-ready]")?.textContent ?? "", /^No exam: reviews /);
+		assert.equal(render(<ReadyLine course={course(false)} ready={null} />).querySelector("[data-slot=course-ready]")?.textContent, "");
 	});
 });
 
@@ -179,12 +180,7 @@ describe("the open mistakes", () => {
 		assert.equal(presses[1]!.getAttribute("href"), "/chat/c1");
 	});
 
-	it("shows neither the head's press nor the list's group when nothing is open", () => {
+	it("shows no press in the head when nothing is open", () => {
 		assert.equal(render(<MistakesPress rows={[]} />).querySelector("[data-slot=course-mistakes]"), null);
-		assert.equal(render(<MistakesSection rows={[]} />).querySelector("[data-slot=course-mistakes]"), null);
-		const rows = mistakeRows(STANDING, course(false), [], null);
-		const doc = render(<MistakesSection rows={rows} />);
-		assert.equal(doc.querySelector("[data-slot=course-mistakes] [data-slot=course-group-header]")?.textContent, "Mistakes to fix");
-		assert.equal(doc.querySelectorAll("[data-slot=mistake-row]").length, 2);
 	});
 });

@@ -1,9 +1,9 @@
 /**
- * The course page head candidates (components/course-page/course-head/):
- * the facts each adds, from the engine's plan and record only, and what
- * every candidate drops and keeps: no progress words and no line that
- * repeats the rows, the title and the press kept, Context in place of
- * Add material, "Studied" opening his last session.
+ * The course page head (components/course-page/course-head/): its facts,
+ * from the engine's plan and record only, and what it drops and keeps: no
+ * progress words and no line that repeats the rows, the title and the
+ * press kept, Context in place of Add material, "Studied" opening his last
+ * session.
  */
 
 import React from "react";
@@ -14,9 +14,9 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, ExamGapReason, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
-import { examGaps, lastSessionOf, namesWords, paceOf } from "../components/course-page/course-head/head-facts.ts";
+import { examGaps, lastSessionOf, namesWords } from "../components/course-page/course-head/head-facts.ts";
 import { EXAM_GAP_WHY, EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
-import { PaceHead } from "../components/course-page/course-head/pace-head.tsx";
+import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
 
@@ -48,30 +48,12 @@ function course(over: Partial<StudyCourse["map"]> = {}, rest: Partial<Omit<Study
 	};
 }
 
-const plan = (doesNotFit: string[] = []) => ({ doesNotFit: doesNotFit.map(h), planned: [{ date: "2026-11-08", reviews: [], new: [h("poisson")] }, { date: "2026-11-12", reviews: [], new: [h("variance")] }] });
 
-describe("pace, from the engine's plan", () => {
-	it("names the topics the plan has no room for before the exam first", () => {
-		assert.deepEqual(paceOf(course({}, { unready: [h("bayes")] }), plan(["variance"])), { kind: "short", words: "No room before the exam to start Variance" });
-	});
-
-	it("inside the run-up, names the topics not yet solid", () => {
-		assert.deepEqual(paceOf(course({}, { unready: [h("bayes"), h("binomial")] }), plan()), { kind: "unready", words: "Not yet solid for the exam: Bayes and Binomial" });
-	});
-
-	it("says every topic fits, or that every topic is started", () => {
-		assert.equal(paceOf(course(), plan())?.words, "Every topic fits before the exam");
-		const taught = course({ topics: [topic("bayes", { introduced: "2026-11-01" }), topic("poisson", { excluded: "Not examined" })] });
-		assert.equal(paceOf(taught, plan())?.words, "Every topic started");
-	});
-
-	it("says nothing with no exam ahead or before the plan is read", () => {
-		assert.equal(paceOf(course({ exam: null }), plan()), null);
-		assert.equal(paceOf(course(), null), null);
-	});
-
-	it("names four or more topics as three and others, never a count", () => {
-		assert.equal(namesWords(["A", "B", "C", "D", "E"]), "A, B, C and others");
+describe("a list of topics", () => {
+	it("names every topic, never \"and others\" and never a count", () => {
+		assert.equal(namesWords(["A", "B", "C", "D", "E"]), "A, B, C, D and E");
+		assert.equal(namesWords(["A", "B"]), "A and B");
+		assert.equal(namesWords(["A"]), "A");
 	});
 });
 
@@ -103,20 +85,18 @@ function viewOf(c: StudyCourse, chats: ChatListItem[] = []) {
 }
 
 describe("the course head", () => {
-	for (const [name, Head] of [["Pace", PaceHead]] as const) {
-		it(`${name}: the title and the press stay, Context replaces Add material, no progress words, no line repeating the rows, Studied opens the last session`, () => {
-			const document = render(<Head view={viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")])} busy={false} onContinue={() => {}} />);
-			const text = document.body.textContent ?? "";
-			assert.equal(document.querySelector("[data-slot=course-title]")?.textContent, "Probability");
-			assert.ok(document.querySelector("[data-slot=course-action]"));
-			assert.ok(document.querySelector("[data-slot=course-context]"));
-			assert.equal(document.querySelector("[data-slot=course-add-material]"), null);
-			assert.equal(document.querySelector("[data-slot=course-next]"), null);
-			assert.doesNotMatch(text, /on your own/i);
-			assert.equal(document.querySelector("[data-slot=course-studied]")?.getAttribute("href"), "/chat/b");
-			assert.match(document.querySelector("[data-slot=course-exam]")?.textContent ?? "", /Exam in 11 days/);
-		});
-	}
+	it("keeps the title and the press, puts Context in place of Add material, drops progress words and lines repeating the rows, and Studied opens the last session", () => {
+		const document = render(<CourseHead view={viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")])} busy={false} onContinue={() => {}} />);
+		const text = document.body.textContent ?? "";
+		assert.equal(document.querySelector("[data-slot=course-title]")?.textContent, "Probability");
+		assert.ok(document.querySelector("[data-slot=course-action]"));
+		assert.ok(document.querySelector("[data-slot=course-context]"));
+		assert.equal(document.querySelector("[data-slot=course-add-material]"), null);
+		assert.equal(document.querySelector("[data-slot=course-next]"), null);
+		assert.doesNotMatch(text, /on your own/i);
+		assert.equal(document.querySelector("[data-slot=course-studied]")?.getAttribute("href"), "/chat/b");
+		assert.match(document.querySelector("[data-slot=course-exam]")?.textContent ?? "", /Exam in 11 days/);
+	});
 });
 
 describe("a lesson that could not start", () => {
@@ -124,7 +104,7 @@ describe("a lesson that could not start", () => {
 		const head = (error: string | null) =>
 			render(
 				<CourseLessonError value={error}>
-					<PaceHead view={viewOf(course())} busy={false} onContinue={() => {}} />
+					<CourseHead view={viewOf(course())} busy={false} onContinue={() => {}} />
 				</CourseLessonError>,
 			);
 		assert.equal(head(null).querySelector('[role="alert"]'), null);
@@ -145,12 +125,7 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.equal(examGaps(course({ exam: { date: "2026-11-01", daysLeft: -7, unreviewed: [h("binomial")] } }).map), null, "once the exam has passed");
 	});
 
-	it("never says every topic fits while the final review leaves one out", () => {
-		assert.deepEqual(paceOf(gapped([], ["binomial"]), plan()), { kind: "short", words: "No room in the final review for Binomial" });
-		assert.deepEqual(paceOf(gapped(["variance"], ["binomial"]), plan(["variance"])), { kind: "short", words: "No room before the exam to start Variance" }, "what has no room to start first");
-	});
-
-	const gapLine = (c: StudyCourse, lead?: React.ReactNode) => render(<PaceHead view={viewOf(c)} busy={false} onContinue={() => {}} lead={lead} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
+	const gapLine = (c: StudyCourse) => render(<CourseHead view={viewOf(c)} busy={false} onContinue={() => {}} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
 
 	it("says why under the head's first line, names what that line does not, and offers a way in: start or review it today, or ask the tutor", () => {
 		const one = gapLine(gapped(["variance"], [], { variance: "full" }))!;
@@ -182,8 +157,8 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.deepEqual([...stuck.querySelectorAll("button")].map((b) => b.textContent), [EXAM_GAP_WORDS.ask], "named, with only the tutor to ask");
 	});
 
-	it("shows under either candidate's first line, and nothing when every topic fits", () => {
-		assert.ok(gapLine(gapped(["variance"], [], { variance: "no_study_day" }), <p data-slot="course-ready">Ready line</p>), "the Exam & mistakes candidates keep it");
+	it("shows under the readiness line, and nothing when every topic fits", () => {
+		assert.equal(gapLine(gapped(["variance"], [], { variance: "no_study_day" }))?.previousElementSibling?.getAttribute("data-slot"), "course-ready");
 		assert.equal(gapLine(course()), null);
 	});
 

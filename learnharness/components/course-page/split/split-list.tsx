@@ -56,14 +56,8 @@ export function SplitList({
 	onPoint,
 	onEnterMap,
 	onExitTop,
-	arcExam,
-	after,
 	ref,
 }: {
-	/** What an arc's line says about the exam in place of its exam words. */
-	arcExam?: (section: CourseArcSection) => ReactNode;
-	/** A section under the groups or arcs, inside the scrolling pane. */
-	after?: ReactNode;
 	groups: readonly Group[];
 	/** The course's arcs, which the list shows in place of its groups. */
 	arcs?: readonly CourseArcSection[] | null;
@@ -262,7 +256,6 @@ export function SplitList({
 										if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) walk({ kind: "check", id: section.arc.handle }, e);
 									}}
 									renderItem={row}
-									exam={arcExam?.(section)}
 								/>
 							))
 						: groups.map((group) => (
@@ -280,7 +273,6 @@ export function SplitList({
 								/>
 							))}
 				</div>
-				{after}
 			</div>
 		</section>
 	);

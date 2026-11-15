@@ -12,7 +12,9 @@ import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
 import { distanceWords, finalReviewWords, longDayWords, roadOf, spanWords } from "@/components/calendar/calendar-facts";
 import { ContextSheet } from "@/components/course-context/context-sheet";
-import { paceOf } from "@/components/course-page/course-head/head-facts";
+import { ArcPill } from "@/components/course-map/arc-strip";
+import { arcOnPage } from "@/components/course-page/course-head/course-head";
+import type { ExamReady } from "@/components/course-page/standing/standing-model";
 import { cn } from "@/lib/utils";
 
 
@@ -44,16 +46,16 @@ export function ContextButton({ course, open: shown, onOpenChange }: { course: S
 }
 
 /** "Exam in 11 days", pressed: the exam's run-up as the engine plans it.
- *  The day, whether every topic fits before it, each week's new topics,
+ *  The day, whether he is ready in the head's own words (`ready`, the
+ *  readiness line's, so the two never disagree), each week's new topics,
  *  the final review, and the calendar one press away. */
-export function ExamFact({ course, runup, words }: { course: StudyCourse; runup: CalendarCourse | null; words: string }) {
+export function ExamFact({ course, runup, words, ready }: { course: StudyCourse; runup: CalendarCourse | null; words: string; ready: ExamReady | null }) {
 	const { map } = course;
 	const exam = map.exam;
 	if (!exam) return null;
 	const titleOf = (h: string) => map.topics.find((t) => t.handle === h)?.title ?? h;
 	const road = runup ? roadOf(runup.planned, exam.date, titleOf) : [];
 	const finalReview = finalReviewWords(runup?.finalReview ?? null, map.today);
-	const pace = paceOf(course, runup);
 	return (
 		<Popover>
 			<PopoverTrigger data-slot="course-exam" className={PRESS}>
@@ -66,9 +68,10 @@ export function ExamFact({ course, runup, words }: { course: StudyCourse; runup:
 					<p className="text-label text-muted-foreground">
 						{longDayWords(exam.date)}, {distanceWords(exam.date, map.today).toLowerCase()}
 					</p>
-					{pace && (
-						<p className={cn("text-label", pace.kind === "short" ? "text-warning" : "text-muted-foreground")}>
-							<MathText>{pace.words}</MathText>
+					{ready && (
+						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-1 text-label", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>
+							<MathText>{ready.words}</MathText>
+							{ready.kind === "notYet" && ready.arcs.map((arc) => <ArcPill key={arc.handle} arc={arc} href={arcOnPage(map.workspace, arc.handle)} />)}
 						</p>
 					)}
 				</div>
