@@ -138,25 +138,38 @@ function inListOrTable(text: string, i: number): boolean {
 	return /^\s*(?:[-*+]|\d+[.)])\s/.test(line) || /^\s*\|/.test(line);
 }
 
-/** The punctuation that ends a clause, right after a formula lifted out of
- *  the line: it goes into the display with it, so the next line never
- *  starts with it (round 9: ". Before computing anything"). */
-const TRAILING = /^[.,;:!?]+/;
+/** The punctuation that ends a clause, after a display or a formula lifted
+ *  out of the line, on its line or the next: it goes into the display with
+ *  it, so the next paragraph never starts with it (round 9: ". Before
+ *  computing anything"). */
+const TRAILING = /^\s*([.,;:!?]+)/;
+
+/** What the display ending at `end` takes after it: the punctuation, the
+ *  source it swallows, and the break before the words that follow. */
+function trailing(markdown: string, end: number): { punct: string; swallow: number; after: string } {
+	const match = TRAILING.exec(markdown.slice(end));
+	const rest = end + (match?.[0].length ?? 0);
+	return { punct: match?.[1] ?? "", swallow: match?.[0].length ?? 0, after: rest === markdown.length || markdown[rest] === "\n" ? "" : "\n\n" };
+}
 
 function transformDelimiters(markdown: string): string {
 	let offset = 0;
 	let swallow = 0;
 	return readContentSpans(markdown).map(span => {
 		const start = offset; offset += span.raw.length;
-		const taken = swallow; swallow = 0;
-		if (span.kind !== "math") return span.raw.slice(taken);
+		const skip = swallow; swallow = 0;
+		if (span.kind !== "math") return span.raw.slice(skip);
 		if (span.open === "$" && MATRIX_ENV.test(span.body) && !indented(markdown, start) && !inListOrTable(markdown, start)) {
-			const punct = TRAILING.exec(markdown.slice(start + span.raw.length))?.[0] ?? "";
-			swallow = punct.length;
-			const end = start + span.raw.length + punct.length;
+			const { punct, swallow: taken, after } = trailing(markdown, start + span.raw.length);
+			swallow = taken;
 			const before = blockPosition(markdown, start) ? "" : "\n\n";
-			const after = end === markdown.length || markdown[end] === "\n" ? "" : "\n\n";
 			return `${before}$$\n${span.body.trim()}${punct}\n$$${after}`;
+		}
+		if (span.open === "$$" && span.display) {
+			const { punct, swallow: taken, after } = trailing(markdown, start + span.raw.length);
+			if (!punct) return span.raw;
+			swallow = taken;
+			return `$$${span.body.trimEnd()}${punct}\n${span.close}${after}`;
 		}
 		if (span.open === "$") return "$" + inlineSized(replaceEscapedDollars(span.body)) + span.close;
 		if (span.open === "$$" && !span.display) {
@@ -173,10 +186,8 @@ function transformDelimiters(markdown: string): string {
 		if (span.open === "\\(") return `$$${inlineSized(body)}$$`;
 		if (indented(markdown, start)) return `$$${body.replace(/\s*\n\s*/g, " ")}$$`;
 		const before = blockPosition(markdown, start) ? "" : "\n\n";
-		const punct = TRAILING.exec(markdown.slice(start + span.raw.length))?.[0] ?? "";
-		swallow = punct.length;
-		const end = start + span.raw.length + punct.length;
-		const after = end === markdown.length || markdown[end] === "\n" ? "" : "\n\n";
+		const { punct, swallow: taken, after } = trailing(markdown, start + span.raw.length);
+		swallow = taken;
 		return `${before}$$\n${body}${punct}\n$$${after}`;
 	}).join("");
 }
