@@ -30,7 +30,7 @@ Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes 
 | Part | Notes |
 |---|---|
 | chrome | the 52px drag strip and the sidebar toggle, as the composer's |
-| column | 960px, 32px sides, 52px above, 24px below; the page never scrolls: the map takes half the column (it shrinks to 192px at least when Today needs more), Today the rest |
+| column | 960px, 32px sides, 52px above, 24px below (Proposed: the pages' own column, `PAGE_COLUMN`: up to 80rem, 24px sides, 24px under the 52px band, so the tabs start where a course or topic page's head does, at x=280, y=76 in his window); the page never scrolls: the map takes half the column (it shrinks to 192px at least when Today needs more), Today the rest |
 | map | `home-map` (home-map.md), half the column (Edo, 12 Nov 2026: smaller, so Today's rows lead); enlarged, the whole column |
 | Today | `today` (today.md), 20px under the map |
 

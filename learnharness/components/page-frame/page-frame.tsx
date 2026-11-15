@@ -4,6 +4,11 @@ import { ArrowRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+/** The column every page sits in: centred, up to 80rem, 24px sides, 24px
+ *  under the window's 52px band and above its foot. Home's Proposed wears
+ *  it too, so moving between pages no edge moves. */
+export const PAGE_COLUMN = "mx-auto w-full max-w-[80rem] px-6 pb-6";
+
 /**
  * The page frame (spec: page-frame.md) every page with a head and a body
  * shares, the course page and the topic page first: one centred column
@@ -11,7 +16,7 @@ import { cn } from "@/lib/utils";
  */
 export function PageFrame({ className, children, ...rest }: ComponentProps<"div">) {
 	return (
-		<div data-slot="page-frame" className={cn("mx-auto flex min-h-0 w-full max-w-[80rem] flex-1 flex-col gap-5 px-6 pt-6 pb-6", className)} {...rest}>
+		<div data-slot="page-frame" className={cn(PAGE_COLUMN, "flex min-h-0 flex-1 flex-col gap-5 pt-6", className)} {...rest}>
 			{children}
 		</div>
 	);

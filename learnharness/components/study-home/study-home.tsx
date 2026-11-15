@@ -11,6 +11,7 @@ import type { TodayRow } from "@/components/study-home/study-facts";
 import { Today } from "@/components/study-home/today";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
+import { PAGE_COLUMN } from "@/components/page-frame/page-frame";
 import { useHomeVariant, type HomeVariant } from "@/components/design-variant";
 import type { TopicHandle } from "@/src/core";
 
@@ -35,7 +36,7 @@ export function StudyHome() {
 	const variant = useHomeVariant();
 
 	return (
-		<HomeFrame quiet={enlarged} className={cn("mx-auto flex h-full w-full flex-col gap-5 px-8 pt-13 pb-6", !enlarged && HOME_WIDTH[variant])}>
+		<HomeFrame quiet={enlarged} className={cn("flex h-full flex-col gap-5", HOME_FRAME[variant], enlarged ? "max-w-none" : HOME_WIDTH[variant])}>
 			{(ready) => <HomeBody ready={ready} enlarged={enlarged} onEnlarge={setEnlarged} standing={variant === "proposed"} />}
 		</HomeFrame>
 	);
@@ -43,10 +44,20 @@ export function StudyHome() {
 
 /** Home's column by variant: Current as it was; Proposed as wide as the
  *  course page's frame (`PageFrame`), so the map has more room and the
- *  rows room for the standing (Edo's notes, 15 Nov 2026, N1). */
+ *  rows room for the standing (Edo's notes, 15 Nov 2026, N1). The map
+ *  enlarged takes the whole window's width either way. */
 export const HOME_WIDTH: Record<HomeVariant, string> = {
 	current: "max-w-[60rem]",
 	proposed: "max-w-[80rem]",
+};
+
+/** Home's edges by variant: Current as it was, 32px sides right under the
+ *  52px band; Proposed on the pages' own column (`PAGE_COLUMN`), so its
+ *  tabs, map and Today start where a course or topic page's head and
+ *  columns do, 24px under the band. */
+const HOME_FRAME: Record<HomeVariant, string> = {
+	current: "mx-auto w-full px-8 pt-13 pb-6",
+	proposed: cn(PAGE_COLUMN, "pt-19"),
 };
 
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
