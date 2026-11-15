@@ -191,7 +191,17 @@ const RUN_ACTIVITY: Record<string, string> = {
 	grouping: "Settling what each topic builds on, then grouping the topics into arcs from the material's chapters",
 };
 
-/** Merge the feed into one oldest-first blob list (the stable blob order). */
+/** Whether a background run shows under Background work: a course-map
+ *  build does, since he waits on it and may stop it; saving what a closed
+ *  lesson taught does not, since it is the close finishing its own work and
+ *  stopping it would lose what he learned (round 8: a "Saving what you
+ *  learned… Stop" row after every close). */
+export function runShows(run: Pick<FeedRun, "phase">): boolean {
+	return run.phase !== "digesting";
+}
+
+/** Merge the feed into one oldest-first blob list (the stable blob order),
+ *  leaving out the runs that do not show (`runShows`). */
 export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 	const blobs: ActivityBlob[] = feed.jobs.map((job) => ({
 		id: job.id,
@@ -205,7 +215,7 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 		// the dispatch card's quiet tone.
 		activity: isProviderKeyRefusal(job.error) ? "needs a sign-in" : (job.activity ?? ""),
 	}));
-	for (const run of feed.runs) {
+	for (const run of feed.runs.filter(runShows)) {
 		blobs.push({
 			id: run.id,
 			process: "run",

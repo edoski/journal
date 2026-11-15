@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
-import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
+import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedAgoWords, studiedDaysWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -136,28 +136,41 @@ export function whyOf(row: TodayRow): Why | null {
 	}
 }
 
-/** The line's one clock, short enough for a trailing column: "Today",
- *  "Yesterday", "3d ago", "40d ago". A session's line says when
- *  he last wrote in that session, so one started minutes ago reads Today;
- *  a course's line says when he last studied the course; an open task's
- *  line says nothing there, since its reason already dates it ("Left off
- *  2d ago"), so a row never shows two days at once. Null for a course
- *  never studied or a line with no course. Pure. */
-export function studiedAgo(row: TodayRow): string | null {
+/** The days since the line's one clock: a session's line, since he last
+ *  wrote in that session, so one started minutes ago is 0; a course's
+ *  line, since he last studied the course; an open task's line has none,
+ *  since its reason already dates it ("Left off 2d ago"), so a row never
+ *  shows two days at once. Null for a course never studied or a line with
+ *  no course. Pure. */
+function studiedDays(row: TodayRow): number | null {
 	if (row.kind === "session") {
 		const today = row.course?.map.today;
 		if (!today) return null;
 		const at = new Date(row.chat.updatedAt);
 		const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
-		return agoWords(Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000)));
+		return Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000));
 	}
 	if (row.step.kind === "task") return null;
-	const days = row.course.lastActiveDaysAgo;
+	return row.course.lastActiveDaysAgo;
+}
+
+/** The line's one clock, short enough for a trailing column: "Today",
+ *  "Yesterday", "3d ago", "40d ago" (`studiedDays`). Pure. */
+export function studiedAgo(row: TodayRow): string | null {
+	const days = studiedDays(row);
 	return days === null ? null : agoWords(days);
 }
 
 /** Some days ago in Home's words, the app's one form (`study-words.ts`). */
 export { agoWords };
+
+/** What Home's row shows of its clock, labelled: "Studied 7d ago" beside
+ *  the course, so it never reads as the line's reason ("7d ago · Planned
+ *  today", round 8). Null where `studiedAgo` is. Pure. */
+export function studiedLabel(row: TodayRow): string | null {
+	const days = studiedDays(row);
+	return days === null ? null : studiedAgoWords(days);
+}
 
 /** When the learner last studied a line's course, in words: "Studied
  *  today", "Studied 3 days ago", "Studied 20 days ago", or "Not studied

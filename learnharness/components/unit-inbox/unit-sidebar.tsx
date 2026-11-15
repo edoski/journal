@@ -7,7 +7,7 @@ import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, typ
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
-import { ActivitySection, useActivity } from "@/components/activity-dock";
+import { ActivitySection, toBlobs, useActivity } from "@/components/activity-dock";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseResultRow } from "@/components/unit-inbox/course-result-row";
@@ -111,7 +111,7 @@ export function UnitSidebar() {
 	const { open, toggle } = useSidebar();
 	const { open: openSettings } = useSettingsDialog();
 	const { feed } = useActivity();
-	const running = feed.jobs.length > 0 || feed.runs.length > 0;
+	const running = toBlobs(feed).length > 0;
 	const s = useSessionsSidebar({ open, toggle });
 	const { state, scope, setScope, folded, fold } = useUnitInbox(s.chats);
 	const query = s.query.trim();

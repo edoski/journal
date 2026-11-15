@@ -33,12 +33,51 @@ function partOfDay(hour: number): string {
 	return "today";
 }
 
+/** An exam close enough for Home's heading to name: within the coming
+ *  week, so its weekday names one day. */
+export interface NearExam {
+	course: string;
+	/** The exam's date, YYYY-MM-DD. */
+	date: string;
+	/** Days from the engine's today: 0 is today. */
+	daysLeft: number;
+}
+
+const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" });
+
+/** The days in which a weekday names one day: today and the six after it. */
+const ONE_WEEK = 7;
+
+/** The nearest exam ahead within the coming week, or null: the one Home's
+ *  heading names (round 8: nothing on Home said the Probability exam was
+ *  two days away). Pure. */
+export function nearExam(exams: readonly NearExam[]): NearExam | null {
+	return [...exams].filter((e) => e.daysLeft >= 0 && e.daysLeft < ONE_WEEK).sort((a, b) => a.daysLeft - b.daysLeft)[0] ?? null;
+}
+
+/** Whose exam, by its day: "today's Probability exam", "tomorrow's",
+ *  "Thursday's". Pure. */
+function examWords(exam: NearExam): string {
+	const day = exam.daysLeft === 0 ? "today's" : exam.daysLeft === 1 ? "tomorrow's" : `${WEEKDAY.format(new Date(`${exam.date}T00:00:00Z`))}'s`;
+	return `${day} ${exam.course} exam`;
+}
+
 /** Home's heading, one question for the hour (Edo, 13 Nov 2026: dynamic,
  *  never the date): "What are we studying this morning?", or once he has
  *  studied something today, "What else are we studying this morning?".
- *  Pure. */
-export function dayQuestion(hour: number, studied: boolean): string {
-	return `What ${studied ? "else " : ""}are we studying ${partOfDay(hour)}?`;
+ *  With an exam in the coming week it asks for that exam instead, by its
+ *  day: "What are we studying for Thursday's Probability exam?". Pure. */
+export function dayQuestion(hour: number, studied: boolean, exam: NearExam | null = null): string {
+	const what = `What ${studied ? "else " : ""}are we studying`;
+	if (exam) return `${what} ${exam.daysLeft === 0 ? "before" : "for"} ${examWords(exam)}?`;
+	return `${what} ${partOfDay(hour)}?`;
+}
+
+/** Home's heading when Today holds nothing: a statement, never a question
+ *  with nothing under it (round 8: closing every lesson left "What are we
+ *  studying today?" above an empty list). Pure. */
+export function nothingTodayWords(studied: boolean): string {
+	return studied ? "Nothing else is planned today" : "Nothing is planned today";
 }
 
 /** The line under the heading that says what he studied today, by name

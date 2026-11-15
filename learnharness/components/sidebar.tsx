@@ -7,6 +7,8 @@ import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UnitSidebar } from "@/components/unit-inbox/unit-sidebar";
+import { ServerSidebarWidth } from "@/components/unit-inbox/sidebar-width";
+import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_OPEN_COOKIE, SIDEBAR_WIDTH_COOKIE, sidebarCookie } from "@/components/sidebar-cookies";
 import { kbdEventForAction } from "@/src/core";
 
 /**
@@ -17,6 +19,12 @@ import { kbdEventForAction } from "@/src/core";
  */
 
 const STORAGE_KEY = "lh:sidebar-open";
+
+/** Keeps the open state where both the server and the next load read it. */
+function storeOpen(open: boolean): void {
+	localStorage.setItem(STORAGE_KEY, open ? "1" : "0");
+	document.cookie = sidebarCookie(SIDEBAR_OPEN_COOKIE, open ? "1" : "0");
+}
 
 /*
  * Narrow-window behavior (owner, 2026-09-17): below SIDEBAR_AUTOCLOSE the
@@ -62,10 +70,13 @@ export function useSidebar() {
 	return useContext(SidebarContext);
 }
 
-export function SidebarProvider({ children }: { children: React.ReactNode }) {
-	// Start closed so server and client first-render agree (no hydration
-	// mismatch); the stored value is applied after mount.
-	const [open, setOpen] = useState(false);
+export function SidebarProvider({ children, initial = { open: null, width: SIDEBAR_DEFAULT_WIDTH } }: { children: React.ReactNode; initial?: { open: boolean | null; width: number } }) {
+	// The server read the open state from its cookie, so server and client
+	// first-render agree and the first frame is the settled layout. A load
+	// with no cookie yet (the first after this change)
+	// opens, as a first run does, and applies a stored closed state after
+	// mount, writing the cookie.
+	const [open, setOpen] = useState(initial.open ?? true);
 	const [narrow, setNarrow] = useState(false);
 	const [mounted, setMounted] = useState(false);
 
@@ -90,12 +101,18 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 		const off = window.lh?.onZoom?.(setZoomVar);
 		void window.lh?.getZoom?.().then(setZoomVar);
 
-		const stored = localStorage.getItem(STORAGE_KEY);
-		// Default: open (first run introduces the sidebar).
-		setOpen(stored === null ? true : stored === "1");
+		if (initial.open === null) {
+			const stored = localStorage.getItem(STORAGE_KEY);
+			// Default: open (first run introduces the sidebar).
+			const first = stored === null ? true : stored === "1";
+			if (!first) setOpen(false);
+			storeOpen(first);
+			const width = localStorage.getItem("lh:sidebar-width");
+			if (width !== null) document.cookie = sidebarCookie(SIDEBAR_WIDTH_COOKIE, width);
+		}
 		setMounted(true);
 		return () => off?.();
-	}, []);
+	}, [initial.open]);
 
 	// Narrow-window auto-close/auto-restore (see SIDEBAR_AUTOCLOSE note):
 	// fires only on actual resizes — a boolean compare, no layout work.
@@ -116,13 +133,13 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 		// persists like any other open, so a restart at a narrow width
 		// still auto-restores when widened.
 		if (narrow && !open) {
-			localStorage.setItem(STORAGE_KEY, "0");
+			storeOpen(false);
 			setOpen(true);
 			window.lh?.expandWindow();
 			return;
 		}
 		setOpen((v) => {
-			localStorage.setItem(STORAGE_KEY, v ? "0" : "1");
+			storeOpen(!v);
 			return !v;
 		});
 	}, [narrow, open]);
@@ -142,8 +159,10 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
 	return (
 		<SidebarContext.Provider value={{ open: open && !narrow, toggle }}>
-			{/* transitions gated on mount: no slide-in flash on page load */}
-			<div className={cn("flex h-dvh", mounted && "[&_.sidebar-motion]:transition-[width,margin,opacity]")}>{children}</div>
+			<ServerSidebarWidth.Provider value={initial.width}>
+				{/* transitions gated on mount: no slide-in flash on page load */}
+				<div className={cn("flex h-dvh", mounted && "[&_.sidebar-motion]:transition-[width,margin,opacity]")}>{children}</div>
+			</ServerSidebarWidth.Provider>
 		</SidebarContext.Provider>
 	);
 }

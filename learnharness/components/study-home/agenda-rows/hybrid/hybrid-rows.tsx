@@ -1,6 +1,6 @@
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
-import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedAgo, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
+import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedLabel, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { MathLine } from "@/components/ui/math-line";
@@ -30,7 +30,7 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 						<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
 						<MathLine className="text-label text-muted-foreground">{courseTitle(row)}</MathLine>
 						<span data-slot="today-when" className="justify-self-end text-label text-muted-foreground tabular-nums">
-							{studiedAgo(row)}
+							{studiedLabel(row)}
 						</span>
 						<MathLine className="text-control font-medium text-foreground">{lessonTitle(row)}</MathLine>
 						<WhyMark why={whyOf(row)} />

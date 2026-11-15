@@ -1392,6 +1392,9 @@ export function Chat({
 		steerOrSendRef.current();
 	}, [chatId, applyText]);
 
+	// The lesson's topic crumb, a link to its page (lesson-top-bar.md).
+	const topicCrumb = course && !courseGone && place?.topic ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined;
+
 	return (
 		<ChatActionsContext.Provider
 			value={{
@@ -1467,7 +1470,7 @@ export function Chat({
 									aria-label="Session title"
 									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-control font-medium text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
 								/>
-							) : (
+							) : topicCrumb && !topicCrumbShown(topicCrumb.title, titleText) ? null : (
 								<Hint label="Rename session" action="rename-session" side="bottom">
 									<Button
 										variant="quiet"
@@ -1485,7 +1488,7 @@ export function Chat({
 						course={course?.title}
 						// A deleted course has no page: its crumb goes Home.
 						courseHref={course ? (courseGone ? "/" : courseHref(course.workspace)) : undefined}
-						topic={course && !courseGone && place?.topic && topicCrumbShown(place.topic.title, titleText) ? { title: place.topic.title, href: unitHref(course.workspace, place.topic.handle) } : undefined}
+						topic={topicCrumb}
 						roadmap={
 							<LessonRoadmap
 								steps={steps}

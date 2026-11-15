@@ -169,6 +169,14 @@ export function agoWords(days: number): string {
 	return `${days}d ago`;
 }
 
+/** Home's clock beside a course or a session, labelled so it never reads
+ *  as the line's reason: "Studied today", "Studied yesterday", "Studied 7d
+ *  ago" (round 8: "7d ago" above "Planned today" read as a contradiction).
+ *  The short days are `agoWords`'. */
+export function studiedAgoWords(days: number): string {
+	return days <= 1 ? studiedDaysWords(days) : `Studied ${agoWords(days)}`;
+}
+
 /** When he last studied something, as a phrase: "Studied today",
  *  "Studied yesterday", "Studied 3 days ago", "Studied 40 days ago". */
 export function studiedDaysWords(days: number): string {
@@ -298,42 +306,73 @@ export const ARC_EXAM_WORDS = {
 export const EXAM_GAP_WORDS = {
 	start: "Start it today",
 	review: "Review it today",
-	startOne: "Start one today",
+	/** The menu of the other topics he can take up today, beside the pick. */
+	another: "Or another",
 	ask: "Ask the tutor",
 	/** Each topic in Start one today's menu: "Start Variance", "Review Rank". */
 	startTopic: "Start",
 	reviewTopic: "Review",
 } as const;
 
-/** Each engine reason (`ExamGapReason`) a topic is left out, in his
- *  words: for a topic with no room to start (`start`), and for a taught
- *  one the final review has no room for (`review`). */
-export const EXAM_GAP_WHY: {
-	start: Readonly<Partial<Record<ExamGapReason, string>>>;
-	review: Readonly<Partial<Record<ExamGapReason, string>>>;
-} = {
-	start: {
-		no_study_day: "No study day is left before the exam",
-		not_ready: "What comes first won’t be solid before the exam",
-		full: "Every study day before the exam is full at your pace",
-	},
-	review: {
-		no_study_day: "No study day is left in the final review",
-		too_late: "Starts too close to the exam for a review",
-		full: "Every day of the final review is full at your pace",
-	},
-};
+/** A topic the exam's plan leaves out, by title, with the engine's reason
+ *  (`exam.reasons`); a topic with no reason reads as `full`. */
+export interface ExamGapTopic {
+	title: string;
+	reason?: ExamGapReason;
+}
+
+/** "it" or "they" for some topics' clause, by their number. */
+const startsWord = (titles: readonly string[]) => (titles.length === 1 ? "starts" : "start");
+
+/**
+ * Why the exam's plan leaves topics out, in at most two sentences (round 8:
+ * five sentences, "full at your pace" twice, and "Starts too close to the
+ * exam for a review" naming no topic): one for the topics with no room to
+ * start (`start`), which the head's first line already names, and one for
+ * the taught topics the final review has no room for (`review`), each
+ * reason said once. A clause names its topics when the first line does not
+ * (the review's topics under a first line about starts), or when its list
+ * has more than one reason; a topic that starts too late is always named.
+ * Your pace is said once: a final review full at your pace is the same
+ * cause as study days full at your pace. Null with nothing left out. Pure.
+ */
+export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly ExamGapTopic[]): string | null {
+	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => (t.reason ?? "full") === reason).map((t) => t.title);
+	const reasons = (topics: readonly ExamGapTopic[]) => new Set(topics.map((t) => t.reason ?? "full")).size;
+	const sentence = (clauses: readonly string[]) => (clauses.length > 0 ? `${clauses.join(", and ").replace(/^./, (c) => c.toUpperCase())}.` : null);
+	const name = start.length > 1 && reasons(start) > 1;
+	const startFull = by(start, "full");
+	const notReady = by(start, "not_ready");
+	const first = sentence([
+		...(by(start, "no_study_day").length > 0 ? ["no study day is left before the exam"] : []),
+		...(startFull.length > 0 ? ["your pace fills every study day before the exam"] : []),
+		...(notReady.length > 0 ? [name ? `what ${listWords(notReady)} ${notReady.length === 1 ? "needs" : "need"} won’t be solid in time` : "what comes first won’t be solid in time"] : []),
+	]);
+	const paceSaid = startFull.length > 0;
+	const named = start.length > 0 || reasons(review) > 1;
+	const full = by(review, "full");
+	const noDay = by(review, "no_study_day");
+	const late = by(review, "too_late");
+	const second = sentence([
+		...(noDay.length > 0 ? [named ? `no study day is left in the final review for ${listWords(noDay)}` : "no study day is left in the final review"] : []),
+		...(full.length > 0 ? [named ? `the final review has no room for ${listWords(full)}${paceSaid ? "" : " at your pace"}` : paceSaid ? "the final review is full too" : "your pace fills every day of the final review"] : []),
+		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),
+	]);
+	const both = [first, second].filter((s): s is string => s !== null);
+	return both.length > 0 ? both.join(" ") : null;
+}
+
+/** The pick among the topics he can take up today, as its press says it:
+ *  "Start Expectation and linearity today", "Review Binomial distribution
+ *  today". */
+export function examGapPickWords(starts: boolean, title: string): string {
+	return `${starts ? EXAM_GAP_WORDS.startTopic : EXAM_GAP_WORDS.reviewTopic} ${title} today`;
+}
 
 /** The taught topics the final review has no room for, standing alone
  *  (the calendar's "No room in it for" reads under its final review). */
 export function finalReviewMissWords(titles: readonly string[]): string {
 	return `No room in the final review for ${listWords(titles)}`;
-}
-
-/** The same, when the head's first line already names a topic with no
- *  room to start. */
-export function examGapEitherWords(titles: readonly string[]): string {
-	return `${finalReviewMissWords(titles)} either`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */

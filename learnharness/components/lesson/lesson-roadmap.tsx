@@ -110,7 +110,7 @@ export function LessonRoadmap({
 						data-slot="lesson-roadmap-trigger"
 						data-testid="roadmap"
 						aria-label={`Where this lesson is: ${mathPlain(label)}`}
-						className="min-w-0 max-w-[22rem] shrink gap-2.5 font-normal"
+						className="min-w-0 shrink gap-2.5 font-normal"
 					>
 						<span data-slot="roadmap-strip" aria-hidden className="flex shrink-0 items-center gap-1">
 							{steps.map((s) => (

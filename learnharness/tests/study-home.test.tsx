@@ -217,9 +217,11 @@ describe("today's lines", () => {
 	});
 
 	it("lets a session that works on the step stand for it", () => {
-		const review = chat({ id: "r", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"] });
+		const review = chat({ id: "r", title: "Review Linear independence, Rank, Span", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"], ownTopics: ["independence", "rank", "span"] });
 		const rows = todayRows([LINALG], [review], TODAY);
-		assert.deepEqual(rows.map((r) => r.kind), ["session"]);
+		assert.deepEqual(rows.map((r) => r.kind), ["session"], "a review of those topics stands for today's review");
+		const lesson = chat({ id: "l", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"], ownTopics: ["rank"] });
+		assert.deepEqual(todayRows([LINALG], [lesson], TODAY).map((r) => r.kind), ["session", "course"], "a lesson on the topics never stands for their review (round 8, 1 D3)");
 		const sheet = chat({ id: "s", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, tasks: ["sheet-4"] });
 		assert.deepEqual(todayRows([{ ...LINALG, due: [] }], [sheet], TODAY).map((r) => r.kind), ["session"], "the open task's lesson");
 	});
@@ -322,7 +324,7 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraTodayEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank, Span16d overdue", "Linear AlgebraContinue Problem sheet 4Left off 3d ago", "Real Analysis11d agoReview Sequences1d overdue"],
+			["Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityStudied 4d agoContinue Bayes' ruleNext up", "Linear AlgebraStudied 2d agoReview Linear independence, Rank, Span16d overdue", "Linear AlgebraContinue Problem sheet 4Left off 3d ago", "Real AnalysisStudied 11d agoReview Sequences1d overdue"],
 		);
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
@@ -434,11 +436,11 @@ describe("what a line of Today reads", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"Linear AlgebraTodayEigen lessonYour turn",
-			"Probability4d agoContinue Bayes' ruleNext up",
-			"Linear Algebra2d agoReview Linear independence, Rank, Span16d overdue",
+			"Linear AlgebraStudied todayEigen lessonYour turn",
+			"ProbabilityStudied 4d agoContinue Bayes' ruleNext up",
+			"Linear AlgebraStudied 2d agoReview Linear independence, Rank, Span16d overdue",
 			"Linear AlgebraContinue Problem sheet 4Left off 3d ago",
-			"Real Analysis11d agoReview Sequences1d overdue",
+			"Real AnalysisStudied 11d agoReview Sequences1d overdue",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["task", 1], ["review", 1]]);

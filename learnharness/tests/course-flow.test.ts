@@ -146,6 +146,18 @@ describe("course chooser routes", () => {
 		}
 		assert.equal(chatStore.listChats().length, before, "a refused creation creates nothing");
 	});
+
+	it("POST /api/chats names a lesson opened on a topic after it, keeps a review's words, and the list knows a review by its opening (round 8, 1 D9 and 2 m5)", async () => {
+		const lesson = (await (await createChat({ title: "Start Rank and the column space", course: { workspace: LINALG }, topics: ["rank"] })).json()) as { id: string; title: string };
+		assert.equal(lesson.title, "Rank and the column space");
+		const review = (await (await createChat({ title: "Review Rank and the column space", course: { workspace: LINALG }, topics: ["rank"] })).json()) as { id: string; title: string };
+		assert.equal(review.title, "Review Rank and the column space");
+		chatStore.saveMessages(review.id, [{ id: "u1", role: "user", content: "Review Rank and the column space", timestamp: 1 } as never]);
+		chatStore.renameChat(review.id, "Rank check");
+		const listed = chatStore.listChats().find((c) => c.id === review.id);
+		assert.equal(listed?.review, true, "renamed, it is still a review");
+		assert.equal(chatStore.listChats().find((c) => c.id === lesson.id)?.review, false);
+	});
 });
 
 /** Resolves once `check` holds, re-checked on every server event (the map

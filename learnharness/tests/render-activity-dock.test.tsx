@@ -47,25 +47,26 @@ describe("activity dock pure layer", () => {
 	it("merges jobs + background runs oldest-first (the stable blob order)", () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "new", createdAt: new Date(NOW - 10_000).toISOString() })],
-			runs: [{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 100_000 }],
+			runs: [{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 100_000 }],
 		};
 		const blobs = toBlobs(feed);
 		assert.equal(blobs.length, 2);
 		const first = blobs[0]!;
-		assert.equal(first.id, "cx#digest"); // the digest started first
+		assert.equal(first.id, "algebra#course-map"); // the map build started first
 		assert.equal(first.process, "run");
-		assert.equal(first.phase, "digesting");
+		assert.equal(first.phase, "mapping");
 		assert.equal(blobs[1]!.id, "new");
 	});
 
-	it("a digest and a map build are one row each, keyed by their registry key", () => {
+	it("a map build and an arc grouping are one row each, keyed by their registry key; the close's own save has none (round 8)", () => {
 		const rows: FeedRun[] = [
 			{ id: "cx#digest", chatId: "cx", title: "Old lesson", phase: "digesting", startedAt: NOW - 1000 },
 			{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 500 },
+			{ id: "calc#arcs", chatId: "calc", title: "Calculus", phase: "grouping", startedAt: NOW - 200 },
 		];
 		const blobs = toBlobs({ jobs: [], runs: rows });
-		assert.deepEqual(blobs.map((b) => b.id), ["cx#digest", "algebra#course-map"], "unique row ids — no duplicate React keys");
-		assert.deepEqual(blobs.map((b) => b.chatId), ["cx", "algebra"], "the abort sends the key's chat or course");
+		assert.deepEqual(blobs.map((b) => b.id), ["algebra#course-map", "calc#arcs"], "unique row ids — no duplicate React keys");
+		assert.deepEqual(blobs.map((b) => b.chatId), ["algebra", "calc"], "the abort sends the key's course");
 	});
 
 	it("a connection-refused job reads as info — 'needs a sign-in'", () => {
@@ -86,15 +87,15 @@ describe("activity dock pure layer", () => {
 	});
 
 	it("a background run says in words what it is doing", () => {
-		const [digest, map] = toBlobs({
+		const [map, grouping] = toBlobs({
 			jobs: [],
 			runs: [
-				{ id: "cx#digest", chatId: "cx", title: "T", phase: "digesting", startedAt: NOW },
-				{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW + 1 },
+				{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW },
+				{ id: "calc#arcs", chatId: "calc", title: "Calculus", phase: "grouping", startedAt: NOW + 1 },
 			],
 		});
-		assert.equal(digest!.activity, "Writing down what you learned in this lesson");
 		assert.equal(map!.activity, "Reading the course's material to build its topic map");
+		assert.match(grouping!.activity, /grouping the topics into arcs/);
 	});
 
 	it("formatUsd keeps four decimals under $1, two above", () => {
@@ -190,14 +191,14 @@ describe("activity section render", () => {
 		assert.equal(detail.href, courseHref("calculus"));
 	});
 
-	it("a running digest's sidebar row says what it is doing before it is opened", () => {
+	it("a running map build's sidebar row says what it is doing before it is opened", () => {
 		const html = renderToStaticMarkup(
 			<ActivitySection
-				feed={{ jobs: [], runs: [{ id: "cx#digest", chatId: "cx", title: "Invertible matrices", phase: "digesting", startedAt: NOW }] }}
+				feed={{ jobs: [], runs: [{ id: "gt#course-map", chatId: "gt", title: "Graph Theory", phase: "mapping", startedAt: NOW }] }}
 			/>,
 		);
 		const label = html.match(/data-slot="nav-row-label"[^>]*>(?:<[^>]*>)*([^<]*)</)?.[1] ?? "";
-		assert.equal(label, "Saving what you learned in Invertible matrices", "what it does and the lesson it works for, whole, on the row");
+		assert.equal(label, "Building the topic map of Graph Theory", "what it does and the course it works for, whole, on the row");
 		assert.doesNotMatch(html, /activity-blob-detail/, "the row is closed");
 	});
 });

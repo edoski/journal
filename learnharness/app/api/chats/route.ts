@@ -1,4 +1,4 @@
-import { derivePlanStatusesLh, newSessionModeMessage, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
+import { derivePlanStatusesLh, newSessionModeMessage, openingTitle, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type LhMessage } from "@/src/core";
 import { compactionInFlight, courseGone, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
@@ -47,7 +47,10 @@ export async function POST(req: Request) {
 	const topics = Array.isArray(body.topics) ? body.topics.filter((t): t is string => typeof t === "string" && t.length > 0).slice(0, 32) : [];
 	// The arc a session started from Check it checks; the brief reads its check from the engine.
 	const arcCheck = typeof body.arcCheck === "string" && body.arcCheck.length > 0 ? body.arcCheck : undefined;
-	const chat = createChat(titleFromPrompt(title || "Untitled session"), course, topics, arcCheck);
+	// A lesson opened on topics is named after them, not the verb that
+	// opened it ("Start Poisson distribution" is "Poisson distribution");
+	// a review keeps its words (`openingTitle`).
+	const chat = createChat(titleFromPrompt(openingTitle(title, topics) || "Untitled session"), course, topics, arcCheck);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the
