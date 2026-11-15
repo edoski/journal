@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-	AlarmClockIcon,
 	BookOpenIcon,
 	CircleDashedIcon,
 	ClipboardListIcon,
@@ -24,9 +23,12 @@ import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<EntryLook, LucideIcon> = {
+/** One icon per look. An overdue review wears the review's History icon,
+ *  muted, as Home and the sidebar draw it (round 8: a red alarm here
+ *  against the history arrow everywhere else). */
+export const ICONS: Record<EntryLook, LucideIcon> = {
 	exam: GraduationCapIcon,
-	overdue: AlarmClockIcon,
+	overdue: HistoryIcon,
 	review: HistoryIcon,
 	new: BookOpenIcon,
 	task: ClipboardListIcon,
@@ -39,10 +41,10 @@ const ICONS: Record<EntryLook, LucideIcon> = {
  *  `from`. */
 export type StartSession = (opening: string, workspace: string, how: { topics: readonly string[]; from?: string }) => void;
 
-/** The look's ink: an exam in full ink, the rest muted. An overdue
- *  review's icon alone is in danger, so a day of them stays quiet. */
+/** The look's ink: an exam in full ink, the rest muted, an overdue
+ *  review included, since its words say how late. */
 const LOOK_INK: Partial<Record<EntryLook, string>> = { exam: "text-foreground" };
-const ICON_INK: Partial<Record<EntryLook, string>> = { exam: "text-foreground", overdue: "text-danger" };
+export const ICON_INK: Partial<Record<EntryLook, string>> = { exam: "text-foreground" };
 
 function Mark({ entry }: { entry: CalendarEntry }) {
 	return entry.course ? <CourseMark title={entry.course.title} /> : <CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />;
