@@ -54,7 +54,7 @@ The older `text-xs`…`text-3xl` names resolve to the same sizes (`--lh-text-*`)
 
 ## Icons
 
-Lucide, as shadcn uses it. 16 for navigation and a page head's facts, 14 for marks inside a row (Today's reason, standing and slip), 12 in a sidebar card's status slot and on a map card (drawn at 80% on Home's map). Lucide draws a 2px stroke on its 24px grid, so the stroke scales with the size: 1.33 at 16, 1.17 at 14.
+Lucide, as shadcn uses it. 16 for navigation and a page head's facts, 14 for marks inside a row (Today's reason, standing and slip), 12 in a sidebar card's status slot and on a map card (drawn at 80% on Home's map). Lucide draws a 2px stroke on its 24px grid, so the stroke scales with the size: 1.33 at 16, 1.17 at 14. That is the app's one icon weight, lucide's own default: Edo tried a fixed 2px line at every size and found it heavy (15 Nov 2026).
 
 ## The standing legend
 
