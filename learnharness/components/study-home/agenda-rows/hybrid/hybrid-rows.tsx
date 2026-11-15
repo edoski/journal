@@ -15,6 +15,9 @@ import { MathText } from "@/components/ui/math-text";
  *  sit flush right, so each lines up down the list. */
 const ROW =
 	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-lg px-3 text-left font-normal whitespace-normal data-[pointed]:bg-fill-hover";
+/** Home's Proposed: the hover fill's corners at 8, as every other row with
+ *  a hover fill (the sidebar's, the course page's, Settings'). */
+const ROW_CORNERS = "rounded-md";
 const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_auto]";
 /** With the standing: its own column before the ends, its marks on the
  *  column's left edge, as wide as the longest standing words ("Right on
@@ -44,7 +47,7 @@ export function HybridRows({ rows, busy, onContinue, standing = false, ...point 
 				const facts = standing ? rowStanding(row) : undefined;
 				return (
 					<li key={lineKey(row)} className={HAIRLINE}>
-						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? COLUMNS_STANDING : COLUMNS)} {...pointProps(row, point)}>
+						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? cn(COLUMNS_STANDING, ROW_CORNERS) : COLUMNS)} {...pointProps(row, point)}>
 							<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
 							<MathLine className="text-label text-muted-foreground">{courseTitle(row)}</MathLine>
 							{facts !== undefined && <SlipFact facts={facts} />}
