@@ -58,7 +58,7 @@ export function CourseBadge({ course }: { course: StudyCourse }) {
 						<path data-slot="today-progress" d={outline} fill="none" stroke="currentColor" strokeWidth={BADGE.line} strokeLinecap="round" pathLength={1} strokeDasharray={share >= 1 ? undefined : `${share} 1`} />
 					)}
 				</svg>
-				<span className="text-callout font-medium leading-none tracking-[-0.02em] text-foreground/85">{monogram(course.map.title)}</span>
+				<span className="text-title-3 font-semibold leading-none tracking-[-0.02em] text-foreground/90">{monogram(course.map.title)}</span>
 			</span>
 		</Hint>
 	);
