@@ -51,7 +51,7 @@ type Listener = (event: AgentEvent) => void;
 
 /** A Claude Code that sends nothing for this long is stopped: background
  *  jobs have no one to press Stop. */
-const IDLE_MS = 10 * 60_000;
+export const IDLE_MS = 10 * 60_000;
 
 interface Steer { message: AgentMessage; uuid: string }
 

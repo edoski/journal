@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { after, describe, it } from "node:test";
+import { after, describe, it, mock } from "node:test";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { createFauxCore, fauxAssistantMessage, type AssistantMessage } from "@earendil-works/pi-ai";
@@ -28,7 +28,7 @@ import type { CompactionDeps } from "../src/server/compaction.ts";
 const { subscribe } = await import("../src/core/events.ts");
 const { activeCompactionOf, newUserMessage, COMPACTED_HISTORY_HEADER } = await import("../src/core/index.ts");
 import type { ChatSession, LhMessage } from "../src/core/index.ts";
-const { SdkAgent } = await import("../src/agent/sdk/agent.ts");
+const { SdkAgent, IDLE_MS } = await import("../src/agent/sdk/agent.ts");
 import type { SdkEngine, SdkPrompt } from "../src/agent/sdk/engine.ts";
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { fakeSdk, type FakeSdk } from "./helpers/fake-sdk.ts";
@@ -200,6 +200,34 @@ describe("the compaction service", () => {
 		const ok = compactor(fake);
 		await ensureCompacted(depsOf(ok.engine), chatId);
 		assert.ok(activeCompactionOf(chatStore.getChat(chatId)!.messages));
+	});
+
+	it("a compaction Claude Code goes silent on is stopped after the idle limit, so the lesson's next turn is not held", async () => {
+		const { chatId, fake } = await lesson("compact: silent");
+		const before = chatStore.getChat(chatId);
+		let closed = false;
+		const engine: SdkEngine = {
+			...fake.engine,
+			query: () => {
+				let end: () => void = () => undefined;
+				const ended = new Promise<void>((resolve) => { end = resolve; });
+				const iterator = (async function* (): AsyncGenerator<SDKMessage> { await ended; })();
+				return { [Symbol.asyncIterator]: () => iterator, interrupt: async () => undefined, close: () => { closed = true; end(); } };
+			},
+		} as SdkEngine;
+		mock.timers.enable({ apis: ["setTimeout"] });
+		try {
+			const gate = ensureCompacted(depsOf(engine), chatId);
+			await new Promise((resolve) => setImmediate(resolve));
+			assert.equal(compactionInFlight(chatId), true);
+			mock.timers.tick(IDLE_MS);
+			await gate;
+		} finally {
+			mock.timers.reset();
+		}
+		assert.equal(closed, true, "the silent query is closed");
+		assert.equal(compactionInFlight(chatId), false, "the gate is released");
+		assert.deepEqual(chatStore.getChat(chatId), before, "no marker, no session change");
 	});
 
 	it("effectiveThresholdTokens: LH_COMPACTION_TOKENS overrides; else the 150k bound or the window rule", () => {
