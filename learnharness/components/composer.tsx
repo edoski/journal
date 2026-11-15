@@ -45,7 +45,7 @@ export function Composer({
 	onStop,
 	canSend,
 	autoFocus,
-	placeholder = "Ask, answer, or steer the lesson…",
+	placeholder = "Ask the tutor anything…",
 	nextProblem = false,
 	onNext,
 	toolbar,
@@ -74,7 +74,7 @@ export function Composer({
 	/** The controls on the toolbar's left (course, mode). */
 	toolbar?: ReactNode;
 	/** The textarea's placeholder (owner refinement round, 2026-09-24):
-	 *  active sessions read "Ask, answer, or steer the lesson…"; a fresh
+	 *  active sessions read "Ask the tutor anything…"; a fresh
 	 *  start asks its opening question instead. */
 	placeholder?: string;
 	/** The practice pause is live (owner round 16): Enter on the empty

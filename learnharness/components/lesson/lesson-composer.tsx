@@ -73,7 +73,7 @@ export function LessonComposer({
 	onStop,
 	canSend,
 	autoFocus,
-	placeholder = "Ask, answer, or steer the lesson…",
+	placeholder = "Ask the tutor anything…",
 	leading,
 	toolbar,
 	answer,
