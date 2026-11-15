@@ -84,7 +84,9 @@ function OpenQuestion({ spec, stepAnchor, repeat }: { spec: ProseQuestionSpec; s
 	);
 }
 
-/** The choices as plain rows: the digit that picks it, then its words. A
+/** The choices as plain rows: the digit that picks it, then its words,
+ *  with nothing under them (round 8: helper lines under the goal question's
+ *  options, the bloat Edo ruled out under a question on 14 Nov 2026). A
  *  pick fills the row. Rows never take focus: his field keeps it. */
 export function ChoiceRows({ options, multi, selected, onPick, compact = false }: {
 	options: readonly QuestionOption[];
@@ -104,7 +106,6 @@ export function ChoiceRows({ options, multi, selected, onPick, compact = false }
 						</span>
 						<span className="min-w-0">
 							<ToolContentResponse className={compact ? SMALL_SIZE : undefined}>{option.label}</ToolContentResponse>
-							{option.description && !compact && <ToolContentResponse className={SMALL}>{option.description}</ToolContentResponse>}
 						</span>
 					</>
 				);

@@ -232,6 +232,17 @@ function AnswerComposer({
 		onSubmitAnswer(proseAnswer(spec, selection, text, confidence), textMode ? sentPhotos(photos.photos) : undefined);
 	};
 	useEnterSubmits(submit);
+	// A single choice picked with nothing typed is his answer: it sends at
+	// once, with no second press (round 8: "Anything to add?" waited on a
+	// second send). Typed words first keep the pick for Send.
+	const picks = answer.picks ?? 0;
+	const picksSeen = useRef(picks);
+	useEffect(() => {
+		const picked = picks > picksSeen.current;
+		picksSeen.current = picks;
+		if (picked && spec?.mode === "single-select" && selection.selected.size === 1 && !text.trim()) submit();
+		// Only a new pick decides.
+	}, [picks]);
 
 	// Hint on a check: a request, never an answer. The check comes back
 	// as a new question, and his work waits in the carry to fill it.
