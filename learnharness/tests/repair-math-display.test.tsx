@@ -88,16 +88,20 @@ describe("upgraded KaTeX rendering on real question and practice surfaces", () =
 	] as const) {
 		it(`${name}: dollar and legacy delimiters preserve glyphs and copied TeX`, () => {
 			for (const raw of [`$${formula}$`, `\\(${formula}\\)`, `$$\n${formula}\n$$`, `\\[\n${formula}\n\\]`]) {
+				// Inside a line a fraction is set as a slash (round 9: inline
+				// fractions too small to read); a display keeps it.
+				const inline = !raw.includes("\n");
+				const shown = name === "fraction and root" && inline ? String.raw`1/\sqrt{x}` : formula;
 				for (const element of [
 					<MessageResponse mode="static">{raw}</MessageResponse>,
 					question(raw, "security_question"),
 					dock({ statement: raw }),
 				]) {
 					const html = renderToStaticMarkup(element);
-					assertMath(html, [formula], [...glyphs]);
+					assertMath(html, [shown], [...glyphs]);
 					const { document } = parseHTML(html);
 					assert.ok(document.querySelector(".katex-base .katex-strut"), "matching 0.18 internal layout classes");
-					if (name === "fraction and root") assert.ok(document.querySelector(".mfrac .sqrt"));
+					if (name === "fraction and root") assert.ok(document.querySelector(inline ? ".sqrt" : ".mfrac .sqrt"));
 					if (name === "accents") assert.ok(document.querySelectorAll(".katex-accent").length >= 2);
 					if (name.endsWith("rows")) assert.ok(document.querySelectorAll(".mtable .mtr").length >= 2 || document.querySelectorAll(".mtable .vlist > span").length >= 2, "two real rows, not repaired-away slashes");
 				}

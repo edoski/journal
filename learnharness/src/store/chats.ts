@@ -49,7 +49,7 @@ function createChat(title: string, course?: CourseLink, topics: readonly string[
 		updatedAt: now,
 		messages: [],
 		...(course ? { course: { workspace: course.workspace, title: course.title } } : {}),
-		...(topics.length > 0 ? { topics: [...topics] } : {}),
+		...(topics.length > 0 ? { topics: [...topics], appOpening: true as const } : {}),
 		...(arcCheck ? { arcCheck } : {}),
 	};
 	fs.mkdirSync(PATHS.chats, { recursive: true });

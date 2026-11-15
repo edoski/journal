@@ -393,15 +393,17 @@ export function ModeToggle({ mode, kind, onToggle }: { mode: "answer" | "ask"; k
 	);
 }
 
-/** How sure he is as a meter of three rising bars, drawn on lucide's 24px
- *  grid and 2px stroke so it sits with the toolbar's icons: Guessing lights
- *  one, Neutral two, Confident three; the rest stay at 30%. */
+/** How sure he is as a meter of three rising bars on lucide's 24px grid:
+ *  Guessing lights one, Neutral two, Confident three; the rest stay at 30%.
+ *  The bars are wider than the icons' 2px stroke, with rounder ends (Edo,
+ *  15 Nov 2026: thin bars read sharp and narrow). */
+const METER_BAR_WIDTH = 3.5;
 const LIT: Record<Confidence, number> = { guessing: 1, neutral: 2, confident: 3 };
 
 function ConfidenceMeter({ value }: { value: Confidence }) {
 	const lit = LIT[value] ?? 2;
 	return (
-		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden data-lit={lit}>
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={METER_BAR_WIDTH} strokeLinecap="round" aria-hidden data-lit={lit}>
 			{[
 				{ x: 6, top: 14 },
 				{ x: 12, top: 9 },

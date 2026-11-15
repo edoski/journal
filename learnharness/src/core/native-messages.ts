@@ -986,13 +986,25 @@ export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
  *  cleanly-posed problem BEFORE this conclude call. The reveal is never
  *  re-authored (the slim schema dropped solutionReveal); legacy conclude
  *  inputs that still carry their own solutionReveal fall back to it at the
- *  card. Undefined when the pose carries no string solution. */
+ *  card. Undefined when the pose carries no string solution, and when he
+ *  pressed Explain instead on it: the explanation that follows is its
+ *  answer, and the same solution above it said it twice (round 9). */
 export function modelSolutionForConclude(
 	messages: readonly LhMessage[],
 	concludeCallId: string,
 ): string | undefined {
-	const input = problemInputForConclude(messages, concludeCallId);
-	return typeof input?.modelSolution === "string" ? input.modelSolution : undefined;
+	const pose = poseForConclude(messages, concludeCallId);
+	if (!pose || typeof pose.input?.modelSolution !== "string") return undefined;
+	return explainedInstead(messages, pose.id) ? undefined : pose.input.modelSolution;
+}
+
+/** He pressed Explain instead on this problem. */
+function explainedInstead(messages: readonly LhMessage[], problemCallId: string): boolean {
+	return messages.some((m) => {
+		if (m.role !== "custom" || m.customType !== "practice-request") return false;
+		const d = m.details as Partial<PracticeRequestDetails> | null;
+		return d?.problemCallId === problemCallId && d.request === "explain";
+	});
 }
 
 /** The full pose-side fold (owner round 17, 2026-10-06 — observability):
@@ -1004,7 +1016,14 @@ export function modelSolutionForConclude(
 export function problemInputForConclude(
 	messages: readonly LhMessage[],
 	concludeCallId: string,
-): { statement?: unknown; mode?: unknown; topics?: unknown; modelSolution?: unknown } | undefined {
+): PoseInput | undefined {
+	return poseForConclude(messages, concludeCallId)?.input;
+}
+
+type PoseInput = { statement?: unknown; mode?: unknown; topics?: unknown; modelSolution?: unknown };
+
+/** The cleanly-posed problem a conclude call ends: the newest before it. */
+function poseForConclude(messages: readonly LhMessage[], concludeCallId: string): { id: string; input: PoseInput | undefined } | undefined {
 	let mi = messages.findIndex(
 		(m) =>
 			(m as { role?: string }).role === "assistant" &&
@@ -1022,9 +1041,7 @@ export function problemInputForConclude(
 			const block = assistant.content[bi]!;
 			if (block.type !== "toolCall" || block.name !== PRACTICE_PROBLEM_TOOL) continue;
 			if (!clean.has(block.id)) continue; // a refused pose revealed nothing
-			return (block.arguments ?? undefined) as
-				| { statement?: unknown; mode?: unknown; topics?: unknown; modelSolution?: unknown }
-				| undefined;
+			return { id: block.id, input: (block.arguments ?? undefined) as PoseInput | undefined };
 		}
 	}
 	return undefined;

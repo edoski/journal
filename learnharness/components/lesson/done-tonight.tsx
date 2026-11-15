@@ -8,7 +8,8 @@ import { LESSON_WORDS } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
 /** Done for today: he stops now, whatever the tutor left open. A clear
- *  outlined button with its icon, so it reads as the one way to stop.
+ *  outlined button with its icon, so it reads as the one way to stop, its
+ *  corners those of the lesson's other buttons, not a pill (Edo, 15 Nov 2026).
  *  `gone` once the lesson is closed for today: it keeps its room in the
  *  bar, unseen and out of reach, so the roadmap beside it stays still
  *  (round 6: the strip jumped 146px). */
@@ -22,7 +23,7 @@ export function DoneTonightButton({ onDone, disabled, gone = false }: { onDone: 
 			aria-hidden={gone || undefined}
 			tabIndex={gone ? -1 : undefined}
 			onClick={onDone}
-			className={cn("shrink-0 rounded-full px-3 font-normal has-[>svg]:px-3", gone && "invisible")}
+			className={cn("shrink-0 px-3 font-normal has-[>svg]:px-3", gone && "invisible")}
 		>
 			<CircleCheckIcon />
 			{LESSON_WORDS.doneTonight}

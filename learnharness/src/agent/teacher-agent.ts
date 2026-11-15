@@ -25,6 +25,8 @@ import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../core/native-messages.ts";
+
+const PROBE_DONE_TOOL = "probe_done";
 import { VoiceGuard } from "./voice-guard.ts";
 
 /**
@@ -104,12 +106,16 @@ export interface AgentBuildOptions {
  * validation does not: the model retries within the same turn. Practice's
  * problem pose and the mode handoffs have the same wait-for-the-answer
  * contract, mixed batches included (sdk/agent.ts holds a clean pose until
- * every pose of its reply resolved cleanly).
+ * every pose of its reply resolved cleanly). The prober's clean probe_done
+ * ends its turn too: the teacher opens the lesson next, and closing words
+ * after it were only written to be withheld (round 9: 7 s of the 70 s
+ * before teaching).
  */
-function endsTurnFor(kind: AgentKind): (toolName: string) => boolean {
+export function endsTurnFor(kind: AgentKind): (toolName: string) => boolean {
 	return (name) =>
 		(QUESTION_TOOLS as readonly string[]).includes(name) ||
 		(kind === "practice" && name === PRACTICE_PROBLEM_TOOL) ||
+		(kind === "prober" && name === PROBE_DONE_TOOL) ||
 		MODE_HANDOFF_TOOLS[name] !== undefined;
 }
 
