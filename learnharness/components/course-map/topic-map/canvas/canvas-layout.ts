@@ -6,7 +6,7 @@
  * on its prerequisite's bracket, and into the topic's top centre. Pure.
  */
 
-import { coordSimplex, decrossOpt, decrossTwoLayer, graphStratify, layeringSimplex, sugiyama, type Layering } from "d3-dag";
+import { coordSimplex, decrossOpt, decrossTwoLayer, graphStratify, layeringSimplex, sugiyama, type Decross, type Layering, type SugiNode } from "d3-dag";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "@/src/core";
 import { layoutTopicMap, type PlacedTopic, type Point, type Route, type TopicMapLayout } from "../topic-map-layout";
 
@@ -128,6 +128,7 @@ function lanesOf(crossings: readonly Crossing[]): Map<Crossing, number> {
 function straighten(
 	nodes: readonly { id: string; layer: number; x: number; width: number }[],
 	links: readonly { source: string; target: string; columns: readonly number[]; layer: number }[],
+	gap: number,
 ): Map<string, number> {
 	const x = new Map(nodes.map((n) => [n.id, n.x]));
 	const layerOf = new Map(nodes.map((n) => [n.id, n.layer]));
@@ -159,7 +160,7 @@ function straighten(
 			const near = ends(n.id);
 			const score = (at: number) => near.reduce((s, e) => s + cost(e - at), 0);
 			const beside = others(n.id);
-			const free = (at: number) => beside.every((o) => Math.abs(o.at - at) >= o.half + n.width / 2 + NODE_GAP - 0.5 && Math.sign(o.at - at) === Math.sign(o.at - here));
+			const free = (at: number) => beside.every((o) => Math.abs(o.at - at) >= o.half + n.width / 2 + gap - 0.5 && Math.sign(o.at - at) === Math.sign(o.at - here));
 			const best = near.filter((at) => free(at) && score(at) < score(here) && !crossedStraight(n.id, at)).sort((a, b) => score(a) - score(b) || Math.abs(a - here) - Math.abs(b - here))[0];
 			if (best !== undefined) {
 				x.set(n.id, best);
@@ -182,6 +183,15 @@ function corners(points: readonly Point[]): Point[] {
 		kept.push(p);
 	}
 	return kept;
+}
+
+/** Each layer left to right by rank: a box by its own, a line passing through by its ends' middle. */
+function byRank(order: (id: string) => number): Decross<{ id: string }, unknown> {
+	const rank = (n: SugiNode<{ id: string }, unknown>) =>
+		n.data.role === "node" ? order(n.data.node.data.id) : (order(n.data.link.source.data.id) + order(n.data.link.target.data.id)) / 2;
+	return (layers) => {
+		for (const layer of layers) layer.sort((a, b) => rank(a) - rank(b));
+	};
 }
 
 /** A box to place: a topic's card, or a group of them. */
@@ -207,6 +217,11 @@ export interface LayeredOptions {
 	layerOf?: (id: string) => number;
 	/** Room kept clear just above a layer, under the lines that reach it (a band's header). */
 	headerAbove?: (layer: number) => number;
+	/** Space between boxes side by side; the card gap unset. */
+	nodeGap?: number;
+	/** Each box's rank left to right in its layer (an arc's place in study order), in place of the order that
+	 *  crosses the fewest lines; a line passing through a layer sits between its ends' ranks. */
+	order?: (id: string) => number;
 }
 
 /** Boxes in layers with their links, each link `source>target` as its corners. */
@@ -254,9 +269,9 @@ export function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { so
 			const box = node.data ? size.get(node.data.id) : undefined;
 			return box ? [box.width, box.height] : [0, 0];
 		})
-		.gap([NODE_GAP, GAP])
+		.gap([options.nodeGap ?? NODE_GAP, GAP])
 		.layering(layering)
-		.decross(nodes.length <= OPTIMAL_DECROSS_LIMIT ? decrossOpt() : decrossTwoLayer())
+		.decross(options.order ? byRank(options.order) : nodes.length <= OPTIMAL_DECROSS_LIMIT ? decrossOpt() : decrossTwoLayer())
 		.coord(coordSimplex())(dag);
 
 	const layerYs = [...new Set([...dag.nodes()].map((n) => n.y))].sort((a, b) => a - b);
@@ -264,6 +279,7 @@ export function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { so
 	straighten(
 		[...dag.nodes()].map((n) => ({ id: n.data.id, layer: layerYs.indexOf(n.y), x: n.x, width: size.get(n.data.id)!.width })),
 		[...dag.links()].map((link, i) => ({ source: link.source.data.id, target: link.target.data.id, columns: columnsOf[i]!, layer: layerYs.indexOf(link.source.y) })),
+		options.nodeGap ?? NODE_GAP,
 	).forEach((x, id) => {
 		for (const n of dag.nodes()) if (n.data.id === id) n.x = x;
 	});

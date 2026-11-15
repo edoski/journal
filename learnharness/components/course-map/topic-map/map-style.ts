@@ -7,8 +7,10 @@ import { onPolishChange, polishVariant } from "@/components/dev/polish-variant.j
  *  (design-variant.ts). Current is the map as it is. Every candidate reads
  *  the same course record, says the same words and opens the same pages:
  *  - `tree`: Canvas tree, the canvas drawing only the needs no longer path
- *    implies (canvas/canvas.md; Edo's pick, 16 Nov 2026). */
-export const MAP_STYLE_OPTIONS = ["tree"] as const;
+ *    implies (canvas/canvas.md; Edo's pick, 16 Nov 2026);
+ *  - `regions`: Canvas tree with each arc a numbered, tinted region holding
+ *    its topics, one line between arcs (regions/regions.md). */
+export const MAP_STYLE_OPTIONS = ["tree", "regions"] as const;
 export type MapStyle = "current" | (typeof MAP_STYLE_OPTIONS)[number];
 
 const DEV = process.env.NODE_ENV === "development";
