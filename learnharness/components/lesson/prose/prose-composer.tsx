@@ -343,7 +343,7 @@ function AnswerComposer({
 				head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
 				photos={textMode ? photos : undefined}
 			/>
-			{confirmShow && typeof document !== "undefined" && <ShowMeConfirm what={confirmShow} onClose={() => setConfirmShow(null)} onConfirm={shown} />}
+			{typeof document !== "undefined" && <ShowMeConfirm what={confirmShow} onClose={() => setConfirmShow(null)} onConfirm={shown} />}
 		</>
 	);
 }

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useDialogSubject } from "@/components/ui/overlay";
 import { cn } from "@/lib/utils";
 import { ExamDayField, MaterialField } from "@/components/new-course-fields";
 import { DeleteCourseDialog, RenameCourseDialog } from "@/components/course-manage-dialogs";
@@ -166,34 +167,28 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
 				onManage={(action, course) => setManaging({ action, course })}
 				asked={choice.asked}
 			/>
-			{creating && (
-				<NewCourseDialog
-					roots={state.roots}
-					onClose={() => setCreating(false)}
-					onCreated={(course) => choice.add(course)}
-					onCloseAutoFocus={focusComposer}
-				/>
-			)}
-			{managing?.action === "rename" && (
-				<RenameCourseDialog
-					course={managing.course}
-					onClose={() => setManaging(null)}
-					onRenamed={(title) => {
-						choice.renamed(managing.course.workspace, title);
-						setManaging(null);
-					}}
-				/>
-			)}
-			{managing?.action === "delete" && (
-				<DeleteCourseDialog
-					course={managing.course}
-					onClose={() => setManaging(null)}
-					onDeleted={() => {
-						choice.removed(managing.course.workspace);
-						setManaging(null);
-					}}
-				/>
-			)}
+			<NewCourseDialog
+				roots={creating ? state.roots : null}
+				onClose={() => setCreating(false)}
+				onCreated={(course) => choice.add(course)}
+				onCloseAutoFocus={focusComposer}
+			/>
+			<RenameCourseDialog
+				course={managing?.action === "rename" ? managing.course : null}
+				onClose={() => setManaging(null)}
+				onRenamed={(title) => {
+					if (managing) choice.renamed(managing.course.workspace, title);
+					setManaging(null);
+				}}
+			/>
+			<DeleteCourseDialog
+				course={managing?.action === "delete" ? managing.course : null}
+				onClose={() => setManaging(null)}
+				onDeleted={() => {
+					if (managing) choice.removed(managing.course.workspace);
+					setManaging(null);
+				}}
+			/>
 		</>
 	);
 }
@@ -416,10 +411,19 @@ export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fet
 	);
 }
 
-export function NewCourseDialog(props: { roots: readonly string[]; onClose: () => void; onCreated: (course: CourseSummary) => void; onCloseAutoFocus?: (e: Event) => void }) {
+export function NewCourseDialog({ roots, ...props }: {
+	/** The folders a new course can go in; null = closed. */
+	roots: readonly string[] | null;
+	onClose: () => void;
+	onCreated: (course: CourseSummary) => void;
+	onCloseAutoFocus?: (e: Event) => void;
+}) {
+	const { open, shown, opening } = useDialogSubject(roots);
 	return (
-		<Dialog open onOpenChange={(open) => !open && props.onClose()}>
-			<NewCourseBody {...props} />
-		</Dialog>
+		shown && (
+			<Dialog open={open} onOpenChange={(next) => !next && props.onClose()}>
+				<NewCourseBody key={opening} roots={shown} {...props} />
+			</Dialog>
+		)
 	);
 }

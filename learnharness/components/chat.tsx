@@ -1801,9 +1801,7 @@ export function Chat({
 					/>
 				)}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
-				{disputing && disputeMark && (
-					<DisputeDialog key={disputing} mark={disputeMark} onClose={() => setDisputing(null)} onSend={(draft) => sendDispute(disputing, disputeMark, draft)} />
-				)}
+				<DisputeDialog mark={disputeMark ?? null} onClose={() => setDisputing(null)} onSend={(draft) => disputing && disputeMark && sendDispute(disputing, disputeMark, draft)} />
 				</div>
 			</div>
 		</div>

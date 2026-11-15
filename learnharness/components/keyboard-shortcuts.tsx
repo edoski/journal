@@ -183,9 +183,8 @@ export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }
  *  in the app's own words. A label too long for its column wraps under
  *  itself rather than losing its end. */
 function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-	if (!open) return null;
 	return (
-		<Dialog open onOpenChange={(next) => !next && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
 			<DialogContent aria-describedby={undefined} data-testid="cheat-sheet" className="max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Keyboard shortcuts</DialogTitle>

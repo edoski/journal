@@ -68,7 +68,7 @@ describe("dialogs keep their actions", () => {
 	it("abort: an alert dialog with the question's own words and action, Cancel first", async () => {
 		await mount(
 			<AlertDialog open>
-				<AbortTurnBody mode="problem" busy onClose={() => {}} onConfirm={() => {}} />
+				<AbortTurnBody open mode="problem" busy onClose={() => {}} onConfirm={() => {}} />
 			</AlertDialog>,
 		);
 		assert.equal($('[data-testid="abort-turn-dialog"]')?.getAttribute("role"), "alertdialog");

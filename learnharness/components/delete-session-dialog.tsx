@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	AlertDialog,
@@ -10,6 +10,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useDialogSubject } from "@/components/ui/overlay";
 import type { ChatListItem } from "@/src/core";
 
 /** A refused delete, by the route's code, in the learner's words. */
@@ -34,8 +35,7 @@ const FAILURE_WORDS: Record<string, string> = {
  */
 export function DeleteSessionDialog({
 	chat,
-	onClose,
-	onDeleted,
+	...props
 }: {
 	/** The session up for deletion; null = closed. */
 	chat: Pick<ChatListItem, "id" | "title"> | null;
@@ -43,19 +43,28 @@ export function DeleteSessionDialog({
 	/** Success path — the sidebar owns navigation + list patching. */
 	onDeleted: (id: string) => void;
 }) {
+	const { open, shown, opening } = useDialogSubject(chat);
+	return shown && <DeleteSessionAlert key={opening} open={open} chat={shown} {...props} />;
+}
+
+/** One opening of the dialog: its own busy and failure, so the next
+ *  opening starts clean. */
+function DeleteSessionAlert({
+	open,
+	chat,
+	onClose,
+	onDeleted,
+}: {
+	open: boolean;
+	chat: Pick<ChatListItem, "id" | "title">;
+	onClose: () => void;
+	onDeleted: (id: string) => void;
+}) {
 	const [busy, setBusy] = useState(false);
 	const [failure, setFailure] = useState<{ code: string; error: string } | null>(null);
 
-	// Fresh state per session: closing resets, opening a new chat starts clean.
-	useEffect(() => {
-		if (!chat) {
-			setBusy(false);
-			setFailure(null);
-		}
-	}, [chat]);
-
 	const run = async () => {
-		if (!chat || busy) return;
+		if (busy) return;
 		setBusy(true);
 		setFailure(null);
 		try {
@@ -79,10 +88,8 @@ export function DeleteSessionDialog({
 		}
 	};
 
-	if (!chat) return null;
-
 	return (
-		<AlertDialog open onOpenChange={(open) => !open && !busy && onClose()}>
+		<AlertDialog open={open} onOpenChange={(next) => !next && !busy && onClose()}>
 			<DeleteSessionBody
 				chat={chat}
 				busy={busy}
@@ -94,8 +101,8 @@ export function DeleteSessionDialog({
 	);
 }
 
-/** The dialog's body — exported for render pins. The wrapper owns state,
- *  effects and the AlertDialog root. */
+/** The dialog's body — exported for render pins. The wrapper owns state
+ *  and the AlertDialog root. */
 export function DeleteSessionBody({
 	chat,
 	busy,
