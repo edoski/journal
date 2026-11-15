@@ -791,10 +791,10 @@ export function Chat({
 	// a pending question still owns the interaction (the dock replaces the
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
-	// Compaction (owner round 14): the RUNNING state, flipped by
-	// compaction-changed. Nothing gates on it: the server holds any turn
-	// until the compaction ends, so his Enter goes through and the line
-	// below the transcript says why the reply waits (round 6).
+	// Compaction: a turn held for it, flipped by compaction-changed (only a
+	// lesson at its limit waits; round 9). Nothing gates on it: his Enter
+	// goes through and the line below the transcript says why the reply
+	// waits (round 6).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	// A turn the server is setting up itself (turn-waking): the line shows
 	// from the start of its setup, not only once it runs.
@@ -1259,10 +1259,9 @@ export function Chat({
 		if (p.chatId === chatId) setWaking(p.waking);
 	});
 	useServerEvent("compaction-changed", (p) => {
-		// The settle-kick's background summary: while it runs, sends gate
-		// (the next turn's server-side ensureCompacted awaits it anyway —
-		// this only keeps the affordance honest). On finish, record-changed
-		// (emitted by the compaction write itself) carries the marker in.
+		// A turn of this lesson waits on its compaction (the lesson is at
+		// its limit). On finish, record-changed (emitted by the compaction
+		// write itself) carries the marker in.
 		if (p.chatId !== chatId) return;
 		setCompacting(p.running);
 	});

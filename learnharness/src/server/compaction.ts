@@ -1,6 +1,7 @@
 import {
 	activeCompactionOf,
 	compactionInstructions,
+	compactionLimitTokens,
 	compactionTriggerTokens,
 	contextTokensOf,
 	newCompactionMarker,
@@ -13,15 +14,19 @@ import type { ChatStore } from "../core/ports.ts";
 import { compactSession } from "../agent/sdk/compact.ts";
 import type { SdkEngine } from "../agent/sdk/engine.ts";
 import type { SessionStore } from "../agent/sdk/session-files.ts";
+import { isTurnRunning } from "./turn-liveness.ts";
 
 /**
  * The app's compaction policy over Claude Code's own compaction. Once a
- * settled turn's last request carried the trigger's worth of context, the
- * lesson's session is compacted in the background, inside the learner's
- * pause (question and problem poses end turns, so a settle is always
- * between turns), with the lesson's instructions. The next turn waits for a
- * compaction still running: nothing model-facing for a lesson interleaves
- * with one. Claude Code's automatic compaction stays on as the backstop.
+ * settled turn's last request carried the trigger's worth of context, a
+ * copy of the lesson's session is compacted in the background, inside the
+ * learner's pause, with the lesson's instructions. The lesson takes the
+ * compacted copy only if no turn ran on its session meanwhile; a summary a
+ * turn overtook is dropped and redone once no turn runs. So a turn never
+ * waits on a compaction while its request still fits under the limit
+ * (round 9: 30 to 43 s under "Compacting the conversation…"); only a lesson
+ * at the limit waits for its compaction. Claude Code's automatic
+ * compaction stays on as the backstop.
  */
 export interface CompactionDeps {
 	canStart?: () => boolean;
@@ -29,19 +34,35 @@ export interface CompactionDeps {
 	engine: SdkEngine;
 	kind: "teach" | "practice" | "probe";
 	thresholdTokens: number;
+	/** The most context a turn's request may carry: at it, the turn waits
+	 *  for the compaction. */
+	limitTokens: number;
 	sessionStore?: SessionStore;
 }
 
 interface CompactionState {
 	inFlight: Map<string, Promise<void>>;
+	/** Lessons whose running compaction a turn went past. */
+	overtaken: Set<string>;
+	/** Lessons whose turn waits on their compaction. */
+	holding: Set<string>;
 }
-const g = globalThis as typeof globalThis & { __lhCompaction?: CompactionState };
+const g = globalThis as typeof globalThis & { __lhCompaction?: Partial<CompactionState> };
 function state(): CompactionState {
-	return (g.__lhCompaction ??= { inFlight: new Map() });
+	const s = (g.__lhCompaction ??= {});
+	s.inFlight ??= new Map();
+	s.overtaken ??= new Set();
+	s.holding ??= new Set();
+	return s as CompactionState;
 }
 
 export function compactionInFlight(chatId: string): boolean {
 	return state().inFlight.has(chatId);
+}
+
+/** A turn of the lesson waits on its compaction: the lesson says so. */
+export function compactionHoldsTurn(chatId: string): boolean {
+	return state().holding.has(chatId);
 }
 
 export async function awaitCompaction(chatId: string): Promise<void> {
@@ -53,6 +74,11 @@ export async function awaitCompaction(chatId: string): Promise<void> {
 export function effectiveThresholdTokens(contextWindowTokens: number | undefined): number {
 	const override = Number(process.env.LH_COMPACTION_TOKENS);
 	return Number.isFinite(override) && override > 0 ? override : compactionTriggerTokens(contextWindowTokens);
+}
+
+/** The limit for a model window, never under its trigger. */
+export function effectiveLimitTokens(contextWindowTokens: number | undefined): number {
+	return Math.max(compactionLimitTokens(contextWindowTokens), effectiveThresholdTokens(contextWindowTokens));
 }
 
 /** The context the lesson's last request carried, or 0 when a compaction
@@ -71,14 +97,21 @@ function due(record: ChatRecord, deps: CompactionDeps): boolean {
 	return record.session !== undefined && settledContextTokens(record.messages) >= deps.thresholdTokens;
 }
 
-async function compact(deps: CompactionDeps, chatId: string): Promise<void> {
+/** One compaction of a copy of the session: "overtaken" when a turn ran on
+ *  the lesson meanwhile, so the summary was dropped. */
+async function compact(deps: CompactionDeps, chatId: string): Promise<"done" | "overtaken"> {
 	const record = deps.chatStore.getChat(chatId);
-	if (!record?.session || !due(record, deps)) return;
-	emit("compaction-changed", { chatId, running: true });
+	if (!record?.session || !due(record, deps)) return "done";
+	const from = record.session;
+	state().overtaken.delete(chatId);
 	try {
-		const done = await compactSession(deps.engine, record.session, compactionInstructions(deps.kind, planTreeToText(record.tree, record.messages)), deps.sessionStore);
+		const done = await compactSession(deps.engine, from, compactionInstructions(deps.kind, planTreeToText(record.tree, record.messages)), deps.sessionStore);
 		const fresh = deps.chatStore.getChat(chatId);
-		if (!fresh?.session) return;
+		if (!fresh?.session) return "done";
+		if (state().overtaken.has(chatId) || isTurnRunning(chatId) || fresh.session.id !== from.id || fresh.session.synced !== from.synced) {
+			console.info(`[chat ${chatId}] compaction dropped: a turn ran on the lesson while it worked`);
+			return "overtaken";
+		}
 		const marker = newCompactionMarker(done.summary, {
 			firstKeptMessageId: "",
 			tokensBefore: done.tokensBefore,
@@ -86,29 +119,51 @@ async function compact(deps: CompactionDeps, chatId: string): Promise<void> {
 			at: new Date().toISOString(),
 		});
 		deps.chatStore.saveMessages(chatId, [...fresh.messages, marker]);
-		deps.chatStore.saveSession(chatId, { id: fresh.session.id, synced: fresh.session.synced, ...(done.anchor ? { anchor: done.anchor } : {}) });
+		deps.chatStore.saveSession(chatId, { id: done.sessionId, synced: fresh.session.synced, ...(done.anchor ? { anchor: done.anchor } : {}) });
+		done.keep();
 		emit("record-changed", { chatId });
 	} catch (err) {
 		console.error(`[chat ${chatId}] compaction failed:`, err);
 	} finally {
-		emit("compaction-changed", { chatId, running: false });
+		state().overtaken.delete(chatId);
 	}
+	return "done";
+}
+
+/** Compacts until a summary lands or a turn is running, whose settle kicks
+ *  the next one. */
+async function run(deps: CompactionDeps, chatId: string): Promise<void> {
+	while (await compact(deps, chatId) === "overtaken" && !isTurnRunning(chatId) && deps.canStart?.() !== false);
 }
 
 function start(deps: CompactionDeps, chatId: string): Promise<void> {
-	const run = compact(deps, chatId);
-	state().inFlight.set(chatId, run);
-	return run.finally(() => state().inFlight.delete(chatId));
+	const running = run(deps, chatId);
+	state().inFlight.set(chatId, running);
+	return running.finally(() => state().inFlight.delete(chatId));
 }
 
-/** The turn gate: waits for a running compaction, and compacts now when the
- *  lesson is still over the trigger (the settle kick was skipped). */
+/** The turn gate. Under the limit the turn goes ahead at once, past any
+ *  running compaction. At the limit it waits for the running compaction,
+ *  or compacts now (the settle kick was skipped), and the lesson says why
+ *  the reply waits. */
 export async function ensureCompacted(deps: CompactionDeps, chatId: string): Promise<void> {
-	await awaitCompaction(chatId);
-	if (deps.canStart?.() === false) return;
 	const record = deps.chatStore.getChat(chatId);
-	if (!record || !due(record, deps) || state().inFlight.has(chatId)) return;
-	await start(deps, chatId);
+	if (!record || settledContextTokens(record.messages) < deps.limitTokens) {
+		if (state().inFlight.has(chatId)) state().overtaken.add(chatId);
+		return;
+	}
+	state().holding.add(chatId);
+	emit("compaction-changed", { chatId, running: true });
+	try {
+		while (state().inFlight.has(chatId)) await awaitCompaction(chatId);
+		if (deps.canStart?.() === false) return;
+		const fresh = deps.chatStore.getChat(chatId);
+		if (!fresh || !due(fresh, deps)) return;
+		await start(deps, chatId);
+	} finally {
+		state().holding.delete(chatId);
+		emit("compaction-changed", { chatId, running: false });
+	}
 }
 
 /** The settle kick: starts the compaction in the background when due. */

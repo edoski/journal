@@ -450,8 +450,8 @@ export interface ChatSummary {
  *  split at exactly the record/liveness seam. */
 export interface ChatListItem extends ChatSummary {
 	busy: boolean;
-	/** Live compaction liveness (turn-liveness's twin): true while a
-	 *  background context compaction holds the chat's model gate. The
+	/** Live compaction liveness (turn-liveness's twin): true while a turn
+	 *  of the chat waits on its compaction (the lesson is at its limit). The
 	 *  route attaches it from the compaction registry — never
 	 *  record-derived (the marker persists, the RUN is ephemeral). */
 	compacting: boolean;

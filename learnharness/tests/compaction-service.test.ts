@@ -4,7 +4,9 @@
  * - the trigger reads the settled turn's last request (input + cacheRead + cacheWrite);
  * - over the trigger → the session is compacted, a marker with the summary
  *   is appended, the session map moves to the compacted anchor, events fire;
- * - the registry is a mutex, and a later gate rides the in-flight run;
+ * - the registry is a mutex, and a gate at the limit rides the in-flight run;
+ * - a compaction works on a copy of the session: under the limit a turn
+ *   never waits on it, and a summary a turn overtook is dropped and redone;
  * - background eligibility (`canStart`) skips without writes;
  * - a lesson with no session is never compacted;
  * - LH_COMPACTION_TOKENS overrides the trigger.
@@ -23,7 +25,7 @@ const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-compaction-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
 const { chatStore } = await import("../src/store/chats.ts");
-const { ensureCompacted, kickCompaction, awaitCompaction, compactionInFlight, effectiveThresholdTokens } = await import("../src/server/compaction.ts");
+const { ensureCompacted, kickCompaction, awaitCompaction, compactionInFlight, compactionHoldsTurn, effectiveThresholdTokens, effectiveLimitTokens } = await import("../src/server/compaction.ts");
 import type { CompactionDeps } from "../src/server/compaction.ts";
 const { subscribe } = await import("../src/core/events.ts");
 const { activeCompactionOf, newUserMessage, COMPACTED_HISTORY_HEADER } = await import("../src/core/index.ts");
@@ -73,7 +75,7 @@ function compactor(fake: FakeSdk, { gate, fail = false }: { gate?: Promise<void>
 			const lines: unknown[] = fail
 				? [{ type: "result", subtype: "error_during_execution", is_error: true, errors: ["boom"] }]
 				: [
-					{ type: "system", subtype: "init", session_id: params.options.resume, apiKeySource: "none", mcp_servers: [], uuid: `init-${k}` },
+					{ type: "system", subtype: "init", session_id: params.options.forkSession ? params.options.sessionId : params.options.resume, apiKeySource: "none", mcp_servers: [], uuid: `init-${k}` },
 					{ type: "system", subtype: "compact_boundary", compact_metadata: { trigger: "manual", pre_tokens: 45_000 }, uuid: `boundary-${k}` },
 					{ type: "user", isSynthetic: true, message: { role: "user", content: `This session is being continued from a previous conversation that ran out of context. Summary:\nSUMMARY #${k}: the learner knows buckets.\n\nIf you need specific details from before compaction, read the transcript.` }, parent_tool_use_id: null, uuid: `summary-${k}` },
 					{ type: "result", subtype: "success", is_error: false, result: "", session_id: params.options.resume },
@@ -88,7 +90,9 @@ function compactor(fake: FakeSdk, { gate, fail = false }: { gate?: Promise<void>
 	return { engine, runs };
 }
 
-const depsOf = (engine: SdkEngine, thresholdTokens = OVER): CompactionDeps => ({ chatStore, engine, kind: "teach", thresholdTokens });
+/** The limit defaults to the trigger: a lesson with no room left, whose turn waits. */
+const depsOf = (engine: SdkEngine, thresholdTokens = OVER, limitTokens = thresholdTokens): CompactionDeps => ({ chatStore, engine, kind: "teach", thresholdTokens, limitTokens });
+const ROOM = 1_000_000;
 
 function watchEvents(chatId: string): { events: string[]; off: () => void } {
 	const events: string[] = [];
@@ -121,6 +125,9 @@ describe("the compaction service", () => {
 		assert.match(String(runs[0]!.prompt), /^\/compact This is a tutoring session/, "Claude Code's own /compact with the lesson's instructions");
 		assert.equal(runs[0]!.options.resume, session!.id);
 		assert.equal(runs[0]!.options.resumeSessionAt, "anchor-before", "a cut session compacts from its anchor");
+		assert.equal(runs[0]!.options.forkSession, true, "it compacts a copy: the lesson's own session is never written");
+		const copy = runs[0]!.options.sessionId!;
+		assert.notEqual(copy, session!.id);
 
 		const record = chatStore.getChat(chatId)!;
 		const marker = activeCompactionOf(record.messages);
@@ -129,7 +136,7 @@ describe("the compaction service", () => {
 		assert.equal(marker!.content, `${COMPACTED_HISTORY_HEADER}\n\nSUMMARY #1: the learner knows buckets.`, "the summary without Claude Code's framing");
 		assert.equal(marker!.details.firstKeptMessageId, "", "Claude Code's compaction keeps no verbatim tail");
 		assert.equal(marker!.details.tokensBefore, 45_000);
-		assert.deepEqual(record.session, { id: session!.id, synced: session!.synced, anchor: "summary-1" }, "the anchor moves to the compacted session's end, and the cut clears");
+		assert.deepEqual(record.session, { id: copy, synced: session!.synced, anchor: "summary-1" }, "the lesson moves to the compacted copy, at its end, and the cut clears");
 		assert.deepEqual(events, ["true", "record", "false"]);
 	});
 
@@ -176,7 +183,7 @@ describe("the compaction service", () => {
 		await ensureCompacted(depsOf(engine), chatId);
 		off();
 		assert.equal(runs.length, 1, "the marker after the last reply means no context is settled over the trigger");
-		assert.deepEqual(events, ["true", "record", "false"], "no second compaction started");
+		assert.deepEqual(events, ["record"], "no second compaction started, and one in the background holds no turn, so the lesson shows no line for it");
 	});
 
 	it("a lesson with no session is never compacted", async () => {
@@ -228,6 +235,78 @@ describe("the compaction service", () => {
 		assert.equal(closed, true, "the silent query is closed");
 		assert.equal(compactionInFlight(chatId), false, "the gate is released");
 		assert.deepEqual(chatStore.getChat(chatId), before, "no marker, no session change");
+	});
+
+	it("a turn under the limit never waits on a running compaction: the summary it overtook is dropped and redone once no turn runs (round 9 #5, 30 to 43 s under \"Compacting the conversation…\")", async () => {
+		const { chatId, fake, session } = await lesson("compact: overtaken");
+		let release!: () => void;
+		const gate = new Promise<void>((done) => { release = done; });
+		const first = compactor(fake, { gate });
+		const { events, off } = watchEvents(chatId);
+		kickCompaction(() => depsOf(first.engine, OVER, ROOM), chatId);
+		assert.equal(compactionInFlight(chatId), true);
+		let passed = false;
+		const turn = ensureCompacted(depsOf(first.engine, OVER, ROOM), chatId).then(() => { passed = true; });
+		await new Promise((r) => setTimeout(r, 10));
+		assert.equal(passed, true, "his turn goes ahead while the copy is compacted");
+		assert.equal(compactionHoldsTurn(chatId), false, "no turn waits, so the lesson shows no compacting line");
+		await turn;
+		release();
+		await awaitCompaction(chatId);
+		await awaitCompaction(chatId);
+		off();
+		assert.equal(first.runs.length, 2, "the overtaken summary is redone once no turn runs");
+		const record = chatStore.getChat(chatId)!;
+		assert.equal(record.messages.filter((m) => m.role === "custom" && m.customType === "compaction").length, 1, "only the redone summary lands");
+		assert.equal(record.session!.id, first.runs[1]!.options.sessionId, "the lesson moves to the redone copy");
+		assert.notEqual(record.session!.id, session!.id);
+		assert.deepEqual(events, ["record"]);
+	});
+
+	it("a compaction a turn ran past while it worked is never adopted: the lesson keeps the session the turn wrote", async () => {
+		const { chatId, fake, session } = await lesson("compact: turn ran");
+		let release!: () => void;
+		const gate = new Promise<void>((done) => { release = done; });
+		const { engine, runs } = compactor(fake, { gate });
+		kickCompaction(() => ({ ...depsOf(engine, OVER, ROOM), canStart: () => runs.length < 1 }), chatId);
+		chatStore.saveSession(chatId, { ...session!, synced: "a turn that ran meanwhile" });
+		release();
+		await awaitCompaction(chatId);
+		const record = chatStore.getChat(chatId)!;
+		assert.equal(activeCompactionOf(record.messages), null, "no marker for a summary of an older conversation");
+		assert.deepEqual(record.session, { ...session!, synced: "a turn that ran meanwhile" });
+	});
+
+	it("at the limit his turn waits for the compaction, and only then does the lesson say so", async () => {
+		const { chatId, fake } = await lesson("compact: at the limit");
+		let release!: () => void;
+		const gate = new Promise<void>((done) => { release = done; });
+		const { engine, runs } = compactor(fake, { gate });
+		const { events, off } = watchEvents(chatId);
+		let passed = false;
+		const turn = ensureCompacted(depsOf(engine, OVER, 45_000), chatId).then(() => { passed = true; });
+		await new Promise((r) => setTimeout(r, 10));
+		assert.equal(passed, false, "45k reaches a 45k limit: the request would not fit");
+		assert.equal(compactionHoldsTurn(chatId), true);
+		release();
+		await turn;
+		off();
+		assert.equal(compactionHoldsTurn(chatId), false);
+		assert.equal(runs.length, 1);
+		assert.deepEqual(events, ["true", "record", "false"]);
+	});
+
+	it("effectiveLimitTokens: the window less its reserve, unmoved by LH_COMPACTION_TOKENS", () => {
+		const previous = process.env.LH_COMPACTION_TOKENS;
+		try {
+			process.env.LH_COMPACTION_TOKENS = "20000";
+			assert.equal(effectiveLimitTokens(200_000), 200_000 - 16_384);
+			assert.equal(effectiveLimitTokens(undefined), 150_000, "with no known window the trigger's bound is the limit");
+			assert.equal(effectiveLimitTokens(10_000), 20_000, "never under the trigger");
+		} finally {
+			if (previous === undefined) delete process.env.LH_COMPACTION_TOKENS;
+			else process.env.LH_COMPACTION_TOKENS = previous;
+		}
 	});
 
 	it("effectiveThresholdTokens: LH_COMPACTION_TOKENS overrides; else the 150k bound or the window rule", () => {

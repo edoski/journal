@@ -38,7 +38,7 @@ import { persistTurn, TurnPersistenceError } from "./turn-service.ts";
 import { answeredQuestionsOf, hasUnresolvedQuestion, HIS_MESSAGE, recordedBySaves, respondingAgentOf, type LhMessage } from "../core/native-messages.ts";
 import { remarkableOf } from "../core/answer-marks.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
-import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
+import { ensureCompacted, kickCompaction, effectiveLimitTokens, effectiveThresholdTokens } from "./compaction.ts";
 import { PATHS } from "../../config.ts";
 import { nextChatSession } from "../core/sdk-session.ts";
 import type { SessionStore } from "../agent/sdk/session-files.ts";
@@ -167,12 +167,14 @@ function sessionStoreFor(chatId: string): SessionStore {
 }
 
 function compactionDeps(chatId: string, record: ChatRecord, engine: SdkEngine, account: string) {
+	const window = catalogContextLimits().get(`${engine.model.provider}:${engine.model.id}`);
 	return {
 		chatStore: stores.chatStore,
 		engine,
 		canStart: () => connectionBackgroundAllowed(account),
 		kind: compactionKind(record),
-		thresholdTokens: effectiveThresholdTokens(catalogContextLimits().get(`${engine.model.provider}:${engine.model.id}`)),
+		thresholdTokens: effectiveThresholdTokens(window),
+		limitTokens: effectiveLimitTokens(window),
 		sessionStore: sessionStoreFor(chatId),
 	};
 }
@@ -288,15 +290,13 @@ export async function handleChatInput(
 		return Response.json(envelope, { status: 503 });
 	}
 
-	// THE COMPACTION GATE (owner round 14, 2026-10-05 — the structural
-	// ruling: NOTHING model-facing for this chat interleaves with a
-	// running compaction): await any in-flight compaction (the settle
-	// kick usually finished inside the learner's answer pause), and if
-	// the record is STILL over threshold, compact synchronously — this
-	// request waits. Skipped under tests (scripted chats are fixtures);
-	// placement mirrors the connection gate — BEFORE appends and
-	// beginTurn, no liveness effects — and the record re-reads after
-	// because compaction appends the marker.
+	// THE COMPACTION GATE: nothing model-facing for this chat writes the
+	// session a compaction reads, because a compaction works on a copy.
+	// Under the limit the turn goes ahead at once; a lesson at the limit
+	// waits for its compaction (round 9: 30 to 43 s of waiting on a
+	// summary he never needed yet). Placement mirrors the connection gate:
+	// BEFORE appends and beginTurn, and the record re-reads after because
+	// compaction appends the marker.
 	let conversationEngine: SdkEngine;
 	try { conversationEngine = claudeEngine(account); }
 	catch { return Response.json({ error: CLAUDE_MODEL_MISSING }, { status: 503 }); }
@@ -639,8 +639,8 @@ export async function handleChatInput(
 				// projection is now over threshold, the summary starts in the
 				// background, INSIDE the learner's reading/answering pause
 				// (question/problem poses end runs, so this moment is always a
-				// between-runs window). The next turn's ensureCompacted gate
-				// awaits whatever this leaves running; a lost engine or a
+				// between-runs window). A turn that comes before it ends runs
+				// past it, and the summary is redone after; a lost engine or a
 				// beneath-threshold record is a silent no-op. Skipped under
 				// tests (scripted chats are fixtures; the service itself is
 				// pinned directly).

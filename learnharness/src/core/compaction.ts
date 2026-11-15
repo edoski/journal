@@ -21,12 +21,18 @@ export const COMPACTION_RESERVE_TOKENS = 16_384;
  *  long lesson draws, well inside every window. */
 export const DEFAULT_COMPACTION_THRESHOLD_TOKENS = 150_000;
 
-/** Where compaction triggers for a model window: the bound, or the window
- *  less its reserve when that is smaller; the bound alone with no known
- *  window. Pure. */
-export function compactionTriggerTokens(contextWindowTokens: number | undefined | null): number {
+/** The most context a request may carry in a model window: the window less
+ *  its reserve, or the bound with no known window. A lesson past it waits
+ *  for its compaction; under it, a turn never does. Pure. */
+export function compactionLimitTokens(contextWindowTokens: number | undefined | null): number {
 	if (contextWindowTokens == null) return DEFAULT_COMPACTION_THRESHOLD_TOKENS;
-	return Math.min(DEFAULT_COMPACTION_THRESHOLD_TOKENS, Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1));
+	return Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1);
+}
+
+/** Where compaction triggers for a model window: the bound, or the limit
+ *  when that is smaller. Pure. */
+export function compactionTriggerTokens(contextWindowTokens: number | undefined | null): number {
+	return Math.min(DEFAULT_COMPACTION_THRESHOLD_TOKENS, compactionLimitTokens(contextWindowTokens));
 }
 
 /** The context one request carried: every input token, cached or not. */
