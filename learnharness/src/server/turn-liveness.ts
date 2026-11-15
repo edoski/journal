@@ -24,12 +24,12 @@ import { emit } from "../core/events.ts";
 import { clearTurnFailure } from "./turn-runs.ts";
 
 interface LhGlobal {
-	__lhTurnRegistry?: Set<string>;
+	__lhTurnsInFlight?: Set<string>;
 }
 
 function registry(): Set<string> {
 	const g = globalThis as typeof globalThis & LhGlobal;
-	return (g.__lhTurnRegistry ??= new Set<string>());
+	return (g.__lhTurnsInFlight ??= new Set<string>());
 }
 
 const inFlight = registry();
