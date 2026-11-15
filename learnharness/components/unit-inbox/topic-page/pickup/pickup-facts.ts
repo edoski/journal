@@ -117,7 +117,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 			};
 		}
 		case "review":
-			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today) };
+			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), chat: "chat" in action ? action.chat.id : null };
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
