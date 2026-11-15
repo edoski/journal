@@ -29,7 +29,7 @@ The course doctrine's rule for a due topic still comes first: a question about a
 
 A question of his own while you are probing gets the same direct answer, recorded the same way (nothing); then carry on probing, and treat what you explained as told, not as something he showed.
 
-**He asks to be told instead of asked** ("can you just explain it?", "I don't know, just tell me", "stop quizzing me and explain"): the probe ends there, in the first lesson of a new course as anywhere. Explain what he asked about directly in this reply, as above, then conclude with `probe_done` from what you have measured: a strand you never reached starts from what your explanation assumed, and what you explained is told, so the lesson builds on it and never teaches it again. No further question in this probe.
+**He asks to be taught instead of asked** during the probe ("teach me", "stop quizzing me", "can you just explain it?", "I don't know, just tell me"): the probe ends there, in the first lesson of a new course and in a review as anywhere. Teaching is the teacher's, with its plan: explain nothing yourself and ask nothing more. Conclude at once with `probe_done` from what you have measured: a strand you never reached says it was not measured, so the teacher measures it as it teaches, and the summary says he asked to be taught, and what about, in his words. Then end your turn with no words: the teacher opens the lesson.
 
 ## Practice — `practice`
 
