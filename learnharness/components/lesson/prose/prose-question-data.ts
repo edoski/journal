@@ -11,6 +11,7 @@ import {
 	normalizeQuestionType,
 	parseQuestionInput,
 	QUESTION_TOOLS,
+	sameQuestionKey,
 	toolQuestionKind,
 	type AskToolInput,
 	type Confidence,
@@ -185,6 +186,20 @@ function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
 	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next);
 }
 
+/** Whether `next` asks again, in the same words, a question he answered
+ *  with a question of his own, sent in Answer mode by mistake: the tutor
+ *  answers it and asks the question again as it was, whose words are on
+ *  screen above already (round 10, 2 m7: printed in full a second time).
+ *  A question after a real answer is drawn in full. */
+function sameWords(left: QuestionPart, next: QuestionPart): boolean {
+	const answer = left.output as Partial<QuestionAnswerData> | undefined;
+	if (!answer || answer.dismissed === true || answer.hintRequested === true || !answer.text?.trim().endsWith("?")) return false;
+	const words = (part: QuestionPart) => (part.input as { question?: unknown } | undefined)?.question;
+	const x = words(left);
+	const y = words(next);
+	return typeof x === "string" && typeof y === "string" && questionKindOf(left) === questionKindOf(next) && sameQuestionKey(x) === sameQuestionKey(y);
+}
+
 function sameStep(a: QuestionPart, b: QuestionPart): boolean {
 	const step = (part: QuestionPart) => (part.input as { nodeId?: unknown } | undefined)?.nodeId;
 	const x = step(a);
@@ -207,14 +222,16 @@ export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPar
  *  the transcript draws its words once, above the hint or his side
  *  question, so the re-ask draws only the mark that it is his turn again
  *  (round 5: the whole question printed twice after a hint; round 6: after
- *  a side question; round 8: twice again whenever the re-ask was reworded). */
+ *  a side question; round 8: twice again whenever the re-ask was reworded).
+ *  So is one asked again word for word after he sent a question as his
+ *  answer (`sameWords`). */
 export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
 	const reasked = new Set<string>();
 	let previous: QuestionPart | null = null;
 	for (const message of messages) {
 		for (const part of message.parts) {
 			if (!asked(part)) continue;
-			if (previous && part.toolCallId && leftOpen(previous.output) !== null && asksAgain(previous, part)) reasked.add(part.toolCallId);
+			if (previous && part.toolCallId && ((leftOpen(previous.output) !== null && asksAgain(previous, part)) || sameWords(previous, part))) reasked.add(part.toolCallId);
 			previous = part;
 		}
 	}

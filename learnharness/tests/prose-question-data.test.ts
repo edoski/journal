@@ -103,6 +103,13 @@ describe("a question asked again after a hint", () => {
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, aside)] }, { parts: [hint, ask("q2", reworded)] }])], ["q2"]);
 	});
 
+	it("is drawn once when asked again word for word after his answer, as after a question he sent as his answer by mistake (round 10, 2 m7)", () => {
+		const asQuestion = proseAnswer(spec, emptyDockSelection(), "Why does independence matter here?", "neutral");
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, asQuestion)] }, { parts: [hint, ask("q2", check)] }])], ["q2"]);
+		const other = { ...check, question: "Which way does $B$ stretch?" };
+		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, asQuestion)] }, { parts: [hint, ask("q2", other)] }])], [], "a new question after his answer is drawn in full");
+	});
+
 	it("draws a different question after a hint in full: another step, or another form", () => {
 		const onStep = { ...check, nodeId: "stretch" };
 		const otherStep = { ...check, nodeId: "det", question: "What is $\\det A$?" };
