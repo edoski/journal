@@ -1,5 +1,7 @@
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
+import { CourseMark } from "@/components/unit-inbox/unit-row";
+import { useSystemVariant } from "@/components/design-variant";
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, studiedLabel, whyOf, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
@@ -40,6 +42,8 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  */
 export function HybridRows({ rows, busy, onContinue, standing = false, ...point }: RowsProps & { standing?: boolean }) {
 	const { shown, also } = foldLines(rows);
+	// The visual system's Proposed: the course's badge, the sidebar card's own, on the course line, where a ring read as a checkbox.
+	const badge = useSystemVariant() === "proposed";
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
 			{shown.map((row) => {
@@ -48,7 +52,11 @@ export function HybridRows({ rows, busy, onContinue, standing = false, ...point 
 				return (
 					<li key={lineKey(row)} className={HAIRLINE}>
 						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, standing ? cn(COLUMNS_STANDING, ROW_CORNERS) : COLUMNS)} {...pointProps(row, point)}>
-							<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
+							{badge ? (
+								<span className="row-span-2 self-start">{row.course && <CourseMark title={row.course.map.title} />}</span>
+							) : (
+								<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
+							)}
 							<MathLine className="text-callout system-current:text-label text-muted-foreground">{courseTitle(row)}</MathLine>
 							{facts !== undefined && <SlipFact facts={facts} />}
 							<span data-slot="today-when" className="justify-self-end text-callout system-current:text-label text-muted-foreground tabular-nums">

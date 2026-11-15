@@ -48,7 +48,7 @@ The older `text-xs`…`text-3xl` names resolve to the same sizes (`--lh-text-*`)
 |---|---|---|---|
 | nav | 32 | 16 icon, 8, words | `nav/nav-row.tsx` |
 | course page topic | 32 (36 roomy) | pie 16, 16, title, fact at the end | `course-page/course-topic-row.tsx` |
-| Today | 64 | course ring, two lines; standing column (Proposed); reason column flush right | `study-home/agenda-rows/hybrid` |
+| Today | 64 | course ring (on the Visual system's Proposed, the course's badge on the course line, `CourseMark`), two lines; standing column (Proposed); reason column flush right | `study-home/agenda-rows/hybrid` |
 | sidebar card | 60 or 80 | course badge, course and status, title | `unit-inbox/row-card.tsx` |
 | Settings nav | 32, 2 apart | words | `settings/settings-dialog.tsx` |
 
