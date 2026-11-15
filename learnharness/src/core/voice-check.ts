@@ -41,6 +41,7 @@ export type VoiceRule =
 	| "advice"
 	| "echo"
 	| "duplicate"
+	| "machinery"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -65,6 +66,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
 	{ rule: "comprehension", re: /\b(?:does (?:that|this) make sense|is that clear|any questions)\b/i },
+	// The app's own parts are nothing he talks about (round 9: "Your message
+	// arrived in the answer field…, so that question is now closed").
+	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
 ];
 
 /** Requests in an instruction text for a form the voice bans: each names
