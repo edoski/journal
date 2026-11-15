@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
-import { STREAM_DROPPED, visibleQueuedSteers } from "@/components/session-core";
+import { droppedError, visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,7 @@ import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, type LeftOpen } from "@/components/lesson/stranded-draft";
-import { sendHoldingDraft } from "@/components/lesson/sent-draft";
+import { sendKeepingWords } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
 import { carryBox, carryWords, forgetClosedBoxes, keepForNewLesson, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
@@ -810,7 +810,7 @@ export function Chat({
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
 	// A dropped connection: Try again asks the app what became of the reply.
-	const dropped = status === "error" && error?.message === STREAM_DROPPED;
+	const dropped = status === "error" && droppedError(error);
 	const [healFailed, setHealFailed] = useState(false);
 	useEffect(() => setHealFailed(false), [error]);
 	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : dropped ? () => healDroppedStreamRef.current().then((healed) => setHealFailed(!healed)) : retryable && !claudeLimit ? retryFailedTurn : undefined;
@@ -1164,7 +1164,7 @@ export function Chat({
 		// The channel came back after the app restarted: a turn the restart
 		// cut never settles, so the dropped stream's line would stand
 		// forever. Ask the record what is true now.
-		if (statusRef.current === "error" && errorMessageRef.current === STREAM_DROPPED) void healDroppedStreamRef.current();
+		if (statusRef.current === "error" && droppedError(errorRef.current)) void healDroppedStreamRef.current();
 	});
 	useEffect(
 		() => () => {
@@ -1182,8 +1182,8 @@ export function Chat({
 	// between renders, and a ref holds the live value at event time.
 	const statusRef = useRef(status);
 	statusRef.current = status;
-	const errorMessageRef = useRef(error?.message);
-	errorMessageRef.current = error?.message;
+	const errorRef = useRef(error);
+	errorRef.current = error;
 	// Also Try again on the dropped line (round 7: after a restart the line
 	// sat ~26 s with nothing to press): false while the app can't be reached.
 	const healDroppedStreamRef = useRef(async (): Promise<boolean> => false);
@@ -1309,16 +1309,19 @@ export function Chat({
 		if (pending) return;
 		doSteerOrSend();
 	};
-	// A refused send puts its photos back, as the refusal flow keeps the text.
-	const sendWithPhotos = (go: (photos: Photo[] | undefined) => Promise<boolean>) => {
+	// A send that fails puts what he typed and his photos back (sent-draft.ts).
+	const sendWithPhotos = (typed: string, go: (text: string, photos: Photo[] | undefined, onAccepted: () => void) => Promise<boolean>) => {
 		const taken: PendingPhoto[] = composerPhotos.take();
-		void go(sentPhotos(taken)).then((accepted) => {
+		const photos = sentPhotos(taken);
+		void sendKeepingWords(draftRef, typed, (text, onAccepted) => go(text, photos, onAccepted), () => textRef.current).then(({ accepted, back }) => {
 			if (!accepted) composerPhotos.restore(taken);
+			if (back !== null) applyText(back);
 		});
 	};
 	const doSend = () => {
 		if (busy || pending) return;
-		const t = textRef.current.trim();
+		const typed = textRef.current;
+		const t = typed.trim();
 		const withPhotos = composerPhotos.photos.length > 0;
 		if (!t && !withPhotos) return;
 		if (unconnected) {
@@ -1330,7 +1333,7 @@ export function Chat({
 			return;
 		}
 		applyText("");
-		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }, onAccepted)));
+		sendWithPhotos(typed, (text, photos, onAccepted) => send({ type: "text", text, ...(photos ? { photos } : {}) }, onAccepted));
 	};
 
 	/* STEER VS SEND (owner arc 2026-10-03): a send while a turn runs steers
@@ -1344,11 +1347,11 @@ export function Chat({
 	 * plain send; a raced settle 409s and falls back to exactly that. */
 	const doSteerOrSend = () => {
 		if (pending) return;
-		const t = textRef.current.trim();
-		if (!t && composerPhotos.photos.length === 0) return;
+		const typed = textRef.current;
+		if (!typed.trim() && composerPhotos.photos.length === 0) return;
 		if (busy) {
 			applyText("");
-			sendWithPhotos((photos) => steer(t, photos));
+			sendWithPhotos(typed, (text, photos, onAccepted) => steer(text, photos, onAccepted));
 			return;
 		}
 		doSend();
@@ -1361,7 +1364,8 @@ export function Chat({
 	 * again as it was, and his answer so far waits for it in the carry. A
 	 * problem stays open and his message reaches the tutor beside it. */
 	const askInstead = async () => {
-		const t = textRef.current.trim();
+		const typed = textRef.current;
+		const t = typed.trim();
 		if (!t && composerPhotos.photos.length === 0) return;
 		if (unconnected) {
 			setSetupOpen(true);
@@ -1374,13 +1378,13 @@ export function Chat({
 			const question = (p.input as { question?: string } | null)?.question ?? "";
 			if (carryScope) carryBox(`${chatId}:q:${p.key}`, carryScope, { question, from: p.toolCallId });
 			if (!(await dismissQuestion(p.toolCallId, dismissedAnswer(toolQuestionKind(p.tool), question, "asked"), p.key))) return;
-		} else if (busyRef.current) {
-			applyText("");
-			sendWithPhotos((photos) => steer(t, photos));
-			return;
 		}
 		applyText("");
-		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, asked: true, ...(photos ? { photos } : {}) }, onAccepted)));
+		if (!p && busyRef.current) {
+			sendWithPhotos(typed, (text, photos, onAccepted) => steer(text, photos, onAccepted));
+			return;
+		}
+		sendWithPhotos(typed, (text, photos, onAccepted) => send({ type: "text", text, asked: true, ...(photos ? { photos } : {}) }, onAccepted));
 	};
 
 	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner

@@ -91,6 +91,16 @@ async function turnInFlight(model: SessionModel): Promise<boolean | null> {
 
 export const STREAM_DROPPED = LESSON_WORDS.connectionDropped;
 
+/** The failure a session shows. `dropped` keeps a reply the connection cut
+ *  owed while a later send fails for its own reason (round 10, 4 major 1). */
+export type SessionError = { message: string; repeat?: number; dropped?: true };
+
+/** Whether the reply the connection cut is still owed: the drop's own line,
+ *  or a later failure that kept it. */
+export function droppedError(error: SessionError | null | undefined): boolean {
+	return error?.message === STREAM_DROPPED || error?.dropped === true;
+}
+
 /** Mark transport failures without confusing JSON/application bugs with drops. */
 class StreamReadError extends Error {
 	constructor(cause: unknown) {
@@ -193,7 +203,7 @@ export interface SessionState {
 	status: SessionStatus;
 	/** `repeat` counts the failures just before it that failed the same
 	 *  way, so a press that fails again still shows (round 9). */
-	error: { message: string; repeat?: number } | null;
+	error: SessionError | null;
 	/** Steers sent but not yet drained (composer steering, 2026-10-03):
 	 *  the queued indicator's truth. An entry dies when its id lands in
 	 *  the messages (the drain's verbatim events upsert the real card) —
@@ -259,7 +269,7 @@ export class SessionModel {
 	private streamingMessageId: string | null = null;
 	private statusValue: SessionStatus = "ready";
 	/** Request/loop failures are transient; provider failures derive from messages. */
-	private errorValue: { message: string; repeat?: number } | null = null;
+	private errorValue: SessionError | null = null;
 	/** The failure the send under way tries again after, and how many
 	 *  times it had already repeated: failing the same way again is a
 	 *  repeat (round 9: a second Enter while the app was down changed
@@ -346,9 +356,9 @@ export class SessionModel {
 		this.onChange?.();
 	}
 
-	private setError(message: string | null): void {
+	private setError(message: string | null, dropped = false): void {
 		const repeat = message !== null && this.retrying?.message === message ? this.retrying.repeat + 1 : 0;
-		this.errorValue = message === null ? null : repeat > 0 ? { message, repeat } : { message };
+		this.errorValue = message === null ? null : { message, ...(repeat > 0 ? { repeat } : {}), ...(dropped ? { dropped: true as const } : {}) };
 		if (message !== null) this.retrying = null;
 		if (message !== null) this.automaticContinuationBlocked = true;
 		this.onChange?.();
@@ -689,6 +699,9 @@ export class SessionModel {
 		this.consumeAbort = controller;
 		this.latestRequest = controller;
 		this.retrying = recovering && this.errorValue ? { message: this.errorValue.message, repeat: this.errorValue.repeat ?? 0 } : null;
+		// A send that fails after the connection cut a reply leaves that
+		// reply owed: the app's return still recovers it.
+		const afterDrop = recovering && droppedError(this.errorValue);
 		this.setError(null);
 		this.setStatus("submitted");
 		if (recovering && input.type === "answer") {
@@ -715,7 +728,7 @@ export class SessionModel {
 				}
 			} catch (err) {
 				if (this.consumeAbort !== controller || controller.signal.aborted) return false;
-				this.setError((err as Error).message);
+				this.setError((err as Error).message, afterDrop);
 				this.setStatus("error");
 				return false;
 			}
@@ -836,7 +849,7 @@ export class SessionModel {
 					for (const id of ids) this.unconfirmedAnswers.delete(id);
 				});
 			}
-			this.setError((err as Error).message);
+			this.setError((err as Error).message, afterDrop && !accepted);
 			this.setStatus("error");
 			// true means we observed this POST's acknowledgment. false does
 			// NOT prove non-delivery: a network failure may hide acceptance.
@@ -856,8 +869,9 @@ export class SessionModel {
 	 *  key) and the indicator's fold drops the line. A 409 means the turn
 	 *  settled mid-send (the race): fall back to the plain text send —
 	 *  the entry is dropped and send() pushes its own optimistic card.
+	 *  `onAccepted` fires once the app took it, either way.
 	 */
-	async steer(text: string, photos?: Photo[]): Promise<boolean> {
+	async steer(text: string, photos?: Photo[], onAccepted?: () => void): Promise<boolean> {
 		const t = text.trim();
 		if (!t && !photos?.length) return false;
 		const id = `steer_${localId()}`;
@@ -873,10 +887,13 @@ export class SessionModel {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ input: { type: "steer", id, text: t, ...(photos?.length ? { photos } : {}) } }),
 			});
-			if (res.ok) return true; // parked or delivered — the stream lands the card
+			if (res.ok) {
+				onAccepted?.();
+				return true; // parked or delivered — the stream lands the card
+			}
 			if (res.status === 409) {
 				dropSteer();
-				return await this.send({ type: "text", text: t, ...(photos?.length ? { photos } : {}) }); // the settle race: plain send
+				return await this.send({ type: "text", text: t, ...(photos?.length ? { photos } : {}) }, onAccepted); // the settle race: plain send
 			}
 			dropSteer();
 			this.setError((await res.text()) || `The steer failed (${res.status}).`);
@@ -1048,7 +1065,7 @@ export class SessionModel {
 	 *  A dropped connection is no failure of the tutor's, so the record alone
 	 *  decides what is owed next, as when the lesson opens. */
 	recoverDroppedStream(): void {
-		if (this.statusValue !== "error" || this.errorValue?.message !== STREAM_DROPPED) return;
+		if (this.statusValue !== "error" || !droppedError(this.errorValue)) return;
 		this.automaticContinuationBlocked = false;
 		this.setError(null);
 		this.setStatus("ready");

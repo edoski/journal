@@ -16,3 +16,25 @@ export function sendHoldingDraft(
 		if (held.current === text) held.current = null;
 	});
 }
+
+/**
+ * A message from the box on its way: its words are held for the refusal
+ * flows (sendHoldingDraft), and a send that fails gives them back as he
+ * typed them, trailing space too. Round 10 (4 major 1): a message sent
+ * while the app was down, after a reply the connection cut, emptied the
+ * box and was lost. Words another flow took meanwhile (a deleted course
+ * moves them to the New lesson box) stay there, and words he typed since
+ * stay in the box. Pure.
+ */
+export async function sendKeepingWords(
+	held: { current: string | null },
+	typed: string,
+	go: (text: string, onAccepted: () => void) => Promise<boolean>,
+	box: () => string,
+): Promise<{ accepted: boolean; back: string | null }> {
+	const text = typed.trim();
+	const accepted = await sendHoldingDraft(held, text, (onAccepted) => go(text, onAccepted));
+	if (accepted || held.current !== text) return { accepted, back: null };
+	held.current = null;
+	return { accepted, back: text && !box().trim() ? typed : null };
+}

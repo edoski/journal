@@ -21,7 +21,7 @@
  */
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { absorbed, pendingCallTool, SessionModel } from "../components/session-core.ts";
+import { absorbed, droppedError, pendingCallTool, SessionModel } from "../components/session-core.ts";
 import type { ChatInput } from "../src/core/input-events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { newUserMessage, newAnswerResult, newThinkingMessage, needsContinuation, endsInDismissal, pendingQuestionOf } from "../src/core/native-messages.ts";
@@ -961,6 +961,30 @@ describe("automatic continuation after recovery failure", () => {
 		m.setMessages(answered);
 		await m.continueIfOwed(answered);
 		assert.equal(JSON.parse(bodies.at(-1)!).input.type, "continue");
+	});
+
+	it("a message he sends while the app is down after a dropped reply keeps the drop, so the reply still comes back (round 10, 4 major 1)", async () => {
+		const bodies: string[] = [];
+		const restarted = droppedByRestart(bodies);
+		let down = false;
+		const up = restarted.fetch;
+		restarted.fetch = async (url, init) => {
+			if (down) throw new TypeError("Failed to fetch");
+			return up(url, init);
+		};
+		await restarted.send({ type: "answer", toolCallId: "q1", answer } as ChatInput);
+		assert.equal(restarted.getState().error?.message, "The connection dropped before the tutor finished replying.");
+		down = true;
+		assert.equal(await restarted.send({ type: "text", text: "hello? did that go through?" }, () => {}), false);
+		assert.equal(restarted.getState().error?.message, "Failed to fetch", "the line says the app can't be reached");
+		assert.ok(droppedError(restarted.getState().error), "the dropped reply is still owed");
+		assert.ok(!restarted.getState().nativeMessages.some((m) => m.role === "user"), "the refused message leaves no bubble");
+		down = false;
+		restarted.recoverDroppedStream();
+		assert.equal(restarted.getState().error, null);
+		restarted.setMessages(answered);
+		await restarted.continueIfOwed(answered);
+		assert.equal(JSON.parse(bodies.at(-1)!).input.type, "continue", "the dropped reply comes back once the app is");
 	});
 
 	it("only a dropped stream recovers so: a failed reply still waits for him", async () => {
