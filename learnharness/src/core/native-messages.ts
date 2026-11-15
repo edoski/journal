@@ -765,26 +765,18 @@ export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
 	return [...topics];
 }
 
-/** The topics a session's record first ties it to: its first problem's,
- *  else its first save's observations and introductions. A session with no
- *  topic of its own (one the naming rule never reached) belongs to them, so
- *  an open practice session stays with its topic (round 6 N10). */
-export function firstSessionTopicsOf(messages: readonly LhMessage[]): string[] {
+/** The topics a practice session's first problem is on. A practice session
+ *  with no topic of its own (one the naming rule never reached) belongs to
+ *  them, so it stays with its topic while open (round 6 N10); a lesson
+ *  still belongs to none until its plan names one. */
+export function firstProblemTopicsOf(messages: readonly LhMessage[]): string[] {
 	const clean = cleanToolCallIds(messages);
 	for (const m of messages) {
 		if ((m as { role?: string }).role !== "assistant") continue;
 		for (const block of (m as AssistantMessage).content) {
-			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
-			const args = block.arguments as Record<string, unknown>;
-			if (block.name === PRACTICE_PROBLEM_TOOL && strings(args.topics).length > 0) return strings(args.topics);
-			const changes = block.name === "course_save" ? saveChanges(args) : null;
-			if (!changes) continue;
-			const topics = new Set<string>();
-			for (const o of Array.isArray(changes.observations) ? changes.observations : []) for (const t of strings((o as { topics?: unknown } | null)?.topics)) topics.add(t);
-			if (typeof changes.topics === "object" && changes.topics !== null) {
-				for (const [t, patch] of Object.entries(changes.topics)) if ((patch as { introduced?: unknown } | null)?.introduced === true) topics.add(t);
+			if (block.type === "toolCall" && clean.has(block.id) && block.name === PRACTICE_PROBLEM_TOOL && strings((block.arguments as Record<string, unknown>).topics).length > 0) {
+				return strings((block.arguments as Record<string, unknown>).topics);
 			}
-			if (topics.size > 0) return [...topics];
 		}
 	}
 	return [];

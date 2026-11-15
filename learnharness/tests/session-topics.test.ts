@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { firstSessionTopicsOf, sessionTopicsOf, type LhMessage } from "../src/core/native-messages.ts";
+import { firstProblemTopicsOf, sessionTopicsOf, type LhMessage } from "../src/core/native-messages.ts";
 
 const call = (id: string, name: string, args: unknown) => ({ type: "toolCall", id, name, arguments: args });
 const assistant = (...content: unknown[]) => ({ role: "assistant", content, stopReason: "toolUse", timestamp: 0 });
@@ -54,27 +54,17 @@ describe("sessionTopicsOf", () => {
 	});
 });
 
-describe("firstSessionTopicsOf: the topic a session with none of its own belongs to (round 6 N10)", () => {
-	it("a practice session belongs to its first problem's topics, not every topic it touched later", () => {
+describe("firstProblemTopicsOf: the topic a practice session with none of its own belongs to (round 6 N10)", () => {
+	it("is its first problem's topics, not every topic it touched later", () => {
 		const messages = transcript(
+			assistant(call("s0", "course_save", { changes: { observations: [{ topics: ["span"], text: "…" }] } })),
+			result("s0"),
 			assistant(call("p1", "problem", { statement: "…", topics: ["rank"] })),
 			result("p1"),
 			assistant(call("s1", "course_save", { changes: { observations: [{ topics: ["kernel"], text: "…" }] } })),
 			result("s1"),
 		);
-		assert.deepEqual(firstSessionTopicsOf(messages), ["rank"]);
-	});
-
-	it("a lesson belongs to what its first save ties it to", () => {
-		const messages = transcript(
-			assistant(call("plan", "plan_init", { mermaid: "graph TD\n  a[A]" })),
-			result("plan"),
-			assistant(call("s1", "course_save", { changes: { topics: { eigen: { introduced: true } }, observations: [{ topics: ["eigen"], text: "…" }] } })),
-			result("s1"),
-			assistant(call("s2", "course_save", { changes: { observations: [{ topics: ["kernel"], text: "…" }] } })),
-			result("s2"),
-		);
-		assert.deepEqual(firstSessionTopicsOf(messages), ["eigen"]);
-		assert.deepEqual(firstSessionTopicsOf(transcript({ role: "user", content: "Why columns?", timestamp: 0 })), [], "a general question belongs to none");
+		assert.deepEqual(firstProblemTopicsOf(messages), ["rank"]);
+		assert.deepEqual(firstProblemTopicsOf(transcript({ role: "user", content: "Why columns?", timestamp: 0 })), []);
 	});
 });
