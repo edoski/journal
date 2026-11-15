@@ -1,14 +1,15 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
 import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
-import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
+import { planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
 	rows: readonly TodayRow[];
 	busy: boolean;
-	onContinue: (workspace: string) => void;
+	/** Take up a course line's step (`courseMove`). */
+	onContinue: (workspace: string, step?: NextStep) => void;
 	/** The line Home's map follows, and
 	 *  where a line reports that he points at it (by pointer or focus) or
 	 *  stops pointing. */
@@ -47,9 +48,14 @@ export function foldLines(rows: readonly TodayRow[]): { shown: readonly TodayRow
 	return { shown, also: rows.slice(shown.length) };
 }
 
-/** The key React keeps a line by. Pure. */
+/** The key React keeps a line by: a session's id, else its course and
+ *  step, since a course may have a line for its review, each open task and
+ *  today's new topics. Pure. */
 export function lineKey(row: TodayRow): string {
-	return row.kind === "session" ? row.chat.id : row.course.map.workspace;
+	if (row.kind === "session") return row.chat.id;
+	const { step } = row;
+	const which = step.kind === "task" ? `task:${step.key}` : step.kind === "none" ? "none" : `${step.kind}:${step.topics.join(",")}`;
+	return `${row.course.map.workspace}#${which}`;
 }
 
 /** A line's course by name, "No course" for a session outside one. Pure. */

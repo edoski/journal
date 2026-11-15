@@ -265,10 +265,11 @@ describe("the header's facts and next lesson", () => {
 
 	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
 		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
-		const next = courseNext(course(), [left]);
+		const next = courseNext(course({ tasks: [], focus: null }), [left]);
 		assert.equal(next.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
+		assert.equal(courseNext(course(), [left]).lesson.title, `Continue ${course().map.tasks[0]!.title}`, "with an open task, the line Home still has for the course");
 	});
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {

@@ -84,7 +84,8 @@ describe("NowCard", () => {
 	});
 
 	it("takes Home's word for a course line's action", () => {
-		assert.deepEqual(nowActionOf(lines[2]!), { label: "Review", workspace: "/s/prob" });
+		const row = lines[2]!.row;
+		assert.deepEqual(nowActionOf(lines[2]!), { label: "Review", workspace: "/s/prob", step: row.kind === "course" ? row.step : null }, "the line's own step, so it starts that lesson");
 		assert.deepEqual(nowActionOf(lines[0]!), { label: "Resume", href: "/chat/chat_eigen" });
 	});
 });

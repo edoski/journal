@@ -50,25 +50,43 @@ export type NextStep =
 	| { kind: "none" };
 
 export function nextStepOf(course: StudyCourse): NextStep {
+	return todaySteps(course)[0]!;
+}
+
+/**
+ * Every step a course holds for today, in the order Continue takes them, as
+ * the calendar lists today: today's review, each open task (the focused one
+ * first), then the new topics the plan starts today. With none of them, the
+ * one step after (`nextStepOf`'s rest): the current topic while it is
+ * taught, not yet his own and given no review, else the plan's next item on
+ * a later day, else the current topic not started, else none. Round 7:
+ * Today showed only the first, so Problem sheet 4 left Home once focus moved
+ * to a lesson's task, and Poisson, planned today, hid behind the review,
+ * while the calendar listed both. Never empty. Pure.
+ */
+export function todaySteps(course: StudyCourse): NextStep[] {
 	const { map } = course;
-	const task = map.tasks.find((t) => t.key === map.focus) ?? map.tasks[0];
+	const focused = map.tasks.find((t) => t.key === map.focus);
+	const tasks = focused ? [focused, ...map.tasks.filter((t) => t !== focused)] : map.tasks;
 	const current = map.topics.find((t) => t.handle === map.current);
+	const steps: NextStep[] = [];
 	const reviews = todaysReview(course);
 	if (reviews.length > 0) {
-		return { kind: "review", titles: reviews.map((t) => t.title), topics: reviews.map((t) => t.handle), then: task?.title ?? current?.title ?? null };
+		steps.push({ kind: "review", titles: reviews.map((t) => t.title), topics: reviews.map((t) => t.handle), then: tasks[0]?.title ?? current?.title ?? null });
 	}
-	if (task) {
+	for (const task of tasks) {
 		const held = map.topics.filter((t) => t.tasks.includes(task.key)).map((t) => t.handle);
-		return { kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] };
+		steps.push({ kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] });
 	}
 	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
 	if (planned.length > 0) {
-		return { kind: "topic", title: titleList(planned.map((t) => t.title)), topics: planned.map((t) => t.handle), fresh: true, planned: true };
+		steps.push({ kind: "topic", title: titleList(planned.map((t) => t.title)), topics: planned.map((t) => t.handle), fresh: true, planned: true });
 	}
+	if (steps.length > 0) return steps;
 	if (current && current.level !== "new" && !SOLID.has(current.level) && !current.review) {
-		return { kind: "topic", title: current.title, topics: [current.handle], fresh: false, planned: false };
+		return [{ kind: "topic", title: current.title, topics: [current.handle], fresh: false, planned: false }];
 	}
-	return laterStep(course) ?? (current?.level === "new" ? { kind: "topic", title: current.title, topics: [current.handle], fresh: true, planned: false } : { kind: "none" });
+	return [laterStep(course) ?? (current?.level === "new" ? { kind: "topic", title: current.title, topics: [current.handle], fresh: true, planned: false } : { kind: "none" })];
 }
 
 /** The plan's next item after today, or null when it dates none: the
@@ -168,9 +186,9 @@ const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
  * Today's lines: each session to pick up since yesterday (it waits on the
  * learner, the tutor writes in it, or stopped mid-reply) and each one left
  * for next time on an earlier day however long ago, most recent first,
- * then each course's next step, most urgent first and a line with nothing
- * for today last (`laterOnly`), unless a session shown, or one he ended
- * today, already works on it. A session he ended with Done for today has
+ * then each course's steps for today (`todaySteps`), most urgent course
+ * first and a line with nothing for today last (`laterOnly`), each unless a
+ * session shown, or one he ended today, already works on it. A session he ended with Done for today has
  * no line until tomorrow: he said he is done with it for today, and Home's
  * Studied today names it (round 4: the finished lesson stayed the first
  * row). A session stays on its line while the tutor writes. An older
@@ -185,11 +203,11 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
 	const working = open.filter((c) => recent.includes(c) || leftToday(c));
 	const rest = ordered
-		.flatMap((course): (TodayRow & { kind: "course" })[] => {
-			const step = nextStepOf(course);
-			const taken = working.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
-			return taken ? [] : [{ kind: "course", course, step }];
-		})
+		.flatMap((course): (TodayRow & { kind: "course" })[] =>
+			todaySteps(course)
+				.filter((step) => !working.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step)))
+				.map((step) => ({ kind: "course", course, step })),
+		)
 		.sort((a, b) => Number(laterOnly(a.step)) - Number(laterOnly(b.step)));
 	return [...sessions, ...rest];
 }
@@ -221,15 +239,15 @@ export function addDays(date: string, days: number): string {
 export type CourseMove = { kind: "open"; chat: ChatListItem } | { kind: "start"; opening: string; topics: readonly TopicHandle[]; from?: string };
 
 /**
- * A course's line, pressed: take up its next step. A review opens a session
+ * A course's line, pressed: take up its step (the course's next step when
+ * none is given). A review opens a session
  * on those topics that is still to pick up, else starts a review of them,
  * named for them; never an older lesson. An open task or the current topic
  * continues the lesson that holds it, as the session model says
  * (`continueMove`), else starts one. With nothing to take up, a session
  * starts and the tutor proposes. Pure.
  */
-export function courseMove(course: StudyCourse, chats: readonly ChatListItem[]): CourseMove {
-	const step = nextStepOf(course);
+export function courseMove(course: StudyCourse, chats: readonly ChatListItem[], step: NextStep = nextStepOf(course)): CourseMove {
 	const { workspace } = course.map;
 	const opening = stepWords(step);
 	if (step.kind === "none") return { kind: "start", opening: CONTINUE_OPENING, topics: [] };

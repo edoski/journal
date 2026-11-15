@@ -10,7 +10,7 @@ Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes 
 |---|---|---|---|
 | Course map | the selected course's map, faded at its edges, centred on "You are here" (home-map.md) | the course's `map`, already in `/api/study` | where he is and what is not started yet, in one picture; it also carries what the Exams section said (dashed topics are what's left before the exam) |
 | Course tabs | every course, in Today's order; opens on Today's first line's course | the same | a handful of courses; one click compares paths without leaving Home |
-| Today | each session to pick up, then each course's one next lesson (today.md) | `map` + `plan`'s `due` and run-up, sessions to pick up | the next action, not a to-do list (GTD's next action; Things' Today holds only what you'll do today) |
+| Today | each session to pick up, then every step each course's plan holds today (today.md) | `map` + `plan`'s `due` and run-up, sessions to pick up | the next action, not a to-do list (GTD's next action; Things' Today holds only what you'll do today) |
 
 ## What is cut, and why
 
