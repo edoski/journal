@@ -73,6 +73,32 @@ function outcomeLabel(outcome: string): string {
 	return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** Whether an explain result answered a question asked as a prediction. */
+function predictedAnswer(result: ToolResultMessage, ctx: MarkdownContext): boolean {
+	return result.toolName === "explain" && normalizeQuestionType(ctx.calls.get(result.toolCallId)?.args?.type) === "predict";
+}
+
+/** Everything the learner wrote in these messages, in order: his messages
+ *  and his answers to the tutor's questions, each marked when it answered a
+ *  prediction. What the lesson digest's gaps must quote (lesson-digest.ts). */
+export function learnerWords(messages: ReadonlyArray<LhMessage>): { text: string; predicted: boolean }[] {
+	const ctx = markdownContext(messages);
+	const words: { text: string; predicted: boolean }[] = [];
+	const add = (text: unknown, predicted: boolean) => {
+		if (typeof text === "string" && text.trim()) words.push({ text: text.trim(), predicted });
+	};
+	for (const message of messages) {
+		if (message.role === "user") for (const text of userFacingTextOf((message as { content: unknown }).content)) add(text, false);
+		else if (message.role === "custom" && (message as { customType?: string }).customType === "practice-thinking") add((message as { details?: { text?: unknown } }).details?.text, false);
+		else if (message.role === "toolResult" && !message.isError && ["explain", "recall", "ask_user_question"].includes(message.toolName)) {
+			const out = message.details as { text?: unknown; note?: unknown; other?: unknown } | undefined;
+			const predicted = predictedAnswer(message, ctx);
+			for (const text of [out?.text, out?.note, out?.other]) add(text, predicted);
+		}
+	}
+	return words;
+}
+
 /** One tool result's learner-visible outcome, rendered as body lines. */
 function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { heading: string; body: string[] } {
 	const out = result.details as
@@ -90,7 +116,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 	if (result.toolName === "explain" || result.toolName === "recall") {
 		// A prediction says so wherever the lesson is read back: the digest
 		// once wrote one's miss as the topic's gap (round 8, 1 D2).
-		const predicted = result.toolName === "explain" && normalizeQuestionType(ctx?.calls.get(result.toolCallId)?.args?.type) === "predict";
+		const predicted = ctx !== undefined && predictedAnswer(result, ctx);
 		const heading = result.toolName === "recall" ? "Recall" : predicted ? "Prediction" : "Recall check"; // explain — the teach free-recall name
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];

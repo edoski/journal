@@ -344,7 +344,7 @@ describe("when a topic comes up", () => {
 
 	it("never says a topic has no review before the exam beside a review day before it (round 9, 2 M1: Binomial read Review Wed 11 Nov, No review before the exam)", () => {
 		const exam = { date: "2026-11-19", daysLeft: 11, unreviewed: [h("binomial")], reasons: { binomial: "full" } as const };
-		const binomial = topic("binomial", { level: "assisted", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11", held: null } });
+		const binomial = topic("binomial", { level: "assisted", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11" } });
 		const facts = topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, binomial] } }, topic: binomial, chats: [], read: null });
 		assert.ok(binomial.review?.kind === "scheduled" && binomial.review.date < exam.date, "its review comes before the exam");
 		assert.doesNotMatch(facts.waits ?? "", /No review before the exam/);
