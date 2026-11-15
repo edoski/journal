@@ -603,6 +603,14 @@ export const STOP_WORDS = {
 	alsoStops: "The tutor's reply stops too.",
 } as const;
 
+/** Show me's confirm: it gives the question or problem up, which no undo
+ *  can take back once the answer is on screen (round 8: Show me gave up
+ *  at once, with no confirm). */
+export const SHOW_WORDS = {
+	question: { title: "Show the answer?", line: "This question counts as given up.", action: "Show me" },
+	problem: { title: "Show the solution?", line: "This problem counts as given up.", action: "Show me" },
+} as const;
+
 /** What stops a course's record being read, after
  *  `LESSON_WORDS.unreadableCourse`, in a student's words. */
 export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {

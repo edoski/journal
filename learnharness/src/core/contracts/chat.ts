@@ -178,15 +178,18 @@ export interface TurnUsage {
  *  fragment asks for. So the wake paces it: reason out the optimal way to
  *  teach THIS person THIS thing BEFORE plan_init. Honest to the machinery
  *  — plan_init is still the first tool and the plan map the first
- *  artifact; then the goal in one line and the first step, in the same
- *  turn (Edo, 14 Nov 2026: no approval of a map of material he doesn't
- *  know yet; he interrupts when he wants). */
+ *  artifact; then the first step, in the same turn (Edo, 14 Nov 2026: no
+ *  approval of a map of material he doesn't know yet; he interrupts when
+ *  he wants). No goal line (round 8: "Today: …" previewed the lesson), and
+ *  the step builds on the probe's feedback, which he already read (round
+ *  8: the first step re-taught it on the same matrix). */
 export const HANDOFF_TEXT =
 	"Next: plan the full teaching arc from my current understanding to the goal understanding. " +
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else.";
+	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
+	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans

@@ -175,6 +175,21 @@ export function planTitlesGiveAway(tree: Pick<PlanTree, "nodes">): string | null
 	);
 }
 
+/** A step named after the lesson itself: its topic's handle as the id, or
+ *  the lesson's title as the title's start. The whole map is the topic, so
+ *  such a step repeats it (round 8: "Invertible matrices: test and compute"
+ *  closed the Invertible matrices map). Words the tutor can act on, or null. */
+export function planStepIsTheTopic(tree: Pick<PlanTree, "nodes">, lesson: { topic?: string; titles: readonly string[] }): string | null {
+	const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+	const titles = lesson.titles.map(norm).filter((t) => t.length > 0);
+	const named = tree.nodes.filter((n) => (lesson.topic && n.id === lesson.topic) || titles.some((t) => norm(n.title) === t || norm(n.title).startsWith(`${t} `)));
+	if (named.length === 0) return null;
+	return (
+		`These steps are the lesson itself: ${named.map((n) => JSON.stringify(n.title)).join(", ")}. ` +
+		"The whole map is the topic, so leave such a step out: the map ends at the last step he reaches."
+	);
+}
+
 // The per-node mutation ops (addNode/updateNode/removeNode/addEdge/removeEdge/
 // setCurrent/markDone) were deleted with the author-once protocol
 // (2026-09-03) and their dead exports removed with the 2026-09-11 pivot: the

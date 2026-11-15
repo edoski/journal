@@ -44,13 +44,39 @@ function replaceEscapedDollars(content: string): string {
 	return out;
 }
 
+/** A display sets fractions at full size: `\tfrac` keeps the text size it
+ * was written for inline, tiny inside a display (round 8: Bin(n, 4/n) and
+ * (1/6)³ in displays). */
+const fullSizeFractions = (body: string) => body.replace(/\\tfrac(?![A-Za-z])/g, "\\frac");
+
+/** A matrix is read as a picture, so it stands in a display of its own,
+ * never inside a line of prose, where it doubles the line's height (round
+ * 8: a 2 × 2 matrix inline in a question). */
+const MATRIX_ENV = /\\begin\{[pbvBV]?matrix\}/;
+
 /** Read old \(...\)/\[...\] syntax without touching literal content or
  * reparsing native math as Markdown. Dollar authoring remains native. */
 export function transformMathDelimiters(markdown: string): string {
+	return transformDelimiters(markdown).replace(/\$\$([\s\S]*?)\$\$/g, (whole, body: string) => (body.includes("\\tfrac") ? `$$${fullSizeFractions(body)}$$` : whole));
+}
+
+/** A list item's or a table row's line, which a display would break. */
+function inListOrTable(text: string, i: number): boolean {
+	const line = text.slice(text.lastIndexOf("\n", i - 1) + 1, i);
+	return /^\s*(?:[-*+]|\d+[.)])\s/.test(line) || /^\s*\|/.test(line);
+}
+
+function transformDelimiters(markdown: string): string {
 	let offset = 0;
 	return readContentSpans(markdown).map(span => {
 		const start = offset; offset += span.raw.length;
 		if (span.kind !== "math") return span.raw;
+		if (span.open === "$" && MATRIX_ENV.test(span.body) && !indented(markdown, start) && !inListOrTable(markdown, start)) {
+			const end = start + span.raw.length;
+			const before = blockPosition(markdown, start) ? "" : "\n\n";
+			const after = end === markdown.length || markdown[end] === "\n" ? "" : "\n\n";
+			return `${before}$$\n${span.body.trim()}\n$$${after}`;
+		}
 		if (span.open === "$") return "$" + replaceEscapedDollars(span.body) + span.close;
 		if (span.open === "$$" && !span.display) {
 			// A formula alone on its line is a display, though written as

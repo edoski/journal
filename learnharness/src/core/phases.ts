@@ -14,8 +14,7 @@
  *            where teaching starts.
  *
  * There is no verdict gate and no approval step (Edo, 14 Nov 2026): the
- * teacher writes the plan, says the goal in one line and starts teaching
- * in the same turn. The live indicator LAGS by design (owner accepted):
+ * teacher writes the plan and starts teaching in the same turn. The live indicator LAGS by design (owner accepted):
  * "teach" shows only once the first node's question is posed.
  * A teacher that never tags a question can no longer exist — nodeId is
  * schema-required at the teach explain boundary (owner ruling 2026-09-26),

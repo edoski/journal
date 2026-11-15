@@ -66,8 +66,9 @@ export function RowFacts({ row }: { row: MarkRow }) {
 	return (
 		<span data-testid="mark-row" data-result={row.result} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
 			{row.label && <span className="text-muted-foreground">{row.label}</span>}
-			<Fact icon={RESULT_ICON[row.result]} className="text-foreground">{MARK_WORDS.result[row.result]}</Fact>
-			<Fact icon={HOW_ICON[how]}>{MARK_HOW_WORDS[how]}</Fact>
+			{/* Gave up says the result itself: "Not right · Gave up" was two chips for one fact (round 8). */}
+			{how !== "gaveUp" && <Fact icon={RESULT_ICON[row.result]} className="text-foreground">{MARK_WORDS.result[row.result]}</Fact>}
+			<Fact icon={HOW_ICON[how]} className={how === "gaveUp" ? "text-foreground" : undefined}>{MARK_HOW_WORDS[how]}</Fact>
 			{row.sure && <Fact icon={GaugeIcon}>{MARK_WORDS.sure[row.sure]}</Fact>}
 		</span>
 	);

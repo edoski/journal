@@ -32,7 +32,8 @@ function render(
 describe("Composer", () => {
 	it("chat placeholder + send button", () => {
 		const html = render();
-		assert.match(html, /Ask, answer, or steer the lesson/, "the default — active sessions");
+		assert.match(html, /Ask the tutor anything/, "the default — active sessions");
+		assert.doesNotMatch(html, /steer/, "round 8: \"steer the lesson\" told him nothing");
 		assert.ok(html.includes('aria-label="Send"'), "send button present");
 	});
 

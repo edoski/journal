@@ -16,6 +16,10 @@ export interface ProseAnswer {
 	/** `answer`: Send answers. `ask`: Send is a message to the tutor. */
 	mode: "answer" | "ask";
 	toggle: (index: number, multi: boolean) => void;
+	/** How many picks he has made on this item: a single choice picked
+	 *  with nothing typed sends at once (round 8: the goal question took a
+	 *  pick, then a second send). */
+	picks?: number;
 	setConfidence: (confidence: Confidence) => void;
 	setMode: (mode: "answer" | "ask") => void;
 }
@@ -25,9 +29,10 @@ interface State {
 	selection: DockSelection;
 	confidence: Confidence;
 	mode: "answer" | "ask";
+	picks: number;
 }
 
-const fresh = (key: string | null): State => ({ key, selection: emptyDockSelection(), confidence: DEFAULT_CONFIDENCE, mode: "answer" });
+const fresh = (key: string | null): State => ({ key, selection: emptyDockSelection(), confidence: DEFAULT_CONFIDENCE, mode: "answer", picks: 0 });
 
 /** The open item's picks, confidence and mode, fresh for each question or
  *  problem. A question starts from this call's unconfirmed submission, else
@@ -67,12 +72,12 @@ export function useProseAnswer({ openKey, box, draft, replying = false, askDraft
 		// Once per open item.
 	}, [openKey]);
 	const toggle = useCallback((index: number, multi: boolean) => {
-		setState((s) => ({ ...s, selection: toggleOption(multi ? "multi-select" : "single-select", s.selection, index) }));
+		setState((s) => ({ ...s, selection: toggleOption(multi ? "multi-select" : "single-select", s.selection, index), picks: s.picks + 1 }));
 	}, []);
 	const setConfidence = useCallback((confidence: Confidence) => setState((s) => ({ ...s, confidence })), []);
 	const setMode = useCallback((mode: "answer" | "ask") => setState((s) => ({ ...s, mode })), []);
 	return useMemo(
-		() => ({ openKey: state.key, selection: state.selection, confidence: state.confidence, mode: state.mode, toggle, setConfidence, setMode }),
+		() => ({ openKey: state.key, selection: state.selection, confidence: state.confidence, mode: state.mode, picks: state.picks, toggle, setConfidence, setMode }),
 		[state, toggle, setConfidence, setMode],
 	);
 }
