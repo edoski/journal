@@ -4,7 +4,7 @@ import { misfitWords } from "@/components/calendar/calendar-facts";
 import { resumableSession } from "@/components/nav/session-state";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { finalReviewMissWords, notReadyWords, READY_WORDS, slipMark, weekdayWords, type SlipKey } from "@/components/study-words";
+import { finalReviewMissWords, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -64,7 +64,7 @@ export interface MistakeRow {
 	topic: CourseMapTopic;
 	slip: SlipKey;
 	words: string;
-	/** "Today", "Yesterday", "Thu 5 Nov"; null when the engine gives no day. */
+	/** "Today", "5 Nov"; null when the engine gives no day. */
 	when: string | null;
 	helped: boolean;
 	/** What it was on, with his answer: the row's hint. */
@@ -78,10 +78,10 @@ export interface MistakeRow {
 const days = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
 /** The day of a mistake, never a count of days (round 8: "3d ago"):
- *  "Today", "Yesterday", "Thu 5 Nov". */
+ *  "Today", "5 Nov", as narrow as the count was, so the gap beside it
+ *  keeps its room. */
 function mistakeDayWords(day: string, today: string): string {
-	const ago = days(day, today);
-	return ago <= 0 ? "Today" : ago === 1 ? "Yesterday" : weekdayWords(day);
+	return days(day, today) <= 0 ? "Today" : shortDay(day);
 }
 
 /** The open mistakes in the engine's order, newest first, as rows; a

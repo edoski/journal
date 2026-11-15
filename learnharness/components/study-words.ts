@@ -206,7 +206,7 @@ export const FIRST_LESSON = "First lesson";
 
 const SHORT_DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 /** "1 Oct". */
-const shortDay = (day: string) => SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
+export const shortDay = (day: string) => SHORT_DAY.format(new Date(`${day}T00:00:00Z`));
 
 /** Why a review waits past the day memory asks for it (the engine's
  *  `held`): another course's final review came first, or the days before
