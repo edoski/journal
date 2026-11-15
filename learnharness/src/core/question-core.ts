@@ -169,7 +169,7 @@ export const explainInputObject = Type.Object({
 			"The lesson's position on the map derives from these tags (the node the latest tagged question is about is " +
 			"where the map stands; earlier ones count as visited). A node takes as many questions as it deserves: stay on " +
 			"one node for as many turns as the understanding needs — one reasoning step at a time, never rush forward. " +
-			"For off-map checks use ask_user_question.",
+			"A question off the plan with a right answer (a guess, a side check) is still this tool, tagged with the node it grows from; ask_user_question never asks one.",
 	}),
 	...explainInputBase.properties,
 });
