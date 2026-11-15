@@ -11,13 +11,14 @@ import { ExamGapLine } from "@/components/course-page/course-head/exam-gaps";
 import { useCourseStanding } from "@/components/course-page/use-course-standing";
 import { ReadyLine } from "@/components/course-page/standing/ready-line";
 import { MistakesPress } from "@/components/course-page/standing/mistakes-press";
-import { mistakeRows } from "@/components/course-page/standing/standing-model";
+import { examReady, mistakeRows } from "@/components/course-page/standing/standing-model";
 
 /**
  * The course page's head (spec: course-head.md): the head answers "am I
  * ready for the exam, and where not?" from the engine's `standing`, as a
  * project's health leads Linear's project page. Under the title, the
- * readiness line (`ReadyLine`), then what the exam's plan leaves out
+ * readiness line (`ReadyLine`), which the exam's run-up repeats word for
+ * word (`ExamFact`), then what the exam's plan leaves out
  * (`ExamGapLine`); then the arc he is in as its pill, the exam (its
  * run-up on press) and when he last studied (his last session on press).
  * Mistakes, before Context, opens the open mistakes.
@@ -27,6 +28,7 @@ export function CourseHead({ view, busy, onContinue }: { view: CourseView; busy:
 	const runup = useCourseRunup(course.map.workspace);
 	const standing = useCourseStanding(course.map.workspace);
 	const rows = useMemo(() => (standing ? mistakeRows(standing, course, chats, arcs) : []), [standing, course, chats, arcs]);
+	const ready = useMemo(() => (standing?.readiness ? examReady(standing.readiness, course.map, arcs) : null), [standing, course.map, arcs]);
 	const here = arcs?.find((a) => a.current) ?? null;
 	return (
 		<PageHead
@@ -40,7 +42,7 @@ export function CourseHead({ view, busy, onContinue }: { view: CourseView; busy:
 			}
 			lead={
 				<div className="flex min-w-0 flex-col gap-0.5">
-					<ReadyLine course={course} readiness={standing?.readiness} arcs={arcs} />
+					<ReadyLine course={course} ready={ready} />
 					<ExamGapLine course={course} />
 				</div>
 			}
@@ -51,7 +53,7 @@ export function CourseHead({ view, busy, onContinue }: { view: CourseView; busy:
 							<ArcPill arc={{ handle: here.arc.handle, title: here.arc.title, share: here.share }} href={arcOnPage(course.map.workspace, here.arc.handle)} />
 						</span>
 					)}
-					{facts.exam && <ExamFact course={course} runup={runup} words={facts.exam} />}
+					{facts.exam && <ExamFact course={course} runup={runup} words={facts.exam} ready={ready} />}
 					{facts.studied && <StudiedFact words={facts.studied} session={facts.lastSession} />}
 				</>
 			}

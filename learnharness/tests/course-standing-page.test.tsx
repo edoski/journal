@@ -122,7 +122,7 @@ describe("exam readiness, from the engine's sorting", () => {
 describe("the head's readiness line", () => {
 	it("with arcs, shows the arcs not ready as bubbles that show them on the page", () => {
 		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} readiness={readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] }))} arcs={view.arcs} />);
+		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs)} />);
 		const line = doc.querySelector("[data-slot=course-ready]")!;
 		assert.match(line.textContent ?? "", /Not ready yet in/);
 		const pills = [...line.querySelectorAll("[data-slot=arc-pill]")];
@@ -132,15 +132,15 @@ describe("the head's readiness line", () => {
 
 	it("with arcs, says only that he is not ready when no arc is", () => {
 		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} readiness={readiness(part({ arc: a("spaces"), notYet: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] }))} arcs={view.arcs} />);
+		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), notYet: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs)} />);
 		assert.equal(doc.querySelector("[data-slot=course-ready]")?.textContent, "Not ready for the exam yet");
 		assert.equal(doc.querySelectorAll("[data-slot=arc-pill]").length, 0);
 	});
 
 	it("without an exam says what the plan does with its reviews, and while the engine is read says nothing", () => {
 		const plain = course(false, false);
-		assert.match(render(<ReadyLine course={plain} readiness={null} arcs={null} />).querySelector("[data-slot=course-ready]")?.textContent ?? "", /^No exam: reviews /);
-		assert.equal(render(<ReadyLine course={course(false)} readiness={undefined} arcs={null} />).querySelector("[data-slot=course-ready]")?.textContent, "");
+		assert.match(render(<ReadyLine course={plain} ready={null} />).querySelector("[data-slot=course-ready]")?.textContent ?? "", /^No exam: reviews /);
+		assert.equal(render(<ReadyLine course={course(false)} ready={null} />).querySelector("[data-slot=course-ready]")?.textContent, "");
 	});
 });
 

@@ -14,7 +14,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
-import { examGaps, lastSessionOf, namesWords, paceOf } from "../components/course-page/course-head/head-facts.ts";
+import { examGaps, lastSessionOf, namesWords } from "../components/course-page/course-head/head-facts.ts";
 import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
@@ -48,28 +48,8 @@ function course(over: Partial<StudyCourse["map"]> = {}, rest: Partial<Omit<Study
 	};
 }
 
-const plan = (doesNotFit: string[] = []) => ({ doesNotFit: doesNotFit.map(h), planned: [{ date: "2026-11-08", reviews: [], new: [h("poisson")] }, { date: "2026-11-12", reviews: [], new: [h("variance")] }] });
 
-describe("pace, from the engine's plan", () => {
-	it("names the topics the plan has no room for before the exam first", () => {
-		assert.deepEqual(paceOf(course({}, { unready: [h("bayes")] }), plan(["variance"])), { kind: "short", words: "No room before the exam to start Variance" });
-	});
-
-	it("inside the run-up, names the topics not yet solid", () => {
-		assert.deepEqual(paceOf(course({}, { unready: [h("bayes"), h("binomial")] }), plan()), { kind: "unready", words: "Not yet solid for the exam: Bayes and Binomial" });
-	});
-
-	it("says every topic fits, or that every topic is started", () => {
-		assert.equal(paceOf(course(), plan())?.words, "Every topic fits before the exam");
-		const taught = course({ topics: [topic("bayes", { introduced: "2026-11-01" }), topic("poisson", { excluded: "Not examined" })] });
-		assert.equal(paceOf(taught, plan())?.words, "Every topic started");
-	});
-
-	it("says nothing with no exam ahead or before the plan is read", () => {
-		assert.equal(paceOf(course({ exam: null }), plan()), null);
-		assert.equal(paceOf(course(), null), null);
-	});
-
+describe("a list of topics", () => {
 	it("names every topic, never \"and others\" and never a count", () => {
 		assert.equal(namesWords(["A", "B", "C", "D", "E"]), "A, B, C, D and E");
 		assert.equal(namesWords(["A", "B"]), "A and B");
@@ -142,11 +122,6 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.equal(examGaps(gapped([], []).map), null);
 		assert.equal(examGaps(course({ exam: null }).map), null);
 		assert.equal(examGaps(course({ exam: { date: "2026-11-01", daysLeft: -7, unreviewed: [h("binomial")] } }).map), null, "once the exam has passed");
-	});
-
-	it("never says every topic fits while the final review leaves one out", () => {
-		assert.deepEqual(paceOf(gapped([], ["binomial"]), plan()), { kind: "short", words: "No room in the final review for Binomial" });
-		assert.deepEqual(paceOf(gapped(["variance"], ["binomial"]), plan(["variance"])), { kind: "short", words: "No room before the exam to start Variance" }, "what has no room to start first");
 	});
 
 	const gapLine = (c: StudyCourse) => render(<CourseHead view={viewOf(c)} busy={false} onContinue={() => {}} />).querySelector('[data-slot="page-head"] [data-slot="course-exam-gaps"]');
