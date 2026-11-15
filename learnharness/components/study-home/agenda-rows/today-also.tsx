@@ -19,7 +19,7 @@ export function alsoHint(row: TodayRow): string {
  *  a quiet button named by its lesson, as a full line names it, that opens
  *  it, its tooltip naming its course and why; the label sits as far from
  *  the first lesson as the lessons sit from each other. A lesson too long
- *  for the room left ends on a whole word. */
+ *  for the room left is cut at its end, never inside a formula. */
 export function TodayAlso({ rows, busy, onContinue, className }: { rows: readonly TodayRow[]; busy: boolean; onContinue: (workspace: string, step?: NextStep) => void; className?: string }) {
 	const label = "min-w-0 shrink text-row font-normal text-foreground";
 	return (

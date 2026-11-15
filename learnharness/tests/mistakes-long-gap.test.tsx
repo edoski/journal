@@ -1,9 +1,10 @@
 /**
  * Mistakes on Linear Algebra's course page, opened with the gap the tutor
  * wrote for Eigen in round 8 (66 words, inline maths): the popover opens
- * and each line ends on the last whole word that fits, then "…" (round 8,
- * 2 B1: the line dropped one word per render and React stopped it at 50
- * nested updates, "Maximum update depth exceeded" in `MathLine`).
+ * and each line runs to its box's edge, where the box's ellipsis cuts the
+ * word that does not fit when a letter of it fits (round 8, 2 B1: the line dropped one word per
+ * render and React stopped it at 50 nested updates, "Maximum update depth
+ * exceeded" in `MathLine`).
  */
 
 import React, { act } from "react";
@@ -68,7 +69,7 @@ afterEach(async () => {
 });
 
 describe("Mistakes with a long gap", () => {
-	it("opens, and each line ends on the last whole word that fits its box, then an ellipsis", async () => {
+	it("opens, and each line draws the words that fit its box and the word its ellipsis cuts", async () => {
 		const host = document.createElement("div");
 		document.body.appendChild(host);
 		root = createRoot(host);
@@ -89,6 +90,7 @@ describe("Mistakes with a long gap", () => {
 		const words = EIGEN_GAP.split(" ");
 		let fits = 1;
 		while (`${words.slice(0, fits + 1).join(" ")}…`.length * CHAR <= BOX) fits++;
-		assert.equal(line.textContent, `${words.slice(0, fits).join(" ")}…`);
+		const letterFits = `${words.slice(0, fits).join(" ")} ${words[fits]![0]}…`.length * CHAR <= BOX;
+		assert.equal(line.textContent, `${words.slice(0, letterFits ? fits + 1 : fits).join(" ")}…`);
 	});
 });
