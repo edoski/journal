@@ -233,7 +233,7 @@ export function SplitList({
 				data-more-above={more.above || undefined}
 				data-more-below={more.below || undefined}
 				className={cn(
-					"-mx-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+					"-mx-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 pb-1",
 					more.below && "mask-b-from-[calc(100%-2.5rem)]",
 					more.above && "mask-t-from-[calc(100%-2.5rem)]",
 				)}

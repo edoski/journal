@@ -283,7 +283,7 @@ export function SettingsDialogBody({
 						<XIcon />
 					</Button>
 				</Hint>
-				<div className="min-w-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="settings-content">
+				<div className="min-w-0 flex-1 overflow-y-auto" data-testid="settings-content">
 					{sections}
 				</div>
 			</TabsContent>

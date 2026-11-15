@@ -271,31 +271,11 @@ body {
 	line-height: 1.25;
 }
 
-/* Thin dark native scrollbar (app-wide): dark thumb, transparent track.
-   In the base layer, so a utility such as `[scrollbar-width:none]` on a
-   scroll box that draws no bar wins over it; unlayered, it beat them all. */
+/* No scrollbar is ever drawn (Edo's ruling); every box still scrolls by
+   wheel, trackpad and keys. */
 @layer base {
 	* {
-		scrollbar-width: thin;
-		scrollbar-color: var(--color-border) transparent;
-	}
-
-	::-webkit-scrollbar {
-		width: 8px;
-		height: 8px;
-	}
-
-	::-webkit-scrollbar-track {
-		background: transparent;
-	}
-
-	::-webkit-scrollbar-thumb {
-		background: var(--color-border);
-		border-radius: 8px;
-	}
-
-	::-webkit-scrollbar-thumb:hover {
-		background: var(--color-muted-foreground);
+		scrollbar-width: none;
 	}
 }
 

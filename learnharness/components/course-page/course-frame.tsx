@@ -7,7 +7,6 @@ import { useLessonStart } from "@/components/start/use-lesson-start";
 import { courseMove } from "@/components/study-home/study-facts";
 import { unreadableLine } from "@/components/study-home/unreadable-course";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { PageFrame } from "@/components/page-frame/page-frame";
 import { CourseChrome } from "@/components/course-page/course-chrome";
 import { CourseLessonError } from "@/components/course-page/course-head/head-parts";
@@ -49,13 +48,13 @@ export function CourseFrame({ workspace, children }: { workspace: string; childr
 	};
 	return (
 		<CourseChrome>
-			<ScrollArea bar={false} data-slot="course-page" className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full">
+			<div data-slot="course-page" className="min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring">
 				<CourseLessonError value={lesson.error}>
 					<CourseBody read={read} standing={standing} onRetry={retry}>
 						{(view, known) => children({ view, standing: known, busy: lesson.busy, onContinue: onContinue(view) })}
 					</CourseBody>
 				</CourseLessonError>
-			</ScrollArea>
+			</div>
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</CourseChrome>
 	);

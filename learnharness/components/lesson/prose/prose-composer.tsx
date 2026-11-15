@@ -489,7 +489,7 @@ function OpenQuote({ open, spec, selected, onPick }: { open: ProseOpen; spec: Pr
 		<div
 			data-testid="prose-quote"
 			data-slot="composer-quote"
-			className="max-h-[min(40dvh,20rem)] overflow-y-auto border-b border-white/5 px-4 pt-3 pb-2.5 text-muted-foreground [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+			className="max-h-[min(40dvh,20rem)] overflow-y-auto border-b border-white/5 px-4 pt-3 pb-2.5 text-muted-foreground"
 		>
 			{open.kind === "problem" ? (
 				<ToolContentResponse className="[--lh-prose-leading:calc(20/14)] [--lh-prose-size:14px]">{open.statement}</ToolContentResponse>

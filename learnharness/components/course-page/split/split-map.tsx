@@ -26,8 +26,6 @@ const TAG_ROOM = 20;
  *  rest before it moves, and before it glides back, are shared with Home's
  *  map (lit-camera.ts). */
 const GLIDE_MS = 200;
-/** No visible scrollbar on either axis (T3 Code shows none). */
-const NO_BAR = "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 function reducedMotion(): boolean {
 	return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -301,7 +299,7 @@ export function SplitMap({
 			}}
 		>
 			<div className="absolute inset-0" style={mapFade(fade.x, fade.y)}>
-				<div ref={scroller} data-slot="course-split-map-scroller" className={`size-full overflow-auto overscroll-contain ${NO_BAR}`}>
+				<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain">
 					{/* The surface's size, from the course's layout: the map fits it whole. */}
 					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
 						<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />

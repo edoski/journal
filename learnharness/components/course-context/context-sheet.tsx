@@ -46,7 +46,7 @@ function ContextBody({ workspace }: { workspace: string }) {
 	const api = useCourseContext(workspace);
 	const { read } = api;
 	return (
-		<div data-slot="context-body" className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6 [scrollbar-width:none]">
+		<div data-slot="context-body" className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6">
 			{read.status === "loading" && <p className="text-row text-muted-foreground">Reading the course…</p>}
 			{read.status === "failed" && <p className="text-row text-danger">The course’s context could not be read. Close and open it again.</p>}
 			{read.status === "ready" && (
