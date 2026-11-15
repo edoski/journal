@@ -89,12 +89,6 @@ export function KeyboardShortcuts() {
 			}
 
 			if (e.key === "Escape") {
-				// Our own overlay is the topmost layer.
-				if (cheatOpen) {
-					setCheatOpen(false);
-					e.preventDefault();
-					return;
-				}
 				// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): one
 				// Esc, one action, on the topmost active layer. Field-level
 				// handlers claim at their element (focus in a field: the
@@ -160,7 +154,7 @@ export function KeyboardShortcuts() {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [cheatOpen]);
+	}, []);
 
 	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} />;
 }

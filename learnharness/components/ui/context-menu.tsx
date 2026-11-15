@@ -15,7 +15,7 @@ import {
   MENU_SEPARATOR,
   MENU_SHORTCUT,
 } from "@/components/ui/dropdown-menu"
-import { OVERLAY_ATTRS, OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
+import { OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
 
 /** shadcn context menu on the dropdown menu's anatomy (spec: menu.md,
  *  context-menu.md). It opens at the pointer. */
@@ -96,7 +96,6 @@ function ContextMenuSubContent({
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.SubContent
         data-slot="context-menu-sub-content"
-        {...OVERLAY_ATTRS}
         className={cn(
           OVERLAY_LAYER,
           OVERLAY_MOTION,
@@ -119,7 +118,6 @@ function ContextMenuContent({
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
-        {...OVERLAY_ATTRS}
         onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
         className={cn(
           OVERLAY_LAYER,

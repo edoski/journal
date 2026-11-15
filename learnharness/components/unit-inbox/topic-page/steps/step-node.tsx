@@ -72,7 +72,7 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 			onBlur={() => state?.onActive(null)}
 			onKeyDown={(event) => state?.onKeyDown(handle, event)}
 			className={cn(
-				"pointer-events-auto flex size-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 outline-none transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none",
+				"pointer-events-auto flex size-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none",
 				"hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
 				current && "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)] hover:border-ring",
 			)}

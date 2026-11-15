@@ -8,7 +8,7 @@ The three app rules every portalled shadcn primitive carries (`overlay.ts`). The
 | Clickable over a drag band | `lh-no-drag` on every portalled content | Portals leave `.lh-drag`'s automatic carve-out, which only covers native controls, so a menu row over the 52–60px top band could drag the window |
 | One z stack | dialogs 50 (`DIALOG_LAYER`); menus, selects and popovers 70 (`OVERLAY_LAYER`); tooltips 80 | A list opened inside a dialog and a hint inside a popover always draw on top |
 
-Portalled menus also carry `data-lh-menu`, so the hand-rolled outside-click guards that remain (`enter-submits.ts`, session find) count them as inside.
+The outside-click guards that remain (`enter-submits.ts`, session find) count Radix's popper wrapper (`[data-radix-popper-content-wrapper]`), which every portalled menu, select and popover sits in, as inside.
 
 Motion (`OVERLAY_MOTION`): 150ms fade with a 95% zoom from the trigger's side, drawn by `tw-animate-css` (`app/globals.css`, as shadcn sets it up); under reduced motion the one rule there stops every primitive's enter and exit.
 

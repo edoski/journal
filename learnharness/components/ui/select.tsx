@@ -6,7 +6,7 @@ import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { MENU_CONTENT, MENU_INDICATOR, MENU_LABEL, MENU_SEPARATOR } from "@/components/ui/dropdown-menu"
-import { OVERLAY_ATTRS, OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
+import { OVERLAY_LAYER, OVERLAY_MOTION, claimEscape } from "@/components/ui/overlay"
 
 /** shadcn select: a field-styled trigger over the menu anatomy (spec:
  *  select.md). The list opens below the trigger at least as wide as it. */
@@ -68,7 +68,6 @@ function SelectContent({
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         data-slot="select-content"
-        {...OVERLAY_ATTRS}
         onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
         className={cn(
           OVERLAY_LAYER,

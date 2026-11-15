@@ -35,9 +35,8 @@
 import { useEffect, useRef } from "react";
 import { isTypingSurface } from "@/src/core";
 
-/** Overlay roots whose buttons keep native Enter (hand-rolled menus mark
- *  themselves data-lh-menu; Radix poppers/dialogs carry their own attrs). */
-const OVERLAY_ROOTS = '[data-lh-menu], [data-radix-popper-content-wrapper], [role="menu"], [role="dialog"]';
+/** Overlay roots whose buttons keep native Enter: Radix's poppers and dialogs. */
+const OVERLAY_ROOTS = '[data-radix-popper-content-wrapper], [role="menu"], [role="dialog"]';
 
 /** Pure decision, exported for pins: does a focused BUTTON keep native
  *  Enter (true) or does Enter belong to submit (false)? */

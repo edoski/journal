@@ -53,8 +53,6 @@ files:
   - "!**/*"
   - electron/**/*
   - package.json
-  # Main-process ID-token signature verification (no bundled OAuth implementation).
-  - node_modules/jose/**/*
 extraResources:
   # Attribution/license for the bounded local Pi cutoff-selector port.
   - from: docs/compaction-accounting.md

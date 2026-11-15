@@ -52,7 +52,7 @@ function publishHighlights(ranges: readonly Range[], index: number): void {
  * must not block Find once they have stopped being a surfaced layer. */
 export function sessionFindHasForegroundLayer(doc: Document): boolean {
 	return Array.from(doc.querySelectorAll(
-		'[data-lh-menu], [data-radix-popper-content-wrapper], [role="menu"], [role="dialog"], [data-testid="cheat-sheet"]',
+		'[data-radix-popper-content-wrapper], [role="menu"], [role="dialog"], [data-testid="cheat-sheet"]',
 	)).some((element) => {
 		if (element.getAttribute("data-state") === "closed" || element.hasAttribute("hidden")) return false;
 		// A force-mounted popover keeps its Popper wrapper while closed; the
