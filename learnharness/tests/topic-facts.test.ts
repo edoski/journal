@@ -12,6 +12,7 @@ import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contrac
 import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { SessionPlan, TopicAttempt, TopicRecord } from "../src/core/contracts/topic.ts";
 import { studiedAgo } from "../components/study-home/agenda-rows/row-facts.ts";
+import { slipOf } from "../components/unit-inbox/units.ts";
 import type { TodayRow } from "../components/study-home/study-facts.ts";
 import {
 	agoWords,
@@ -208,6 +209,15 @@ describe("where he stands, in the app's one wording", () => {
 			{ kind: "review", words: "2d overdue" },
 		]);
 		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);
+	});
+
+	it("drops the slip when the standing already says it, which the sidebar keeps as the row's reason (round 7)", () => {
+		const kernel = { ...TOPICS.kernel, right: "unaided" as const, review: null, signals: { ...QUIET, confidentErrors: 2, repaired: true } };
+		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
+		assert.equal(said(kernel), "Right on your own, check another day");
+		assert.equal(slipOf(MAP, kernel), "Fixed, check again later");
+		const helped = { ...kernel, right: "helped" as const };
+		assert.equal(said(helped), "Right with help. Fixed, check again later", "a fix the standing does not say stays");
 	});
 
 	it("is silent for a topic not started that already has a session", () => {

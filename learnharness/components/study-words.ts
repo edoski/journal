@@ -85,6 +85,13 @@ export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) =
 	return { key: "gap", words: SLIP_WORDS.gap };
 }
 
+/** The standing words that already say a slip, where a head would say it
+ *  twice: right on his own beside a mistake fixed on his own both say a
+ *  check on another day (round 7). */
+export const SLIP_SAID_BY: Readonly<Partial<Record<SlipKey, string>>> = {
+	repaired: RIGHT_WORDS.unaided,
+};
+
 /** The slip's words alone (`slipMark`). */
 export function slipWords(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): string {
 	return slipMark(signals, titleOf).words;
