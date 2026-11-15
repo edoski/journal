@@ -10,7 +10,7 @@ import { ContextButton, CourseAction, ExamFact, LessonError, StudiedFact } from 
 import { useCourseRunup } from "@/components/course-page/course-head/use-course-runup";
 import { ExamGapLine } from "@/components/course-page/course-head/exam-gaps";
 import { ReadyLine } from "@/components/course-page/standing/ready-line";
-import { MistakesPress } from "@/components/course-page/standing/mistakes-press";
+import { MistakesHead, MistakesPress } from "@/components/course-page/standing/mistakes-press";
 import { examReady, mistakeRows } from "@/components/course-page/standing/standing-model";
 
 /**
@@ -22,7 +22,7 @@ import { examReady, mistakeRows } from "@/components/course-page/standing/standi
  * word (`ExamFact`), then what the exam's plan leaves out
  * (`ExamGapLine`); then the arc he is in as its pill, the exam (its
  * run-up on press) and when he last studied (his last session on press).
- * Mistakes, before Context, opens the open mistakes.
+ * Mistakes, before Context, opens the open mistakes under the whole head.
  */
 export function CourseHead({ view, standing, busy, onContinue }: { view: CourseView; standing: CourseStanding | null; busy: boolean; onContinue: (workspace: string) => void }) {
 	const { course, facts, arcs, chats } = view;
@@ -31,35 +31,37 @@ export function CourseHead({ view, standing, busy, onContinue }: { view: CourseV
 	const ready = useMemo(() => (standing?.readiness ? examReady(standing.readiness, course.map, arcs) : null), [standing, course.map, arcs]);
 	const here = arcs?.find((a) => a.current) ?? null;
 	return (
-		<PageHead
-			title={<span data-slot="course-title">{course.map.title}</span>}
-			actions={
-				<>
-					<MistakesPress rows={rows} />
-					<ContextButton course={course} />
-					<CourseAction view={view} busy={busy} onContinue={onContinue} />
-				</>
-			}
-			lead={
-				<div className="flex min-w-0 flex-col gap-0.5">
-					<ReadyLine course={course} ready={ready} />
-					<ExamGapLine course={course} />
-				</div>
-			}
-			standing={
-				<>
-					{here && (
-						<span data-slot="course-arc-here" className="inline-flex h-5 min-w-0 items-center">
-							<ArcPill arc={{ handle: here.arc.handle, title: here.arc.title, share: here.share }} href={arcOnPage(course.map.workspace, here.arc.handle)} />
-						</span>
-					)}
-					{facts.exam && <ExamFact course={course} runup={runup} words={facts.exam} ready={ready} />}
-					{facts.studied && <StudiedFact words={facts.studied} session={facts.lastSession} />}
-				</>
-			}
-		>
-			<LessonError />
-		</PageHead>
+		<MistakesHead>
+			<PageHead
+				title={<span data-slot="course-title">{course.map.title}</span>}
+				actions={
+					<>
+						<MistakesPress rows={rows} />
+						<ContextButton course={course} />
+						<CourseAction view={view} busy={busy} onContinue={onContinue} />
+					</>
+				}
+				lead={
+					<div className="flex min-w-0 flex-col gap-0.5">
+						<ReadyLine course={course} ready={ready} />
+						<ExamGapLine course={course} />
+					</div>
+				}
+				standing={
+					<>
+						{here && (
+							<span data-slot="course-arc-here" className="inline-flex h-5 min-w-0 items-center">
+								<ArcPill arc={{ handle: here.arc.handle, title: here.arc.title, share: here.share }} href={arcOnPage(course.map.workspace, here.arc.handle)} />
+							</span>
+						)}
+						{facts.exam && <ExamFact course={course} runup={runup} words={facts.exam} ready={ready} />}
+						{facts.studied && <StudiedFact words={facts.studied} session={facts.lastSession} />}
+					</>
+				}
+			>
+				<LessonError />
+			</PageHead>
+		</MistakesHead>
 	);
 }
 
