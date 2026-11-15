@@ -28,7 +28,7 @@ export function CourseHead({ view, standing, busy, onContinue }: { view: CourseV
 	const { course, facts, arcs, chats } = view;
 	const runup = useCourseRunup(course.map.workspace);
 	const rows = useMemo(() => (standing ? mistakeRows(standing, course, chats, arcs) : []), [standing, course, chats, arcs]);
-	const ready = useMemo(() => (standing?.readiness ? examReady(standing.readiness, course.map, arcs) : null), [standing, course.map, arcs]);
+	const ready = useMemo(() => (standing?.readiness ? examReady(standing.readiness, course.map, arcs, standing.mistakes) : null), [standing, course.map, arcs]);
 	const here = arcs?.find((a) => a.current) ?? null;
 	return (
 		<MistakesHead>

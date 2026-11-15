@@ -1,10 +1,10 @@
-import type { ChatListItem, CourseMap, CourseMapTopic, CourseReadiness, CourseStanding, ReadinessPart, StudyCourse } from "@/src/core";
+import { TOPIC_LEVELS, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
 import type { StripArc } from "@/components/course-map/arc-strip";
 import { misfitWords } from "@/components/calendar/calendar-facts";
 import { resumableSession } from "@/components/nav/session-state";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { finalReviewMissWords, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
+import { finalReviewMissWords, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
 import { namesWords } from "@/components/course-page/course-head/head-facts";
 import type { CourseArcSection } from "@/components/course-page/course-model";
 
@@ -29,11 +29,37 @@ export function partState(part: ReadinessPart): PartState {
  *    final review has no room for, named (the run-up's words);
  *  - `notYet`: the arcs not ready, as their bubbles (`arcs`), none when no
  *    arc is ready; in a course the page shows without arcs, the topics,
- *    named (`words`);
+ *    named (`words`): every one when they are few, else the least ready
+ *    and "and the rest", a press that shows `rest` (every topic the line
+ *    means, least ready first, under `heading`; null when it names them all);
  *  - `ready`: every part solid. */
-export type ExamReady = { kind: "short"; words: string } | { kind: "notYet"; words: string; arcs: readonly StripArc[] } | { kind: "ready"; words: string };
+export type ExamReady =
+	| { kind: "short"; words: string }
+	| { kind: "notYet"; words: string; arcs: readonly StripArc[]; rest: { heading: string; topics: readonly CourseMapTopic[] } | null }
+	| { kind: "ready"; words: string };
 
-export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam">, arcs: readonly CourseArcSection[] | null): ExamReady {
+/** How many least-ready topics the line names before "and the rest": a
+ *  line of every name said little about what to do (round 9, 2 m13: nine of
+ *  Linear Algebra's ten started topics); a list one longer is named whole,
+ *  so the press always holds at least two more. */
+export const READY_NAMED = 3;
+
+/** The topics least ready for the exam first, from the engine's standing
+ *  facts: a topic with a mistake still open (`standing.mistakes`) before
+ *  one without, the newest mistake first; then the lower engine level (its
+ *  `progress` standing, on the map: introduced, attempted, assisted, then
+ *  on his own); then the engine's weak verdict; then the engine's path
+ *  order, which only breaks a tie. Pure. */
+export function leastReadyFirst(handles: readonly TopicHandle[], map: Pick<CourseMap, "topics">, mistakes: readonly OpenMistake[]): CourseMapTopic[] {
+	const open = new Map(mistakes.map((m, at) => [m.topic, at]));
+	const ranked = handles.flatMap((handle, at) => {
+		const topic = map.topics.find((t) => t.handle === handle);
+		return topic ? [{ topic, mistake: open.get(handle) ?? mistakes.length, level: TOPIC_LEVELS.indexOf(topic.level), weak: topic.weak ? 0 : 1, at }] : [];
+	});
+	return ranked.sort((a, b) => a.mistake - b.mistake || a.level - b.level || a.weak - b.weak || a.at - b.at).map((r) => r.topic);
+}
+
+export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam">, arcs: readonly CourseArcSection[] | null, mistakes: readonly OpenMistake[]): ExamReady {
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const wontFit = readiness.parts.flatMap((p) => p.wontFit);
 	if (wontFit.length > 0) return { kind: "short", words: misfitWords(wontFit.map(titleOf))! };
@@ -41,18 +67,20 @@ export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topi
 	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf)) };
 	const notReady = readiness.parts.filter((p) => partState(p) === "notYet");
 	if (notReady.length === 0) return { kind: "ready", words: READY_WORDS.ready };
-	if (arcs && notReady.length === readiness.parts.length) return { kind: "notYet", words: READY_WORDS.notYet, arcs: [] };
+	if (arcs && notReady.length === readiness.parts.length) return { kind: "notYet", words: READY_WORDS.notYet, arcs: [], rest: null };
 	if (arcs) {
 		const shown = notReady.flatMap((p) => {
 			const section = arcs.find((s) => s.arc.handle === p.arc);
 			return section ? [{ handle: section.arc.handle, title: section.arc.title, share: section.share }] : [];
 		});
-		if (shown.length > 0) return { kind: "notYet", words: READY_WORDS.notYetIn, arcs: shown };
+		if (shown.length > 0) return { kind: "notYet", words: READY_WORDS.notYetIn, arcs: shown, rest: null };
 	}
 	const notYet = notReady.flatMap((p) => p.notYet);
 	const kind = notYet.length > 0 ? "notYet" : "toStart";
-	const names = namesWords((kind === "notYet" ? notYet : notReady.flatMap((p) => p.toStart)).map(titleOf));
-	return { kind: "notYet", words: notReadyWords(kind, names), arcs: [] };
+	const topics = leastReadyFirst(kind === "notYet" ? notYet : notReady.flatMap((p) => p.toStart), map, mistakes);
+	if (topics.length <= READY_NAMED + 1) return { kind: "notYet", words: notReadyWords(kind, namesWords(topics.map((t) => t.title))), arcs: [], rest: null };
+	const named = topics.slice(0, READY_NAMED).map((t) => t.title).join(", ");
+	return { kind: "notYet", words: notReadyWords(kind, named), arcs: [], rest: { heading: notReadyHeading(kind), topics } };
 }
 
 /** One open mistake as a row: the topic, what went wrong in the tutor's

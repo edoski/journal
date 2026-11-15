@@ -13,7 +13,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ArcHandle, ChatListItem, CourseMapTopic, CourseReadiness, CourseStanding, ReadinessPart, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseRead } from "../components/course-page/course-model.ts";
-import { examReady, mistakeRows, partState } from "../components/course-page/standing/standing-model.ts";
+import { examReady, leastReadyFirst, mistakeRows, partState } from "../components/course-page/standing/standing-model.ts";
 import { ReadyLine } from "../components/course-page/standing/ready-line.tsx";
 import { MistakeList } from "../components/course-page/standing/mistake-list.tsx";
 import { MistakesPress } from "../components/course-page/standing/mistakes-press.tsx";
@@ -83,38 +83,67 @@ describe("exam readiness, from the engine's sorting", () => {
 
 	it("with arcs, names the arcs not ready as bubbles, and says so plainly when none is ready", () => {
 		const view = viewOf(course(true));
-		const some = examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs);
+		const some = examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs, []);
 		assert.equal(some.kind, "notYet");
 		assert.deepEqual(some.kind === "notYet" && some.arcs.map((arc) => arc.title), ["Linear maps"]);
-		const none = examReady(readiness(part({ arc: a("spaces"), notYet: [h("basis")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs);
-		assert.deepEqual(none, { kind: "notYet", words: "Not ready for the exam yet", arcs: [] });
+		const none = examReady(readiness(part({ arc: a("spaces"), notYet: [h("basis")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs, []);
+		assert.deepEqual(none, { kind: "notYet", words: "Not ready for the exam yet", arcs: [], rest: null });
 	});
 
 	it("without arcs, names the topics not yet solid, else those still to start", () => {
 		const { map } = course(false);
-		assert.deepEqual(examReady(readiness(part({ solid: [h("span")], notYet: [h("basis"), h("rank")], toStart: [h("kernel")] })), map, null), { kind: "notYet", words: "Not yet solid for the exam: Basis and Rank", arcs: [] });
-		assert.deepEqual(examReady(readiness(part({ solid: [h("span")], toStart: [h("kernel")] })), map, null), { kind: "notYet", words: "Still to start before the exam: Kernel", arcs: [] });
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span")], notYet: [h("basis"), h("rank")], toStart: [h("kernel")] })), map, null, []), { kind: "notYet", words: "Not yet solid for the exam: Basis and Rank", arcs: [], rest: null });
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span")], toStart: [h("kernel")] })), map, null, []), { kind: "notYet", words: "Still to start before the exam: Kernel", arcs: [], rest: null });
 	});
 
-	it("in a course without arcs, names every topic not yet solid, however many", () => {
+	it("in a course without arcs, names the three least ready by the engine's facts, then folds the rest behind a press that holds them all", () => {
+		// Linear Algebra's demo in round 9: nine of ten started topics named on one line (2 m13).
 		const { map } = course(false);
-		const many = { ...map, topics: [...map.topics, ...["det", "cramer", "eigen", "diag"].map((t) => topic(t))] };
-		const words = examReady(readiness(part({ notYet: ["basis", "rank", "kernel", "det", "cramer", "eigen", "diag"].map(h) })), many, null).words;
-		assert.equal(words, "Not yet solid for the exam: Basis, Rank, Kernel, Det, Cramer, Eigen and Diag");
-		assert.doesNotMatch(words, /others/);
+		const handles = ["independence", "matmul", "gauss", "rank", "kernel", "det", "cramer", "eigen", "basis"];
+		const taught = map.topics.filter((t) => t.handle !== "kernel");
+		const many = { ...map, topics: [...taught, ...handles.filter((t) => t !== "rank" && t !== "basis").map((t) => topic(t, t === "independence" ? { level: "attempted" } : {}))] };
+		const mistakes = [
+			{ topic: h("eigen"), gap: null, latest: "2026-11-08", answers: [] },
+			{ topic: h("matmul"), gap: "Gave a 3 by 3 product", latest: "2026-11-05", answers: [] },
+		];
+		const ready = examReady(readiness(part({ notYet: handles.map(h) })), many, null, mistakes);
+		assert.equal(ready.kind, "notYet");
+		assert.equal(ready.words, "Not yet solid for the exam: Eigen, Matmul, Independence", "open mistakes first, newest first, then the lowest level; never the path's first three");
+		assert.doesNotMatch(ready.words, /others/);
+		const rest = ready.kind === "notYet" ? ready.rest : null;
+		assert.equal(rest?.heading, "Not yet solid for the exam");
+		assert.deepEqual(
+			rest?.topics.map((t) => t.handle),
+			["eigen", "matmul", "independence", "gauss", "rank", "kernel", "det", "cramer", "basis"],
+			"every topic, least ready first; the rest, alike, keep the path's order",
+		);
+	});
+
+	it("ranks the least ready by open mistake, then engine level, then the weak verdict, and only then the path", () => {
+		const { map } = course(false);
+		const topics = [topic("a"), topic("b", { level: "introduced" }), topic("c", { weak: true }), topic("d", { level: "independent" }), topic("e")];
+		const mistakes = [{ topic: h("e"), gap: "slip", latest: "2026-11-07", answers: [] }];
+		assert.deepEqual(leastReadyFirst(["a", "b", "c", "d", "e"].map(h), { ...map, topics }, mistakes).map((t) => t.handle), ["e", "b", "c", "a", "d"]);
+	});
+
+	it("names four topics whole, so the press always holds at least two more", () => {
+		const { map } = course(false);
+		const many = { ...map, topics: [...map.topics.filter((t) => t.handle !== "kernel"), topic("kernel"), topic("det")] };
+		const four = examReady(readiness(part({ notYet: ["basis", "rank", "kernel", "det"].map(h) })), many, null, []);
+		assert.deepEqual(four, { kind: "notYet", words: "Not yet solid for the exam: Basis, Rank, Kernel and Det", arcs: [], rest: null });
 	});
 
 	it("names what has no room first, and says ready when every part is solid", () => {
 		const { map } = course(false);
-		assert.deepEqual(examReady(readiness(part({ notYet: [h("rank")], wontFit: [h("kernel")] })), map, null), { kind: "short", words: "No room before the exam to start Kernel" });
-		assert.deepEqual(examReady(readiness(part({ solid: [h("span")] })), map, null), { kind: "ready", words: "Ready for the exam" });
+		assert.deepEqual(examReady(readiness(part({ notYet: [h("rank")], wontFit: [h("kernel")] })), map, null, []), { kind: "short", words: "No room before the exam to start Kernel" });
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span")] })), map, null, []), { kind: "ready", words: "Ready for the exam" });
 	});
 
 	it("never says ready while the final review leaves a taught topic out", () => {
 		const { map } = course(false);
 		const left = { ...map, exam: { date: "2026-11-19", daysLeft: 11, unreviewed: [h("rank")] } };
-		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), left, null), { kind: "short", words: "No room in the final review for Rank" });
-		assert.deepEqual(examReady(readiness(part({ wontFit: [h("kernel")] })), left, null), { kind: "short", words: "No room before the exam to start Kernel" }, "what has no room to start first");
+		assert.deepEqual(examReady(readiness(part({ solid: [h("span"), h("rank")] })), left, null, []), { kind: "short", words: "No room in the final review for Rank" });
+		assert.deepEqual(examReady(readiness(part({ wontFit: [h("kernel")] })), left, null, []), { kind: "short", words: "No room before the exam to start Kernel" }, "what has no room to start first");
 	});
 
 });
@@ -122,7 +151,7 @@ describe("exam readiness, from the engine's sorting", () => {
 describe("the head's readiness line", () => {
 	it("with arcs, shows the arcs not ready as bubbles that show them on the page", () => {
 		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs)} />);
+		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs, [])} />);
 		const line = doc.querySelector("[data-slot=course-ready]")!;
 		assert.match(line.textContent ?? "", /Not ready yet in/);
 		const pills = [...line.querySelectorAll("[data-slot=arc-pill]")];
@@ -132,7 +161,7 @@ describe("the head's readiness line", () => {
 
 	it("with arcs, says only that he is not ready when no arc is", () => {
 		const view = viewOf(course(true));
-		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), notYet: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs)} />);
+		const doc = render(<ReadyLine course={view.course} ready={examReady(readiness(part({ arc: a("spaces"), notYet: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs, [])} />);
 		assert.equal(doc.querySelector("[data-slot=course-ready]")?.textContent, "Not ready for the exam yet");
 		assert.equal(doc.querySelectorAll("[data-slot=arc-pill]").length, 0);
 	});

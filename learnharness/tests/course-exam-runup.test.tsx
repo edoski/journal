@@ -19,6 +19,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { CalendarCourse, CourseMapTopic, CourseReadiness, ReadinessPart, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { ExamFact } from "../components/course-page/course-head/head-parts.tsx";
 import { examReady } from "../components/course-page/standing/standing-model.ts";
+import { ReadyLine } from "../components/course-page/standing/ready-line.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -54,7 +55,7 @@ afterEach(async () => {
 });
 
 /** The run-up as he sees it after pressing "Exam in 25 days". */
-async function opened(ready: ReturnType<typeof examReady> | null) {
+async function opened(ready: ReturnType<typeof examReady> | null, shown: StudyCourse = course) {
 	const host = document.createElement("div");
 	document.body.appendChild(host);
 	root = createRoot(host);
@@ -62,7 +63,8 @@ async function opened(ready: ReturnType<typeof examReady> | null) {
 	await act(async () =>
 		root!.render(
 			<AppRouterContext.Provider value={router as never}>
-				<ExamFact course={course} runup={runup} words="Exam in 25 days" ready={ready} />
+				<ExamFact course={shown} runup={runup} words="Exam in 25 days" ready={ready} />
+				{ready && <ReadyLine course={shown} ready={ready} />}
 			</AppRouterContext.Provider>,
 		),
 	);
@@ -76,14 +78,34 @@ async function opened(ready: ReturnType<typeof examReady> | null) {
 
 describe("the exam's run-up", () => {
 	it("says what the head says while topics are not yet solid, never that every topic fits", async () => {
-		const ready = examReady(readiness({ solid: [h("span")], notYet: [h("basis"), h("rank"), h("kernel")], toStart: [h("eigen")] }), course.map, null);
+		const ready = examReady(readiness({ solid: [h("span")], notYet: [h("basis"), h("rank"), h("kernel")], toStart: [h("eigen")] }), course.map, null, []);
 		const panel = await opened(ready);
 		assert.doesNotMatch(panel.textContent ?? "", /Every topic fits/);
 		assert.equal(panel.querySelector("[data-slot=course-exam-ready]")?.textContent, "Not yet solid for the exam: Basis, Rank and Kernel");
 	});
 
+	it("names the least ready as the head does, and its \"and the rest\" opens every topic, least ready first", async () => {
+		// Round 9, 2 m13: Linear Algebra's line named nine topics; the run-up repeats it word for word.
+		const many: StudyCourse = { ...course, map: { ...course.map, topics: [...course.map.topics, topic("det"), topic("cramer", { level: "attempted" })] } };
+		const mistakes = [{ topic: h("kernel"), gap: "Counted nonzero entries", latest: "2026-11-07", answers: [] }];
+		const ready = examReady(readiness({ solid: [h("span")], notYet: ["basis", "rank", "kernel", "det", "cramer"].map(h) }), many.map, null, mistakes);
+		const panel = await opened(ready, many);
+		const said = panel.querySelector("[data-slot=course-exam-ready]")!.textContent;
+		assert.equal(said, "Not yet solid for the exam: Kernel, Cramer, Basis and the rest");
+		assert.equal(document.querySelector("[data-slot=course-ready]")!.textContent, said, "the head's line says the run-up's words");
+		await act(async () => {
+			panel.querySelector("[data-slot=ready-rest]")!.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+		});
+		const list = document.querySelector("[data-slot=ready-rest-list]");
+		assert.ok(list, "the rest opens");
+		assert.match(list.textContent ?? "", /^Not yet solid for the exam/);
+		const links = [...list.querySelectorAll("a")];
+		assert.deepEqual(links.map((a) => a.textContent), ["Kernel", "Cramer", "Basis", "Rank", "Det"], "every topic the line means, least ready first");
+		assert.ok(links.every((a) => /^\/unit\//.test(a.getAttribute("href") ?? "")), "each opens its topic's page");
+	});
+
 	it("names the topics with no room before the exam, in the warning ink", async () => {
-		const ready = examReady(readiness({ notYet: [h("basis")], wontFit: [h("eigen")] }), course.map, null);
+		const ready = examReady(readiness({ notYet: [h("basis")], wontFit: [h("eigen")] }), course.map, null, []);
 		const line = (await opened(ready)).querySelector("[data-slot=course-exam-ready]")!;
 		assert.equal(line.textContent, "No room before the exam to start Eigen");
 		assert.match(line.getAttribute("class") ?? "", /text-warning/);
