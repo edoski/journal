@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, disputeStampWords, distanceWords, heldWords, lapsedNow, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -34,9 +34,23 @@ describe("where he stands, true to the record", () => {
 		assert.equal(assisted("guess"), "Right, but a guess");
 		assert.equal(assisted("uncertain"), "Right, not yet confirmed");
 		assert.equal(assisted("helped"), "Right with help");
-		assert.equal(assisted(), "Right with help", "an engine that does not say keeps the pie's words");
+		assert.equal(assisted(), "Not right last time", "no right answer since his newest wrong one: never help he did not have (round 8, 2 M1)");
 		assert.equal(standingWords(0.75, { level: "independent" }), "Right with help", "a weak topic he could do on his own keeps its pie's words");
 		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet", "no right answer since his newest wrong one");
+	});
+
+	it("never says Right with help when the newest answer was wrong, and drops 'check another day' once the review is due (round 8, 2 M1, 1 D11)", () => {
+		assert.equal(standingWords(0.75, { level: "assisted" }), "Not right last time");
+		assert.equal(standingWords(0.75, { level: "assisted", right: "unaided", review: { kind: "due", date: "2026-11-09", overdue: 0 } }), "Right on your own");
+		assert.equal(standingWords(0.75, { level: "assisted", right: "unaided", review: { kind: "scheduled", date: "2026-11-10" } }), "Right on your own, check another day");
+		assert.equal(standingWords(0.5, { level: "attempted", right: "unaided", review: { kind: "due", date: "2026-11-09", overdue: 2 } }), "Right on your own");
+	});
+
+	it("puts every pick of his in the dispute's stamp, the mark and how it should count (round 8, 2 m2)", () => {
+		assert.equal(disputeStampWords({}), "You disputed the mark");
+		assert.equal(disputeStampWords({ proposed: "correct" }), "You disputed the mark · You think: Right");
+		assert.equal(disputeStampWords({ proposedHow: "ownWork" }), "You disputed the mark · You think: On your own");
+		assert.equal(disputeStampWords({ proposed: "partial", proposedHow: "withHelp" }), "You disputed the mark · You think: Partly right, With help");
 	});
 
 	it("says the right answers since a review day's wrong first try, never that he has not got it right (round 7)", () => {
@@ -112,8 +126,8 @@ describe("why a review needs him", () => {
 		assert.deepEqual([0, 1, 3, 6, 7, 13, 14, 30].map(overdueWords), ["Due today", "1d overdue", "3d overdue", "6d overdue", "7d overdue", "13d overdue", "14d overdue", "30d overdue"]);
 	});
 
-	it("says when a dated review comes back in days, then weeks, then months", () => {
-		assert.deepEqual([1, 5, 13, 14, 21, 59, 60, 90].map(returnWords), ["Back in 1d", "Back in 5d", "Back in 13d", "Back in 14d", "Back in 21d", "Back in 59d", "Back in 60d", "Back in 90d"]);
+	it("says the day a dated review comes back, never a count of days (round 8, 2 m4)", () => {
+		assert.deepEqual(["2026-11-10", "2026-11-13", "2027-01-05"].map(returnWords), ["Back Tue 10 Nov", "Back Fri 13 Nov", "Back Tue 5 Jan"]);
 	});
 });
 
@@ -148,8 +162,8 @@ describe("why a review waits", () => {
 	});
 	it("says since when a held review was due, so weeks late never reads as 'Back in 25d'", () => {
 		assert.equal(reviewWords(late, "2026-11-08"), "Due since 1 Oct");
-		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back in 25d");
-		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back in 12d", "memory's day is still ahead");
+		assert.equal(reviewWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), "Back Thu 3 Dec");
+		assert.equal(reviewWords({ ...behind, held: { exam: "Probability", since: "2026-11-13" } }, "2026-11-08"), "Back Fri 20 Nov", "memory's day is still ahead");
 		assert.equal(reviewWords({ kind: "due", date: "2026-11-08", overdue: 3 }, "2026-11-08"), "3d overdue");
 	});
 	it("says from which told day a review moved and what of his study moved it, ahead of memory's day", () => {

@@ -29,7 +29,7 @@ describe("a late review", () => {
 	it("leaves a review dated ahead off the card, which says where he stands", () => {
 		const c = course({ kind: "scheduled", date: "2026-11-20" });
 		const said = sidebarSays([c], [], c.map.workspace).get("cramer" as TopicHandle);
-		assert.match(said?.fact?.words ?? "", /^Back in/);
+		assert.match(said?.fact?.words ?? "", /^Back /);
 		assert.equal(cardLine(said), null);
 	});
 });

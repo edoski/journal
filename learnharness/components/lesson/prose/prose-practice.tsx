@@ -2,7 +2,7 @@
 
 import { BookOpenIcon, EyeIcon, FlagIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
-import { MARK_WORDS, LESSON_WORDS } from "@/components/study-words";
+import { disputeStampWords, LESSON_WORDS } from "@/components/study-words";
 import type { Confidence, DisputeDetails, Photo, PracticeRequest, PracticeRequestDetails } from "@/src/core";
 import { BubbleMark, LearnerBubble } from "@/components/lesson/prose/learner-bubble";
 import { Disclosure, YourTurn } from "@/components/lesson/prose/prose-question";
@@ -93,6 +93,5 @@ export function RequestBubble({ data }: { data: PracticeRequestDetails }) {
 
 /** His dispute of a mark, as his bubble. */
 export function DisputeBubble({ data }: { data: DisputeDetails }) {
-	const label = data.proposed ? `${MARK_WORDS.youDisputed} · ${MARK_WORDS.youThink}: ${MARK_WORDS.result[data.proposed]}` : MARK_WORDS.youDisputed;
-	return <LearnerBubble testId="dispute-row" icon={FlagIcon} label={label} text={data.said} />;
+	return <LearnerBubble testId="dispute-row" icon={FlagIcon} label={disputeStampWords(data)} text={data.said} />;
 }

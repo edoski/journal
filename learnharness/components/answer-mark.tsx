@@ -9,7 +9,7 @@ import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { MARK_HOW_WORDS, MARK_WORDS } from "@/components/study-words";
+import { disputeStampWords, MARK_HOW_WORDS, MARK_WORDS } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
 /**
@@ -222,13 +222,7 @@ export function DisputeRow({ data }: { data: DisputeDetails }) {
 		<div data-testid="dispute-row" className="my-1 w-full rounded-xl bg-card px-4 py-3">
 			<div className="flex items-center gap-2 text-row text-muted-foreground">
 				<FlagIcon aria-hidden className="size-4 shrink-0" />
-				{MARK_WORDS.youDisputed}
-				{(data.proposed || data.proposedHow) && (
-					<>
-						<span aria-hidden>·</span>
-						{MARK_WORDS.youThink}: {[data.proposed && MARK_WORDS.result[data.proposed], data.proposedHow && MARK_HOW_WORDS[data.proposedHow]].filter(Boolean).join(", ")}
-					</>
-				)}
+				{disputeStampWords(data)}
 			</div>
 			{data.said ? <p className="lh-prose mt-1 whitespace-pre-wrap italic text-muted-foreground"><MathText>{data.said}</MathText></p> : null}
 		</div>

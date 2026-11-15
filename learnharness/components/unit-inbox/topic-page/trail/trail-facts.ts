@@ -11,8 +11,15 @@ import { dayWords, type SessionEntry } from "@/components/unit-inbox/topic-page/
  * answers sat under "Rank practice").
  */
 
-/** One row of the line: a session, or an attempt. */
-export type TrailRow = { kind: "session"; entry: SessionEntry } | { kind: "attempt"; attempt: TopicAttempt };
+/** One row of the line: a session, or an attempt. An attempt on the same
+ *  question as the row above it reads "First try" (its oldest) or "Then"
+ *  in place of the question (`title`), so a practice problem's two tries
+ *  never print the whole statement twice (round 8). */
+export type TrailRow = { kind: "session"; entry: SessionEntry } | { kind: "attempt"; attempt: TopicAttempt; title?: string };
+
+/** The words a repeated question's older tries read in place of it, as
+ *  the answer card names them. */
+export const TRY_WORDS = { first: "First try", then: "Then" } as const;
 
 /** One day of the line: its words, then its rows. */
 export interface TrailDay {
@@ -30,6 +37,20 @@ const newestFirst = (a: string, b: string) => (a < b ? 1 : a > b ? -1 : 0);
 const byId = new Intl.Collator("en", { numeric: true });
 const byRecorded = (a: TopicAttempt, b: TopicAttempt) => newestFirst(a.recorded ?? "", b.recorded ?? "") || byId.compare(b.id, a.id);
 const attemptRow = (attempt: TopicAttempt): TrailRow => ({ kind: "attempt", attempt });
+
+/** A question's words, for telling the same one asked again. */
+const questionKey = (attempt: TopicAttempt) => attempt.text.trim().replace(/\s+/g, " ");
+
+/** Attempts newest first as rows: in a run on the same question, the
+ *  newest keeps it, the oldest reads "First try" and any between "Then". */
+function retitled(attempts: readonly TopicAttempt[]): TrailRow[] {
+	return attempts.map((attempt, i) => {
+		const key = questionKey(attempt);
+		if (i === 0 || questionKey(attempts[i - 1]!) !== key) return attemptRow(attempt);
+		const oldest = i === attempts.length - 1 || questionKey(attempts[i + 1]!) !== key;
+		return { kind: "attempt", attempt, title: oldest ? TRY_WORDS.first : TRY_WORDS.then };
+	});
+}
 
 /** One entry per day that has a session or an attempt, newest day first. */
 export function trailDays(sessions: readonly SessionEntry[], attempts: readonly TopicAttempt[], today: string): TrailDay[] {
@@ -49,8 +70,8 @@ export function trailDays(sessions: readonly SessionEntry[], attempts: readonly 
 			day,
 			label: dayWords(day, today),
 			rows: [
-				...found.loose.sort(byRecorded).map(attemptRow),
-				...found.sessions.sort((a, b) => newestFirst(a.chat.updatedAt, b.chat.updatedAt)).flatMap((entry): TrailRow[] => [{ kind: "session", entry }, ...saved(entry).map(attemptRow)]),
+				...retitled(found.loose.sort(byRecorded)),
+				...found.sessions.sort((a, b) => newestFirst(a.chat.updatedAt, b.chat.updatedAt)).flatMap((entry): TrailRow[] => [{ kind: "session", entry }, ...retitled(saved(entry))]),
 			],
 		}));
 }

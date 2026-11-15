@@ -163,8 +163,8 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "2d overdue" });
 		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "9d overdue" });
 		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "Left off 2d ago" });
-		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back in 1d" });
-		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back in 22d" });
+		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back Mon 9 Nov" });
+		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back Mon 30 Nov" });
 		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "3d ago" });
 	});
 
