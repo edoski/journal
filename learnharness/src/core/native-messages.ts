@@ -849,6 +849,17 @@ export function answeredQuestionsOf(messages: readonly LhMessage[]): Map<string,
 	return questionScan(messages).answered;
 }
 
+/** Whether he studied in a session: he answered a question or a problem in
+ *  it ended, or he wrote to the tutor after the words it opened with (an
+ *  answer in words, a follow-up). A session holding only its opening, a
+ *  plan question or "Continue Problem sheet 4" and the tutor's first
+ *  question, is not study (round 10, 1 m2: Home's "Studied today" listed
+ *  both). Pure. */
+export function studiedIn(messages: readonly LhMessage[]): boolean {
+	if (messages.filter((m) => m.role === "user").length > 1) return true;
+	return [...answeredQuestionsOf(messages).keys()].some((key) => key !== HIS_MESSAGE);
+}
+
 /** True when the solution of the question or problem a call asked had been
  *  shown to him before it was asked (`AnsweredQuestion.seenBefore`). Pure. */
 export function seenBeforeAsked(messages: readonly LhMessage[], callId: string): boolean {
