@@ -19,6 +19,7 @@ def planned(record: dict[str, Any]) -> dict[str, Any]:
 
 MONDAY = date(2026, 1, 5)
 WEEKDAYS = frozenset(range(5))
+EVERY_DAY = frozenset(range(7))
 
 
 def on(offset: int) -> date:
@@ -473,11 +474,9 @@ def test_a_review_a_full_day_leaves_out_is_held_and_says_why() -> None:
     assert alone.held == {"free": {"t02": None, "t03": None}}
 
 
-def test_a_nearer_exams_final_review_comes_before_a_later_courses_new_topics() -> None:
+def test_a_nearer_exams_final_review_comes_before_a_later_courses_reviews() -> None:
     near = solid(course(8, exam=6), on(-1))
-    far = course(8, exam=40)
-    every = {key: {"introduced": True} for key in far["topics"]}
-    far = save(far, {"topics": every}, on(-1))
+    far = solid(course(8, exam=40), on(-1))
     together = plan({"near": near, "far": far}, 7, week(2, 0, frozenset(range(7))))
     reviewed = {t for day in together.days["near"][:6] for t in day["reviews"]}
     assert reviewed == set(near["topics"])
@@ -748,7 +747,78 @@ def test_a_save_that_changes_no_topic_moves_no_courses_days() -> None:
     assert after.days == before.days
 
 
-EVERY_DAY = frozenset(range(7))
+def test_a_first_review_comes_on_its_day_ahead_of_older_reviews_and_another_courses_final_review() -> (
+    None
+):
+    near = solid(course(12, exam=5), MONDAY)
+    backlog = solid(course(6), on(-5))
+    fresh = save(course(3), {"topics": {"t00": {"introduced": True}}}, MONDAY)
+    records = {"near": near, "backlog": backlog, "fresh": fresh}
+    together = agenda.plan(records, MONDAY, 10, week(2, 0, EVERY_DAY))
+    assert together.when("fresh", MONDAY, True).reviews["t00"] == on(1)
+    assert "t00" not in together.held.get("fresh", {})
+    assert together.days["near"][1]["reviews"], "its final review keeps the rest"
+
+
+def test_among_first_reviews_what_he_learned_last_comes_first() -> None:
+    stale = taught(course(4), on(-1))
+    fresh = save(course(3), {"topics": {"t00": {"introduced": True}}}, MONDAY)
+    together = agenda.plan(
+        {"stale": stale, "fresh": fresh}, MONDAY, 10, week(1, 0, EVERY_DAY)
+    )
+    assert together.when("fresh", MONDAY, True).reviews["t00"] == on(1)
+
+
+def test_a_night_with_nothing_saved_moves_no_estimate() -> None:
+    history = {
+        on(-n): Done(reviews=1 + n % 4, new=n % 2, reviews_short=n % 5 == 0)
+        for n in range(1, 40)
+    }
+    history[MONDAY] = Done(reviews=6, new=1)
+    tonight = capacity.estimate(history, MONDAY)
+    assert (
+        tonight.on(MONDAY).reviews.value
+        > capacity.estimate(
+            {day: done for day, done in history.items() if day < MONDAY}, MONDAY
+        )
+        .on(MONDAY)
+        .reviews.value
+    )
+    assert capacity.estimate(history, on(1)) == tonight
+    del history[MONDAY]
+    skipped, before = (
+        capacity.estimate(history, on(1)),
+        capacity.estimate(history, MONDAY),
+    )
+    for kind in ("reviews", "new"):
+        assert [getattr(day, kind) for day in skipped.weekdays] == [
+            getattr(day, kind) for day in before.weekdays
+        ]
+
+
+def studied(record: dict[str, Any], first: int, last: int) -> dict[str, Any]:
+    """Each day from ``first`` to ``last``, the reviews due answered right, as
+    many as its weekday's number (all of them on ``last``), so he stops short
+    on some days and the plan learns his limits from the record."""
+    for offset in range(first, last + 1):
+        day = on(offset)
+        due = progress.due(record, day, limit=0)
+        count = len(due) if offset == last else 1 + day.weekday() % 3
+        topics = [item["topic"] for item in due[:count]]
+        if topics:
+            record = save(record, {"observations": [answer(t) for t in topics]}, day)
+    return record
+
+
+def test_a_plan_made_tomorrow_from_the_same_record_gives_the_same_dates() -> None:
+    record = studied(taught(course(24), on(-36)), -35, 0)
+    first = agenda.plan({"c": record}, MONDAY, 40)
+    assert first.when("c", MONDAY, True).reviews
+    tomorrow = agenda.plan({"c": record}, on(1), 39)
+    today = first.when("c", MONDAY, True).reviews
+    assert tomorrow.when("c", on(1), True).reviews == {
+        topic: day for topic, day in today.items() if day > MONDAY
+    }
 
 
 def test_a_fractional_pace_starts_on_some_days_and_leaves_the_rest_to_a_course_without_an_exam() -> (

@@ -31,6 +31,12 @@ describe("a planned day in words", () => {
 		assert.equal((withDayWords({ items: { t: { starts: "2026-11-15" } } }, "2026-11-08") as { items: { t: { starts_words: string } } }).items.t.starts_words, "Sunday 15 November, in 7 days");
 	});
 
+	it("names the day a moved day was told for, so the tutor says it moved without counting", () => {
+		const moved = { from: "2026-11-10", by: "study", courses: ["Probability"] };
+		const show = withDayWords({ items: { eigen: { review: { planned: "2026-11-11" }, moved } } }, "2026-11-09") as { items: { eigen: { moved: Record<string, unknown> } } };
+		assert.deepEqual(show.items.eigen.moved, { ...moved, from_words: "Tuesday 10 November" });
+	});
+
 	it("reads the study day the engine's clock reads", () => {
 		assert.equal(studyDay({ LEARNING_TODAY: "2026-11-08" }), "2026-11-08");
 		assert.equal(studyDay({}, new Date(2026, 10, 14, 23, 30)), "2026-11-14");

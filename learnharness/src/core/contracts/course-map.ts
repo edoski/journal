@@ -27,6 +27,12 @@ export interface ReviewHeld {
 	since: string;
 }
 
+/** A day he was told that has since moved (the engine's `moved`): `from`
+ *  is the day the plan gave it as yesterday ended, `by` what of his study
+ *  moved it: his study today in `courses`, no study yesterday, or
+ *  yesterday's plan left unfinished. */
+export type TopicMoved = { from: string; by: "study"; courses: readonly string[] } | { from: string; by: "missed" | "left" };
+
 /** The topic's review on the day the engine's daily plan puts it: `due`
  *  exactly when that day is today, with the days since memory asked for
  *  it; a review the plan moves to a later day is `scheduled` for that day,
@@ -103,6 +109,8 @@ export interface CourseMapTopic {
 	startsAfter?: readonly string[];
 	/** Why it starts then in its own course, present with `starts`. */
 	startsWhy?: StartsWhy;
+	/** Its next review or start, when that is not the day he was told. */
+	moved?: TopicMoved;
 }
 
 /** `needs`: the prerequisite comes before the topic that needs it.

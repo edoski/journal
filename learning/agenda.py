@@ -13,9 +13,15 @@ ladder's next steps; what does not fit stays due. The plan never stores
 anything; the next save and the next plan start again from what happened.
 
 Reviews, when there are more than fit:
+  0. a topic's first review, the day after it was taught: what he has just
+     learned is checked within days, ahead of every older review and of
+     another course's final review, which would otherwise hold it until its
+     exam. Within its own course's final review it is that review's. Among
+     first reviews, those of 2 come first, then the most recently taught: a
+     topic taught weeks ago and never reviewed is no longer just learned.
   1. a course's final review, the one deadline the plan keeps: from its
      final-review day to the exam, its reviews come before every other
-     course's, nearest exam first. Its solid topics are spread over its study
+     course's but first reviews, nearest exam first. Its solid topics are spread over its study
      days to the exam in proportion to the reviews he completes on each, so a
      lighter day takes less of it and a day off none; its not-yet-solid
      topics come back as their short intervals ask. Every taught topic is due
@@ -209,6 +215,7 @@ class _Course:
     projected: set[str] = field(default_factory=set)
     holding: dict[str, str | None] = field(default_factory=dict)
     placed: set[str] = field(default_factory=set)
+    checked: set[str] = field(default_factory=set)
     held: dict[str, str | None] = field(default_factory=dict)
     gaps: set[str] = field(default_factory=set)
     pending: list[str] = field(default_factory=list)
@@ -402,6 +409,18 @@ class _Course:
     def due(self, day: date) -> list[str]:
         return [item["topic"] for item in self.due_items(day)]
 
+    def first(self, topic: str) -> bool:
+        """Its next review is its first: taught, and no review answered yet,
+        on record or in the plan."""
+        return topic not in self.checked and progress.PROBE not in (
+            self.replayed[topic].days.values()
+        )
+
+    def worked(self, topic: str) -> int:
+        """The day he last worked on it, as a day number."""
+        last = self.levels[topic].get("last", {}).get("date")
+        return date.fromisoformat(last).toordinal() if last else 0
+
     def need(self, item: dict[str, Any]) -> float:
         """Memory's need for a due review: days late as a share of its interval."""
         return progress.late_share(item, self.levels[item["topic"]])
@@ -538,6 +557,7 @@ class _Course:
         expected = engine or (date.fromisoformat(stored) if stored else None)
         late = progress.late_days(day, expected, self.exam_of(topic)) if expected else 0
         self.projected.add(topic)
+        self.checked.add(topic)
         self.paired.pop(topic, None)
         self.streaks[topic] = self.streaks.get(topic, 0) + 1
         standing = {
@@ -719,8 +739,8 @@ def _room_after(week: Capacity, day: date, last: date) -> int | None:
 def _reviews(
     courses: list[_Course], day: date, room: float, week: Capacity
 ) -> dict[str, list[str]]:
-    """The day's reviews within ``room``: final reviews first, nearest exam
-    first, then by memory's need (the module's rule). Each one a full day
+    """The day's reviews within ``room``: first reviews, then final reviews,
+    nearest exam first, then by memory's need (the module's rule). Each one a full day
     leaves out waits on its course's ``holding``, with the course whose final
     review took some of the day."""
     candidates: list[tuple[tuple[Any, ...], str, _Course, str]] = []
@@ -749,6 +769,17 @@ def _reviews(
             tier = course.tier(topic, day)
             learning = tier == RELEARNING
             gating = learning and topic in gates
+            if course.first(topic):
+                key = (
+                    -1,
+                    not gating,
+                    distance if gating else 0.0,
+                    -course.worked(topic),
+                    distance if examined else math.inf,
+                    rank,
+                )
+                candidates.append((key, course.name, course, topic))
+                continue
             key = (
                 1,
                 tier == EXAM_PASSED,
@@ -985,32 +1016,57 @@ def _new(
     return chosen
 
 
-def _morning(record: dict[str, Any], today: date) -> dict[str, Any]:
-    """The record as today began: without today's answers, and each review
-    the engine moved for one of them back on the day it had then."""
+def touched(record: dict[str, Any], today: date) -> set[str]:
+    """The topics he answered or started today."""
     day = today.isoformat()
-    observations = {
-        key: item for key, item in record["observations"].items() if item["date"] < day
-    }
-    touched = {
+    return {
         topic
         for item in record["observations"].values()
         if item["date"] >= day
         for topic in item["topics"]
+    } | {
+        key
+        for key, topic in record["topics"].items()
+        if topic.get("introduced", "") >= day
+    }
+
+
+def morning(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The record as today began: without today's answers, a topic started
+    today not yet started, and each review the engine moved for one of
+    them back on the day it had then."""
+    day = today.isoformat()
+    observations = {
+        key: item for key, item in record["observations"].items() if item["date"] < day
+    }
+    started = {
+        key
+        for key, topic in record["topics"].items()
+        if topic.get("introduced", "") >= day
     }
     before = {**record, "observations": observations}
-    replayed = progress.replays(before)
-    topics = dict(record["topics"])
-    for key in touched & topics.keys():
+    topics = {
+        key: {name: value for name, value in topic.items() if name != "introduced"}
+        if key in started
+        else topic
+        for key, topic in record["topics"].items()
+    }
+    replayed = progress.replays({**before, "topics": topics})
+    for key in touched(record, today) & topics.keys():
         review = topics[key].get("review", {})
         if review.get("by") != "engine":
             continue
         rest = {name: value for name, value in review.items() if name != "due"}
         due = replayed[key].due
-        topics[key] = {
+        entry = {
             **topics[key],
             "review": {**rest, "due": due.isoformat()} if due else rest,
         }
+        topics[key] = (
+            entry
+            if entry["review"]
+            else {name: value for name, value in entry.items() if name != "review"}
+        )
     return {**before, "topics": topics}
 
 
@@ -1024,8 +1080,8 @@ def _spent_today(
     began. A review he chose beyond them, one the plan had put on a later
     day, is study past the plan: it takes no place from a review still
     planned today, so nothing shown due today drops off it unstudied."""
-    morning = plan(
-        {name: _morning(record, today) for name, record in records.items()},
+    began = plan(
+        {name: morning(record, today) for name, record in records.items()},
         today,
         1,
         week,
@@ -1034,7 +1090,7 @@ def _spent_today(
     return sum(
         1
         for course in courses
-        for topic in morning.days[course.name][0]["reviews"]
+        for topic in began.days[course.name][0]["reviews"]
         if course.replayed[topic].days.get(day) == progress.PROBE
     )
 

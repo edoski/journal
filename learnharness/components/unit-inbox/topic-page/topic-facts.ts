@@ -187,9 +187,10 @@ function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | nul
 	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null;
 }
 
-function waitsWords(review: CourseMapTopic["review"], today: string): string | null {
-	const why = heldWords(review);
-	const moved = movedWords(review, today);
+function waitsWords(topic: CourseMapTopic, today: string): string | null {
+	if (topic.moved && topic.review) return movedWords(topic.review, today, topic.moved);
+	const why = heldWords(topic.review);
+	const moved = movedWords(topic.review, today);
 	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : why;
 }
 
@@ -396,8 +397,8 @@ export function topicFacts({
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
-		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam) : null) ?? waitsWords(topic.review, map.today),
-		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : startsAfterWords(topic.startsAfter) } : null,
+		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam) : null) ?? waitsWords(topic, map.today),
+		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		action: topicAction(topic, map, chats),
 		pickups,

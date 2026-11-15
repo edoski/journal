@@ -302,11 +302,12 @@ export function calendarEntries({
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) => {
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
-			const since = held ? movedWords(held, today) : null;
-			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held ? heldWords(held) : null, ...facts(topic) });
+			const told = topic.review?.date === day ? topic.moved : undefined;
+			const since = held || told ? movedWords(held, today, told) : null;
+			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
-			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? startsAfterWords(topic.startsAfter)) : null, ...facts(topic) });
+			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(null, today, topic.moved) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });
 		const topicOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle);
 		for (const handle of due ?? []) {
 			const topic = topicOf(handle);

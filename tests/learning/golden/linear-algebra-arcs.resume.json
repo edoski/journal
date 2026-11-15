@@ -8,7 +8,7 @@
       "date": "2026-12-03",
       "format": "Written, 3 hours, 6 problems",
       "coverage": "Chapters 1-7 of the lecture notes",
-      "final_review": "2026-11-14",
+      "final_review": "2026-11-18",
       "days_left": 25
     }
   },
@@ -16,38 +16,56 @@
     "date": "2026-11-08",
     "days_ago": 0
   },
+  "due": [
+    {
+      "topic": "kernel",
+      "due": "2026-11-07",
+      "overdue": 1,
+      "level": "attempted"
+    }
+  ],
   "due_later": [
     {
       "topic": "matmul",
       "planned": "2026-11-09"
     },
     {
-      "topic": "rank",
-      "planned": "2026-11-11"
-    },
-    {
-      "topic": "elimination",
-      "planned": "2026-11-14"
-    },
-    {
       "topic": "cramer",
+      "planned": "2026-11-12"
+    },
+    {
+      "topic": "rank",
       "planned": "2026-11-14"
     },
     {
       "topic": "independence",
       "planned": "2026-11-16"
+    },
+    {
+      "topic": "elimination",
+      "planned": "2026-11-18"
     }
   ],
-  "due_later_more": 4,
+  "due_later_more": 3,
   "starts": {
     "inner-product": "2026-11-09",
-    "invertibility": "2026-11-13",
-    "projection": "2026-11-14",
-    "change-basis": "2026-11-18",
-    "diagonalization": "2026-11-20"
+    "projection": "2026-11-12",
+    "invertibility": "2026-11-14",
+    "change-basis": "2026-11-15",
+    "diagonalization": "2026-11-16"
   },
   "starts_why": {
     "inner-product": {
+      "arc": "orthogonality",
+      "kind": "early",
+      "behind": "determinants",
+      "waiting_on": [
+        "rank",
+        "determinant"
+      ],
+      "exam": true
+    },
+    "projection": {
       "arc": "orthogonality",
       "kind": "early",
       "behind": "determinants",
@@ -61,15 +79,8 @@
       "arc": "determinants",
       "kind": "after",
       "needs": [
+        "rank",
         "determinant"
-      ]
-    },
-    "projection": {
-      "arc": "orthogonality",
-      "kind": "early",
-      "behind": "eigenvalues",
-      "waiting_on": [
-        "invertibility"
       ]
     },
     "change-basis": {
@@ -350,7 +361,7 @@
       "review": {
         "due": "2026-10-29",
         "by": "engine",
-        "planned": "2026-11-23"
+        "planned": "2026-11-21"
       },
       "standing": {
         "level": "retained",
@@ -381,7 +392,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-14"
+        "planned": "2026-11-18"
       },
       "standing": {
         "level": "retained",
@@ -421,7 +432,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-11"
+        "planned": "2026-11-14"
       },
       "judged": "2026-10-30",
       "standing": {
@@ -460,7 +471,7 @@
       "review": {
         "due": "2026-11-07",
         "by": "engine",
-        "planned": "2026-11-16"
+        "planned": "2026-11-08"
       },
       "standing": {
         "level": "attempted",

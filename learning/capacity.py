@@ -39,7 +39,15 @@ starts ``PRIOR_NEW`` new topics on a study day, each weighing as much as one
 observed day. Recent weeks count more (each week half as much as the next
 every ``HALF_LIFE_DAYS``), so a change of routine shows within a week or two;
 the days of one week weigh alike, so no weekday counts more for being the most
-recent. The evidence starts on his first recorded day. A weekday leans on his
+recent. The evidence starts on his first recorded day.
+
+Only his study moves the estimate, never the calendar alone, so a plan made
+tomorrow from the same records keeps the days today's plan told him. Today's
+work counts as he saves it, as a day he finished (whether he stopped short is
+known only once the day is over), and the weeks are counted back from his
+latest day of study, not from the day the plan is made: a night with nothing
+saved moves no weight. What the end of a day adds is evidence of its own: a
+day he skipped, or stopped with work still owed. A weekday leans on his
 overall rates as much as one day would, so a weekday seen once does not swing
 the plan and a single skip does not turn it off.
 """
@@ -351,10 +359,11 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
 # --- the estimate -------------------------------------------------------------
 
 
-def _weight(day: date, today: date) -> float:
-    """Whole weeks back from yesterday weigh alike, so no weekday counts more
-    for being the most recent."""
-    weeks_back = (today - day - timedelta(days=1)).days // WEEK
+def _weight(day: date, latest: date) -> float:
+    """Whole weeks back from his ``latest`` day of study weigh alike, so no
+    weekday counts more for being the most recent, and a day with nothing
+    saved shifts no weight."""
+    weeks_back = (latest - day).days // WEEK
     return float(0.5 ** (weeks_back * WEEK / HALF_LIFE_DAYS))
 
 
@@ -410,19 +419,19 @@ def _limit(seen: list[_Seen]) -> Limit:
 
 
 def _kind(
-    days: dict[date, Done], today: date, done: str, short: str, prior: float | None
+    days: dict[date, Done], done: str, short: str, prior: float | None
 ) -> list[Limit]:
     """One kind's limit on each weekday, leaning on his overall limit."""
+    latest = max(days, default=date.min)
     seen = [
-        _Seen(day, _weight(day, today), getattr(item, done), getattr(item, short))
+        _Seen(day, _weight(day, latest), getattr(item, done), getattr(item, short))
         for day, item in days.items()
     ]
-    if prior is not None:
-        seen.append(_Seen(today, PRIOR_WEIGHT, prior, False))
-    overall = _limit(seen)
+    priors = [] if prior is None else [_Seen(latest, PRIOR_WEIGHT, prior, False)]
+    overall = _limit([*seen, *priors])
     weekdays = [_Tally() for _ in range(WEEK)]
     for item in seen:
-        if item.day < today and (item.short or item.done >= overall.value):
+        if item.short or item.done >= overall.value:
             weekdays[item.day.weekday()].add(item.weight, item.done)
     return [Limit(tally.toward(overall.value), overall.shown) for tally in weekdays]
 
@@ -439,8 +448,10 @@ class _Week:
 
 def _study_weekdays(days: Iterable[date], today: date) -> _Week:
     """His study weekdays, replayed day by day from his first record: a day
-    off the plan held nothing for, and he did nothing on, is not counted."""
-    studied = {day for day in days if day < today}
+    off the plan held nothing for, and he did nothing on, is not counted.
+    Today counts once he has studied; a day skipped is known only once it is
+    over."""
+    studied = {day for day in days if day <= today}
     fade = 0.5 ** (WEEK / HALF_LIFE_DAYS)
     weight = [0.0] * WEEK
     total = [0.0] * WEEK
@@ -455,11 +466,13 @@ def _study_weekdays(days: Iterable[date], today: date) -> _Week:
         return chance, frozenset(day for day in range(WEEK) if chance[day] >= usual / 2)
 
     first = min(studied, default=today)
-    for offset in range((today - first).days):
+    last = today if today in studied else today - timedelta(days=1)
+    for offset in range((last - first).days + 1):
         day = first + timedelta(days=offset)
         weekday = day.weekday()
         if weekday in week()[1]:
-            planned.add(day)
+            if day < today:
+                planned.add(day)
         elif day not in studied:
             continue
         weight[weekday] = weight[weekday] * fade + 1
@@ -469,11 +482,11 @@ def _study_weekdays(days: Iterable[date], today: date) -> _Week:
 
 
 def estimate(days: dict[date, Done], today: date) -> Capacity:
-    """His week from the days before ``today`` (today is still under way)."""
-    past = {day: done for day, done in days.items() if day < today}
+    """His week from his study through ``today``, today's as saved so far."""
+    past = {day: done for day, done in days.items() if day <= today}
     week = _study_weekdays(past, today)
-    reviews = _kind(past, today, "reviews", "reviews_short", None)
-    new = _kind(past, today, "new", "new_short", PRIOR_NEW)
+    reviews = _kind(past, "reviews", "reviews_short", None)
+    new = _kind(past, "new", "new_short", PRIOR_NEW)
     weekdays = tuple(
         Weekday(week.chance[day], reviews[day], new[day]) for day in range(WEEK)
     )
