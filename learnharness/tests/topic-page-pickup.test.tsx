@@ -235,6 +235,16 @@ describe("a topic not started", () => {
 		assert.equal(document.querySelector('[data-slot="pickup-material"]')!.textContent, "Section 4.7Blitzstein and Hwang");
 	});
 
+	// Round 10, 3 m9: "Random variables and dis…" beside "Right with help" in the 320px history column.
+	it("wraps a long title onto a second line instead of cutting it, the row growing to hold it", () => {
+		const row = page(facts).querySelector('[data-slot="pickup-builds-on"]')!;
+		const title = row.querySelector('[data-slot="pickup-builds-on-title"]')!;
+		assert.doesNotMatch(title.className, /\btruncate\b/, "the title is never cut to one line");
+		assert.match(title.className, /\bline-clamp-2\b/, "two lines at most");
+		assert.doesNotMatch(row.className, /(?:^|\s)h-10(?:\s|$)/, "a fixed 40px row would clip the second line");
+		assert.match(row.className, /\bmin-h-10\b/, "one line keeps the history's 40px row");
+	});
+
 	it("draws beside it the course map cut to the topic and everything it builds on, near or far", () => {
 		assert.deepEqual(facts.buildsMap?.topics.map((t) => t.handle), ["vectors", "span", "rank", "kernel", "poisson"]);
 		assert.equal(facts.buildsMap?.current, "rank", "where he is, when it is among them");

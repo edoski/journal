@@ -26,6 +26,11 @@ export const TWO_LINE_ROW = `${ROW_GRID} h-16 grid-rows-[auto_auto] content-cent
 /** A 40px row of one line. */
 export const ONE_LINE_ROW = `${ROW_GRID} h-10`;
 
+/** A row whose title wraps to a second line rather than being cut: 40px
+ *  while it fits one (round 10, 3 m9: "Random variables and dis…" in
+ *  Builds on). */
+export const WRAPPING_ROW = `${ROW_GRID} min-h-10 py-2`;
+
 /** A hairline above every row but the first, the column's width. */
 export const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
 

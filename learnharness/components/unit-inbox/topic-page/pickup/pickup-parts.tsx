@@ -9,7 +9,7 @@ import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/to
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { BLEED, GUTTER, HAIRLINE, NOW_RULE, ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
+import { BLEED, GUTTER, HAIRLINE, NOW_RULE, ONE_LINE_ROW, TWO_LINE_ROW, WRAPPING_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import type { BuildsOn, StartsReason, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
@@ -124,6 +124,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 }
 
 /** Builds on: each topic this one builds on as a row, its pie, its title
+ *  (two lines at most, never cut to one)
  *  and where he stands on it in the pie's words, opening its page; a
  *  pointer or focus on a row tells the page (`onPoint`), so the map beside
  *  can light it. */
@@ -140,10 +141,10 @@ export function BuildsOnList({ builds, onPoint }: { builds: readonly BuildsOn[];
 						onMouseLeave={() => onPoint?.(null)}
 						onFocus={() => onPoint?.(topic.handle)}
 						onBlur={() => onPoint?.(null)}
-						className={cn(ONE_LINE_ROW, "outline-none transition-colors duration-150 hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none")}
+						className={cn(WRAPPING_ROW, "outline-none transition-colors duration-150 hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none")}
 					>
 						<TopicGlyph standing={standing} />
-						<span className="truncate text-body system-current:text-row text-foreground">
+						<span data-slot="pickup-builds-on-title" className="line-clamp-2 text-body system-current:text-row text-foreground">
 							<LineText>{topic.title}</LineText>
 						</span>
 						<span data-slot="pickup-builds-on-standing" className="text-callout system-current:text-label text-muted-foreground">
