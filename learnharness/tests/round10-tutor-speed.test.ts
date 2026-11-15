@@ -171,3 +171,19 @@ describe("a point made once still lets news through (round 10)", () => {
 		assert.deepEqual(rules(new VoiceGuard(turn), send("The mark stays right, with help. Before the hint you had written \"$(\\frac14)^3$ times something for the other 5\", and the hint pointed at exactly that missing piece, the $\\frac34$ for each wrong answer.")), []);
 	});
 });
+
+describe("plan_init's first draft passes when it names its steps (round 10)", () => {
+	it("the Eigen map of every run: \"Finding every eigenvalue\" names a task, while \"Pivots in every column\" still states a law", async () => {
+		const { planTitlesGiveAway } = await import("../src/core/plan-tree.ts");
+		const titles = (...t: string[]) => ({ nodes: t.map((title, i) => ({ id: `s${i}`, title })) });
+		assert.equal(planTitlesGiveAway(titles("Directions a matrix keeps on their line", "The eigen-equation", "Finding every eigenvalue", "Finding the eigenvectors for one $\\lambda$", "Computing a $2 \\times 2$ spectrum", "What an eigenbasis does to $A$")), null);
+		for (const law of ["Pivots in every column", "Continuity for every $\\varepsilon$"]) assert.match(planTitlesGiveAway(titles(law)) ?? "", /state their step's result/, law);
+	});
+
+	it("the Invertible title refused in rounds 9 and 10 is the counterexample both plan_init texts give", async () => {
+		const { planTools } = await import("../src/agent/tools/plan.ts");
+		const description = planTools({ chatId: "c1", chatStore: { getChat: () => ({ messages: [] }), saveTree: () => {}, nameSession: () => {} } as never }).plan_init!.description;
+		const guidance = fs.readFileSync(path.join(import.meta.dirname, "..", "src", "agent", "prompts", "teacher", "10-planning.md"), "utf-8");
+		for (const text of [description, guidance]) assert.match(text, /never "Solving \$Ax = b\$ with \$A\^\{-1\}\$"/);
+	});
+});
