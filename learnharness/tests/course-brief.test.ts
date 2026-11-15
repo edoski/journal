@@ -106,7 +106,7 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 		const { text } = projectCourseBrief(RESUME, "teach");
 		assert.match(text, /^\[Course record\] Linear Algebra · today 2026-11-07 \(Saturday\) · exam in 10 days/);
 		assert.match(text, /Path, current rank: systems \(independent\), pivots \(new\), rank \(attempted\)/);
-		assert.match(text, /^Not started yet \(never taught, whatever their planned day\): pivots$/m, "round 8 (1 D10): the tutor misread which topics are started");
+		assert.match(text, /^Not started yet \(never taught, whatever their planned day\): pivots, eigen$/m, "round 8 (1 D10): the tutor misread which topics are started; eigen has a gap but was never taught");
 		assert.match(text, /- rank \(attempted\)\n/);
 		assert.doesNotMatch(text, /prompt:|points:/, "the teacher fetches review keys on demand");
 		assert.match(text, /- rank \(attempted\): counts vectors, not independent ones; sure but wrong ×1/, "the current topic keeps its gap");
