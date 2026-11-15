@@ -77,6 +77,10 @@ export type CalendarEntry =
 export interface NextMove {
 	verb: "Review" | "Continue" | "Start";
 	what: string;
+	/** The later day the plan holds it on, when nothing is left for today:
+	 *  the panel names that day and offers no button, so it never invites
+	 *  tomorrow's review today (round 10: 1 m9). */
+	on: string | null;
 	move: CourseMove;
 }
 
@@ -316,7 +320,7 @@ export function calendarEntries({
 			const road = roadOf(planned, map.exam.date, titleOf, finalReview);
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
 			const step = nextStepOf(studied);
-			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), move: courseMove(studied, chats) } : null;
+			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), on: (step.kind === "review" || step.kind === "topic") && step.on ? step.on : null, move: courseMove(studied, chats) } : null;
 			const reasons = map.exam.reasons ?? {};
 			const unreviewed = (map.exam.unreviewed ?? []).map((h): ExamGapTopic => {
 				const reason = reasons[h];

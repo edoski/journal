@@ -90,6 +90,15 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 
 const summary = (entries: ReturnType<typeof calendarEntries>) => entries.map((e) => `${e.day} ${lookOf(e)} ${e.title}`);
 
+describe("an exam's next step", () => {
+	it("names the later day it is planned for and offers nothing to start today (round 10: 1 m9)", () => {
+		const exam = calendarEntries({ courses: [PROB], chats: [], scope: null }).find((e) => e.kind === "exam");
+		assert.deepEqual(exam?.kind === "exam" && exam.next && [exam.next.verb, exam.next.what, exam.next.on], ["Review", "Bayes' rule", "2026-11-09"]);
+		const today = calendarEntries({ courses: [LINALG], chats: [], scope: null }).find((e) => e.kind === "exam");
+		assert.equal(today?.kind === "exam" && today.next?.on, null, "a step for today is today's");
+	});
+});
+
 describe("calendar entries", () => {
 	it("puts each exam on its date, today's review today, and each later day's reviews and new topics as the daily plan proposes", () => {
 		const entries = calendarEntries({ courses: [LINALG, PROB], chats: [], scope: null });
