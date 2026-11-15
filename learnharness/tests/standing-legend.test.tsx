@@ -5,7 +5,8 @@
  * Home's Today row, the topic map's card, the course page's row and the
  * topic page's head; a slip wears the same icon there and on the sidebar,
  * and a review due the same History icon. Same tsx classic-JSX shim as
- * the other render tests.
+ * the other render tests. A pie in the warning ink says Slipping, the one
+ * word for that state, with the slip beside it (Edo, 15 Nov 2026).
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -108,6 +109,14 @@ describe("one standing legend on every surface", () => {
 		for (const { t, words } of table) assert.deepEqual([words.card, words.row, words.head], [words.home, words.home, words.home], t.handle);
 	});
 
+	it("says Slipping beside every pie in the warning ink, and only there, on every surface", () => {
+		for (const { t, words } of table) {
+			assert.equal(words.home === "Slipping", t.weak, `${t.handle}: Slipping exactly when the engine calls it weak`);
+			assert.deepEqual([words.card, words.row, words.head], [words.home, words.home, words.home], t.handle);
+		}
+		assert.ok(table.some((r) => r.t.weak && r.t.level === "independent") && table.some((r) => r.t.weak && r.t.level === "assisted"), "Slipping on a pie short of full and on one he could do on his own");
+	});
+
 	it("draws a slip with the same icon and words on Home and the topic page, and that icon is the sidebar's and the map's", () => {
 		for (const { t, slips } of table) {
 			assert.deepEqual(slips.home, slips.head, t.handle);
@@ -115,7 +124,7 @@ describe("one standing legend on every surface", () => {
 			if (slip) assert.equal(slips.home?.icon, lucideName(factIcon({ kind: "slip", words: slip.words, slip: slip.key })!), `${t.handle}: the sidebar's and the map's icon`);
 		}
 		const keys = new Set(table.flatMap((r) => (r.slips.home ? [slipBeside(r.t, titleOf)!.key] : [])));
-		assert.deepEqual([...keys].sort(), ["check", "confident", "gap", "mixed", "repaired"], "every slip the standing words leave unsaid; a lapse is said by the words themselves");
+		assert.deepEqual([...keys].sort(), ["check", "confident", "gap", "lapsed", "mixed", "repaired"], "every slip, beside Slipping");
 	});
 
 	it("marks a review due with one icon: Home's reason, the map, the sidebar and the topic page", () => {

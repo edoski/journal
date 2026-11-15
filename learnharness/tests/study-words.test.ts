@@ -35,7 +35,6 @@ describe("where he stands, true to the record", () => {
 		assert.equal(assisted("uncertain"), "Right, not yet confirmed");
 		assert.equal(assisted("helped"), "Right with help");
 		assert.equal(assisted(), "Not right last time", "no right answer since his newest wrong one: never help he did not have (round 8, 2 M1)");
-		assert.equal(standingWords(0.75, { level: "independent" }), "Right with help", "a weak topic he could do on his own keeps its pie's words");
 		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet", "no right answer since his newest wrong one");
 	});
 

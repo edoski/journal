@@ -254,8 +254,7 @@ export { agoWords, studiedDaysWords as studiedWords };
 /**
  * What the head says beside the pie, in the app's words (study-words.ts),
  * each drawn as an icon and a few words: why the engine calls the topic
- * weak, unless the standing beside it already says so (`SLIP_SAID_BY`;
- * the sidebar keeps it as the row's reason), then its review, due ("Due since 5 Nov"), held past memory's day ("Due
+ * weak (the sidebar keeps it as the row's reason), then its review, due ("Due since 5 Nov"), held past memory's day ("Due
  * since 1 Oct") or dated ("Back in 5d"), as the map, Home and the sidebar
  * say it (`reviewWords`). `today` is the engine's study day.
  */

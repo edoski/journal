@@ -20,6 +20,11 @@ export const STANDING_WORDS: Record<Fill, string> = {
 	1: "On your own",
 };
 
+/** A topic the engine calls weak, whatever its pie: the warning ink's words,
+ *  as every other state has its own (Edo, 15 Nov 2026), with the slip
+ *  beside it saying why (`slipMark`). */
+export const SLIPPING_WORDS = "Slipping";
+
 /** A topic he cannot yet do on his own, by how he answered it since his
  *  newest answer that was not right (the engine's `right`): the 3/4 pie's
  *  words when help is what kept it there. Right unaided only on the day it was taught says what is left, a
@@ -43,14 +48,12 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  (round 8: Eigen read "Right with help" after a Show me). Right on his
  *  own drops "check another day" once that day has come, beside the review
  *  due (round 8). `attempted` with no right answer since keeps its pie's
- *  words; a weak topic he could do on his own keeps its 3/4 pie's words,
- *  but says "Not right last time" while a wrong answer is open. Pure. */
-export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals">>): string {
+ *  words. A weak topic says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review">>): string {
 	const learning = topic.level === "assisted" || topic.level === "attempted";
 	if (learning && topic.right) return topic.right === "unaided" && topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS[topic.right];
-	// No right answer since his newest wrong one: on a topic still being
-	// learned, or one he could do on his own whose wrong answer is open.
-	if (topic.level === "assisted" || (fill === 0.75 && topic.signals?.mistake)) return WRONG_LAST_WORDS;
+	// No right answer since his newest wrong one, on a topic still being learned.
+	if (topic.level === "assisted") return WRONG_LAST_WORDS;
 	return STANDING_WORDS[fill];
 }
 
@@ -99,14 +102,6 @@ export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) =
 	if (confidentErrors > 0) return { key: "confident", words: SLIP_WORDS.confident };
 	return { key: "gap", words: SLIP_WORDS.gap };
 }
-
-/** The standing words that already say a slip, where a head would say it
- *  twice: right on his own beside a mistake fixed on his own both say a
- *  check on another day (round 7). */
-export const SLIP_SAID_BY: Readonly<Partial<Record<SlipKey, string>>> = {
-	repaired: RIGHT_WORDS.unaided,
-	lapsed: WRONG_LAST_WORDS,
-};
 
 /** The slip's words alone (`slipMark`). */
 export function slipWords(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): string {

@@ -328,7 +328,7 @@ describe("the course topic row and group", () => {
 		const link = document.querySelector('[data-slot="course-topic-row"]')!;
 		assert.equal(link.getAttribute("href"), unitHref(WS, "kernel"));
 		assert.ok(document.querySelector('[data-slot="topic-glyph"]'));
-		assert.equal(document.querySelector('[data-slot="course-topic-title"]')!.textContent, "Kernel, Tried, not right yet");
+		assert.equal(document.querySelector('[data-slot="course-topic-title"]')!.textContent, "Kernel, Slipping");
 		assert.equal(document.querySelector('[data-slot="course-topic-fact"]')!.textContent, "Sure, but wrong");
 	});
 

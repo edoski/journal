@@ -185,17 +185,17 @@ describe("the open tasks that hold a topic", () => {
 describe("where he stands, in the app's one wording", () => {
 	it("says every seeded head line word for word", () => {
 		const lines: [CourseMapTopic, string][] = [
-			[TOPICS.rank, "Not right last time. Mistake to fix. Due since 5 Nov"],
-			[TOPICS.matmul, "Not right last time. Due since 6 Nov"],
+			[TOPICS.rank, "Slipping. Mistake to fix. Due since 5 Nov"],
+			[TOPICS.matmul, "Slipping. Not right last time. Due since 6 Nov"],
 			[TOPICS.span, "On your own. Due since 29 Oct"],
 			[TOPICS.vectors, "On your own. Back Fri 13 Nov"],
 			[TOPICS.cramer, "Taught, not tried. Due since 6 Nov"],
-			[TOPICS.riemann, "Not right last time. Due today"],
-			[TOPICS.elimination, "Not right last time. Mixed up with Cramer's rule. Due since 6 Nov"],
-			[TOPICS.kernel, "Tried, not right yet. Sure, but wrong. Due since 7 Nov"],
+			[TOPICS.riemann, "Slipping. Not right last time. Due today"],
+			[TOPICS.elimination, "Slipping. Mixed up with Cramer's rule. Due since 6 Nov"],
+			[TOPICS.kernel, "Slipping. Sure, but wrong. Due since 7 Nov"],
 			[TOPICS.basis, "On your own. Due since 30 Oct"],
-			[TOPICS.independence, "Not right last time. Mistake to fix. Due since 23 Oct"],
-			[TOPICS.chain, "Not right last time. Due since 9 Oct"],
+			[TOPICS.independence, "Slipping. Mistake to fix. Due since 23 Oct"],
+			[TOPICS.chain, "Slipping. Not right last time. Due since 9 Oct"],
 			[TOPICS.eigen, "Not started"],
 		];
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
@@ -207,17 +207,18 @@ describe("where he stands, in the app's one wording", () => {
 			{ kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" },
 			{ kind: "review", words: "Due since 6 Nov" },
 		]);
-		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [{ kind: "review", words: "Due since 6 Nov" }], "the standing already says Not right last time (round 8)");
+		assert.deepEqual(headMarks(TOPICS.matmul, titleOf, TODAY), [
+			{ kind: "slip", words: "Not right last time", slip: "lapsed" },
+			{ kind: "review", words: "Due since 6 Nov" },
+		], "a lapse is the slip beside Slipping");
 		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf, TODAY), []);
 	});
 
-	it("drops the slip when the standing already says it, which the sidebar keeps as the row's reason (round 7)", () => {
+	it("says Slipping beside a weak topic's pie, and the slip beside it says why", () => {
 		const kernel = { ...TOPICS.kernel, right: "unaided" as const, review: null, signals: { ...QUIET, confidentErrors: 2, repaired: true } };
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
-		assert.equal(said(kernel), "Right on your own, check another day");
+		assert.equal(said(kernel), "Slipping. Fixed, check again later");
 		assert.equal(slipOf(MAP, kernel), "Fixed, check again later");
-		const helped = { ...kernel, right: "helped" as const };
-		assert.equal(said(helped), "Right with help. Fixed, check again later", "a fix the standing does not say stays");
 	});
 
 	it("is silent for a topic not started that already has a session", () => {
