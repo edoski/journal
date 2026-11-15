@@ -904,19 +904,56 @@ def _miss_only_predicted(
     return predicted and answered and not any(_shows_a_miss(item) for item in new)
 
 
+def _today(key: str, item: dict[str, Any], keys: Collection[str], today: date) -> bool:
+    """Saved in this save (``keys``) or earlier today."""
+    return key in keys or clock.local_day(item["recorded"]) == today
+
+
+def _gap_unfounded(
+    after: dict[str, Any], topic: str, keys: Collection[str], today: date
+) -> bool:
+    """Whether a gap set on ``topic`` now could only name a prediction's
+    miss: a wrong prediction was saved today, on any topic, and no miss on
+    ``topic`` that stands (a counted answer not right on his own and sure,
+    or his own statement) was saved today. Round 8: a wrong prediction
+    saved on eigen became the gap of diagonalization, a topic never
+    answered."""
+    superseded = {
+        target
+        for item in after["observations"].values()
+        for target in item.get("corrects", ())
+    }
+    standing = [
+        (key, item)
+        for key, item in after["observations"].items()
+        if key not in superseded and _today(key, item, keys, today)
+    ]
+    predicted = any(
+        item.get("predicted") and item.get("result") != "correct"
+        for _, item in standing
+    )
+    return predicted and not any(
+        topic in item["topics"] and _shows_a_miss(item) for _, item in standing
+    )
+
+
 def _check_predictions(
     before: dict[str, Any],
     after: dict[str, Any],
     changes: dict[str, Any],
     outcome: PatchResult,
+    today: date,
 ) -> None:
     """Refuse a patch that treats a prediction as evidence: a topic whose
     only answers are predictions is not taught, mistaken or due, so the patch
     may not introduce it, give it a gap, date its review or move the path
     onto it, nor may a save whose only new answers on a topic are
     predictions; nor may a save set a gap whose only miss on the topic is a
-    prediction's. Teaching with no question asked is still introduced."""
+    prediction's, nor, on a day a prediction missed, a gap on a topic with
+    no miss saved that day (`_gap_unfounded`). Teaching with no question
+    asked is still introduced."""
     claims: dict[str, list[str]] = defaultdict(list)
+    unfounded: list[str] = []
     for key in outcome.introduced:
         claims[key].append(f"topics.{key}.introduced")
     for key, change in (changes.get("topics") or {}).items():
@@ -931,6 +968,8 @@ def _check_predictions(
                     "expected miss. Leave the gap as it was, or set it in a save "
                     f"with the answer on {key} that counts and shows it"
                 )
+            if gap and _gap_unfounded(after, key, outcome.observations, today):
+                unfounded.append(key)
     for key in outcome.tutor_reviews:
         claims[key].append(f"topics.{key}.review")
     current = (changes.get("path") or {}).get("current")
@@ -950,6 +989,15 @@ def _check_predictions(
             f"{'them' if len(fields) > 1 else 'it'} out until an answer on "
             f"{topic} that counts is saved (a check or a recall after the "
             "teaching), in this save or a later one"
+        )
+    if unfounded:
+        key = unfounded[0]
+        raise ValueError(
+            f"topics.{key}.gap: a prediction missed today, and no answer on {key} "
+            "that counts showed a miss today. A gap names only a mistake such an "
+            "answer showed, or what the learner said he does not get: never what "
+            "a prediction got wrong, on this topic or another. Leave it out, or "
+            f"set it in a save with the answer on {key} that shows it"
         )
 
 
@@ -1890,7 +1938,7 @@ def apply_patch(
             f"{', '.join(citing[:12])} cite it; change those refs first, or keep "
             "the source"
         )
-    _check_predictions(record, result, changes, outcome)
+    _check_predictions(record, result, changes, outcome, today)
     outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
     outcome.questions_moved = record["preferences"].get(
         preferences.QUESTIONS
