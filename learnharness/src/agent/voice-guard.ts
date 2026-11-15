@@ -25,7 +25,7 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, narratedConfidence, problemAdvice, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, narratedConfidence, problemAdvice, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -272,6 +272,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 			return `A right answer gets no feedback sentence: ${quoted(b.excerpt)}.`;
 		case "confidence":
 			return `Closing words never tell him how sure he was, which his card already shows, and never restate the break your feedback named: drop ${quoted(b.excerpt)} and keep only the one move that was not obvious.`;
+		case "letter":
+			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -655,7 +657,7 @@ export class VoiceGuard {
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
-		return [...out, ...this.repeats(text, true)];
+		return [...out, ...this.letters(text), ...this.repeats(text, true)];
 	}
 
 	private questionBreaks(text: string): VoiceBreak[] {
@@ -664,7 +666,13 @@ export class VoiceGuard {
 		if (compound) out.push(compound);
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
-		return [...out, ...this.repeats(text)];
+		return [...out, ...this.letters(text), ...this.repeats(text)];
+	}
+
+	/** A matrix named with a letter an earlier one of the session has. */
+	private letters(text: string): VoiceBreak[] {
+		const reused = reusedLetter(text, [...this.earlier, ...this.said]);
+		return reused ? [{ rule: "letter", excerpt: `${reused.letter} ${reused.written}` }] : [];
 	}
 
 	/** A matrix or display of a teaching step that he already read earlier

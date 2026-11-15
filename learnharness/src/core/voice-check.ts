@@ -49,6 +49,7 @@ export type VoiceRule =
 	| "machinery"
 	| "review-lesson"
 	| "confidence"
+	| "letter"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -485,6 +486,23 @@ export function closingMoral(text: string): string | null {
 	if (!last || last.endsWith("?")) return null;
 	const tail = /^(?:so|that(?:'s| is) why|this is why|which is why)\b.*|,\s*which is why\b.*$/i.exec(last)?.[0];
 	return tail && !/\bX\b|\d/.test(tail) ? last : null;
+}
+
+/** Each matrix a text names with a capital letter, "A = \begin{pmatrix}…",
+ *  as the letter and its entries without spacing. */
+function namedMatrices(text: string): { letter: string; entries: string; written: string }[] {
+	return [...text.matchAll(/(?<![\\A-Za-z])([A-Z])\s*=\s*\\begin\{([pbBvV]?matrix)\}([\s\S]*?)\\end\{\2\}/g)].map((m) => ({ letter: m[1]!, entries: m[3]!.replace(/\s+/g, ""), written: m[0] }));
+}
+
+/** A letter the text gives a matrix that the session already gave another
+ *  (round 10, 3 m7: seven matrices named A in one lesson, and B both a
+ *  rank-2 matrix and the undoing matrix), so he cannot tell which A a later
+ *  step means. The first such naming, or null. */
+export function reusedLetter(text: string, earlier: readonly string[]): { letter: string; written: string } | null {
+	const before = new Map<string, string>();
+	for (const e of earlier) for (const m of namedMatrices(e)) before.set(m.letter, m.entries);
+	const reused = namedMatrices(text).find((m) => before.has(m.letter) && before.get(m.letter) !== m.entries);
+	return reused ? { letter: reused.letter, written: reused.written } : null;
 }
 
 /** A sentence that tells him how sure he was ("You were sure the kernel
