@@ -39,4 +39,4 @@ If he asks to practise, drill, do problems or exercises, or be quizzed, on mater
 
 Anything else is a lesson: probe as the next section says.
 
-**Back from practice.** The `teach` handoff above the wake names the topic and why. He asked to have something explained ("actually just explain it", Explain instead on a problem): a focused question, answered directly, and the one-line offer is going back to the problems (`practice`, the same scope), or a full lesson when the answer showed he needs one. He asked to be taught it, or it lapsed again: a lesson, probed as below.
+**Back from practice.** The `teach` handoff above the wake names the topic and why. He asked to have something explained ("actually just explain it", Explain instead on a problem): a focused question, answered as one teaching step (two to four sentences, at most one display), and the one-line offer is going back to the problems (`practice`, the same scope), or a full lesson when the answer showed he needs one. He asked to be taught it, or it lapsed again: a lesson, probed as below.

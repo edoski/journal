@@ -87,3 +87,17 @@ describe("a length refusal names what counted past the full stops (round 10)", (
 		assert.doesNotMatch(said, /run of commas/);
 	});
 });
+
+describe("Explain instead is told the budget it is held to (round 10)", () => {
+	it("the hand-back to teaching, and both agents' Back from practice, name a teaching turn's budget, the one the guard reads it under", async () => {
+		const { MODE_HANDOFF_TEXT } = await import("../src/core/contracts/chat.ts");
+		const { newModeHandoffMessage } = await import("../src/core/native-messages.ts");
+		const { turnInputOf } = await import("../src/agent/voice-guard.ts");
+		assert.equal(turnInputOf([newUserMessage("Rank practice"), newModeHandoffMessage("chat", "call", "teach") as LhMessage]).kind, "teach");
+		const back = (file: string) => fs.readFileSync(path.join(import.meta.dirname, "..", "src", "agent", "prompts", file), "utf-8").split("\n").find((l) => l.includes("**Back from practice.**")) ?? "";
+		for (const text of [MODE_HANDOFF_TEXT.teach, back("shared/20-question-tools.md"), back("prober/05-opening.md")]) {
+			assert.match(text, /two to four sentences/, text);
+			assert.doesNotMatch(text, /answer(?:ed)? it directly|answered directly/, text);
+		}
+	});
+});
