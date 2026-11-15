@@ -26,6 +26,12 @@ import {
 	edgeProblems,
 	passDue,
 	pathBasis,
+	readingProblems,
+	withReadings,
+	mergeReadings,
+	breakLoops,
+	loopRulingProblems,
+	withoutImplied,
 	stripPrefixes,
 	type ArcPassLedger,
 	type ArcPassView,
@@ -35,14 +41,20 @@ import {
 	mergeMisses,
 	purposeAnswerProblems,
 	purposeProblems,
+	purposeQuiz,
 	sortAnswerProblems,
 	sortMisses,
 	sortProblems,
 	sortQuiz,
 	withProposed,
+	addCandidates,
+	kindAdmits,
+	kindProblems,
+	type KindVerdict,
 } from "../src/core/arc-pass.ts";
 import { duplicateOf, type ViewTopic } from "../src/core/course-map-build.ts";
 import { createArcPass, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
+import { createMaterialTools, measureMaterial } from "../src/agent/tools/material.ts";
 import { mapRuns } from "../src/agent/subagents/course-map-builder.ts";
 import type { SdkEngine } from "../src/agent/models.ts";
 import { arcPassLedgersAt } from "../src/store/arc-pass-ledgers.ts";
@@ -142,6 +154,167 @@ describe("the edge step", () => {
 		const now = view({ ...CALC, riemann: topic("Riemann sums", ["limits"]), continuity: topic("Continuity", ["limits", "chain"]) });
 		const merged = edgeChanges(edgeDiffs(all), now);
 		assert.equal(merged, null);
+	});
+});
+
+describe("the readers", () => {
+	const JUDGED: EdgeSubmit = {
+		verdicts: [
+			{ topic: "continuity", need: "limits", keep: true, reason: "defined by a limit" },
+			{ topic: "derivative", need: "limits", keep: false, reason: "judged implied" },
+			{ topic: "chain", need: "derivative", keep: true, reason: "differentiates compositions" },
+			{ topic: "riemann", need: "limits", keep: true, reason: "a limit of sums" },
+			{ topic: "riemann", need: "chain", keep: false, reason: "a Riemann sum needs no derivative" },
+		],
+		add: [],
+	};
+
+	it("a drop takes both checks: the judge's drop stands only when the topic's reader found no step using it, and a reader that did not finish keeps every need", () => {
+		const readings = new Map([
+			["derivative", { uses: [{ need: "limits", step: "the derivative is the limit of the difference quotient" }] }],
+			["riemann", null],
+		]);
+		const { submit } = withReadings(JUDGED, readings, view(CALC));
+		assert.deepEqual(submit.verdicts.filter((v) => !v.keep), [], "neither drop stands");
+		assert.match(submit.verdicts.find((v) => v.topic === "derivative")!.reason, /^kept: the topic's reader found a step that uses it: the derivative is the limit/);
+		assert.match(submit.verdicts.find((v) => v.topic === "riemann" && v.need === "chain")!.reason, /did not finish, and a drop takes both checks/);
+		const agreed = withReadings(JUDGED, new Map([["derivative", { uses: [] }], ["riemann", { uses: [{ need: "limits", step: "a limit of sums" }] }]]), view(CALC));
+		assert.deepEqual(agreed.submit.verdicts.filter((v) => !v.keep).map((v) => `${v.topic}<-${v.need}`), ["derivative<-limits", "riemann<-chain"], "both drops stand when the readers agree");
+	});
+
+	it("adds every use a reader found that the graph lacks, after the judge's adds and in path order; one that would close a loop is set aside", () => {
+		const topics = { ...CALC, riemann: topic("Riemann sums", ["limits"]) };
+		const judged = { verdicts: JUDGED.verdicts.filter((v) => v.need !== "chain"), add: [{ topic: "riemann", need: "continuity", reason: "the judge's add" }] };
+		const readings = new Map([
+			["riemann", { uses: [{ need: "limits", step: "stored already" }] }],
+			["chain", { uses: [{ need: "continuity", step: "the inner function is continuous" }] }],
+			["limits", { uses: [{ need: "chain", step: "a loop" }] }],
+		]);
+		const { submit, loops } = withReadings(judged, readings, view(topics));
+		assert.deepEqual(submit.add.map((a) => `${a.topic}<-${a.need}: ${a.reason}`), ["riemann<-continuity: the judge's add", "chain<-continuity: the inner function is continuous"]);
+		assert.deepEqual(loops, [
+			{
+				use: { topic: "limits", need: "chain", reason: "a loop" },
+				path: [
+					{ topic: "chain", need: "derivative", reason: "differentiates compositions", stored: true },
+					{ topic: "derivative", need: "limits", reason: "judged implied; kept: the topic's reader did not finish, and a drop takes both checks", stored: true },
+				],
+			},
+		], "the loop names the kept edges that lead from the use's need back to its topic");
+		assert.equal(edgeProblems(submit, view(topics, { sources: [] })), null, "the merged answer passes the edge step's own checks");
+	});
+
+	it("sets aside an add the rest of the settled graph already implies, whatever order the adds come in", () => {
+		const readings = new Map([
+			["chain", { uses: [{ need: "continuity", step: "the inner function is continuous" }] }],
+			["riemann", { uses: [{ need: "chain", step: "substitution" }, { need: "continuity", step: "a continuous integrand" }, { need: "derivative", step: "differentiates the antiderivative" }] }],
+		]);
+		const { submit, implied } = withoutImplied(withReadings(JUDGED, readings, view(CALC)).submit, view(CALC));
+		assert.deepEqual(submit.add.map((a) => `${a.topic}<-${a.need}`), ["chain<-continuity"], "riemann already reaches both through chain");
+		assert.deepEqual(implied.map((a) => `${a.topic}<-${a.need}`), ["riemann<-continuity", "riemann<-derivative"]);
+		const reordered = view({ riemann: CALC.riemann, chain: CALC.chain, continuity: CALC.continuity, derivative: CALC.derivative, limits: CALC.limits });
+		const reversed = withoutImplied(withReadings(JUDGED, new Map([...readings].reverse()), reordered).submit, reordered);
+		assert.deepEqual(reversed.submit.add.map((a) => `${a.topic}<-${a.need}`), ["chain<-continuity"], "the same set in another order");
+	});
+
+	it("never breaks a loop at a stored edge its topic's readers found too: two checks hold it", () => {
+		const judged: EdgeSubmit = { verdicts: JUDGED.verdicts.map((v) => ({ ...v, keep: true })), add: [] };
+		const readings = new Map([
+			["derivative", { uses: [{ need: "limits", step: "the derivative is a limit" }] }],
+			["limits", { uses: [{ need: "derivative", step: "a limit worked by differentiating" }] }],
+		]);
+		const { loops } = withReadings(judged, readings, view(CALC));
+		assert.deepEqual(loops[0]!.path, [{ topic: "derivative", need: "limits", reason: "judged implied", stored: true, fixed: true }]);
+		assert.match(loopRulingProblems([{ loop: 1, topic: "derivative", need: "limits", reason: "x" }], loops)!, /stored and its topic's readers found it too, so the loop cannot break there/);
+		assert.equal(loopRulingProblems([{ loop: 1, topic: "limits", need: "derivative", reason: "x" }], loops), null);
+	});
+
+	it("breaks each loop where the loop check rules: at the use, at an added edge, or at a stored edge, which it drops with its reason", () => {
+		const judged: EdgeSubmit = { verdicts: JUDGED.verdicts.map((v) => ({ ...v, keep: true })), add: [{ topic: "continuity", need: "derivative", reason: "continuity is checked by differentiating" }] };
+		const loops = [
+			{ use: { topic: "derivative", need: "continuity", reason: "differentiable functions are continuous" }, path: [{ topic: "continuity", need: "derivative", reason: "continuity is checked by differentiating", stored: false }] },
+			{ use: { topic: "limits", need: "chain", reason: "a limit computed by the chain rule" }, path: [{ topic: "chain", need: "derivative", reason: "x", stored: true }, { topic: "derivative", need: "limits", reason: "x", stored: true }] },
+		];
+		assert.match(loopRulingProblems([{ loop: 1, topic: "riemann", need: "limits", reason: "x" }], loops)!, /L1 has no edge "riemann" needs "limits"[\s\S]*L2 missing/);
+		const rulings = [
+			{ loop: 1, topic: "continuity", need: "derivative", reason: "a continuity exercise never differentiates" },
+			{ loop: 2, topic: "limits", need: "chain", reason: "limits are worked before any derivative" },
+		];
+		assert.equal(loopRulingProblems(rulings, loops), null);
+		const { submit, aside } = breakLoops(judged, loops, rulings, view(CALC));
+		assert.deepEqual(submit.add.map((a) => `${a.topic}<-${a.need}`), ["derivative<-continuity"], "the use comes in, the added edge it ruled against goes");
+		assert.deepEqual(aside.map((a) => `${a.topic}<-${a.need}`), ["continuity<-derivative", "limits<-chain"]);
+		const stored = breakLoops({ verdicts: judged.verdicts, add: [] }, [loops[1]!], [{ loop: 1, topic: "derivative", need: "limits", reason: "the exercise only cites the limit's value" }], view(CALC));
+		assert.deepEqual(stored.submit.verdicts.find((v) => v.topic === "derivative")!, { topic: "derivative", need: "limits", keep: false, loop: true, reason: "dropped: it closes a loop, and the loop check found the exercise only cites the limit's value" });
+		assert.deepEqual(stored.submit.add.map((a) => `${a.topic}<-${a.need}`), ["limits<-chain"]);
+		assert.deepEqual(breakLoops(judged, loops, [], view(CALC)).aside.map((a) => `${a.topic}<-${a.need}`), ["derivative<-continuity", "limits<-chain"], "a loop with no ruling leaves its use aside");
+	});
+
+	it("a topic's readers are heard as one: every use any of them found, once, and none only when no reader finished", () => {
+		assert.deepEqual(
+			mergeReadings([{ uses: [{ need: "limits", step: "first" }] }, null, { uses: [{ need: "limits", step: "second" }, { need: "chain", step: "only here" }] }]),
+			{ uses: [{ need: "limits", step: "first" }, { need: "chain", step: "only here" }] },
+		);
+		assert.equal(mergeReadings([null, null]), null);
+		const judged: EdgeSubmit = { verdicts: [{ topic: "riemann", need: "chain", keep: false, reason: "judged false" }], add: [] };
+		const heard = withReadings(judged, new Map([["riemann", mergeReadings([{ uses: [] }, { uses: [{ need: "chain", step: "substitution" }] }])]]), view(CALC));
+		assert.equal(heard.submit.verdicts[0]!.keep, true, "a drop needs every reader's agreement");
+	});
+
+	it("a reading names other topics of the course, each once, each with its step", () => {
+		const problems = readingProblems({ uses: [{ need: "ghost", step: "x" }, { need: "chain", step: "x" }, { need: "limits", step: " " }, { need: "limits", step: "y" }] }, "chain", view(CALC))!;
+		assert.match(problems, /"ghost" is no topic/);
+		assert.match(problems, /"chain" is the topic you read/);
+		assert.match(problems, /"limits" gives no step/);
+		assert.match(problems, /"limits" is listed twice/);
+		assert.equal(readingProblems({ uses: [{ need: "derivative", step: "differentiates the outer function" }] }, "chain", view(CALC)), null);
+	});
+});
+
+describe("the kind check", () => {
+	const JUDGED: EdgeSubmit = {
+		verdicts: [{ topic: "riemann", need: "chain", keep: false, reason: "a Riemann sum needs no derivative" }],
+		add: [{ topic: "chain", need: "continuity", reason: "the judge's add" }],
+	};
+
+	it("sorts each use a reader found and each of the judge's adds that the stored graph lacks, once, in path order, with every step given for it", () => {
+		const readings = new Map([
+			["riemann", [{ uses: [{ need: "chain", step: "stored already" }, { need: "continuity", step: "a continuous integrand" }] }, null]],
+			["chain", [{ uses: [{ need: "continuity", step: "the reader's step" }, { need: "limits", step: "a limit inside" }] }, { uses: [{ need: "continuity", step: "the reader's step" }, { need: "continuity", step: "the second reader's step" }] }]],
+		]);
+		assert.deepEqual(
+			addCandidates(JUDGED, readings, view(CALC)).map((a) => `${a.topic}<-${a.need}: ${a.reason}`),
+			["chain<-continuity: the reader's step / the second reader's step / the judge's add", "chain<-limits: a limit inside", "riemann<-continuity: a continuous integrand"],
+		);
+	});
+
+	it("takes an answer that sorts every candidate once into a known kind, each with its reason", () => {
+		const candidates = [{ topic: "chain", need: "continuity", reason: "x" }, { topic: "riemann", need: "continuity", reason: "y" }];
+		const ok: KindVerdict[] = [{ topic: "chain", need: "continuity", kind: "definition", reason: "r" }, { topic: "riemann", need: "continuity", kind: "property", reason: "r" }];
+		assert.equal(kindProblems(ok, candidates), null);
+		const problems = kindProblems([ok[0]!, ok[0]!, { topic: "limits", need: "chain", kind: "guess" as KindVerdict["kind"], reason: " " }], candidates)!;
+		assert.match(problems, /sorted twice/);
+		assert.match(problems, /"limits" needs "chain" is no candidate/);
+		assert.match(problems, /"guess" is no kind/);
+		assert.match(problems, /gives no reason/);
+		assert.match(problems, /sort every candidate: "riemann" needs "continuity" missing/);
+	});
+
+	it("admits only a candidate whose step makes a prerequisite; a reader's use of any kind still keeps a stored edge; a check that did not finish admits every one", () => {
+		const readings = new Map([
+			["riemann", { uses: [{ need: "chain", step: "a substitution exercise" }, { need: "continuity", step: "a continuous integrand" }] }],
+			["chain", { uses: [{ need: "continuity", step: "the inner function is continuous" }] }],
+		]);
+		const kinds: KindVerdict[] = [
+			{ topic: "chain", need: "continuity", kind: "placement", reason: "taught just before" },
+			{ topic: "riemann", need: "continuity", kind: "method", reason: "the sum samples a continuous integrand" },
+			{ topic: "riemann", need: "chain", kind: "other exercise", reason: "the substitution exercise belongs to another topic" },
+		];
+		const heard = withReadings(JUDGED, readings, view(CALC), kindAdmits(kinds));
+		assert.deepEqual(heard.submit.add.map((a) => `${a.topic}<-${a.need}`), ["riemann<-continuity"]);
+		assert.deepEqual(heard.refused.map((a) => `${a.topic}<-${a.need}`), ["chain<-continuity"], "the judge's add and the reader's same use go once");
+		assert.equal(heard.submit.verdicts[0]!.keep, true, "the stored edge stays: its reader found a step that uses it");
+		assert.deepEqual(withReadings(JUDGED, readings, view(CALC), kindAdmits(null)).submit.add.map((a) => `${a.topic}<-${a.need}`), ["chain<-continuity", "riemann<-continuity"]);
 	});
 });
 
@@ -248,6 +421,21 @@ describe("the cut's shape rules", () => {
 		const m = (topic: string, readsAs: string[]) => ({ topic, title: topic, arc: "A", readsAs });
 		assert.deepEqual(mergeMisses([m("x", ["B"])], [m("x", ["C"]), m("y", ["B"])]), [m("x", ["B", "C"]), m("y", ["B"])]);
 		assert.deepEqual(mergeMisses([], []), []);
+	});
+
+	it("in propose mode a drop the loop check made goes with the reversed use, so the cut holds the use", () => {
+		const diffs = [
+			{ topic: "derivative", need: "limits", change: "drop" as const, reason: "dropped: it closes a loop", loop: true as const },
+			{ topic: "limits", need: "derivative", change: "add" as const, reason: "a limit worked by differentiating" },
+			{ topic: "riemann", need: "limits", change: "drop" as const, reason: "a judged drop, not part of a loop" },
+		];
+		const v = withProposed(view(CALC), diffs);
+		assert.deepEqual(v.proposed, { limits: ["derivative"] });
+		assert.deepEqual(v.topics.derivative!.needs, [], "the loop's drop is applied");
+		assert.deepEqual(v.topics.riemann!.needs, ["limits", "chain"], "a judged drop is not: the cut still holds the stored edge");
+		const { aside, submit } = breakLoops({ verdicts: [{ topic: "derivative", need: "limits", keep: true, reason: "x" }], add: [] }, [{ use: { topic: "limits", need: "derivative", reason: "y" }, path: [{ topic: "derivative", need: "limits", reason: "x", stored: true }] }], [{ loop: 1, topic: "derivative", need: "limits", reason: "z" }], view(CALC));
+		assert.deepEqual(aside, []);
+		assert.deepEqual(edgeDiffs(submit).find((d) => d.change === "drop")?.loop, true, "the loop check marks its drop");
 	});
 
 	it("an arc handle no topic, source, task or knowledge entry has", () => {
@@ -381,30 +569,51 @@ function memoryLedgers(): ArcPassLedgers & { all: Map<string, ArcPassLedger> } {
 	return { all, get: (w) => all.get(w), save: (w, l) => void all.set(w, structuredClone(l)), workspaces: () => [...all.keys()], forget: (w) => void all.delete(w) };
 }
 
-/** A model that answers the edge step with `edges`, the missing-prerequisite
- *  check with `missing`, the cut with each of `cuts` in turn (the next one
- *  after a refusal), and the blind sort with `readsAs` for a title it names,
- *  else every arc name; it counts the edge and cut calls apart from the
- *  check's and the sort's. */
+/** A model that answers the edge step with `edges`, each topic's reader with
+ *  `uses` (after reading the first source its topic's refs cite, or the first
+ *  readable one, unless `unread` names the topic), the loop check with
+ *  `loopBreaks` by each loop's use ("topic<-need"), else a break at the use, the cut with each of `cuts` in turn (the next
+ *  one after a refusal), and the blind sort with `readsAs` for a title it
+ *  names, else every arc name; it counts the edge and cut calls apart from
+ *  the readers', the sort's and the purpose check's. */
 function scriptedModel(
 	edges: EdgeSubmit,
 	cuts: ArcSubmit[],
 	hook?: () => void,
 	readsAs: Record<string, string> = {},
-	missing: EdgeSubmit["add"] = [],
+	uses: Record<string, { need: string; step: string }[]> = {},
 	purposeFalseOf: string[] = [],
-): SdkEngine & { calls: number; sorts: number; checks: number; purposes: number; refusals: string[] } {
+	unread: string[] = [],
+	loopBreaks: Record<string, { topic: string; need: string; reason: string }> = {},
+	kindOf: Record<string, KindVerdict["kind"]> = {},
+): SdkEngine & { calls: number; sorts: number; readers: number; loops: number; kinds: number; purposes: number; refusals: string[]; prompts: Set<string> } {
 	const faux = createFauxCore({});
-	const state = { calls: 0, sorts: 0, checks: 0, purposes: 0, refusals: [] as string[] };
+	const state = { calls: 0, sorts: 0, readers: 0, loops: 0, kinds: 0, purposes: 0, refusals: [] as string[], prompts: new Set<string>() };
 	let cut = 0;
 	const step: FauxResponseStep = async (context) => {
 		const last = context.messages.at(-1) as { role: string; isError?: boolean; content?: Array<{ text?: string }> };
 		const asked = (context.messages.find((m) => m.role === "user") as { content: string | Array<{ text?: string }> } | undefined)?.content ?? "";
 		const body = typeof asked === "string" ? asked : asked.map((c) => c.text ?? "").join("");
-		if (body.includes("## The graph as judged")) {
-			state.checks++;
+		state.prompts.add(body);
+		if (body.includes("\n## Loops\n")) {
+			state.loops++;
+			const breaks = [...body.matchAll(/^- L(\d+):\n {2}- "([\w-]+)" \(.*?\) needs "([\w-]+)"/gm)].map((m) => loopBreaks[`${m[2]}<-${m[3]}`] ?? { loop: Number(m[1]), topic: m[2]!, need: m[3]!, reason: "the use is the weakest" }).map((b, i) => ({ ...b, loop: i + 1 }));
+			return fauxAssistantMessage([fauxToolCall("submit_loops", { breaks } as unknown as ToolCall["arguments"], { id: `loops-${state.loops}` })], { stopReason: "toolUse" });
+		}
+		if (body.includes("\n## Candidates\n")) {
+			state.kinds++;
+			const kinds = [...body.matchAll(/^- "([\w-]+)" \(.*?\) needs "([\w-]+)"/gm)].map((m) => ({ topic: m[1]!, need: m[2]!, kind: kindOf[`${m[1]}<-${m[2]}`] ?? "definition", reason: "its definition uses it" }));
+			return fauxAssistantMessage([fauxToolCall("submit_kinds", { kinds } as unknown as ToolCall["arguments"], { id: `kinds-${state.kinds}` })], { stopReason: "toolUse" });
+		}
+		const yours = /## Your topic\n- ([\w-]+): .*\((?:refs (\S+?)[ ;)])?/.exec(body);
+		if (yours) {
+			state.readers++;
+			const [, topic, cited] = yours;
+			const source = cited ?? /^ *- ([\w-]+): .*\((?:text|PDF)/m.exec(body.split("## Topics")[0]!)?.[1];
 			if (last.role === "toolResult" && last.isError) state.refusals.push(last.content?.map((c) => c.text ?? "").join("") ?? "");
-			return fauxAssistantMessage([fauxToolCall("submit_missing", { add: missing } as unknown as ToolCall["arguments"], { id: `missing-${state.checks}` })], { stopReason: "toolUse" });
+			const hasRead = context.messages.some((m) => m.role === "toolResult" && (m as { toolName?: string }).toolName === "read_material");
+			if (source && !hasRead && !unread.includes(topic!)) return fauxAssistantMessage([fauxToolCall("read_material", { source }, { id: `read-${state.readers}` })], { stopReason: "toolUse" });
+			return fauxAssistantMessage([fauxToolCall("submit_needs", { uses: uses[topic!] ?? [] } as unknown as ToolCall["arguments"], { id: `needs-${state.readers}` })], { stopReason: "toolUse" });
 		}
 		if (/^## .+\nPurpose: /.test(body)) {
 			state.purposes++;
@@ -506,35 +715,127 @@ describe("the grouping pass (real engine, scripted model)", { skip: !realEngine 
 		assert.deepEqual(record(dir).arc_log.map((e: Record<string, unknown>) => [e.kind, "edges_entry" in e]), [["formed", false]], "nothing settled, nothing referred to");
 	});
 
-	it("a second fresh check adds the prerequisites the edge step missed, each once, and the cut holds them", async () => {
-		const dir = course("missing");
-		const model = scriptedModel(EDGES, [CUT], undefined, {}, [
-			{ topic: "chain", need: "continuity", reason: "a chain-rule exercise checks the inner function is continuous" },
-			{ topic: "riemann", need: "limits", reason: "stored already, refused" },
-		]);
-		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" }), /never submitted/, "a check that lists a stored edge is sent back until it stops");
-		assert.match(model.refusals.join("\n"), /"riemann" needs "limits", which is stored already/);
-		const dir2 = course("missing-2");
-		const good = scriptedModel(EDGES, [CUT], undefined, {}, [{ topic: "chain", need: "continuity", reason: "a chain-rule exercise checks the inner function is continuous" }]);
-		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: good }).run(dir2, { edges: "apply" });
+	it("a reader per topic adds what its topic's exercises use, and keeps a need the judge drops when an exercise uses it", async () => {
+		const dir = course("readers");
+		const model = scriptedModel(EDGES, [CUT], undefined, {}, {
+			chain: [{ need: "continuity", step: "a chain-rule exercise checks the inner function is continuous" }, { need: "derivative", step: "differentiates the outer function" }],
+			riemann: [{ need: "chain", step: "the substitution exercise differentiates the inner function" }],
+		});
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" });
 		assert.equal(result.status, "formed", JSON.stringify(result));
-		assert.deepEqual(record(dir2).topics.chain.needs, ["derivative", "continuity"]);
-		assert.deepEqual(result.status === "formed" && result.edges.diffs.map((d) => `${d.change} ${d.topic}<-${d.need}`), ["drop riemann<-chain", "add chain<-continuity"]);
-		assert.equal(good.checks, 1);
+		assert.deepEqual(record(dir).topics.chain.needs, ["derivative", "continuity"]);
+		assert.deepEqual(record(dir).topics.riemann.needs, ["limits", "chain"], "the judge's drop needs the reader's agreement");
+		assert.deepEqual(result.status === "formed" && result.edges.diffs.map((d) => `${d.change} ${d.topic}<-${d.need}`), ["add chain<-continuity"]);
+		assert.equal(model.readers, 2 * Object.keys(CALC).length, "two fresh readers per topic");
+		assert.equal(model.kinds, 1, "one kind check for the course");
+	});
+
+	it("proposes only the uses the kind check sorts into a kind that makes a prerequisite, and lists the rest as refused", async () => {
+		const dir = course("kinds");
+		const model = scriptedModel(EDGES, [CUT], undefined, {}, {
+			chain: [{ need: "continuity", step: "the chain rule's statement needs the inner function continuous" }],
+			continuity: [{ need: "derivative", step: "the section after it differentiates continuous functions" }],
+		}, [], [], {}, { "continuity<-derivative": "placement" });
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "propose" });
+		assert.equal(result.status, "formed", JSON.stringify(result));
+		assert.deepEqual(result.status === "formed" && result.edges.diffs.filter((d) => d.change === "add").map((d) => `${d.topic}<-${d.need}`), ["chain<-continuity"]);
+		assert.deepEqual(result.status === "formed" && result.edges.refused.map((a) => `${a.topic}<-${a.need}`), ["continuity<-derivative"]);
+		assert.deepEqual(result.status === "formed" && result.edges.kinds?.map((k) => `${k.topic}<-${k.need} ${k.kind}`), ["continuity<-derivative placement", "chain<-continuity definition"]);
+	});
+
+	it("the loop check settles a loop the readers' uses close, and a stored edge it rules against is dropped", async () => {
+		const dir = course("loops");
+		const keep = { ...EDGES, verdicts: EDGES.verdicts.map((v) => ({ ...v, keep: true })) };
+		const model = scriptedModel(keep, [CUT], undefined, {}, { limits: [{ need: "continuity", step: "a limit exercise uses continuity to substitute" }] }, [], [], {
+			"limits<-continuity": { topic: "continuity", need: "limits", reason: "a continuity exercise is worked from its definition" },
+		});
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "propose" });
+		assert.equal(result.status, "formed", JSON.stringify(result));
+		assert.equal(model.loops, 1, "one loop check for the course");
+		assert.deepEqual(result.status === "formed" && result.edges.diffs.map((d) => `${d.change} ${d.topic}<-${d.need}`), ["drop continuity<-limits", "add limits<-continuity"]);
+		const quiet = scriptedModel(keep, [CUT]);
+		await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: quiet }).run(course("no-loops"), { edges: "propose" });
+		assert.equal(quiet.loops, 0, "no loop, no check");
+	});
+
+	it("a reader's answer counts only once it has read from each source its topic's refs cite", async () => {
+		const withNotes = (name: string) => {
+			const dir = course(name);
+			fs.writeFileSync(path.join(dir, "notes.md"), "# 5.1 Riemann sums\nExercise: a limit of sums.\n");
+			engine(["--workspace", dir, "save"], { sources: { notes: { path: "notes.md" } }, topics: Object.fromEntries(Object.keys(CALC).map((t) => [t, { refs: [{ source: "notes", locator: "5.1" }] }])) });
+			return dir;
+		};
+		const dir = withNotes("read-first");
+		const keep = { ...EDGES, verdicts: EDGES.verdicts.map((v) => ({ ...v, keep: true })) };
+		const cut = { ...CUT, arcs: CUT.arcs.map((a) => ({ ...a, refs: [{ source: "notes" }] })) };
+		const lazy = scriptedModel(keep, [cut], undefined, {}, {}, [], ["riemann"]);
+		const log: TranscriptEntry[] = [];
+		const result = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: lazy }).run(dir, { edges: "propose", transcript: (e) => log.push(e) });
+		assert.equal(result.status, "formed", JSON.stringify(result));
+		assert.match(lazy.refusals.join("\n"), /Read your topic's material before you answer: nothing read yet from notes/);
+		assert.deepEqual(result.status === "formed" && result.edges.readings.riemann, [null, null], "a reader that never reads never counts");
+		assert.ok(log.some((e) => e.kind === "skipped" && e.topic === "riemann"));
+		const reading = scriptedModel(keep, [cut], undefined, {}, { riemann: [{ need: "continuity", step: "a continuous integrand" }] });
+		const read = await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: reading }).run(withNotes("read-first-2"), { edges: "propose" });
+		assert.equal(read.status, "formed");
+		assert.deepEqual(reading.refusals, [], "a reader that read first is taken at once");
+		assert.deepEqual(read.status === "formed" && read.edges.readings.riemann, [{ uses: [{ need: "continuity", step: "a continuous integrand" }] }, { uses: [{ need: "continuity", step: "a continuous integrand" }] }]);
+	});
+
+	it("reads the course's material as the engine lists it: a registered folder through its files, a sheet beside the record, code as text", async () => {
+		const dir = course("material");
+		fs.mkdirSync(path.join(dir, "lectures"));
+		fs.writeFileSync(path.join(dir, "lectures", "l3.md"), "# Lecture 3\nThe closed world assumption, by SLD refutation.\n");
+		fs.writeFileSync(path.join(dir, "sheet.md"), "# Sheet\nExercise 19: minimise the least-squares loss.\n");
+		fs.writeFileSync(path.join(dir, "screening.ts"), "export function screenEntities() {\n\treturn searchPublicationMentions();\n}\n");
+		fs.writeFileSync(path.join(dir, "slides.pptx"), Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]));
+		engine(["--workspace", dir, "save"], { sources: { lectures: { path: "lectures" }, code: { path: "screening.ts" }, deck: { path: "slides.pptx" } } });
+		const model = scriptedModel({ ...EDGES, verdicts: EDGES.verdicts.map((v) => ({ ...v, keep: true })) }, [{ ...CUT, arcs: CUT.arcs.map((a) => ({ ...a, refs: [{ source: "lectures" }] })) }]);
+		await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "propose" });
+		const edges = [...model.prompts].find((p) => p.includes("## Edges to judge"))!;
+		const material = edges.split("## Material")[1]!.split("## Topics")[0]!;
+		assert.match(material, /^- code: screening\.ts \(text, \d+ characters\)$/m, "a registered code file is text");
+		assert.match(material, /^- deck: slides\.pptx \(cannot be opened: a \.pptx cannot be read here; export it as PDF\)$/m, "a binary one is not");
+		assert.match(material, /^- lectures: lectures \(a registered folder, read through its files below\)\n {2}- l3: lectures\/l3\.md \(text, \d+ characters; in the folder lectures: refs cite lectures\)$/m);
+		assert.match(material, /^- sheet: sheet\.md \(text, \d+ characters; not registered: read it, never cite it in refs\)$/m);
+	});
+
+	it("a search that names no source searches every source, so an exercise a section points to is found wherever it is listed", async () => {
+		const dir = fs.mkdtempSync(path.join(TMP, "search-"));
+		fs.writeFileSync(path.join(dir, "lecture.md"), "### Chain rule\nSuggested Exercises 18 and 19.\n");
+		fs.writeFileSync(path.join(dir, "sheet.md"), "Exercise 19: find the beta that minimises the least-squares loss.\n");
+		const tools = createMaterialTools(await measureMaterial(dir, [{ handle: "lecture", path: "lecture.md" }, { handle: "sheet", path: "sheet.md" }]));
+		const text = async (input: object) => JSON.stringify(await tools.search_material!.execute("t", input as never, undefined as never));
+		assert.match(await text({ query: "Exercise 19" }), /## sheet.*1: Exercise 19: find the beta/);
+		assert.doesNotMatch(await text({ query: "Exercise 19" }), /## lecture/, "a source with no match is left out");
+		assert.match(await text({ source: "lecture", query: "Exercise 19" }), /No match for \\"Exercise 19\\" in lecture/);
 	});
 
 	it("a purpose line a fresh reader finds false of one of its topics sends the cut back, naming the topic", async () => {
 		const dir = course("purpose");
-		const model = scriptedModel(EDGES, [CUT], undefined, {}, [], ["Chain rule"]);
+		const model = scriptedModel(EDGES, [CUT], undefined, {}, {}, ["Chain rule"]);
 		await assert.rejects(createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: model }).run(dir, { edges: "apply" }), /never submitted/);
 		assert.match(model.refusals[0]!, /"Derivatives": its purpose line is not true of "Chain rule" \(chain\): the line promises nothing of it/);
-		const quiz = { arcs: [{ title: "Derivatives", purpose: "Differentiate.", topics: [{ id: "t1", handle: "chain", title: "Chain rule" }] }] };
+		const quiz = { arcs: [{ title: "Derivatives", purpose: "Differentiate.", units: [], topics: [{ id: "t1", handle: "chain", title: "Chain rule" }] }] };
 		assert.match(purposeProblems({ false: [], lines: [{ arc: "Derivatives", why: "it restates the name" }] }, quiz)!, /- "Derivatives": it restates the name/);
 		assert.match(purposeAnswerProblems({ false: [], lines: [{ arc: "Integrals", why: "x" }] }, quiz)!, /"Integrals" is no arc name/);
 		assert.equal(purposeProblems({ false: [], lines: [] }, quiz), null);
 		const fine = scriptedModel(EDGES, [CUT]);
 		assert.equal((await createArcPass({ courseRecords: records, ledgers: memoryLedgers(), engine: fine }).run(course("purpose-fine"), { edges: "apply" })).status, "formed");
 		assert.equal(fine.purposes, 1);
+	});
+
+	it("a name that lists its topics instead of naming one idea sends the cut back, and the reader sees the unit each arc cites", () => {
+		const cut: ArcSubmit = { basis: "chapters", arcs: [arc("estimation", "Efficiency, sufficiency and estimation methods", ["limits", "continuity"], { refs: [{ source: "book", locator: "Chapter 9" }] }), arc("tests", "Hypothesis testing", ["derivative", "chain", "riemann"])] };
+		const quiz = purposeQuiz(cut, view(CALC), arcPassChanges(cut, view(CALC))!);
+		assert.deepEqual(quiz.arcs[0]!.units, ["book Chapter 9"]);
+		const answer = { false: [], names: [{ arc: "Efficiency, sufficiency and estimation methods", why: "it enumerates three of its topics" }] };
+		assert.equal(purposeAnswerProblems(answer, quiz), null);
+		const refusal = purposeProblems(answer, quiz)!;
+		assert.match(refusal, /- "Efficiency, sufficiency and estimation methods": the name does not name the arc's one idea: it enumerates three of its topics/);
+		assert.match(refusal, /Name each such arc for the one idea all its topics serve, in the material's words, by its unit's own title when that fits every topic/);
+		assert.doesNotMatch(refusal, /Write each such line again/, "no purpose line was faulted");
+		assert.match(purposeAnswerProblems({ false: [], names: [{ arc: "Sorting", why: "x" }] }, quiz)!, /"Sorting" is no arc name/);
 	});
 
 	it("a blind reader sorts the titles into the arc names alone; two topics that read as another arc send the cut back, naming them", async () => {

@@ -29,9 +29,35 @@ export const RENDER_PAGES = 6;
 /** 100 DPI is the pdf reader's guidance for text pages. */
 const RENDER_DPI = 100;
 
-/** Files read as text. Anything else registered (slides as .pptx, .docx)
- *  cannot be read here, and the agent says so under `unread`. */
-const TEXT_SUFFIXES = new Set([".md", ".txt", ".tex", ".py", ".csv", ".html", ".org", ".rst", ".ipynb"]);
+/** Bytes of a file's start read to tell text from binary. */
+const SNIFF_BYTES = 8 * 1024;
+
+/** Whether a file reads as text: its start is UTF-8 with no NUL byte. A
+ *  registered file is material whatever its suffix (notes, code, config);
+ *  only binary ones (slides as .pptx, .docx) cannot be read here, and the
+ *  agent says so under `unread`. */
+async function isText(absolute: string): Promise<boolean> {
+	const handle = await fs.open(absolute, "r");
+	try {
+		const { buffer, bytesRead } = await handle.read(Buffer.alloc(SNIFF_BYTES), 0, SNIFF_BYTES, 0);
+		const head = buffer.subarray(0, bytesRead);
+		if (head.includes(0)) return false;
+		// A cut at the sniff's end may split one character: decode up to the last whole one.
+		let end = head.length;
+		for (let back = 1; back <= 3 && end - back >= 0 && bytesRead === SNIFF_BYTES; back++) {
+			if ((head[end - back]! & 0xc0) !== 0x80) {
+				end -= back;
+				break;
+			}
+		}
+		new TextDecoder("utf-8", { fatal: true }).decode(head.subarray(0, end));
+		return true;
+	} catch {
+		return false;
+	} finally {
+		await handle.close();
+	}
+}
 
 /** `folder`: a linked folder, read through its own registered files. */
 export type MaterialKind = "pdf" | "text" | "unreadable" | "folder";
@@ -108,7 +134,7 @@ export async function measureMaterial(
 					chars: info.pages.reduce((n, p) => n + p.text_length, 0),
 				};
 			}
-			if (TEXT_SUFFIXES.has(suffix)) {
+			if (await isText(absolute)) {
 				const stat = await fs.stat(absolute);
 				return { ...base, kind: "text", chars: stat.size };
 			}
@@ -180,6 +206,22 @@ async function textRead(file: MaterialFile, offset: number): Promise<string> {
 	return next <= lines.length ? `${picked.join("\n")}\n\n[Lines ${offset}-${next - 1} of ${lines.length}; continue with offset ${next}.]` : picked.join("\n");
 }
 
+/** A source's matches for `query`, or null when it has none; a failure is
+ *  the sentence the agent reads. */
+async function searchOne(file: MaterialFile, query: string): Promise<string | null> {
+	try {
+		if (file.kind === "pdf") {
+			const { hits } = await pdfSearch(file.absolute, query, { literal: true });
+			return hits.length > 0 ? hits.slice(0, 20).map((h) => `p${h.page}:\n${h.context}`).join("\n\n") : null;
+		}
+		const needle = query.toLowerCase();
+		const hits = (await fs.readFile(file.absolute, "utf-8")).split("\n").flatMap((line, i) => (line.toLowerCase().includes(needle) ? [`${i + 1}: ${line}`] : []));
+		return hits.length > 0 ? hits.slice(0, 40).join("\n") : null;
+	} catch (err) {
+		return `${file.handle} could not be searched: ${(err as Error).message}`;
+	}
+}
+
 export function createMaterialTools(files: readonly MaterialFile[], model?: Pick<Model<Api>, "input" | "inputLimits">): Record<string, AgentTool<any>> {
 	const byHandle = new Map(files.map((f) => [f.handle, f]));
 	const texts = pageTextsCache();
@@ -195,7 +237,7 @@ export function createMaterialTools(files: readonly MaterialFile[], model?: Pick
 		offset: Type.Optional(Type.Integer({ minimum: 1, description: "Text files: the line to start from (default 1)." })),
 	});
 	const searchInput = Type.Object({
-		source: sourceInput,
+		source: Type.Optional(Type.String({ description: "The source's handle, as listed in the material; leave it out to search every source." })),
 		query: Type.String({ description: "Words to find, case-insensitive." }),
 	});
 	const renderInput = Type.Object({
@@ -221,23 +263,17 @@ export function createMaterialTools(files: readonly MaterialFile[], model?: Pick
 		search_material: {
 			name: "search_material",
 			label: "search_material",
-			description: "Find words in a source: the pages (or lines) and their context.",
+			description: "Find words in a source, or in every source when none is named: the pages (or lines) and their context.",
 			parameters: searchInput,
 			execute: serverExecute("search_material", searchInput, async ({ source, query }) => {
+				if (source === undefined) {
+					const found = await Promise.all(files.filter((f) => f.kind === "pdf" || f.kind === "text").map(async (f) => [f.handle, await searchOne(f, query)] as const));
+					const hits = found.filter(([, h]) => h !== null).map(([handle, h]) => `## ${handle}\n${h}`);
+					return hits.length > 0 ? hits.join("\n\n") : `No match for "${query}" in any source.`;
+				}
 				const file = find(source);
 				if (typeof file === "string") return file;
-				try {
-					if (file.kind === "pdf") {
-						const { hits } = await pdfSearch(file.absolute, query, { literal: true });
-						if (hits.length === 0) return `No match for "${query}" in ${source}.`;
-						return hits.slice(0, 20).map((h) => `p${h.page}:\n${h.context}`).join("\n\n");
-					}
-					const needle = query.toLowerCase();
-					const hits = (await fs.readFile(file.absolute, "utf-8")).split("\n").flatMap((line, i) => (line.toLowerCase().includes(needle) ? [`${i + 1}: ${line}`] : []));
-					return hits.length > 0 ? hits.slice(0, 40).join("\n") : `No match for "${query}" in ${source}.`;
-				} catch (err) {
-					return `${source} could not be searched: ${(err as Error).message}`;
-				}
+				return (await searchOne(file, query)) ?? `No match for "${query}" in ${source}.`;
 			}),
 		},
 		render_pages: {
