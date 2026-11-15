@@ -138,6 +138,12 @@ describe("a re-mark corrects only what this session saved or he disputed (round 
 		assert.equal((await courseSave(disputing.tools, [attempt({ corrects: ["o6"], disputed: "It was right", ruling: "It was" })])).isError, false);
 		assert.equal(saves.length, 2);
 	});
+
+	it("an answer saved just before a restart is this session's own, from the save kept with the lesson, though the transcript lost its receipt (round 8: J2's re-mark rule meeting J5's kept saves)", () => {
+		const check = asked("check");
+		assert.equal(remarkableOf(check.messages).saved.has("o6"), false);
+		assert.equal(remarkableOf(check.messages, { [check.id]: ["o6"] }).saved.has("o6"), true);
+	});
 });
 
 describe("his confidence is the one he chose", () => {

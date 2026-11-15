@@ -108,8 +108,10 @@ function transcriptLinks(messages: readonly LhMessage[]): Record<string, string[
  *  every attempt this session's saves and problems recorded, which it may
  *  set right on its own; `disputed`, every attempt a dispute of his named,
  *  which only a ruling on that dispute re-marks. Pure. */
-export function remarkableOf(messages: readonly LhMessage[]): { saved: Set<string>; disputed: Set<string> } {
-	const saved = new Set<string>();
+export function remarkableOf(messages: readonly LhMessage[], kept?: Readonly<Record<string, readonly string[]>>): { saved: Set<string>; disputed: Set<string> } {
+	// The saves kept with the lesson the moment the engine took them count
+	// too: a restart can lose the transcript's receipt (round 8).
+	const saved = new Set<string>(Object.values(kept ?? {}).flat());
 	const disputed = new Set<string>();
 	for (const message of messages) {
 		if (message.role === "custom" && message.customType === "dispute") {
