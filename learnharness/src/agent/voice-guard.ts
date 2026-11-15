@@ -24,8 +24,8 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { opensTurn, PRACTICE_CONCLUDE_TOOL, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, compoundAsk, echoOf, leavesAWayOn, repeatedAdvice, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
+import { adviceSentences, afterQuestion, closingMoral, compoundAsk, echoOf, leavesAWayOn, lengthOf, problemAdvice, repeatedAdvice, repeatedPoint, restatesWithoutReason, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -131,16 +131,17 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 }
 
 /** Every text he read from the tutor before this turn: its delivered
- *  messages and the questions it posed. */
-function earlierTexts(messages: readonly LhMessage[]): string[] {
+ *  messages and the questions it posed, each marked which it is. */
+function earlierTexts(messages: readonly LhMessage[]): Array<{ text: string; asked: boolean }> {
 	const failed = failedOutputCallIds(messages);
 	return messages.flatMap((m) =>
 		m.role !== "assistant"
 			? []
 			: m.content.flatMap((b) => {
 					if (b.type !== "toolCall" || failed.has(b.id)) return [];
-					const text = b.name === SEND_TO_USER_TOOL ? sendToUserText(b) : (QUESTION_TOOLS as readonly string[]).includes(b.name) ? questionText(b) : undefined;
-					return text ? [text] : [];
+					const asked = (QUESTION_TOOLS as readonly string[]).includes(b.name);
+					const text = b.name === SEND_TO_USER_TOOL ? sendToUserText(b) : asked ? questionText(b) : undefined;
+					return text ? [{ text, asked }] : [];
 				}),
 	);
 }
@@ -246,9 +247,19 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined): string {
 		case "advice":
 			return `A question is its own words with nothing under them: no advice on how to answer it, ${quoted(b.excerpt)}.`;
 		case "repeat":
-			return b.excerpt.startsWith("display ")
-				? `He has already seen ${b.excerpt.slice("display ".length)} earlier in the session, and what he was told is said once: build on it with a new case, never show or explain it again.`
-				: `This advice was given earlier in the session, and advice is said once: ${b.excerpt}. Leave it out.`;
+			if (b.excerpt.startsWith("display ")) return `He has already seen ${b.excerpt.slice("display ".length)} earlier in the session, and what he was told is said once: build on it with a new case, never show or explain it again.`;
+			if (b.excerpt.startsWith("point ")) return `He was already told this earlier in the session, and a point is made once: ${b.excerpt.slice("point ".length)}. Leave it out; say only what is new.`;
+			return `This advice was given earlier in the session, and advice is said once: ${b.excerpt}. Leave it out.`;
+		case "colon":
+			return `A colon goes only before a display, a list or a definition's body: end the verdict with a full stop and give the reason as its own sentence: ${quoted(b.excerpt)}.`;
+		case "backref":
+			return `Say the thing itself, never point back to an earlier one, which he must check against the screen: ${quoted(b.excerpt)}.`;
+		case "chain":
+			return `One relation per display: this one chains different relations, ${quoted(b.excerpt)}. Give each relation its own display line, or say the step in words.`;
+		case "moral":
+			return `A direct answer stops where the answer does, with no closing lesson: drop ${quoted(b.excerpt)}.`;
+		case "reason":
+			return `He was unsure of his answer, and this only states it again: say in one or two sentences why it holds, starting with the content: ${quoted(b.excerpt)}.`;
 		case "echo":
 			return `Start with the content, never by handing his answer back or grading a right one: ${quoted(b.excerpt)}.`;
 		case "feedback":
@@ -366,11 +377,20 @@ function mathsShown(text: string, displaysOnly: boolean): Array<{ key: string; l
 export class VoiceGuard {
 	private readonly input: TurnInput;
 	private readonly earlier: string[];
+	/** The messages he read before this turn, questions aside. */
+	private readonly told: string[];
 	private readonly answeredAt: number;
 	private readonly decisions = new Map<string, AgentToolResult<unknown> | null>();
 	/** How many times each kind of call was refused this turn. */
 	private readonly refused = new Map<Family, number>();
 	private readonly said: string[] = [];
+	/** The messages shown this turn, questions aside. */
+	private readonly toldNow: string[] = [];
+	/** A message refused for its length this turn, and the most words its
+	 *  rewrite may keep: the draft less its shortest sentence, so a rewrite
+	 *  that joins the draft's sentences instead of cutting one is refused
+	 *  too (round 9: ", that" and "because" for a colon, nothing cut). */
+	private lengthDraft: { words: number; allowed: number } | null = null;
 	private readonly asked: string[] = [];
 	private concluded = false;
 	private sentAtConclude = 0;
@@ -397,7 +417,9 @@ export class VoiceGuard {
 		private readonly endsTurn: (toolName: string) => boolean = (name) => (QUESTION_TOOLS as readonly string[]).includes(name),
 	) {
 		this.input = turnInputOf(messages);
-		this.earlier = earlierTexts(messages);
+		const earlier = earlierTexts(messages);
+		this.earlier = earlier.map((e) => e.text);
+		this.told = earlier.filter((e) => !e.asked).map((e) => e.text);
 		// The question his answer replies to is the last one he read: a reply
 		// works on its matrix, so only what came before it counts as shown.
 		this.answeredAt = this.input.answers ? Math.max(0, this.earlier.length - 1) : this.earlier.length;
@@ -485,9 +507,15 @@ export class VoiceGuard {
 			if (breaks.length > 0) {
 				this.refused.set("message", (this.refused.get("message") ?? 0) + 1);
 				this.owed = true;
+				if (breaks.some((b) => b.rule === "length") && !this.lengthDraft) {
+					const { words, shortest } = lengthOf(text);
+					this.lengthDraft = { words, allowed: words - shortest };
+				}
 				return refusal("message", call.name, text, breaks, kind);
 			}
 			this.owed = false;
+			this.lengthDraft = null;
+			this.toldNow.push(text);
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
@@ -501,6 +529,7 @@ export class VoiceGuard {
 			this.heldForOwed++;
 			return this.owed ? OWED(call.name) : PLAIN_OWED(call.name);
 		}
+		if (call.name === PRACTICE_PROBLEM_TOOL) return this.judgeProblem(call);
 		if (!(QUESTION_TOOLS as readonly string[]).includes(call.name)) return null;
 		const text = questionText(call);
 		if (!text) return null;
@@ -516,6 +545,18 @@ export class VoiceGuard {
 		this.said.push(text);
 		this.posed = true;
 		return null;
+	}
+
+	/** A posed problem's statement holds no advice and no instruction to
+ *  defend the answer under its question (round 9: "What is dim span{u, v,
+ *  w}? Justify your answer."); its parts are its own asks. */
+	private judgeProblem(call: ToolCall): AgentToolResult<unknown> | null {
+		const statement = isRecord(call.arguments) && typeof call.arguments.statement === "string" ? call.arguments.statement : "";
+		const advice = problemAdvice(statement);
+		const breaks = this.held("question", advice.length > 0 ? [{ rule: "advice", excerpt: advice.join(" ") }] : []);
+		if (breaks.length === 0) return null;
+		this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
+		return refusal("question", call.name, statement, breaks, undefined);
 	}
 
 	/** The breaks a call is refused for: all of them for the draft and its
@@ -551,9 +592,17 @@ export class VoiceGuard {
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;
 		if (echo) out.push({ rule: "echo", excerpt: echo });
+		const unsureEcho = replying && this.input.unsure ? restatesWithoutReason(text) : null;
+		if (unsureEcho && !echo) out.push({ rule: "reason", excerpt: unsureEcho });
+		const moral = kind === "direct" ? closingMoral(text) : null;
+		if (moral) out.push({ rule: "moral", excerpt: moral });
+		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
+			const { words } = lengthOf(text);
+			if (words > this.lengthDraft.allowed) out.push({ rule: "length", excerpt: `${words} words where the draft had ${this.lengthDraft.words}, so no whole sentence was cut` });
+		}
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
-		return [...out, ...this.repeats(text)];
+		return [...out, ...this.repeats(text, true)];
 	}
 
 	private questionBreaks(text: string): VoiceBreak[] {
@@ -578,8 +627,13 @@ export class VoiceGuard {
 		return hit ? hit.label : null;
 	}
 
-	private repeats(text: string): VoiceBreak[] {
+	/** Advice said earlier in the session, and for a message, a point it
+ *  made earlier (round 9: one lesson said four times that pairs miss a
+ *  combination of two others). A question may name what a message said. */
+	private repeats(text: string, message = false): VoiceBreak[] {
 		const repeat = repeatedAdvice(text, [...this.earlier, ...this.said]);
-		return repeat ? [{ rule: "repeat", excerpt: `${quoted(repeat.said)}, said before as ${quoted(repeat.before)}` }] : [];
+		if (repeat) return [{ rule: "repeat", excerpt: `${quoted(repeat.said)}, said before as ${quoted(repeat.before)}` }];
+		const point = message ? repeatedPoint(text, [...this.told, ...this.toldNow]) : null;
+		return point ? [{ rule: "repeat", excerpt: `point ${quoted(point.said)}, said before as ${quoted(point.before)}` }] : [];
 	}
 }

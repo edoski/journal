@@ -142,7 +142,7 @@ describe("turns within the voice pass untouched", () => {
 			send("| Course | Overdue reviews |\n| --- | --- |\n| Probability | 1 (Law of total probability, planned Sat 14 Nov) |\n| Calculus I | 20 |\n\nThe most overdue is Monotonicity in Calculus I, 37 days late. It is planned for Thu 19 November, after your Probability exam."),
 		],
 		["a check question", answering("rank 2"), ask("Calls arrive at an average of $\\lambda$ per minute, and the minute is split into $n$ slots. Write $P(X_n = k)$ in terms of $n$, $\\lambda$ and $k$.")],
-		["a correction that starts with the right value", answering("the product is AB"), send("That's not right: the product is $BA$, since $B$ acts first.")],
+		["a correction that starts with the right value", answering("the product is AB"), send("That's not right. The product is $BA$, since $B$ acts first.")],
 	];
 	for (const [name, turn, call] of good) {
 		it(name, () => assert.deepEqual(rules(new VoiceGuard(turn), call), []));

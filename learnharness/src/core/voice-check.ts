@@ -41,6 +41,11 @@ export type VoiceRule =
 	| "advice"
 	| "echo"
 	| "duplicate"
+	| "colon"
+	| "backref"
+	| "chain"
+	| "moral"
+	| "reason"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -65,6 +70,12 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
 	{ rule: "comprehension", re: /\b(?:does (?:that|this) make sense|is that clear|any questions)\b/i },
+	// The voice's colon goes only before a display, a list or a definition's
+	// body, never after the verdict (round 9: "That's not right: the rank is 2…").
+	{ rule: "colon", re: /(?:^|[.!?]\s+|\n)(?:(?:that|this|it)(?:'s| is) )?(?:not (?:quite )?(?:right|correct|complete)|(?:partly|partially|half) right|wrong)\s*:/i },
+	// A pointer back instead of the thing itself, which he must check against
+	// the screen (round 9: "The base is the same as before" when it was not).
+	{ rule: "backref", re: /\b(?:the )?same as (?:before|last time|above|earlier|the last (?:one|question|problem))\b|\bas (?:before|last time)\b/i },
 ];
 
 /** Requests in an instruction text for a form the voice bans: each names
@@ -169,6 +180,15 @@ export function sentenceLoad(said: readonly string[]): number {
 	}, 0);
 }
 
+const wordCount = (text: string) => (text.match(/\S+/g) ?? []).length;
+
+/** A turn's prose words, and the words of its shortest sentence: what
+ *  cutting one whole sentence takes off it at the least. */
+export function lengthOf(text: string): { words: number; shortest: number } {
+	const plain = prose(text).text;
+	return { words: wordCount(plain), shortest: Math.min(...sentences(plain).map(wordCount)) };
+}
+
 /** Every rule one tutor turn breaks. `kind` adds its budget and, after a
  *  right answer, the feedback rule; without it only the phrase rules apply. */
 export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
@@ -185,10 +205,67 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const symbol = said.find((s) => /^X\b/.test(s.trim()) && /[A-Za-z]{2,}/.test(s.trim().slice(1)));
 	if (symbol) out.push({ rule: "symbol", excerpt: symbol });
 	if (displays > DISPLAYS[kind]) out.push({ rule: "displays", excerpt: `${displays} displays, budget ${DISPLAYS[kind]}` });
+	const chain = chainedDisplay(text);
+	if (chain) out.push({ rule: "chain", excerpt: chain });
 	if (kind === "right" && said[0] && /\b(?:is|are|was|were) (?:right|correct)\b|^(?:right|correct|yes)\b/i.test(said[0])) {
 		out.push({ rule: "feedback", excerpt: said[0] });
 	}
 	return out;
+}
+
+/** Each relation a display line can state, by kind: a chain of one kind
+ *  ("a = b = c", "0 < x < 1") states one relation, a mix ("= … → … =")
+ *  states several. */
+const RELATIONS: ReadonlyArray<{ kind: string; re: RegExp }> = [
+	{ kind: "equal", re: /^=/ },
+	{ kind: "unequal", re: /^(?:≠|\\neq?(?![A-Za-z]))/ },
+	{ kind: "below", re: /^(?:<|≤|\\(?:leq?|lt|leqslant)(?![A-Za-z]))/ },
+	{ kind: "above", re: /^(?:>|≥|\\(?:geq?|gt|geqslant)(?![A-Za-z]))/ },
+	{ kind: "near", re: /^(?:≈|\\approx(?![A-Za-z]))/ },
+	{ kind: "tends", re: /^(?:→|⟶|\\(?:to|rightarrow|longrightarrow)(?![A-Za-z]))/ },
+	{ kind: "implies", re: /^(?:⇒|⟹|⇔|⟺|\\(?:Rightarrow|Longrightarrow|implies|iff|Leftrightarrow)(?![A-Za-z]))/ },
+	{ kind: "same", re: /^(?:≡|\\equiv(?![A-Za-z]))/ },
+];
+
+/** The relation kinds a line of TeX states at its own level: none inside
+ *  braces, brackets or parentheses, or in a sub- or superscript ("P(X = k)",
+ *  "\\lim_{n \\to \\infty}" state none). */
+function lineRelations(line: string): string[] {
+	const kinds: string[] = [];
+	let depth = 0;
+	for (let i = 0; i < line.length; i++) {
+		const c = line[i]!;
+		if (c === "\\" && /^\\(?:left|right|big|Big|bigg|Bigg)[lr]?(?![A-Za-z])/.test(line.slice(i))) {
+			i += /^\\[A-Za-z]+/.exec(line.slice(i))![0].length - 1;
+			continue;
+		}
+		if (c === "{" || c === "(" || c === "[") depth++;
+		else if (c === "}" || c === ")" || c === "]") depth = Math.max(0, depth - 1);
+		else if ((c === "_" || c === "^") && line[i + 1] !== "{") i++;
+		else if (depth === 0) {
+			const rel = RELATIONS.find((r) => r.re.test(line.slice(i)));
+			if (rel) kinds.push(rel.kind);
+		}
+	}
+	return kinds;
+}
+
+/** A display line that states two kinds of relation, as one chain: the
+ *  voice sets one relation per display (round 9: "(1−1/n)^{2n} = [(1−1/n)^n]^2
+ *  → (e^{−1})^2 = e^{−2}" chained an equality into a limit and back). Its
+ *  TeX, or null. A matrix's rows and an aligned derivation's lines are read
+ *  one by one. */
+export function chainedDisplay(text: string): string | null {
+	const bodies = [...text.replace(FENCE, " ").matchAll(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g)].map((m) => (m[1] ?? m[2] ?? "").trim());
+	for (const body of bodies) {
+		// An arrow from one matrix to the next is a row operation, a step
+		// of the work, not a limit.
+		const steps = body.replace(/\\begin\{([pbvBV]?matrix)\}[\s\S]*?\\end\{\1\}/g, "@M@").replace(/@M@\s*(?:\\xrightarrow\{[^}]*\}|\\(?:to|rightarrow|longrightarrow)(?![A-Za-z])|→|⟶|\\sim(?![A-Za-z]))\s*(?=@M@)/g, "@M@ ");
+		for (const line of steps.split(/\\\\/)) {
+			if (new Set(lineRelations(line)).size > 1) return body;
+		}
+	}
+	return null;
 }
 
 const SHINGLE = 6;
@@ -268,7 +345,9 @@ const SCENE = /^(?:when|where)\b(?!\s+(?:does|do|did|is|are|was|were|will|would|
  *  by commas, "then", "and" or a new sentence ("What is the rank of A,
  *  what is dim ker A, and is A invertible?" asks three). Alternatives
  *  ("…, or …") and a reason asked for with the answer ("…, and why?") stay
- *  one ask. Maths is read as one word. */
+ *  one ask, and a colon opens a clause like a comma ("What do you know
+ *  about X: what it counts, and its formula?" asks two). Maths is read as
+ *  one word. */
 export function questionAsks(text: string): string[] {
 	const out: string[] = [];
 	// A display is part of its sentence here ("Show that $$N$$ is not invertible").
@@ -279,7 +358,7 @@ export function questionAsks(text: string): string[] {
 		if (ADVICE.test(sentence)) continue;
 		const clauses = sentence
 			.replace(/^(?:then|and|also|now)\b[,\s]*/i, "")
-			.split(/\s*;\s*|,\s*(?:and\s+|then\s+)?/i)
+			.split(/\s*[;:]\s*|,\s*(?:and\s+|then\s+)?/i)
 			.flatMap((c) => c.split(ASK_AFTER_AND))
 			.map((c) => c.trim().replace(/^(?:and|then)\s+/i, ""));
 		for (const clause of clauses) if (ASK_OPENS.test(clause) && !BARE_WHY.test(clause) && !SCENE.test(clause)) out.push(clause);
@@ -306,24 +385,48 @@ export function leavesAWayOn(text: string): boolean {
 const ADVICE =
 	/^(?:check|verify|make sure|remember|be careful|note that|don'?t forget|try to|think of|always)\b|^(?:before|when|whenever|if) you\b[^,]*,\s*(?:check|verify|multiply|make sure|always)\b|\b(?:should have caught|would have caught|protects you|you can stop there|stop there)\b/i;
 
+/** An instruction under a problem's question that asks him to defend his
+ *  answer rather than asking for the reason in the question ("Justify your
+ *  answer."). */
+const DEFEND = /^(?:justify|explain|give reasons for|show) (?:your|the|each) (?:answer|reasoning|work(?:ing)?|steps?)\b/i;
+
+/** The advice in a problem's statement: advice sentences, and an
+ *  instruction under its last question to defend the answer. A statement's
+ *  later parts are its own asks, so only these count. */
+export function problemAdvice(text: string): string[] {
+	return [...new Set([...adviceSentences(text), ...afterQuestion(text).filter((s) => DEFEND.test(s.trim()))])];
+}
+
 /** The sentences of a text that give advice on how to work. */
 export function adviceSentences(text: string): string[] {
 	return sentences(prose(text).text).filter((s) => ADVICE.test(s));
 }
 
 const STOP = new Set(
-	"a an the of to it its it's your you you're by on in at and or but is are was were be been that this these those when before after every each one only would should could have has had with for from as so if then there here not no".split(" "),
+	"a an the of to it its it's your you you're by on in at and or but is are was were be been that this these those when before after every each one only would should could have has had with for from as so if then there here not no what which who how why where yet can does do did also just than into out more most very same any some they them their his him he".split(" "),
 );
+
+/** A word cut to a rough stem, so "rows" and "row", "catches" and "catch",
+ *  "multiplying" and "multiply" read as one. */
+function stem(w: string): string {
+	if (w.length > 5 && w.endsWith("ing")) return w.slice(0, -3);
+	if (w.length > 4 && w.endsWith("ied")) return `${w.slice(0, -3)}y`;
+	if (w.length > 4 && w.endsWith("ed")) return w.slice(0, -2);
+	if (w.length > 4 && w.endsWith("ies")) return `${w.slice(0, -3)}y`;
+	if (w.length > 4 && /(?:ch|sh|x|ss)es$/.test(w)) return w.slice(0, -2);
+	if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
+	return w;
+}
+
+/** The content words of a sentence in their order, each cut to its stem. */
+function contentStems(sentence: string): string[] {
+	return (sentence.toLowerCase().match(/[a-z]+/g) ?? []).filter((w) => !STOP.has(w) && w !== "x" && w.length >= 3).map(stem);
+}
 
 /** The content words of a sentence, each cut to a rough stem, so "multiply
  *  it out" and "multiplying out" share one. */
 function stems(sentence: string): Set<string> {
-	const out = new Set<string>();
-	for (const w of sentence.toLowerCase().match(/[a-z]+/g) ?? []) {
-		if (STOP.has(w) || w === "x" || w.length < 3) continue;
-		out.add(w.length > 4 ? w.replace(/(?:ing|ed|es|s)$/, "") : w);
-	}
-	return out;
+	return new Set(contentStems(sentence));
 }
 
 /** The first advice sentence of `text` that says again what an advice
@@ -337,6 +440,45 @@ export function repeatedAdvice(text: string, earlier: readonly string[]): { said
 		if (match) return { said, before: match.s };
 	}
 	return null;
+}
+
+/** Content words in a row two sentences share, past which the later one
+ *  reuses the earlier one's phrase ("a combination of two others"). */
+const SHARED_RUN = 3;
+
+/** The first sentence of `text` that makes again a point a sentence of
+ *  `earlier` made: at least three content words in common that are most of
+ *  its own, or three in a row, however the rest is reworded (round 9: "…a
+ *  row can be a combination of two others, which checking pairs never
+ *  catches", then "Counting pivots after elimination is what catches a
+ *  column hiding as a combination of two others"). Null when none does. */
+export function repeatedPoint(text: string, earlier: readonly string[]): { said: string; before: string } | null {
+	const before = earlier.flatMap((t) => sentences(prose(t).text)).map((s) => {
+		const run = contentStems(s);
+		return { s, set: new Set(run), runs: new Set(run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "))) };
+	});
+	for (const said of sentences(prose(text).text)) {
+		const run = contentStems(said);
+		const mine = new Set(run);
+		const runs = run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "));
+		const match = before.find((b) => {
+			const shared = [...mine].filter((w) => b.set.has(w)).length;
+			return (shared >= SHARED_RUN && shared * 2 > mine.size) || runs.some((r) => b.runs.has(r));
+		});
+		if (match) return { said, before: match.s };
+	}
+	return null;
+}
+
+/** A direct answer's last sentence that draws a lesson from it instead of
+ *  answering: it opens "So …" or ends "…, which is why …", and what it draws
+ *  holds no maths or number, so it states no step (round 9: "So checking for independent,
+ *  steady arrivals comes before reaching for Poisson at all."). */
+export function closingMoral(text: string): string | null {
+	const last = sentences(prose(text).text).at(-1)?.trim();
+	if (!last || last.endsWith("?")) return null;
+	const tail = /^(?:so|that(?:'s| is) why|this is why|which is why)\b.*|,\s*which is why\b.*$/i.exec(last)?.[0];
+	return tail && !/\bX\b|\d/.test(tail) ? last : null;
 }
 
 /** The prose sentences after a message's last question: what sits under
@@ -360,6 +502,20 @@ const GRADES =
  *  called right, where no "but" goes on to where it broke. */
 const CALLED_RIGHT = /^(?:[a-z]+ ){1,4}(?:is|are|was|were) (?:right|correct)\b/i;
 const RESTATES = /^(?:(?:that|this|it)(?:'s| is) X\b|the [a-z]+(?: [a-z]+){0,3} (?:is|are) X\s*[,.])/i;
+
+/** Words that give a reason, which a reply to an unsure answer owes him. */
+const REASON = /\b(?:because|since|so|as|means|which is why|that is why|comes from|follows|each|every|for all)\b/i;
+
+/** A reply to an answer he was unsure of that opens by stating what he
+ *  answered ("The PMF is …, where λ is the average count") and gives no
+ *  reason anywhere (round 9: a guessed right answer got its own formula
+ *  back). The opening sentence, or null. */
+export function restatesWithoutReason(text: string): string | null {
+	const said = sentences(prose(text).text);
+	const first = said[0]?.trim();
+	if (!first || !RESTATES.test(first)) return null;
+	return said.some((s) => REASON.test(s)) ? null : first;
+}
 
 const bare = (math: string) => math.replace(/\\(?:left|right)|[\s${}]/g, "");
 

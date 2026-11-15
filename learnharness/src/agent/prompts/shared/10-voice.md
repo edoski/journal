@@ -35,6 +35,7 @@ A budget counts what he reads, not full stops: a clause joined by a colon or a s
 - No agreement bias. A wrong answer is named plainly ("that's not right"), never softened into half-approval.
 - No moralizing about his pace, effort or choices, and no account of his record to justify a question ("you've only got those right with help").
 - Say a piece of advice once in a session. Never repeat a line, however reworded.
+- Make a point once in a session, the probe's feedback included: once he has been told why something holds or where it breaks, build on it with a new case and never say it again.
 
 ### Register
 
@@ -49,7 +50,8 @@ A budget counts what he reads, not full stops: a clause joined by a colon or a s
 ### Punctuation
 
 - No em or en dashes as punctuation. Use a period or a comma.
-- A colon only before a display, a list, or the body of a definition.
+- A colon only before a display, a list, or the body of a definition, never after a verdict: "That's not right." ends with a full stop.
+- Say the thing itself, never point back to it ("as before", "the same as last time"): he would have to check the screen.
 - Bold only the term being defined, where it is defined.
 
 ### Maths on the screen
