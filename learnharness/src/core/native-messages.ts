@@ -41,6 +41,7 @@ import {
 	CONCLUDE_ACK_TEXT,
 	DONE_TONIGHT_TEXT,
 	HANDOFF_TEXT,
+	REVIEW_HANDOFF_TEXT,
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
 	PRACTICE_REQUEST_TEXT,
@@ -235,13 +236,14 @@ export function newAnswerResult(
 }
 
 /** The probe→teach handoff wake: scaffolding, not speech — the model reads
- *  HANDOFF_TEXT, the UI renders the quiet system line. */
-export function newHandoffMessage(chatId: string): LhMarkerMessage {
+ *  HANDOFF_TEXT, with a review's own line in a review, and the UI renders
+ *  the quiet system line. */
+export function newHandoffMessage(chatId: string, review = false): LhMarkerMessage {
 	return {
 		id: `steer_probe_${chatId}`,
 		role: "custom",
 		customType: "probe-handoff",
-		content: HANDOFF_TEXT,
+		content: review ? `${HANDOFF_TEXT} ${REVIEW_HANDOFF_TEXT}` : HANDOFF_TEXT,
 		display: true,
 		details: { chatId },
 		timestamp: Date.now(),

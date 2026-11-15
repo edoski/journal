@@ -147,7 +147,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt(kind, { arcs: opts.course.arcs })}` : composed;
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.
-	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind));
+	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true);
 	const spoken = (tool: AgentTool<any, any>) => (voice.guards(tool.name) ? voice.wrap(tool) : tool);
 	return new SdkAgent({
 		engine,

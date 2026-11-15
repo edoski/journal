@@ -197,6 +197,12 @@ export const HANDOFF_TEXT =
 	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
 	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
 
+/** What a review's wake adds (round 9, 2 m4): a review that turns into
+ *  teaching said nothing of the switch and closed on "the lesson", since
+ *  the wake asked only to start teaching. */
+export const REVIEW_HANDOFF_TEXT =
+	"This session is my review. Where its answers show I need part of the topic taught again, open the first step with one plain line saying you re-teach that part (\"Let's re-teach the counting step.\"), and call the session my review to its close, never the lesson.";
+
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans
  *  again, and reconnects in one sentence from where it stopped. */
