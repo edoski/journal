@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Runs the grouping pass's lever (scripts/arc-pass.ts) on copies only: the four demo courses, seeded fresh into the
-# sandbox, and Edo's SMM and AIKR, of which .study/course.json, .study/workspace.json and the course's folder
-# are copied.
+# Runs the grouping pass's lever (scripts/arc-pass.ts) on copies only: by default the four demo courses, seeded fresh
+# into the sandbox, which are the ones calibration scores. Edo's SMM and AIKR run only when COURSES names them, as an
+# unscored check once their slides are fresh; of each, .study/course.json, .study/workspace.json and the course's
+# folder are copied.
 # The engine runs under the sandbox's HOME, so no real registry, record or backup is read or written; the originals'
 # checksums are taken before and after, and the run fails if one changed. The demo copies settle their edges
 # (--edges apply); the real copies only propose (--edges propose), and each run's run.json names its original, the
 # one course --apply may later give its arcs, with his approval.
 #
 #   OUT=<empty folder> ACCOUNT=<Claude account label> PY=<python with the engine's packages> \
-#     [COURSES="calculus linear-algebra probability real-analysis SMM AIKR"] bash scripts/arc-pass-copies.sh
+#     [COURSES="calculus linear-algebra probability real-analysis" | COURSES="SMM AIKR"] bash scripts/arc-pass-copies.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -17,14 +18,15 @@ ENGINE="$(cd "$APP/.." && pwd -P)"
 : "${OUT:?OUT names an empty folder for the sandbox and the runs}" "${ACCOUNT:?ACCOUNT names the Claude account}" "${PY:?PY names the python with the engine packages}"
 SEED="${SEED:-$HOME/.claude/skills/logbook/adapters/journal/seed}"
 VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/the-vault"
-COURSES="${COURSES:-calculus linear-algebra probability real-analysis SMM AIKR}"
-REAL_NAMES="SMM AIKR"
+COURSES="${COURSES:-calculus linear-algebra probability real-analysis}"
 real_of() {
 	case "$1" in
 		SMM) echo "$VAULT/university/msc/SMM" ;;
 		AIKR) echo "$VAULT/university/msc/AIKR" ;;
 	esac
 }
+REAL_NAMES=""
+for name in $COURSES; do if [ -n "$(real_of "$name")" ]; then REAL_NAMES="$REAL_NAMES $name"; fi; done
 
 case "$OUT" in /*) ;; *) echo "refusing: OUT must be absolute, not $OUT" >&2; exit 1 ;; esac
 if [ -e "$OUT" ] && [ -n "$(ls -A "$OUT")" ]; then echo "refusing: $OUT is not empty" >&2; exit 1; fi
