@@ -2,7 +2,7 @@ import { markHow, type ArcHandle, type ChatListItem, type CourseMap, type Course
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_SAID_BY, SLIP_WORDS, slipMark, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
-import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
+import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
@@ -50,6 +50,9 @@ export type Pickup =
 
 export interface SessionEntry {
 	chat: ChatListItem;
+	/** It belongs to the topic (`ownsTopic`), rather than only touching it:
+	 *  only such a session is the page's Now, Next or first map. */
+	own: boolean;
 	state: SessionState;
 	/** The day of its last message, YYYY-MM-DD. */
 	day: string;
@@ -118,7 +121,8 @@ export interface TopicFacts {
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
-	/** Every session of the topic, newest first. */
+	/** Every session tied to the topic, newest first: its own and those
+	 *  that only touched it (`SessionEntry.own`). */
 	sessions: readonly SessionEntry[];
 	/** The sessions not already shown as a pick-up row. */
 	listed: readonly SessionEntry[];
@@ -201,11 +205,12 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  * no review set, else study (the engine has set the next review in the
  * future, so nothing needs him). Continue picks up the lesson that holds
  * the task, or the topic's newest lesson, as the session model says
- * (`continueMove`). `chats` are every session; the topic's are those the
- * engine's records tie to it (`topicSessions`).
+ * (`continueMove`). `chats` are every session; the topic's are those that
+ * belong to it (`ownsTopic`), never one that only touched it on the way
+ * (round 7: Kernel's page resumed the Eigen lesson).
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
-	const sessions = topicSessions(chats, map.workspace, topic.handle);
+	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
 	const active = resumableSession(sessions);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
 	if (topic.review?.kind === "due") return { kind: "review", opening: `Review ${topic.title}` };
@@ -275,13 +280,14 @@ export function localDay(iso: string): string {
 }
 
 /** The topic's sessions as the page lists them, in the order given
- *  (newest first), each with its plan when the read holds one. A session
- *  dated after the engine's day counts as that day. */
-export function sessionEntries(sessions: readonly ChatListItem[], plans: readonly SessionPlan[], today: string): SessionEntry[] {
+ *  (newest first), each with whether it belongs to `handle` and its plan
+ *  when the read holds one. A session dated after the engine's day counts
+ *  as that day. */
+export function sessionEntries(sessions: readonly ChatListItem[], plans: readonly SessionPlan[], today: string, handle: string): SessionEntry[] {
 	return sessions.map((chat) => {
 		const local = localDay(chat.updatedAt);
 		const day = local > today ? today : local;
-		return { chat, state: sessionState(chat), day, when: agoWords(daysBetween(day, today)), plan: plans.find((plan) => plan.id === chat.id) ?? null };
+		return { chat, own: ownsTopic(chat, handle), state: sessionState(chat), day, when: agoWords(daysBetween(day, today)), plan: plans.find((plan) => plan.id === chat.id) ?? null };
 	});
 }
 
@@ -306,13 +312,13 @@ function whereOf(entry: SessionEntry): string {
 }
 
 /**
- * The places to pick the topic back up: the session that waits on him, is
- * being written or stopped, if any, then each open task that holds the
+ * The places to pick the topic back up: the topic's own session that
+ * waits on him, is being written or stopped, if any, then each open task that holds the
  * topic at the step it was left on, the focused one first, except a task
  * that session holds. A task's press continues the lesson that holds it.
  */
 export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
-	const active = resumableSession(entries.map((entry) => entry.chat));
+	const active = resumableSession(entries.filter((entry) => entry.own).map((entry) => entry.chat));
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
@@ -372,7 +378,7 @@ export function topicFacts({
 	const sessions = topicSessions(chats, map.workspace, topic.handle);
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const attempts = read?.record?.attempts ?? [];
-	const entries = sessionEntries(sessions, read?.plans ?? [], map.today);
+	const entries = sessionEntries(sessions, read?.plans ?? [], map.today, topic.handle);
 	const pickups = pickupsOf(topic, map, entries, chats, read?.record ?? null, map.today);
 	const picked = new Set(pickups.flatMap((pickup) => (pickup.kind === "session" ? [pickup.chat.id] : [])));
 	const silent = topic.level === "new" && sessions.length > 0;

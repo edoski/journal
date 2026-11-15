@@ -120,7 +120,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				return { ...base, icon: action.task ? "task" : "standing", words: stoppedOn(entry) ?? action.task?.title ?? action.chat.title, note: action.task?.step ?? (entry ? `Left off ${dayWords(entry.day, facts.today).toLowerCase()}` : null), chat: action.chat.id };
 			}
 			if (action.task) return { ...base, icon: "task", words: action.task.title, note: action.task.step };
-			const last = facts.sessions.find(isPlanned);
+			const last = facts.sessions.find((entry) => entry.own && isPlanned(entry));
 			const step = stoppedOn(last);
 			return step && last
 				? { ...base, icon: "standing", words: step, note: `Left off ${dayWords(last.day, facts.today).toLowerCase()}` }
@@ -133,12 +133,14 @@ export function nowItem(facts: TopicFacts): NowItem {
 	}
 }
 
-/** Every place after Now, most pressing first: another session that waits
- *  on him, then one the tutor is writing in, then one left for next time,
+/** Every place after Now, most pressing first: another of the topic's own
+ *  sessions that waits on him, then one the tutor is writing in, then one
+ *  left for next time (a session that only touched the topic stays in
+ *  Earlier),
  *  a due review the action does not already start, then each open task
  *  the action does not continue. */
 export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
-	const sessions = facts.sessions.filter((entry) => entry.chat.id !== now.chat && entry.state !== "finished");
+	const sessions = facts.sessions.filter((entry) => entry.own && entry.chat.id !== now.chat && entry.state !== "finished");
 	const waiting = (["your-turn", "working", "left"] as const).flatMap((state) => sessions.filter((entry) => entry.state === state));
 	const review =
 		facts.action.kind !== "review" && facts.topic.review?.kind === "due"

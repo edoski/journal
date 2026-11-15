@@ -101,6 +101,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 		pendingProblem: false,
 		course: { workspace: WORKSPACE, title: "Linear Algebra" },
 		topics: [],
+		ownTopics: over.topics ?? [],
 		busy: false,
 		compacting: false,
 		...over,
@@ -253,7 +254,7 @@ describe("the page's words for time", () => {
 });
 
 describe("when he last studied the topic", () => {
-	const entries = (...days: string[]) => sessionEntries(days.map((day) => chat({ updatedAt: `${day}T10:00:00.000Z` })), [], TODAY);
+	const entries = (...days: string[]) => sessionEntries(days.map((day) => chat({ updatedAt: `${day}T10:00:00.000Z` })), [], TODAY, "rank");
 
 	it("is the latest of its newest attempt, its newest session and the day it was first taught", () => {
 		const taught = { ...TOPICS.cramer, introduced: "2026-11-01" };
@@ -272,9 +273,9 @@ describe("when he last studied the topic", () => {
 	it("dates a session by its local day, never after the engine's", () => {
 		const late = new Date(2026, 10, 6, 23, 30).toISOString();
 		assert.equal(localDay(late), "2026-11-06");
-		const [entry] = sessionEntries([chat({ updatedAt: late })], [], TODAY);
+		const [entry] = sessionEntries([chat({ updatedAt: late })], [], TODAY, "rank");
 		assert.deepEqual([entry!.day, entry!.when], ["2026-11-06", "2d ago"]);
-		const [later] = sessionEntries([chat({ updatedAt: "2026-11-12T10:00:00.000Z" })], [], TODAY);
+		const [later] = sessionEntries([chat({ updatedAt: "2026-11-12T10:00:00.000Z" })], [], TODAY, "rank");
 		assert.deepEqual([later!.day, later!.when], [TODAY, "Today"]);
 	});
 });
@@ -333,10 +334,13 @@ describe("when a topic comes up", () => {
 
 describe("where to pick the topic back up", () => {
 	const record: TopicRecord = { attempts: [], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] };
-	const pickups = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[] = []) => pickupsOf(t, MAP, sessionEntries(sessions, plans, TODAY), sessions, record, TODAY);
+	const pickups = (t: CourseMapTopic, chats: ChatListItem[], plans: SessionPlan[] = []) => {
+		const sessions = chats.map((c) => (c.ownTopics?.includes(t.handle) ? c : { ...c, ownTopics: [...(c.ownTopics ?? []), t.handle] }));
+		return pickupsOf(t, MAP, sessionEntries(sessions, plans, TODAY, t.handle), sessions, record, TODAY);
+	};
 
 	it("puts a lesson waiting on a step at that step", () => {
-		const lesson = chat({ id: "chat_eigen", title: "Eigenvalues and eigenvectors", pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z" });
+		const lesson = chat({ id: "chat_eigen", title: "Eigenvalues and eigenvectors", pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z", ownTopics: ["eigen"] });
 		assert.deepEqual(pickups(TOPICS.eigen, [lesson], [EIGEN_PLAN]), [
 			{ kind: "session", chat: lesson, waits: true, title: "Eigenvalues and eigenvectors", where: "Computing a 2×2 spectrum", when: "Today" },
 		]);
@@ -402,8 +406,8 @@ describe("the topic's sessions", () => {
 
 	it("carry the plan their tutor authored", () => {
 		const lesson = chat({ id: "chat_eigen" });
-		assert.equal(sessionEntries([lesson, chat()], [EIGEN_PLAN], TODAY)[0]!.plan, EIGEN_PLAN);
-		assert.equal(sessionEntries([chat()], [EIGEN_PLAN], TODAY)[0]!.plan, null);
+		assert.equal(sessionEntries([lesson, chat()], [EIGEN_PLAN], TODAY, "rank")[0]!.plan, EIGEN_PLAN);
+		assert.equal(sessionEntries([chat()], [EIGEN_PLAN], TODAY, "rank")[0]!.plan, null);
 	});
 });
 

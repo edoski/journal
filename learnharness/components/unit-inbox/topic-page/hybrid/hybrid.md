@@ -49,7 +49,7 @@ A step title, a session's title and an attempt's sentence may hold TeX; each is 
 
 | Function | Out |
 |---|---|
-| `mapLessonAtFirst(sessions, action)` | The session the action opens when it planned, else the newest that planned, else null |
+| `mapLessonAtFirst(sessions, action)` | The session the action opens when it planned, else the topic's newest own session (`SessionEntry.own`) that planned, else null: a session that only touched the topic shows its map only when he picks it |
 | `nextSteps(plan)` | The steps resting on `plan.current` that no question was about |
 | `hybridMarks(plan, waits)` | `stepMarks` with "Next" on `nextSteps` |
 

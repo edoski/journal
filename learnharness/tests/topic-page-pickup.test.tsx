@@ -24,6 +24,7 @@ import { sessionPlanOf, topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
+import { mapLessonAtFirst } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
 const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), "utf-8"));
@@ -60,7 +61,7 @@ const MAP: CourseMap = {
 const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 function chat(id: string, title: string, updatedAt: string, over: Partial<ChatListItem> = {}): ChatListItem {
-	return { id, title, createdAt: updatedAt, updatedAt, kind: "teach", messageCount: 6, phase: "teach", pendingQuestion: false, pendingProblem: false, course: { workspace: WORKSPACE, title: "Linear Algebra" }, topics: [], busy: false, compacting: false, ...over };
+	return { id, title, createdAt: updatedAt, updatedAt, kind: "teach", messageCount: 6, phase: "teach", pendingQuestion: false, pendingProblem: false, course: { workspace: WORKSPACE, title: "Linear Algebra" }, topics: [], ownTopics: over.topics ?? [], busy: false, compacting: false, ...over };
 }
 
 const EIGEN_PLAN = sessionPlanOf(fixture("chat_demo_eigen.json") as ChatRecord) as SessionPlan;
@@ -69,7 +70,7 @@ const DET_STOPPED = DET_PLAN.tree.nodes.find((node) => node.id === DET_PLAN.curr
 const RANK_RECORD = topicRecordOf(fixture("show.rank+task.json"), "rank", ["sheet-4"]);
 
 const factsOf = (t: CourseMapTopic, sessions: ChatListItem[] = [], plans: SessionPlan[] = [], record: TopicRecord | null = null): TopicFacts =>
-	topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read: { record, plans } });
+	topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle], ownTopics: [...(c.ownTopics ?? []), t.handle] })), read: { record, plans } });
 
 const EIGEN_LESSON = chat("chat_demo_eigen", "Eigenvalues and eigenvectors", "2026-11-08T08:19:40.000Z", { pendingQuestion: true, topics: ["eigen"] });
 
@@ -233,9 +234,25 @@ describe("a topic not started", () => {
 	});
 });
 
+describe("a session that only touched the topic", () => {
+	// Round 7: Kernel's page resumed and mapped the Eigen lesson, which saved one kernel answer.
+	const touched = { ...EIGEN_LESSON, topics: ["eigen", "determinant"], ownTopics: ["eigen"] };
+	const own = chat("chat_demo_det", "Determinants as volume scaling", "2026-11-07T16:45:00.000Z", { topics: ["determinant"] });
+	const facts = factsOf(DET, [touched, own], [EIGEN_PLAN, DET_PLAN]);
+
+	it("is never Now, Next or the first map; Earlier still lists it", () => {
+		assert.notEqual("chat" in facts.action && facts.action.chat.id, touched.id, "Now never opens it");
+		assert.equal(mapLessonAtFirst(facts.sessions, facts.action), own.id, "the map shows the topic's own lesson");
+		const { now, next, earlier } = pickupSections(facts);
+		assert.notEqual(now.words, EIGEN_PLAN.tree.nodes.find((node) => node.id === EIGEN_PLAN.current)!.title);
+		assert.deepEqual(next.flatMap((item) => (item.kind === "session" ? [item.entry.chat.id] : [])), []);
+		assert.ok(earlier.some((day) => day.sessions.some((entry) => entry.chat.id === touched.id)), "Earlier lists it");
+	});
+});
+
 describe("the sections drawn", () => {
 	const RICH = factsOf(VECTORS, [
-		{ ...EIGEN_LESSON, topics: ["vectors"] },
+		{ ...EIGEN_LESSON, topics: ["vectors"], ownTopics: ["vectors"] },
 		chat("chat_other", "Vectors, a question", "2026-11-07T08:00:00.000Z", { pendingQuestion: true, topics: ["vectors"] }),
 		chat("chat_old", "Vectors, first pass", "2026-11-02T08:00:00.000Z", { topics: ["vectors"] }),
 	], [EIGEN_PLAN]);

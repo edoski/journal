@@ -14,10 +14,12 @@ export type PlannedEntry = SessionEntry & { plan: SessionPlan };
 export const isPlanned = (entry: SessionEntry): entry is PlannedEntry => (entry.plan?.tree.nodes.length ?? 0) > 0;
 
 /** The lesson the map shows at first: the session the page's action opens
- *  when it planned, else the newest session that planned; null when no
- *  session planned. */
+ *  when it planned, else the topic's newest own session that planned;
+ *  null when none planned. A session that only touched the topic shows
+ *  its map only when he picks it (round 7: Kernel's page drew the Eigen
+ *  lesson's map). */
 export function mapLessonAtFirst(sessions: readonly SessionEntry[], action: TopicAction): string | null {
-	const planned = sessions.filter(isPlanned);
+	const planned = sessions.filter((entry) => entry.own && isPlanned(entry));
 	const opens = "chat" in action ? planned.find((entry) => entry.chat.id === action.chat.id) : undefined;
 	return (opens ?? planned[0])?.chat.id ?? null;
 }
