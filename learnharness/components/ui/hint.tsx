@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Kbd } from "@/components/ui/kbd"
 import { bindingForAction, formatBinding, type KeyAction } from "@/src/core"
 
@@ -40,8 +40,7 @@ export function Hint({ label, action, binding, side = "top", children }: HintPro
 	// The label, then the shortcut as muted glyphs (kbd.md), not in parentheses.
 	const live = hintBinding(action, binding)
 	return (
-		<TooltipProvider>
-			<Tooltip>
+		<Tooltip>
 				{/* Hover only. Tab is dead app-wide, so focus lands on a
 				    control only programmatically (a dialog's autofocus, a closed
 				    menu's return), and a tooltip opened then would take the next
@@ -51,7 +50,6 @@ export function Hint({ label, action, binding, side = "top", children }: HintPro
 					<span>{label}</span>
 					{live && <Kbd>{live}</Kbd>}
 				</TooltipContent>
-			</Tooltip>
-		</TooltipProvider>
+		</Tooltip>
 	)
 }

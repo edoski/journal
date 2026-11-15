@@ -5,7 +5,7 @@ import React, { act } from "react";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { parseHTML } from "linkedom";
-import type { Root } from "react-dom/client";
+import type { Root } from "./helpers/app-render.tsx";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ProseComposer } from "../components/lesson/prose/prose-composer.tsx";
 import { forgetRescue, holdsRescue, keepRescue, overtakenDraft } from "../components/lesson/stranded-draft.ts";
@@ -75,7 +75,7 @@ test("Esc back to the answer never moves rescued words into the next question's 
 	const noop = () => {};
 	const host = document.createElement("div") as unknown as HTMLElement;
 	document.body.append(host);
-	const { createRoot } = await import("react-dom/client");
+	const { createRoot } = await import("./helpers/app-render.tsx");
 	const root = createRoot(host);
 	roots.push(root);
 	await act(async () => {
@@ -109,7 +109,7 @@ test("the composer answering a question reports what he types as he types it", a
 	const noop = () => {};
 	const host = document.createElement("div") as unknown as HTMLElement;
 	document.body.append(host);
-	const { createRoot } = await import("react-dom/client");
+	const { createRoot } = await import("./helpers/app-render.tsx");
 	const root = createRoot(host);
 	roots.push(root);
 	await act(async () => {

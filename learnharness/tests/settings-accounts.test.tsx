@@ -3,7 +3,7 @@ import React from "react";
 import "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { Dialog } from "../components/ui/dialog.tsx";
 import { SettingsDialogBody } from "../components/settings/settings-dialog.tsx";
 

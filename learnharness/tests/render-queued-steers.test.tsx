@@ -5,7 +5,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { QueuedSteersBody } from "../components/queued-steers.tsx";
 import { visibleQueuedSteers } from "../components/session-core.ts";
 

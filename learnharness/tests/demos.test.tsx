@@ -33,8 +33,8 @@ import { after, describe, it } from "node:test";
 import { createCanvas } from "@napi-rs/canvas";
 import { Value } from "typebox/value";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep, type ToolCall } from "@earendil-works/pi-ai";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
+import { createRoot } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { PATHS } from "../config.ts";
 import {

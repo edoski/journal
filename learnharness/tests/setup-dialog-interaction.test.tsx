@@ -4,7 +4,7 @@ import React, { act } from "react";
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { SetupDialog } from "../components/setup-dialog.tsx";
 import { CLAUDE_MODEL } from "../src/core/index.ts";
 

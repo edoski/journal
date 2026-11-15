@@ -4,7 +4,7 @@ import React, { act } from "react";
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { CoursePicker, NewCourseBody } from "../components/course-picker.tsx";
 import { AddMaterialDialog, DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
 import { pickWords } from "../components/new-course-facts.ts";

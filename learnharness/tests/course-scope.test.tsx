@@ -6,7 +6,7 @@ import React, { act } from "react";
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { StudyCourse } from "../src/core/index.ts";
 import { CourseScope } from "../components/unit-inbox/course-scope.tsx";

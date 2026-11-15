@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { ArcHandle } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Ring } from "@/components/ui/pie";
 import { MathText } from "@/components/ui/math-text";
 import { toggleVariants } from "@/components/ui/toggle";
@@ -43,8 +43,7 @@ function ArcName({ title }: { title: string }) {
 	}, [title]);
 	// One tree whether cut or not, so the measured span stays the same node; the tooltip opens only on a cut name.
 	return (
-		<TooltipProvider>
-			<Tooltip {...(cut ? {} : { open: false })}>
+		<Tooltip {...(cut ? {} : { open: false })}>
 				{/* Hover only, as `Hint`: Tab is dead app-wide. */}
 				<TooltipTrigger asChild onFocus={(e) => e.preventDefault()}>
 					<span ref={ref} data-slot="arc-name" data-cut={cut || undefined} className="min-w-0 truncate data-cut:pointer-events-auto">
@@ -54,8 +53,7 @@ function ArcName({ title }: { title: string }) {
 				<TooltipContent>
 					<MathText>{title}</MathText>
 				</TooltipContent>
-			</Tooltip>
-		</TooltipProvider>
+		</Tooltip>
 	);
 }
 

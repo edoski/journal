@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
+import { TooltipProvider } from "../components/ui/tooltip.tsx";
 import { SidebarResizeHandle } from "../components/unit-inbox/sidebar-resize-handle.tsx";
 import { maxSidebarWidth } from "../components/unit-inbox/sidebar-width.ts";
 
@@ -27,7 +28,7 @@ function serverHtml(): string {
 	const kept = hidden.map((key) => Object.getOwnPropertyDescriptor(globalThis, key)!);
 	for (const key of hidden) delete (globalThis as Record<string, unknown>)[key];
 	try {
-		return renderToString(<Handle />);
+		return renderToString(<TooltipProvider><Handle /></TooltipProvider>);
 	} finally {
 		hidden.forEach((key, i) => Object.defineProperty(globalThis, key, kept[i]!));
 	}
@@ -50,7 +51,7 @@ describe("the sidebar's resize handle", () => {
 		let root: ReturnType<typeof hydrateRoot> | null = null;
 		try {
 			await act(async () => {
-				root = hydrateRoot(host, <Handle />, { onRecoverableError: (e) => void logged.push(String(e)) });
+				root = hydrateRoot(host, <TooltipProvider><Handle /></TooltipProvider>, { onRecoverableError: (e) => void logged.push(String(e)) });
 			});
 		} finally {
 			console.error = error;

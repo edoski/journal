@@ -8,7 +8,7 @@ import React from "react";
 import "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { DoneTonightButton } from "../components/lesson/done-tonight.tsx";
 
 test("closed for today, Done for today still holds its room, unseen and out of reach", () => {

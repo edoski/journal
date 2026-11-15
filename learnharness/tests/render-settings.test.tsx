@@ -11,8 +11,8 @@ import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
+import { createRoot } from "./helpers/app-render.tsx";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { INK_SWATCHES } from "../components/settings/controls.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";

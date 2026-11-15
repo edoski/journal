@@ -10,7 +10,7 @@ import React, { act } from "react";
 import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createRoot } from "react-dom/client";
+import { createRoot } from "./helpers/app-render.tsx";
 import { MermaidOverlay } from "../components/session-overlay.tsx";
 
 const FIGURE = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160"><path d="M0 0L20 20"/></svg>';

@@ -8,7 +8,7 @@
 import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ProseComposer, type ProseComposerProps } from "../components/lesson/prose/prose-composer.tsx";

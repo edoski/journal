@@ -12,7 +12,7 @@ import { dom } from "./helpers/radix-dom.ts";
 (globalThis as Record<string, unknown>).self = globalThis;
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot, type Root } from "./helpers/app-render.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { Confidence } from "../src/core/contracts/course.ts";
