@@ -8,6 +8,7 @@ import {
 	monogram,
 	openingFor,
 	sessionTwins,
+	sessionsNow,
 	shelfOf,
 	topicSessions,
 	unitStatus,
@@ -209,6 +210,19 @@ describe("the topic page", () => {
 		assert.equal(resumableSession([stopped, newer, running])?.id, "running");
 		assert.equal(resumableSession([newer, stopped])?.id, "stopped");
 		assert.equal(resumableSession([newer]), null);
+	});
+
+	it("drops a session a later one on the topic started after, so the newer lesson is Now and the page and the sidebar agree (round 9, 2 m7)", () => {
+		const preview = chat("preview", { ended: "cut", createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:40:05.000Z" });
+		const lesson = chat("lesson", { ended: "left", createdAt: "2026-11-08T09:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
+		assert.equal(resumableSession([lesson, preview])?.id, "lesson", "the stale preview never leads the topic page");
+		assert.equal(sessionsNow([lesson, preview]), "left");
+		const asked = chat("asked", { pendingQuestion: true, createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:41:00.000Z" });
+		const closed = chat("closed", { createdAt: "2026-11-08T09:00:00.000Z", updatedAt: "2026-11-08T10:00:00.000Z" });
+		assert.equal(resumableSession([closed, asked]), null, "a question a later lesson moved past waits on nobody");
+		assert.equal(sessionsNow([closed, asked]), null);
+		const writing = chat("writing", { busy: true, createdAt: "2026-11-06T21:40:00.000Z", updatedAt: "2026-11-06T21:41:00.000Z" });
+		assert.equal(resumableSession([closed, writing])?.id, "writing", "a turn running now is never dropped");
 	});
 
 	it("lists only the sessions the engine's records tie to the topic, never one that only holds a task covering it", () => {

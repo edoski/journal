@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { sessionState } from "@/components/nav/session-state";
+import { currentSessions, sessionState } from "@/components/nav/session-state";
 
 /**
  * The sidebar's topics. Each unit (a course map topic the learner has
@@ -107,7 +107,7 @@ export function nowOf(sessions: readonly ChatListItem[], handle: string): UnitNo
  *  every session tied to it (`topicSessions`) says what its page's Now and
  *  the session's card on Today's top say. Pure. */
 export function sessionsNow(sessions: readonly ChatListItem[]): UnitNow {
-	const states = sessions.map(sessionState);
+	const states = currentSessions(sessions).map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	if (states.includes("working")) return "working";
 	return states.includes("left") ? "left" : null;

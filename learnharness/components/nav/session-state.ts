@@ -47,13 +47,23 @@ const CONTINUE: Record<SessionState, (chat: ChatListItem, finished: typeof FINIS
 
 const PICK_UP_ORDER: readonly SessionState[] = ["your-turn", "working", "paused", "left"];
 
-/** The session to pick up among some: one that waits on the learner, else
- *  one the tutor writes in, else one the tutor stopped in, else one left
- *  for next time; the first in the order given (newest first) within
- *  each. */
+/** The sessions still current among some: each but one a later session of
+ *  its kind started after he last touched it, which moved past it (round
+ *  9, 2 m7: a preview whose turn failed on 6 Nov stayed Diagonalization's
+ *  Now over the lesson he left on 8 Nov). A turn running now stays. Pure. */
+export function currentSessions(sessions: readonly ChatListItem[]): ChatListItem[] {
+	const started = (kind: ChatListItem["kind"]) => sessions.reduce((last, chat) => (chat.kind === kind && chat.createdAt > last ? chat.createdAt : last), "");
+	return sessions.filter((chat) => chat.busy || chat.updatedAt >= started(chat.kind));
+}
+
+/** The session to pick up among some: of the current ones
+ *  (`currentSessions`), one that waits on the learner, else one the tutor
+ *  writes in, else one the tutor stopped in, else one left for next time;
+ *  the first in the order given (newest first) within each. */
 export function resumableSession(sessions: readonly ChatListItem[]): ChatListItem | null {
+	const current = currentSessions(sessions);
 	for (const state of PICK_UP_ORDER) {
-		const found = sessions.find((chat) => sessionState(chat) === state);
+		const found = current.find((chat) => sessionState(chat) === state);
 		if (found) return found;
 	}
 	return null;

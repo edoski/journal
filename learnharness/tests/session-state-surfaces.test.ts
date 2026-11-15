@@ -101,7 +101,7 @@ function seed(title: string, messages: LhMessage[], steps: string[], updatedAt: 
 	chatStore.saveTree(chat.id, { nodes: steps.map((id) => ({ id, title: id })), edges: steps.slice(1).map((to, i) => ({ from: steps[i]!, to })), version: 1 });
 	chatStore.saveMessages(chat.id, messages);
 	const file = path.join(TMP_DATA, "chats", `${chat.id}.json`);
-	fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf-8")), updatedAt }));
+	fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf-8")), createdAt: updatedAt, updatedAt }));
 	return chat.id;
 }
 
