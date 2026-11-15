@@ -20,6 +20,7 @@ import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
 import { openedAsReview } from "../core/session-opening.ts";
+import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
@@ -130,6 +131,7 @@ function listChats(): ChatSummary[] {
 						ownTopics: own,
 						ended: sessionEndOf(messages, tree, summary.kind, own),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
+						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						review: openedAsReview({ topics: summary.topics, messages }),
 					};

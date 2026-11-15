@@ -138,7 +138,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
 				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
-				resume: resumableSession(topicSessions(chats, map.workspace, topic.handle)),
+				resume: resumableSession(topicSessions(chats, map.workspace, topic.handle), chats),
 				workspace: map.workspace,
 				today: map.today,
 				href: unitHref(map.workspace, topic.handle),

@@ -226,7 +226,7 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
  */
 export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
 	const sessions = topicSessions(chats, map.workspace, topic.handle).filter((chat) => ownsTopic(chat, topic.handle));
-	const active = resumableSession(sessions);
+	const active = resumableSession(sessions, chats);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
 	if (topic.review?.kind === "due") return { kind: "review", opening: `Review ${topic.title}` };
 	const [task] = heldTasks(topic, map);
@@ -328,7 +328,7 @@ function whereOf(entry: SessionEntry): string {
  * that session holds. A task's press continues the lesson that holds it.
  */
 export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
-	const active = resumableSession(entries.filter((entry) => entry.own).map((entry) => entry.chat));
+	const active = resumableSession(entries.filter((entry) => entry.own).map((entry) => entry.chat), chats);
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
