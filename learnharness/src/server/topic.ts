@@ -80,7 +80,7 @@ function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>
  *  every attempt their answers' marks link (`markLinks`). Pure. */
 export function savedBy(chats: readonly ChatRecord[]): Map<string, string> {
 	const saved = new Map<string, string>();
-	for (const chat of chats) for (const ids of Object.values(markLinks(chat.messages))) for (const id of ids) saved.set(id, chat.id);
+	for (const chat of chats) for (const ids of Object.values(markLinks(chat))) for (const id of ids) saved.set(id, chat.id);
 	return saved;
 }
 

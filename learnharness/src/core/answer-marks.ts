@@ -16,6 +16,7 @@
  */
 
 import { answeredQuestionsOf, HIS_MESSAGE, savedQuestionsOf, type LhMessage } from "./native-messages.ts";
+import type { AnswerSaves } from "./contracts/chat.ts";
 import type { AnswerMark, MarkGrade, MarkRow } from "./contracts/marks.ts";
 import { chosenSure, isMarkResult } from "./contracts/marks.ts";
 
@@ -43,23 +44,35 @@ function savedIds(json: string): string[] {
 	}
 }
 
-/** Each answer's recorded attempt ids, keyed by the answer's tool call: a
- *  graded question's call, or a practice problem's conclude. In
- *  transcript order. */
-export function markLinks(messages: readonly LhMessage[], saves: Readonly<Record<string, readonly string[]>> = {}): Record<string, string[]> {
-	const links = transcriptLinks(messages);
-	const answered = answeredQuestionsOf(messages);
-	// Where each answer sits: a question's call, or his message.
+/** Where each answer sits in the transcript: a question's call, or his
+ *  message. */
+function placesOf(messages: readonly LhMessage[]): Map<string, number> {
 	const place = new Map<string, number>();
 	messages.forEach((message, i) => {
 		if (message.role === "user") place.set(message.id, i);
 		else if (message.role === "assistant") for (const block of message.content) if (block.type === "toolCall") place.set(block.id, i);
 	});
+	return place;
+}
+
+/** Each answer's recorded attempt ids, keyed by the answer's tool call: a
+ *  graded question's call, a practice problem's conclude, or his message.
+ *  In transcript order. The record's kept save links (`answerSaves`) fill
+ *  in only the attempts no save in the transcript links, so a save the
+ *  transcript lost to a restart still marks its answer, and a link the
+ *  transcript holds is never copied onto another answer. Every reader of
+ *  the links passes the whole record, so none leaves the kept ones out. */
+export function markLinks(record: { readonly messages: readonly LhMessage[]; readonly answerSaves?: AnswerSaves }): Record<string, string[]> {
+	const { messages, answerSaves: saves = {} } = record;
+	const links = transcriptLinks(messages);
+	const answered = answeredQuestionsOf(messages);
+	const place = placesOf(messages);
+	const linked = new Set(Object.values(links).flat());
 	for (const [key, ids] of Object.entries(saves)) {
 		if (!(answered.has(key) || messages.some((m) => m.role === "user" && m.id === key))) continue;
-		const seen = links[key] ?? [];
-		const found = ids.filter((id) => typeof id === "string" && !seen.includes(id));
-		if (found.length) links[key] = [...seen, ...found];
+		const found = ids.filter((id) => typeof id === "string" && !linked.has(id));
+		for (const id of found) linked.add(id);
+		if (found.length) links[key] = [...(links[key] ?? []), ...found];
 	}
 	if (Object.keys(saves).length === 0) return links;
 	const order = (key: string) => place.get(key) ?? Number.MAX_SAFE_INTEGER;
@@ -108,7 +121,7 @@ function transcriptLinks(messages: readonly LhMessage[]): Record<string, string[
  *  every attempt this session's saves and problems recorded, which it may
  *  set right on its own; `disputed`, every attempt a dispute of his named,
  *  which only a ruling on that dispute re-marks. Pure. */
-export function remarkableOf(messages: readonly LhMessage[], kept?: Readonly<Record<string, readonly string[]>>): { saved: Set<string>; disputed: Set<string> } {
+export function remarkableOf(messages: readonly LhMessage[], kept?: AnswerSaves): { saved: Set<string>; disputed: Set<string> } {
 	// The saves kept with the lesson the moment the engine took them count
 	// too: a restart can lose the transcript's receipt (round 8).
 	const saved = new Set<string>(Object.values(kept ?? {}).flat());
@@ -130,8 +143,13 @@ export function remarkableOf(messages: readonly LhMessage[], kept?: Readonly<Rec
 
 /** The answer whose mark ⌘⇧M disputes: the newest one with a mark. */
 export function latestMarkedAnswer(messages: readonly LhMessage[], marks: Readonly<Record<string, AnswerMark>>): string | null {
-	const keys = Object.keys(markLinks(messages)).filter((key) => marks[key]);
-	return keys[keys.length - 1] ?? null;
+	const place = placesOf(messages);
+	let latest: string | null = null;
+	for (const key of Object.keys(marks)) {
+		const at = place.get(key);
+		if (at !== undefined && (latest === null || at >= place.get(latest)!)) latest = key;
+	}
+	return latest;
 }
 
 type Shown = Record<string, unknown>;

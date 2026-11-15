@@ -12,6 +12,9 @@ import { describe, it } from "node:test";
 import type { AssistantMessage, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 
 import { markLinks } from "../src/core/answer-marks.ts";
+import { disputeAppends } from "../src/core/input-events.ts";
+import { savedBy } from "../src/server/topic.ts";
+import type { ChatRecord } from "../src/core/contracts/chat.ts";
 import { answeredQuestionsOf, recordedBySaves, HIS_MESSAGE, type LhMessage } from "../src/core/native-messages.ts";
 import { courseTools, type CourseToolContext } from "../src/agent/tools/course.ts";
 
@@ -43,17 +46,25 @@ const said = (id: string, text: string): LhMessage => ({ id, role: "user", conte
 describe("a save the transcript never got", () => {
 	it("the lesson's kept links mark the answer (the transcript holds no course_save for it)", () => {
 		const messages = asked("q34", "An eigenvector for λ = 4?");
-		assert.deepEqual(markLinks(messages), {});
-		assert.deepEqual(markLinks(messages, { q34: ["o34"] }), { q34: ["o34"] });
+		assert.deepEqual(markLinks({ messages }), {});
+		assert.deepEqual(markLinks({ messages, answerSaves: { q34: ["o34"] } }), { q34: ["o34"] });
+	});
+
+	it("its mark can be disputed, and the topic page names the session that saved it", () => {
+		const messages = asked("q34", "An eigenvector for λ = 4?");
+		const dispute = { type: "dispute" as const, answerId: "q34", observations: ["o34"], said: "(1, 2) is right" };
+		assert.throws(() => disputeAppends({ messages }, dispute), /targets no marked answer/);
+		assert.match(String((disputeAppends({ messages, answerSaves: { q34: ["o34"] } }, dispute).at(-1) as { content: string }).content), /\[MARK DISPUTED\]/);
+		assert.equal(savedBy([{ id: "chat_la", messages, answerSaves: { q34: ["o34"] } } as unknown as ChatRecord]).get("o34"), "chat_la");
 	});
 
 	it("a kept link to an answer the lesson does not hold marks nothing", () => {
-		assert.deepEqual(markLinks(asked("q1", "Rank?"), { elsewhere: ["o9"] }), {});
+		assert.deepEqual(markLinks({ messages: asked("q1", "Rank?"), answerSaves: { elsewhere: ["o9"] } }), {});
 	});
 
 	it("the links keep the transcript's order of answers", () => {
 		const messages = [...asked("q1", "First?"), ...asked("q2", "Second?")];
-		assert.deepEqual(Object.keys(markLinks(messages, { q2: ["o2"], q1: ["o1"] })), ["q1", "q2"]);
+		assert.deepEqual(Object.keys(markLinks({ messages, answerSaves: { q2: ["o2"], q1: ["o1"] } })), ["q1", "q2"]);
 	});
 
 	it("the course tool hands the engine's ids to the lesson as soon as the save went through", async () => {
