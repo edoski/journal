@@ -336,6 +336,11 @@ export function projectCourseBrief(
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
 	if (topics.length > 0) lines.push(`Path${str(path.current) ? `, current ${path.current}` : ""}: ${topics.join(", ")}`);
+	// The level word "new" read as "not planned yet" (round 8: "they're the
+	// only ones you haven't started" named two of four untaught topics), so
+	// the untaught ones are named in plain words too.
+	const untaught = list(path.topics).flatMap((t) => (Array.isArray(t) && t[1] === "new" ? [String(t[0])] : []));
+	if (untaught.length > 0) lines.push(`Not started yet (never taught, whatever their planned day): ${untaught.join(", ")}`);
 	const excluded = handles(path.excluded);
 	if (excluded.length > 0) lines.push(`Left out of the course: ${excluded.join(", ")}`);
 	const health = pathHealthLine(r.path_health);
