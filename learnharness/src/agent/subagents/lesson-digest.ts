@@ -15,6 +15,7 @@ import { Type, type Static } from "typebox";
 import type { ChatRecord, DigestLedger } from "../../core/contracts/chat.ts";
 import type { CourseMap } from "../../core/contracts/course-map.ts";
 import { recordHasArcs } from "../../core/contracts/course.ts";
+import { isReviewSession } from "../../core/session-opening.ts";
 import type { ChatStore, CourseRecords } from "../../core/ports.ts";
 import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/plan.ts";
 import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
@@ -220,6 +221,7 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 		if (!whole.ok) throw new Error(`course record: ${whole.message}`);
 		const { notes, knowledge } = recordOf(whole.json);
 		const arcs = digestArcs(whole.json, record.topics ?? []);
+		const tasks = sessionTasksOf(record.messages).filter((key) => map.tasks.some((t) => t.key === key));
 		const view: DigestCourseView = {
 			topics: map.topics.map((t) => ({
 				handle: t.handle,
@@ -229,7 +231,9 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 				note: notes.get(t.handle) ?? null,
 			})),
 			current: map.current,
-			tasks: sessionTasksOf(record.messages).filter((key) => map.tasks.some((t) => t.key === key)),
+			tasks,
+			movesPath: !isReviewSession(record) && tasks.length === 0,
+			own: record.topics ?? [],
 			planFinished: planFinished(record.tree, record.messages),
 			knowledge,
 			reached: reachedSteps(record.tree, record.messages),
