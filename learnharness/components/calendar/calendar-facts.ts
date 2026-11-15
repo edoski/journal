@@ -334,7 +334,12 @@ export function calendarEntries({
 				heldBy.set(lesson.id, task);
 				continue;
 			}
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
+			// One piece of work, one name: an unfinished session that holds the
+			// task names it, as Home and the sidebar do (round 8: "Eigenvalues
+			// and eigenvectors" on Home, "Eigenvalues lesson: eigenspaces and
+			// diagonalising" here).
+			const holder = chats.find((chat) => chat.course?.workspace === map.workspace && !chat.courseDeleted && sessionState(chat) !== "finished" && holdsTask(chat, task, holders.map((t) => t.handle)));
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
 		}
 	}
 	for (const chat of chats) {
