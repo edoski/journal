@@ -136,6 +136,12 @@ describe("the page's one action", () => {
 	});
 
 	it("reviews a topic whose review is due, at any level, ahead of an open task", () => {
+		// Round 10 (1 m7): Eigen's page led with the review closed on 9 Nov as "Resume · Left off today".
+		const closedReview = chat({ title: "Review Vectors and linear combinations", topics: ["vectors"], ended: "left" });
+		assert.equal(topicAction(TOPICS.vectors, MAP, [closedReview]).kind, "study", "a review left for next time waits for its review day");
+		const left = chat({ title: "Review Span", topics: ["span"], ended: "left" });
+		const back = topicAction(TOPICS.span, MAP, [left]);
+		assert.ok(back.kind === "resume" && back.chat === left, "on its review day the review he left is the one it opens");
 		assert.deepEqual(topicAction(TOPICS.span, MAP, []), { kind: "review", opening: "Review Span" });
 		assert.deepEqual(topicAction(TOPICS.basis, MAP, []), { kind: "review", opening: "Review Basis and dimension" });
 		assert.deepEqual(topicAction(TOPICS.matmul, MAP, []), { kind: "review", opening: "Review Matrix multiplication as composition" });

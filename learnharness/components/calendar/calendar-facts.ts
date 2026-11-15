@@ -368,6 +368,9 @@ export function calendarEntries({
 			// and eigenvectors" on Home, "Eigenvalues lesson: eigenspaces and
 			// diagonalising" here).
 			const holder = chats.find((chat) => chat.course?.workspace === map.workspace && !chat.courseDeleted && sessionState(chat) !== "finished" && holdsTask(chat, task, holders.map((t) => t.handle)));
+			// A review he left for next time rides with its topics' next review,
+			// which opens it, never an Unfinished row of its own (round 10, 1 m7).
+			if (holder && isReviewSession(holder) && sessionState(holder) === "left") continue;
 			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
 		}
 	}
