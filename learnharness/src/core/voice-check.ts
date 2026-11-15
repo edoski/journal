@@ -34,6 +34,8 @@ export type VoiceRule =
 	| "questions"
 	| "compound"
 	| "verdict"
+	| "symbol"
+	| "options"
 	| "headings"
 	| "repeat"
 	| "advice"
@@ -59,6 +61,7 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "praise", re: /\b(?:is|was) (?:the|a) (?:right|good|great|nice) (?:instinct|idea|start|move|approach|thought)\b/i },
 	{ rule: "preview", re: /\b(?:next (?:is|up|comes|you'?ll|we'?ll)|next,? (?:we|you)(?:'ll| will)|the next (?:question|step|problem) (?:tests|is|will)|here(?:'s| is) a fresh|now (?:we|you)(?:'ll| will)|coming up next)\b/i },
 	{ rule: "narration", re: /\b(?:I(?:'ll| will| am going to|'m going to) (?:save|record|ask|check|build|verify|now|start|move|give|stop|wait)|I(?:'ve| have) (?:saved|recorded|noted|told you)|let me (?:verify|check|build|save|record|ask|start)|I'?m (?:having|waiting|saving|recording|building)|I'?ll stop)\b/i },
+	{ rule: "plan", re: /(?:^|\n)\s*(?:today|this lesson|in this lesson|the goal)\s*:/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
 	{ rule: "comprehension", re: /\b(?:does (?:that|this) make sense|is that clear|any questions)\b/i },
@@ -139,9 +142,31 @@ function phraseBreaks(text: string, skip: ReadonlySet<VoiceRule> = new Set()): V
 	}
 	const bang = /[A-Za-z)][!](?!\[)/.exec(text);
 	if (bang) out.push({ rule: "exclamation", excerpt: text.slice(Math.max(0, bang.index - 20), bang.index + 2) });
-	const dash = /[–—]/.exec(text);
+	// An en dash joining two names or numbers ("rank–nullity", "3–5") is
+	// part of the name, not punctuation (round 8: "rank–nullity" refused).
+	const dash = /—|(?<![\p{L}\p{N}])–|–(?![\p{L}\p{N}])/u.exec(text);
 	if (dash) out.push({ rule: "dash", excerpt: text.slice(Math.max(0, dash.index - 20), dash.index + 20) });
 	return out;
+}
+
+/** Words a sentence may carry before it counts as two: past this, a
+ *  sentence is two ideas glued with commas (round 8: a 7-sentence draft
+ *  came back as one long sentence and passed). Twenty-five words is the
+ *  plain-language ceiling GOV.UK's style guide sets; the voice states it,
+ *  each formula counting as one word. */
+export const SENTENCE_WORDS = 25;
+
+/** The sentences a text costs him to read: each sentence, plus each
+ *  clause it joins with a colon or semicolon (a colon before a display or
+ *  a list ends its line, so it joins nothing), plus one for every
+ *  `SENTENCE_WORDS` words past the first (round 8: length rewrites glued
+ *  sentences with colons and commas, and a count of full stops passed them). */
+export function sentenceLoad(said: readonly string[]): number {
+	return said.reduce((sum, s) => {
+		const joins = (s.match(/[:;]\s+(?=\S)/g) ?? []).length;
+		const words = (s.match(/\S+/g) ?? []).length;
+		return sum + 1 + joins + Math.max(0, Math.ceil(words / SENTENCE_WORDS) - 1);
+	}, 0);
 }
 
 /** Every rule one tutor turn breaks. `kind` adds its budget and, after a
@@ -154,7 +179,11 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const asked = said.filter((s) => s.trim().endsWith("?"));
 	if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });
 	if (!kind) return out;
-	if (said.length > SENTENCES[kind]) out.push({ rule: "length", excerpt: `${said.length} sentences, budget ${SENTENCES[kind]}` });
+	const load = sentenceLoad(said);
+	if (load > SENTENCES[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCES[kind]}` });
+	// A formula alone is a display written inline, not a sentence.
+	const symbol = said.find((s) => /^X\b/.test(s.trim()) && /[A-Za-z]{2,}/.test(s.trim().slice(1)));
+	if (symbol) out.push({ rule: "symbol", excerpt: symbol });
 	if (displays > DISPLAYS[kind]) out.push({ rule: "displays", excerpt: `${displays} displays, budget ${DISPLAYS[kind]}` });
 	if (kind === "right" && said[0] && /\b(?:is|are|was|were) (?:right|correct)\b|^(?:right|correct|yes)\b/i.test(said[0])) {
 		out.push({ rule: "feedback", excerpt: said[0] });
@@ -265,6 +294,13 @@ export function compoundAsk(text: string): VoiceBreak | null {
 	return asks.length > 1 ? { rule: "compound", excerpt: asks.join(" / ") } : null;
 }
 
+/** Whether a reply's last sentence leaves him a move: a question, or an
+ *  instruction he can act on ("Look at the rows.", "Plug $v$ back in."). */
+export function leavesAWayOn(text: string): boolean {
+	const last = sentences(prose(text).text).at(-1)?.trim() ?? "";
+	return last.endsWith("?") || ASK_OPENS.test(last) || /^(?:look|try|plug|put|substitute|multiply|recheck|redo|recompute|start|go back|use|take|set|write|read|compare)\b/i.test(last);
+}
+
 /** A sentence of advice on how he should work: checking, verifying, what
  *  to think of, where to stop, what would have caught a slip. */
 const ADVICE =
@@ -318,7 +354,8 @@ export function afterQuestion(text: string): string[] {
 /** A first sentence that hands his answer back to him or grades a right
  *  one: "You got it right: …", "Yes, …", "That is right, …" always; "That
  *  is X, …" and "The product is X, …" when X is what he answered. */
-const GRADES = /^(?:you got (?:it|(?:[a-z]+ ){0,3}(?:right|correct))\b|you(?:'re| are) right|you said|your answer (?:is|was)|yes\b|(?:that|this|it)(?:'s| is) (?:right|correct)\b|(?:right|correct)[,.])/i;
+const GRADES =
+	/^(?:you got (?:it|(?:[a-z]+ ){0,3}(?:right|correct))\b|you(?:'re| are) right|you said|your answer (?:is|was)|yes\b|(?:that|this|it)(?:'s| is) (?:right|correct)\b|(?:right|correct)[,.:]|(?:that|this|it|your (?:reasoning|argument|logic|method|idea|approach|step|working|route)|(?:that|this) (?:reasoning|argument|logic|method|idea|approach|step|working|route)) (?:holds|works|is (?:sound|valid|right|correct|complete|fine|good|exactly right))\b)/i;
 /** "Your last answer is right", "Both parts are correct": a right answer
  *  called right, where no "but" goes on to where it broke. */
 const CALLED_RIGHT = /^(?:[a-z]+ ){1,4}(?:is|are|was|were) (?:right|correct)\b/i;
