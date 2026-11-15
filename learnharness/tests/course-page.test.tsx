@@ -17,6 +17,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../
 import { courseFacts, courseGroups, courseNext, courseRead, GROUP_IDS, type CourseGroup as Group } from "../components/course-page/course-model.ts";
 import { CourseHeaderSkeleton } from "../components/course-page/course-header-skeleton.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
+import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { CourseGroup } from "../components/course-page/course-group.tsx";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { courseHref, unitHref, workspaceOf } from "../components/unit-inbox/unit-href.ts";
@@ -399,5 +400,20 @@ describe("the sidebar's search", () => {
 		const [eigen] = searchInbox(inbox, [], "eigen", [course()]).units;
 		assert.equal(eigen!.topic.level, "new");
 		assert.deepEqual(unitStatus(eigen!, "2026-11-08"), { kind: "none", words: "Not started" });
+	});
+});
+
+describe("a topic row's title with room (round 10, 1 m8)", () => {
+	// Shot 56b: "Binomial distribut…" and "Expectation and line…" cut beside a status that kept its whole width.
+	it("keeps the title at its own width and lets the status give way first, the title cut only past what leaves the status's icon", () => {
+		const row = { topic: topic("binomial", { title: "Binomial distribution", level: "assisted" }), group: "learning" as const, standing: standingOf(topic("binomial", { level: "assisted" })), current: false, fact: { kind: "review" as const, words: "Due since 6 Nov, back 11 Nov" }, href: "/" };
+		const document = render(<ul><CourseTopicRow row={row as never} /></ul>);
+		const title = document.querySelector('[data-slot="course-topic-title"]')!.parentElement!;
+		const fact = document.querySelector('[data-slot="course-topic-fact"]')!;
+		assert.doesNotMatch(title.className, /\bflex-1\b/, "a zero basis gave the title only what the status left");
+		assert.match(title.className, /\bshrink-0\b/);
+		assert.match(title.className, /max-w-\[calc\(100%-4rem\)\]/, "room kept for the pie, the gaps and the status's icon");
+		assert.doesNotMatch(fact.className, /\bshrink-0\b/, "the status shrinks, its words cut");
+		assert.match(fact.className, /\bmin-w-0\b/);
 	});
 });
