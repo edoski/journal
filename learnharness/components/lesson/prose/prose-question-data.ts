@@ -150,7 +150,7 @@ export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPa
 		for (const part of message.parts) {
 			if (!asked(part)) continue;
 			if (part.toolCallId === toolCallId) {
-				if (previous?.toolCallId && leftOpen(previous.output)) return previous.toolCallId;
+				if (previous?.toolCallId && leftOpen(previous.output)) return asksAgain(previous, part) ? previous.toolCallId : null;
 				const same = lastOfKind.get(questionKindOf(part));
 				return same?.toolCallId && leftForToday(same.output) && sameStep(same, part) ? same.toolCallId : null;
 			}
@@ -176,6 +176,13 @@ function questionKindOf(part: QuestionPart): string {
 function leftForToday(output: unknown): boolean {
 	const left = output as Partial<QuestionAnswerData> | undefined;
 	return left?.dismissed === true && left.reason === "tonight";
+}
+
+/** Whether `next` asks `left` again, in whatever words: the same kind of
+ *  question on the same plan step. A question of another form or step
+ *  after a hint or a side question is a new one, and draws its words. */
+function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
+	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next);
 }
 
 function sameStep(a: QuestionPart, b: QuestionPart): boolean {
@@ -207,7 +214,7 @@ export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPar
 	for (const message of messages) {
 		for (const part of message.parts) {
 			if (!asked(part)) continue;
-			if (previous && part.toolCallId && leftOpen(previous.output) !== null) reasked.add(part.toolCallId);
+			if (previous && part.toolCallId && leftOpen(previous.output) !== null && asksAgain(previous, part)) reasked.add(part.toolCallId);
 			previous = part;
 		}
 	}
