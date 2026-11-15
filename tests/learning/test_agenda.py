@@ -256,7 +256,7 @@ def test_a_review_beyond_todays_plan_takes_no_place_from_one_still_planned() -> 
 
 
 def test_a_review_on_todays_plan_answered_leaves_room_for_the_rest_only() -> None:
-    record = taught(course(4), on(-1))
+    record = learned(course(4), on(-1))
     morning = plan({"c": record}, 1, week(2, 0)).days["c"][0]["reviews"]
     first, second = morning
     record = save(record, {"observations": [answer(first)]}, MONDAY)
@@ -959,3 +959,52 @@ def test_a_topic_he_must_relearn_is_checked_within_days_like_a_first_review() ->
         week(1, 0, EVERY_DAY),
     )
     assert together.when("exam", MONDAY, True).reviews["t00"] == MONDAY
+
+
+def test_an_exam_day_holds_nothing_of_any_course() -> None:
+    """Round 8 (1 D7): the Probability exam's day took four Linear Algebra
+    items, reviews its final review had held and new topics besides."""
+    near = solid(course(6, exam=6), on(-1))
+    other = solid(course(8), on(-1))
+    fresh = course(6, exam=30)
+    together = agenda.plan(
+        {"near": near, "other": other, "fresh": fresh},
+        MONDAY,
+        10,
+        week(2, 1, EVERY_DAY),
+    )
+    exam_day = on(6).isoformat()
+    for name, days in together.days.items():
+        held = [day for day in days if day["date"] == exam_day]
+        assert held == [{"date": exam_day, "reviews": [], "new": []}], name
+
+
+def test_a_first_review_weeks_late_does_not_take_another_courses_final_review() -> None:
+    """Round 8 (1 §11): a first review two weeks late took the only place
+    the day before the Probability exam, and its two-day final review
+    reviewed one topic."""
+    near = solid(course(4, exam=2), on(-1))
+    stale = save(course(2), {"topics": {"t00": {"introduced": True}}}, on(-14))
+    together = agenda.plan(
+        {"near": near, "stale": stale}, MONDAY, 4, week(1, 0, EVERY_DAY)
+    )
+    assert [day["reviews"] for day in together.days["near"][:2]] == [["t00"], ["t01"]]
+    assert together.when("stale", MONDAY, True).reviews["t00"] == on(3), (
+        "after the exam's day, which holds nothing"
+    )
+
+
+def test_a_topic_that_does_not_fit_before_its_exam_names_the_exam_not_other_courses() -> (
+    None
+):
+    """Round 8 (1 §11): Expectation, left out of the days before its exam,
+    read "after Linear Algebra's and Real Analysis's new topics", a course
+    with no exam among them. An exam that leaves a topic out plans the
+    rest of the course after it."""
+    exam = course(12, exam=6)
+    exam = save(exam, {"exam": {"leaves_out": ["t11"]}}, MONDAY)
+    other = course(20)
+    together = agenda.plan({"exam": exam, "other": other}, MONDAY, 30, week(4, 1))
+    late = together.does_not_fit["exam"]
+    assert set(late) & set(started(together.days["exam"])), "started after it"
+    assert not set(late) & set(together.starts_after.get("exam", {}))

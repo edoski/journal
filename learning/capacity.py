@@ -61,7 +61,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable, Hashable, Iterable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 import math
 from typing import Any, TypeVar
@@ -117,15 +117,22 @@ class Weekday:
 
 @dataclass(frozen=True)
 class Capacity:
-    """His estimated week, Monday first, and the study days behind it."""
+    """His estimated week, Monday first, and the study days behind it, less
+    the days he sits an exam (``off``)."""
 
     weekdays: tuple[Weekday, ...]
     study_weekdays: frozenset[int]
     evidence: float
+    off: frozenset[date] = field(default=frozenset())
 
     def studies(self, day: date) -> bool:
-        """Whether he studies on this weekday, as his recent weeks show."""
-        return day.weekday() in self.study_weekdays
+        """Whether he studies on this day: on his study weekdays, as his
+        recent weeks show, but not on a day he sits an exam."""
+        return day.weekday() in self.study_weekdays and day not in self.off
+
+    def resting(self, days: Iterable[date]) -> Capacity:
+        """The same week, holding nothing on ``days`` too."""
+        return replace(self, off=self.off | frozenset(days))
 
     def on(self, day: date) -> Weekday:
         return self.weekdays[day.weekday()]
@@ -334,6 +341,17 @@ def _new_short(
     return short
 
 
+def exam_days(records: Iterable[dict[str, Any]]) -> frozenset[date]:
+    """The days he sits an exam, of every course: the plan holds nothing on
+    them, of any course, since the exam is that day's work. Nothing he does
+    or leaves that day reads as his limit or his study days."""
+    return frozenset(
+        date.fromisoformat(when)
+        for record in records
+        if (when := record.get("exam", {}).get("date"))
+    )
+
+
 def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]:
     """Every day with recorded study, across the given courses: reviews
     answered on a review day, topics started, and, on a day the plan held
@@ -359,7 +377,8 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
                 elif kind == progress.PRACTICE:
                     reviews.setdefault(date.fromisoformat(day), 0)
     studied = sorted({*reviews, *new})
-    week = _study_weekdays(studied, today)
+    rest = exam_days(records)
+    week = _study_weekdays(studied, today, rest)
     left: set[date] = set()
     short: set[date] = set()
     for record, replays in zip(records, replayed, strict=True):
@@ -379,10 +398,13 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
             for day in studied
         },
         today,
+        rest,
     )
 
 
-def _settled(days: dict[date, Done], today: date) -> dict[date, Done]:
+def _settled(
+    days: dict[date, Done], today: date, rest: frozenset[date]
+) -> dict[date, Done]:
     """Each day read against the plan made that morning, from the days
     before it (``estimate``), oldest first. A day he stopped with work owed
     is short only where he did less than that plan proposed, or more (he
@@ -395,7 +417,7 @@ def _settled(days: dict[date, Done], today: date) -> dict[date, Done]:
     for day in sorted(days):
         done = days[day]
         if done.reviews_short or done.new_short:
-            morning = estimate(settled, day)
+            morning = estimate(settled, day, rest)
             reviews = _stop(morning, day, "reviews", done.reviews, today)
             new = _stop(morning, day, "new", done.new, today)
             done = replace(
@@ -522,11 +544,14 @@ class _Week:
     planned: frozenset[date]
 
 
-def _study_weekdays(days: Iterable[date], today: date) -> _Week:
+def _study_weekdays(
+    days: Iterable[date], today: date, rest: frozenset[date] = frozenset()
+) -> _Week:
     """His study weekdays, replayed day by day from his first record: a day
-    off the plan held nothing for, and he did nothing on, is not counted.
-    Today counts once he has studied; a day skipped is known only once it is
-    over. ``planned`` holds the days through today the plan held work for."""
+    off the plan held nothing for, and he did nothing on, is not counted, nor
+    is an exam day (``rest``) he did nothing on. Today counts once he has
+    studied; a day skipped is known only once it is over. ``planned`` holds
+    the days through today the plan held work for."""
     studied = {day for day in days if day <= today}
     fade = 0.5 ** (WEEK / HALF_LIFE_DAYS)
     weight = [0.0] * WEEK
@@ -546,7 +571,7 @@ def _study_weekdays(days: Iterable[date], today: date) -> _Week:
     for offset in range((last - first).days + 1):
         day = first + timedelta(days=offset)
         weekday = day.weekday()
-        if weekday in week()[1]:
+        if weekday in week()[1] and day not in rest:
             planned.add(day)
         elif day not in studied:
             continue
@@ -556,20 +581,24 @@ def _study_weekdays(days: Iterable[date], today: date) -> _Week:
     return _Week(chance, study, frozenset(planned))
 
 
-def estimate(days: dict[date, Done], today: date) -> Capacity:
-    """His week from his study through ``today``, today's as saved so far."""
+def estimate(
+    days: dict[date, Done], today: date, rest: frozenset[date] = frozenset()
+) -> Capacity:
+    """His week from his study through ``today``, today's as saved so far,
+    holding nothing on the exam days ``rest``."""
     past = {day: done for day, done in days.items() if day <= today}
-    week = _study_weekdays(past, today)
+    week = _study_weekdays(past, today, rest)
     reviews = _kind(past, "reviews", "reviews_short", None)
     new = _kind(past, "new", "new_short", PRIOR_NEW)
     weekdays = tuple(
         Weekday(week.chance[day], reviews[day], new[day]) for day in range(WEEK)
     )
-    return Capacity(weekdays, week.study, float(len(past)))
+    return Capacity(weekdays, week.study, float(len(past)), rest)
 
 
 def of(records: Iterable[dict[str, Any]], today: date) -> Capacity:
-    return estimate(activity(records, today), today)
+    records = list(records)
+    return estimate(activity(records, today), today, exam_days(records))
 
 
 # --- the final review ---------------------------------------------------------

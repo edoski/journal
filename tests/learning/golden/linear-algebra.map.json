@@ -28,6 +28,13 @@
       "review": "2026-11-15",
       "held": true,
       "due": "2026-10-12",
+      "moved": {
+        "from": "2026-11-20",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ]
+      },
       "weak": false,
       "tasks": []
     },
@@ -59,7 +66,7 @@
       "held": true,
       "due": "2026-10-28",
       "moved": {
-        "from": "2026-11-16",
+        "from": "2026-11-13",
         "by": "left"
       },
       "weak": true,
@@ -80,7 +87,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-07",
-      "review": "2026-11-18",
+      "review": "2026-11-20",
       "held": true,
       "due": "2026-10-29",
       "weak": false,
@@ -120,11 +127,11 @@
       ],
       "level": "retained",
       "introduced": "2026-10-15",
-      "review": "2026-11-13",
+      "review": "2026-11-18",
       "held": true,
       "due": "2026-11-06",
       "moved": {
-        "from": "2026-11-18",
+        "from": "2026-11-16",
         "by": "study",
         "courses": [
           "Linear Algebra"
@@ -150,13 +157,9 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-03",
-      "review": "2026-11-14",
+      "review": "2026-11-11",
       "held": true,
       "due": "2026-11-06",
-      "moved": {
-        "from": "2026-11-13",
-        "by": "left"
-      },
       "weak": true,
       "right": "helped",
       "gap": "You count nonzero entries instead of pivots, and mix up rank with the number of rows",
@@ -196,13 +199,9 @@
       ],
       "level": "assisted",
       "introduced": "2026-11-04",
-      "review": "2026-11-15",
+      "review": "2026-11-13",
       "held": true,
       "due": "2026-11-09",
-      "moved": {
-        "from": "2026-11-13",
-        "by": "left"
-      },
       "weak": false,
       "right": "helped",
       "tasks": []
@@ -218,9 +217,16 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-11",
+      "review": "2026-11-19",
       "held": true,
       "due": "2026-11-06",
+      "moved": {
+        "from": "2026-11-16",
+        "by": "study",
+        "courses": [
+          "Linear Algebra"
+        ]
+      },
       "weak": false,
       "tasks": []
     },
@@ -233,11 +239,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-13",
-        "by": "left"
-      },
-      "starts": "2026-11-15",
+      "starts": "2026-11-13",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -257,11 +259,7 @@
       ],
       "contrasts": [],
       "level": "new",
-      "moved": {
-        "from": "2026-11-14",
-        "by": "left"
-      },
-      "starts": "2026-11-18",
+      "starts": "2026-11-14",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -299,7 +297,11 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-19",
+      "moved": {
+        "from": "2026-11-19",
+        "by": "left"
+      },
+      "starts": "2026-11-15",
       "starts_why": {
         "kind": "after",
         "needs": [
@@ -321,7 +323,6 @@
       "starts_why": {
         "kind": "early",
         "waiting_on": [
-          "rank",
           "determinant"
         ]
       },
@@ -345,7 +346,6 @@
       "starts_why": {
         "kind": "early",
         "waiting_on": [
-          "rank",
           "determinant"
         ]
       },

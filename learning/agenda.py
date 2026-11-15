@@ -19,9 +19,12 @@ Reviews, when there are more than fit:
      he does not know, is checked within days, ahead of every older review
      and of another course's final review, which would otherwise hold it
      until its exam. Within its own course's final review it is that
-     review's. Among these, those of 2 come first, then the most recently
-     worked on: a topic taught weeks ago and never reviewed is no longer just
-     learned.
+     review's, and the exam's topics come before the check of one it does
+     not examine. Among these, those of 2 come first, then the most recently
+     worked on. One left more than its own interval late is no longer just
+     learned: it ranks by memory's need with the reviews not yet solid
+     (round 8: a first review two weeks late took the last place in another
+     course's final review the day before its exam).
   1. a course's final review, the one deadline the plan keeps: from its
      final-review day to the exam, its reviews come before every other
      course's but first reviews, nearest exam first. Its solid topics are spread over its study
@@ -64,11 +67,13 @@ on to the next; the plan says why it waits past the day memory asks for it
 (``When.held``): another course's final review came first, or the days
 before were full.
 
-An exam day is planned like any other day of its weekday, less the examined
-course: neither its reviews nor its new topics. Whether he does less on a
-day he sits an exam is his to show, as on any day: stopping short lowers that
-weekday's limit. A lighter exam day by
-assumption would be a guessed share.
+An exam day holds nothing, of any course (``capacity.exam_days``): the exam
+is that day's work. Planned as a study day less the examined course, it took
+another course's reviews that the exam's final review had held, and new
+topics besides (round 8: four Linear Algebra items on the Probability exam's
+day). It is not a share of the day: like a day off, the plan proposes
+nothing on it, and nothing he does or leaves that day reads as his limit or
+his study days.
 
 New topics come only from the ready set: topics whose prerequisites are all
 solid and not lapsed, and that no taught but not yet solid competing method
@@ -419,10 +424,16 @@ class _Course:
             self.replayed[topic].days.values()
         )
 
-    def relearning(self, topic: str) -> bool:
-        """Missed on its last two counted days (``progress`` ``relearn``), as
-        the record stands: he is learning it again."""
-        return bool(self.levels[topic].get("relearn"))
+    def just_learned(self, topic: str, item: dict[str, Any]) -> bool:
+        """A check of what he has just learned, or has just shown he does not
+        know: its first review, or one of a topic missed on its last two
+        counted days (``progress``'s ``relearn``), while it is no more than
+        its own interval late (``progress.late_share``). Past that its gap
+        has doubled: it is no longer just learned, and memory's need ranks
+        it with the reviews not yet solid."""
+        return (
+            self.first(topic) or bool(self.levels[topic].get("relearn"))
+        ) and self.need(item) <= 1
 
     def worked(self, topic: str) -> int:
         """The day he last worked on it, as a day number."""
@@ -769,7 +780,7 @@ def _reviews(
             tier = course.tier(topic, day)
             learning = tier == RELEARNING
             gating = learning and topic in gates
-            if course.first(topic) or course.relearning(topic):
+            if course.just_learned(topic, item) and not reviewing:
                 key = (
                     -1,
                     not gating,
@@ -1127,7 +1138,9 @@ def plan(
     held as the day began (``_spent_today``).
     """
     history = capacity.activity(records.values(), today)
-    week = week or capacity.estimate(history, today)
+    week = (week or capacity.estimate(history, today)).resting(
+        capacity.exam_days(records.values())
+    )
     courses = [_Course.of(name, record) for name, record in records.items()]
     done = history.get(today, capacity.Done())
     spent = _spent_today(records, courses, today, week) if done.reviews else 0
@@ -1180,7 +1193,17 @@ def plan(
         late,
         {course.name: dict(course.held) for course in courses if course.held},
         unreviewed,
-        {course.name: course.starts_after for course in courses if course.starts_after},
+        {
+            course.name: after
+            for course in courses
+            if (
+                after := {
+                    topic: names
+                    for topic, names in course.starts_after.items()
+                    if topic not in late.get(course.name, [])
+                }
+            )
+        },
         {course.name: course.why for course in courses},
         {
             course.name: reasons

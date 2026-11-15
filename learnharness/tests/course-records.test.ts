@@ -285,7 +285,7 @@ describe("course map arcs (E2's goldens)", () => {
 		assert.equal(map.topics.some((t) => "arc" in t), false, "no topic names an arc");
 		assert.equal(currentArc(map), null);
 		assert.deepEqual(topicOf(map, "invertibility").startsWhy, { kind: "after", needs: ["determinant"], partners: [] });
-		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["rank", "determinant"], exam: false });
+		assert.deepEqual(topicOf(map, "inner-product").startsWhy, { kind: "early", waitingOn: ["determinant"], exam: false });
 		assert.deepEqual(
 			map.topics.filter((t) => t.startsWhy).map((t) => t.handle),
 			map.topics.filter((t) => t.starts).map((t) => t.handle),

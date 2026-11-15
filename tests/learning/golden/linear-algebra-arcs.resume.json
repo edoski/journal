@@ -37,29 +37,29 @@
       "planned": "2026-11-09"
     },
     {
-      "topic": "cramer",
-      "planned": "2026-11-12"
-    },
-    {
-      "topic": "elimination",
-      "planned": "2026-11-13"
-    },
-    {
       "topic": "rank",
-      "planned": "2026-11-14"
+      "planned": "2026-11-12"
     },
     {
       "topic": "vectors",
       "planned": "2026-11-15"
+    },
+    {
+      "topic": "span",
+      "planned": "2026-11-16"
+    },
+    {
+      "topic": "elimination",
+      "planned": "2026-11-18"
     }
   ],
   "due_later_more": 2,
   "starts": {
     "inner-product": "2026-11-09",
     "projection": "2026-11-12",
-    "invertibility": "2026-11-15",
-    "change-basis": "2026-11-16",
-    "diagonalization": "2026-11-19"
+    "invertibility": "2026-11-13",
+    "change-basis": "2026-11-14",
+    "diagonalization": "2026-11-15"
   },
   "starts_why": {
     "inner-product": {
@@ -77,7 +77,6 @@
       "kind": "early",
       "behind": "determinants",
       "waiting_on": [
-        "rank",
         "determinant"
       ],
       "exam": true
@@ -367,7 +366,7 @@
       "review": {
         "due": "2026-10-29",
         "by": "engine",
-        "planned": "2026-11-19"
+        "planned": "2026-11-20"
       },
       "standing": {
         "level": "retained",
@@ -398,7 +397,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-13"
+        "planned": "2026-11-18"
       },
       "standing": {
         "level": "retained",
@@ -438,7 +437,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-14"
+        "planned": "2026-11-12"
       },
       "judged": "2026-10-30",
       "standing": {
