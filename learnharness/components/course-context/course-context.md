@@ -1,6 +1,6 @@
 # Course context
 
-What the tutor and the course map builder read about a course beyond its topics, opened from the course page head's Context (`ContextSheet`, `context-sheet.tsx`, `data-slot="context-sheet"`), the way a Claude project's knowledge, a Codex project's folders or NotebookLM's sources sit beside the work.
+What the tutor and the course map builder read about a course beyond its topics, opened from the course page head's Context, its only opener, in a sheet that slides in from the window's right edge (`ContextSheet`, `context-sheet.tsx`, `data-slot="context-sheet"`, on `../ui/sheet.md`; Edo asked for the sheet on 15 Nov 2026), the way a Claude project's knowledge, a Codex project's folders or NotebookLM's sources sit beside the work.
 
 ## Data
 

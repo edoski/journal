@@ -5,12 +5,14 @@ import { Dialog as SheetPrimitive } from "radix-ui";
 import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { DIALOG_LAYER, claimEscape } from "@/components/ui/overlay";
+import { DIALOG_LAYER, claimEscape, openerReturn } from "@/components/ui/overlay";
 
 /** shadcn's Radix sheet on the Proposed tokens (spec: sheet.md): a panel
  *  that slides in from the window's right edge over the page, for work
  *  done beside it. Radix owns the focus trap, Esc and the click outside,
- *  as for the dialog (dialog.md). */
+ *  as for the dialog (dialog.md); on close focus goes back to what opened
+ *  it (`openerReturn`), since its openers are plain buttons, not a
+ *  SheetTrigger. */
 
 const Sheet = SheetPrimitive.Root;
 const SheetTrigger = SheetPrimitive.Trigger;
@@ -23,7 +25,7 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Sheet
 			data-slot="sheet-overlay"
 			className={cn(
 				DIALOG_LAYER,
-				"fixed inset-0 bg-black/40 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none",
+				"fixed inset-0 bg-black/40 motion-safe:data-[state=open]:animate-scrim-in motion-safe:data-[state=closed]:animate-scrim-out",
 				className,
 			)}
 			{...props}
@@ -32,17 +34,27 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Sheet
 }
 
 /** The panel: full height at the right edge, the raised popover fill, a
- *  hairline on its left, 200ms slide in, none under reduced motion. */
-function SheetContent({ className, children, onEscapeKeyDown, ...props }: React.ComponentProps<typeof SheetPrimitive.Content>) {
+ *  hairline on its left, a 200ms slide in and 150ms out (globals.css), none
+ *  under reduced motion. */
+function SheetContent({ className, children, onEscapeKeyDown, onOpenAutoFocus, onCloseAutoFocus, ...props }: React.ComponentProps<typeof SheetPrimitive.Content>) {
+	const [focusReturn] = React.useState(() => openerReturn());
 	return (
 		<SheetPrimitive.Portal>
 			<SheetOverlay />
 			<SheetPrimitive.Content
 				data-slot="sheet-content"
 				onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
+				onOpenAutoFocus={(e) => {
+					focusReturn.onOpenAutoFocus();
+					onOpenAutoFocus?.(e);
+				}}
+				onCloseAutoFocus={(e) => {
+					onCloseAutoFocus?.(e);
+					if (!e.defaultPrevented) focusReturn.onCloseAutoFocus(e);
+				}}
 				className={cn(
 					DIALOG_LAYER,
-					"fixed inset-y-0 right-0 flex h-full w-full max-w-md flex-col border-l bg-popover text-popover-foreground shadow-2xl outline-none duration-200 data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:animate-in data-[state=open]:slide-in-from-right motion-reduce:animate-none",
+					"fixed inset-y-0 right-0 flex h-full w-full max-w-md flex-col border-l bg-popover text-popover-foreground shadow-2xl outline-none motion-safe:data-[state=open]:animate-sheet-in motion-safe:data-[state=closed]:animate-sheet-out",
 					className,
 				)}
 				{...props}
