@@ -601,6 +601,74 @@ def test_a_topic_the_lesson_moves_to_is_placed_where_the_learner_was(
     assert receipt["arcs_placed"] == {"product": "derivatives"}
 
 
+BOOK = {"title": "OpenStax Calculus", "path": "calculus.pdf"}
+NOTES = {"title": "Lecture notes", "path": "notes.pdf"}
+
+
+def in_sections(workspace: Workspace, current: str, **locators: str) -> None:
+    """The course formed with each named topic citing the book at its locator."""
+    topics = deepcopy(TOPICS)
+    for key, locator in locators.items():
+        topics[key]["refs"] = [{"source": "book", "locator": locator}]
+    formed(
+        workspace,
+        sources={"book": BOOK, "notes": NOTES},
+        topics=topics,
+        path={"arcs": ORDER, "current": current},
+    )
+
+
+def cites(title: str, source: str, locator: str, **topic: Any) -> dict[str, Any]:
+    return {"title": title, **topic, "refs": [{"source": source, "locator": locator}]}
+
+
+def test_a_new_topic_lands_in_its_sections_arc(workspace: Workspace) -> None:
+    in_sections(
+        workspace,
+        "limit",
+        derivative="Section 3.1",
+        riemann="Section 3.4",
+        **{"chain-rule": "Section 3.6", "ftc": "Module 05"},
+    )
+    assert placed(
+        workspace,
+        {
+            "power": cites("Power rule", "book", "§3.3", needs=["limit"]),
+            "area": cites("Area", "book", "module 5", needs=["riemann"]),
+        },
+    ) == {"power": "derivatives", "area": "integrals"}
+
+
+def test_a_section_arc_outside_the_range_falls_back(workspace: Workspace) -> None:
+    in_sections(workspace, "ftc", derivative="Section 3.1")
+    assert placed(
+        workspace,
+        {
+            "power": cites("Power rule", "book", "Section 3.3"),
+            "continuity": {"needs": ["limit", "power"]},
+        },
+    ) == {"power": "limits"}
+
+
+def test_a_section_with_no_arc_or_a_tie_falls_back(workspace: Workspace) -> None:
+    in_sections(workspace, "limit", derivative="Section 3.1", ftc="Section 3.9")
+    assert placed(
+        workspace,
+        {
+            "power": cites("Power rule", "notes", "Section 3.3", needs=["limit"]),
+            "tied": cites("Rates", "book", "Section 3.4", needs=["limit"]),
+            "series": cites("Series", "book", "Chapter 9", needs=["limit"]),
+        },
+    ) == {"power": "limits", "tied": "limits", "series": "limits"}
+
+
+def test_a_page_names_no_section(workspace: Workspace) -> None:
+    in_sections(workspace, "limit", derivative="p. 112", **{"chain-rule": "p. 112"})
+    assert placed(
+        workspace, {"power": cites("Power rule", "book", "p. 112", needs=["limit"])}
+    ) == {"power": "limits"}
+
+
 # --- cleanup (P2) and forget --------------------------------------------------
 
 
