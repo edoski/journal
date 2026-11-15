@@ -1961,3 +1961,39 @@ describe("absorbed — the custom role (the doubled thinking card)", () => {
 		assert.equal((customs[0] as { id?: string }).id, "srv_1");
 	});
 });
+
+describe("a lesson mounted from an old page (round 9, 2 m11: Back after Done showed an empty \"New session\" page until reload)", () => {
+	const said = newUserMessage("Teach me the binomial distribution.");
+	const reply = { role: "assistant", content: [{ type: "text", text: "Every sequence with k successes has the same probability." }], stopReason: "stop", id: "a_1", timestamp: 1 } as unknown as LhMessage;
+
+	it("takes the record as it stands now when it moved since the page was rendered", async () => {
+		const model = new SessionModel({
+			chatId: "chat_x",
+			initialMessages: [],
+			fetch: (async () => Response.json({ messages: [said, reply], turnInFlight: false })) as typeof globalThis.fetch,
+		});
+		await model.refreshFromRecord();
+		assert.deepEqual(model.getState().nativeMessages.map((m) => m.id), [said.id, "a_1"], "the session he closed, not an empty page");
+	});
+
+	it("keeps what he did meanwhile: a send under way is never replaced by the read", async () => {
+		let release!: () => void;
+		const held = new Promise<void>((done) => { release = done; });
+		const model = new SessionModel({
+			chatId: "chat_x",
+			initialMessages: [said, reply],
+			fetch: (async () => { await held; return Response.json({ messages: [said], turnInFlight: false }); }) as typeof globalThis.fetch,
+		});
+		const read = model.refreshFromRecord();
+		model.setMessages([said, reply, newUserMessage("And for k = 2?")]);
+		release();
+		await read;
+		assert.equal(model.getState().nativeMessages.length, 3);
+	});
+});
+
+it("the lesson's mount reads the record whenever no turn was in flight when the page was rendered", async () => {
+	const { readFileSync } = await import("node:fs");
+	const hook = readFileSync(new URL("../components/session.ts", import.meta.url), "utf8");
+	assert.match(hook, /if \(initiallyInFlight\) void model\.resumeStream\(false\);\s*else void model\.refreshFromRecord\(\);/);
+});

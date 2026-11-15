@@ -979,6 +979,27 @@ export class SessionModel {
 		}
 	}
 
+	/** The page a lesson mounts from can be old: Back restores it from the
+	 *  router's cache as first rendered, maybe before the lesson had a word
+	 *  (round 9: an empty "New session" page after Done for today). Once per
+	 *  mount the lesson reads the record and takes it if it moved, unless
+	 *  something happened here meanwhile; a turn running now is attached. */
+	async refreshFromRecord(): Promise<void> {
+		const base = this.base;
+		let record: { messages?: LhMessage[]; turnInFlight?: boolean; turnError?: string };
+		try {
+			const res = await this.fetch(`/api/chats/${encodeURIComponent(this.chatId)}`);
+			if (!res.ok) return;
+			record = await res.json();
+		} catch {
+			return;
+		}
+		if (!Array.isArray(record.messages) || this.base !== base || this.tail.length > 0 || this.statusValue !== "ready") return;
+		const ids = (messages: readonly LhMessage[]) => messages.map((m) => m.id).join("\n");
+		if (ids(record.messages) !== ids(base)) this.setMessages(record.messages, record.turnError);
+		if (record.turnInFlight === true) await this.resumeStream(false);
+	}
+
 	/** Full snapshot swap (the idle settle sync — server canon). */
 	setMessages(record: LhMessage[], turnError?: string): void {
 		this.mutate(() => {
