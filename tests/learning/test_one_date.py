@@ -234,11 +234,14 @@ def no_new_topics(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.usefixtures("no_new_topics")
-def test_a_day_his_study_today_moves_says_from_which_day_and_which_course(
+def test_a_told_day_holds_all_day_and_the_next_morning_says_which_study_moved_it(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Round 9 (2 M2, 1 D3): a save in Linear Algebra moved Probability's
+    told review from 11 to 9 Nov and back within the day, and a day the
+    tutor had just named moved that afternoon."""
     algebra = course(tmp_path / "algebra")
     chance = course(tmp_path / "chance")
     eigen = {"introduced": day(-20), "review": {"due": day(1)}}
@@ -264,12 +267,19 @@ def test_a_day_his_study_today_moves_says_from_which_day_and_which_course(
 
     started = {"topics": {"expectation": {"introduced": True}}}
     run(monkeypatch, capsys, chance, "save", stdin=started)
-    assert moves(monkeypatch, capsys, algebra) == {
-        "eigen": (day(2), {"from": day(1), "by": "study", "courses": ["Probability"]})
-    }
+    assert moves(monkeypatch, capsys, algebra) == {"eigen": (day(1), None)}
     assert moves(monkeypatch, capsys, chance)["expectation"] == (day(1), None)
+
+    monkeypatch.setenv("LEARNING_TODAY", day(1))
+    moved = {
+        "from": day(1),
+        "by": "study",
+        "courses": ["Probability"],
+        "day": "yesterday",
+    }
+    assert moves(monkeypatch, capsys, algebra) == {"eigen": (day(2), moved)}
     shown = run(monkeypatch, capsys, algebra, "show", "eigen")["items"]["eigen"]
-    assert shown["moved"] == {"from": day(1), "by": "study", "courses": ["Probability"]}
+    assert shown["moved"] == moved
 
 
 @pytest.mark.parametrize("studied", [False, True])

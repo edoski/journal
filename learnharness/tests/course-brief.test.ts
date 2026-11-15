@@ -377,7 +377,7 @@ describe("the daily plan of every course", () => {
 
 	it("says a day he was told moved, from which day and what of his study moved it, so the tutor never names it in silence", () => {
 		const moved = courseMap("/study/linalg", "Linear Algebra", null, [
-			topic("eigen", "Eigenvalues", { review: scheduled("2026-11-11", { exam: null, since: "2026-11-09" }), moved: { from: "2026-11-10", by: "study", courses: ["Probability"] } }),
+			topic("eigen", "Eigenvalues", { review: scheduled("2026-11-11", { exam: null, since: "2026-11-09" }), moved: { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const } }),
 			topic("projection", "Projection", { level: "new", starts: "2026-11-12", moved: { from: "2026-11-11", by: "missed" } }),
 		]);
 		const days = [day("2026-11-11", ["eigen"]), { date: "2026-11-12", reviews: [], new: ["projection" as TopicHandle] }];

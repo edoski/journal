@@ -234,7 +234,7 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 
 /** What of his study moved a day he was told (`TopicMoved`). */
 const MOVED_BY = {
-	study: (courses: readonly string[]) => ` after your ${listWords(courses)} study today`,
+	study: (courses: readonly string[], day: "today" | "yesterday") => ` after your ${listWords(courses)} study ${day}`,
 	missed: ", no study yesterday",
 	left: ", yesterday's plan was not finished",
 } as const;
@@ -246,7 +246,7 @@ const MOVED_BY = {
  *  never a day he was told, so nothing moved "from" it (round 8: "Moved
  *  from 11 Nov" named a day he never heard). */
 export function movedWords(review: CourseMapTopic["review"], today: string, told?: TopicMoved): string | null {
-	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses) : MOVED_BY[told.by]}`;
+	if (told) return `Moved from ${shortDay(told.from)}${told.by === "study" ? MOVED_BY.study(told.courses, told.day) : MOVED_BY[told.by]}`;
 	if (review?.kind !== "scheduled" || !review.held) return null;
 	return review.held.since < today ? `Due since ${shortDay(review.held.since)}` : null;
 }

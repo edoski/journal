@@ -156,7 +156,7 @@ describe("calendar entries", () => {
 			"Linear Algebra",
 			{
 				topics: [
-					topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"] } }),
+					topic("eigen", { title: "Eigenvalues", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const } }),
 					topic("projection", { title: "Projection", level: "new", starts: "2026-11-12", moved: { from: "2026-11-11", by: "missed" } }),
 				],
 			},

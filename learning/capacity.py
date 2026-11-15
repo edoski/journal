@@ -597,8 +597,15 @@ def estimate(
 
 
 def of(records: Iterable[dict[str, Any]], today: date) -> Capacity:
+    """His week as today began: today's work counts once the day is over,
+    and until then moves only the topics it touched (``agenda.plan``)."""
     records = list(records)
-    return estimate(activity(records, today), today, exam_days(records))
+    return estimate(began(activity(records, today), today), today, exam_days(records))
+
+
+def began(days: Mapping[date, Done], today: date) -> dict[date, Done]:
+    """The days before ``today``: what his record showed as today began."""
+    return {day: done for day, done in days.items() if day < today}
 
 
 # --- the final review ---------------------------------------------------------

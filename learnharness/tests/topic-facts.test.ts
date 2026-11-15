@@ -343,7 +343,7 @@ describe("when a topic comes up", () => {
 	});
 
 	it("says from which told day a review or a start moved and what of his study moved it", () => {
-		const moved = topic("eigen", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"] } });
+		const moved = topic("eigen", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const } });
 		assert.equal(factsOf(moved).waits, "Moved from 10 Nov after your Probability study today");
 		const start = topic("projection", { starts: "2026-11-20", startsAfter: ["Probability"], moved: { from: "2026-11-14", by: "left" } });
 		assert.equal(factsOf(start).starts?.waits, "Moved from 14 Nov, yesterday's plan was not finished");
