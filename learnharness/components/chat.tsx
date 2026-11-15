@@ -82,7 +82,7 @@ import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
-import { forgetRescue, keepRescue, overtakenDraft, type LeftOpen } from "@/components/lesson/stranded-draft";
+import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
 import { carryBox, carryWords, forgetClosedBoxes, keepForNewLesson, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
@@ -609,6 +609,13 @@ export function Chat({
 		const before = prevDockRef.current;
 		prevDockRef.current = dock;
 		if (before.key === dockKey) return;
+		// A rescue dies with its own question: an untouched one leaves the
+		// box once the question after it closes (stranded-draft.ts).
+		const cleared = boxAfterClose(chatId, textRef.current, before.key);
+		if (cleared !== null) {
+			applyText(cleared);
+			setOvertaken((was) => (was === "answered" ? null : was));
+		}
 		const live = liveDraftRef.current;
 		liveDraftRef.current = null;
 		if (dockKey !== null) setOvertaken((was) => (was === "answered" ? was : null));
@@ -620,8 +627,8 @@ export function Chat({
 			if (dockKey === null) setOvertaken(moved.why);
 			return;
 		}
-		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${moved.words}` : moved.words);
-		keepRescue(chatId, moved.words);
+		applyText(rescuedBox(chatId, textRef.current, moved.words));
+		keepRescue(chatId, moved.words, before.key);
 		setOvertaken("answered");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
