@@ -167,11 +167,9 @@ function startServer(port) {
 	return new Promise((resolve, reject) => {
 		const child = spawn(
 			process.execPath,
-			// Only the macOS backend needs this: Next's native title setter
-			// otherwise checks this Node-mode process in as a foreground app.
-			process.platform === "darwin"
-				? ["--require", path.join(process.resourcesPath, "server-title-guard.cjs"), serverEntry()]
-				: [serverEntry()],
+			// Next's native title setter otherwise checks this Node-mode
+			// process in as a foreground app.
+			["--require", path.join(process.resourcesPath, "server-title-guard.cjs"), serverEntry()],
 			{
 				cwd: path.dirname(serverEntry()),
 				env: {
@@ -233,18 +231,8 @@ function createWindow(url) {
 		// (band 0–59.5, pill box 19–39.5) — y 22.5 lands the circles at
 		// 29.25, exactly on the pill. Wordmark gutter: components/sidebar.tsx.
 		// Dragging comes from the renderer's .lh-drag bands (app/globals.css).
-		...(process.platform === "darwin"
-			? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 22.5 } }
-			: {
-				titleBarStyle: "hidden",
-				// Native min/max/close on the right, at the OS's compact default
-				// height. Do not force the zoom-invariant native overlay to match
-				// the renderer's 60 CSS px bar: zooming out would cover its border.
-				// The renderer reserves the actual width via env(titlebar-area-*).
-				titleBarOverlay: { color: "#141414", symbolColor: "#e5e5e5" },
-				// Keep the custom bar alone; Alt reveals the native menu.
-				autoHideMenuBar: true,
-			}),
+		titleBarStyle: "hiddenInset",
+		trafficLightPosition: { x: 16, y: 22.5 },
 		webPreferences: {
 			contextIsolation: true,
 			sandbox: true,
@@ -408,10 +396,9 @@ function installMenu() {
 }
 
 async function main() {
-	app.on("window-all-closed", () => {
-		// macOS convention: the app stays resident, reactivated from the Dock.
-		if (process.platform !== "darwin") app.quit();
-	});
+	// macOS convention: the app stays resident, reactivated from the Dock.
+	// Without a listener Electron quits when the last window closes.
+	app.on("window-all-closed", () => {});
 
 	// The child must not outlive us — cover every quit path.
 	app.on("before-quit", killServer);

@@ -17,10 +17,10 @@ const mainRequire = createRequire(mainFile);
 const guardSource = readFileSync(path.join(root, "electron/server-title-guard.cjs"), "utf8");
 const backendEnv = { ELECTRON_RUN_AS_NODE: "1", LH_DESKTOP_SERVER: "1" };
 
-function titleFixture(platform = "darwin", env: Record<string, string> = backendEnv) {
+function titleFixture(env: Record<string, string> = backendEnv) {
 	const nativeWrites: unknown[] = [];
 	let nativeReads = 0;
-	const process = { platform, env } as { platform: string; env: Record<string, string>; title: unknown };
+	const process = { env } as { env: Record<string, string>; title: unknown };
 	Object.defineProperty(process, "title", {
 		configurable: true, enumerable: true,
 		get() { nativeReads++; return "initial native title"; },
@@ -31,7 +31,7 @@ function titleFixture(platform = "darwin", env: Record<string, string> = backend
 	return { process, nativeWrites, original, nativeReads: () => nativeReads };
 }
 
-describe("macOS backend process.title guard", () => {
+describe("backend process.title guard", () => {
 	it("reads the initial title once, then isolates strict-mode writes from the native setter", () => {
 		const fixture = titleFixture();
 		assert.equal(fixture.nativeReads(), 1);
@@ -74,15 +74,13 @@ describe("macOS backend process.title guard", () => {
 		assert.equal(fixture.nativeReads(), 1);
 	});
 
-	for (const [label, platform, env] of [
-		["Windows", "win32", backendEnv],
-		["Linux", "linux", backendEnv],
-		["full-Electron browser helper", "darwin", {}],
-		["non-backend Node child", "darwin", { ELECTRON_RUN_AS_NODE: "1" }],
-		["non-Node-mode process", "darwin", { LH_DESKTOP_SERVER: "1" }],
+	for (const [label, env] of [
+		["full-Electron browser helper", {}],
+		["non-backend Node child", { ELECTRON_RUN_AS_NODE: "1" }],
+		["non-Node-mode process", { LH_DESKTOP_SERVER: "1" }],
 	] as const) {
 		it(`leaves the original property untouched for ${label}`, () => {
-			const fixture = titleFixture(platform, env);
+			const fixture = titleFixture(env);
 			assert.deepEqual(Object.getOwnPropertyDescriptor(fixture.process, "title"), fixture.original);
 			assert.equal(fixture.nativeReads(), 0);
 			assert.deepEqual(fixture.nativeWrites, []);
@@ -90,7 +88,7 @@ describe("macOS backend process.title guard", () => {
 	}
 });
 
-async function serverLaunch(platform: string) {
+async function serverLaunch() {
 	let launch!: { binary: string; args: string[]; options: { cwd: string; env: Record<string, string>; stdio: string[] } };
 	const child = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter() });
 	const context = {
@@ -102,7 +100,7 @@ async function serverLaunch(platform: string) {
 				return child;
 			},
 		} : mainRequire(id),
-		process: { platform, argv: [], env: { FIXTURE: "kept" }, on() {}, execPath: "/fixture/LearnHarness", resourcesPath: "/fixture/resources with spaces" },
+		process: { argv: [], env: { FIXTURE: "kept" }, on() {}, execPath: "/fixture/LearnHarness", resourcesPath: "/fixture/resources with spaces" },
 		__dirname: path.dirname(mainFile),
 	};
 	runInNewContext(mainSource, context, { filename: mainFile });
@@ -111,46 +109,38 @@ async function serverLaunch(platform: string) {
 }
 
 describe("backend-only preload wiring and packaging", () => {
-	for (const platform of ["darwin", "win32", "linux"]) {
-		it(`${platform} uses the real server launch with the intended argument order`, async () => {
-			const launch = await serverLaunch(platform);
-			const entry = path.join("/fixture/resources with spaces", "server", "standalone", "server.js");
-			assert.equal(launch.binary, "/fixture/LearnHarness");
-			assert.deepEqual(launch.args, platform === "darwin"
-				? ["--require", path.join("/fixture/resources with spaces", "server-title-guard.cjs"), entry]
-				: [entry]);
-			assert.equal(launch.options.cwd, path.dirname(entry));
-			assert.equal(launch.options.env.NODE_OPTIONS, undefined, "do not add NODE_OPTIONS to the child environment");
-			assert.equal(launch.options.env.ELECTRON_RUN_AS_NODE, "1");
-			assert.equal(launch.options.env.LH_DESKTOP_SERVER, "1");
-			assert.equal(launch.options.env.LH_DATA_DIR, path.join("/fixture/user-data", "data"));
-			assert.equal(launch.options.env.LH_AUTH_FILE, undefined, "no API-key store reaches the server");
-			assert.equal(launch.options.env.PORT, "54321");
-			assert.equal(launch.options.env.HOSTNAME, "127.0.0.1");
-			assert.equal(launch.options.env.FIXTURE, "kept");
-			assert.deepEqual(launch.options.stdio, ["ignore", "pipe", "pipe"]);
-		});
-	}
+	it("uses the real server launch with the intended argument order", async () => {
+		const launch = await serverLaunch();
+		const entry = path.join("/fixture/resources with spaces", "server", "standalone", "server.js");
+		assert.equal(launch.binary, "/fixture/LearnHarness");
+		assert.deepEqual(launch.args, ["--require", path.join("/fixture/resources with spaces", "server-title-guard.cjs"), entry]);
+		assert.equal(launch.options.cwd, path.dirname(entry));
+		assert.equal(launch.options.env.NODE_OPTIONS, undefined, "do not add NODE_OPTIONS to the child environment");
+		assert.equal(launch.options.env.ELECTRON_RUN_AS_NODE, "1");
+		assert.equal(launch.options.env.LH_DESKTOP_SERVER, "1");
+		assert.equal(launch.options.env.LH_DATA_DIR, path.join("/fixture/user-data", "data"));
+		assert.equal(launch.options.env.LH_AUTH_FILE, undefined, "no API-key store reaches the server");
+		assert.equal(launch.options.env.PORT, "54321");
+		assert.equal(launch.options.env.HOSTNAME, "127.0.0.1");
+		assert.equal(launch.options.env.FIXTURE, "kept");
+		assert.deepEqual(launch.options.stdio, ["ignore", "pipe", "pipe"]);
+	});
 
-	it("electron-builder copies the guard outside ASAR only on macOS, retaining shared resources", async () => {
+	it("electron-builder copies the guard outside ASAR, retaining shared resources", async () => {
 		const yaml = require("js-yaml");
 		const config = yaml.load(readFileSync(path.join(root, "electron-builder.yml"), "utf8"));
 		const { getFileMatchers, copyFiles } = require("app-builder-lib/out/fileMatcher.js");
 		const destination = mkdtempSync(path.join(tmpdir(), "lh-title-resource-"));
 		try {
-			for (const platform of ["mac", "win", "linux"]) {
-				const matchers = getFileMatchers(config, "extraResources", destination, {
-					defaultSrc: root, customBuildOptions: config[platform], macroExpander: (value: string) => value,
-					globalOutDir: path.join(root, "dist"),
-				});
-				assert.ok(matchers.some((matcher: { to: string }) => matcher.to === path.join(destination, "server")), "shared standalone payload remains included");
-				const guards = matchers.filter((matcher: { to: string }) => matcher.to === path.join(destination, "server-title-guard.cjs"));
-				assert.equal(guards.length, platform === "mac" ? 1 : 0);
-				if (platform === "mac") {
-					await copyFiles(guards, null, false);
-					assert.equal(readFileSync(path.join(destination, "server-title-guard.cjs"), "utf8"), guardSource);
-				}
-			}
+			const matchers = getFileMatchers(config, "extraResources", destination, {
+				defaultSrc: root, customBuildOptions: config.mac, macroExpander: (value: string) => value,
+				globalOutDir: path.join(root, "dist"),
+			});
+			assert.ok(matchers.some((matcher: { to: string }) => matcher.to === path.join(destination, "server")), "shared standalone payload remains included");
+			const guards = matchers.filter((matcher: { to: string }) => matcher.to === path.join(destination, "server-title-guard.cjs"));
+			assert.equal(guards.length, 1);
+			await copyFiles(guards, null, false);
+			assert.equal(readFileSync(path.join(destination, "server-title-guard.cjs"), "utf8"), guardSource);
 		} finally {
 			rmSync(destination, { recursive: true, force: true });
 		}

@@ -4,7 +4,6 @@ import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
-import { Readable } from "node:stream";
 import { describe, it } from "node:test";
 import { setImmediate as turn } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -18,17 +17,13 @@ const requireMain = createRequire(mainFile);
 function helperFixture(connected = true, channel = true) {
 	let allowAppReady!: () => void;
 	const appReady = new Promise<void>((resolve) => { allowAppReady = resolve; });
-	const state = { quits: 0, exits: [] as number[], windows: 0, stdinReads: 0, switches: [] as string[][] };
+	const state = { quits: 0, exits: [] as number[], windows: 0, switches: [] as string[][] };
 	const logs: string[] = [];
 	const errors: string[] = [];
-	// Match Electron 44's Windows override, not a native pipe.
-	const stdin = new Readable({ read() {} });
-	stdin.push(null);
 	const process = Object.assign(new EventEmitter(), {
-		platform: "win32", argv: ["electron", "--browser-service"], env: {},
+		argv: ["electron", "--browser-service"], env: {},
 		connected, channel: channel ? {} : undefined,
 	});
-	Object.defineProperty(process, "stdin", { get() { state.stdinReads++; return stdin; } });
 	const app = {
 		setName() {}, whenReady: () => appReady,
 		commandLine: { appendSwitch(...args: string[]) { state.switches.push(args); } },
@@ -44,18 +39,15 @@ function helperFixture(connected = true, channel = true) {
 		console: { log: (line: string) => logs.push(line), error: (...parts: unknown[]) => errors.push(parts.join(" ")) },
 	}, { filename: mainFile });
 	return {
-		state, logs, errors, stdin, process, allowAppReady,
+		state, logs, errors, process, allowAppReady,
 		disconnect() { process.connected = false; process.emit("disconnect"); },
 	};
 }
 
 describe("browser-service IPC-owned lifetime", () => {
-	it("ignores synthetic Windows stdin EOF while IPC remains connected", async () => {
+	it("stays up while IPC remains connected and quits on disconnect", async () => {
 		const helper = helperFixture();
-		helper.stdin.resume();
 		await turn();
-		assert.equal(helper.stdin.readableEnded, true);
-		assert.equal(helper.state.stdinReads, 0);
 		assert.equal(helper.state.quits, 0);
 		helper.allowAppReady();
 		await turn();
@@ -91,7 +83,6 @@ describe("browser-service IPC-owned lifetime", () => {
 			assert.match(helper.errors.join("\n"), /requires connected parent IPC/);
 			assert.equal(helper.state.windows, 0);
 			assert.deepEqual(helper.state.switches, []);
-			assert.equal(helper.state.stdinReads, 0);
 			assert.equal(helper.process.listenerCount("disconnect"), 0);
 		}
 	});

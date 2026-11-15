@@ -35,12 +35,12 @@ export const courseMapLedgers: CourseMapLedgers = {
 		const all = readAll();
 		all[workspace] = ledger;
 		fs.mkdirSync(path.dirname(FILE()), { recursive: true });
-		writeFileAtomicSync(FILE(), JSON.stringify(all, null, "\t"), { allowInPlaceFallback: true });
+		writeFileAtomicSync(FILE(), JSON.stringify(all, null, "\t"));
 	},
 	forget(workspace) {
 		const all = readAll();
 		if (!(workspace in all)) return;
 		delete all[workspace];
-		writeFileAtomicSync(FILE(), JSON.stringify(all, null, "\t"), { allowInPlaceFallback: true });
+		writeFileAtomicSync(FILE(), JSON.stringify(all, null, "\t"));
 	},
 };

@@ -1,7 +1,5 @@
 /**
- * Store rename failures (#403), plus the explicit Windows compatibility
- * policy for previously in-place vs previously atomic writers.
- * For each store, the save is made to fail at the rename:
+ * Store rename failures (#403). For each store, the save is made to fail at the rename:
  * the save must throw and the file on disk must be exactly what it was,
  * with no temp file left. Stores that write in place would never reach
  * the rename, so their saves would succeed and this test would fail. Runs
@@ -21,7 +19,6 @@ const config = await import("../config.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { jobStore } = await import("../src/store/jobs.ts");
 const { writeSettings } = await import("../src/store/settings.ts");
-const { writeFileAtomicSync } = await import("../src/store/atomic-write.ts");
 
 after(() => fs.rmSync(TMP_DATA, { recursive: true, force: true }));
 
@@ -58,50 +55,4 @@ describe("failed saves leave the old file whole", () => {
 			() => writeSettings({ version: 1, appearance: { mode: "light" } }),
 			() => writeSettings({ version: 1, appearance: { mode: "dark" } }));
 	});
-});
-
-describe("Windows sharing violations: per-writer compatibility policy (modeled)", () => {
-	const cases: { name: string; fallback: boolean; prepare: () => { file?: string; save: () => unknown } }[] = [
-		{ name: "chat", fallback: true, prepare: () => {
-			const { id } = chatStore.createChat("compatibility");
-			return { file: path.join(config.PATHS.chats, `${id}.json`), save: () => chatStore.renameChat(id, "saved") };
-		} },
-		{ name: "job create", fallback: true, prepare: () => ({ save: () => jobStore.createJob({ kind: "research", chatId: "chat_policy", toolCallId: "tc_new" }) }) },
-		{ name: "job update", fallback: true, prepare: () => {
-			const { id } = jobStore.createJob({ kind: "research", chatId: "chat_policy", toolCallId: "tc_update" });
-			return { file: path.join(config.PATHS.data, "jobs", `${id}.json`), save: () => jobStore.updateJob(id, { status: "done" }) };
-		} },
-		{ name: "settings", fallback: true, prepare: () => ({ file: config.SETTINGS_FILE, save: () => writeSettings({ version: 1, appearance: { mode: "light" } }) }) },
-		{ name: "a writer without the fallback", fallback: false, prepare: () => {
-			const file = path.join(config.PATHS.data, "no-fallback.json");
-			writeFileAtomicSync(file, "{}");
-			return { file, save: () => writeFileAtomicSync(file, '{"saved":true}') };
-		} },
-	];
-	for (const { name, fallback, prepare } of cases) {
-		it(`${name}: ${fallback ? "retains" : "does not acquire"} in-place fallback`, (t) => {
-			const { file, save } = prepare();
-			const before = file ? snapshot(file) : null;
-			const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
-			Object.defineProperty(process, "platform", { value: "win32" });
-			t.after(() => Object.defineProperty(process, "platform", platform));
-			let attempted: string | undefined;
-			const rename = t.mock.method(fs, "renameSync", (...[_tmp, target]: Parameters<typeof fs.renameSync>) => {
-				attempted = String(target);
-				throw Object.assign(new Error("modeled sharing violation"), { code: "EACCES" });
-			});
-			const warn = t.mock.method(console, "warn", () => {});
-			if (fallback) {
-				assert.doesNotThrow(save);
-				assert.ok(attempted && snapshot(attempted) !== null, "the save reached the active file");
-				assert.equal(warn.mock.callCount(), 1);
-			} else {
-				assert.throws(save, { code: "EACCES" });
-				assert.equal(snapshot(file!), before, "the existing record is untouched");
-				assert.equal(warn.mock.callCount(), 0);
-			}
-			assert.ok(rename.mock.callCount() > 1, "the sharing violation was retried");
-			assert.deepEqual(fs.readdirSync(path.dirname(attempted!)).filter((name) => name.includes(".tmp-")), []);
-		});
-	}
 });

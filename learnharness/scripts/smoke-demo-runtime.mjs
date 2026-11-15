@@ -22,8 +22,7 @@ export function probeEnv(env, home) {
 		!["NODE_OPTIONS", "NODE_PATH", "LH_DEV_URL", "ELECTRON_RUN_AS_NODE"].includes(key)));
 	return {
 		...clean,
-		HOME: home, USERPROFILE: home,
-		APPDATA: path.join(home, "config"), LOCALAPPDATA: path.join(home, "local"),
+		HOME: home,
 		XDG_CONFIG_HOME: path.join(home, "config"), XDG_CACHE_HOME: path.join(home, "cache"),
 		LH_DATA_DIR: path.join(home, "data"),
 		NODE_ENV: "production",
@@ -146,8 +145,6 @@ async function browserProbe(puppeteer) {
 	const helper = spawn(process.execPath, [
 		"--browser-service", `--user-data-dir=${path.join(home, "browser-profile")}`,
 		"--disable-background-networking", "--disable-component-update", "--no-proxy-server",
-		// Hosted Linux runners disallow Chromium's unprivileged sandbox.
-		...(process.platform === "linux" ? ["--no-sandbox"] : []),
 	], { cwd: home, env, stdio: ["ignore", "pipe", "pipe", "ipc"] });
 	let output = "";
 	let errors = "";

@@ -32,7 +32,7 @@ describe("offline native Pi Google initialization gate", () => {
 	it("rejects an otherwise complete SDK outside the payload (no host fallback)", () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), "lh-provider-escape-"));
 		try {
-			fs.symlinkSync(path.join(checkout, "node_modules"), path.join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+			fs.symlinkSync(path.join(checkout, "node_modules"), path.join(root, "node_modules"), "dir");
 			const result = run(root);
 			assert.equal(result.status, 1);
 			assert.match(String(result.stderr), /dependency escaped standalone payload/);

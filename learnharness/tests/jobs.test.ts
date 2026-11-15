@@ -712,7 +712,6 @@ describe("pdf runner (sources v0)", () => {
 	let home: string;
 	let homeAlias: string;
 	const originalHome = process.env.HOME;
-	const originalUserProfile = process.env.USERPROFILE;
 
 	before(() => {
 		home = fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-job-home-"));
@@ -722,16 +721,13 @@ describe("pdf runner (sources v0)", () => {
 		// Exercise a genuine alias even when the outer test HOME/TMPDIR are
 		// canonical. Callers need not canonicalize their environment first.
 		homeAlias = `${home}-alias`;
-		fs.symlinkSync(home, homeAlias, process.platform === "win32" ? "junction" : "dir");
+		fs.symlinkSync(home, homeAlias, "dir");
 		process.env.HOME = homeAlias;
-		process.env.USERPROFILE = homeAlias;
 	});
 
 	after(() => {
 		if (originalHome === undefined) delete process.env.HOME;
 		else process.env.HOME = originalHome;
-		if (originalUserProfile === undefined) delete process.env.USERPROFILE;
-		else process.env.USERPROFILE = originalUserProfile;
 		fs.unlinkSync(homeAlias);
 		fs.rmSync(home, { recursive: true, force: true });
 	});

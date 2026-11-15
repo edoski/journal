@@ -15,7 +15,7 @@ const mainRequire = createRequire(mainFile);
 /** Decline the single-instance lock so normal boot never spawns a server.
  * Then call the REAL createWindow with a stub Electron API and inspect its
  * constructor options. No rewritten copy of the production logic. */
-function windowOptions(platform: string, env: Record<string, string> = {}) {
+function windowOptions(env: Record<string, string> = {}) {
 	class FakeWindow {
 		constructor(readonly options: unknown) {}
 		webContents = { on() {}, setWindowOpenHandler() {} };
@@ -29,7 +29,7 @@ function windowOptions(platform: string, env: Record<string, string> = {}) {
 	};
 	const context = {
 		require: (id: string) => id === "electron" ? electron : mainRequire(id),
-		process: { platform, argv: [], env, on() {} },
+		process: { argv: [], env, on() {} },
 		__dirname: dirname(mainFile),
 	};
 	runInNewContext(mainSource, context, { filename: mainFile });
@@ -39,32 +39,18 @@ function windowOptions(platform: string, env: Record<string, string> = {}) {
 }
 
 describe("desktop window chrome", () => {
-	it("macOS keeps the proven traffic lights and does not enable WCO", () => {
-		const options = windowOptions("darwin");
+	it("keeps the proven traffic lights in a sandboxed window", () => {
+		const options = windowOptions();
 		assert.equal(options.titleBarStyle, "hiddenInset");
 		assert.deepEqual(options.trafficLightPosition, { x: 16, y: 22.5 });
-		assert.equal(options.titleBarOverlay, undefined);
-		assert.equal(options.autoHideMenuBar, undefined);
+		assert.equal(options.webPreferences.contextIsolation, true);
+		assert.equal(options.webPreferences.sandbox, true);
+		assert.equal(options.webPreferences.nodeIntegration, false);
 	});
 
-	for (const platform of ["win32", "linux"]) {
-		it(`${platform} uses native-height right-side controls with an Alt-accessible menu`, () => {
-			const options = windowOptions(platform);
-			assert.equal(options.titleBarStyle, "hidden");
-			assert.deepEqual(options.titleBarOverlay, { color: "#141414", symbolColor: "#e5e5e5" });
-			assert.equal(Object.hasOwn(options.titleBarOverlay, "height"), false, "omit height so the OS selects its native default");
-			assert.equal(options.trafficLightPosition, undefined);
-			assert.equal(options.autoHideMenuBar, true);
-			assert.equal(options.webPreferences.contextIsolation, true);
-			assert.equal(options.webPreferences.sandbox, true);
-			assert.equal(options.webPreferences.nodeIntegration, false);
-		});
-	}
-
-	it("preload exposes OS identity without exposing Node/Electron to the renderer", () => {
+	it("preload exposes its small API without exposing Node/Electron to the renderer", () => {
 		let bridge: Record<string, unknown> = {};
 		const context = {
-			process: { platform: "win32" },
 			require: () => ({
 				contextBridge: {
 					exposeInMainWorld(name: string, api: Record<string, unknown>) {
@@ -76,9 +62,8 @@ describe("desktop window chrome", () => {
 			}),
 		};
 		runInNewContext(readFileSync(new URL("../electron/preload.cjs", import.meta.url), "utf8"), context);
-		assert.equal(bridge.platform, "win32");
 		assert.deepEqual(Object.keys(bridge).sort(), [
-			"expandWindow", "getZoom", "onResume", "onZoom", "pickFolder", "platform",
+			"expandWindow", "getZoom", "onResume", "onZoom", "pickFolder",
 		]);
 	});
 });
@@ -92,25 +77,12 @@ describe("desktop packaging policy", () => {
 		await validateConfiguration(config, { isEnabled: false });
 	});
 
-	it("ships Mac arm64, Windows NSIS x64, and both Linux x64 channels", () => {
+	it("ships only the Mac arm64 dmg", () => {
 		assert.deepEqual(config.mac.target, [
 			{ target: "dmg", arch: ["arm64"] },
 		]);
-		assert.deepEqual(config.win.target, [{ target: "nsis", arch: ["x64"] }]);
-		assert.equal(config.win.signExecutable, false);
-		assert.deepEqual(config.linux.target, [
-			{ target: "AppImage", arch: ["x64"] }, { target: "deb", arch: ["x64"] },
-		]);
-		assert.equal(config.linux.syncDesktopName, true);
+		for (const platform of ["win", "nsis", "linux"]) assert.equal(platform in config, false, platform);
 		assert.equal(config.publish, null, "no update feed: the fork ships no releases");
-	});
-
-	it("deb has public maintainer metadata and a matching desktop identity", () => {
-		const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-		assert.equal(pkg.author.name, "Amos Blomqvist");
-		assert.equal(pkg.author.email, "255718537+amosblomqvist@users.noreply.github.com");
-		assert.equal(pkg.homepage, "https://github.com/amosblomqvist/learnharness");
-		assert.equal(pkg.desktopName, "learnharness.desktop");
 	});
 });
 
@@ -140,7 +112,7 @@ describe("workflow action versions", () => {
 
 describe("journal CI standalone job", () => {
 	type Step = { run?: string; env?: Record<string, string> };
-	type Workflow = { jobs: Record<string, { steps: Step[]; strategy?: { matrix: { include: { os: string; platform: string }[] } } }> };
+	type Workflow = { jobs: Record<string, { steps: Step[]; "runs-on": string; strategy?: unknown }> };
 	const yaml = require("js-yaml") as { load(source: string): Workflow };
 	const job = yaml.load(readFileSync(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8")).jobs.standalone;
 
@@ -150,7 +122,8 @@ describe("journal CI standalone job", () => {
 		assert.ok(native?.run?.startsWith("npx electron --import tsx --test "));
 		assert.equal(native?.env?.ELECTRON_RUN_AS_NODE, "1");
 		assert.ok(job.steps.some(step => step.run === "node scripts/smoke-server.mjs --electron"));
-		assert.equal(job.strategy?.matrix.include.find(entry => entry.platform === "mac-arm64")?.os, "macos-15");
+		assert.equal(job["runs-on"], "macos-15");
+		assert.equal(job.strategy, undefined, "one Mac leg, no platform matrix");
 	});
 });
 

@@ -7,7 +7,6 @@
 		"email": "255718537+amosblomqvist@users.noreply.github.com"
 	},
 	"homepage": "https://github.com/amosblomqvist/learnharness",
-	"desktopName": "learnharness.desktop",
 	"description": "An agent harness for learning: adaptive teaching and practice on a persistent course record.",
 	"type": "module",
 	"private": true,

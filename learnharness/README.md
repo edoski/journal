@@ -46,12 +46,8 @@ Future teaching sessions can read the graph instead of starting from scratch. Pr
 **[Download from learnharness.ai](https://learnharness.ai)** · [GitHub Releases](https://github.com/amosblomqvist/learnharness/releases)
 
 - **macOS (Apple Silicon):** signed and notarized DMG. Drag the app to Applications.
-- **Windows (x64):** run the installer. It is currently unsigned; Windows may show an “unknown publisher” or SmartScreen warning.
-- **Linux (x64):** make the AppImage executable and open it, or install the Debian/Ubuntu `.deb`.
 
 Add your provider API key and choose your models, then start a session with what you want to understand. LearnHarness supports 30+ provider options, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. With a Claude subscription model, the research assistant searches the web through Claude Code. With other providers, it reads pages it can name without searching.
-
-All three platforms support in-app updates.
 
 ## Your keys, your data
 

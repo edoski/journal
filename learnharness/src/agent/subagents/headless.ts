@@ -12,8 +12,8 @@ import { standardFontsDir } from "./pdf-ops";
  * SVGs use resvg (browser fallback); PDFs use pdfjs + Skia (no browser).
  * No extra Chromium is shipped or downloaded.
  *
- * Chrome fallback resolution: CHROME_PATH first, then common macOS,
- * Windows and Linux install paths. `available()` is a cheap executable
+ * Chrome fallback resolution: CHROME_PATH first, then the common macOS
+ * install paths. `available()` is a cheap executable
  * check; the helper must still prove it can launch/connect at job time.
  *
  * Test seam: `headlessOverride.current` replaces the whole API (tests inject
@@ -80,18 +80,9 @@ export function getHeadless(): HeadlessApi {
 // ─── Chrome resolution ───────────────────────────────────────────────────────
 
 const CHROME_CANDIDATES = [
-	...(process.platform === "win32" ? [
-		path.join(process.env.PROGRAMFILES ?? "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
-		path.join(process.env["PROGRAMFILES(X86)"] ?? "C:\\Program Files (x86)", "Google", "Chrome", "Application", "chrome.exe"),
-		...(process.env.LOCALAPPDATA ? [path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe")] : []),
-	] : []),
 	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 	"/Applications/Chromium.app/Contents/MacOS/Chromium",
 	"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-	"/usr/bin/google-chrome",
-	"/usr/bin/google-chrome-stable",
-	"/usr/bin/chromium",
-	"/usr/bin/chromium-browser",
 ];
 
 export function resolveChromeExecutablePath(): string | null {

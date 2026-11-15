@@ -11,25 +11,22 @@ const { makeIgnoreFn } = require("next/dist/build/collect-build-traces");
 const patterns = nextConfig.outputFileTracingExcludes!["*"];
 
 describe("standalone JavaScript tracing exclusions and native workaround policy", () => {
-	for (const windows of [false, true]) {
-		const root = windows ? "C:\\build\\learnharness" : "/build/learnharness";
-		const file = (relative: string) => root + (windows ? "\\" : "/") + (windows ? relative.replaceAll("/", "\\") : relative);
-		const ignored = picomatch(patterns, { contains: true, dot: true, windows });
-		it(`excludes genuine data directories and secrets (${windows ? "Windows" : "POSIX"})`, () => {
-			for (const relative of ["data/canary.json", "nested/data/private.json", "auth.json", ".env", ".env.local", "chatgpt-credentials.json", "chatgpt-credentials.json.fixture.tmp"]) {
-				assert.equal(ignored(file(relative)), true, relative);
-			}
-			// The explicit includes remain necessary: this raw ignore still matches SDK data.
-			assert.equal(ignored(file("node_modules/@earendil-works/pi-ai/dist/providers/data/models.json")), true);
-			assert.ok(nextConfig.outputFileTracingIncludes!["*"]!.includes("node_modules/@earendil-works/pi-ai/dist/providers/data/**/*"));
-		});
-		it(`does not confuse dependency suffixes with data directories (${windows ? "Windows" : "POSIX"})`, () => {
-			for (const relative of ["node_modules/gcp-metadata/build/src/index.js", "node_modules/form-data/lib/form_data.js", "node_modules/@swc/helpers/_/_ts_metadata.js", "node_modules/@swc/helpers/_/_ts_metadata/index.js", "node_modules/somedata/runtime.js"]) {
-				assert.equal(ignored(file(relative)), false, relative);
-				assert.equal(picomatch("data/**/*", { contains: true, dot: true, windows })(file("node_modules/gcp-metadata/build/src/index.js")), true, "old pattern must reproduce the bug");
-			}
-		});
-	}
+	const file = (relative: string) => `/build/learnharness/${relative}`;
+	const ignored = picomatch(patterns, { contains: true, dot: true });
+	it("excludes genuine data directories and secrets", () => {
+		for (const relative of ["data/canary.json", "nested/data/private.json", "auth.json", ".env", ".env.local", "chatgpt-credentials.json", "chatgpt-credentials.json.fixture.tmp"]) {
+			assert.equal(ignored(file(relative)), true, relative);
+		}
+		// The explicit includes remain necessary: this raw ignore still matches SDK data.
+		assert.equal(ignored(file("node_modules/@earendil-works/pi-ai/dist/providers/data/models.json")), true);
+		assert.ok(nextConfig.outputFileTracingIncludes!["*"]!.includes("node_modules/@earendil-works/pi-ai/dist/providers/data/**/*"));
+	});
+	it("does not confuse dependency suffixes with data directories", () => {
+		for (const relative of ["node_modules/gcp-metadata/build/src/index.js", "node_modules/form-data/lib/form_data.js", "node_modules/@swc/helpers/_/_ts_metadata.js", "node_modules/@swc/helpers/_/_ts_metadata/index.js", "node_modules/somedata/runtime.js"]) {
+			assert.equal(ignored(file(relative)), false, relative);
+			assert.equal(picomatch("data/**/*", { contains: true, dot: true })(file("node_modules/gcp-metadata/build/src/index.js")), true, "old pattern must reproduce the bug");
+		}
+	});
 	it("uses the installed Next JavaScript early-ignore function on the host platform", () => {
 		const root = process.cwd();
 		const ignore = makeIgnoreFn(root, patterns);
