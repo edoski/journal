@@ -3,18 +3,17 @@
 import { useSyncExternalStore } from "react";
 import { onPolishChange, polishVariant, type PolishGroup } from "@/components/dev/polish-variant.js";
 
-/** Home's candidates (Edo's notes, 15 Nov 2026, N1; spec:
- *  components/study-home/study-home.md, "Width"): both widen Home to the
- *  course page's frame; `exam` gives each course's first Today row its
- *  exam day, `standing` gives a row on one topic where he stands on it. */
-export const HOME_OPTIONS = ["exam", "standing"] as const;
-export type HomeVariant = "current" | (typeof HOME_OPTIONS)[number];
-/** What production builds draw until Edo picks a candidate. */
+/** Home's Proposed (Edo's notes, 15 Nov 2026, N1; spec:
+ *  components/study-home/study-home.md, "Width"): Home as wide as the
+ *  course page's frame, each Today row on one topic saying where he stands
+ *  on it. He picked it over the exam day the same day. */
+export type HomeVariant = "current" | "proposed";
+/** What production builds draw until Edo ships Proposed. */
 const HOME_SHIPPED: HomeVariant = "current";
 
 /** The switch registry, which the Logbook's in-app guide switches (dev
  *  only). Read only through the hooks below. */
-export const POLISH_GROUPS: readonly PolishGroup[] = [{ id: "home", label: "Home", options: HOME_OPTIONS }];
+export const POLISH_GROUPS: readonly PolishGroup[] = [{ id: "home", label: "Home" }];
 
 const DEV = process.env.NODE_ENV === "development";
 const subscribeNever = () => () => {};
@@ -31,8 +30,7 @@ function subscribeSwitch(onChange: () => void): () => void {
 }
 const readShipped = (): HomeVariant => HOME_SHIPPED;
 function readHome(): HomeVariant {
-	const value = polishVariant("home");
-	return HOME_OPTIONS.find((option) => option === value) ?? "current";
+	return polishVariant("home") === "proposed" ? "proposed" : "current";
 }
 
 /** Which Home draws. Production builds draw the shipped one. */
