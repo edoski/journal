@@ -102,7 +102,7 @@ describe("Now", () => {
 	it("says since when a review the plan holds past its due day is due, as the sidebar says it, never Nothing due (round 4) or Nothing planned today (round 8, 1 D11)", () => {
 		const held = topic("binomial", { title: "Binomial distribution", level: "assisted", introduced: "2026-11-05", review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-06" } } });
 		const { now, scheduled } = pickupSections(factsOf(held));
-		assert.equal(now.words, "Due since 6 Nov");
+		assert.equal(now.words, "Due since 6 Nov, back 10 Nov", "with the day the plan brings it back, as the sidebar says it");
 		const today = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-08" } } });
 		assert.equal(pickupSections(factsOf(today)).now.words, "Due today");
 		assert.equal(scheduled?.kind, "review");
