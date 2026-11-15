@@ -83,8 +83,8 @@ function Roadmap({ onJump = () => {} }: { onJump?: (id: string) => void }) {
 describe("the lesson's top bar", () => {
 	it("names no phase and holds no details menu: the crumbs, the roadmap and Done for today", async () => {
 		await mount(<LessonTopBar title="Eigenvalues" course="Linear Algebra" courseHref="/unit/la" topic={{ title: "Spectra of 2×2 maps", href: "/unit/la/eigen" }} roadmap={<Roadmap />} tonight={<DoneTonightButton onDone={() => {}} />} />);
-		assert.equal(document.querySelector('[data-testid="phase-chip"]'), null);
-		assert.equal(document.querySelector('[data-testid="session-details"]'), null);
+		assert.ok(document.querySelector('[data-testid="phase-chip"]') === null);
+		assert.ok(document.querySelector('[data-testid="session-details"]') === null);
 		assert.equal(element('[data-testid="course-label"]').getAttribute("href"), "/unit/la");
 		assert.equal(element('[data-testid="topic-label"]').getAttribute("href"), "/unit/la/eigen");
 		assert.ok(element('[data-testid="roadmap"]'));
@@ -116,7 +116,7 @@ describe("where the lesson is", () => {
 		assert.match(element('[data-testid="roadmap-step-maps"]').textContent!, /Done$/);
 		assert.match(element('[data-testid="roadmap-step-equation"]').textContent!, /Now$/);
 		assert.match(element('[data-testid="roadmap-step-compute"]').textContent!, /Next$/);
-		assert.equal(element('[data-testid="roadmap-step-compute"]').querySelector("button"), null);
+		assert.ok(element('[data-testid="roadmap-step-compute"]').querySelector("button") === null);
 		await click(element('[data-testid="roadmap-step-maps"] button'));
 		assert.deepEqual(jumped, ["maps"]);
 		assert.equal(panel.isConnected && document.querySelector('[data-testid="roadmap-panel"]') !== null, false, "the panel closes on the jump");
@@ -139,7 +139,7 @@ describe("where the lesson is", () => {
 	it("⌘K opens the steps with focus on Now, not the first done step (round 8)", async () => {
 		await mount(<Roadmap />);
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
-		assert.equal(document.activeElement, element('[data-testid="roadmap-step-equation"] button'));
+		assert.ok(document.activeElement === element('[data-testid="roadmap-step-equation"] button'));
 	});
 
 	it("arrows walk the panel's taught steps and links, Home and End jump to its ends", async () => {
@@ -150,17 +150,17 @@ describe("where the lesson is", () => {
 		await act(async () => stops[0]!.focus());
 		const key = async (k: string) => press(document.activeElement ?? panel, "keydown", { key: k });
 		await key("ArrowDown");
-		assert.equal(document.activeElement, stops[1], "down to the next taught step");
+		assert.ok(document.activeElement === stops[1], "down to the next taught step");
 		await key("ArrowDown");
-		assert.equal(document.activeElement, stops[2], "past the step not taught yet, to the topic's page");
+		assert.ok(document.activeElement === stops[2], "past the step not taught yet, to the topic's page");
 		await key("ArrowUp");
-		assert.equal(document.activeElement, stops[1]);
+		assert.ok(document.activeElement === stops[1]);
 		await key("End");
-		assert.equal(document.activeElement, stops[3]);
+		assert.ok(document.activeElement === stops[3]);
 		await key("ArrowDown");
-		assert.equal(document.activeElement, stops[3], "the last stays put");
+		assert.ok(document.activeElement === stops[3], "the last stays put");
 		await key("Home");
-		assert.equal(document.activeElement, stops[0]);
+		assert.ok(document.activeElement === stops[0]);
 	});
 
 	it("Esc closes the panel without reaching the turn, and ⌘K opens it", async () => {
@@ -168,12 +168,12 @@ describe("where the lesson is", () => {
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
 		assert.ok(element('[data-testid="roadmap-panel"]'));
 		assert.equal(await escapeReachesWindow(), false);
-		assert.equal(document.querySelector('[data-testid="roadmap-panel"]'), null);
+		assert.ok(document.querySelector('[data-testid="roadmap-panel"]') === null);
 	});
 
 	it("draws nothing for a lesson with no plan", async () => {
 		await mount(<LessonRoadmap steps={[]} open={false} onOpenChange={() => {}} onJump={() => {}} />);
-		assert.equal(document.querySelector('[data-testid="roadmap"]'), null);
+		assert.ok(document.querySelector('[data-testid="roadmap"]') === null);
 	});
 
 	it("⌘K in a lesson with no plan opens the way up, with no strip drawn", async () => {
@@ -183,10 +183,10 @@ describe("where the lesson is", () => {
 			return <LessonRoadmap steps={[]} place={PLACE} course={COURSE} open={open} onOpenChange={setOpen} onJump={() => {}} />;
 		}
 		await mount(<NoPlan />);
-		assert.equal(document.querySelector('[data-testid="roadmap"]'), null, "no strip without a plan");
+		assert.ok(document.querySelector('[data-testid="roadmap"]') === null, "no strip without a plan");
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
 		assert.match(element('[data-testid="roadmap-topic"]').getAttribute("href")!, /^\/unit\/[^/]+\/eigen$/);
 		assert.match(element('[data-testid="roadmap-course"]').getAttribute("href")!, /^\/unit\/[^/]+$/);
-		assert.equal(document.querySelector('[data-slot="roadmap-steps"]'), null);
+		assert.ok(document.querySelector('[data-slot="roadmap-steps"]') === null);
 	});
 });

@@ -242,13 +242,13 @@ describe("a topic not started", () => {
 		assert.ok(document.querySelector('[data-slot="topic-panes"] [data-slot="topic-builds-map"]'), "the map column");
 		const alone = topicFacts({ course: { ...COURSE, map }, topic: topic("vectors-2", { level: "new" }), chats: [], read: null });
 		assert.equal(alone.buildsMap, null);
-		assert.equal(page(alone).querySelector('[data-slot="topic-builds-map"]'), null, "a topic that builds on nothing takes the width");
+		assert.ok(page(alone).querySelector('[data-slot="topic-builds-map"]') === null, "a topic that builds on nothing takes the width");
 	});
 
 	it("says none of it once a session or the engine has started it", () => {
 		const taught = topicFacts({ course: { ...COURSE, map }, topic: { ...POISSON, level: "introduced", introduced: TODAY }, chats: [], read: { record, plans: [] } });
 		assert.equal(pickupSections(taught).why, null);
-		assert.equal(page(taught).querySelector('[data-slot="topic-builds-map"]'), null);
+		assert.ok(page(taught).querySelector('[data-slot="topic-builds-map"]') === null);
 	});
 });
 
@@ -284,7 +284,7 @@ describe("the sections drawn", () => {
 	it("draws every row of the action table as Now, the session it opens as a link and every other press as a button, with no button in the head", () => {
 		for (const [name, facts] of ROWS) {
 			const document = page(facts);
-			assert.equal(document.querySelector('[data-testid="topic-action"]'), null, `${name}: no head button`);
+			assert.ok(document.querySelector('[data-testid="topic-action"]') === null, `${name}: no head button`);
 			const now = document.querySelector('[data-slot="pickup-now"]')!;
 			assert.equal(now.getAttribute("data-action"), facts.action.kind, name);
 			const press = now.querySelector('[data-slot="pickup-now-press"]')!;
@@ -298,7 +298,7 @@ describe("the sections drawn", () => {
 		assert.deepEqual(pickupSections(held).scheduled, { kind: "review", day: "Thu 3 Dec", waits: "Due since 1 Oct, waits for your Probability exam" });
 		const line = page(held).querySelector('[data-slot="pickup-scheduled"]')!;
 		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Due since 1 Oct, waits for your Probability exam");
-		assert.equal(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]'), null);
+		assert.ok(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]') === null);
 	});
 
 	it("keeps the lesson Now opens on the map, its map button pressed, Now itself a plain row with no fill", () => {

@@ -42,11 +42,11 @@ test("a long shelf offers Show the rest, and one press shows every row", async (
 	assert.equal(more()!.textContent, "Show the rest");
 	await act(async () => more()!.click());
 	assert.equal(rows(), 60);
-	assert.equal(more(), null);
+	assert.ok(more() === null);
 });
 
 test("a shelf that fits shows no more row", async () => {
 	await mount(10);
 	assert.equal(rows(), 10);
-	assert.equal(more(), null);
+	assert.ok(more() === null);
 });

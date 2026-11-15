@@ -150,7 +150,7 @@ describe("the topic page", () => {
 		assert.equal(topicFacts({ course: LINALG_ARCS, topic: vectors, chats: [], read: null }).arc?.share, 1, "Vectors and Linear independence are both his own");
 		const plain = render(<TopicHead facts={topicFacts({ course: LINALG, topic: rank, chats: [], read: null })} />);
 		assert.equal(topicFacts({ course: LINALG, topic: rank, chats: [], read: null }).arc, null);
-		assert.equal(plain.querySelector('[data-slot="arc-pill"]'), null);
+		assert.ok(plain.querySelector('[data-slot="arc-pill"]') === null);
 	});
 
 	it("says why a topic not started comes when it does, under its planned first lesson", () => {

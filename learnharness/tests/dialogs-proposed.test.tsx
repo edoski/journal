@@ -96,7 +96,7 @@ describe("dialogs keep their actions", () => {
 		assert.equal(name?.textContent, "Rank practice");
 		const dialog = $('[data-testid="delete-session-dialog"]')!.textContent ?? "";
 		assert.doesNotMatch(dialog, /graph|extraction|background job|session/i);
-		assert.equal($('[data-testid="delete-traces-checkbox"]'), null);
+		assert.ok($('[data-testid="delete-traces-checkbox"]') === null);
 		assert.match($('[data-testid="delete-failure"]')?.textContent ?? "", /^The tutor is still working in this lesson\. Delete it once that ends\. Try again$/);
 	});
 });

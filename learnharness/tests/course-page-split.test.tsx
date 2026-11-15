@@ -146,7 +146,7 @@ describe("the list's groups and rows", () => {
 				["On your own", "BUTTON", "false"],
 			],
 		);
-		assert.equal(document.querySelector(`[href="${unitHref(WS, "vectors")}"]`), null, "a folded group's rows are not drawn");
+		assert.ok(document.querySelector(`[href="${unitHref(WS, "vectors")}"]`) === null, "a folded group's rows are not drawn");
 	});
 
 	it("marks the row of the topic he points at on the map, and only that row", () => {
@@ -182,7 +182,7 @@ describe("the map pane", () => {
 		const document = drawMap(litOf(pointed, MAP.edges), revealOf(pointed));
 		const glowing = [...document.querySelectorAll('[data-slot="course-map-node"].lh-card-mark')].map((n) => n.getAttribute("data-testid"));
 		assert.deepEqual(glowing, ["map-node-span"]);
-		assert.equal(drawMap().querySelector(".lh-card-mark"), null, "nothing glows at rest");
+		assert.ok(drawMap().querySelector(".lh-card-mark") === null, "nothing glows at rest");
 	});
 });
 

@@ -62,7 +62,7 @@ describe("photo answers in the composer and the transcript", () => {
 	it("a multiple-choice question offers no photo", () => {
 		const d = composer({ kind: "question", key: "k", tool: "ask_user_question", toolCallId: "a1", input: { question: "Pick one", options: [{ label: "A" }, { label: "B" }] } });
 		assert.ok(send(d), "the composer is drawn");
-		assert.equal(d.querySelector('[data-testid="photo-attach"]'), null);
+		assert.ok(d.querySelector('[data-testid="photo-attach"]') === null);
 	});
 
 	it("his answer and his work show the sent photo, which opens large in a lesson", () => {

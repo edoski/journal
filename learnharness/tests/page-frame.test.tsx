@@ -53,8 +53,8 @@ describe("the page frame", () => {
 
 	it("leaves out what a page does not give, and makes the press a button without an href", () => {
 		const document = render(<PageHead title="Probability" actions={<PageAction disabled>Review</PageAction>} />);
-		assert.equal(document.querySelector('[data-slot="page-standing"]'), null);
-		assert.equal(document.querySelector('[data-slot="page-lead"]'), null);
+		assert.ok(document.querySelector('[data-slot="page-standing"]') === null);
+		assert.ok(document.querySelector('[data-slot="page-lead"]') === null);
 		const press = document.querySelector('[data-slot="page-actions"] button')!;
 		assert.ok(press.hasAttribute("disabled"));
 	});

@@ -23,6 +23,6 @@ describe("the linked columns", () => {
 		assert.match(root.getAttribute("class")!, /gap-6/);
 		assert.doesNotMatch(root.getAttribute("class")!, /border|rounded|bg-/, "no frame and no fill");
 		assert.deepEqual([...root.children].map((column) => column.firstElementChild!.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
-		assert.equal(root.querySelector("svg"), null, "no line between a row and its card");
+		assert.ok(root.querySelector("svg") === null, "no line between a row and its card");
 	});
 });

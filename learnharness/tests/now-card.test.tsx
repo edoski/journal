@@ -62,7 +62,7 @@ describe("NowCard", () => {
 		assert.equal(link.getAttribute("data-sidebar-row"), "chat:chat_eigen");
 		assert.equal(link.getAttribute("aria-current"), "page");
 		assert.match(link.textContent ?? "", /No course.*Your turn.*Eigenvalues lesson/);
-		assert.equal(doc.querySelector('[data-slot="row-action"]'), null);
+		assert.ok(doc.querySelector('[data-slot="row-action"]') === null);
 	});
 
 	it("draws a course line with no topic to lead with as its course's card, under Home's name, taking up the work as Home's line does, with Home's action", () => {

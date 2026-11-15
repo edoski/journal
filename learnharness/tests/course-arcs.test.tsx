@@ -154,12 +154,12 @@ describe("the list's arc lines", () => {
 		const document = draw({});
 		for (const header of document.querySelectorAll('[data-slot="course-arc-header"]')) {
 			const status = header.querySelector('[data-slot="course-arc-state"]')!;
-			assert.equal(header.lastElementChild, status, "nothing follows the status in its line");
+			assert.ok(header.lastElementChild === status, "nothing follows the status in its line");
 			assert.match(header.className, /flex-1/, "the line reaches the column's right edge");
 			assert.match(status.className, /shrink-0/);
 		}
 		const check = document.querySelector('[data-slot="course-arc-check"]')!;
-		assert.equal(check.closest('[data-slot="course-arc-header"]'), null, "Check it is not in the line's flow");
+		assert.ok(check.closest('[data-slot="course-arc-header"]') === null, "Check it is not in the line's flow");
 		assert.match(check.className, /\babsolute\b/);
 		assert.match(check.className, /opacity-0/, "folded, it shows only on hover or keyboard focus");
 		assert.match(check.className, /group-hover\/sidebar-row:opacity-100/);
@@ -213,7 +213,7 @@ describe("the course head", () => {
 		const pill = standing.firstElementChild!.querySelector('[data-slot="arc-pill"]')!;
 		assert.ok(pill, "the arc is a pill, never text beside the facts");
 		assert.equal(pill.getAttribute("href"), `${courseHref(ARCS.map.workspace)}?arc=systems`, "it shows that arc on the page");
-		for (const c of [noArcs, oneArc]) assert.equal(render(<CourseHead view={viewOf(c)} standing={null} busy={false} onContinue={noop} />).querySelector('[data-slot="course-arc-here"]'), null);
+		for (const c of [noArcs, oneArc]) assert.ok(render(<CourseHead view={viewOf(c)} standing={null} busy={false} onContinue={noop} />).querySelector('[data-slot="course-arc-here"]') === null);
 	});
 });
 
@@ -267,7 +267,7 @@ describe("the arc pill", () => {
 		assert.match(linked!.className, /rounded-full/);
 		assert.ok(linked!.querySelector("svg"), "its ring");
 		assert.equal(plain!.tagName, "SPAN");
-		assert.equal(plain!.querySelector("svg"), null, "no ring for an arc with no topic live");
+		assert.ok(plain!.querySelector("svg") === null, "no ring for an arc with no topic live");
 	});
 });
 
@@ -314,7 +314,7 @@ describe("what next, above the arcs", () => {
 		const document = render(<WhatNextRows next={whatNext(named)} course={named} busy={false} onContinue={noop} />);
 		const then = document.querySelector('[data-slot="what-next-then"]')!;
 		assert.match(text(then), /Next in Eigenvalues/);
-		assert.equal(then.querySelector('[data-slot="arc-pill"]'), null);
+		assert.ok(then.querySelector('[data-slot="arc-pill"]') === null);
 	});
 
 	it("says Then goes back to an earlier arc once a lesson moved You are here past it, so the head's arc and Then never disagree (round 6)", () => {
@@ -332,7 +332,7 @@ describe("what next, above the arcs", () => {
 		assert.equal(next.then?.why, "Back to Linear systems");
 		const then = render(<WhatNextRows next={next} course={ahead} busy={false} onContinue={noop} />).querySelector('[data-slot="what-next-then"]')!;
 		assert.doesNotMatch(text(then), /Next in/);
-		assert.equal(then.querySelector('[data-slot="arc-pill"]'), null, "the words name the arc");
+		assert.ok(then.querySelector('[data-slot="arc-pill"]') === null, "the words name the arc");
 	});
 
 	it("says nothing for a course without arcs, or with nothing to pick up and nothing planned", () => {
@@ -340,7 +340,7 @@ describe("what next, above the arcs", () => {
 		const quiet: StudyCourse = { ...ARCS, map: { ...ARCS.map, topics: ARCS.map.topics.map((t) => ({ ...t, review: null, weak: false, tasks: [] })), tasks: [], focus: null }, due: [], unready: [] };
 		const next = whatNext(quiet);
 		assert.ok(next === null || next.then === null, "no planned start, no Then row");
-		assert.equal(render(<WhatNextRows next={null} course={ARCS} busy={false} onContinue={noop} />).querySelector('[data-slot="what-next"]'), null);
+		assert.ok(render(<WhatNextRows next={null} course={ARCS} busy={false} onContinue={noop} />).querySelector('[data-slot="what-next"]') === null);
 	});
 });
 
@@ -378,7 +378,7 @@ describe("a map of one arc", () => {
 		assert.match(rank.parentElement!.getAttribute("style") ?? "", /opacity:\s*0?\.\d/);
 		const eigen = document.querySelector('[data-testid="map-node-eigen"]')!;
 		assert.equal(eigen.getAttribute("data-entry"), null);
-		assert.equal(eigen.querySelector('[data-slot="topic-from"]'), null);
+		assert.ok(eigen.querySelector('[data-slot="topic-from"]') === null);
 		assert.doesNotMatch(eigen.parentElement!.getAttribute("style") ?? "", /opacity/);
 	});
 
@@ -430,7 +430,7 @@ describe("Home's map", () => {
 
 	it("shows a course without arcs whole, with no strip", () => {
 		const document = home(PROB.map.workspace);
-		assert.equal(document.querySelector('[data-slot="arc-strip"]'), null);
+		assert.ok(document.querySelector('[data-slot="arc-strip"]') === null);
 		assert.equal(shown(document).querySelectorAll('[data-slot="course-map-node"]').length, PROB.map.topics.length);
 	});
 });

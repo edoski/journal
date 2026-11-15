@@ -119,7 +119,7 @@ describe("the exam's run-up", () => {
 
 	it("says nothing about readiness while the engine is read", async () => {
 		const panel = await opened(null);
-		assert.equal(panel.querySelector("[data-slot=course-exam-ready]"), null);
+		assert.ok(panel.querySelector("[data-slot=course-exam-ready]") === null);
 		assert.doesNotMatch(panel.textContent ?? "", /Every topic fits/);
 	});
 });

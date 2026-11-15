@@ -99,7 +99,7 @@ describe("a long title in a course row", () => {
 		room = 181;
 		const line = await mount("Product construction for $M_1 \\times M_2$");
 		assert.equal(line.box.textContent, "Product construction for…");
-		assert.equal(line.box.querySelector(".katex"), null, "no part of the formula is drawn");
+		assert.ok(line.box.querySelector(".katex") === null, "no part of the formula is drawn");
 		assert.ok(line.box.scrollWidth <= line.box.clientWidth, "nothing is left for the box's ellipsis to cut");
 		await line.unmount();
 	});

@@ -85,7 +85,7 @@ describe("course chip", () => {
 		await press(element('[data-testid="course-picker"]'), "pointerdown");
 		assert.ok(document.querySelector('[data-testid="course-menu"]'));
 		assert.equal(await escapeReachesWindow(), false, "Esc must not abort the turn underneath");
-		assert.equal(document.querySelector('[data-testid="course-menu"]'), null);
+		assert.ok(document.querySelector('[data-testid="course-menu"]') === null);
 	});
 });
 
@@ -147,7 +147,7 @@ describe("New course", () => {
 		const text = element('[data-testid="new-course-dialog"]').textContent ?? "";
 		for (const words of ["Title", "Exam day", "Not set yet", "Course material", "Add files", "Add a folder"]) assert.match(text, new RegExp(words));
 		assert.doesNotMatch(text, /Study root/);
-		assert.equal(document.querySelector('[data-testid="new-course-root"]'), null);
+		assert.ok(document.querySelector('[data-testid="new-course-root"]') === null);
 	});
 
 	it("sends the title, the picked exam day and every picked file under its folder path", async () => {
@@ -250,8 +250,8 @@ describe("course menu: rename and delete", () => {
 	it("has no Rename or Delete while no course is picked", async () => {
 		await mount(<CoursePicker courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} onManage={() => {}} />);
 		await press(element('[data-testid="course-picker"]'), "pointerdown");
-		assert.equal(document.querySelector('[data-testid="course-rename"]'), null);
-		assert.equal(document.querySelector('[data-testid="course-delete"]'), null);
+		assert.ok(document.querySelector('[data-testid="course-rename"]') === null);
+		assert.ok(document.querySelector('[data-testid="course-delete"]') === null);
 	});
 
 	it("Rename sends the new title for that course and reports it", async () => {
@@ -324,11 +324,11 @@ describe("Add material", () => {
 describe("course chip by keyboard", () => {
 	it("Command O opens the course menu, and a send blocked for want of a course opens it too", async () => {
 		await mount(<CoursePicker courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={0} />);
-		assert.equal(document.querySelector('[data-testid="course-menu"]'), null);
+		assert.ok(document.querySelector('[data-testid="course-menu"]') === null);
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent(kbdEventForAction("pick-course"))); });
 		assert.ok(document.querySelector('[data-testid="course-menu"]'), "the shortcut's event opens the menu");
 		await escapeReachesWindow();
-		assert.equal(document.querySelector('[data-testid="course-menu"]'), null);
+		assert.ok(document.querySelector('[data-testid="course-menu"]') === null);
 		await act(async () => { root!.render(<CoursePicker courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={1} />); });
 		assert.ok(document.querySelector('[data-testid="course-menu"]'), "a blocked send opens the menu");
 	});

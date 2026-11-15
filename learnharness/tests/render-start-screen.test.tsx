@@ -31,9 +31,9 @@ describe("the start screen", () => {
 
 	it("offers no Teach/Practice switch and no proposition picker: the tutor routes the request", () => {
 		const doc = screen();
-		assert.equal(doc.querySelector('[data-testid="home-mode-switch"]'), null);
-		assert.equal(doc.querySelector('[role="radiogroup"]'), null);
-		assert.equal(doc.querySelector('[data-testid="practice-props-chip"]'), null);
+		assert.ok(doc.querySelector('[data-testid="home-mode-switch"]') === null);
+		assert.ok(doc.querySelector('[role="radiogroup"]') === null);
+		assert.ok(doc.querySelector('[data-testid="practice-props-chip"]') === null);
 		assert.doesNotMatch(doc.body.textContent ?? "", /\bTeach\b|\bPractice\b/);
 	});
 

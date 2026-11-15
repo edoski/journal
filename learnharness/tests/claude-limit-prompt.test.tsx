@@ -74,7 +74,7 @@ test("with no account left, the prompt says so with the soonest reset and offers
 	install([status(EXHAUSTED, "Main", 0, true, RESET + 500), status("claude-subscription-work", "Work", 0, true, RESET)]);
 	let continued = false;
 	await mount(() => { continued = true; });
-	assert.equal(byTestid("claude-limit-continue"), null);
+	assert.ok(byTestid("claude-limit-continue") === null);
 	assert.equal(byTestid("claude-limit-none")?.textContent, `All Claude accounts are at their limit · the first resets ${claudeResetLabel(RESET)}`);
 	assert.equal(continued, false);
 });

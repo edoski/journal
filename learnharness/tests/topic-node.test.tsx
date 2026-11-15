@@ -81,7 +81,7 @@ describe("the card", () => {
 		assert.match(pie(topic({ level: "attempted" })).getAttribute("class")!, /size-4/);
 		assert.ok(pie(topic({ level: "retained" })).querySelector("circle[r='5']"), "full once he can do it on his own");
 		assert.ok(pie(topic()).querySelector('[data-part="outline"]:not([stroke-dasharray])'), "a solid outline, never a dashed spinner");
-		assert.equal(pie(topic()).querySelector("path, circle[r='5']"), null, "empty before he starts");
+		assert.ok(pie(topic()).querySelector("path, circle[r='5']") === null, "empty before he starts");
 		assert.match(pie(weak("attempted", { lapsed: true })).getAttribute("class")!, /text-warning/);
 	});
 

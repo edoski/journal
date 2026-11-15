@@ -28,7 +28,7 @@ describe("course picker", () => {
 	it("shows the picked course", () => {
 		const document = documentFor(<CourseControl choice={choice({ workspace: "/study/smm" })} />);
 		assert.equal(document.querySelector('[data-testid="course-picker"] span')!.textContent, "SMM");
-		assert.equal(document.querySelector('[data-testid="course-notice"]'), null);
+		assert.ok(document.querySelector('[data-testid="course-notice"]') === null);
 	});
 
 	it("an unavailable engine leaves no picker, and its line names the reason and the two settings", () => {
@@ -72,6 +72,6 @@ describe("course link banner", () => {
 	it("with the engine unavailable it shows the reason and no Link button", () => {
 		const document = documentFor(<CourseLinkBody choice={choice({ state: { status: "unavailable", reason: "plan failed" } })} busy={false} error={null} onLink={() => {}} />);
 		assert.ok(document.querySelector('[data-testid="courses-unavailable"]'));
-		assert.equal(document.querySelector('[data-testid="course-link"]'), null);
+		assert.ok(document.querySelector('[data-testid="course-link"]') === null);
 	});
 });

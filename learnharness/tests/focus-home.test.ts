@@ -15,7 +15,7 @@ test("while the tutor answers what he sent from a question or problem, his next 
 	// the message box, kept there unseen behind the next question until it
 	// surfaced later as a stray draft ("he o").
 	const doc = page('<form data-testid="composer"><textarea></textarea></form>');
-	assert.equal(focusHomeIn(doc, true), null);
+	assert.ok(focusHomeIn(doc, true) === null);
 	let focused = "";
 	const root = { querySelector: (selector: string) => (selector.includes("composer") ? { focus: () => { focused = "composer"; } } : null) } as unknown as ParentNode;
 	const body = { isConnected: true };

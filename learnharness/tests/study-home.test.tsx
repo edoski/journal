@@ -331,7 +331,7 @@ describe("Today", () => {
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|today)\?$/);
-		assert.equal(doc.querySelector('[data-slot="today-done"]'), null, "nothing says done before he finishes anything");
+		assert.ok(doc.querySelector('[data-slot="today-done"]') === null, "nothing says done before he finishes anything");
 	});
 
 	it("once he studied something today, asks what else and names what he did, never a count", () => {

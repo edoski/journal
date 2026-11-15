@@ -106,7 +106,7 @@ describe("background agents", () => {
 		assert.doesNotMatch(row?.textContent ?? "", /\d/, "no timer");
 		assert.equal(row?.getAttribute("aria-expanded"), "false");
 		assert.equal(doc.querySelector('[data-testid="activity-abort"]')?.getAttribute("aria-label"), "Stop: Looking things up for Eigenvalues and eigenvectors");
-		assert.equal(doc.querySelector('[data-testid="activity-blob-cost"]'), null, "no cost on the row's face");
-		assert.equal(doc.querySelector('[data-testid="activity-total-cost"]'), null, "no running total in the header");
+		assert.ok(doc.querySelector('[data-testid="activity-blob-cost"]') === null, "no cost on the row's face");
+		assert.ok(doc.querySelector('[data-testid="activity-total-cost"]') === null, "no running total in the header");
 	});
 });

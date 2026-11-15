@@ -46,8 +46,8 @@ describe("the sidebar's one row rule", () => {
 			const title = row.querySelector('[data-slot="unit-row-title"]')!;
 			assert.ok(classes(title).includes("line-clamp-2"), "two title lines at most");
 			const statusLine = row.querySelector('[data-slot="unit-status-slot"]')!;
-			assert.equal(statusLine.parentElement, row, "the status is a line of the row");
-			assert.equal(row.lastElementChild, statusLine, "the status is always the row's last line");
+			assert.ok(statusLine.parentElement === row, "the status is a line of the row");
+			assert.ok(row.lastElementChild === statusLine, "the status is always the row's last line");
 			assert.ok(classes(statusLine).includes("h-5"), "one 20px line, as a card's course line");
 			assert.ok(classes(row).includes("py-2") && classes(row).includes("flex-col"), "a card's padding, lines stacked");
 		}

@@ -59,7 +59,7 @@ describe("the course filter menu", () => {
 			[...document.querySelectorAll('[role="menuitemradio"]')].map((item) => item.textContent),
 			["All courses", "LALinear Algebra", "CICalculus I"],
 		);
-		assert.equal(document.querySelector('[data-slot="dropdown-menu-label"]'), null, "no second list under a label");
+		assert.ok(document.querySelector('[data-slot="dropdown-menu-label"]') === null, "no second list under a label");
 		const pages = [...document.querySelectorAll('[data-testid="course-scope-page"]')];
 		assert.deepEqual(
 			pages.map((link) => [link.tagName, link.getAttribute("href"), link.getAttribute("aria-label")]),
