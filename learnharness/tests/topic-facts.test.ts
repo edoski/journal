@@ -51,8 +51,8 @@ const TOPICS = {
 		signals: { ...QUIET, gap: "Treats pairwise non-parallel vectors as independent; misses a third vector in their span", mistake: true, confidentErrors: 1 },
 	}),
 	basis: topic("basis", { title: "Basis and dimension", level: "independent", introduced: "2026-10-20", review: due("2026-10-30", 9), tasks: ["sheet-4"] }),
-	matmul: topic("matmul", { title: "Matrix multiplication as composition", level: "independent", introduced: "2026-10-27", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, lapsed: true } }),
-	elimination: topic("elimination", { title: "Gaussian elimination", level: "assisted", introduced: "2026-10-20", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 } } }),
+	matmul: topic("matmul", { title: "Matrix multiplication as composition", level: "independent", introduced: "2026-10-27", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, lapsed: true, mistake: true } }),
+	elimination: topic("elimination", { title: "Gaussian elimination", level: "assisted", introduced: "2026-10-20", review: due("2026-11-06", 2), weak: true, signals: { ...QUIET, choiceErrors: { cramer: 1 }, mistake: true } }),
 	rank: topic("rank", {
 		title: "Rank and the column space",
 		level: "assisted",
@@ -62,12 +62,12 @@ const TOPICS = {
 		signals: { ...QUIET, gap: "Counts nonzero entries instead of pivots; confuses rank with the number of rows", mistake: true, stale: true },
 		tasks: ["sheet-4"],
 	}),
-	kernel: topic("kernel", { title: "Kernel and rank-nullity", level: "attempted", introduced: "2026-11-06", review: due("2026-11-07", 1), weak: true, signals: { ...QUIET, confidentErrors: 1 }, tasks: ["sheet-4"] }),
+	kernel: topic("kernel", { title: "Kernel and rank-nullity", level: "attempted", introduced: "2026-11-06", review: due("2026-11-07", 1), weak: true, signals: { ...QUIET, confidentErrors: 1, mistake: true }, tasks: ["sheet-4"] }),
 	determinant: topic("determinant", { title: "Determinants as volume scaling", level: "assisted", introduced: "2026-11-03", review: due("2026-11-04", 4) }),
 	cramer: topic("cramer", { title: "Cramer's rule", level: "introduced", introduced: "2026-11-05", review: due("2026-11-06", 2) }),
 	eigen: topic("eigen", { title: "Eigenvalues and eigenvectors" }),
-	riemann: topic("riemann-sums", { title: "Riemann sums", level: "retained", introduced: "2026-10-11", review: due("2026-11-08", 0), weak: true, signals: { ...QUIET, lapsed: true } }),
-	chain: topic("chain-rule", { title: "Chain rule", level: "retained", introduced: "2026-09-11", review: due("2026-10-09", 30), weak: true, signals: { ...QUIET, lapsed: true } }),
+	riemann: topic("riemann-sums", { title: "Riemann sums", level: "retained", introduced: "2026-10-11", review: due("2026-11-08", 0), weak: true, signals: { ...QUIET, lapsed: true, mistake: true } }),
+	chain: topic("chain-rule", { title: "Chain rule", level: "retained", introduced: "2026-09-11", review: due("2026-10-09", 30), weak: true, signals: { ...QUIET, lapsed: true, mistake: true } }),
 };
 const SHEET = { key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A", updated: null };
 const MAP: CourseMap = {

@@ -94,7 +94,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 		const [newest] = m.answers;
 		// The icon the sidebar and the map draw for the topic's slip, else this mistake's own.
 		const shared = slipMark(topic.signals, (h) => map.topics.find((t) => t.handle === h)?.title ?? h).key;
-		const slip: SlipKey = shared !== "repaired" && shared !== "none" ? shared : newest?.confident ? "confident" : newest?.chose ? "mixed" : m.gap ? "gap" : "lapsed";
+		const slip: SlipKey = shared !== "repaired" && shared !== "check" ? shared : newest?.confident ? "confident" : newest?.chose ? "mixed" : m.gap ? "gap" : "lapsed";
 		const section = arcs?.find((s) => s.arc.handle === topic.arc);
 		const said = newest ? [newest.on, newest.response && `You answered ${newest.response}`].filter((s): s is string => Boolean(s)) : [];
 		return [

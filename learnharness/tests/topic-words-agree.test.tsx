@@ -97,7 +97,7 @@ describe("a review of several topics, on the course page and the map", () => {
 
 describe("a slip, wherever it shows", () => {
 	it("keeps which slip it is, so it wears its own icon", () => {
-		const sure = topic("kernel", "Kernel and rank-nullity", "attempted", { weak: true, review: back("2026-11-12"), signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 1, repaired: false } });
+		const sure = topic("kernel", "Kernel and rank-nullity", "attempted", { weak: true, review: back("2026-11-12"), signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 1, repaired: false, mistake: true } });
 		const la: StudyCourse = { ...LINALG, map: { ...LINALG.map, topics: [...LINALG.map.topics.filter((t) => t.handle !== "kernel"), sure] } };
 		const fact = sidebarSays([la], CHATS, la.map.workspace).get("kernel" as TopicHandle)?.fact;
 		assert.deepEqual(fact, { kind: "slip", words: "Sure, but wrong", slip: "confident" });

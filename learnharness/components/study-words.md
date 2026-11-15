@@ -22,7 +22,7 @@ One form each, wherever it shows.
 
 | Reason | Words |
 |---|---|
-| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap` while a wrong answer is open, the engine's `mistake`, an alert); Check on your own (a `gap` with no wrong answer open, such as two right answers with help, a person with a check); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Look again (a magnifier). A repair made only with help (`repairedWithHelp`) is not "Fixed": it is Mistake to fix (Check on your own when no wrong answer is open), since the signals under it describe answers before that right one ("Not right last time" or "Sure, but wrong" would contradict it). |
+| a slip, the first signal that holds, each with its own icon (`slip-icons.ts`) | Fixed, check again later (`repaired` on his own, a check); with no wrong answer open (the engine's `mistake`, which any right answer closes, with help or not), Check on your own (a person with a check), whatever else the record says, since the signals below describe a wrong answer a right one has since answered (round 7: "Not right last time" after a right last try); else Not right last time (`lapsed`, a crossed circle; never "Missed", which beside an overdue review read as a review he skipped); Mistake to fix (`gap`, an alert); Mixed up with Cramer's rule (`choiceErrors`, the method's title, two arrows); Sure, but wrong (`confidentErrors`, a warning); else Mistake to fix. A repair made only with help (`repairedWithHelp`) is not "Fixed", since help may have carried it. |
 | a review come due | Due today, 3d overdue, 16d overdue (always days, round 4) |
 | a review dated ahead | Back in 5d, Back in 21d, Back in 60d |
 | unfinished work holds it | Left off today, Left off yesterday, Left off 3d ago, Left off 20d ago; Unfinished when no day is known. Never the tutor's step text. |
@@ -42,7 +42,7 @@ A topic often has more than one reason, and a row says one. Every surface takes 
 
 Both "left off" and "due" are true at once, and neither is wrong: a review due today is today's work, so it leads; a review the plan has moved to a later day is not, so the unfinished work leads until that day. A topic Home's Today takes up says Today's reason instead, wherever it shows (the sidebar's card, the course page's Needs you).
 
-Home's line names the lapsed topic when the line is about another one ("Not right last time: Chain rule", `lapsedOnWords`, `row-facts.ts`). An attempt's result in a topic's history (Right, Partly right, Not right: `ATTEMPT_WORDS`) is not a reason and keeps its own words.
+Home's line names the lapsed topic when the line is about another one ("Not right last time: Chain rule", `lapsedOnWords`, `row-facts.ts`), only while that topic's slip is a lapse (`lapsedNow`), as every line that names a lapse reads. An attempt's result in a topic's history (Right, Partly right, Not right: `ATTEMPT_WORDS`) is not a reason and keeps its own words.
 
 ## Arcs
 

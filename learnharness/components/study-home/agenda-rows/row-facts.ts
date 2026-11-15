@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
-import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
+import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -80,7 +80,7 @@ export interface Why {
 /** A review's reason from the engine's own fields: a lapse first (the
  *  topic it was), else how overdue the most overdue one is. Pure. */
 function reviewReason(due: readonly CourseMapTopic[]): Why | null {
-	const lapsed = due.find((t) => t.signals.lapsed);
+	const lapsed = due.find((t) => lapsedNow(t.signals));
 	if (lapsed) return { kind: "missed", short: lapsedOnWords(lapsed.title) };
 	const overdue = Math.max(-1, ...due.map((t) => (t.review?.kind === "due" ? t.review.overdue : -1)));
 	if (overdue < 0) return null;

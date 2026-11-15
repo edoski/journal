@@ -58,7 +58,6 @@ export const SLIP_WORDS = {
 	// "still to check on your own" (round 6), never a mistake he made.
 	check: "Check on your own",
 	confident: "Sure, but wrong",
-	none: "Look again",
 } as const;
 
 /** Which slip a topic shows: one per `SLIP_WORDS` entry, and a method
@@ -66,29 +65,36 @@ export const SLIP_WORDS = {
 export type SlipKey = keyof typeof SLIP_WORDS | "mixed";
 
 /** Why the engine calls a topic weak, its first signal: a mistake he has
- *  answered right on his own since, a miss after he had it, a diagnosed
- *  mistake, a method chosen in its place, a wrong answer he was sure of,
- *  else none of those. A repair made only with help is not shown fixed,
- *  since help may have carried it, and is still a mistake to fix: the
- *  signals under it describe answers before that right one, so "Not right
- *  last time" or "Sure, but wrong" would contradict it (round 5). A gap or
- *  a repair is a mistake only while a wrong answer is open (`mistake`);
- *  else it is what is left to check on his own (round 6). */
+ *  answered right on his own since; else, with no wrong answer open (the
+ *  engine's `mistake`, closed by any right answer), what is left to check
+ *  on his own; else a miss after he had it, a diagnosed mistake, a method
+ *  chosen in its place, a wrong answer he was sure of, else the mistake to
+ *  fix. The signals that describe a wrong answer show only while one is
+ *  open, so a right last try never reads "Not right last time" (round 7),
+ *  and a repair made only with help is not shown fixed, since help may
+ *  have carried it (round 5). */
 export function slipMark(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): { key: SlipKey; words: string } {
-	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp } = signals;
-	const toFix = signals.mistake ? ({ key: "gap", words: SLIP_WORDS.gap } as const) : ({ key: "check", words: SLIP_WORDS.check } as const);
-	if (repaired) return repairedWithHelp ? toFix : { key: "repaired", words: SLIP_WORDS.repaired };
+	const { gap, lapsed, choiceErrors, confidentErrors, repaired, repairedWithHelp, mistake } = signals;
+	if (repaired && !repairedWithHelp) return { key: "repaired", words: SLIP_WORDS.repaired };
+	if (!mistake) return { key: "check", words: SLIP_WORDS.check };
 	if (lapsed) return { key: "lapsed", words: SLIP_WORDS.lapsed };
-	if (gap) return toFix;
+	if (gap) return { key: "gap", words: SLIP_WORDS.gap };
 	const [method] = Object.keys(choiceErrors);
 	if (method) return { key: "mixed", words: `Mixed up with ${titleOf(method as TopicHandle)}` };
 	if (confidentErrors > 0) return { key: "confident", words: SLIP_WORDS.confident };
-	return { key: "none", words: SLIP_WORDS.none };
+	return { key: "gap", words: SLIP_WORDS.gap };
 }
 
 /** The slip's words alone (`slipMark`). */
 export function slipWords(signals: TopicSignals, titleOf: (handle: TopicHandle) => string): string {
 	return slipMark(signals, titleOf).words;
+}
+
+/** Whether a topic's slip is a lapse (`slipMark`), the one rule every
+ *  line that names a lapse reads, so none says "Not right last time" once
+ *  a right answer closed it (round 7). Pure. */
+export function lapsedNow(signals: TopicSignals): boolean {
+	return slipMark(signals, (handle) => handle).key === "lapsed";
 }
 
 /** A lapse on a line about another topic, naming the lapsed one: "Not

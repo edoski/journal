@@ -42,7 +42,7 @@ const MAP: StudyCourse["map"] = {
 	topics: [
 		topic("vectors", { title: "Vectors", level: "transferred", introduced: "2026-09-01", review: { kind: "scheduled", date: "2026-11-13" } }),
 		topic("span", { title: "Span", level: "assisted", introduced: "2026-09-05" }),
-		topic("independence", { title: "Linear independence", level: "assisted", introduced: "2026-09-10", weak: true, review: { kind: "due", date: "2026-11-01", overdue: 7 }, signals: { ...QUIET, confidentErrors: 1 } }),
+		topic("independence", { title: "Linear independence", level: "assisted", introduced: "2026-09-10", weak: true, review: { kind: "due", date: "2026-11-01", overdue: 7 }, signals: { ...QUIET, confidentErrors: 1, mistake: true } }),
 		topic("basis", { title: "Basis and dimension" }),
 		topic("eigen", { title: "Eigenvalues" }),
 	],

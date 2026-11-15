@@ -176,7 +176,7 @@ describe("the sections' order", () => {
 });
 
 describe("a topic not started", () => {
-	const KERNEL = topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-11-01", weak: true, signals: { ...QUIET, confidentErrors: 1 } });
+	const KERNEL = topic("kernel", { title: "Kernel", level: "attempted", introduced: "2026-11-01", weak: true, signals: { ...QUIET, confidentErrors: 1, mistake: true } });
 	const POISSON = topic("poisson", { title: "Poisson distribution", level: "new", starts: "2026-11-11" });
 	const map: CourseMap = {
 		...MAP,
