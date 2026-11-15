@@ -24,7 +24,7 @@ const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_auto]";
  *  your own, check another day"); the ends' column as wide as the reason's
  *  most (`WhyMark`'s 224), not each row's own words, so the standing starts
  *  at one edge down the list and its marks stack. */
-const COLUMNS_STANDING = "grid-cols-[1rem_minmax(0,1fr)_14rem_14rem]";
+const COLUMNS_STANDING = "grid-cols-[1rem_minmax(0,1fr)_15rem_14rem]";
 
 /** A standing fact: a 14px mark, as the reason's, then its words. */
 const FACT = "flex min-w-0 items-center gap-1.5 text-label text-muted-foreground";
