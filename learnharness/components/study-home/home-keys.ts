@@ -14,6 +14,8 @@ export interface HomeKeyHandlers {
 	enlarge: () => void;
 	/** Open the course page of the Today line with this key (`lineKey`). */
 	openCoursePage: (line: string) => void;
+	/** Open the course page of the course whose map shows. */
+	openShownCoursePage: () => void;
 }
 
 /** Today's lines on the page, top to bottom: each full row, then each
@@ -58,7 +60,8 @@ function focusedLine(): HTMLElement | null {
  * Home's keys, window-wide while Home is mounted: ← → move the map to the
  * neighbouring course, f presses its enlarge button (Edo's notes, 15 Nov
  * 2026, N2); ↑ ↓ walk only Today's lines, o opens the focused line as a
- * click does and c opens its course page (N3). Capture phase, so they run
+ * click does and c opens its course page (N3), or with no line focused
+ * the page of the course whose map shows (N4). Capture phase, so they run
  * before the page's arrows (`useSpatialArrows`); no key fires while he
  * types in a field, holds a modifier or has a dialog, menu or popover open.
  */
@@ -90,13 +93,13 @@ export function useHomeKeys(handlers: HomeKeyHandlers) {
 				return;
 			}
 			const line = focusedLine();
-			if (!line) return;
-			if (e.key === "o") {
+			if (e.key === "o" && line) {
 				e.preventDefault();
 				line.click();
 			} else if (e.key === "c") {
 				e.preventDefault();
-				on.openCoursePage(line.dataset.line!);
+				if (line) on.openCoursePage(line.dataset.line!);
+				else on.openShownCoursePage();
 			}
 		};
 		window.addEventListener("keydown", onKeyDown, { capture: true });

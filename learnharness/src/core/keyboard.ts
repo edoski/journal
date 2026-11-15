@@ -143,7 +143,7 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "home-map-enlarge", label: "Enlarge the map, and back", scope: "global", binding: "f", displayOnly: true, group: "home" },
 	{ id: "home-rows", label: "Move between Today's rows", scope: "global", binding: "arrows-ud", displayOnly: true, group: "home" },
 	{ id: "home-open", label: "Open the row", scope: "global", binding: "o", displayOnly: true, group: "home" },
-	{ id: "home-course-page", label: "Open the row's course page", scope: "global", binding: "c", displayOnly: true, group: "home" },
+	{ id: "home-course-page", label: "Open the row's course page, else the map's", scope: "global", binding: "c", displayOnly: true, group: "home" },
 ];
 
 const STORAGE_KEY = "lh:keymap";

@@ -65,7 +65,7 @@ describe("the cheat sheet groups them in plain words", () => {
 			["Enlarge the map, and back", "F"],
 			["Move between Today's rows", "↑ ↓"],
 			["Open the row", "O"],
-			["Open the row's course page", "C"],
+			["Open the row's course page, else the map's", "C"],
 		]);
 	});
 

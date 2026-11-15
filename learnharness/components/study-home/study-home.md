@@ -46,7 +46,7 @@ Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is moun
 | f | presses the map's enlarge button: the map takes Home, and f again brings it back (N2) |
 | ↑ ↓ | walk only Today's lines, the lessons Also today folds in included, never the tabs or the map above them: with nothing focused ↓ takes the first and ↑ the last, and at either end focus stays (N3) |
 | o | opens the focused line, as a click does (N3) |
-| c | opens the focused line's course page (N3) |
+| c | opens the focused line's course page (N3); with no line focused, the page of the course whose map shows (N4) |
 
 ## States
 

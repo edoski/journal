@@ -75,6 +75,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 			const course = rows.find((row) => lineKey(row) === line)?.course;
 			if (course) router.push(courseHref(course.map.workspace));
 		},
+		openShownCoursePage: () => router.push(courseHref(workspace)),
 	});
 
 	const onPoint = (row: TodayRow, by: "pointer" | "focus") => {
