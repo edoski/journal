@@ -8,7 +8,7 @@ Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps` and the start's
 
 | Pane | Its job | What it does not do |
 |---|---|---|
-| History | The topic's sessions and scored attempts in Now, Next, Scheduled and Earlier. A session row opens the lesson; the map button beside a lesson that planned puts its steps on the map | List a lesson's steps |
+| History | The topic's sessions and scored attempts in Now, Next, Scheduled and Earlier. A session row opens the lesson; pointing at a lesson that planned puts its steps on the map | List a lesson's steps |
 | Lesson map | Where the lesson on the map stands: the step it stopped on ringed, the steps asked about before dotted, the steps right after it marked Next. Every step opens the lesson | Date anything, or list the other lessons |
 
 ## Anatomy
@@ -28,7 +28,7 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 
 - Earlier restates Trail's line, by day: the attempts of no session it lists, then each session followed by the attempts it saved (`trailDays`), the 1px spine in the map's edge ink, attempts as plain entries: the result icon (`attemptMark`'s result) and the tutor's sentence, and under it, only when the answer was not his own plain work, how it counted in the answer card's words (With help), or Gave up, Prediction, not counted, Sure, but wrong, Mixed up with a method. "With a hint" told him nothing on 13 Nov, when nearly every lesson answer was saved helped; round 4 found a helped ✓ indistinguishable from an unaided one once the marks were true. Every row is one grid, the icon column, the text in its own column wrapping to two lines, and in Pick up's Earlier the date flush right in one column; an attempt's sentence and date share a baseline. No "Earlier" fold: the pane scrolls instead.
 - Bounded: `HistoryPane`: a plain scroller with no bar (`data-slot="topic-history"`), a flex column whose viewport shrinks to the pane. The pane reaches 12px past the column on each side (`-mx-3`) and its list pads them back (`px-3`), so a row's 12px bleed (`../row-classes.ts`, Home's row) keeps its rounded fill and the icon's inset inside the clip; the section labels stay on the head's edge, and the rows' icons sit past the shared gutter (`GUTTER`, `../pickup/pickup.md`). An edge fades 32px only while more of the history lies past it, so at rest the first day is never dimmed.
-- A session row (`data-slot="topic-history-session"`, link `data-testid="unit-page-session"`): kind icon, title, `WhyMark` ("Your turn", or the spinner), then for a lesson that planned the map button (`data-slot="topic-map-toggle"`, `WaypointsIcon`, the lesson page's Plan icon, `size="icon-inline"`, `aria-pressed`, hint "Show its steps on the map"). The lesson on the map has its row filled `bg-fill-selected` and its button in ink (`data-shown`).
+- A session row (`data-slot="topic-history-session"`, link `data-testid="unit-page-session"`): kind icon, title, `WhyMark` ("Your turn", or the spinner), and a lesson that planned puts its steps on the map when he points at it, by pointer or focus (`data-on-map="point"`), as Home's map follows the row he points at; Now's row does the same for its lesson. The lesson on the map has its row filled `bg-fill-selected` (`data-shown`). Round 10, 1 m8: a map button did this, a glyph with no words beside Resume and on every lesson row.
 
 ## Lesson map (`lesson-map.tsx`)
 

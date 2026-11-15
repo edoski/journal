@@ -120,15 +120,17 @@ describe("the hybrid page drawn", () => {
 		assert.equal(document.querySelector('[data-slot="topic-step-tag"]')!.textContent, "Next");
 	});
 
-	it("opens the shown lesson from Now and gives every earlier lesson that planned the button that puts it on the map", () => {
+	it("opens the shown lesson from Now, and shows a lesson that planned on the map when he points at it, with no unlabelled map button (round 10, 1 m8)", () => {
 		const document = page(factsOf(EIGEN, [EIGEN_LESSON, EIGEN_EARLIER], [EIGEN_PLAN, { ...DET_PLAN, id: "chat_eigen_before" }]));
 		const now = document.querySelector('[data-slot="pickup-now"]')!;
 		assert.equal(now.querySelector('[data-slot="pickup-now-press"]')!.getAttribute("href"), "/chat/chat_demo_eigen");
-		assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true");
+		assert.equal(now.getAttribute("data-shown"), "true");
+		assert.equal(document.querySelectorAll('[data-slot="topic-map-toggle"]').length, 0, "no glyph without words beside Resume or on a row");
 		const rows = [...document.querySelectorAll('[data-slot="topic-history-session"]')];
 		assert.deepEqual(
-			rows.map((row) => [row.querySelector("a")!.getAttribute("href"), row.getAttribute("data-shown"), row.querySelector('[data-slot="topic-map-toggle"]')?.getAttribute("aria-pressed")]),
-			[["/chat/chat_eigen_before", null, "false"]],
+			rows.map((row) => [row.querySelector("a")!.getAttribute("href"), row.getAttribute("data-shown"), row.getAttribute("data-on-map")]),
+			[["/chat/chat_eigen_before", null, "point"]],
+			"pointing at it puts its steps on the map",
 		);
 	});
 
