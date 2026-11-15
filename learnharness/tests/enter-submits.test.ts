@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
 import { describe, it } from "node:test";
-import { buttonKeepsNativeEnter } from "../components/enter-submits.ts";
+import { buttonKeepsNativeEnter, claimsEnter } from "../components/enter-submits.ts";
 import { blurAfterPointerClick } from "../components/focus-hygiene.ts";
 
 const { document } = parseHTML("<html><body></body></html>");
@@ -56,6 +56,28 @@ describe("buttonKeepsNativeEnter (the pointer/keyboard Enter split)", () => {
 		const b = buttonIn({});
 		assert.doesNotThrow(() => buttonKeepsNativeEnter(b));
 		assert.equal(buttonKeepsNativeEnter(b), false);
+	});
+});
+
+describe("claimsEnter (which Enter the open question or Try again takes)", () => {
+	const enter = (target: HTMLElement, mods: Partial<KeyboardEvent> = {}) => ({ key: "Enter", defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, target, ...mods }) as unknown as KeyboardEvent;
+	const keyboardFocused = (el: HTMLElement) => {
+		(el as unknown as { matches: (sel: string) => boolean }).matches = (sel: string) => sel === ":focus-visible";
+		return el;
+	};
+	it("a search result walked to with the arrows opens on Enter: the lesson never takes it (round 10, 4 minor 4)", () => {
+		const row = document.createElement("a");
+		row.setAttribute("href", "/chat/c1");
+		row.setAttribute("data-sidebar-row", "chat:c1");
+		document.body.appendChild(row);
+		assert.equal(claimsEnter(enter(keyboardFocused(row))), false);
+	});
+	it("a pointer-focused transcript button still sends: Enter is the lesson's", () => {
+		assert.equal(claimsEnter(enter(buttonIn({}))), true);
+	});
+	it("modified Enter and an Enter a surface already took are never claimed", () => {
+		assert.equal(claimsEnter(enter(buttonIn({}), { shiftKey: true })), false);
+		assert.equal(claimsEnter(enter(buttonIn({}), { defaultPrevented: true })), false);
 	});
 });
 
