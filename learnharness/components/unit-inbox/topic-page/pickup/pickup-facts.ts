@@ -3,6 +3,7 @@ import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionE
 import type { TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
+import { pausedWords } from "@/components/nav/session-state";
 import { FIRST_LESSON, TUTOR_WRITING, overdueWords, reviewWords, startsAfterWords } from "@/components/study-words";
 
 /**
@@ -111,7 +112,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				...base,
 				icon: action.kind === "open" ? "writing" : left ? "task" : "reply",
 				words: stoppedOn(entry) ?? action.chat.title,
-				note: action.kind === "open" ? TUTOR_WRITING : left ? leftWords(action.chat, facts.today) : "Your turn",
+				note: action.kind === "open" ? TUTOR_WRITING : left ? leftWords(action.chat, facts.today) : entry?.state === "paused" ? pausedWords(action.chat) : "Your turn",
 				chat: action.chat.id,
 			};
 		}
