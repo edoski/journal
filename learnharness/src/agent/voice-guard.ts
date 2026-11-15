@@ -202,7 +202,13 @@ const SAVED_AGAINST_WORDS: AgentToolResult<unknown> = {
 
 /** An ask for the reason of the answer beside it: "explain why…", "say how
  *  you got it", "justify it". */
-const REASON_ASK = /^(?:explain|say|justify|give|state)\b[^.?!]*\b(?:why|how|reason)\b|^(?:explain|justify) (?:it|this|that|your)\b/i;
+const REASON_ASK = /^(?:explain|say|justify|give|state)\b[^.?!]*\b(?:why|how|reason)\b|^(?:explain|justify) (?:it|this|that|your)\b|^why\b/i;
+
+/** Words under a question that ask for his reason or his working ("Say
+ *  why.", "Justify your answer.", "Show how you get it."): the reason
+ *  belongs in the question, as ", and why?" (round 10: told only "no
+ *  advice", the rewrite asked it as a second clause and was refused again). */
+const REASON_UNDER = /\b(?:why|reasons?|justify|explain|show how|how you (?:got|get)|accounts? for)\b/i;
 
 const quoted = (text: string) => `"${text.length > 160 ? `${text.slice(0, 157)}…` : text}"`;
 
@@ -256,7 +262,9 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 		case "displays":
 			return `Too many displays for ${kind ? KIND_WORDS[kind] : "one turn"} (${b.excerpt}).`;
 		case "advice":
-			return `A question is its own words with nothing under them: no advice on how to answer it, ${quoted(b.excerpt)}.`;
+			return REASON_UNDER.test(b.excerpt)
+				? `A question is its own words with nothing under them: ${quoted(b.excerpt)}. To ask for his reason, end the question itself with ", and why?".`
+				: `A question is its own words with nothing under them: no advice on how to answer it, ${quoted(b.excerpt)}.`;
 		case "repeat":
 			if (b.excerpt.startsWith("display ")) return `He has already seen ${b.excerpt.slice("display ".length)} earlier in the session, and what he was told is said once: build on it with a new case, never show or explain it again.`;
 			if (b.excerpt.startsWith("point ")) return `He was already told this earlier in the session, and a point is made once: ${b.excerpt.slice("point ".length)}. Leave it out; say only what is new.`;

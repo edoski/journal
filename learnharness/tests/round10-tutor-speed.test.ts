@@ -101,3 +101,37 @@ describe("Explain instead is told the budget it is held to (round 10)", () => {
 		}
 	});
 });
+
+describe("his reason is asked one way, and every refusal of another way names it (round 10)", () => {
+	const POISSON = "Each item a machine makes is defective with probability $0.02$, independently of the others. In a batch of $100$ items, what is the probability that exactly $3$ are defective";
+
+	it("the Poisson first question: the line under it is refused with the form to use, and that form is posed", () => {
+		const guard = new VoiceGuard([newUserMessage("Poisson distribution")]);
+		const refused = decision(guard, ask(`${POISSON}? Write the expression (no need to evaluate it) and say what each factor in it accounts for.`, "recall"));
+		assert.deepEqual(refused?.details.rules, ["advice"]);
+		assert.match(refused!.content[0]!.text, /end the question itself with ", and why\?"/);
+		assert.deepEqual(rules(guard, ask(`${POISSON}, and why?`, "recall")), []);
+	});
+
+	it("a why-clause beside the ask is refused with the same form", () => {
+		const refused = decision(new VoiceGuard([newUserMessage("Poisson distribution")]), ask(`${POISSON}, and why does each factor in your expression belong there?`, "recall"));
+		assert.deepEqual(refused?.details.rules, ["compound"]);
+		assert.match(refused!.content[0]!.text, /end the first ask with ", and why\?"/);
+	});
+
+	it("\"Say why.\" and \"Justify your answer.\" under a question or a problem name it too", () => {
+		const said = decision(new VoiceGuard([newUserMessage("Eigenvalues")]), ask("Before computing anything: which two directions do you expect to stay on their own line? Say why."));
+		assert.match(said!.content[0]!.text, /", and why\?"/);
+		const problem = decision(new VoiceGuard([newUserMessage("Rank practice")]), { type: "toolCall", id: `p-${++n}`, name: "problem", arguments: { statement: "Are the columns of $B$ linearly independent? Justify your answer." } });
+		assert.match(problem!.content[0]!.text, /", and why\?"/);
+	});
+
+	it("\"and what makes you think so?\" asks his reason with the answer, one ask", () => {
+		assert.deepEqual(rules(new VoiceGuard([newUserMessage("Invertible matrices")]), ask("The map $P$ sends $(x, y)^T$ to $(x, 0)^T$, squashing the whole plane flat onto the $x$-axis. Can any matrix undo $P$, and what makes you think so?")), []);
+	});
+
+	it("the voice says it is the only way", () => {
+		const voice = fs.readFileSync(path.join(import.meta.dirname, "..", "src", "agent", "prompts", "shared", "10-voice.md"), "utf-8");
+		assert.match(voice, /the only way to ask for his reason: never a sentence under the question \("Say why\.", "Justify your answer\."\)/);
+	});
+});
