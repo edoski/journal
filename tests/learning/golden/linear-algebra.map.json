@@ -102,7 +102,7 @@
       "contrasts": [],
       "level": "retained",
       "introduced": "2026-10-12",
-      "review": "2026-11-11",
+      "review": "2026-11-09",
       "held": true,
       "due": "2026-11-06",
       "weak": true,
@@ -173,9 +173,8 @@
       "contrasts": [],
       "level": "attempted",
       "introduced": "2026-11-06",
-      "review": "2026-11-09",
-      "held": true,
-      "due": "2026-11-07",
+      "review": "2026-11-08",
+      "overdue": 1,
       "weak": true,
       "mistake": true,
       "confident_errors": 1,
@@ -216,15 +215,9 @@
       ],
       "level": "introduced",
       "introduced": "2026-11-05",
-      "review": "2026-11-08",
-      "overdue": 2,
-      "moved": {
-        "from": "2026-11-11",
-        "by": "study",
-        "courses": [
-          "Linear Algebra"
-        ]
-      },
+      "review": "2026-11-11",
+      "held": true,
+      "due": "2026-11-06",
       "weak": false,
       "tasks": []
     },

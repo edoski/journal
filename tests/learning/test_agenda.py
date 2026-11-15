@@ -760,6 +760,15 @@ def test_a_first_review_comes_on_its_day_ahead_of_older_reviews_and_another_cour
     assert together.days["near"][1]["reviews"], "its final review keeps the rest"
 
 
+def test_among_first_reviews_what_he_learned_last_comes_first() -> None:
+    stale = taught(course(4), on(-1))
+    fresh = save(course(3), {"topics": {"t00": {"introduced": True}}}, MONDAY)
+    together = agenda.plan(
+        {"stale": stale, "fresh": fresh}, MONDAY, 10, week(1, 0, EVERY_DAY)
+    )
+    assert together.when("fresh", MONDAY, True).reviews["t00"] == on(1)
+
+
 def test_a_night_with_nothing_saved_moves_no_estimate() -> None:
     history = {
         on(-n): Done(reviews=1 + n % 4, new=n % 2, reviews_short=n % 5 == 0)

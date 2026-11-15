@@ -18,20 +18,19 @@
   },
   "due": [
     {
-      "topic": "cramer",
-      "title": "Cramer's rule",
-      "due": "2026-11-06",
-      "overdue": 2,
-      "level": "introduced"
+      "topic": "kernel",
+      "due": "2026-11-07",
+      "overdue": 1,
+      "level": "attempted"
     }
   ],
   "due_later": [
     {
-      "topic": "kernel",
+      "topic": "matmul",
       "planned": "2026-11-09"
     },
     {
-      "topic": "matmul",
+      "topic": "cramer",
       "planned": "2026-11-11"
     },
     {
@@ -384,7 +383,7 @@
       "review": {
         "due": "2026-11-07",
         "by": "engine",
-        "planned": "2026-11-09"
+        "planned": "2026-11-08"
       },
       "standing": {
         "level": "attempted",

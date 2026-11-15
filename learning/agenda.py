@@ -17,7 +17,8 @@ Reviews, when there are more than fit:
      learned is checked within days, ahead of every older review and of
      another course's final review, which would otherwise hold it until its
      exam. Within its own course's final review it is that review's. Among
-     first reviews, those of 2 come first, then as in 3.
+     first reviews, those of 2 come first, then the most recently taught: a
+     topic taught weeks ago and never reviewed is no longer just learned.
   1. a course's final review, the one deadline the plan keeps: from its
      final-review day to the exam, its reviews come before every other
      course's but first reviews, nearest exam first. Its solid topics are spread over its study
@@ -395,6 +396,11 @@ class _Course:
             self.replayed[topic].days.values()
         )
 
+    def worked(self, topic: str) -> int:
+        """The day he last worked on it, as a day number."""
+        last = self.levels[topic].get("last", {}).get("date")
+        return date.fromisoformat(last).toordinal() if last else 0
+
     def need(self, item: dict[str, Any]) -> float:
         """Memory's need for a due review: days late as a share of its interval."""
         return progress.late_share(item, self.levels[item["topic"]])
@@ -748,7 +754,7 @@ def _reviews(
                     -1,
                     not gating,
                     distance if gating else 0.0,
-                    -course.need(item),
+                    -course.worked(topic),
                     distance if examined else math.inf,
                     rank,
                 )
