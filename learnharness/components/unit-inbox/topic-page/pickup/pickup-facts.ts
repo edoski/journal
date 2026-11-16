@@ -56,6 +56,9 @@ export interface PickupSections {
 	 *  first lesson, or the day a lesson he began goes on; its day, "Fri 13 Nov", and why it waits that long when
 	 *  something comes first; null when it dated none ahead. */
 	scheduled: { kind: "review" | "start" | "lesson"; day: string; waits: string | null; why?: StartsReason | null } | null;
+	/** Under a lesson he began that goes on, the day the plan first reviews
+	 *  the topic after it ("Wed 11 Nov"); null otherwise (round 14, m36). */
+	review: { day: string } | null;
 	/** The sessions neither Now nor Next hold, and every scored attempt, by day. */
 	earlier: TrailDay[];
 	/** Why the topic comes now, while Now starts it: what it builds on and
@@ -189,17 +192,19 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 	const held = new Set([now.chat, ...next.flatMap((item) => (item.kind === "session" ? [item.entry.chat.id] : []))]);
 	const review = facts.topic.review;
 	const begun = lessonBegun(facts);
+	const scheduled: PickupSections["scheduled"] =
+		review?.kind === "scheduled"
+			? { kind: "review", day: dayOf(review.date), waits: facts.waits }
+			: facts.starts && now.kind !== "start"
+				? { kind: begun ? "lesson" : "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
+				: begun && facts.topic.starts && facts.topic.starts <= facts.today
+					? { kind: "lesson", day: dayWords(facts.topic.starts, facts.today), waits: null, why: facts.startsWhy }
+					: null;
 	return {
 		now,
 		next,
-		scheduled:
-			review?.kind === "scheduled"
-				? { kind: "review", day: dayOf(review.date), waits: facts.waits }
-				: facts.starts && now.kind !== "start"
-					? { kind: begun ? "lesson" : "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
-					: begun && facts.topic.starts && facts.topic.starts <= facts.today
-						? { kind: "lesson", day: dayWords(facts.topic.starts, facts.today), waits: null, why: facts.startsWhy }
-						: null,
+		scheduled,
+		review: scheduled?.kind === "lesson" && facts.firstReview ? { day: dayOf(facts.firstReview) } : null,
 		earlier: trailDays(earlierSessions(facts.sessions, held, facts.attempts), facts.attempts, facts.today),
 		why: now.kind === "start" || begun ? { builds: facts.builds, refs: facts.refs } : null,
 	};

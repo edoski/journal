@@ -71,7 +71,10 @@ export interface SessionPlan {
 }
 
 /** What GET /api/topic answers. `record` is null when the engine could not
- *  be read; `plans` holds only sessions that have a plan. */
+ *  be read; `plans` holds only sessions that have a plan. `firstReview`,
+ *  asked for a lesson he began (`?begun=1`), is the first day the engine's
+ *  daily plan reviews the topic, null when it plans none or the plan could
+ *  not be read. */
 export type TopicReadResponse =
-	| { ok: true; record: TopicRecord | null; plans: SessionPlan[] }
+	| { ok: true; record: TopicRecord | null; plans: SessionPlan[]; firstReview?: string | null }
 	| { ok: false; code: "bad_request" | "unknown_course"; error: string };
