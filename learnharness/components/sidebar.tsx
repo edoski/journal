@@ -55,6 +55,8 @@ declare global {
 			/** The zoom truth (owner round 7): subscribes to "lh:zoom" pushes; returns unsubscribe. */
 			onZoom?: (cb: (factor: number) => void) => () => void;
 			getZoom?: () => Promise<number>;
+			/** The traffic lights' centre from the window's top, in points (electron/main.cjs). */
+			lightsCentre?: number;
 		};
 	}
 }
@@ -86,6 +88,7 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 		// and in the plain browser the class never appears.
 		if (IS_ELECTRON) {
 			document.documentElement.classList.add("lh-electron");
+			document.documentElement.style.setProperty("--lh-lights-centre", `${window.lh?.lightsCentre}px`);
 		}
 
 		// THE ZOOM TRUTH (owner round 7, 2026-10-05): ⌘±/⌘0 zoom the UI

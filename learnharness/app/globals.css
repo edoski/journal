@@ -512,16 +512,18 @@ body {
    92px rail looked "extremely thick"). The lights sit over its 52px head,
    so its open button stands where T3 Code's sidebar toggle stands on
    macOS: in the window's band beside the lights, 90px in
-   (`--desktop-window-controls-inset`, the T3 Code app's bundle),
-   physical under zoom as the lights are, centred on the band's height.
-   The page's band content starts a 12px gap past it (T3 Code's
-   `--workspace-titlebar-control-gap`) while the sidebar is folded. */
+   (`--desktop-window-controls-inset`, the T3 Code app's bundle), level
+   with the lights (Edo, 16 Nov 2026: "yes lined up"): centred on their
+   centre (--lh-lights-centre, from electron/main.cjs). Both lengths are
+   physical under zoom, as the lights are. The page's band content starts
+   a 12px gap past it (T3 Code's `--workspace-titlebar-control-gap`) while
+   the sidebar is folded. */
 .lh-electron .lh-rail-toggle {
 	position: fixed;
-	top: 0;
+	top: calc(var(--lh-lights-centre) / var(--lh-zoom));
 	left: calc(90px / var(--lh-zoom));
 	z-index: 20;
-	height: 3.25rem;
+	transform: translateY(-50%);
 }
 /* The lights sit over the rail's head, so its edge starts under the band:
    the head covers the rail's border, and no line runs through the lights. */

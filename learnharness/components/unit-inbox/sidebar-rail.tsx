@@ -64,8 +64,8 @@ function RailButton({
  * its field) and New lesson, and Settings at the foot, each named in a
  * tooltip with its shortcut. The open button sits where T3 Code's sidebar
  * toggle sits, centred in the band, never under its rule. In the Mac app
- * the traffic lights sit over the head, so the button stands beside them
- * (`.lh-rail-toggle`), drawn at the end of the page so the page's own
+ * the traffic lights sit over the head, so the button stands beside them,
+ * level with them (`.lh-rail-toggle`), drawn at the end of the page so the page's own
  * drag band, later in the page, cannot take its clicks (Electron resolves
  * drag regions in page order).
  */

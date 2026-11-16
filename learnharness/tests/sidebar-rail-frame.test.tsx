@@ -5,7 +5,10 @@
  * app: the rail was 92px wide, as wide as the traffic lights (Edo:
  * "extremely thick"), and a 52px lights band above the button's own head
  * pushed the button under the line ("makes no sense"). The browser probe
- * that measured it: rail 92, button at y 64, the line at y 51.
+ * that measured it: rail 92, button at y 64, the line at y 51. Then the
+ * button sat centred on the band, 4pt above the lights' centre at zoom 1
+ * and 2.5pt below it at 1.25 (window shots: lights at y 30, the button at
+ * 26 and 32.5); Edo wants it "lined up".
  * Same tsx classic-JSX shim as the other render tests.
  */
 import React from "react";
@@ -41,10 +44,44 @@ const rule = (selector: string) => {
 const px = (calc: string | undefined) =>
 	[...(calc ?? "").replace(/\/ var\(--lh-zoom\)/g, "").matchAll(/([+-])?\s*([\d.]+)(px|rem)/g)].reduce((sum, [, sign, n, unit]) => sum + (sign === "-" ? -1 : 1) * Number(n) * (unit === "rem" ? 16 : 1), 0);
 
-// electron/main.cjs: the lights start 16px in, three 12px circles 8px apart.
-const lightsX = Number(read("../electron/main.cjs").match(/trafficLightPosition:\s*\{\s*x:\s*([\d.]+)/)?.[1]);
-const LIGHTS_RIGHT = lightsX + 3 * 12 + 2 * 8;
-const BAND = 52;
+// electron/main.cjs: the lights' corner and size, three 14pt lights 9pt
+// apart (measured in the running app), and the zoom ladder.
+const main = read("../electron/main.cjs");
+const lights = main.match(/const TRAFFIC_LIGHTS = \{ x: ([\d.]+), y: ([\d.]+) \};/);
+const lightSize = Number(main.match(/const LIGHT_SIZE = ([\d.]+);/)?.[1]);
+const [lightsX, lightsY] = [Number(lights?.[1]), Number(lights?.[2])];
+const LIGHTS_RIGHT = lightsX + 3 * lightSize + 2 * 9;
+const LIGHTS_CENTRE = lightsY + lightSize / 2;
+const ZOOMS = JSON.parse(main.match(/const ZOOM_LADDER = (\[[^\]]+\]);/)?.[1] ?? "[]") as number[];
+/** A length in CSS px, the renderer's custom properties put in: + - * / and
+ *  parentheses over px and rem (16px). */
+const cssPx = (calc: string | undefined, vars: Record<string, number>) => {
+	const tokens = (calc ?? "")
+		.replace(/^calc/, "")
+		.replace(/var\((--[\w-]+)\)/g, (_, name: string) => String(vars[name] ?? NaN))
+		.replace(/([\d.]+)rem/g, (_, n: string) => String(Number(n) * 16))
+		.replace(/([\d.]+)px/g, "$1")
+		.match(/[\d.]+|NaN|[-+*/()]/g) ?? [];
+	let at = 0;
+	const atom = (): number => {
+		const token = tokens[at++];
+		if (token !== "(") return Number(token);
+		const value = sum();
+		at++;
+		return value;
+	};
+	const product = () => {
+		let value = atom();
+		while (tokens[at] === "*" || tokens[at] === "/") value = tokens[at++] === "*" ? value * atom() : value / atom();
+		return value;
+	};
+	const sum = () => {
+		let value = product();
+		while (tokens[at] === "+" || tokens[at] === "-") value = tokens[at++] === "+" ? value + product() : value - product();
+		return value;
+	};
+	return sum();
+};
 const RAIL = 48;
 
 describe("the folded sidebar", () => {
@@ -81,8 +118,21 @@ describe("the folded sidebar", () => {
 		assert.ok(open.closest(".lh-rail-toggle"), "the button wears the Mac app's place");
 		const place = rule(".lh-electron .lh-rail-toggle");
 		assert.equal(place.position, "fixed");
-		assert.equal(place.top, "0");
-		assert.equal(px(place.height), BAND, "centred on the band's height");
+		// The button's centre in window points, at every zoom: its top, less
+		// half its height when it is translated up by half.
+		const centre = (zoom: number) => {
+			const vars = { "--lh-lights-centre": LIGHTS_CENTRE, "--lh-zoom": zoom };
+			const top = cssPx(place.top, vars);
+			const centred = place.transform === "translateY(-50%)";
+			const height = centred ? 0 : cssPx(place.height, vars);
+			return (top + height / 2) * zoom;
+		};
+		assert.ok(ZOOMS.length > 1 && ZOOMS.includes(1), "main.cjs has its zoom ladder");
+		for (const zoom of ZOOMS) assert.ok(Math.abs(centre(zoom) - LIGHTS_CENTRE) < 1e-9, `level with the lights' centre (${LIGHTS_CENTRE}pt) at zoom ${zoom}, not ${centre(zoom)}`);
+		assert.ok(main.includes("additionalArguments: [`--lh-lights-centre=${TRAFFIC_LIGHTS.y + LIGHT_SIZE / 2}`]"), "main.cjs hands the renderer the lights' centre");
+		assert.ok(main.includes("trafficLightPosition: TRAFFIC_LIGHTS"), "from the same corner the lights are placed at");
+		assert.ok(read("../electron/preload.cjs").includes('lightsCentre: Number(process.argv.find((arg) => arg.startsWith("--lh-lights-centre="))'), "the preload reads it");
+		assert.ok(read("../components/sidebar.tsx").includes('setProperty("--lh-lights-centre", `${window.lh?.lightsCentre}px`)'), "the renderer publishes it");
 		const left = px(place.left);
 		assert.equal(left, 90, "T3 Code's --desktop-window-controls-inset");
 		assert.ok(left >= LIGHTS_RIGHT, `clear of the lights, which end at ${LIGHTS_RIGHT}px`);
