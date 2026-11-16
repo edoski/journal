@@ -2,7 +2,7 @@ import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCours
 import { leftOffWords, overdueWords, reviewWords, slipMark, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { slipBeside } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { currentSessions, resumableSession, sessionState } from "@/components/nav/session-state";
+import { currentSessions, pausedWords, resumableSession, sessionState } from "@/components/nav/session-state";
 
 /**
  * The sidebar's topics. Each unit (a course map topic the learner has
@@ -24,7 +24,7 @@ export interface UnitCourse {
 
 /** What a unit's sessions are doing now: one waits on the learner, the
  *  tutor writes in one, one is left for next time, or nothing runs. */
-export type UnitNow = "your-turn" | "working" | "left" | null;
+export type UnitNow = "your-turn" | "working" | "paused" | "left" | null;
 
 export interface Unit {
 	/** `<workspace>#<handle>`, unique across courses. */
@@ -126,6 +126,8 @@ export function sessionsNow(sessions: readonly ChatListItem[], course: readonly 
 	const states = currentSessions(sessions, course).map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	if (states.includes("working")) return "working";
+	// A reply cut off says so on its topic, never an older left session's or task's day (round 14, m33).
+	if (states.includes("paused")) return "paused";
 	return states.includes("left") ? "left" : null;
 }
 
@@ -197,7 +199,7 @@ export type UnitStatus =
 	| { kind: "your-turn" }
 	| { kind: "working" }
 	| { kind: "slip"; words: string; slip: SlipKey }
-	| { kind: "review" | "task" | "returns" | "studied"; words: string }
+	| { kind: "review" | "task" | "returns" | "studied" | "stopped"; words: string }
 	/** Nothing to say; `words` names a topic he has not started ("Not
 	 *  started"), which search lists beside the topics he has. */
 	| { kind: "none"; words?: string };
@@ -254,10 +256,17 @@ export function unitStatus(unit: Unit, today: string, live: string | null = null
 		const left = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left");
 		return { kind: "task", words: left ? leftWords(left, today) : leftOffWords(null, today) };
 	}
+	if (unit.now === "paused") {
+		const cut = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "paused");
+		return { kind: "stopped", words: pausedWords(cut ?? {}) };
+	}
 	if (unit.now) return { kind: unit.now };
 	if (slip) return slip;
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue, today) };
-	if (unit.task) return { kind: "task", words: taskWords(unit.task, today) };
+	// An open task's day, unless he studied the topic itself since it last changed: then that study is the
+	// latest about it (round 14, m33: Rank read "Left off 6 Nov", the sheet's day, after his Rank practice today).
+	const studied = unit.sessions.find((c) => ownsTopic(c, topic.handle))?.updatedAt;
+	if (unit.task && !(studied && unit.task.updated && dayOf(studied) > unit.task.updated)) return { kind: "task", words: taskWords(unit.task, today) };
 	// A review held past memory's day is due already ("Due since 6 Nov"):
 	// a fact that needs him, which the map's card shows, never a date ahead.
 	if (topic.review?.kind === "scheduled") return { kind: topic.review.held && topic.review.held.since < today ? "review" : "returns", words: reviewWords(topic.review, today) };
