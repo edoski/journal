@@ -9,6 +9,9 @@ import { useServerEvent } from "@/components/server-events";
 export interface TopicRead {
 	record: TopicRecord | null;
 	plans: readonly SessionPlan[];
+	/** For a lesson he began, the day the engine's plan first reviews the
+	 *  topic; null when it plans none; absent when not asked. */
+	firstReview?: string | null;
 }
 
 /** The most sessions one read names: the topic's newest. */
@@ -16,7 +19,8 @@ const SESSIONS = 20;
 
 /**
  * The topic read (spec: topic-page.md): the engine's attempts and task
- * days for one topic and the plans of its newest sessions. Read again
+ * days for one topic and the plans of its newest sessions, and for a
+ * lesson he began (`begun`) the day the plan first reviews it. Read again
  * when a turn settles, the list, a record or the course record changes, and when the tasks
  * or sessions asked for change. A failed read is `read: null` the first
  * time and keeps the last good one after.
@@ -26,6 +30,7 @@ export function useTopicRead(
 	handle: string,
 	taskKeys: readonly string[],
 	sessionIds: readonly string[],
+	begun = false,
 ): { status: "loading" } | { status: "ready"; read: TopicRead | null } {
 	const [state, setState] = useState<{ status: "loading" } | { status: "ready"; read: TopicRead | null }>({ status: "loading" });
 	const [attempt, setAttempt] = useState(0);
@@ -38,6 +43,7 @@ export function useTopicRead(
 		["topic", handle],
 		...taskKeys.map((key) => ["task", key]),
 		...sessionIds.slice(0, SESSIONS).map((id) => ["session", id]),
+		...(begun ? [["begun", "1"]] : []),
 	]).toString();
 	useEffect(() => {
 		let live = true;
@@ -46,7 +52,7 @@ export function useTopicRead(
 			.then((r) => r.json() as Promise<TopicReadResponse>)
 			.then((body) => {
 				if (!body.ok) return failed();
-				if (live) setState({ status: "ready", read: { record: body.record, plans: body.plans } });
+				if (live) setState({ status: "ready", read: { record: body.record, plans: body.plans, ...(body.firstReview !== undefined ? { firstReview: body.firstReview } : {}) } });
 			})
 			.catch(failed);
 		return () => {

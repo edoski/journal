@@ -72,9 +72,11 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 			<Icon role="img" aria-label={how ? `${words}, ${how}` : words} className={cn(ICON, "mt-px self-start")} />
 			{/* The sentence wraps whole (round 13, 1 n11: "…4, n…" cut in the
 			    320px column beside an empty half-pane); Earlier moves the days
-			    that do not fit behind "Show the rest". Each formula is one box
-			    (round 13, 2 n1), so a line never breaks inside one. */}
-			<p data-slot="topic-attempt-text" className={cn("text-body text-muted-foreground [&_.katex]:inline-block", date !== undefined && "col-span-2")}>
+			    that do not fit behind "Show the rest". A formula wider than the
+			    row breaks after a top-level relation, KaTeX's own break points,
+			    never inside a power or a fraction (globals.css; round 14, m37:
+			    one box ran past the column and was clipped to "≈ 0.7"). */}
+			<p data-slot="topic-attempt-text" className={cn("text-body text-muted-foreground", date !== undefined && "col-span-2")}>
 				<LineText>{title ?? attempt.text}</LineText>
 			</p>
 			{date !== undefined && <DateCell date={date} />}
@@ -120,17 +122,19 @@ export function SessionItem({
 				data-testid="unit-page-session"
 				className={cn(
 					// Its fill reaches back over the row's gutter and 12px past the column, as every row's does (`BLEED`).
-					"col-span-full row-start-1 -mr-3 -ml-[1.875rem] grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg pr-3 pl-[1.875rem] text-left font-normal whitespace-normal has-[>svg]:pr-3 has-[>svg]:pl-[1.875rem]",
+					// 40px for a title on one line; a longer title wraps whole, the icon, status and date on its first line
+					// (round 14, m36: "Eigenvalues a…" cut beside an empty half-pane).
+					"col-span-full row-start-1 -mr-3 -ml-[1.875rem] grid h-auto min-h-10 grid-cols-subgrid items-start gap-x-4 rounded-lg py-2.5 pr-3 pl-[1.875rem] text-left font-normal whitespace-normal has-[>svg]:pr-3 has-[>svg]:pl-[1.875rem]",
 					shown && "bg-fill-selected hover:bg-fill-selected",
 				)}
 			>
 				<Link href={`/chat/${chat.id}`} onPointerEnter={planned ? () => onShow(chat.id) : undefined} onFocus={planned ? () => onShow(chat.id) : undefined}>
-					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />}
-					<span className="truncate text-body text-foreground">
+					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={cn(ICON, "mt-0.5")} /> : <MessageSquareIcon aria-label="Lesson" className={cn(ICON, "mt-0.5")} />}
+					<span data-slot="topic-history-session-title" className="text-pretty text-body text-foreground">
 						<LineText>{chat.title}</LineText>
 					</span>
-					{why && <span className="flex items-center gap-2 justify-self-end">{why}</span>}
-					{date !== undefined && <DateCell date={date} />}
+					{why && <span className="flex h-5 items-center gap-2 justify-self-end">{why}</span>}
+					{date !== undefined && <DateCell date={date} className="leading-5" />}
 				</Link>
 			</Button>
 		</li>

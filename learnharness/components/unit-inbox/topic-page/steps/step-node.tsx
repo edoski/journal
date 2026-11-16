@@ -40,6 +40,25 @@ const DOT: Record<PlanNodeStatus, string> = {
 	upcoming: "",
 };
 
+/** A step card's box, the drawn card's and the one the lesson map measures
+ *  (lesson-map.tsx): its padding holds a title wrapping onto as many lines
+ *  as it needs clear of the edges. */
+export const STEP_CARD = "flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3";
+
+/** A step card's inside: the Plan list's dot and the step's title, whole
+ *  on as many lines as it takes (round 14, m34: never cut). */
+export function StepFace({ status, title }: { status: PlanNodeStatus; title: string }) {
+	return (
+		<>
+			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />
+			{/* KaTeX's fonts have no medium face, so a hairline stroke sets the math at the title's weight. */}
+			<span data-slot="topic-step-title" className="min-w-0 text-pretty text-body text-foreground [&_.katex]:[-webkit-text-stroke:0.015em_currentcolor]">
+				<MathText>{title}</MathText>
+			</span>
+		</>
+	);
+}
+
 /** The open's per-layer stagger, capped so the whole entrance ends under 300ms (the topic map's). */
 const STAGGER_MS = 15;
 const STAGGER_CAP_MS = 110;
@@ -72,16 +91,13 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 			onBlur={() => state?.onActive(null)}
 			onKeyDown={(event) => state?.onKeyDown(handle, event)}
 			className={cn(
-				"pointer-events-auto flex size-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none",
+				STEP_CARD,
+				"pointer-events-auto size-full cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none",
 				"hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
 				current && "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)] hover:border-ring",
 			)}
 		>
-			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />
-			{/* KaTeX's fonts have no medium face, so a hairline stroke sets the math at the title's weight. */}
-			<span className="line-clamp-2 min-w-0 text-body text-foreground [&_.katex]:[-webkit-text-stroke:0.015em_currentcolor]">
-				<MathText>{title}</MathText>
-			</span>
+			<StepFace status={status} title={title} />
 		</Link>
 	);
 	return (

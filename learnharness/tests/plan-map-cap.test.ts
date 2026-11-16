@@ -43,6 +43,7 @@ describe("PLAN_MAP_CAP", () => {
 		const rows = Math.floor(((PANE.height - FADE.y * 2) / WHOLE_COURSE_ZOOM - TAG_ROOM + LAYER_GAP) / (STEP_SIZE.height + LAYER_GAP));
 		assert.deepEqual([rows, across], [8, 4]);
 		assert.equal(PLAN_MAP_CAP.deep, rows);
+		assert.equal(PLAN_MAP_CAP.across, across, "a card is sized for four across (stepCard)");
 		assert.ok(PLAN_MAP_CAP.steps <= rows * across);
 		assert.ok(fit(chain(PLAN_MAP_CAP.deep)) >= WHOLE_COURSE_ZOOM, "a chain as deep as the cap opens whole");
 		assert.ok(fit(chain(PLAN_MAP_CAP.deep + 1)) < WHOLE_COURSE_ZOOM, "one step deeper does not");

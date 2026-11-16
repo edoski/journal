@@ -162,3 +162,16 @@ describe("where a lesson's step map opens", () => {
 		assert.ok(hidden.length > 0 && !hidden.includes("s6" as never));
 	});
 });
+
+// Round 14, m39: Kernel's page drew the sheet's two parts as two cards floating mid-page.
+describe("a lesson's step map that fits its pane", () => {
+	it("sits at the top of the pane, by the list's first row, centred across", () => {
+		const plan: SessionPlan = { id: "chat_sheet", tree: { nodes: [{ id: "c", title: "Part (c) of sheet 4" }, { id: "d", title: "Part (d) of sheet 4" }], edges: [] }, current: null, visited: [] };
+		const { layout } = stepsLayout(plan);
+		const camera = stepsCamera(layout, null, COLUMN, FADE);
+		assert.equal(camera.zoom, 1);
+		assert.equal(camera.y, FADE.y + TAG_ROOM, "the first step's tag room starts where the fade ends");
+		assert.equal(camera.x, (COLUMN.width - layout.width) / 2);
+		assert.deepEqual(clearOfFade(layout, camera), []);
+	});
+});

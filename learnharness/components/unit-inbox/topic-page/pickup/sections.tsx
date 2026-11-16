@@ -13,7 +13,7 @@ import { BuildsOnList, EarlierDays, MaterialList, NextList, NowRow, ScheduledEnt
  * material say why it comes now.
  */
 export function SectionsPane({ facts, busy, onAct, onTask, shown, onShow, onPoint, className }: HybridPaneProps & { onPoint?: (handle: string | null) => void }) {
-	const { now, next, scheduled, earlier, why } = pickupSections(facts);
+	const { now, next, scheduled, review, earlier, why } = pickupSections(facts);
 	return (
 		<HistoryPane className={className}>
 			<Section label="Now">
@@ -37,6 +37,7 @@ export function SectionsPane({ facts, busy, onAct, onTask, shown, onShow, onPoin
 			{scheduled && (
 				<Section label="Scheduled">
 					<ScheduledEntry kind={scheduled.kind} day={scheduled.day} waits={scheduled.waits} why={scheduled.why} />
+					{review && <ScheduledEntry kind="review" day={review.day} waits={null} />}
 				</Section>
 			)}
 			{earlier.length > 0 && (

@@ -10,6 +10,7 @@ import { PageFrame } from "@/components/page-frame/page-frame";
 import { topicFacts, type Press, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 import { continueHref } from "@/components/nav/session-state";
+import { lessonBegun } from "@/components/study-words";
 
 /** What the page's body takes. */
 export interface TopicPageProps {
@@ -51,6 +52,7 @@ export function TopicPage({
 		topic.handle,
 		topic.tasks,
 		sessions.map((chat) => chat.id),
+		lessonBegun(topic),
 	);
 	const start = (opening: string, from?: string) => lesson.start(opening, workspace, { topics: [topic.handle], from });
 	const press = (does: Press) => ("open" in does ? router.push(continueHref(does.open)) : start(does.opening, does.from));

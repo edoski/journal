@@ -62,7 +62,61 @@ function texPlain(tex: string): string {
 /** KaTeX's HTML for one inline formula; a formula KaTeX cannot read shows
  *  its TeX in the error ink rather than breaking the label. */
 function formula(tex: string): string {
-	return katex.renderToString(tex, { throwOnError: false, strict: "ignore", trust: false, output: "htmlAndMathml" });
+	return holdBrackets(katex.renderToString(tex, { throwOnError: false, strict: "ignore", trust: false, output: "htmlAndMathml" }));
+}
+
+const HTML_ROOT = '<span class="katex-html" aria-hidden="true">';
+
+/** The top-level spans of a run of KaTeX's HTML, each whole, up to the
+ *  close of the span the run sits in. */
+function topSpans(html: string): string[] {
+	const spans: string[] = [];
+	let depth = 0;
+	let start = 0;
+	for (const tag of html.matchAll(/<span\b|<\/span>/g)) {
+		if (tag[0] === "</span>") {
+			depth -= 1;
+			// The close of the span the run sits in: the run ends.
+			if (depth < 0) break;
+			if (depth === 0) spans.push(html.slice(start, tag.index + tag[0].length));
+		} else {
+			if (depth === 0) start = tag.index;
+			depth += 1;
+		}
+	}
+	return spans;
+}
+
+/**
+ * KaTeX's inline formula with the pieces between an open bracket and its
+ * close held on one line (`katex-hold`): KaTeX may break a line after any
+ * top-level relation or operator, and a bracket is no group in TeX, so a
+ * wrapping formula broke inside one ("P(X =" | "0)"). Where a formula may
+ * wrap (an Earlier row, globals.css), it now breaks only at a relation or
+ * operator outside every bracket (round 14, m37). Pure.
+ */
+export function holdBrackets(html: string): string {
+	const at = html.indexOf(HTML_ROOT);
+	if (at < 0) return html;
+	const from = at + HTML_ROOT.length;
+	const pieces = topSpans(html.slice(from));
+	const inner = pieces.join("");
+	if (pieces.length < 2 || !html.startsWith(inner, from)) return html;
+	const out: string[] = [];
+	let held: string[] = [];
+	let open = 0;
+	for (const piece of pieces) {
+		open += (piece.match(/class="mopen\b/g) ?? []).length - (piece.match(/class="mclose\b/g) ?? []).length;
+		if (open > 0 || held.length > 0) held.push(piece);
+		else out.push(piece);
+		if (open <= 0 && held.length > 0) {
+			out.push(held.length > 1 ? `<span class="katex-hold">${held.join("")}</span>` : held[0]!);
+			held = [];
+			open = 0;
+		}
+	}
+	if (held.length > 0) out.push(held.length > 1 ? `<span class="katex-hold">${held.join("")}</span>` : held[0]!);
+	return html.slice(0, from) + out.join("") + html.slice(from + inner.length);
 }
 
 /** A label's words, cut at its spaces: each word is the run of plain
