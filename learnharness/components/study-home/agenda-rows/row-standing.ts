@@ -44,23 +44,24 @@ export function rowWords(facts: RowStanding): string {
 export type RowStatus = { kind: "standing"; facts: RowStanding } | { kind: "why"; why: Why };
 
 /**
- * The one status a Today row says, in words (round 11, 1 N9: "Studied
- * today · Mistake to fix · Your turn" on one row): the tutor's own state
- * in a session while it writes or stopped mid-reply, since that changes
- * what the row opens on; else the slip he would act on (a miss as the
- * row's reason, else its topic's slip); else why the row is on Today
- * ("Your turn", "Due since 6 Nov", "Planned today", "Left off 6 Nov"),
- * except a plain "Next up", which says only that the row is on Today;
- * else where he stands on its topic. When he last studied it is not a
+ * The one status a Today row says, in words, the same on Home's row and on
+ * the sidebar's card for the line (round 11, 1 N9: "Studied today ·
+ * Mistake to fix · Your turn" on one row; round 12, 1 m3 and 2 n2: Home
+ * said "Mistake to fix" where the sidebar said "Your turn" for one
+ * session, "Check again another day" beside "Due today" for one review):
+ * why the row is on Today ("Your turn", "Tutor writing", "Due since 6
+ * Nov", "Not right last time: Chain rule", "Left off 6 Nov", "Planned
+ * today"), since that is what its press opens on, except a plain "Next
+ * up", which says only that the row is on Today; else the slip he would
+ * act on ("Mistake to fix"); else where he stands on its topic. The pie
+ * beside it keeps a slip's warning ink. When he last studied it is not a
  * status: Home's "Studied today" line names what he studied. Null with
  * nothing to say. Pure.
  */
 export function rowStatus(row: TodayRow): RowStatus | null {
 	const why = whyOf(row);
-	if (why && (why.kind === "working" || why.kind === "stopped" || why.kind === "missed")) return { kind: "why", why };
 	const facts = rowStanding(row);
-	if (facts?.slip) return { kind: "standing", facts };
-	// A plain "Next up" says only that the row is on Today; where he stands says more.
+	// A plain "Next up" says only that the row is on Today; the slip or where he stands says more.
 	if (why && !(facts && why.kind === "next" && !why.starts)) return { kind: "why", why };
 	return facts ? { kind: "standing", facts } : null;
 }

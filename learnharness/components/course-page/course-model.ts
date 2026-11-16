@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords, startsWhyShort } from "@/components/study-words";
+import { AFTER_EXAM, ARC_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords, startsWhyShort } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -103,7 +103,9 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5).
 		const planned: TopicFact | null = group === "not-started" && fact === null && topic.starts ? { kind: "next", words: topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` } : null;
 		const shown = here ? HERE : (planned ?? fact);
-		const words = planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
+		// A start the exam's plan has no room for before the exam says so, its day in the hint (round 12, 1 m11: "Planned 29 Nov" on the exam's own course page).
+		const afterExam = planned && shown === planned && topic.starts && map.exam && map.exam.daysLeft >= 0 && topic.starts > map.exam.date && (map.exam.doesNotFit ?? []).includes(topic.handle);
+		const words = afterExam ? AFTER_EXAM : planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
 		return { topic, group, fact: shown, factWords: words, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };

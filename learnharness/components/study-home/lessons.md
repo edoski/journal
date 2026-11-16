@@ -21,7 +21,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 
 | State | Shows |
 |---|---|
-| loading | "Reading your courses…" |
+| loading | "Reading your courses…", only before this window has read Home once; a later visit shows the last Home read until its own read lands (round 12, 1 m8) |
 | engine unavailable | `CoursesUnavailable` with its fix |
 | read failed | "Couldn't read your courses." with Try again |
 | no courses | "No courses yet. Start a lesson from New lesson and pick a course there." |

@@ -6,6 +6,8 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { sessionState } from "@/components/nav/session-state";
 import { courseTitle } from "@/components/study-home/agenda-rows/row-facts";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
+import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
+import { MathText } from "@/components/ui/math-text";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { NowLine } from "@/components/study-home/needs-you";
 import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
@@ -89,7 +91,22 @@ export function NowAction({ line, title, className, chats = [] }: { line: NowLin
  * (`courseCardMove`).
  */
 export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowLine; unit: Unit | null; active: boolean; parent?: string; chats?: readonly ChatListItem[] }) {
-	const reason = <WhyMark why={line.why} size="slot" words={line.slot} />;
+	// The line's one status, Home's row's (`NowLine.status`): its reason, else the slip or where he stands, with the pie.
+	const { status } = line;
+	const reason =
+		status?.kind === "standing" ? (
+			<span data-slot="why-mark" data-kind="standing" className="contents text-callout system-current:text-label text-muted-foreground">
+				<span className="flex h-4 shrink-0 items-center">
+					<TopicGlyph standing={status.facts.standing} className="size-3" />
+				</span>
+				<span className="sr-only">, </span>
+				<span className="whitespace-nowrap">
+					<MathText>{line.slot ?? ""}</MathText>
+				</span>
+			</span>
+		) : (
+			<WhyMark why={status?.why ?? null} size="slot" words={line.slot} />
+		);
 	const { row } = line;
 	const { take } = useContinueCourse();
 	if (unit) {

@@ -1,8 +1,7 @@
 import { TOPIC_LEVELS, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
 import type { StripArc } from "@/components/course-map/arc-strip";
 import { misfitWords } from "@/components/calendar/calendar-facts";
-import { topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
-import { topicCreation } from "@/components/unit-inbox/start-unit";
+import { topicPress } from "@/components/unit-inbox/start-unit";
 import type { SessionCreation } from "@/components/start-session";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { finalReviewMissWords, notReadyHeading, notReadyWords, READY_WORDS, shortDay, slipMark, type SlipKey } from "@/components/study-words";
@@ -109,13 +108,10 @@ export interface MistakeRow {
 	href: string;
 }
 
-/** A row's press from its topic's action: the session to open, else what
- *  to start, a continued task as the page starts it. Pure. */
-function pressOf(action: ReturnType<typeof topicAction>, workspace: string, topic: CourseMapTopic, today: string): Pick<MistakeRow, "resume" | "creation"> {
-	const creation = topicCreation(workspace, topic, today);
-	if ("chat" in action) return { resume: action.chat, creation };
-	if (action.kind !== "continue") return { resume: null, creation };
-	return { resume: null, creation: { title: action.opening, course: { workspace }, topics: [topic.handle], ...(action.from ? { resume: { from: action.from } } : {}) } };
+/** A row's press from its topic's action (`topicPress`). Pure. */
+function pressOf(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): Pick<MistakeRow, "resume" | "creation"> {
+	const { resume, creation } = topicPress(topic, map, chats);
+	return { resume, creation };
 }
 
 const days = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
@@ -154,7 +150,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
 				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
-				...pressOf(topicAction(topic, map, chats), map.workspace, topic, map.today),
+				...pressOf(topic, map, chats),
 				workspace: map.workspace,
 				href: unitHref(map.workspace, topic.handle),
 			},

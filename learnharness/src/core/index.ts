@@ -66,3 +66,5 @@ export * from "./spatial-nav.ts";
 // session-markdown.ts: the session→markdown formatter behind the export.
 // Pure, browser-safe.
 export * from "./session-markdown.ts";
+// demo-frame.ts: the base every demo runs on, and its controls' contrast check (pure).
+export * from "./demo-frame.ts";

@@ -16,6 +16,7 @@ import type { ChatListItem, CourseMapTopic, ExamGapReason, StudyCourse, TopicHan
 import { courseRead } from "../components/course-page/course-model.ts";
 import { examGaps, lastSessionOf, namesWords } from "../components/course-page/course-head/head-facts.ts";
 import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
+import { topicPress } from "../components/unit-inbox/start-unit.ts";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
 import { ServerEventsProvider } from "../components/server-events.tsx";
@@ -205,5 +206,20 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 	it("asks the tutor in his words, naming the topics", () => {
 		assert.equal(examGapAsk(["Variance"]), "My exam plan has no room for Variance. How can I still fit it in before the exam?");
 		assert.equal(examGapAsk(["Variance", "Binomial"]), "My exam plan has no room for Variance and Binomial. How can I still fit them in before the exam?");
+	});
+});
+
+describe("a topic he began, on the exam's ways in (round 12, 1 D5: Start Poisson distribution opened a second chat for the lesson)", () => {
+	it("reads Continue and opens the lesson's own chat, never a new one", () => {
+		const task = { key: "poisson-lesson", title: "Poisson distribution lesson", step: "The help-desk question", updated: "2026-11-10" };
+		const lesson = { ...chat("chat_poisson", "2026-11-10T10:00:00Z"), title: "Poisson", ownTopics: ["poisson"], topics: ["poisson"], ended: "left", studied: true, tasks: [task.key] } as ChatListItem;
+		const topics = [topic("bayes", { level: "assisted", introduced: "2026-11-01" }), topic("poisson", { tasks: [task.key] }), topic("geometric")];
+		const c = course({ today: "2026-11-17", topics, tasks: [task], exam: { date: "2026-11-19", daysLeft: 2, finalReview: "2026-11-17", doesNotFit: [h("poisson"), h("geometric")], unreviewed: [], reasons: {} } });
+		const press = topicPress(topics[1]!, c.map, [lesson]);
+		assert.equal(press.resume?.id ?? "a new chat", "chat_poisson");
+		assert.equal(press.continues, true);
+		const line = render(<CourseHead view={viewOf(c, [lesson])} standing={null} busy={false} onContinue={() => {}} />).querySelector("[data-slot=course-exam-gaps]")!;
+		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), ["Continue Poisson today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
+		assert.equal(topicPress(topics[2]!, c.map, [lesson]).resume, null, "a topic he never began still starts");
 	});
 });

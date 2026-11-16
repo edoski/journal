@@ -47,11 +47,11 @@ const at = (hour: number) => new Date(2026, 10, 8, hour).toISOString();
 const EIGEN = topic("eigen", "Eigenvalues and eigenvectors", { level: "assisted", introduced: "2026-11-06", weak: false, signals: { ...QUIET, gap: "Read −x + y = 0 as (1, −1)", mistake: true } });
 
 describe("one status per Today row (1 N9, 1 N12)", () => {
-	it("a lesson waiting on him with a mistake to fix says the mistake alone, not Studied today and Your turn beside it", () => {
+	it("a lesson waiting on him with a mistake to fix says Your turn alone, as the sidebar does, never Studied today or the mistake beside it (round 12, 1 m3)", () => {
 		const course: StudyCourse = { map: map({ today: TODAY, topics: [EIGEN] }), unready: null, due: [], newToday: [], lastActiveDaysAgo: 0 };
 		const eigen = chat({ id: "eigen", pendingQuestion: true, studied: true, updatedAt: at(9) });
 		const line = draw(course, [eigen]).querySelector('[data-slot="today-line"]')!;
-		assert.deepEqual(statuses(line), ["Mistake to fix"]);
+		assert.deepEqual(statuses(line), ["Your turn"]);
 	});
 
 	it("a session he only opened never reads Studied today", () => {

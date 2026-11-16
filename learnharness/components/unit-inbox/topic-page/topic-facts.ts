@@ -1,6 +1,6 @@
 import { isReviewSession, markHow, topicOpening, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { cardLine, slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, examGapTopicWords, heldExamWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -369,10 +369,12 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	const how = markHow({ ...attempt, helped: !attempt.unaided });
 	if (how === "predicted" || how === "gaveUp") return { result, words: MARK_HOW_WORDS[how] };
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
-	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : null };
+	if (attempt.result === "incorrect") return { result, words: attempt.sure === "confident" ? SLIP_WORDS.confident : ATTEMPT_WORDS.wrong };
 	// How a right or partly right answer counted, in the answer card's words;
-	// his own work says nothing, so the ones that differ stand out.
-	return { result, words: how === "ownWork" ? null : MARK_HOW_WORDS[how] };
+	// a right one on his own says nothing, so the ones that differ stand out,
+	// and a partly right one says so (round 12, 1 m12: its icon alone).
+	if (how !== "ownWork") return { result, words: MARK_HOW_WORDS[how] };
+	return { result, words: result === "partly" ? ATTEMPT_WORDS.partly : null };
 }
 
 /** The arc a topic lies in, by handle and title, with the share of its

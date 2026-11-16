@@ -7,6 +7,7 @@ import { runSubagent } from "../sdk/task.ts";
 import type { DemoResult } from "../../core/contracts.ts";
 import { getHeadless, type DemoRunResult, type HeadlessApi } from "./headless.ts";
 import { healToolRecord } from "../tools/heal.ts";
+import { withDemoBase } from "../../core/demo-frame.ts";
 
 /**
  * The demo-builder sub-agent (vision §2 interactive demos + §2.5 "sub-agents
@@ -60,7 +61,14 @@ Build quality:
 - Controls need labels; sliders/inputs need current-value readouts. A learner should operate it unguided.
 - Show only what the brief asks it to show: add no readout, header line or footer of your own, and never print a formula or computed result the brief does not ask for (a learner finds those himself).
 - Smooth enough interaction; requestAnimationFrame for animation, not setInterval when it matters.
-- Dark-mode neutral: pick a clean light background for the demo area so it reads on any card.
+- A clean light page. The document starts with the app's base stylesheet (shadcn's button variants in its
+  light tokens): a plain <button> is the outline button, class="primary" the filled one, class="secondary"
+  the soft one. Use them as they are; never restyle a button's colours. run_demo fails a control whose
+  words do not read against what lies under it.
+- One screen: the whole demo, controls and readouts included, is seen at once in a frame about 700px wide
+  and 600px tall, with no scrolling.
+- Labels say what each control and readout is. No helper lines, footers or instructions under the demo
+  ("Hover a bar to see…", "Resets when n changes…").
 
 THE HOUSE RULE — never deliver untested:
 1. Call write_demo with the complete HTML document.
@@ -128,7 +136,8 @@ export function createDemoBuilderTools(
 				if (reason) return `HEADLESS UNAVAILABLE: ${reason}`;
 				let result: DemoRunResult;
 				try {
-					result = await headless.runDemo(state.html, probe ? { probe } : undefined);
+					// The test runs the document as his app shows it, on the base (`withDemoBase`).
+					result = await headless.runDemo(withDemoBase(state.html), probe ? { probe } : undefined);
 				} catch (err) {
 					const msg = err instanceof Error ? err.message : String(err);
 					onActivity?.("run_demo: browser error");
@@ -150,6 +159,7 @@ function summarizeCounts(result: DemoRunResult): string {
 		result.consoleErrors.length > 0 ? `${result.consoleErrors.length} console error${result.consoleErrors.length === 1 ? "" : "s"}` : null,
 		result.pageErrors.length > 0 ? `${result.pageErrors.length} page error${result.pageErrors.length === 1 ? "" : "s"}` : null,
 		result.failedRequests.length > 0 ? `${result.failedRequests.length} failed request${result.failedRequests.length === 1 ? "" : "s"}` : null,
+		(result.unreadable?.length ?? 0) > 0 ? `${result.unreadable!.length} unreadable control${result.unreadable!.length === 1 ? "" : "s"}` : null,
 	].filter(Boolean);
 	return counts.length > 0 ? counts.join(", ") : "ok";
 }
@@ -160,7 +170,7 @@ function formatRunResult(result: DemoRunResult): string {
 			result.probeResult !== undefined
 				? ` Probe result: ${JSON.stringify(result.probeResult) ?? "undefined"}.`
 				: "";
-		return `PASSED: no console errors, no uncaught errors, no failed requests.${probe} If you are satisfied, finish with your notes; otherwise keep improving and re-test.`;
+		return `PASSED: no console errors, no uncaught errors, no failed requests, every control readable.${probe} If you are satisfied, finish with your notes; otherwise keep improving and re-test.`;
 	}
 	const sections: string[] = [`FAILED: ${summarizeCounts(result)}.`];
 	if (result.consoleErrors.length > 0)
@@ -169,6 +179,8 @@ function formatRunResult(result: DemoRunResult): string {
 		sections.push(`Uncaught errors:\n${result.pageErrors.slice(0, 10).map((e) => `- ${e}`).join("\n")}`);
 	if (result.failedRequests.length > 0)
 		sections.push(`Failed requests:\n${result.failedRequests.slice(0, 10).map((r) => `- ${r}`).join("\n")}`);
+	if (result.unreadable?.length)
+		sections.push(`Unreadable controls (their words against what lies under them; 4.5:1 is the least):\n${result.unreadable.slice(0, 10).map((r) => `- ${r}`).join("\n")}\nLeave a button's colours to the page's base (a plain <button>, class="primary" or class="secondary"), or set its text colour with its background.`);
 	sections.push("Fix the document (write_demo) and re-test (run_demo).");
 	return sections.join("\n");
 }
@@ -176,7 +188,7 @@ function formatRunResult(result: DemoRunResult): string {
 /** Short summary of a run for failure notes. */
 function failureSummary(result: DemoRunResult | null): string {
 	if (!result) return "never tested";
-	const details = [...result.consoleErrors, ...result.pageErrors, ...result.failedRequests].slice(0, 5);
+	const details = [...result.consoleErrors, ...result.pageErrors, ...result.failedRequests, ...(result.unreadable ?? [])].slice(0, 5);
 	return details.length > 0 ? `${summarizeCounts(result)} — ${details.join(" | ")}` : summarizeCounts(result);
 }
 
@@ -234,7 +246,7 @@ export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderO
 		opts.onActivity?.("final verification");
 		let verify: DemoRunResult;
 		try {
-			verify = await headless.runDemo(state.html);
+			verify = await headless.runDemo(withDemoBase(state.html));
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
 			return { title, html: "", tested: true, notes: `FAILED: final verification crashed — ${msg}` };

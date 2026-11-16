@@ -9,7 +9,7 @@ import { InvertDiscIcon } from "@/components/artifacts/invert-disc";
 import { ChatActionsContext } from "@/components/chat";
 import { downloadFile, slugFilename } from "@/components/artifacts/download";
 import { DispatchCard } from "@/components/artifacts/dispatch-card";
-import type { ArtifactPartProps, DemoResult } from "@/src/core";
+import { withDemoBase, type ArtifactPartProps, type DemoResult } from "@/src/core";
 
 /**
  * Demo artifact card (W6): while the part is input-available, a job activity
@@ -48,8 +48,11 @@ setTimeout(post,50);
 setTimeout(post,400);
 })();</script>`;
 
-/** Inject the bridge before </body> (or at the end of a body-less document). */
-export function buildDemoSrcDoc(html: string): string {
+/** The demo on its base (`withDemoBase`: a light page, shadcn's button
+ *  variants, never the browser's dark colours; round 12, 2 M2), with the
+ *  bridge before </body> (or at the end of a body-less document). */
+export function buildDemoSrcDoc(source: string): string {
+	const html = withDemoBase(source);
 	if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${DEMO_BRIDGE_SCRIPT}</body>`);
 	return `${html}${DEMO_BRIDGE_SCRIPT}`;
 }

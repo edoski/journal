@@ -4,7 +4,8 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SessionStarter, type SessionCreation } from "@/components/start-session";
 import type { Unit } from "@/components/unit-inbox/units";
-import { topicOpening } from "@/src/core";
+import { topicOpening, type ChatListItem, type CourseMap, type CourseMapTopic } from "@/src/core";
+import { topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { examGapAsk } from "@/components/study-words";
 
 /** The row action that starts a session on a unit, worded as the course map's. */
@@ -41,6 +42,22 @@ export function useStartSession(): { start: (key: string, creation: SessionCreat
  *  (`topicOpening`). */
 export function topicCreation(workspace: string, topic: Pick<Unit["topic"], "title" | "handle" | "review">, today: string): SessionCreation {
 	return { title: topicOpening(topic, today), course: { workspace }, topics: [topic.handle] };
+}
+
+/** A press on a topic from any surface, as its topic page's action
+ *  (`topicAction`) takes it: the session to open (`resume`), else what to
+ *  start, an open task continued as the page continues it, else a session
+ *  on the topic. `continues` when it picks up a session or a task he began,
+ *  so the press reads Continue, never Start (round 12, 1 D5: the course
+ *  head's "Start Poisson distribution" opened a second chat for the lesson
+ *  he had begun). Pure. */
+export function topicPress(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): { resume: ChatListItem | null; creation: SessionCreation; continues: boolean } {
+	const action = topicAction(topic, map, chats);
+	const creation = topicCreation(map.workspace, topic, map.today);
+	const continues = action.kind === "resume" || action.kind === "open" || action.kind === "continue";
+	if ("chat" in action) return { resume: action.chat, creation, continues };
+	if (action.kind !== "continue") return { resume: null, creation, continues };
+	return { resume: null, creation: { title: action.opening, course: { workspace: map.workspace }, topics: [topic.handle], ...(action.from ? { resume: { from: action.from } } : {}) }, continues };
 }
 
 /** Starts a session on a unit in its course (`topicCreation`). */

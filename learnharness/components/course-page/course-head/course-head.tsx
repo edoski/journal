@@ -44,7 +44,7 @@ export function CourseHead({ view, standing, busy, onContinue }: { view: CourseV
 				lead={
 					<div className="flex min-w-0 flex-col gap-0.5">
 						<ReadyLine course={course} ready={ready} />
-						<ExamGapLine course={course} />
+						<ExamGapLine course={course} chats={chats} />
 					</div>
 				}
 				standing={

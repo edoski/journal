@@ -286,8 +286,10 @@ const DONE_GRADED = "An answer he sent before pressing it is still graded and sa
 const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
- *  the kernel problem you closed … to pick up"). */
-const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: only what his record keeps for next time, an open task at its place (part (c) of the sheet) and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
+ *  the kernel problem you closed … to pick up"), and only this session's:
+ *  another session's open work is Home's to name (round 12, 3 D7: Rank
+ *  practice closed on "Part (c) of Problem sheet 4 is still open"). */
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:

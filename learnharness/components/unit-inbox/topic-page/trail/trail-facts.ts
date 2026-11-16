@@ -23,13 +23,15 @@ export const TRY_WORDS = { first: "First try", then: "Then" } as const;
 
 /** One day of the line: its words, then its rows. */
 export interface TrailDay {
-	/** YYYY-MM-DD: a session's last message, or the engine's study day of an attempt. */
+	/** YYYY-MM-DD: the engine's study day of a session's newest answer
+	 *  (its last message when it saved none), or of an attempt. */
 	day: string;
 	/** "Today", "Yesterday", "Tue 3 Nov". */
 	label: string;
 	/** The attempts of no listed session, newest first; then each session,
-	 *  newest first by last message, followed by its own attempts, newest
-	 *  first. A session's attempts sit under it on its day. */
+	 *  newest first by its newest answer (its last message when it saved
+	 *  none), followed by its own attempts, newest first. A session's
+	 *  attempts sit under it on its day. */
 	rows: TrailRow[];
 }
 
@@ -61,9 +63,13 @@ export function trailDays(sessions: readonly SessionEntry[], attempts: readonly 
 		if (!found) days.set(day, (found = { loose: [], sessions: [] }));
 		return found;
 	};
-	for (const entry of sessions) dayOf(entry.day).sessions.push(entry);
-	for (const attempt of attempts) if (!attempt.session || !listed.has(attempt.session)) dayOf(attempt.date).loose.push(attempt);
 	const saved = (entry: SessionEntry) => attempts.filter((attempt) => attempt.session === entry.chat.id).sort(byRecorded);
+	// A session sits on the day of its newest answer on the topic, never its last message (round 12, 1 m12: an Ask on
+	// 17 Nov in the 8 Nov lesson's chat put the lesson's answers under Today, above the 9 Nov review's).
+	const newest = (entry: SessionEntry) => saved(entry)[0];
+	for (const entry of sessions) dayOf(newest(entry)?.date ?? entry.day).sessions.push(entry);
+	for (const attempt of attempts) if (!attempt.session || !listed.has(attempt.session)) dayOf(attempt.date).loose.push(attempt);
+	const latest = (entry: SessionEntry) => newest(entry)?.recorded ?? entry.chat.updatedAt;
 	return [...days.entries()]
 		.sort(([a], [b]) => newestFirst(a, b))
 		.map(([day, found]) => ({
@@ -71,7 +77,7 @@ export function trailDays(sessions: readonly SessionEntry[], attempts: readonly 
 			label: dayWords(day, today),
 			rows: [
 				...retitled(found.loose.sort(byRecorded)),
-				...found.sessions.sort((a, b) => newestFirst(a.chat.updatedAt, b.chat.updatedAt)).flatMap((entry): TrailRow[] => [{ kind: "session", entry }, ...retitled(saved(entry))]),
+				...found.sessions.sort((a, b) => newestFirst(latest(a), latest(b))).flatMap((entry): TrailRow[] => [{ kind: "session", entry }, ...retitled(saved(entry))]),
 			],
 		}));
 }

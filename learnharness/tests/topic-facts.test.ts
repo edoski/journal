@@ -484,7 +484,7 @@ describe("how an attempt went", () => {
 		assert.deepEqual(attemptMark(attempt({ grade: "helped", uncertain: true }), titleOf), { result: "right", words: "Not yet confirmed" }, "the engine doubts it: not his own yet (round 7)");
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", gaveUp: true, unaided: false }), titleOf), { result: "wrong", words: "Gave up" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", predicted: true, sure: "confident" }), titleOf), { result: "wrong", words: "Prediction, not counted" });
-		assert.deepEqual(attemptMark(attempt({ result: "incorrect", unaided: false }), titleOf), { result: "wrong", words: null });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", unaided: false }), titleOf), { result: "wrong", words: "Not right" }, "every result not right says so (round 12, 1 m12)");
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false }), titleOf), { result: "wrong", words: "Sure, but wrong" });
 		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false, chose: "cramer" }), titleOf), { result: "wrong", words: "Mixed up with Cramer's rule" });
 	});

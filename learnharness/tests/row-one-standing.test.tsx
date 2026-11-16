@@ -46,7 +46,10 @@ const practice = chat({ id: "rank", title: "Rank practice", kind: "practice", pe
 describe("one status word per row (round 10, 1 m4)", () => {
 	it('says "Mistake to fix" alone beside the warning pie, never with Slipping', () => {
 		const words = "Mistake to fix";
-		const line = draw(rankCourse({ gap: "Counts entries, not pivots", mistake: true }), [practice]).querySelector('[data-slot="today-line"]')!;
+		// The course's next step on Rank, with no session open: a plain "Next up" gives way to the slip (round 12, 1 m3).
+		const weak = rankCourse({ gap: "Counts entries, not pivots", mistake: true });
+		const learning = { ...weak, map: { ...weak.map, topics: weak.map.topics.map((t) => ({ ...t, level: "assisted" as const })) } };
+		const line = draw(learning, []).querySelector('[data-slot="today-line"]')!;
 		const text = line.textContent ?? "";
 		assert.equal(text.split(words).length - 1, 1, `"${words}" once: ${text}`);
 		assert.doesNotMatch(text, /Slipping/);
@@ -86,10 +89,12 @@ describe("an open mistake on a topic not weak (round 10, 1 m4)", () => {
 		);
 	});
 
-	it("is the row's one status on Home", () => {
-		const eigen = chat({ id: "eigen", pendingQuestion: true, updatedAt: "2026-11-09T09:00:00.000Z" });
-		const line = draw(course, [eigen]).querySelector('[data-slot="today-line"]')!;
+	it("is the row's one status on Home where the row says no more than Next up, and a lesson waiting on him says Your turn (round 12, 1 m3)", () => {
+		const line = draw(course, []).querySelector('[data-slot="today-line"]')!;
 		assert.equal(line.querySelector('[data-slot="today-standing"]')?.textContent, "Mistake to fix");
 		assert.doesNotMatch(line.textContent ?? "", /Partly right/);
+		const eigen = chat({ id: "eigen", pendingQuestion: true, updatedAt: "2026-11-09T09:00:00.000Z" });
+		const waiting = draw(course, [eigen]).querySelector('[data-slot="today-line"]')!;
+		assert.equal(waiting.querySelector('[data-slot="today-why"]')?.textContent, "Your turn");
 	});
 });
