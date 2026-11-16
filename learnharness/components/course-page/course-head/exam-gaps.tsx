@@ -32,7 +32,10 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 	const { ways } = gaps;
 	const named = [...gaps.start, ...gaps.review];
 	const open = (topic: CourseMapTopic) => start(`gap:${topic.handle}`, topicCreation(workspace, topic, course.map.today));
-	const only = ways.length === 1 && !ways[0]!.planned ? ways[0]! : null;
+	// "Start it today" only where "it" is the one topic the line names; with two
+	// named, the press names its own (round 12, 1 m2: "No room… for Inner
+	// products and Orthogonal projection… Start it today").
+	const only = ways.length === 1 && !ways[0]!.planned && named.length === 1 ? ways[0]! : null;
 	// The pick: the first way, today's plan before the topics left out, a
 	// review before a start (round 8: eight options and no pick; rounds 10
 	// and 11: the tutor's and Home's order).
