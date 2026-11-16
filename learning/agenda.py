@@ -695,6 +695,8 @@ class When:
     """Why each start comes when it does (``Why``)."""
     reasons: Mapping[str, Reason] = field(default_factory=dict)
     """Why each topic of ``does_not_fit`` and ``unreviewed`` is left out."""
+    final: date | None = None
+    """The final-review start the plan was made with (``Plan.finals``)."""
 
     def review(self, topic: str, stored: str | None) -> str | None:
         placed = self.reviews.get(topic)
@@ -725,6 +727,9 @@ class Plan:
     reasons: dict[str, dict[str, Reason]] = field(default_factory=dict)
     """Why each topic of ``does_not_fit`` and ``unreviewed`` is left out, by
     course and topic (``Reason``)."""
+    finals: dict[str, date] = field(default_factory=dict)
+    """Each exam course's final-review start this plan was made with: the
+    one every view names (``replay``)."""
 
     def when(self, name: str, today: date, studies: bool) -> When:
         reviews: dict[str, date] = {}
@@ -747,6 +752,7 @@ class Plan:
             dict(self.starts_after.get(name, {})),
             {topic: self.why[name][topic] for topic in starts if name in self.why},
             dict(self.reasons.get(name, {})),
+            self.finals.get(name),
         )
 
 
@@ -1332,15 +1338,22 @@ class Replay:
     made on that day: the days he was last told. None before his first."""
     studied: date | None
     afresh: bool = False
-    """Whether today began with a plan made afresh: that day left work owed,
-    or a day he studies went by with no study after it (``missed``)."""
+    """Whether today began with a plan made afresh: the last day he studied
+    left an item of its plan untouched (``left``) and showed where he
+    stops, or a day he studies went by with no study after it (``missed``)."""
     missed: bool = False
     since: date | None = None
     """The first day of the run the replay holds: the day that began with a
     plan made afresh. Only saves from then on move a day past his limit."""
     left: Mapping[str, set[str]] = field(default_factory=dict)
-    """By course, what ``told`` put on ``studied`` and he left undone, when
-    today began from it: the only topics the night moves."""
+    """By course, what ``told`` put on ``studied`` and he left undone: when
+    today began from it, the only topics the night moves."""
+    finals: Mapping[str, tuple[str, str]] = field(default_factory=dict)
+    """By course whose stored record leaves its final review to the plan
+    (``progress.unplanned``), the exam day and final-review start today's
+    plan was made with: read from his pace on the day the run began
+    (``since``), and held through the days he finished since, as the days
+    he was told are."""
 
 
 def plan(
@@ -1384,15 +1397,22 @@ def replay(
     20 Nov an hour after its own save told 12). A topic whose start moves
     takes its reviews with it, so none comes before its first lesson.
 
-    A day begins from the plan as the last day he studied ended, when he
-    finished that day's work and missed no day he studies since: the night
-    moves nothing but what that plan left on its day, so a finished day's
-    days all hold (round 10: one moved 19 dates overnight). A day that left
-    work owed (``capacity.Done``'s ``reviews_short`` or ``new_short``), or a
-    day he studies gone by with no study, is his own study moving the days,
-    so the next begins with a plan made afresh from the record as it began,
-    which spreads what he left within his limit. So the replay reaches back
-    through the days he finished, to the day after one he did not.
+    A day begins from the plan as the last day he studied ended: the night
+    moves nothing but what that plan left on its day, an item he neither
+    answered nor started, and that takes the room the days he was told
+    leave, so a finished day's days all hold (round 10: one moved 19 dates
+    overnight); and what it put on a day his week no longer studies, since
+    nothing lands on one. A day counts as unfinished only when it left such an item:
+    what his limit owed beyond the plan is his limit's evidence, never work
+    left, and an open question at Done for today leaves its topic answered
+    (round 11: a day whose plan was all done moved 36 dates overnight, and
+    the pages called it unfinished). An unfinished day that also showed
+    where he stops (``capacity.Done``'s ``reviews_short`` or ``new_short``),
+    or a day he studies gone by with no study, is his own study moving the
+    days, so the next begins with a plan made afresh from the record as it
+    began, which spreads what he left within his limit. So the replay
+    reaches back through the days he finished, to the day after one he did
+    not.
 
     ``week`` is his week on every day the plan is made; by default, what the
     records showed as each day began (``capacity.of``). Today's allowance is
@@ -1421,22 +1441,17 @@ def _day(
     weekly = week or capacity.of(morning.values(), day)
     studied = _last_studied(records, day)
     if studied is None:
-        began = _planned(morning, day, days, weekly, None)
-        now = _saved(records, day, days, weekly, began, until)
-        return Replay(now, began, None, None, since=day)
-    done = capacity.activity(morning.values(), day).get(studied, capacity.Done())
+        return _afresh(records, day, days, (weekly, morning), until, None)
     missed = any(
         weekly.studies(studied + timedelta(days=n))
         for n in range(1, (day - studied).days)
     )
     span = days + (day - studied).days
-    if missed or done.reviews_short or done.new_short:
-        began = _planned(morning, day, days, weekly, None)
-        now = _saved(records, day, days, weekly, began, until)
+    if missed:
         ended = (
             _day(records, studied, span, week, until, told=False).now if told else None
         )
-        return Replay(now, began, ended, studied, True, missed, day)
+        return _afresh(records, day, days, (weekly, morning), until, (ended, studied))
     before = _day(records, studied, span, week, until, told=False)
     ended = before.now
     left = {
@@ -1447,10 +1462,60 @@ def _day(
         }
         for name in records
     }
-    night = _Told(ended, left, studied, None, yields=True)
+    done = capacity.activity(morning.values(), day).get(studied, capacity.Done())
+    if any(left.values()) and (done.reviews_short or done.new_short):
+        return _afresh(
+            records, day, days, (weekly, morning), until, (ended, studied), left
+        )
+    finals = before.finals
+    morning = _at(records, day, None, until, finals)
+    weekly = week or capacity.of(morning.values(), day)
+    unstudied = {
+        name: {
+            topic
+            for planned in ended.days[name][(day - studied).days :]
+            if not weekly.studies(date.fromisoformat(planned["date"]))
+            for topic in (*planned["reviews"], *planned["new"])
+        }
+        for name in records
+    }
+    moving = {name: left[name] | unstudied[name] for name in records}
+    night = _Told(ended, moving, studied, None, yields=True)
     began = _planned(morning, day, days, weekly, night)
-    now = _saved(records, day, days, weekly, began, until)
-    return Replay(now, began, ended, studied, False, False, before.since, left)
+    now = _saved(records, day, days, weekly, began, until, finals)
+    return Replay(now, began, ended, studied, False, False, before.since, left, finals)
+
+
+def _afresh(
+    records: Mapping[str, dict[str, Any]],
+    day: date,
+    days: int,
+    read: tuple[Capacity, dict[str, dict[str, Any]]],
+    until: date,
+    last: tuple[Plan | None, date] | None,
+    left: Mapping[str, set[str]] | None = None,
+) -> Replay:
+    """The plan of a day that begins afresh (``replay``): from the records
+    as it began (``read``: his week and the courses, read with the final
+    reviews his pace gives them that morning), after ``last``, the plan the
+    last day he studied ended with and that day, when there is one."""
+    weekly, morning = read
+    finals = {
+        name: (record["exam"]["date"], record["exam"]["final_review"])
+        for name, record in morning.items()
+        if "final_review" in record.get("exam", {})
+        and progress.unplanned(
+            progress.begun(records[name], day) if day < until else records[name]
+        )
+    }
+    began = _planned(morning, day, days, weekly, None)
+    now = _saved(records, day, days, weekly, began, until, finals)
+    if last is None:
+        return Replay(now, began, None, None, since=day, finals=finals)
+    ended, studied = last
+    return Replay(
+        now, began, ended, studied, True, left is None, day, left or {}, finals
+    )
 
 
 def _at(
@@ -1458,8 +1523,62 @@ def _at(
     day: date,
     stamp: Stamp | None,
     until: date | None = None,
+    finals: Mapping[str, tuple[str, str]] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    return {name: as_of(record, day, stamp, until) for name, record in records.items()}
+    """Every course as it stood on ``day`` (``as_of``), read with the plan
+    as that day read it. A final review the stored record leaves to the
+    plan (``progress.unplanned``), or, on a day before ``until``, one not
+    yet begun that day (``progress.begun``), starts where ``finals`` holds
+    it, for the same exam day; else where his pace put it as that day began
+    (``capacity.final_reviews``), not where today's pace puts it, so a day
+    replayed is the day he was told (round 11: Probability's final review,
+    read from 10 Nov's pace, replayed 9 Nov's plan with a start a day later,
+    and 16 dates moved overnight after a day whose plan was all done)."""
+    unread = {
+        name
+        for name, record in records.items()
+        if progress.unplanned(
+            progress.begun(record, day) if until is not None and day < until else record
+        )
+    }
+    records = {
+        name: progress.with_final_review(record, None) if name in unread else record
+        for name, record in records.items()
+    }
+    held = {
+        name: progress.redated(
+            progress.with_final_review(record, date.fromisoformat(finals[name][1])),
+            day,
+        )
+        for name, record in records.items()
+        if finals
+        and name in unread
+        and name in finals
+        and finals[name][0] == record["exam"]["date"]
+    }
+    # ``as_of`` replays each topic with some final review; the reading below
+    # dates every one the engine set again, so the exam day serves until then.
+    placed = {
+        name: progress.with_final_review(
+            record, date.fromisoformat(record["exam"]["date"])
+        )
+        if name in unread
+        else record
+        for name, record in records.items()
+    }
+    stood = {
+        name: as_of(record, day, stamp, until)
+        for name, record in {**placed, **held}.items()
+    }
+    return capacity.final_reviews(
+        {
+            name: progress.with_final_review(record, None)
+            if name in unread and name not in held
+            else record
+            for name, record in stood.items()
+        },
+        day,
+    )
 
 
 def _last_studied(records: Mapping[str, dict[str, Any]], today: date) -> date | None:
@@ -1514,13 +1633,16 @@ def _saved(
     week: Capacity | None,
     began: Plan,
     until: date | None = None,
+    finals: Mapping[str, tuple[str, str]] | None = None,
 ) -> Plan:
     """The plan on ``day`` after each of its saves in turn, from ``began``,
-    the plan as the day began; ``until`` as ``as_of`` reads it."""
+    the plan as the day began; ``until`` and ``finals`` as ``_at`` reads
+    them."""
     result = began
     for stamp, touched in _saves(records, day):
         step = _Told(result, touched, day, began)
-        result = _planned(_at(records, day, stamp, until), day, days, week, step)
+        stood = _at(records, day, stamp, until, finals)
+        result = _planned(stood, day, days, week, step)
     return result
 
 
@@ -1656,6 +1778,7 @@ def _planned(
                 )
             )
         },
+        {course.name: course.exam.final for course in courses if course.exam},
     )
 
 

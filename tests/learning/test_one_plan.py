@@ -183,3 +183,52 @@ def test_every_verb_gives_each_topic_the_plan_s_day(
             last,
         ) == {key: when for key, when in planned.items() if key[:2] == (name, "new")}
         assert resume["course"]["exam"]["final_review"] == exam["final_review"]
+
+
+def test_a_day_whose_plan_he_finished_moves_nothing_overnight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """On 9 Nov he did every item its plan held, and closed each lesson with
+    Done for today on an open question: the next morning keeps every day he
+    was told (round 11: 36 dates moved, each "yesterday's plan was not
+    finished")."""
+    world = World(tmp_path, "day-done", monkeypatch, capsys)
+    evening, morning = world.maps("2026-11-09"), world.maps("2026-11-10")
+    told, now = map_days(evening), map_days(morning)
+    assert {key: when for key, when in now.items() if told.get(key) != when} == {}
+    assert [
+        (name, topic["topic"])
+        for name, shown in morning.items()
+        for topic in shown["topics"]
+        if topic.get("moved")
+    ] == []
+
+
+def test_a_moved_day_names_the_day_he_was_told(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """He last studied on 10 Nov and came back on 17 Nov: each moved day
+    names the day the plan gave it as 10 Nov ended, the one every view and
+    close told him (round 11: Eigen's "moved from Saturday 14 November", a
+    day he was never shown)."""
+    world = World(tmp_path, "day-after", monkeypatch, capsys)
+    told = map_days(world.maps("2026-11-10"))
+    later = world.maps("2026-11-17")
+    moved = {
+        (name, "new" if topic.get("starts") else "reviews", topic["topic"]): topic[
+            "moved"
+        ]
+        for name, shown in later.items()
+        for topic in shown["topics"]
+        if topic.get("moved")
+    }
+    assert moved, "a week away moves days"
+    assert {key: why["from"] for key, why in moved.items()} == {
+        key: told[key] for key in moved
+    }
+    assert {why["by"] for why in moved.values()} == {"missed"}
+    assert {why["on"] for why in moved.values()} == {"2026-11-10"}

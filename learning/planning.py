@@ -123,7 +123,9 @@ def _days(
         return None
     return compact(
         {
-            "final_review_days": (exam.day - exam.final).days if exam else None,
+            "final_review_days": (exam.day - (when.final or exam.final)).days
+            if exam
+            else None,
             "days": proposed,
             "why": {
                 topic: why[topic]
@@ -169,7 +171,7 @@ def _course(
     planned = together.when(name, today, bool(week.study_weekdays))
     due, _ = tonight(progress.due(record, today, levels=levels, order=order), planned)
     key, task = selected_task(record)
-    countdown = exam(record, today)
+    countdown = exam(record, today, planned)
     current = record.get("path", {}).get("current")
     return compact(
         {

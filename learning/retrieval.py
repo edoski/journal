@@ -116,11 +116,16 @@ def selected_task(
     return key, tasks.get(key, {}) if key else {}
 
 
-def exam(record: dict[str, Any], today: date) -> dict[str, Any] | None:
-    """The exam with its countdown."""
+def exam(
+    record: dict[str, Any], today: date, planned: agenda.When | None = None
+) -> dict[str, Any] | None:
+    """The exam with its countdown; with ``planned``, the final-review start
+    the daily plan was made with (``agenda.When.final``)."""
     if "exam" not in record:
         return None
     result = dict(record["exam"])
+    if planned is not None and planned.final is not None:
+        result["final_review"] = planned.final.isoformat()
     if "arcs" in result:
         result["arc_titles"] = [record["arcs"][arc]["title"] for arc in result["arcs"]]
     if "date" in result:
@@ -361,12 +366,14 @@ def _arc_of(record: dict[str, Any], topic: str) -> list[str]:
     return [] if arc is None else [arc]
 
 
-def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
+def _course(
+    record: dict[str, Any], today: date, planned: agenda.When
+) -> dict[str, Any]:
     return compact(
         {
             "title": record.get("title"),
             "goal": record.get("goal"),
-            "exam": exam(record, today),
+            "exam": exam(record, today, planned),
             "journal": record.get("journal"),
         }
     )
@@ -457,7 +464,7 @@ def resume(
         "today": today.isoformat(),
         "revision": record.get("revision", 0),
         "new_course": True if "revision" not in record else None,
-        "course": _course(record, today),
+        "course": _course(record, today, planned),
         "last_activity": last_activity(record, today),
         "new_week": True if new_week(record, today) else None,
         "due": [_brief(item, topics) for item in due[:DUE_LIMIT]],
@@ -685,7 +692,7 @@ def _runup(
             "arcs": countdown.get("arcs"),
             "leaves_out": countdown.get("leaves_out"),
             "needed": needed or None,
-            "final_review": plan.final.isoformat() if plan else None,
+            "final_review": (planned.final or plan.final).isoformat() if plan else None,
             "does_not_fit": planned.does_not_fit,
             "unreviewed": planned.unreviewed,
             "reasons": dict(planned.reasons),
@@ -782,7 +789,7 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
             ],
         }
         topics.append(compact(entry, keep=("needs", "contrasts", "tasks", "weak")))
-    countdown = exam(record, today)
+    countdown = exam(record, today, planned)
     return compact(
         {
             "today": today.isoformat(),
@@ -900,7 +907,7 @@ def _readiness(
 ) -> dict[str, Any] | None:
     """The exam's parts and where each topic stands for it; None without an
     exam ahead."""
-    countdown = exam(record, today)
+    countdown = exam(record, today, planned)
     if not countdown or "date" not in countdown or countdown["days_left"] < 0:
         return None
     examined = arc_rules.examined(record)
@@ -1228,8 +1235,11 @@ def daily(readable: Mapping[str, dict[str, Any]], today: date) -> agenda.Replay:
     (``agenda.replay``), so the plan he was told on a day is the plan the
     replay makes of it later (round 11: ``plan`` made every replayed day
     with today's week, ``map`` with each day's own, and the topic page said
-    Eigen Thu 12 Nov while the calendar and the close said Mon 16)."""
-    return agenda.replay(readable, today, agenda.MAX_DAYS)
+    Eigen Thu 12 Nov while the calendar and the close said Mon 16). The
+    replay reads each day's final review as that day did, so it is given
+    each course as stored (``progress.begun``)."""
+    stored = {name: progress.begun(record, today) for name, record in readable.items()}
+    return agenda.replay(stored, today, agenda.MAX_DAYS)
 
 
 def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
@@ -1261,9 +1271,10 @@ def moved(
     was last told, the day the plan gave it as the last day he studied
     before today ended (``agenda.Replay.told``), with why it moved. Only his
     study moves a day (``agenda.replay``): ``missed``, a day he studies went
-    by with no study since, so today's plan was made afresh; ``left``, he
-    left work owed that day, so the plan spread it, or the day he was told
-    went by with it undone; both with ``on``, the last day he studied; ``study`` with ``day`` today, his answers today
+    by with no study since, so today's plan was made afresh; ``left``, the
+    day he was told went by with an item of its plan neither answered nor
+    started, that item or, when that day also showed where he stops, any
+    the plan spread anew; both with ``on``, the last day he studied; ``study`` with ``day`` today, his answers today
     in ``courses`` made a topic it waited on not ready (a topic he answered
     or started today has its own new day and is not listed). A day that moved for none of these has no
     cause in his study, so it is not listed as moved: a told day that moves
