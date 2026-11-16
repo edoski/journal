@@ -18,6 +18,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import { Type } from "typebox";
 import { onFake, sendToUser, type ScriptedModel } from "./helpers/fake-sdk.ts";
 import { signInTestClaude } from "./claude-fixture.ts";
 
@@ -31,7 +33,8 @@ const { handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { jobStore } = await import("../src/store/jobs.ts");
-const { needsContinuation, pendingQuestionOf } = await import("../src/core/native-messages.ts");
+const { needsContinuation, newUserMessage, pendingQuestionOf } = await import("../src/core/native-messages.ts");
+const { ClosedTurn } = await import("../src/agent/closed-turn.ts");
 const { sessionEndOf } = await import("../src/core/session-end.ts");
 const { continuesTask, sessionState } = await import("../components/nav/session-state.ts");
 const { reposeLeftQuestions } = await import("../src/server/chats.ts");
@@ -142,6 +145,37 @@ describe("Done for today with a question open (round 14, M1)", () => {
 		const saved = chatStore.getChat(chat.id)!.messages;
 		assert.equal(pendingQuestionOf(saved), null, "the re-ask is refused");
 		assert.equal(sessionState(summary(chat.id)), "left");
+	});
+
+	it("takes his pick of the tutor's own stop as his Done for today, and starts nothing after it (round 14, M6)", async () => {
+		const CHOICE = { question: "What next?", options: [{ label: "Practice problems on eigenvalues", stops: false }, { label: "Stop here for today", stops: true }] };
+		const { engine, histories } = scripted([
+			() => fauxAssistantMessage([fauxToolCall("ask_user_question", CHOICE, { id: "call-choice" })], { stopReason: "toolUse" }),
+			close,
+			() => sendToUser("Your first review is tomorrow."),
+			() => fauxAssistantMessage([fauxToolCall("plan_init", { mermaid: "graph TD\n  rank[The rank of the sheet's matrix]" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage(""),
+		]);
+		const chat = lesson("Test: stop choice");
+		await turn(engine, chat.id, { type: "text", text: "teach me the planets" });
+		const pick = { kind: "ask", questionText: CHOICE.question, options: [{ index: 1, label: CHOICE.options[0]!.label }, { index: 2, label: CHOICE.options[1]!.label }], answers: [{ label: "Stop here for today", value: "Stop here for today", index: 2 }], answeredAt: "2026-11-08T18:00:00.000Z" };
+		await turn(engine, chat.id, { type: "answer", toolCallId: "call-choice", answer: pick });
+		const saved = chatStore.getChat(chat.id)!.messages;
+		const answered = saved.findIndex((m) => m.role === "toolResult" && m.toolCallId === "call-choice");
+		assert.ok(saved.slice(answered).some((m) => m.role === "custom" && m.customType === "done-tonight"), "his pick is his Done for today");
+		assert.match(histories[1]!, /DONE FOR TODAY/, "so the tutor is told to close");
+		assert.equal(histories.length, 3, "and its closing words end the turn");
+
+		// The continue that opened sheet 4 in the Eigen chat is owed nothing now.
+		await turn(engine, chat.id, { type: "continue" });
+		assert.equal(histories.length, 3, "a continue after the close runs no turn");
+
+		// A wake after the close (a job's result) starts nothing new either.
+		const planned = (): AgentTool<any> => ({ name: "plan_init", label: "plan_init", description: "", parameters: Type.Object({}), execute: async () => ({ content: [{ type: "text", text: "planned" }], details: null }) });
+		const refused = (await new ClosedTurn(saved).wrap(planned()).execute("call-plan", {})) as { isError?: boolean };
+		assert.equal(refused.isError, true, "no new plan in a session closed for today");
+		const open = (await new ClosedTurn([...saved, newUserMessage("one more, please")]).wrap(planned()).execute("call-plan", {})) as { isError?: boolean };
+		assert.notEqual(open.isError, true, "his next message reopens it");
 	});
 
 	it("reads left on a record whose close ended in the tutor's own re-ask (the round-14 records)", async () => {

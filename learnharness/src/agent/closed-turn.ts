@@ -3,7 +3,7 @@ import type { ToolCall } from "@earendil-works/pi-ai";
 import { LESSON_PROGRESS_TOOL, lessonProgressOf } from "../core/contracts/plan.ts";
 import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../core/native-messages.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { doneTonightAtEnd } from "../core/session-end.ts";
+import { closedTonight } from "../core/session-end.ts";
 
 /** The calls that start something he must answer or that runs on: a
  *  question, a problem, a lesson plan, a probe's end (it starts the
@@ -17,8 +17,9 @@ const CLOSED: AgentToolResult<null> = {
 };
 
 /**
- * One turn's stop after the session closed for today: once the turn
- * answers his Done for today, or the tutor's own `lesson_progress` with
+ * One turn's stop after the session closed for today: in a turn that
+ * answers his Done for today, or that runs after a close with no word from
+ * him since (a wake), and once the tutor's own `lesson_progress` with
  * `close` has streamed, every call that starts new work is refused
  * (round 14, M1 and M6: after the closing words the tutor asked the left
  * question again, or opened Problem sheet 4 in the Eigen lesson and posed
@@ -28,7 +29,7 @@ export class ClosedTurn {
 	private closed: boolean;
 
 	constructor(messages: readonly LhMessage[]) {
-		this.closed = doneTonightAtEnd(messages);
+		this.closed = closedTonight(messages);
 	}
 
 	/** Read a call as it finishes streaming: the close counts from there,
