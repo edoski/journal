@@ -62,6 +62,8 @@ import {
 	toolQuestionKind,
 	closedTonight,
 	doneTonightAtEnd,
+	firstProblemTopicsOf,
+	sessionEndOf,
 	replyCutOf,
 	latestMarkedAnswer,
 	appOpeningAt,
@@ -156,6 +158,9 @@ function isSubagentSteer(m: LhViewMessage): boolean {
  * never overlapping the transcript at rest —
  * and DockOverlay animates its height on variant changes.
  */
+/** A session started on no topics. */
+const NO_TOPICS: readonly string[] = [];
+
 export function Chat({
 	chatId,
 	title,
@@ -164,6 +169,7 @@ export function Chat({
 	initialPrompt,
 	initiallyInFlight,
 	startedIn,
+	topics = NO_TOPICS,
 	appOpening = false,
 	course,
 	place,
@@ -187,6 +193,8 @@ export function Chat({
 	 *  over the transcript from it: practice renders a Practice tag in
 	 *  place of the phase chip. */
 	startedIn?: SessionMode;
+	/** The topics the session was started on (the record's `topics`). */
+	topics?: readonly string[];
 	/** Started by a press on its topics: its first message is the app's
 	 *  opening, not his words, and draws no bubble (`appOpeningAt`). */
 	appOpening?: boolean;
@@ -1030,6 +1038,9 @@ export function Chat({
 	// The session's live plan: its steps, where he is on them and where each
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
+	// The tutor ended the session (a review that closed itself): nothing waits, so nothing to stop (round 14, m32).
+	const ownTopics = useMemo(() => (topics.length > 0 ? topics : mode === "practice" ? firstProblemTopicsOf(nativeMessages) : []), [topics, mode, nativeMessages]);
+	const sessionFinished = useMemo(() => !busy && sessionEndOf(nativeMessages, planTree ?? undefined, startedIn, ownTopics) === "closed", [busy, nativeMessages, planTree, startedIn, ownTopics]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
 	const reaskedAfterHint = useMemo(() => askedAfterHint(messages), [messages]);
@@ -1576,7 +1587,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, open: workOpen, courseGone, lessonGone: gone })} disabled={doneTonight && !workOpen} />}
+						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, open: workOpen, finished: sessionFinished, courseGone, lessonGone: gone })} disabled={doneTonight && !workOpen} />}
 					/>
 				</TopBar>
 

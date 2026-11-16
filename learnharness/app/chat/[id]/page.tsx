@@ -25,6 +25,7 @@ export default async function ChatPage({
 			chatId={chat.id}
 			title={chat.title}
 			startedIn={chat.kind}
+			topics={chat.topics}
 			appOpening={openedByApp(chat)}
 			course={chat.course}
 			place={place ?? undefined}
