@@ -140,12 +140,14 @@ const predictCheckType = Type.Union([Type.Literal("predict"), Type.Literal("chec
 // the client never grades free text).
 
 /** The ask's own rule where the question is written (round 11: 11 refusals
- *  of a reason asked as a second question, "…? Why does that formula
- *  apply?"); voice-check's `compoundAsk` holds both examples to it. */
+ *  of a reason asked as a second ask, "…, and why does each factor of your
+ *  expression belong there?"). Said in its positive form only: the
+ *  counterexample the voice gave was the very ask drafts kept writing.
+ *  voice-check's `compoundAsk` holds the example to it. */
 export const ONE_ASK_RULE =
-	"It asks one thing. His reason is asked only by ending that same ask with \", and why?\" " +
-	"(\"What is the rank of $A$, and why?\"), never by a second question or a sentence after it " +
-	"(\"What is the rank of $A$? Why does that hold?\", \"Justify your answer.\").";
+	"It asks one thing. His reason is asked by ending that one ask with \", and why?\" " +
+	"(\"What is the probability that exactly one of 12 bulbs fails, and why?\"), which covers each factor of a formula too; " +
+	"the question ends there.";
 
 export const explainInputBase = Type.Object({
 	question: Type.String({

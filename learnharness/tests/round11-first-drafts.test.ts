@@ -18,13 +18,21 @@ describe("a question's field states the one-ask rule (round 11: a reason asked a
 		assert.ok(explainInputBase.properties.question.description!.includes(ONE_ASK_RULE));
 	});
 
-	it("its good example is one ask, and its bad ones are refused, as the round-11 drafts were", () => {
-		const [suffix, good, twoQuestions, sentenceAfter] = quoted(ONE_ASK_RULE);
+	it("its example is one ask, and the round-11 drafts it replaces are refused", () => {
+		const [suffix, good] = quoted(ONE_ASK_RULE);
 		assert.equal(suffix, ", and why?");
 		assert.equal(compoundAsk(good!), null, good);
-		assert.ok(compoundAsk(twoQuestions!), twoQuestions);
-		assert.ok(compoundAsk("What is the probability that exactly 3 answers are right? Why does that formula apply?"), "the refused probe question");
-		assert.match(sentenceAfter!, /^Justify your answer\.$/);
+		for (const draft of [
+			"What is the probability that exactly 3 answers are right? Why does that formula apply?",
+			"What is the probability that exactly one bulb fails, and why does each factor of your expression belong there?",
+		]) assert.ok(compoundAsk(draft), draft);
+	});
+
+	it("neither the field nor the voice spells out the ask drafts kept writing (round 10's counterexample)", async () => {
+		const fs = await import("node:fs");
+		const voice = fs.readFileSync(new URL("../src/agent/prompts/shared/10-voice.md", import.meta.url), "utf-8");
+		for (const text of [voice, ONE_ASK_RULE]) assert.doesNotMatch(text, /why does each factor/);
+		assert.match(voice, /It covers a formula's parts too/);
 	});
 });
 
