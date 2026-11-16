@@ -2,7 +2,7 @@ from datetime import date, timedelta
 import math
 from typing import Any
 
-from learning import agenda, capacity, progress, schema
+from learning import agenda, capacity, preferences, progress, schema
 from learning.capacity import Capacity, Done, Limit, Weekday
 
 # The final review these tests were written for; a save derives it from his
@@ -842,9 +842,18 @@ def test_a_fractional_pace_starts_on_some_days_and_leaves_the_rest_to_a_course_w
     assert [a + b for a, b in zip(paced, others, strict=True)] == [1] * 28
 
 
+def set_by_course(record: dict[str, Any]) -> dict[str, Any]:
+    """The record with its final review set as a course sets it
+    (``final_review_days``): a start the record holds before it has begun is
+    read again from his pace for each day the plan replays."""
+    lead = {preferences.FINAL_REVIEW_DAYS: str(LEAD)}
+    stored = progress.with_final_review(record, None)
+    return {**stored, "preferences": {**record["preferences"], **lead}}
+
+
 def test_the_plan_made_on_two_consecutive_days_gives_the_same_dates() -> None:
     capacity_ = week(10, 1, EVERY_DAY)
-    records = {"exam": course(27, exam=60), "open": course(30)}
+    records = {"exam": set_by_course(course(27, exam=60)), "open": course(30)}
     first = plan(records, 28, capacity_)
     for name, days in first.days.items():
         if days[0]["new"]:

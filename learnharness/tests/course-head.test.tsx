@@ -165,6 +165,28 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.deepEqual(presses, ["Review Binomial today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask], "a review of a taught topic is the pick, as the tutor orders it (round 10, 1 m6)");
 	});
 
+	it("picks today's plan first, as Home and the tutor do, and lists it before the gaps (round 11, 1 N10: Review Conditional probability while Home and the tutor began with Binomial)", () => {
+		const c = gapped(["variance"], ["bayes"], { variance: "full", bayes: "full" });
+		const due = { kind: "due" as const, date: "2026-11-08", overdue: 2 };
+		const topics = [
+			topic("bayes", { level: "assisted", introduced: "2026-11-01" }),
+			topic("binomial", { level: "attempted", introduced: "2026-11-03", review: due }),
+			topic("poisson", { starts: "2026-11-08" }),
+			topic("variance"),
+		];
+		const map = { ...c.map, topics };
+		assert.deepEqual(
+			examGaps(map)!.ways.map((w) => `${w.starts ? "Start" : "Review"} ${w.topic.handle}`),
+			["Review binomial", "Start poisson", "Review bayes", "Start variance"],
+			"today's reviews, then today's starts, then the gaps",
+		);
+		const line = gapLine({ ...c, map })!;
+		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), ["Review Binomial today", EXAM_GAP_WORDS.another, EXAM_GAP_WORDS.ask]);
+		const needsPoisson = [{ kind: "needs" as const, topic: h("variance"), prerequisite: h("poisson") }];
+		const alone = gapLine({ ...c, map: { ...map, topics: [topics[0]!, topics[1]!, topics[3]!], exam: { ...map.exam!, doesNotFit: [h("variance")], unreviewed: [] }, edges: needsPoisson } })!;
+		assert.deepEqual([...alone.querySelectorAll("button")].map((b) => b.textContent), ["Review Binomial today", EXAM_GAP_WORDS.ask], "today's one item named, never \"Review it today\" for a topic the line does not name");
+	});
+
 	it("offers only what he can do today: review what is taught, start what has its prerequisites taught, nothing for the rest (round 7: Review Poisson, Start Variance before Expectation)", () => {
 		const needs = (topic: string, prerequisite: string) => ({ kind: "needs" as const, topic: h(topic), prerequisite: h(prerequisite) });
 		const c = gapped(["geometric", "expectation", "variance"], ["binomial", "poisson"]);

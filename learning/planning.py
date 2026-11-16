@@ -12,6 +12,7 @@ from learning import workspace as workspaces
 from learning.retrieval import (
     DUE_LIMIT,
     compact,
+    daily,
     exam,
     last_activity,
     last_studied,
@@ -122,7 +123,9 @@ def _days(
         return None
     return compact(
         {
-            "final_review_days": (exam.day - exam.final).days if exam else None,
+            "final_review_days": (exam.day - (when.final or exam.final)).days
+            if exam
+            else None,
             "days": proposed,
             "why": {
                 topic: why[topic]
@@ -168,7 +171,7 @@ def _course(
     planned = together.when(name, today, bool(week.study_weekdays))
     due, _ = tonight(progress.due(record, today, levels=levels, order=order), planned)
     key, task = selected_task(record)
-    countdown = exam(record, today)
+    countdown = exam(record, today, planned)
     current = record.get("path", {}).get("current")
     return compact(
         {
@@ -261,9 +264,8 @@ def plan(
     ]
     near = any(0 <= left <= progress.RUNUP_DAYS for left in ahead)
     shown = max(days, progress.RUNUP_DAYS) if near else days
-    horizon = min(MAX_DAYS, max([shown, *(left + 1 for left in ahead)]))
     week = capacity.of(readable.values(), today)
-    together = agenda.plan(readable, today, horizon, week)
+    together = daily(readable, today).now
     journal = _journal(vault, days, today, shown)
     week_journal = (
         journal

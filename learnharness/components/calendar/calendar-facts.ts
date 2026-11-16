@@ -1,7 +1,7 @@
 import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldWords, leftOutWords, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
+import { distanceWords, heldExamWords, leftOutWords, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 
@@ -333,7 +333,7 @@ export function calendarEntries({
 			const held = topic.review?.kind === "scheduled" && topic.review.date === day && topic.review.held ? topic.review : null;
 			const told = topic.review?.date === day ? topic.moved : undefined;
 			const since = held || told ? movedWords(held, today, told) : null;
-			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldWords(held) : null, ...facts(topic) });
+			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, dueOn: overdue ? dueDay(topic.review) : null, since, waits: held && !told ? heldExamWords(held) : null, ...facts(topic) });
 		};
 		const fresh = (topic: CourseMapTopic, day: string) =>
 			entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, waits: topic.starts === day ? (leftOutWords(topic, map.exam) ?? (topic.moved ? movedWords(null, today, topic.moved) : startsAfterWords(topic.startsAfter))) : null, ...facts(topic) });

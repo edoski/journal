@@ -14,8 +14,9 @@ const PRESS = "text-body system-current:text-row text-link hover:text-link";
  * Under the head's first line, when the exam's plan leaves topics out
  * (spec: course-head.md, `examGaps`): why, in the engine's reasons, naming
  * the topics the final review leaves out that the first line does not,
- * then a way in (`ways`). Start it (or Review it) today opens a lesson on
- * the topic; with several, the first is the pick, named on its press
+ * then a way in (`ways`: today's plan for the course first, then the
+ * topics left out). Start it (or Review it) today opens a lesson on the one
+ * topic the line names; otherwise the first is the pick, named on its press
  * ("Review Binomial distribution today"), and Or another opens a menu of
  * the rest; with none he can take today, Ask alone. Ask the tutor opens a lesson that asks, in his
  * words, how to fit them in. Engine facts only; nothing otherwise.
@@ -31,10 +32,10 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 	const { ways } = gaps;
 	const named = [...gaps.start, ...gaps.review];
 	const open = (topic: CourseMapTopic) => start(`gap:${topic.handle}`, topicCreation(workspace, topic, course.map.today));
-	const only = ways.length === 1 ? ways[0]! : null;
-	// The pick: the first way, a review of a taught topic before a start, in
-	// the engine's order (round 8: eight options and no pick; round 10: the
-	// tutor's order).
+	const only = ways.length === 1 && !ways[0]!.planned ? ways[0]! : null;
+	// The pick: the first way, today's plan before the topics left out, a
+	// review before a start (round 8: eight options and no pick; rounds 10
+	// and 11: the tutor's and Home's order).
 	const [pick, ...others] = ways;
 	return (
 		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-body system-current:text-row font-normal system-current:font-normal text-muted-foreground">
@@ -50,6 +51,7 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 					<Button variant="quiet" size="xs" data-slot="exam-gaps-pick" className={PRESS} disabled={starting !== null} onClick={() => open(pick!.topic)}>
 						<MathText>{examGapPickWords(pick!.starts, pick!.topic.title)}</MathText>
 					</Button>
+				{others.length > 0 && (
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="quiet" size="xs" className={PRESS} disabled={starting !== null}>
@@ -64,6 +66,7 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 						))}
 					</DropdownMenuContent>
 				</DropdownMenu>
+				)}
 				</>
 			)}
 			<Button

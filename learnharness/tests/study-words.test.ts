@@ -236,10 +236,11 @@ describe("why a topic starts then", () => {
 	const why = (map: CourseMap, handle: string) => startsWhyWords(map.topics.find((t) => t.handle === handle)!.startsWhy!, map);
 	it("names its prerequisites, in a course with arcs or without", () => {
 		assert.equal(why(arcs, "change-basis"), "After Invertible matrices, which it needs");
-		assert.equal(why(plain, "invertibility"), "After Determinants as volume scaling, which it needs");
+		assert.equal(why(plain, "invertibility"), "After Rank and the column space, which it needs");
 	});
 	it("names the arc an early start comes from, or the exam's pace that took it", () => {
-		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality, to keep pace with the exam");
+		assert.equal(why(arcs, "inner-product"), "Early, from Orthogonality");
+		assert.equal(startsWhyWords({ kind: "early", arc: "orthogonality" as ArcHandle, waitingOn: [], exam: true }, arcs), "Early, from Orthogonality, to keep pace with the exam");
 		assert.equal(why(plain, "inner-product"), "Early, ahead of its place");
 		assert.equal(startsWhyWords({ kind: "early", waitingOn: ["determinant" as TopicHandle], exam: false }, plain), "Early, ahead of its place, while earlier topics wait on Determinants as volume scaling");
 		const orthogonality = "orthogonality" as ArcHandle;

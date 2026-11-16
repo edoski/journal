@@ -261,10 +261,14 @@ def _opened(
     ready: list[str],
     pace: int,
     free: frozenset[str],
+    final: bool = False,
 ) -> list[str]:
     """Up to ``pace`` of ``ready`` as the plan takes them from its window
     (``progress.opens``), which each start moves on, in the order the plan
-    takes them (``agenda._new``'s ``take``)."""
+    takes them (``agenda._new``'s ``take``): within the final review
+    (``final``), those the exam's other untaught topics need first."""
+    if final:
+        ready = progress.stood_on(record, ready, untaught)
     left, taken = list(untaught), list[str]()
     while len(taken) < pace and left:
         front = left[0]
@@ -337,7 +341,7 @@ def _new_short(
             )
         ]
         owed = pace(len(untaught), left, day, lambda other: other.weekday() in studies)
-        opened = _opened(record, untaught, ready, owed, free)
+        opened = _opened(record, untaught, ready, owed, free, exam.final <= day)
         if len(opened) < owed and not progress.holding_raises(
             left, len(untaught) - len(opened), len(untaught)
         ):

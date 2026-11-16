@@ -22,45 +22,36 @@
       "planned": "2026-11-09"
     },
     {
-      "topic": "basis",
-      "planned": "2026-11-09"
-    },
-    {
       "topic": "kernel",
       "planned": "2026-11-09"
     },
     {
       "topic": "matmul",
+      "planned": "2026-11-11"
+    },
+    {
+      "topic": "basis",
       "planned": "2026-11-12"
     },
     {
-      "topic": "independence",
+      "topic": "elimination",
       "planned": "2026-11-13"
     }
   ],
   "due_later_more": 4,
   "starts": {
-    "inner-product": "2026-11-09",
-    "invertibility": "2026-11-17",
-    "change-basis": "2026-11-19",
-    "diagonalization": "2026-11-26",
-    "projection": "2026-12-01"
+    "invertibility": "2026-11-13",
+    "change-basis": "2026-11-18",
+    "inner-product": "2026-11-19",
+    "diagonalization": "2026-11-20",
+    "projection": "2026-11-23"
   },
   "starts_why": {
-    "inner-product": {
-      "arc": "orthogonality",
-      "kind": "early",
-      "behind": "determinants",
-      "waiting_on": [
-        "rank"
-      ],
-      "exam": true
-    },
     "invertibility": {
       "arc": "determinants",
       "kind": "after",
       "needs": [
-        "determinant"
+        "rank"
       ]
     },
     "change-basis": {
@@ -69,6 +60,11 @@
       "needs": [
         "invertibility"
       ]
+    },
+    "inner-product": {
+      "arc": "orthogonality",
+      "kind": "early",
+      "behind": "eigenvalues"
     },
     "diagonalization": {
       "arc": "eigenvalues",
@@ -79,7 +75,10 @@
     },
     "projection": {
       "arc": "orthogonality",
-      "kind": "next"
+      "kind": "after",
+      "needs": [
+        "inner-product"
+      ]
     }
   },
   "path": {
@@ -305,7 +304,7 @@
       "review": {
         "due": "2026-10-28",
         "by": "engine",
-        "planned": "2026-11-13"
+        "planned": "2026-11-26"
       },
       "judged": "2026-10-22",
       "standing": {
@@ -345,7 +344,7 @@
       "review": {
         "due": "2026-10-29",
         "by": "engine",
-        "planned": "2026-11-09"
+        "planned": "2026-11-12"
       },
       "standing": {
         "level": "retained",
@@ -376,7 +375,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-11-26"
+        "planned": "2026-11-13"
       },
       "standing": {
         "level": "retained",
