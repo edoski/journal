@@ -18,7 +18,7 @@ import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
 import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
-import { sessionEndOf } from "../core/session-end.ts";
+import { leftQuestionRepose, sessionEndOf } from "../core/session-end.ts";
 import { openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
@@ -122,7 +122,9 @@ function listChats(): ChatSummary[] {
 						// native-messages.ts danglingQuestionOf). Liveness (busy) is
 						// NOT record-derived — the API route merges it (ChatListItem).
 						phase: phaseAt3Lh(messages),
-						pendingQuestion: danglingQuestionOf(messages) !== null,
+						// A question Done for today left waits too, though it is posed
+						// again only when he opens the session (reposeLeftQuestions).
+						pendingQuestion: danglingQuestionOf(messages) !== null || leftQuestionRepose(messages).length > 0,
 						// A posed problem with no conclude (the sidebar's "Problem
 						// waiting"); only practice poses, and a handoff to teaching
 						// is refused while one is active.

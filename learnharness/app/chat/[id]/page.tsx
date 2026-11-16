@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
 import { openedByApp } from "@/src/core";
-import { courseDeleted, getChat, isTurnRunning, lessonPlace, turnFailure } from "@/src/server";
+import { courseDeleted, getChat, isTurnRunning, lessonPlace, reposeLeftQuestions, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,8 @@ export default async function ChatPage({
 	searchParams: Promise<{ prompt?: string; continue?: string }>;
 }) {
 	const [{ id }, { prompt, continue: go }] = await Promise.all([params, searchParams]);
+	// Back in a session he left for today: its left question is asked again.
+	reposeLeftQuestions(id);
 	const chat = getChat(id);
 	if (!chat) notFound();
 	// Where the lesson sits in its course, for the top bar's links.

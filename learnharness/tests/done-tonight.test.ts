@@ -234,7 +234,7 @@ describe("Done for today on the server", () => {
 		assert.equal(withheld[0]!.details.reason, "tonight");
 		assert.equal(withheld[0]!.details.committed, undefined, "the answer stays hidden in the record");
 		assert.ok(saved.some((m) => m.role === "custom" && m.customType === "done-tonight"), "the marker is saved");
-		assert.match(JSON.stringify(saved.at(-4)), /Good place to stop/, "the closing turn ran, then the app asked the check again");
+		assert.match(JSON.stringify(saved.at(-3)), /Good place to stop/, "the closing turn ran, and nothing is asked under it (round 14, M1)");
 		assert.equal(histories.length, 3, "the check, then the closing words and the request after their send_to_user");
 		assert.match(histories[1]!, /stopped for today/, "the model reads the check as left, not answered");
 		assert.match(histories[1]!, /DONE FOR TODAY/);
