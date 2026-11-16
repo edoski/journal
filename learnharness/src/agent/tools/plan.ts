@@ -100,8 +100,11 @@ const planInitInput = Type.Object({
 		minLength: 1,
 		description:
 			"A mermaid graph block (any direction), e.g.:\ngraph TD\n  primitives[Number primitives] --> operators[Arithmetic operators] --> expressions[Evaluating expressions]\n" +
-			"The only strict rule: ids are permanent lowercase slugs (a-z, 0-9, hyphens/underscores) — checks reference them via nodeId. " +
-			"Titles are free single-line text; `-->` means 'from = prerequisite' (chains fine); no subgraphs, styles, or classes.",
+			"Ids are permanent lowercase slugs (a-z, 0-9, hyphens/underscores) — checks reference them via nodeId. " +
+			"Each title is one line naming the question its step answers, never its result: he reads every title before the step is taught, " +
+			"so a title holding a relation sign (=, ≠, →, ≤, ∈ or their TeX) or a condition in words (in every, for every, always, never, only if, iff, exactly when) is refused, " +
+			"notation holding one included: `pmf[The probability of $k$ events]`, never \"The formula for $P(X=k)$\". " +
+			"`-->` means 'from = prerequisite' (chains fine); no subgraphs, styles, or classes.",
 	}),
 	goal: Type.Optional(
 		Type.Object(
@@ -150,7 +153,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				"Call once right after the probe concludes, then start teaching the first step in the same turn: he sees the map live and needs to approve nothing. " +
 				"Re-call whenever the map is wrong (the new block replaces the old tree). " +
 				"A mermaid graph block (any direction): one node per line (`slug[Short Title]` — slugs are permanent lowercase ids: a-z, 0-9, hyphens/underscores), " +
-				"each title naming the question the step answers, never its result: he sees it before the step is taught, so no relation in a title (=, ≠, →, ≤, ∈ or their TeX, an equation that names a problem too: `inverse-solve[Solving a system with the inverse]`, never \"Solving $Ax = b$ with $A^{-1}$\"; refused), no condition in words (in every, for every, always, never, only if, iff, exactly when; refused), and maths in `$…$` only names a thing. " +
+				"each title naming the question the step answers, never its result: he sees it before the step is taught, so no relation in a title (=, ≠, →, ≤, ∈ or their TeX, an equation that names a problem too: `inverse-solve[Solving a system with the inverse]`, never \"Solving $Ax = b$ with $A^{-1}$\"; refused), no condition in words (in every, for every, always, never, only if, iff, exactly when; refused), and maths in `$…$` only names a thing, with no relation sign inside it, an event's notation included (`pmf[The probability of $k$ events]`, never \"The formula for $P(X=k)$\"; refused). " +
 				"A title holding square brackets is quoted: `row-reduce[\"Row reducing $[A \\mid I]$\"]`. " +
 				"The topic itself is never a step: no node is named after the lesson's topic or goal (refused). " +
 				"`-->` edges meaning 'from must be understood before to' (chains fine). " +

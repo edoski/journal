@@ -107,3 +107,29 @@ describe("plan_init passes on the first try when the tutor follows its guidance 
 		}
 	});
 });
+
+/** Round 11 integration: the hand-off's first plan_init was refused for
+ *  "The formula for $P(X=k)$", and the question sent beside it was refused
+ *  with it. The field the titles are written in said "Titles are free
+ *  single-line text", and the tool's words let maths in `$…$` "name a
+ *  thing", which $P(X=k)$ does while holding an `=`. The rule now stands
+ *  where the title is written, its example the check's own verdict. */
+describe("the title rule stands where the title is written (round 11 integration)", () => {
+	const tool = planTools({ chatId: "c1", chatStore: {} as never }).plan_init!;
+	const field = (tool.parameters as { properties: { mermaid: { description: string } } }).properties.mermaid.description;
+
+	it("the mermaid field states the rule, never that titles are free", () => {
+		assert.doesNotMatch(field, /free/i);
+		assert.match(field, /never its result/);
+		assert.match(field, /refused/);
+	});
+
+	it("names an event's notation as refused, and its example agrees with the check", () => {
+		for (const words of [field, tool.description]) {
+			assert.ok(words.includes("$P(X=k)$"), "the notation the tutor wrote is named");
+			assert.ok(words.includes("The probability of $k$ events"), "with a title that passes");
+		}
+		assert.match(planTitlesGiveAway(plan("The formula for $P(X=k)$")) ?? "", /state their step's result/);
+		assert.equal(planTitlesGiveAway(plan("The probability of $k$ events")), null);
+	});
+});
