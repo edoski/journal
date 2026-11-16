@@ -12,14 +12,14 @@ const noop = () => {};
 const composer = (props: Partial<React.ComponentProps<typeof LessonComposer>> = {}) =>
 	renderToStaticMarkup(<LessonComposer busy={false} value="" onChange={noop} onSend={noop} onStop={noop} canSend={false} {...props} />);
 describe("the lesson composer", () => {
-	it("draws T3 Code's anatomy: a 16px card, a 14px field of two lines growing to 208px, a 32px round send", () => {
+	it("draws T3 Code's anatomy: a 16px card, a 13px field (Body) of two lines growing to 208px, a 32px round send", () => {
 		const html = composer();
 		assert.match(html, /data-testid="composer"/);
 		assert.match(html, /rounded-\[16px\]/);
 		assert.match(html, /data-slot="composer-body" class="px-4 pt-4 pb-2"/);
 		assert.match(html, /min-h-\[calc\(2lh\+0\.5rem\)\]/);
 		assert.match(html, /max-h-52/);
-		assert.match(html, /text-control leading-relaxed/);
+		assert.match(html, /text-body leading-relaxed/);
 		assert.match(html, /data-slot="composer-send"[^>]*aria-label="Send"/);
 		assert.match(html, /size-8/);
 	});

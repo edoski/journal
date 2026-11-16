@@ -29,7 +29,7 @@ describe("the mark line", () => {
 	it("says the result, how it counted and the confidence on one 13px line, with Dispute at its end", () => {
 		const html = line({ a1: mark });
 		assert.match(html, /data-testid="mark-line"/);
-		assert.match(html, /text-row/);
+		assert.match(html, /text-body/);
 		assert.match(html, /Right/);
 		assert.match(html, /Confident/);
 		assert.match(html, /data-testid="dispute-mark"/);

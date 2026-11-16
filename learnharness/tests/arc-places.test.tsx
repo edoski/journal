@@ -72,7 +72,7 @@ describe("Home's rows", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((line) => line.textContent ?? "");
 		assert.equal(lines.length, 2);
 		for (const line of lines) {
-			assert.ok(line.startsWith("Linear Algebra"), line);
+			assert.ok(line.startsWith("LALinear Algebra"), `the badge's letters, then the course alone: ${line}`);
 			assert.ok(!/Vector spaces|Linear systems|Eigenvalues ·| · /.test(line), `no arc on the row: ${line}`);
 		}
 	});

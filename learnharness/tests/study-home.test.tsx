@@ -318,12 +318,13 @@ describe("Today", () => {
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
-	it("gives each line its pie, its course, and its lesson ending in its one status, where he stands or why it is on Today, with no button and no review counted (round 11, 1 N9)", () => {
+	it("gives each line its course's badge, its course, and its lesson ending in its one status, where he stands or why it is on Today, with no button and no review counted (round 11, 1 N9)", () => {
 		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} done={[]} busy={false} onContinue={() => {}} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesDue since 7 Nov", "Linear AlgebraEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last time", "Linear AlgebraContinue Problem sheet 4Left off 5 Nov"],
+			// The course's badge leads each line with its two letters (the Visual system, shipped 17 Nov 2026).
+			["LALinear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "RAReal AnalysisReview SequencesDue since 7 Nov", "LALinear AlgebraEigen lessonYour turn", "PProbabilityContinue Bayes' ruleNot right last time", "LALinear AlgebraContinue Problem sheet 4Left off 5 Nov"],
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
@@ -430,16 +431,17 @@ describe("what a line of Today reads", () => {
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/);
 	};
 
-	it("hybrid: each line has its pie, its course, and its lesson ending in its one status (round 11, 1 N9)", () => {
+	it("hybrid: each line has its course's badge, its course, and its lesson ending in its one status (round 11, 1 N9)", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
-			"Real AnalysisReview SequencesDue since 7 Nov",
-			"Linear AlgebraEigen lessonYour turn",
-			"ProbabilityContinue Bayes' ruleNot right last time",
-			"Linear AlgebraContinue Problem sheet 4Left off 5 Nov",
+			"LALinear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
+			"RAReal AnalysisReview SequencesDue since 7 Nov",
+			"LALinear AlgebraEigen lessonYour turn",
+			"PProbabilityContinue Bayes' ruleNot right last time",
+			"LALinear AlgebraContinue Problem sheet 4Left off 5 Nov",
 		]);
+		assert.equal(doc.querySelectorAll('[data-slot="course-badge"]').length, 5, "the course's badge on every line");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["task", 1]]);
 		plain(doc);
