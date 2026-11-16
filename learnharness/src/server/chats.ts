@@ -4,6 +4,7 @@ import { titleFromPrompt } from "../core/contracts.ts";
 import { leftQuestionRepose } from "../core/session-end.ts";
 import { stores } from "./stores.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
+import { cancelPlanDraft } from "./plan-draft.ts";
 import { clearTurnFailure } from "./turn-runs.ts";
 import { discardChatDeliveries } from "./jobs.ts";
 
@@ -94,6 +95,8 @@ export async function deleteChatSession(chatId: string): Promise<ChatDeleteOutco
 	}
 	const blocker = runningWorkBlocker(chatId);
 	if (blocker) return blocker;
+	// The plan's draft holds nothing to keep: stop it.
+	cancelPlanDraft(chatId, "the lesson was deleted");
 	if (backgroundRuns().some((run) => run.chatId === chatId)) {
 		abortRuns(chatId); // true cancellation — spend stops, nothing saves
 		if (!(await runsEnded(chatId, WIND_DOWN_TIMEOUT_MS))) {

@@ -156,7 +156,9 @@ export function fakeSdk(scripted: ScriptedModel, { configDir = mkdtempSync(join(
 				const at = history.findIndex((entry) => entry.uuid === options.resumeSessionAt);
 				if (at >= 0) history = history.slice(0, at + 1);
 			}
-			if (options.persistSession === false) id = randomUUID();
+			// Claude Code writes nothing back to a session it resumes unpersisted:
+			// the run reads a copy (the plan draft's fork).
+			if (options.persistSession === false) { id = randomUUID(); history = [...history]; }
 			const save = () => {
 				sessions.set(id, history);
 				if (options.persistSession === false) return;

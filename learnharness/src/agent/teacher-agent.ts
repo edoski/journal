@@ -1,6 +1,8 @@
 import { homedir } from "node:os";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
-import { invalidInputResult, questionResult } from "./tool-execute.ts";
+import { invalidInputResult, questionResult, serverExecute } from "./tool-execute.ts";
+import { checkPlanInit, planInitResult } from "./tools/plan.ts";
+import type { ChatRecord } from "../core/contracts/chat.ts";
 import type { ToolCall, Usage } from "@earendil-works/pi-ai";
 import { SdkAgent } from "./sdk/agent.ts";
 import type { SdkEngine } from "./sdk/engine.ts";
@@ -99,6 +101,40 @@ export interface AgentBuildOptions {
 	 *  the registry and the course doctrine joins the prompt, for every
 	 *  agent kind. Absent = no course (nothing changes). */
 	course?: CourseToolContext;
+	/** The plan draft (server/plan-draft.ts): the teacher built as for its
+	 *  plan turn, its own prompt, tools and effort, so the draft's request
+	 *  is the plan turn's own up to the open question. Its plan_init runs
+	 *  plan_init's checks and hands the map to `keep`, saving nothing; every
+	 *  other tool runs nothing. */
+	draft?: PlanDraftSink;
+}
+
+/** Where a plan draft's map goes, and the record its checks read. */
+export interface PlanDraftSink {
+	record: () => ChatRecord | null;
+	keep: (plan: { mermaid: string; goal?: { title: string; topic?: string } }) => void;
+}
+
+/** What every tool but plan_init answers in a draft. */
+const NOT_IN_A_DRAFT = "Not run: this is a draft of the plan only. Call plan_init with the map, and nothing else.";
+
+/** A draft's tools: plan_init checks and keeps the map; the rest refuse.
+ *  Names, descriptions and parameters stay the teacher's own. */
+function draftTools(tools: AgentTool<any>[], sink: PlanDraftSink): AgentTool<any>[] {
+	return tools.map((tool): AgentTool<any> => tool.name === "plan_init"
+		? {
+				...tool,
+				execute: serverExecute("plan_init", tool.parameters, async (input) => {
+					const { mermaid, goal } = input as { mermaid: string; goal?: { title: string; topic?: string } };
+					const record = sink.record();
+					if (!record) return { ok: false, error: "The lesson is gone." };
+					const checked = checkPlanInit(record, mermaid, goal);
+					if (!checked.ok) return checked;
+					sink.keep({ mermaid, ...(goal ? { goal } : {}) });
+					return planInitResult(checked.tree);
+				}),
+			}
+		: { ...tool, execute: async () => ({ content: [{ type: "text" as const, text: NOT_IN_A_DRAFT }], details: null, isError: true }) as never });
 }
 
 /**
@@ -134,6 +170,10 @@ function closedBefore(kind: AgentKind, earlier: readonly ToolCall[]): boolean {
 	return false;
 }
 
+/** A draft's model calls: the map, and room for plan_init's own refusals
+ *  to be fixed, as in the plan turn. Claude Code stops it there. */
+const DRAFT_MAX_CALLS = 4;
+
 /** Claude Code's own file tools, which every tutor agent reads his files with. */
 const FILE_TOOLS = ["Read", "Grep", "Glob"] as const;
 
@@ -155,6 +195,29 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const engine = opts.engine;
 	const composed = composedInstructions[kind]!;
 	const systemPrompt = [composed, ...(opts.course ? [courseRecordPrompt(kind, { arcs: opts.course.arcs })] : []), foldersPrompt(opts.course)].join("\n\n---\n\n");
+	const registry = [
+		...tools,
+		...(opts.course ? Object.values(courseTools(opts.course)) : []),
+		...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
+	];
+	if (opts.draft) {
+		// The plan turn's own request, at the plan's own effort: the draft
+		// reads like it and warms its cache; nothing it calls is kept.
+		return new SdkAgent({
+			engine,
+			systemPrompt,
+			tools: draftTools(registry, opts.draft),
+			builtins: FILE_TOOLS,
+			effort: CLAUDE_MODEL.thinkingLevel,
+			messages: opts.messages ?? [],
+			endsTurn: (name) => name === "plan_init",
+			session: opts.session,
+			sessionStore: opts.sessionStore,
+			ephemeral: { maxTurns: DRAFT_MAX_CALLS },
+			fork: true,
+			onUsage: opts.onUsage,
+		});
+	}
 	// Every message and question of the turn is read against the voice
 	// before he sees it, and one that breaks it is rewritten.
 	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined);
@@ -167,11 +230,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		// Conditional registry inclusion: when a tool's gate is closed, neither
 		// the tool nor its usage instructions reach the model. Explicit
 		// registries opt out of send_to_user.
-		tools: [
-			...tools,
-			...(opts.course ? Object.values(courseTools(opts.course)) : []),
-			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
-		].map(spoken).map((tool) => closing.wrap(tool)),
+		tools: registry.map(spoken).map((tool) => closing.wrap(tool)),
 		screen: (call) => {
 			closing.screen(call);
 			voice.screen(call);

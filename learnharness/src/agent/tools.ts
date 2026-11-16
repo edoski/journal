@@ -6,6 +6,7 @@ import {
 	askLabelProblems,
 	askOptionProblems,
 	explainInputBase,
+	recallInputObject,
 	explainInputObject,
 	explainInputProblems,
 	parseOptionsIfString,
@@ -142,11 +143,11 @@ export function teachExplainToolFor(
  *  (owner, 2026-10-09): the teach explain adds `type` and `nodeId`, and a
  *  shared name carried the probe call shape into teaching. Old
  *  probe-phase records keep the `explain` name and parse identically. */
-export const probeExplainTool: AgentTool<typeof explainInputBase> = {
+export const probeExplainTool: AgentTool<typeof recallInputObject> = {
 	name: "recall",
 	label: "recall",
 	description: explainDescription("recall", false),
-	parameters: explainInputBase,
+	parameters: recallInputObject,
 	prepareArguments: prepareQuestionArguments,
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {

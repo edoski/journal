@@ -59,6 +59,9 @@ import { steerDelivered } from "../core/contracts.ts";
 import { listenForCourseMaps } from "./course-map.ts";
 import { preparePhotos } from "./photos.ts";
 import type {CallUsage} from "../core/contracts.ts";
+import { draftBasisHolds, lastProbeQuestionOpen, PLAN_DRAFT_TEXT, planDraftNote } from "../core/plan-draft.ts";
+import { newUserMessage } from "../core/native-messages.ts";
+import { cancelPlanDraft, planDraftOf, startPlanDraft, takePlanDraft } from "./plan-draft.ts";
 
 /**
  * One chat turn over the server-owned native record. Framework-free (plain
@@ -189,6 +192,49 @@ export async function handleChatRequest(
 	return handleChatInput(chatId, input, buildAgent);
 }
 
+/** A probe question the probe expects to conclude on (`recall` with
+ *  `last`) is open: start the plan's early draft (core/plan-draft.ts), the
+ *  teacher built as for its plan turn, in draft mode, on a fork of the
+ *  lesson's session. A draft the lesson no longer fits is cancelled. Called
+ *  when a turn settles and when he opens the lesson. */
+/** Tests run the draft on a scripted engine, as `buildAgent` runs turns. */
+export const planDraftEngineOverride: { engine?: SdkEngine } = {};
+
+export async function considerPlanDraft(chatId: string): Promise<void> {
+	const record = stores.chatStore.getChat(chatId);
+	if (!record || courseDeleted(chatId) || isTurnRunning(chatId)) return;
+	const held = planDraftOf(chatId);
+	if (held && !draftBasisHolds(record.messages, held.basis)) cancelPlanDraft(chatId, "the lesson moved on from its question");
+	const basis = lastProbeQuestionOpen(record.messages);
+	if (!basis || !record.session || planDraftOf(chatId)?.basis === basis) return;
+	let engine: SdkEngine;
+	if (planDraftEngineOverride.engine) engine = planDraftEngineOverride.engine;
+	else {
+		const account = effectiveSettings().claude.account;
+		if (!providerKeyPresent(account)) return;
+		try { engine = claudeEngine(account); } catch { return; }
+	}
+	const courseArcs = await fetchCourseArcs(record);
+	const fresh = stores.chatStore.getChat(chatId);
+	if (!fresh || lastProbeQuestionOpen(fresh.messages) !== basis || isTurnRunning(chatId)) return;
+	const lastSaidId = fresh.messages.findLast((m) => m.role === "user")?.id ?? null;
+	startPlanDraft(chatId, basis, (keep) => createTeacherAgent(
+		{ chatId, chatStore: stores.chatStore, jobStore: stores.jobStore, spawn: () => {}, deliver: () => {} },
+		{
+			engine,
+			messages: asAgentMessages([...fresh.messages, newUserMessage(PLAN_DRAFT_TEXT)]),
+			session: fresh.session,
+			sessionStore: sessionStoreFor(chatId),
+			// The teacher's own course context, so its prompt and tools are the
+			// plan turn's; its tools run nothing in a draft.
+			...(fresh.course ? { course: { course: fresh.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(fresh.messages), fresh.answerSaves, lastSaidId), remarkable: remarkableOf(fresh.messages), onSaved: () => {}, review: reviewRecord(fresh), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [] } } : {}),
+			draft: { record: () => stores.chatStore.getChat(chatId), keep },
+		},
+	));
+}
+
+const isProbeHandoff = (m: LhMessage): boolean => m.role === "custom" && (m as { customType?: string }).customType === "probe-handoff";
+
 /** Stops the chat's running turn and resolves once it has settled (its
  *  partial saved). Event-driven: each pass waits for the turn-settled. */
 async function stopRunningTurn(chatId: string): Promise<void> {
@@ -229,7 +275,10 @@ export async function handleChatInput(
 	// Done for today wins over whatever the tutor is doing (round 7: pressed
 	// as a practice handoff woke the teacher, it was refused and the teacher
 	// went on): the running turn stops, its partial saves, then the close.
-	if (input.type === "tonight") await stopRunningTurn(chatId);
+	if (input.type === "tonight") {
+		cancelPlanDraft(chatId, "Done for today");
+		await stopRunningTurn(chatId);
+	}
 
 	// Refuse an ineligible Retry before catalog refresh, compaction, or any
 	// turn/write effects. Revalidate after the awaited gates below too.
@@ -322,6 +371,13 @@ export async function handleChatInput(
 			return Response.json({ error: err.message }, { status: 400 });
 		}
 		throw err;
+	}
+
+	// The probe's end wakes the teacher: the plan's early draft, when ready
+	// and still fitting, rides the handoff it reads (core/plan-draft.ts).
+	if (input.type === "steers" && appends.some(isProbeHandoff)) {
+		const draft = takePlanDraft(chatId, (basis) => draftBasisHolds(record.messages, basis));
+		if (draft) appends = appends.map((m) => (isProbeHandoff(m) ? { ...m, content: `${(m as { content: string }).content}\n\n${planDraftNote(draft)}` } : m)) as typeof appends;
 	}
 
 	// THE PARALLEL-QUESTION GATE (owner, 2026-10-03 — the deepseek parallel
@@ -611,6 +667,9 @@ export async function handleChatInput(
 				// ones stay parked for the chat's next run (the registry is the
 				// stranding safety net — the agent's undrained copy died above).
 				reconcileUserSteers(chatId, stamped);
+				// The turn posed the probe's last question: the plan starts
+				// drafting while he answers (or a probe that asked on drops it).
+				void considerPlanDraft(chatId);
 			},
 		});
 		// The turn is now a live background object: register it so any view
