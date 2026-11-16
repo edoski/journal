@@ -14,8 +14,10 @@ import { BaseNode, BaseNodeContent, BaseNodeHeader } from "../canvas/base-node";
 import { CANVAS_NODE } from "../canvas/canvas-layout";
 import { BAND_LABEL, PEEK, type NeighbourBand } from "./neighbours-layout";
 
-/** How strong a neighbour's card and band name read: clearly behind the arc drawn, its title still legible. */
-export const NEIGHBOUR_STRENGTH = 0.55;
+/** A neighbour's card reads behind the arc drawn through its inks, never a deep opacity (research, round 14: faded
+ *  but pressable words keep 4.5:1, WCAG 1.4.3): its surface and edge fainter than a card's, its words muted, its pie
+ *  at this strength (3:1 for a meaningful graphic, WCAG 1.4.11). */
+export const NEIGHBOUR_GLYPH = 0.6;
 /** A band's name: 16 in from its own start, or 64 in from the visible left edge while that is out of view. */
 const LABEL_IN = 16;
 /** Clear of the map's edge fade (Home's vignette is 64 across). */
@@ -82,19 +84,23 @@ export function NeighbourCardNode({ data }: NodeProps<NeighbourCardFlowNode>) {
 				e.stopPropagation();
 				openArc?.(arc);
 			}}
-			className="pointer-events-auto relative block size-full cursor-pointer overflow-hidden text-left transition-opacity hover:opacity-100! motion-reduce:transition-none"
+			className="group/near pointer-events-auto relative block size-full cursor-pointer overflow-hidden text-left"
 			style={{
-				opacity: NEIGHBOUR_STRENGTH,
 				maskImage: side === "before" ? "linear-gradient(to bottom, transparent, black 8px)" : "linear-gradient(to top, transparent, black 10px)",
 			}}
 		>
-			<BaseNode className="absolute inset-x-0 flex flex-col" style={{ height: CANVAS_NODE.height, top: side === "before" ? -cut : 0 }}>
-				<BaseNodeHeader className="h-6 shrink-0 border-b border-white/6">
-					<span className="truncate text-callout text-muted-foreground">{standing.words}</span>
+			<BaseNode
+				className="absolute inset-x-0 flex flex-col border-white/5 bg-white/[0.015] transition-colors group-hover/near:border-white/12 motion-reduce:transition-none"
+				style={{ height: CANVAS_NODE.height, top: side === "before" ? -cut : 0 }}
+			>
+				<BaseNodeHeader className="h-6 shrink-0 border-b border-white/4">
+					<span className="truncate text-callout text-muted-foreground transition-colors group-hover/near:text-foreground motion-reduce:transition-none">{standing.words}</span>
 				</BaseNodeHeader>
 				<BaseNodeContent className="min-h-0 flex-1">
-					<TopicGlyph standing={standing} />
-					<MathLine className="h-4.5 min-w-0 flex-1 text-body text-muted-foreground">{topic.title}</MathLine>
+					<span className="flex shrink-0" style={{ opacity: NEIGHBOUR_GLYPH }}>
+						<TopicGlyph standing={standing} />
+					</span>
+					<MathLine className="h-4.5 min-w-0 flex-1 text-body text-muted-foreground transition-colors group-hover/near:text-foreground motion-reduce:transition-none">{topic.title}</MathLine>
 				</BaseNodeContent>
 			</BaseNode>
 		</button>
