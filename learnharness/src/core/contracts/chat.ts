@@ -485,6 +485,9 @@ export interface ChatSummary {
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];
+	/** The title its saves gave the first task they opened, kept once the
+	 *  task closes (sessionTaskTitleOf), so it is named one way all day. */
+	taskTitle?: string;
 	/** It is a review of course topics: opened on topics with a review's
 	 *  words (`openedAsReview`), whatever it is named now. The list always
 	 *  sets it; a summary made elsewhere may leave it out. */

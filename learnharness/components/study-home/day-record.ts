@@ -21,8 +21,9 @@ import { localDay } from "@/components/day-change";
 export function doneToday(chats: readonly ChatListItem[], now: Date, courses: readonly StudyCourse[] = []): string[] {
 	const today = localDay(now);
 	const tasks = new Map(courses.flatMap((course) => course.map.tasks.map((task) => [`${course.map.workspace}#${task.key}`, task.title] as const)));
-	// A session holding an open task is named by it, so two sessions of one lesson read as one (round 11, 1 N9).
-	const title = (chat: ChatListItem) => (chat.tasks ?? []).map((key) => tasks.get(`${chat.course?.workspace}#${key}`)).find((t) => t !== undefined) ?? chat.title;
+	// A session holding an open task is named by it, so two sessions of one lesson read as one (round 11, 1 N9), and
+	// by the title it gave its task once that task closed, so it reads one way all day (round 13, 1 n9).
+	const title = (chat: ChatListItem) => (chat.tasks ?? []).map((key) => tasks.get(`${chat.course?.workspace}#${key}`)).find((t) => t !== undefined) ?? chat.taskTitle ?? chat.title;
 	const name = (chat: ChatListItem) => title(chat).trim().toLowerCase();
 	const shared = new Map<string, Set<string>>();
 	for (const chat of chats) shared.set(name(chat), (shared.get(name(chat)) ?? new Set()).add(chat.course?.workspace ?? ""));

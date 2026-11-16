@@ -1040,6 +1040,32 @@ export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
 	return [...held].filter(([, open]) => open).map(([key]) => key);
 }
 
+/** The title the session's saves gave the first task they opened, the
+ *  newest title it gave that task, kept after the task closes, so the day's
+ *  record names the session one way all day (round 13, 1 n9: "Eigenvalues
+ *  and eigenvectors lesson", then "Eigenvalues and eigenvectors" once its
+ *  task closed). Null when its saves titled no task. Pure. */
+export function sessionTaskTitleOf(messages: readonly LhMessage[]): string | null {
+	const clean = cleanToolCallIds(messages);
+	let first: string | null = null;
+	let title: string | null = null;
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const tasks = saveChanges(block.arguments as Record<string, unknown>)?.tasks;
+			if (typeof tasks !== "object" || tasks === null) continue;
+			for (const [key, patch] of Object.entries(tasks)) {
+				const named = (patch as { title?: unknown } | null)?.title;
+				if (typeof named !== "string" || !named.trim()) continue;
+				first ??= key;
+				if (key === first) title = named.trim();
+			}
+		}
+	}
+	return title;
+}
+
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
  *  conclude card is the modelSolution committed at POSE time — the newest
  *  cleanly-posed problem BEFORE this conclude call. The reveal is never
