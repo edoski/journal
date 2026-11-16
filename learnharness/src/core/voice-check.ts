@@ -52,7 +52,12 @@ export type VoiceRule =
 	| "letter"
 	| "reprint"
 	| "operand"
-	| "asks-banned";
+	| "asks-banned"
+	| "guess"
+	| "unsaved"
+	| "maths-words"
+	| "reason-twice"
+	| "card-words";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -72,6 +77,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "praise", re: /\b(?:is|was) (?:the|a) (?:right|good|great|nice) (?:instinct|idea|start|move|approach|thought)\b/i },
 	{ rule: "preview", re: /\b(?:next (?:is|up|comes|you'?ll|we'?ll)|next,? (?:we|you)(?:'ll| will)|the next (?:question|step|problem) (?:tests|is|will)|here(?:'s| is) a fresh|now (?:we|you)(?:'ll| will)|coming up next)\b/i },
 	{ rule: "narration", re: /\b(?:I(?:'ll| will| am going to|'m going to) (?:save|record|ask|check|build|verify|now|start|move|give|stop|wait)|I(?:'ve| have) (?:saved|recorded|noted|told you)|let me (?:verify|check|build|save|record|ask|start)|I'?m (?:having|waiting|saving|recording|building)|I'?ll stop)\b/i },
+	// A handoff between teaching and practice needs no words of its own
+	// (round 12, 3 D4: "Switching to an explanation of when three vectors
+	// form a basis of ℝ³.").
+	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:(?:let'?s|now,?|ok(?:ay)?,?) (?:switch|move|turn|go|head)|(?:now,? )?(?:switching|moving|turning|going|heading)|back)(?: (?:back|over|on|now))?(?: (?:to|into))? (?:(?:an?|the|some|your|more) )?(?:explanation|explaining|teaching|practice|practising|practicing|problems?|exercises?|lesson|review)\b/i },
 	{ rule: "plan", re: /(?:^|\n)\s*(?:today|this lesson|in this lesson|the goal)\s*:/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
@@ -87,6 +96,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
 	// The open question stays above, unchanged, and the app shows no copy of
 	// it (round 11, 4 minor 6: "Here is the question again." and nothing).
+	// Every answer in the record stays saved, an earlier day's included, and
+	// the app says when the record can't be read (round 12, 4 minor 2: "so
+	// it stays unsaved", of an answer saved on 4 Nov).
+	{ rule: "unsaved", re: /\bunsaved\b|\b(?:is|are|was|were|stays?|remains?)(?: still)? not (?:yet )?(?:saved|recorded|kept)\b|\b(?:isn't|aren't|wasn't|weren't)(?: yet)? (?:saved|recorded|kept)\b|\b(?:can't|cannot|couldn't|could not) be (?:saved|recorded|kept)\b/i },
 	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
 ];
 
@@ -225,6 +238,18 @@ export function clausesOf(text: string): { words: number; clauses: number; short
  *  2 n9: "the dimension of im," from a lone `$\operatorname{im}$`). */
 const LONE_OPERATOR = /(?<!\$)\$\s*\\(?:ker|det|dim|operatorname\{[A-Za-z]+\}|mathrm\{(?:im|rank|span|tr)\})\s*\$(?!\$)/;
 
+/** Words set in maths type: a `\\text{…}` holding a phrase of three words
+ *  or more, which reads as a sentence in KaTeX's serif (round 12, 3 D5:
+ *  "A \\text{ is invertible exactly when } \\det A \\neq 0"). A label of
+ *  one or two words in a formula stays ("Bin", "Bayes risk", "for"). */
+const TEXT_IN_MATHS = /\\(?:text|textrm|textit|mbox)\{([^{}]*)\}/g;
+export function mathsWords(text: string): string | null {
+	for (const m of text.matchAll(TEXT_IN_MATHS)) {
+		if ((m[1]!.match(/[A-Za-z][A-Za-z'-]*/g) ?? []).length >= 3) return m[0];
+	}
+	return null;
+}
+
 export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const { text: plain, displays } = prose(text);
 	const out = phraseBreaks(plain, new Set(kind === "direct" ? ["offer"] : []));
@@ -234,6 +259,8 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });
 	const lone = LONE_OPERATOR.exec(text);
 	if (lone) out.push({ rule: "operand", excerpt: lone[0] });
+	const words = mathsWords(text);
+	if (words) out.push({ rule: "maths-words", excerpt: words });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
 	if (load > SENTENCES[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCES[kind]}` });
@@ -420,6 +447,35 @@ export function compoundAsk(text: string): VoiceBreak | null {
 	return asks.length > 1 ? { rule: "compound", excerpt: asks.join(" / ") } : null;
 }
 
+/** The asks of a question that are all his own words: each one's content
+ *  words are in the message he sent, as when he typed a sheet's part and
+ *  the tutor poses it (round 12, 2 n5: "and check it against rank-nullity"
+ *  dropped, since two asks were refused). */
+export function asksAreHis(text: string, words: string | null): boolean {
+	if (!words) return false;
+	const his = stems(prose(words).text);
+	const asks = questionAsks(text);
+	// An ask whose words are all maths has none of his to match ("What is
+	// $\dim \ker A$?" beside his "rank 2"), so it is never his.
+	return asks.length > 0 && asks.every((ask) => {
+		const own = contentStems(ask);
+		return own.length > 0 && own.every((w) => his.has(w));
+	});
+}
+
+/** A mark said with the record's confidence word, not the card's: "on
+ *  your own, sure" where the card says "Confident" (round 12, 2 n5). */
+export function recordConfidenceWord(text: string): string | null {
+	return /\b(?:on your own|with help|partly right|not right|right|gave up)\s*,\s*(?:(?:not )?sure|unsure|a guess|guess|guessed)\b/i.exec(text)?.[0] ?? null;
+}
+
+/** A "Show that…" or "Prove…" that also ends ", and why?": it already asks
+ *  for his reason (round 12, 2 n5: "Show that dim ker A = 2, and why?"). */
+export function reasonAskedTwice(text: string): string | null {
+	const last = sentences(prose(text).text).filter((s) => s.trim()).at(-1)?.trim() ?? "";
+	return /^(?:show|prove|explain|justify|derive|verify|deduce)\b[^?]*,\s*and why\?$/i.test(last) ? last : null;
+}
+
 /** Whether a reply's last sentence leaves him a move: a question, or an
  *  instruction he can act on ("Look at the rows.", "Plug $v$ back in."). */
 export function leavesAWayOn(text: string): boolean {
@@ -499,12 +555,20 @@ const SHARED_RUN = 3;
  *  row can be a combination of two others, which checking pairs never
  *  catches", then "Counting pivots after elimination is what catches a
  *  column hiding as a combination of two others"). Null when none does. */
+/** A sentence that asks him for his next move: a question, or an
+ *  instruction to type, send, find or show something. */
+const NEXT_MOVE = /\?$|^(?:type|send|paste|write|give|find|compute|show|prove|try|answer|name|tell)\b/i;
+
 export function repeatedPoint(text: string, earlier: readonly string[]): { said: string; before: string } | null {
 	const before = earlier.flatMap((t) => sentences(prose(t).text)).map((s) => {
 		const run = contentStems(s);
 		return { s, set: new Set(run), facts: factsOf(s), runs: new Set(run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "))) };
 	});
 	for (const said of sentences(prose(text).text)) {
+		// An ask for his next move asks for something new each time (round
+		// 12, 2 n5: "Type what part (e) asks." refused as "Type what part (d)
+		// asks." again, and the turn ended asking nothing).
+		if (NEXT_MOVE.test(said.trim())) continue;
 		const run = contentStems(said);
 		const mine = new Set(run);
 		const facts = factsOf(said);

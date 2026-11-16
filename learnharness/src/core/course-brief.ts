@@ -317,10 +317,34 @@ function arcCheckLines(arcsReady: unknown, arc: string | undefined): string[] | 
  *  `opened` are the topics the session was opened on from their page, whose
  *  title the app posted as his first message; `review` says he opened them
  *  as their review, which the session stays whatever it re-teaches. */
+/** The day he last studied the course, the engine's `last_studied`. */
+export interface LastStudied {
+	date: string;
+	daysAgo: number;
+}
+
+/** `last_studied` from the course's `plan` output (`{courses: [entry]}`);
+ *  null when the record shows no study. Pure. */
+export function lastStudiedOf(plan: unknown): LastStudied | null {
+	const entries = obj(plan).courses;
+	const studied = obj(Array.isArray(entries) ? entries[0] : null).last_studied;
+	const { date, days_ago: daysAgo } = obj(studied);
+	return typeof date === "string" && typeof daysAgo === "number" ? { date, daysAgo } : null;
+}
+
+/** When he last studied, as the one day to tell him: a moved day's note
+ *  says why that day moved, never his history (round 12, 1 m7: "you
+ *  haven't studied since Monday 9 November", read off a note, after study
+ *  on 10 and 17 Nov). */
+function studiedLine({ date, daysAgo }: LastStudied): string {
+	const when = daysAgo === 0 ? "today" : daysAgo === 1 ? `yesterday, ${dayWithWeekday(date)}` : `on ${dayWithWeekday(date)}, ${daysAgo} days ago`;
+	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
+}
+
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [], review = false }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; review?: boolean } = {},
+	{ runup, arcCheck, plan, opened = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -333,6 +357,7 @@ export function projectCourseBrief(
 	const examLine = typeof exam.days_left === "number" ? ` · exam in ${exam.days_left} days` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
+	if (studied) lines.push(studiedLine(studied));
 	if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
 	const topics = list(path.topics)

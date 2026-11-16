@@ -20,10 +20,11 @@ const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
  *  asked again after a hint or his side question has its words above, so
  *  its mark says where they are (round 8: after a direct answer the open
  *  question had no mark at all). */
-export function YourTurn({ above = false }: { above?: boolean }) {
+export function YourTurn({ above = false, afterHint = false }: { above?: boolean; afterHint?: boolean }) {
 	return (
 		<p data-slot="your-turn" className="mb-1 text-body system-current:text-row text-muted-foreground">
-			{above ? "Your turn, on the question above" : "Your turn"}
+			{/* A hint may end in a question of its own, so "above" would name it (round 12, 3 D11). */}
+			{above ? (afterHint ? "Your turn, on the question you pressed Hint on" : "Your turn, on the question above") : "Your turn"}
 		</p>
 	);
 }
@@ -36,7 +37,7 @@ export function YourTurn({ above = false }: { above?: boolean }) {
  *  its reply is the one guarded voice he reads (round 8: the unguarded
  *  card stated a false fact, opened above a stop marker before any reply,
  *  and named the same thing as practice's "Model solution"). */
-export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false }: {
+export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, afterHint = false }: {
 	tool: string;
 	toolCallId: string;
 	input: unknown;
@@ -51,10 +52,12 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 	/** It asks again, word for word, the question he pressed Hint on or
 	 *  asked about (`askedAgain`): its words are drawn above already. */
 	repeat?: boolean;
+	/** The re-ask follows a hint (`askedAfterHint`). */
+	afterHint?: boolean;
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
 	if (!spec) return null;
-	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} />;
+	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} afterHint={afterHint} />;
 	if (!output) return null;
 	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} repeat={repeat} />;
 }
@@ -71,12 +74,12 @@ export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSp
 	);
 }
 
-function OpenQuestion({ spec, stepAnchor, repeat }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean }) {
+function OpenQuestion({ spec, stepAnchor, repeat, afterHint }: { spec: ProseQuestionSpec; stepAnchor?: string; repeat: boolean; afterHint: boolean }) {
 	const answer = useProseAnswerContext();
 	const selected = answer?.selection.selected ?? new Set<number>();
 	return (
 		<div data-testid="prose-question" data-slot="prose-question" data-open="" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
-			<YourTurn above={repeat && spec.mode === "text"} />
+			<YourTurn above={repeat && spec.mode === "text"} afterHint={afterHint} />
 			{!repeat && <QuestionWords spec={spec} />}
 			{spec.mode !== "text" && (
 				<ChoiceRows

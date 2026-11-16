@@ -20,7 +20,7 @@ import { recordHasArcs, type CourseResult } from "../core/contracts/course.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
 import { studyDay } from "../core/day-words.ts";
 import { subscribe } from "../core/events.ts";
-import { projectCourseBrief, type CoursePlans } from "../core/course-brief.ts";
+import { lastStudiedOf, projectCourseBrief, type CoursePlans } from "../core/course-brief.ts";
 import { reviewRecord } from "../core/session-opening.ts";
 import { newCourseContextMessage, sessionModeOf, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
 import { planDays, plannedOf } from "./calendar.ts";
@@ -40,7 +40,7 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 		// reports: the open course's own plan carries it.
 		const [resumed, read] = await Promise.all([keptResume(workspace), fetchCoursePlans(record.id, workspace)]);
 		const runup = role === "practice" && read?.own ? { plan: read.own, workspace } : undefined;
-		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan: read?.plans, opened: openedOn(record), review: reviewRecord(record) });
+		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan: read?.plans, opened: openedOn(record), review: reviewRecord(record), studied: lastStudiedOf(read?.own) });
 		console.error(`[chat ${record.id}] course brief skipped: ${resumed.message}`);
 	} catch (err) {
 		console.error(`[chat ${record.id}] course brief skipped:`, err);
