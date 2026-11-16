@@ -123,12 +123,21 @@ export function questionNeedsReveal(tool: string, rawInput: unknown, phase: stri
 
 /** The teaching-cycle role field of the teach explain. Bare words, never
  *  quoted (the quote-copy wobble — see tests/tool-heal.test.ts). */
+/** What makes a question a prediction, where its type is written (round 13,
+ *  3 N5: "What chance p per slot would match that rate?" and "How could you
+ *  rewrite (1 + x/n)^n so that this fact gives its limit?" opened their
+ *  steps as predictions, and his worked answers were kept as "Prediction,
+ *  not counted"). The doctrine said it; the field said only "before". */
+export const PREDICT_RULE =
+	"A prediction is a guess he cannot yet work out. A question he can compute or derive from what he has been taught " +
+	"or already knows is a check, even one that opens a step, since his worked answer must count.";
+
 const predictCheckType = Type.Union([Type.Literal("predict"), Type.Literal("check")], {
 	description:
-		"REQUIRED — the question's role in the teaching cycle, as a bare word (no quotes): predict = posed BEFORE " +
+		"REQUIRED — the question's role in the teaching cycle, as a bare word (no quotes): predict = a guess posed BEFORE " +
 		"you teach the step (its own turn; the learner answers, then your teaching resolves it — arrives open, never " +
-		"collapsed); check = posed AFTER the step's teaching is complete (arrives collapsed behind the Check your " +
-		"understanding reveal). ONE question per turn either way.",
+		"collapsed; kept, never counted); check = a question he can work out, posed once what it needs is taught (arrives collapsed behind the Check your " +
+		`understanding reveal; counted). ${PREDICT_RULE} ONE question per turn either way.`,
 });
 
 // ─── the explain tool (free response, owner 2026-09-27) ────────────────────
