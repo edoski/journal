@@ -32,7 +32,7 @@ python -m learning.install --study-root DIR                      # offer the MCP
 | `save [--check]` | apply a JSON patch from stdin; returns observation ids, review dates, level changes, notes and the arc each new topic joined (`arcs_placed`); `--check` runs the same steps and writes nothing |
 | `migrate --all` / `--workspace DIR` [`--to 6`] / `--restore BACKUP` | move course records from schema 6 to 7, or back with `--to 6`, each after a byte-for-byte backup under `backups/` in the learning support folder; `--restore` puts a backup back. Run only by hand at a schema change: no load, save or host start migrates |
 | `sources --scan [DIR]` / `--add PATH...` | find and register course material; with `DIR`, list a folder linked to the course by the same rules |
-| `forget HANDLE...` / `--course` | remove exactly what the learner asked to forget |
+| `forget HANDLE...` / `--course` | remove exactly what the learner asked to forget; `--course` takes the course out of every list and the plan, and keeps its record in `.study/forgotten/` as the history of his study, which his pace and the days he was told keep up to that instant |
 | `note --title T` | write a Markdown note from stdin to `study-notes/` |
 | `init`, `link`, `unlink`, `readiness` | workspace lifecycle and host checks |
 

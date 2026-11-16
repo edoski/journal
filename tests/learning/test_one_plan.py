@@ -285,3 +285,42 @@ def test_a_save_tells_the_day_every_view_then_shows(
     for topic, day in told.items():
         assert shown[("probability", "reviews", topic)] == day, topic
         assert planned[("probability", "reviews", topic)] == day, topic
+
+
+@pytest.mark.parametrize("later", ["2026-11-08", "2026-11-09", "2026-11-10"])
+def test_deleting_a_course_moves_no_day_of_another(
+    later: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Deleting a course is not study: every other course keeps the days he
+    was told, that day and the days after, but for the topics his own study
+    moves, which move as they would have (round 13, 4 M1: deleting
+    Calculus I took 38 days of study out of his pace, and 35 days moved in
+    the other three courses, Series' told Thu 12 Nov among them)."""
+    world = World(tmp_path, "seed", monkeypatch, capsys)
+    told = planned_days(world.plan("2026-11-08"), set())
+    kept = planned_days(world.plan(later), set())
+    world.run("calculus", "forget", "--course", day="2026-11-08")
+    now = planned_days(world.plan(later), set())
+    others = {key: day for key, day in kept.items() if key[0] != "calculus"}
+    assert {key[0] for key in now} == {"linear-algebra", "probability", "real-analysis"}
+    assert others.keys() == now.keys()
+    moved = {key for key, day in now.items() if day != told.get(key)}
+    unmoved = {key for key in moved if kept[key] == told.get(key)}
+    if later == "2026-11-08":
+        assert now == others
+    else:
+        # A day a plan made afresh (a day he studies went by with no study)
+        # may move any topic; each says so, from the day he was told.
+        shown = {
+            (name, "new" if topic.get("starts") else "reviews", topic["topic"]): topic
+            for name in COURSES[1:]
+            for topic in world.run(name, "map", day=later)["topics"]
+        }
+        assert {
+            key: shown[key].get("moved")
+            for key in unmoved
+            if (shown[key].get("moved") or {}).get("from") != told[key]
+        } == {}

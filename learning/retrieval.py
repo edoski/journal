@@ -1220,12 +1220,18 @@ def _readable(workspace: Workspace) -> dict[str, dict[str, Any]]:
 def _replayed(
     workspace: Workspace, record: dict[str, Any], today: date
 ) -> tuple[agenda.Replay, dict[str, dict[str, Any]], bool]:
-    """The daily plan of every course (``agenda.replay``), the records it
-    was made from, and whether he studies on any weekday."""
+    """The daily plan of every course (``agenda.replay``), made with the
+    study of every course he deleted too (``records.history``), the records
+    of the courses he keeps, and whether he studies on any weekday."""
     name = str(workspace.directory)
-    readable = capacity.final_reviews({**_readable(workspace), name: record}, today)
+    readable = capacity.final_reviews(
+        {**records.history(), **_readable(workspace), name: record}, today
+    )
     week = capacity.of(readable.values(), today)
-    return daily(readable, today), readable, bool(week.study_weekdays)
+    courses = {
+        key: course for key, course in readable.items() if not capacity.gone(course)
+    }
+    return daily(readable, today), courses, bool(week.study_weekdays)
 
 
 def daily(readable: Mapping[str, dict[str, Any]], today: date) -> agenda.Replay:

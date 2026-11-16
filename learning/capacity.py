@@ -67,7 +67,7 @@ from datetime import date, timedelta
 import math
 from typing import Any, TypeVar
 
-from learning import arc_rules, memo, progress
+from learning import arc_rules, clock, memo, progress
 
 # Two weeks: each weekday is seen at least twice at near-full weight, and a new
 # routine outweighs the old one within a week.
@@ -77,8 +77,27 @@ PRIOR_WEIGHT = 1.0
 # Cold start: a course is begun one topic at a time.
 PRIOR_NEW = 1.0
 WEEK = 7
+FORGOTTEN = "forgotten"
+"""On a deleted course's record (``records.history``): the instant it was
+deleted. The study he did in it before stays evidence of his week, and the
+work it owed from that day on is no evidence of where he stops."""
+GONE = "gone"
+"""On a deleted course's record read as of a moment (``agenda``): whether it
+was deleted by then. Read as it stands, a deleted course is gone."""
 
 Name = TypeVar("Name", bound=Hashable)
+
+
+def gone(record: dict[str, Any]) -> bool:
+    """Whether a course was deleted by the moment its record is read as of
+    (``GONE``): such a course holds nothing in the plan."""
+    return bool(record.get(GONE, FORGOTTEN in record))
+
+
+def forgotten_on(record: dict[str, Any]) -> date | None:
+    """The day a deleted course was deleted, None for a course he keeps."""
+    when = record.get(FORGOTTEN)
+    return clock.local_day(when) if when else None
 
 
 @dataclass(frozen=True)
@@ -376,10 +395,18 @@ def exam_days(records: Iterable[dict[str, Any]]) -> frozenset[date]:
     them, of any course, since the exam is that day's work. Nothing he does
     or leaves that day reads as his limit or his study days."""
     return frozenset(
-        date.fromisoformat(when)
+        day
         for record in records
         if (when := record.get("exam", {}).get("date"))
+        and _kept((day := date.fromisoformat(when)), record)
     )
+
+
+def _kept(day: date, record: dict[str, Any]) -> bool:
+    """Whether ``day`` comes before the course was deleted, if it was: the
+    days after it hold nothing of it."""
+    until = forgotten_on(record)
+    return until is None or day < until
 
 
 def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]:
@@ -425,12 +452,24 @@ def _activity(records: list[dict[str, Any]], today: date) -> dict[date, Done]:
         if progress.asks(record):
             exam_of = progress.examining(record)
             for key, replay in progress.replays({**record, "exam": {}}).items():
-                left |= _reviews_left(replay, exam_of(key), today + timedelta(days=1))
-        short |= memo.once(
-            "new_short",
-            (memo.content(record), week.planned, week.study),
-            functools.partial(_new_short, record, replays, week.planned, week.study),
-        )
+                left |= {
+                    day
+                    for day in _reviews_left(
+                        replay, exam_of(key), today + timedelta(days=1)
+                    )
+                    if _kept(day, record)
+                }
+        short |= {
+            day
+            for day in memo.once(
+                "new_short",
+                (memo.content(record), week.planned, week.study),
+                functools.partial(
+                    _new_short, record, replays, week.planned, week.study
+                ),
+            )
+            if _kept(day, record)
+        }
     return _settled(
         {
             day: Done(
@@ -679,7 +718,11 @@ def final_reviews(
     with no start on record had no answer in its final review (a save in it
     keeps its start), so its shortest form changes nothing.
     """
-    unplanned = [name for name, record in records.items() if progress.unplanned(record)]
+    unplanned = [
+        name
+        for name, record in records.items()
+        if progress.unplanned(record) and not gone(record)
+    ]
     if not unplanned:
         return dict(records)
 
@@ -767,6 +810,8 @@ def final_review_days(
     limited = any(weekday.reviews.shown for weekday in week.weekdays)
     nearer = []
     for other in others:
+        if gone(other):
+            continue
         plan = progress.exam_plan(other)
         if plan is not None and today < plan.day < exam:
             days = [

@@ -1600,13 +1600,14 @@ def _day(
         return _afresh(records, day, days, (weekly, morning), until, (ended, studied))
     before = _day(records, studied, span, week, until, told=False)
     ended = before.now
+    kept = [name for name, record in morning.items() if not capacity.gone(record)]
     left = {
         name: {
             topic
-            for planned in ended.days[name][: (day - studied).days]
+            for planned in ended.days.get(name, [])[: (day - studied).days]
             for topic in (*planned["reviews"], *planned["new"])
         }
-        for name in records
+        for name in kept
     }
     done = capacity.activity(morning.values(), day).get(studied, capacity.Done())
     if any(left.values()) and (done.reviews_short or done.new_short):
@@ -1619,13 +1620,13 @@ def _day(
     unstudied = {
         name: {
             topic
-            for planned in ended.days[name][(day - studied).days :]
+            for planned in ended.days.get(name, [])[(day - studied).days :]
             if not weekly.studies(date.fromisoformat(planned["date"]))
             for topic in (*planned["reviews"], *planned["new"])
         }
-        for name in records
+        for name in kept
     }
-    moving = {name: left[name] | unstudied[name] for name in records}
+    moving = {name: left[name] | unstudied[name] for name in kept}
     night = _Told(ended, moving, studied, None, yields=True)
     began = _planned(morning, day, days, weekly, night)
     now = _saved(records, day, days, weekly, began, until, finals)
@@ -1650,6 +1651,7 @@ def _afresh(
         name: (record["exam"]["date"], record["exam"]["final_review"])
         for name, record in morning.items()
         if "final_review" in record.get("exam", {})
+        and not capacity.gone(record)
         and progress.unplanned(
             progress.begun(records[name], day) if day < until else records[name]
         )
@@ -1713,7 +1715,7 @@ def _at(
         for name, record in records.items()
     }
     stood = {
-        name: as_of(record, day, stamp, until)
+        name: _standing(as_of(record, day, stamp, until), day, stamp)
         for name, record in {**placed, **held}.items()
     }
     return capacity.final_reviews(
@@ -1725,6 +1727,22 @@ def _at(
         },
         day,
     )
+
+
+def _standing(record: dict[str, Any], day: date, stamp: Stamp | None) -> dict[str, Any]:
+    """A deleted course's record as of ``day``'s ``stamp``, as the day began
+    when None, marked with whether it was deleted by then
+    (``capacity.GONE``): before, it is a course like any other, so the days
+    he was told then replay as they were; after, it holds nothing in the
+    plan, while the study he did in it stays his pace (``records.history``)."""
+    when = record.get(capacity.FORGOTTEN)
+    if when is None:
+        return record
+    on = capacity.forgotten_on(record)
+    assert on is not None
+    deleted = (0, datetime.fromisoformat(when))
+    gone = on < day or (on == day and stamp is not None and stamp > deleted)
+    return {**record, capacity.GONE: gone}
 
 
 def _last_studied(records: Mapping[str, dict[str, Any]], today: date) -> date | None:
@@ -1822,7 +1840,11 @@ def _planned(
     week = (week or capacity.of(records.values(), today)).resting(
         capacity.exam_days(records.values())
     )
-    courses = [_Course.of(name, record) for name, record in records.items()]
+    courses = [
+        _Course.of(name, record)
+        for name, record in records.items()
+        if not capacity.gone(record)
+    ]
     if told is not None:
         for course in courses:
             course.moving = set(told.touched.get(course.name, ()))

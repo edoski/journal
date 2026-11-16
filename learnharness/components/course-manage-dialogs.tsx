@@ -133,8 +133,8 @@ function DeleteCourse({ open, course, onClose, onDeleted, fetchLike = fetch }: O
 				<AlertDialogHeader>
 					<AlertDialogTitle>Delete {courseLabel(course)}?</AlertDialogTitle>
 					<AlertDialogDescription>
-						Its topics, progress, plan and exam day are deleted, and it leaves Home and the calendar. Its lessons stay in your history,
-						and the files in its folder stay on your Mac.
+						Its topics, plan and exam day leave Home and the calendar. What you studied in it still counts toward your pace, its lessons
+						stay in your history, and the files in its folder stay on your Mac.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				{error && <p role="alert" className="text-body system-current:text-row text-danger">{error}</p>}
