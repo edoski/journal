@@ -70,7 +70,10 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 	return (
 		<li data-slot="topic-attempt" data-result={result} className={cn("grid min-h-10 items-baseline gap-x-4 gap-y-0.5 py-2.75", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)]" : DATED, spine(ends))}>
 			<Icon role="img" aria-label={how ? `${words}, ${how}` : words} className={cn(ICON, "mt-px self-start")} />
-			<p className={cn("line-clamp-2 text-body system-current:text-row text-muted-foreground", date !== undefined && "col-span-2")}>
+			{/* Each formula is one box (round 13, 2 n1): one that does not fit
+			    goes to the hidden line whole, never leaving its exponents
+			    above the cut without their bases. */}
+			<p data-slot="topic-attempt-text" className={cn("line-clamp-2 text-body system-current:text-row text-muted-foreground [&_.katex]:inline-block", date !== undefined && "col-span-2")}>
 				<LineText>{title ?? attempt.text}</LineText>
 			</p>
 			{date !== undefined && <DateCell date={date} />}
