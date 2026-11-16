@@ -28,20 +28,38 @@ async function readHome(): Promise<StudyHomeState> {
 	return { status: "ready", courses: withLessonHere(study.courses, chats), failed: study.failed, open: openSessions(chats), chats };
 }
 
-/** Reads the home on each visit and again whenever a turn starts or
+/** The last Home this window read, so a visit shows it while the visit's
+ *  own read is under way (round 12, 1 m8: Home sat on "Reading your
+ *  courses…" for over a minute after a close, while the engine was busy
+ *  with the lesson's background work). */
+let lastRead: Extract<StudyHomeState, { status: "ready" }> | null = null;
+
+/** Keeps a read Home as the one a visit starts from. */
+function remembered(next: StudyHomeState): StudyHomeState {
+	if (next.status === "ready") lastRead = next;
+	return next;
+}
+
+/** Forgets the last read Home (tests). */
+export function forgetStudyHome(): void {
+	lastRead = null;
+}
+
+/** Reads the home on each visit, showing the last one read until the
+ *  visit's read lands, and again whenever a turn starts or
  *  settles, a record, a course record or the session list changes, the day
  *  turns over, or the server comes back, so a line follows its session while the tutor writes and after;
  *  a failed reread keeps what is shown. `retry` reads it again from the
  *  start. */
 export function useStudyHome(): { state: StudyHomeState; retry: () => void } {
-	const [state, setState] = useState<StudyHomeState>({ status: "loading" });
+	const [state, setState] = useState<StudyHomeState>(() => lastRead ?? { status: "loading" });
 	const [attempt, setAttempt] = useState(0);
 	const live = useRef(true);
 	useEffect(() => {
 		live.current = true;
 		void readHome()
-			.then((next) => live.current && setState(next))
-			.catch(() => live.current && setState({ status: "failed" }));
+			.then((next) => live.current && setState((prev) => remembered(next.status === "ready" || prev.status !== "ready" ? next : prev)))
+			.catch(() => live.current && setState((prev) => (prev.status === "ready" ? prev : { status: "failed" })));
 		return () => {
 			live.current = false;
 		};
@@ -51,7 +69,7 @@ export function useStudyHome(): { state: StudyHomeState; retry: () => void } {
 		clearTimeout(timer.current);
 		timer.current = setTimeout(() => {
 			void readHome()
-				.then((next) => live.current && setState((prev) => (next.status === "ready" || prev.status !== "ready" ? next : prev)))
+				.then((next) => live.current && setState((prev) => remembered(next.status === "ready" || prev.status !== "ready" ? next : prev)))
 				.catch(() => {});
 		}, 250);
 	}, []);

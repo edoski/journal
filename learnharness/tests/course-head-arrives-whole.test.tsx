@@ -23,6 +23,7 @@ import type { CourseMapTopic, CourseStanding, StudyCourse, TopicHandle } from ".
 import { ServerEventsProvider } from "../components/server-events.tsx";
 import { CourseFrame } from "../components/course-page/course-frame.tsx";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
+import { forgetStudyHome } from "../components/study-home/use-study-home.ts";
 
 const h = (handle: string) => handle as TopicHandle;
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -69,6 +70,8 @@ afterEach(async () => {
 	root = null;
 	document.body.innerHTML = "";
 	globalThis.fetch = originalFetch;
+	// Each test is a fresh window, with no Home read before it (round 12, 1 m8).
+	forgetStudyHome();
 });
 
 /** The page as SplitCourse draws its head, with the course and its standing each answered by the test. */
