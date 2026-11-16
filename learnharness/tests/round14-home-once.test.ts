@@ -15,6 +15,8 @@ import { todayRows, todaySteps } from "../components/study-home/study-facts.ts";
 import { chat } from "./fixtures/now-demo.ts";
 import { nowLine } from "../components/study-home/needs-you.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
+import { lessonTitle } from "../components/study-home/agenda-rows/row-facts.ts";
+import { doneToday } from "../components/study-home/day-record.ts";
 import type { StudyCourse } from "../src/core/contracts/study.ts";
 
 const FIXTURE = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "plan", "probability-lesson-begun.map.json");
@@ -64,5 +66,24 @@ describe("one session, one status on every surface (round 14, m28)", () => {
 		assert.deepEqual(needs, ["poisson"], "the lesson's own topic; one it only touched stays in its own group");
 		const all = groups.flatMap((g) => g.topics.map((t) => t.topic.handle));
 		assert.ok(all.includes("random-variables" as never), "and is still listed once");
+	});
+});
+
+/**
+ * Round 14, m29 (1 n8, round-13 n9): one session, two names. Problem sheet
+ * 4's session read "Problem sheet 4" on its line while it waited, and
+ * "Problem sheet 4: rank and nullity" once left and in Studied today.
+ */
+describe("one session, one name (round 14, m29)", () => {
+	const course: StudyCourse = { map: { ...MAP, workspace: "/s/la", tasks: [{ key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: null, updated: "2026-11-08", topics: [] }] } as never, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
+	const sheet = (over: Partial<Parameters<typeof chat>[1]>) => chat("s4", { title: "Problem sheet 4", studied: true, tasks: ["sheet-4"], updatedAt: new Date().toISOString(), course: { workspace: "/s/la", title: "Linear Algebra" }, ...over });
+
+	it("is the open task's title on its line in every state, and in Studied today", () => {
+		const waiting = lessonTitle({ kind: "session", chat: sheet({ ended: "mid-lesson", pendingQuestion: true }), course });
+		const left = lessonTitle({ kind: "session", chat: sheet({ ended: "left" }), course });
+		const studied = doneToday([sheet({ ended: "left" })], new Date(), [course]);
+		assert.equal(waiting, "Problem sheet 4: rank and nullity");
+		assert.equal(left, "Continue Problem sheet 4: rank and nullity", "the line he picks up says Continue, with the same name");
+		assert.deepEqual(studied, ["Problem sheet 4: rank and nullity"]);
 	});
 });
