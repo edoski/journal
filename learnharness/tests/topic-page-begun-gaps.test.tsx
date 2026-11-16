@@ -28,10 +28,10 @@ const WORKSPACE = "/study/prob";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const topic = (handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic => ({ handle: handle as TopicHandle, title: handle, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...over });
 
-const RV = topic("random-variables", { title: "Random variables and distributions", level: "learning", introduced: "2026-11-02", review: { kind: "due", date: TODAY, overdue: 0 } });
+const RV = topic("random-variables", { title: "Random variables and distributions", level: "assisted", introduced: "2026-11-02", review: { kind: "due", date: TODAY, overdue: 0 } });
 const POISSON = topic("poisson", { title: "Poisson distribution", tasks: ["poisson-lesson"], starts: TODAY, startsWhy: { kind: "begun" } });
 const MAP: CourseMap = {
-	workspace: WORKSPACE, title: "Probability", today: TODAY, revision: 1, exam: null, current: "random-variables" as TopicHandle,
+	workspace: WORKSPACE, title: "Probability", today: TODAY, revision: 1, exam: null, current: "random-variables" as TopicHandle, focus: null,
 	tasks: [{ key: "poisson-lesson", title: "Poisson distribution lesson", step: null, updated: "2026-11-09", topics: ["poisson" as TopicHandle] }],
 	topics: [RV, POISSON],
 	edges: [{ kind: "needs", prerequisite: "random-variables" as TopicHandle, topic: "poisson" as TopicHandle }],

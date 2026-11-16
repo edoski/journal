@@ -17,11 +17,11 @@ const WORKSPACE = "/study/linalg";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const topic = (handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic => ({ handle: handle as TopicHandle, title: handle, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...over });
 
-const BASIS = topic("basis", { title: "Basis and dimension", level: "secure", introduced: "2026-10-20", review: { kind: "scheduled", date: "2026-11-20" } });
-const EIGEN = topic("eigen", { title: "Eigenvalues and eigenvectors", level: "learning", introduced: "2026-11-06" });
+const BASIS = topic("basis", { title: "Basis and dimension", level: "retained", introduced: "2026-10-20", review: { kind: "scheduled", date: "2026-11-20" } });
+const EIGEN = topic("eigen", { title: "Eigenvalues and eigenvectors", level: "attempted", introduced: "2026-11-06" });
 const DIAG = topic("diag", { title: "Diagonalization", starts: "2026-11-17" });
 const MAP: CourseMap = {
-	workspace: WORKSPACE, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: "eigen" as TopicHandle, tasks: [],
+	workspace: WORKSPACE, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: "eigen" as TopicHandle, focus: null, tasks: [],
 	topics: [BASIS, EIGEN, DIAG],
 	edges: [
 		{ kind: "needs", prerequisite: "basis" as TopicHandle, topic: "diag" as TopicHandle },
