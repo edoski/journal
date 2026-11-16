@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from learning import agenda, capacity, planning, records, retrieval
+from learning import agenda, capacity, planning, progress, records, retrieval
 from learning.__main__ import main
 from learning.workspace import initialize, resolve
 
@@ -404,6 +404,41 @@ def test_filling_the_final_review_keeps_every_day_he_was_told(
         for began, now in zip(made.began.days[name], made.now.days[name]):
             kept = {topic for topic in began["reviews"] if topic not in touched}
             assert kept <= set(now["reviews"]), (name, began, now)
+
+
+def test_a_slip_moves_a_start_to_the_first_final_review_day_with_room(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """When a need slips, the start that waits on it comes back at the first
+    day the plan's order gives it: a final review takes its exam's ready
+    topics as the day's room allows, before any start a day already holds,
+    and every start the slip did not touch keeps its day (round 14, m7:
+    Random variables slipped on 9 Nov, and Poisson's start went to Sat
+    14 Nov while Linear Algebra's kept 11 and 13 Nov)."""
+    seeded = World(tmp_path, "slip", monkeypatch, capsys, R14)
+    found = seeded.plan("2026-11-09")
+    starts = {
+        topic: day["date"]
+        for day in found["probability"]["plan"]["days"]
+        for topic in day["new"]
+    }
+    exam = seeded.run("probability", "map", day="2026-11-09")["exam"]
+    assert starts["poisson"] <= exam["final_review"], starts
+    monkeypatch.setenv("LEARNING_TODAY", "2026-11-09")
+    stored = {name: records.read(resolve(root)) for name, root in seeded.roots.items()}
+    made = agenda.replay(stored, date(2026, 11, 9), WINDOW)
+    for name, record in stored.items():
+        touched = agenda.touched(record, date(2026, 11, 9))
+        for began, now in zip(made.began.days[name], made.now.days[name]):
+            kept = {
+                topic
+                for topic in began["new"]
+                if topic not in touched
+                and not touched.intersection(progress.needs(record, topic))
+            }
+            assert kept <= set(now["new"]), (name, began, now)
 
 
 EVE = json.loads((Path(__file__).parent / "golden" / "exam-eve.json").read_text())

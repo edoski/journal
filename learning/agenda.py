@@ -1129,10 +1129,16 @@ def _new(
     room: float,
     week: Capacity,
     begun: int | None,
+    passed: int = 0,
 ) -> dict[str, list[str]]:
     """New topics within ``room``. Until he has shown a limit (``begun`` is not
     None), every exam course's pace is proposed even past ``room``, less the
-    ``begun`` topics he already started today."""
+    ``begun`` topics he already started today. ``passed`` is the starts a
+    save's step kept on the day: a final review's starts the save moved come
+    before them, as a moved review comes before the reviews it passes, so the
+    day may hold that many more than his limit (round 14, m7: Random
+    variables slipped, and Poisson's start went past the told starts of
+    three days to the Saturday inside the final review)."""
     chosen: dict[str, list[str]] = {course.name: [] for course in courses}
     for course in courses:
         course.fresh.clear()
@@ -1235,9 +1241,13 @@ def _new(
             rest = len(course.scoped)
             after = _room_after(week, day, end)
             before[course.name] = rest
-            paces[course.name] = max(
-                capacity.pace(rest, left, day, week.studies),
-                rest - after if after is not None else 0,
+            paces[course.name] = (
+                rest
+                if course.reviewing(day)
+                else max(
+                    capacity.pace(rest, left, day, week.studies),
+                    rest - after if after is not None else 0,
+                )
             )
     if begun is not None:
         room = max(room, sum(paces.values()) - begun)
@@ -1281,9 +1291,13 @@ def _new(
     # Expectation, which Variance needs, started on the eve, too late for a
     # review).
     reviewing = [course for course in exams if course.reviewing(day)]
+    if reviewing:
+        room += passed
     for course in reviewing:
         room -= gap(course)
         room -= paced(course)
+    if reviewing:
+        room = max(room - passed, 0)
     for course in [*exams, *others]:
         if course not in reviewing:
             room -= gap(course)
@@ -1958,6 +1972,7 @@ def _planned(
                 course.place(topic)
                 course.reviewed(topic, day)
         starts = _continued(courses, day, week)
+        passed = 0
         if told is not None:
             for course in courses:
                 assert course.moving is not None
@@ -1969,10 +1984,11 @@ def _planned(
                         course.why[topic] = told.plan.why[course.name][topic]
                         starts[course.name].append(topic)
                         new_room -= 1
+                        passed += not told.yields
                     else:
                         course.moving.add(topic)
         new = (
-            _new(courses, day, max(new_room, 0), week, begun)
+            _new(courses, day, max(new_room, 0), week, begun, passed)
             if told is None or any(course.starts_moving() for course in courses)
             else _kept_new(courses, day, week)
         )
