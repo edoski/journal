@@ -66,6 +66,9 @@ export interface ProseComposerProps {
 	onSaveDraft: (draft: QuestionFormDraft) => void;
 	onSubmitAnswer: (output: QuestionAnswerData, photos?: Photo[]) => void;
 	onSubmitThinking: (text: string, confidence: Confidence, photos?: Photo[]) => Promise<boolean>;
+	/** Sends his words to the running turn, as the lesson box does while
+	 *  the tutor replies; false when the app refused them. */
+	onSteer: (text: string, photos?: Photo[]) => Promise<boolean>;
 	onRequest: (request: PracticeRequest, text: string) => void;
 	onDraftChange: (key: string, text: string) => void;
 }
@@ -124,6 +127,7 @@ function AnswerComposer({
 	onSaveDraft,
 	onSubmitAnswer,
 	onSubmitThinking,
+	onSteer,
 	onRequest,
 	onDraftChange,
 	message,
@@ -190,26 +194,35 @@ function AnswerComposer({
 		void keepPhotos(box, []);
 	};
 
-	const ready = !waiting && (problem ? text.trim().length > 0 || photos.photos.length > 0 : spec ? proseAnswerReady(spec, selection, text, photos.photos.length) : false);
+	const written = text.trim().length > 0 || photos.photos.length > 0;
+	// While the tutor replies to his work, what he writes here goes to that
+	// reply as the lesson box's words do (round 11, 4 major 1: Enter here
+	// sent nothing, and the words were erased when the problem closed).
+	const steering = waiting && written;
+	const ready = !waiting && (problem ? written : spec ? proseAnswerReady(spec, selection, text, photos.photos.length) : false);
+
+	// What he sent, emptied from the box: a send refused at once gives it
+	// back, words and photos, unless he has started writing again.
+	const sendOut = (go: (words: string, sent: Photo[] | undefined) => Promise<boolean>, after?: () => void) => {
+		const typed = text;
+		setText("");
+		const taken = photos.take();
+		void go(typed.trim(), sentPhotos(taken)).then((accepted) => {
+			if (accepted) return;
+			restorePhotos(taken);
+			if (textRef.current.trim()) return;
+			setText(typed);
+			after?.();
+		});
+	};
 
 	const submit = () => {
+		if (steering) return sendOut(onSteer);
 		if (!ready) return;
 		if (problem) {
-			const typed = text;
-			const words = typed.trim();
-			setText("");
-			setConfidence(DEFAULT_CONFIDENCE);
-			const taken = photos.take();
-			// A send refused at once gives his work back, words and photos,
-			// unless he has started writing again.
 			const sure = confidence;
-			void onSubmitThinking(words, sure, sentPhotos(taken)).then((accepted) => {
-				if (accepted) return;
-				restorePhotos(taken);
-				if (textRef.current.trim()) return;
-				setText(typed);
-				setConfidence(sure);
-			});
+			setConfidence(DEFAULT_CONFIDENCE);
+			sendOut((words, sent) => onSubmitThinking(words, sure, sent), () => setConfidence(sure));
 			return;
 		}
 		if (!spec) return;
@@ -335,11 +348,11 @@ function AnswerComposer({
 				onChange={setText}
 				onSend={submit}
 				onStop={message.onStop}
-				canSend={ready}
+				canSend={ready || steering}
 				placeholder={placeholder}
 				leading={leading}
 				toolbar={toolbar}
-				answer={{ onSubmit: submit, ready, label: problem ? "Submit your work" : "Submit answer" }}
+				answer={{ onSubmit: submit, ready: ready || steering, label: steering ? "Send" : problem ? "Submit your work" : "Submit answer" }}
 				head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
 				photos={textMode ? photos : undefined}
 			/>

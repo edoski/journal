@@ -40,6 +40,7 @@ const composer = (open: ProseComposerProps["open"], initialDraft?: QuestionFormD
 			onSaveDraft={noop}
 			onSubmitAnswer={noop}
 			onSubmitThinking={async () => true}
+			onSteer={async () => true}
 			onRequest={noop}
 			onDraftChange={noop}
 		/>

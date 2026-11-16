@@ -152,6 +152,7 @@ async function mount(key: string, carryScope?: string, input: unknown = check, t
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}
 				onSubmitThinking={async () => true}
+				onSteer={async () => true}
 				onRequest={noop}
 				onDraftChange={noop}
 			/>

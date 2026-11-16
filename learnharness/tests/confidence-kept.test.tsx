@@ -59,6 +59,7 @@ function Lesson({ open, submit }: { open: Open; submit: (text: string, confidenc
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}
 				onSubmitThinking={(text, confidence) => submit(text, confidence)}
+				onSteer={async () => true}
 				onRequest={noop}
 				onDraftChange={noop}
 			/>

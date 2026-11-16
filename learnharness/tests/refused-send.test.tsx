@@ -54,6 +54,7 @@ test("work on a problem refused at once comes back into the box", async () => {
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}
 				onSubmitThinking={() => new Promise<boolean>((resolve) => { refuse = resolve; })}
+				onSteer={async () => true}
 				onRequest={noop}
 				onDraftChange={noop}
 			/>
