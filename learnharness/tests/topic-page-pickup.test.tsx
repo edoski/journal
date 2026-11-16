@@ -264,6 +264,20 @@ describe("a topic not started", () => {
 		assert.ok(page(alone).querySelector('[data-slot="topic-builds-map"]') === null, "a topic that builds on nothing takes the width");
 	});
 
+	// Round 13, 1 n6: on 10 Nov the begun Poisson page was Now and Earlier only.
+	it("keeps all of it, and dates the day the lesson goes on, while a lesson he began has not introduced it", () => {
+		const begun = { ...POISSON, starts: TODAY, startsWhy: { kind: "begun" as const } };
+		const lesson = chat("chat_poisson", "Poisson distribution lesson", "2026-11-07T10:00:00.000Z", { topics: ["poisson"], ownTopics: ["poisson"], ended: "left" });
+		const going = topicFacts({ course: { ...COURSE, map }, topic: begun, chats: [lesson], read: { record, plans: [] } });
+		const { now, why, scheduled } = pickupSections(going);
+		assert.deepEqual([now.kind, now.chat], ["resume", "chat_poisson"]);
+		assert.deepEqual(why?.builds.map((b) => b.topic.handle), ["rank", "kernel"]);
+		assert.deepEqual(scheduled, { kind: "lesson", day: "Today", waits: null, why: null });
+		const document = page(going);
+		assert.deepEqual(order(document).slice(0, 4), ["now", "builds on", "in your material", "scheduled"]);
+		assert.ok(document.querySelector('[data-slot="topic-panes"] [data-slot="topic-builds-map"]'), "the map column");
+	});
+
 	it("says none of it once a session or the engine has started it", () => {
 		const taught = topicFacts({ course: { ...COURSE, map }, topic: { ...POISSON, level: "introduced", introduced: TODAY }, chats: [], read: { record, plans: [] } });
 		assert.equal(pickupSections(taught).why, null);

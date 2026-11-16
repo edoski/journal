@@ -174,12 +174,21 @@ export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	return [...waiting.map((entry): NextItem => ({ kind: "session", entry })), ...review, ...tasks];
 }
 
+/** A lesson he began that has not introduced the topic yet, which the
+ *  plan goes on with (the engine's `starts_why` "begun"): the page still
+ *  says why the topic comes now, as for one not started (round 13, 1 n6:
+ *  the begun Poisson page was Now and Earlier only). */
+export function lessonBegun(facts: TopicFacts): boolean {
+	return facts.topic.level === "new" && facts.topic.startsWhy?.kind === "begun";
+}
+
 /** The page's history sorted by what he does with it. */
 export function pickupSections(facts: TopicFacts): PickupSections {
 	const now = nowItem(facts);
 	const next = nextItems(facts, now);
 	const held = new Set([now.chat, ...next.flatMap((item) => (item.kind === "session" ? [item.entry.chat.id] : []))]);
 	const review = facts.topic.review;
+	const begun = lessonBegun(facts);
 	return {
 		now,
 		next,
@@ -187,9 +196,11 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 			review?.kind === "scheduled"
 				? { kind: "review", day: dayOf(review.date), waits: facts.waits }
 				: facts.starts && now.kind !== "start"
-					? { kind: facts.topic.startsWhy?.kind === "begun" ? "lesson" : "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
-					: null,
+					? { kind: begun ? "lesson" : "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
+					: begun && facts.topic.starts && facts.topic.starts <= facts.today
+						? { kind: "lesson", day: dayWords(facts.topic.starts, facts.today), waits: null, why: facts.startsWhy }
+						: null,
 		earlier: trailDays(earlierSessions(facts.sessions, held, facts.attempts), facts.attempts, facts.today),
-		why: now.kind === "start" ? { builds: facts.builds, refs: facts.refs } : null,
+		why: now.kind === "start" || begun ? { builds: facts.builds, refs: facts.refs } : null,
 	};
 }

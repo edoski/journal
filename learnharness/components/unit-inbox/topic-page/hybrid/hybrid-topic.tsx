@@ -10,6 +10,7 @@ import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/
 import { LessonMap } from "@/components/unit-inbox/topic-page/hybrid/lesson-map";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
+import { lessonBegun } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import { BuildsOnMap } from "@/components/unit-inbox/topic-page/hybrid/builds-on-map";
 import type { TopicHandle } from "@/src/core";
 
@@ -36,8 +37,9 @@ export interface HybridPaneProps {
  * full height under it: the topic's history sorted into Pick up's sections
  * on the left, which holds the page's action, and the steps of the lesson
  * picked in it as a map on the right, since a lesson's steps run down with
- * little branching, in the app's linked columns. A topic not started
- * shows what it builds on there instead. With neither, the history takes
+ * little branching, in the app's linked columns. A topic not started, or
+ * one a lesson he began has not introduced yet, shows what it builds on
+ * there instead. With neither, the history takes
  * the width.
  */
 export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicPageProps & { error?: string | null }) {
@@ -48,7 +50,7 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 	const side = (className?: string) => (
 		<SectionsPane facts={facts} busy={busy} onAct={onAct} onTask={onTask} shown={shown?.chat.id ?? null} onShow={setChosen} onPoint={(handle) => setPointed(handle as TopicHandle | null)} className={className} />
 	);
-	const starting = facts.action.kind === "start" && facts.buildsMap;
+	const starting = (facts.action.kind === "start" || lessonBegun(facts)) && facts.buildsMap;
 	return (
 		<PageFrame data-testid="unit-page" data-topic-candidate="hybrid">
 			{/* Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
