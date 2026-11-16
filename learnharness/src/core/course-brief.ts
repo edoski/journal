@@ -362,25 +362,53 @@ function studiedLine({ date, daysAgo }: LastStudied): string {
 	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
 }
 
-/** A topic he opened that his plan starts on a later day: he starts it
- *  ahead of plan, and the lesson's first words say so (round 13, 1 n7: a
- *  start 11 days early opened on a bare probe). Never a reason the plan
- *  does not give. */
-function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[]): string[] {
+/** "A", "A and B", "A, B and C". */
+const listedWords = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+
+/** What starting `topic` today costs him, in the plan's own facts: what it
+ *  builds on is not solid yet (its start waits on it), or today's plan
+ *  still holds other work, in any course. Null when it costs nothing. */
+function earlyCost(plans: CoursePlans, map: CourseMap, topic: CourseMapTopic): string | null {
+	const titleIn = (m: CourseMap, h: TopicHandle) => m.topics.find((t) => t.handle === h)?.title ?? h;
+	const waits = topic.startsWhy?.kind === "after" ? [...topic.startsWhy.needs, ...topic.startsWhy.partners] : [];
+	const shaky = waits.length > 0 ? `${listedWords(waits.map((h) => titleIn(map, h)))}, which it builds on, ${waits.length > 1 ? "are" : "is"} not solid yet` : null;
+	const held = plans.courses.flatMap(({ map: m, days }) => {
+		const today = days.find((d) => d.date === m.today);
+		if (!today) return [];
+		return [...today.reviews.map((h) => `your ${titleIn(m, h)} review`), ...today.new.filter((h) => h !== topic.handle).map((h) => titleIn(m, h))];
+	});
+	const planned = held.length > 0 ? `today's plan still holds ${listedWords(held)}` : null;
+	const costs = [shaky, planned].filter((c): c is string => c !== null);
+	return costs.length > 0 ? costs.join(", and ") : null;
+}
+
+/** A topic he started today, from its page or a row, that his plan starts
+ *  on a later day: the lesson's first words say so, with what starting it
+ *  early costs him, and only then (round 13, 1 n7: a start 11 days early
+ *  opened on a bare probe; round 14, m1: the line opened every lesson, a
+ *  lesson he had begun, and the Ask-the-tutor reply). `opening` is the
+ *  session's first words: a start opens with the topic's title ("Start" and
+ *  it, or it alone); a continue, a question and a free message never do.
+ *  Never a reason the plan does not give. */
+function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[], opening: string | null): string[] {
 	const map = plans?.courses.find((c) => c.map.workspace === plans.workspace)?.map;
-	if (!map) return [];
+	if (!plans || !map || !opening) return [];
+	const words = opening.trim().replace(/^Start\s+/, "").toLowerCase();
 	return opened.flatMap((handle) => {
 		const topic = map.topics.find((t) => t.handle === handle);
-		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today) return [];
+		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today || lessonBegun(topic)) return [];
+		if (words !== topic.title.toLowerCase()) return [];
+		const cost = earlyCost(plans, map, topic);
+		if (!cost) return [];
 		const day = longDay(topic.starts);
-		return [`Ahead of plan: his plan starts ${topic.title} on ${day}, and he starts it today. Your first message to him says so in one plain sentence ("${topic.title} is ahead of your plan, which starts it on ${day}."), with no reason of your own, then the lesson goes on.`];
+		return [`Ahead of plan: his plan starts ${topic.title} on ${day}, and he starts it today. Your first message to him says so in one plain sentence ("${topic.title} is ahead of your plan, which starts it on ${day}: ${cost}."), with no reason of your own, then the lesson goes on.`];
 	});
 }
 
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [], live = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; live?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
+	{ runup, arcCheck, plan, opened = [], opening = null, live = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; opening?: string | null; live?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -396,7 +424,7 @@ export function projectCourseBrief(
 	if (studied) lines.push(studiedLine(studied));
 	if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
-	if (!review) lines.push(...aheadOfPlanLines(plan, opened));
+	if (!review) lines.push(...aheadOfPlanLines(plan, opened, opening));
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
