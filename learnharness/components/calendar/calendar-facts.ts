@@ -61,7 +61,10 @@ export type CalendarEntry =
 			course: CourseRef;
 			task: CourseMapTask;
 			topic: CourseMapTopic | null;
-			opening: string;
+			/** Continue, as Home's line for the task takes it (`courseMove`):
+			 *  the session that holds it, else a new one (round 13, N6: it
+			 *  started a new session beside the one Home and the sidebar open). */
+			move: CourseMove;
 			/** Home's one status for this work (`openWorkStatus`), or null. */
 			status: string | null;
 	  }
@@ -237,6 +240,12 @@ function openWorkStatus(course: CalendarCourse | undefined, chat: ChatListItem |
 	return step ? nowLine({ kind: "course", course, step }).slot : null;
 }
 
+/** Continue on an open task: Home's move for the course's step on it. Pure. */
+function taskMove(course: CalendarCourse, chats: readonly ChatListItem[], task: CourseMapTask): CourseMove {
+	const step = todaySteps(course).find((s) => s.kind === "task" && s.key === task.key);
+	return courseMove(course, chats, step ?? { kind: "task", key: task.key, title: task.title, updated: task.updated, topics: [] });
+}
+
 export function lookOf(entry: CalendarEntry): EntryLook {
 	switch (entry.kind) {
 		case "exam":
@@ -406,7 +415,7 @@ export function calendarEntries({
 			// A review he left for next time rides with its topics' next review,
 			// which opens it, never an Unfinished row of its own (round 10, 1 m7).
 			if (holder && isReviewSession(holder) && sessionState(holder) === "left") continue;
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}`, status: openWorkStatus(studied, holder ?? null, task) });
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, move: taskMove(studied, chats, task), status: openWorkStatus(studied, holder ?? null, task) });
 		}
 	}
 	for (const chat of chats) {

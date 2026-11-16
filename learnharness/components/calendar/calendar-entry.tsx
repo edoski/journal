@@ -25,6 +25,7 @@ import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
 import { continueHref } from "@/components/nav/session-state";
+import type { ChatListItem } from "@/src/core";
 
 /** One icon per look. An overdue review wears the review's History icon,
  *  muted, as Home and the sidebar draw it (round 8: a red alarm here
@@ -271,21 +272,32 @@ function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, {
 	);
 }
 
+/** A start an entry's button makes: its opening, topics and the lesson it continues from. */
+type StartArgs = { opening: string; topics: readonly string[]; from?: string };
+
 function EntryActions({ entry, busy, onStart }: { entry: Exclude<CalendarEntry, { kind: "session" }>; busy: boolean; onStart: StartSession }) {
 	if (entry.kind === "exam") return <ExamActions entry={entry} busy={busy} onStart={onStart} />;
 	const { topic } = entry;
 	const workspace = entry.course.workspace;
 	const handle = topic?.handle ?? null;
-	const action = entry.kind === "task" ? ({ kind: "continue", opening: entry.opening } as const) : entry.action;
+	const words = ACTION_WORDS[entry.kind === "task" ? "continue" : entry.action.kind];
+	const press: StartArgs | ChatListItem =
+		entry.kind === "task"
+			? entry.move.kind === "open"
+				? entry.move.chat
+				: { opening: entry.move.opening, topics: entry.move.topics, ...(entry.move.from ? { from: entry.move.from } : {}) }
+			: "chat" in entry.action
+				? entry.action.chat
+				: { opening: entry.action.opening, topics: handle ? [handle] : [] };
 	return (
 		<div className="flex items-center gap-2">
-			{"chat" in action ? (
+			{"id" in press ? (
 				<Button asChild size="sm">
-					<Link href={continueHref(action.chat)}>{ACTION_WORDS[action.kind]}</Link>
+					<Link href={continueHref(press)}>{words}</Link>
 				</Button>
 			) : (
-				<Button size="sm" disabled={busy} onClick={() => onStart(action.opening, workspace, { topics: handle ? [handle] : [] })} data-slot="calendar-entry-start">
-					{ACTION_WORDS[action.kind]}
+				<Button size="sm" disabled={busy} onClick={() => onStart(press.opening, workspace, { topics: press.topics, ...(press.from ? { from: press.from } : {}) })} data-slot="calendar-entry-start">
+					{words}
 				</Button>
 			)}
 			{topic && (

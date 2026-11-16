@@ -12,6 +12,7 @@ import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
 import { finalReviewGapWords } from "../components/study-words.ts";
+import { courseMove, todaySteps } from "../components/study-home/study-facts.ts";
 import { calendarEntries, distanceWords, dueDay, finalReviewWords, lookOf, misfitWords, moreWords, quietBetween, roadLines, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
@@ -183,10 +184,17 @@ describe("calendar entries", () => {
 		const span = entries.find((e) => e.kind === "review" && e.title === "Span");
 		assert.deepEqual(span?.kind === "review" && span.action, { kind: "review", opening: "Review Span" });
 		const task = entries.find((e) => e.kind === "task");
-		assert.equal(task?.kind === "task" && task.opening, "Continue Problem sheet 4");
+		assert.deepEqual(task?.kind === "task" && task.move, { kind: "start", opening: "Continue Problem sheet 4", topics: ["rank"] });
 		assert.equal(task?.kind === "task" && task.topic?.handle, "rank");
 		const exam = entries.find((e) => e.kind === "exam" && e.course.workspace === "/study/linalg");
 		assert.deepEqual(exam?.kind === "exam" && [exam.road, exam.finalReview], [[{ from: "2026-11-09", to: "2026-11-09", titles: ["Eigenvalues"] }], "2026-11-23"]);
+	});
+
+	it("continues an open task in the session that holds it, as Home's line does (round 13, N6: the calendar's Continue started a new session)", () => {
+		const sheet = chat({ title: "Problem sheet 4", tasks: ["sheet-4"], topics: ["rank"], updatedAt: "2026-11-06T19:45:00" });
+		const task = calendarEntries({ courses: [LINALG], chats: [sheet], scope: null }).find((e) => e.kind === "task");
+		assert.ok(task?.kind === "task" && task.move.kind === "open" && task.move.chat === sheet, `Continue opens ${JSON.stringify(task?.kind === "task" && task.move)}`);
+		assert.deepEqual(task.move, courseMove(LINALG, [sheet], todaySteps(LINALG).find((s) => s.kind === "task")));
 	});
 
 	it("puts each session on the day of its last message, with its type, its topic and whether it waits", () => {
