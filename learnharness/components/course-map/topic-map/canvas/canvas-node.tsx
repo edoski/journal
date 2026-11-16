@@ -62,7 +62,7 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	return (
 		<div
 			data-focus={role ?? undefined}
-			className="relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none"
+			className="group/card relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none"
 			style={role === "via" ? { opacity: RECEDED } : receded ? { opacity: focus ? FOCUS_RECEDED : RECEDED } : undefined}
 		>
 			{current && (
@@ -77,7 +77,6 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 					marked && "lh-card-mark",
 				)}
 			>
-				{openFrom && <FromLink title={from!} arc={openFrom.arc} onOpen={openFrom.open} />}
 				<Link
 					ref={(el) => state?.register(topic.handle, el)}
 					href={href}
@@ -111,10 +110,13 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 					onKeyDown={(event) => state?.onKeyDown(topic.handle, event)}
 					className="pointer-events-auto flex min-h-0 w-full flex-1 cursor-pointer flex-col rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 				>
-					{!openFrom && (
-					<BaseNodeHeader className={cn("h-6 shrink-0 border-b border-white/6", headerTone(from ? null : line))}>
+					<BaseNodeHeader className={cn("h-6 shrink-0 border-b border-white/6", headerTone(from ? null : line), openFrom && "group-has-[[data-slot=topic-from]:hover]/card:bg-fill-hover")}>
 						{from ? (
-							<span data-slot="topic-from" className="flex min-w-0 items-center gap-1 text-callout text-muted-foreground">
+							<span
+								data-slot={openFrom ? "topic-from-face" : "topic-from"}
+								aria-hidden={openFrom ? true : undefined}
+								className="flex min-w-0 items-center gap-1 text-callout text-muted-foreground transition-colors group-has-[[data-slot=topic-from]:hover]/card:text-foreground motion-reduce:transition-none"
+							>
 								<CornerLeftUpIcon aria-hidden="true" className="size-3 shrink-0" />
 								<span className="truncate">
 									<MathText>{entryCaption(from)}</MathText>
@@ -128,13 +130,13 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 							</span>
 						)}
 					</BaseNodeHeader>
-					)}
 					<BaseNodeContent className="min-h-0 flex-1">
 						<TopicGlyph standing={standing} />
 						<MathLine className={cn("h-4.5 min-w-0 flex-1 text-body", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{topic.title}</MathLine>
 					</BaseNodeContent>
 				</Link>
 			</BaseNode>
+			{openFrom && <FromLink title={from!} arc={openFrom.arc} onOpen={openFrom.open} />}
 			<Handle type="target" position={Position.Top} isConnectable={false} className="invisible" />
 			<Handle type="source" position={Position.Bottom} isConnectable={false} className="invisible" />
 		</div>
@@ -142,12 +144,16 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 }
 
 /**
- * An entry card's "From <arc>" line as a press of its own, above the
- * card's link: it shows the arc the topic comes from on the map (Edo, 16
- * Nov 2026: "make perhaps the From... header in cards clickable"). The
- * line keeps its words and place; under the pointer it reads in the
- * foreground ink. Pointer only, like the card's other shortcuts: the arc
- * selector above the map is the keyboard's way to another arc.
+ * An entry card's "From <arc>" line as a press of its own, laid over the
+ * card's header strip beside the card's link (never inside it): it shows
+ * the arc the topic comes from on the map (Edo, 16 Nov 2026: "make perhaps
+ * the From... header in cards clickable"). The strip keeps its words and
+ * place, inside the link, so every card's link is the card's size; under
+ * the pointer the strip fills and its words read in the foreground ink.
+ * Its press reaches 8 above the card, so it stays 24 tall at the map's
+ * smallest readable scale (WCAG 2.5.8). Pointer only, like the card's
+ * other shortcuts: the arc selector above the map is the keyboard's way
+ * to another arc.
  */
 function FromLink({ title, arc, onOpen }: { title: string; arc: ArcHandle; onOpen: (arc: ArcHandle) => void }) {
 	return (
@@ -158,12 +164,9 @@ function FromLink({ title, arc, onOpen }: { title: string; arc: ArcHandle; onOpe
 			tabIndex={-1}
 			aria-label={`Open ${title}`}
 			onClick={() => onOpen(arc)}
-			className="group/from pointer-events-auto flex h-6 w-full shrink-0 cursor-pointer items-center gap-1 border-b border-white/6 px-3 text-left text-callout text-muted-foreground transition-colors hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none"
+			className="pointer-events-auto absolute inset-x-0 -top-2 h-8 cursor-pointer"
 		>
-			<CornerLeftUpIcon aria-hidden="true" className="size-3 shrink-0" />
-			<span className="truncate">
-				<MathText>{entryCaption(title)}</MathText>
-			</span>
+			<span className="sr-only">{entryCaption(title)}</span>
 		</button>
 	);
 }
