@@ -69,8 +69,8 @@ export interface UnitInbox {
 	other: readonly ChatListItem[];
 }
 
-/** The shelves that fold under Today. */
-export type FoldedShelf = "working" | "learning" | "known" | "other";
+/** The list that folds under Today (now-shelves.md). */
+export type FoldedShelf = "sessions";
 
 export const SOLID: ReadonlySet<string> = new Set(["independent", "retained", "transferred"]);
 
@@ -232,15 +232,11 @@ export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string):
 	return leftOffWords(Math.max(0, daysBetween(dayOf(chat.updatedAt), today)), today);
 }
 
-/** A topic row's one status. `live`, the lesson open on the page while it
- *  waits on him or the tutor writes (`liveChat`), gives its own topic's
- *  card "Your turn" ahead of a slip. `asked`: Today reviews the topic
+/** A topic row's one status. `asked`: Today reviews the topic
  *  (`plannedKeys`). Pure. */
-export function unitStatus(unit: Unit, today: string, live: string | null = null, asked = false): UnitStatus {
+export function unitStatus(unit: Unit, today: string, asked = false): UnitStatus {
 	const { topic } = unit;
 	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
-	// The lesson he is on says it waits on him, on its own topic's card, while it does (round 11, 3 n4: "Mistake to fix" while a question waited).
-	if (live && (unit.now === "your-turn" || unit.now === "working") && unit.sessions.some((c) => c.id === live && ownsTopic(c, topic.handle))) return { kind: unit.now };
 	// A wrong answer still open outranks a session that waits on him or
 	// was left for next time (round 8: Eigen's mistake hid behind "Left for
 	// next time"; round 9, 3 m13: Determinants' behind "Your turn"), except
@@ -308,7 +304,8 @@ export function taskSessions(chats: readonly ChatListItem[], workspace: string, 
 	return chats.filter((c) => c.course?.workspace === workspace && (c.tasks ?? []).includes(task)).sort(newestFirst);
 }
 
-const newestFirst = (a: ChatListItem, b: ChatListItem) => b.updatedAt.localeCompare(a.updatedAt);
+/** Newest first, by the last change. */
+export const newestFirst = (a: ChatListItem, b: ChatListItem) => b.updatedAt.localeCompare(a.updatedAt);
 
 /** A new session's first message from a topic's page: the prompt, led by
  *  the topic's title unless the prompt names it, so the tutor works on

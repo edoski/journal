@@ -350,7 +350,10 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 			}
 		}
 		if (!offered) problems.push(`no surface offers to continue ${task.title}, an open task`);
-		if (holder && !line && !action) problems.push(`neither Home's Today nor the sidebar reaches ${task.title}, open in its session ${holder.id}`);
+		// Since the shelves went (16 Nov 2026), the sidebar reaches a task off Today through its session's row under Sessions, which opens it to read.
+		const row = holder ? app.sidebarCards().find((c) => c.el.matches('[data-testid="session-row"]') && c.title.startsWith(holder.title)) : undefined;
+		const reached = holder && row ? opensChat(await app.lookAt(row.el), holder.id) : false;
+		if (holder && !line && !action && !reached) problems.push(`neither Home's Today nor the sidebar reaches ${task.title}, open in its session ${holder.id}`);
 	}
 	await app.unmount();
 	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);

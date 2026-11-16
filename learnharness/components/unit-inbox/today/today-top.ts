@@ -17,18 +17,17 @@ export type NowItem =
 	| { kind: "course"; line: NowLine; workspace: string }
 	| { kind: "session"; line: NowLine; chat: ChatListItem };
 
-/** The key an item holds in `restShelves`' `onTop`, and the keyboard walk's
+/** The key an item holds in `restTopics`' `onTop`, and the keyboard walk's
  *  row name: the unit's key, `course:<workspace>`, or `chat:<id>`. Pure. */
 export function itemKey(item: NowItem): string {
 	if (item.kind === "topic") return item.unit.key;
 	return item.kind === "course" ? courseKey(item.workspace) : sessionKey(item.chat.id);
 }
 
-/** The keys an item takes off the shelves: its own, and every topic a
- *  session's card stands for (`NowLine.topics`: its own topics and those
- *  it worked on, on its course's map), so one session is one card, never
- *  a second row under Working or Learning for a review's other topic or
- *  the lesson's own. Pure. */
+/** The keys an item takes up: its own, and every topic a session's card
+ *  stands for (`NowLine.topics`: its own topics and those it worked on, on
+ *  its course's map), so one session is one card and its topics count as
+ *  on Today (`restTopics`, the course page's Needs you). Pure. */
 export function claimedKeys(item: NowItem): string[] {
 	const { row, topics } = item.line;
 	if (item.kind !== "session" || !row.course) return [itemKey(item)];
