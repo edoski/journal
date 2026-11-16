@@ -873,17 +873,19 @@ export function Chat({
 	// Stopped for today, by him or by the tutor's close, until he writes
 	// again: the top bar says so, and has nothing left to stop.
 	const closedForToday = closedTonight(nativeMessages);
+	// A question or problem open now, as the one he left is when he is back.
+	const workOpen = !!pending || !!activeProblem;
 	// Done for today wins over the tutor at work (round 7): the server stops
 	// the running turn, its partial saved, then closes the lesson; this
 	// window lets go of the reply it was reading first.
 	const sendTonight = useCallback(() => {
-		if (doneTonight) return;
+		if (doneTonight && !workOpen) return;
 		if (localStreamRef.current) stop();
 		// His half-typed answer waits for the same question next time
 		// (kept-drafts.ts); the answer itself stays hidden.
 		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, { question: (pending.input as { question?: string } | null)?.question ?? "", from: pending.toolCallId });
 		void send({ type: "tonight" });
-	}, [doneTonight, send, pending, carryScope, chatId, stop]);
+	}, [doneTonight, workOpen, send, pending, carryScope, chatId, stop]);
 	// Once the close has settled, his keys go back to the box (round 12, 1 m9).
 	useEffect(() => {
 		const frame = requestAnimationFrame(() => focusAfterDone(document, doneTonight, !busy));
@@ -1574,7 +1576,7 @@ export function Chat({
 								onJump={jumpToStep}
 							/>
 						}
-						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, courseGone, lessonGone: gone })} disabled={doneTonight} />}
+						tonight={<DoneTonightButton onDone={sendTonight} gone={doneTonightGone({ closedForToday, open: workOpen, courseGone, lessonGone: gone })} disabled={doneTonight && !workOpen} />}
 					/>
 				</TopBar>
 
