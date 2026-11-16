@@ -513,6 +513,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "task-continue": {
+			// His Continue on the task: a seam that draws nothing, as a
+			// session's resume draws nothing. The model reads the content.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-task-continue", id: `tc_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "session-resume": {
 			out.push({
 				id: marker.id,

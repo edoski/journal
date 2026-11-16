@@ -67,7 +67,7 @@ export function NowPress({ now, busy, onAct, className }: { now: NowItem; busy: 
 		</>
 	);
 	return now.chat ? (
-		<Link href={`/chat/${now.chat}`} data-slot="pickup-now-press" aria-disabled={busy || undefined} onClick={busy ? (event) => event.preventDefault() : undefined} className={press}>
+		<Link href={now.href ?? `/chat/${now.chat}`} data-slot="pickup-now-press" aria-disabled={busy || undefined} onClick={busy ? (event) => event.preventDefault() : undefined} className={press}>
 			{words}
 		</Link>
 	) : (

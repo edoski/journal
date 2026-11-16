@@ -10,9 +10,9 @@ export default async function ChatPage({
 	searchParams,
 }: {
 	params: Promise<{ id: string }>;
-	searchParams: Promise<{ prompt?: string }>;
+	searchParams: Promise<{ prompt?: string; continue?: string }>;
 }) {
-	const [{ id }, { prompt }] = await Promise.all([params, searchParams]);
+	const [{ id }, { prompt, continue: go }] = await Promise.all([params, searchParams]);
 	const chat = getChat(id);
 	if (!chat) notFound();
 	// Where the lesson sits in its course, for the top bar's links.
@@ -34,6 +34,8 @@ export default async function ChatPage({
 				initialMessages={chat.messages}
 			initialError={turnFailure(chat.id)}
 			initialPrompt={prompt}
+			// Continue on the open task it holds (continueHref).
+			continueTask={go === "task"}
 			// A teacher turn that outlived its client: the remounted view must
 			// attach (busy shimmer + poll), never resurrect the stale record.
 			initiallyInFlight={isTurnRunning(chat.id)}

@@ -15,6 +15,7 @@ import type { CourseRead, CourseView } from "@/components/course-page/course-mod
 import { useCourse } from "@/components/course-page/use-course";
 import { useCourseStanding, type StandingRead } from "@/components/course-page/use-course-standing";
 import type { CourseStanding } from "@/src/core";
+import { continueHref } from "@/components/nav/session-state";
 
 /** What the page draws once its course is read. */
 export interface CourseReady {
@@ -43,7 +44,7 @@ export function CourseFrame({ workspace, children }: { workspace: string; childr
 	const router = useRouter();
 	const onContinue = (view: CourseView) => (ws: string) => {
 		const move = courseMove(view.course, chats);
-		if (move.kind === "open") router.push(`/chat/${move.chat.id}`);
+		if (move.kind === "open") router.push(continueHref(move.chat));
 		else lesson.start(move.opening, ws, { topics: move.topics, from: move.from });
 	};
 	return (

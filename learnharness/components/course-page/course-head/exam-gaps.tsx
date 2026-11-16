@@ -8,6 +8,7 @@ import { MathText } from "@/components/ui/math-text";
 import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, examWayWords, type ExamWayVerb } from "@/components/study-words";
 import { examGapAskCreation, topicPress, useStartSession } from "@/components/unit-inbox/start-unit";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
+import { continueHref } from "@/components/nav/session-state";
 
 const PRESS = "text-body system-current:text-row text-link hover:text-link";
 
@@ -38,7 +39,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	const press = (topic: CourseMapTopic) => topicPress(topic, course.map, chats);
 	const open = (topic: CourseMapTopic) => {
 		const { resume, creation } = press(topic);
-		if (resume) router.push(`/chat/${resume.id}`);
+		if (resume) router.push(continueHref(resume));
 		else start(`gap:${topic.handle}`, creation);
 	};
 	const verb = (way: { topic: CourseMapTopic; starts: boolean }): ExamWayVerb => (!way.starts ? "review" : press(way.topic).continues ? "continue" : "start");

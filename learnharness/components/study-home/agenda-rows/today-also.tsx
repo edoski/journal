@@ -6,6 +6,7 @@ import { mathPlain } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 import { courseTitle, lessonTitle, lineKey, whyOf } from "@/components/study-home/agenda-rows/row-facts";
 import type { NextStep, TodayRow } from "@/components/study-home/study-facts";
+import { continueHref } from "@/components/nav/session-state";
 
 /** What a folded line's button leaves out, for its tooltip: its course and
  *  why it is on Today, as a full line says them: "Calculus I. Back in 21d".
@@ -29,7 +30,7 @@ export function TodayAlso({ rows, busy, onContinue, className }: { rows: readonl
 				<Hint key={row.kind === "session" ? row.chat.id : row.course.map.workspace} label={alsoHint(row)} side="top">
 					{row.kind === "session" ? (
 						<Button variant="quiet" size="sm" asChild data-line={lineKey(row)} className={label}>
-							<Link href={`/chat/${row.chat.id}`}>
+							<Link href={continueHref(row.chat)}>
 								<MathLine>{lessonTitle(row)}</MathLine>
 							</Link>
 						</Button>

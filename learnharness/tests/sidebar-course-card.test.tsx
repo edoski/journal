@@ -37,6 +37,6 @@ describe("the sidebar card of a course line (2 m9)", () => {
 		assert.equal(courseCardMove(line!, [])?.kind, "start");
 		const holder = chat({ id: "paper-session", course: { workspace: "/s/exam", title: "Exam prep" }, topics: [], ownTopics: [], tasks: ["paper"], ended: "left", updatedAt: "2026-11-09T09:00:00.000Z" });
 		const held = render(<NowCard line={line!} unit={null} active={false} chats={[holder]} />);
-		assert.equal(held.querySelector('[data-testid="unit-row"]')?.getAttribute("href"), "/chat/paper-session", "the session that holds it opens");
+		assert.equal(held.querySelector('[data-testid="unit-row"]')?.getAttribute("href"), "/chat/paper-session?continue=task", "the session that holds it opens, asked to take the task up (round 13, 2 M1)");
 	});
 });

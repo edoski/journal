@@ -43,6 +43,7 @@ import {
 	HANDOFF_TEXT,
 	REVIEW_HANDOFF_TEXT,
 	TASK_HANDOFF_TEXT,
+	taskContinueText,
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
 	PRACTICE_REQUEST_TEXT,
@@ -86,6 +87,7 @@ export interface LhMarkerMessage {
 		| "practice-next"
 		| "practice-request"
 		| "done-tonight"
+		| "task-continue"
 		| "dispute"
 		| "problem-dismissed"
 		| "compaction"
@@ -595,6 +597,21 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): Lh
 		content: DONE_TONIGHT_TEXT[agent],
 		display: true,
 		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** His Continue on an open task the session holds, with nothing in it
+ *  waiting on him (round 13, 2 M1): the turn carries on at the task's step.
+ *  The transcript draws nothing for it; the tutor's step is the reply. */
+export function newTaskContinueMessage(tasks: readonly string[]): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "task-continue",
+		content: taskContinueText(tasks),
+		display: true,
+		details: { tasks: [...tasks] },
 		timestamp: Date.now(),
 	};
 }
@@ -1373,7 +1390,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute", "task-continue"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {

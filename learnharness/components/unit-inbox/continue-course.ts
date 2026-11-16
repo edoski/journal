@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SessionStarter } from "@/components/start-session";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { stepWords, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import { continueHref } from "@/components/nav/session-state";
 
 /** Takes up a course's line from the sidebar, as Home's line starts it: a
  *  new session in the course opened on the line's step ("Continue Problem
@@ -36,7 +37,7 @@ export function useContinueCourse(): { start: (workspace: string, step?: NextSte
 	const take = useCallback(
 		(workspace: string, move: CourseMove) => {
 			if (move.kind === "open") {
-				router.push(`/chat/${move.chat.id}`);
+				router.push(continueHref(move.chat));
 				return;
 			}
 			if (starting) return;

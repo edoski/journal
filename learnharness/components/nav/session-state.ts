@@ -86,6 +86,23 @@ export function continueMove(sessions: readonly ChatListItem[], finished: typeof
 	return chat ? CONTINUE[sessionState(chat)](chat, finished) : null;
 }
 
+/** Whether Continue on a session takes up the task it holds with a turn:
+ *  it holds an open task and nothing in it waits on him or runs, so the
+ *  tutor carries on at the task's step as it opens (round 13, 2 M1:
+ *  Continue Problem sheet 4 opened the sheet's finished chat with an empty
+ *  box). Opening it to read it, from the calendar or Earlier, asks for
+ *  nothing. */
+export function continuesTask(chat: ChatListItem): boolean {
+	return (chat.tasks?.length ?? 0) > 0 && !chat.busy && !chat.pendingQuestion && !chat.pendingProblem && chat.ended !== "cut" && chat.ended !== "mid-lesson";
+}
+
+/** Where Continue on a session goes: its chat, asked to take up its task
+ *  when `continuesTask`. Every Continue, Resume and line that picks a
+ *  session up links here. */
+export function continueHref(chat: ChatListItem): string {
+	return continuesTask(chat) ? `/chat/${chat.id}?continue=task` : `/chat/${chat.id}`;
+}
+
 /** What a paused session says (round 8): his own stop in his words, a
  *  turn a restart cut as cut off. */
 export function pausedWords(chat: Pick<ChatListItem, "stopped">): string {

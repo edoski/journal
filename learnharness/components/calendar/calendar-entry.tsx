@@ -24,6 +24,7 @@ import { planDay } from "@/components/study-home/study-facts";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
+import { continueHref } from "@/components/nav/session-state";
 
 /** One icon per look. An overdue review wears the review's History icon,
  *  muted, as Home and the sidebar draw it (round 8: a red alarm here
@@ -253,7 +254,7 @@ function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, {
 			{next.on ? null : <div className="flex items-center gap-2">
 				{move.kind === "open" ? (
 					<Button asChild size="sm">
-						<Link href={`/chat/${move.chat.id}`}>{next.verb}</Link>
+						<Link href={continueHref(move.chat)}>{next.verb}</Link>
 					</Button>
 				) : (
 					<Button
@@ -280,7 +281,7 @@ function EntryActions({ entry, busy, onStart }: { entry: Exclude<CalendarEntry, 
 		<div className="flex items-center gap-2">
 			{"chat" in action ? (
 				<Button asChild size="sm">
-					<Link href={`/chat/${action.chat.id}`}>{ACTION_WORDS[action.kind]}</Link>
+					<Link href={continueHref(action.chat)}>{ACTION_WORDS[action.kind]}</Link>
 				</Button>
 			) : (
 				<Button size="sm" disabled={busy} onClick={() => onStart(action.opening, workspace, { topics: handle ? [handle] : [] })} data-slot="calendar-entry-start">

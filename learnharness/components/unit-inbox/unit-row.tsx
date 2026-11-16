@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
 import type { ChatListItem } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { resumableSession, sessionState } from "@/components/nav/session-state";
+import { resumableSession, sessionState, continueHref } from "@/components/nav/session-state";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
@@ -55,7 +55,7 @@ function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 	if (resume) {
 		return (
 			<Button asChild variant="quiet" size="xs" {...props}>
-				<Link href={`/chat/${resume.id}`} onClick={blurAfterPointerClick}>
+				<Link href={continueHref(resume)} onClick={blurAfterPointerClick}>
 					<Icon aria-hidden />
 					{label}
 				</Link>
