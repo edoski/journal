@@ -241,6 +241,29 @@ export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPar
 	return new Set(reasks(messages).map((r) => r.id));
 }
 
+/** The questions Done for today set aside that are asked again further
+ *  down (the app's re-pose when he opens the session, or an older
+ *  record's re-ask under the close): the next question of its kind asks it
+ *  again (`asksAgain`). Its words are drawn once, where he answers it, and
+ *  the set-aside one keeps only "Left for next time" (round 14, M1 and the
+ *  cross-surface check: opened again, the page drew the left question
+ *  twice). */
+export function leftAskedBelow(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
+	const out = new Set<string>();
+	const waiting = new Map<string, QuestionPart>();
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (!asked(part)) continue;
+			const kind = questionKindOf(part);
+			const left = waiting.get(kind);
+			if (left?.toolCallId && asksAgain(left, part)) out.add(left.toolCallId);
+			waiting.delete(kind);
+			if (part.toolCallId && leftForToday(part.output)) waiting.set(kind, part);
+		}
+	}
+	return out;
+}
+
 /** The re-asks (`askedAgain`) that follow a hint: the hint may itself end
  *  in a question, so their mark names the question he pressed Hint on,
  *  never "the question above" (round 12, 3 D11). */
