@@ -226,14 +226,26 @@ export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPar
  *  So is one asked again word for word after he sent a question as his
  *  answer (`sameWords`). */
 export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
-	const reasked = new Set<string>();
+	return new Set(reasks(messages).map((r) => r.id));
+}
+
+/** The re-asks (`askedAgain`) that follow a hint: the hint may itself end
+ *  in a question, so their mark names the question he pressed Hint on,
+ *  never "the question above" (round 12, 3 D11). */
+export function askedAfterHint(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
+	return new Set(reasks(messages).filter((r) => r.after === "hint").map((r) => r.id));
+}
+
+function reasks(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): Array<{ id: string; after: LeftOpen | null }> {
+	const out: Array<{ id: string; after: LeftOpen | null }> = [];
 	let previous: QuestionPart | null = null;
 	for (const message of messages) {
 		for (const part of message.parts) {
 			if (!asked(part)) continue;
-			if (previous && part.toolCallId && ((leftOpen(previous.output) !== null && asksAgain(previous, part)) || sameWords(previous, part))) reasked.add(part.toolCallId);
+			const left = previous ? leftOpen(previous.output) : null;
+			if (previous && part.toolCallId && ((left !== null && asksAgain(previous, part)) || sameWords(previous, part))) out.push({ id: part.toolCallId, after: left });
 			previous = part;
 		}
 	}
-	return reasked;
+	return out;
 }
