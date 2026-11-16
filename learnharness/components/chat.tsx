@@ -67,6 +67,7 @@ import {
 	latestMarkedAnswer,
 	appOpeningAt,
 	COMPACTING_LINE,
+	workingLine,
 } from "@/src/core";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { ActiveProblemContext } from "@/components/lesson/active-problem";
@@ -796,6 +797,7 @@ export function Chat({
 	// from the start of its setup, not only once it runs.
 	const [waking, setWaking] = useState(false);
 	const thinking = showsWorking(messages, busy || waking);
+	const idleLine = workingLine(messages);
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
 	// "error" too: a dropped stream leaves the model there, and send()
@@ -1689,7 +1691,7 @@ export function Chat({
 														// says what the tutor is doing. On settling, the registry's card
 														// takes over below.
 														if (part.type.startsWith("tool-") && part.state === "input-streaming") {
-															return <LiveToolCard key={pi} part={part as ArtifactPartProps["part"]} />;
+															return <LiveToolCard key={pi} part={part as ArtifactPartProps["part"]} idle={idleLine} />;
 														}
 														// A problem is the tutor's words, its end a mark and a
 														// disclosure (prose-practice.tsx).
@@ -1731,7 +1733,7 @@ export function Chat({
 							    provider-connect gap. turnInFlight: the same state
 							    entered by external discovery (wake) / the poll
 							    fallback. Never collapsible itself. */}
-							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : "Thinking…"} />}
+							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : idleLine} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-body system-current:text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}

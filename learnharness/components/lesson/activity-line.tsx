@@ -1,7 +1,7 @@
 import { Shimmer } from "@/components/ai-elements/shimmer";
 
 /** One muted line saying the tutor is working (spec: activity-line.md):
- *  "Thinking…", "Reading your notes…".
+ *  "Thinking…", "Planning the lesson…".
  *  Shimmering text only; no spinner, no tool arguments. */
 export function ActivityLine({ label, testId }: { label: string; testId?: string }) {
 	return (
