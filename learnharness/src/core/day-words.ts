@@ -23,13 +23,14 @@ export function shortDay(day: string): string {
 }
 
 /** A planned day against the study day: "today", "tomorrow, Monday 9
- *  November", "Thursday 12 November, in 4 days", "Sunday 22 November, in 14
- *  days". Always days, as the app counts every distance. */
+ *  November", "Thursday 12 November", "Wednesday 4 November, yesterday".
+ *  The day itself, never a count of days (round 14, m9: a close said "on
+ *  Tuesday 10 November, in 2 days"). */
 export function plannedDayWords(day: string, today: string): string {
 	const days = Math.round((at(day).getTime() - at(today).getTime()) / 86_400_000);
-	if (days <= 0) return days === 0 ? "today" : `${longDay(day)}, ${-days === 1 ? "yesterday" : `${-days} days ago`}`;
+	if (days === 0) return "today";
 	if (days === 1) return `tomorrow, ${longDay(day)}`;
-	return `${longDay(day)}, in ${days} days`;
+	return days === -1 ? `${longDay(day)}, yesterday` : longDay(day);
 }
 
 /** The engine's study day, as its clock reads it (`learning/clock.py`):

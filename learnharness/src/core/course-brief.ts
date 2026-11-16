@@ -358,7 +358,7 @@ export function lastStudiedOf(plan: unknown): LastStudied | null {
  *  haven't studied since Monday 9 November", read off a note, after study
  *  on 10 and 17 Nov). */
 function studiedLine({ date, daysAgo }: LastStudied): string {
-	const when = daysAgo === 0 ? "today" : daysAgo === 1 ? `yesterday, ${dayWithWeekday(date)}` : `on ${dayWithWeekday(date)}, ${daysAgo} days ago`;
+	const when = daysAgo === 0 ? "today" : daysAgo === 1 ? `yesterday, ${dayWithWeekday(date)}` : `on ${dayWithWeekday(date)}`;
 	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
 }
 
@@ -418,7 +418,7 @@ export function projectCourseBrief(
 	const due = list(r.due);
 
 	const lines: string[] = [];
-	const examLine = typeof exam.days_left === "number" ? ` · exam in ${exam.days_left} days` : "";
+	const examLine = typeof exam.date === "string" ? ` · exam on ${longDay(exam.date)}` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	if (studied) lines.push(studiedLine(studied));

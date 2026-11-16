@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
-import { distanceWords, finalReviewWords, longDayWords, roadLines, roadOf, spanWords } from "@/components/calendar/calendar-facts";
+import { dayAndNearWords, finalReviewWords, longDayWords, roadLines, roadOf, spanWords } from "@/components/calendar/calendar-facts";
 import { ContextSheet } from "@/components/course-context/context-sheet";
 import { ArcPill } from "@/components/course-map/arc-strip";
 import { arcOnPage } from "@/components/course-page/course-head/course-head";
@@ -67,7 +67,7 @@ export function ExamFact({ course, runup, words, ready }: { course: StudyCourse;
 				<div className="flex flex-col gap-1">
 					<p className="text-headline text-foreground">{map.title} exam</p>
 					<p className="text-callout text-muted-foreground">
-						{longDayWords(exam.date)}, {distanceWords(exam.date, map.today).toLowerCase()}
+						{dayAndNearWords(exam.date, longDayWords(exam.date), map.today)}
 					</p>
 					{ready && (
 						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-1 text-callout", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>

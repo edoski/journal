@@ -18,7 +18,7 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
-import { distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, misfitWords, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { dayAndNearWords, distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, misfitWords, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { finalReviewGapWords } from "@/components/study-words";
 import { planDay } from "@/components/study-home/study-facts";
 import { MathText } from "@/components/ui/math-text";
@@ -86,7 +86,7 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 				<Icon aria-hidden={!waits} aria-label={waits ? LOOKS[look].words : undefined} className={cn("size-3.5 shrink-0", ICON_INK[look])} />
 				{!waits && (
 					<span className={cn("truncate", LOOK_INK[look], look === "exam" && "")}>
-						{entry.kind === "exam" ? `Exam, ${distanceWords(entry.day, today).toLowerCase()}` : lookWords(entry, today)}
+						{entry.kind === "exam" ? examDayWords(entry.day, today) : lookWords(entry, today)}
 					</span>
 				)}
 				{waits && (
@@ -149,6 +149,13 @@ export function CalendarEntryView({
 	);
 }
 
+/** The exam on its own day's cell: "Exam", or "Exam, tomorrow" when it
+ *  is that near; never a count of days (round 14, m9). */
+function examDayWords(day: string, today: string): string {
+	const near = distanceWords(day, today);
+	return near ? `Exam, ${near.toLowerCase()}` : "Exam";
+}
+
 /** The popover's body: the course, the title, when and why in plain
  *  words, then the actions. */
 function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarEntry, { kind: "session" }>; today: string; busy: boolean; onStart: StartSession }) {
@@ -156,17 +163,17 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	const Icon = ICONS[look];
 	const lines: string[] = [];
 	if (entry.kind === "exam") {
-		lines.push(`${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		lines.push(dayAndNearWords(entry.day, longDayWords(entry.day), today));
 		const misfit = misfitWords(entry.doesNotFit);
 		if (misfit) lines.push(misfit);
 		if (entry.allStarted) lines.push("Every topic started");
 	} else if (entry.kind === "review") {
 		if (entry.overdue) lines.push(`Was due ${longDayWords(entry.dueOn ?? entry.day)}`);
-		else if (entry.day !== today) lines.push(`Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		else if (entry.day !== today) lines.push(`Planned for ${dayAndNearWords(entry.day, longDayWords(entry.day), today)}`);
 		if (entry.since) lines.push(entry.since);
 		if (entry.waits) lines.push(entry.waits);
 	} else if (entry.kind === "new") {
-		lines.push(entry.day === today ? "Planned for today" : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		lines.push(entry.day === today ? "Planned for today" : `Planned for ${dayAndNearWords(entry.day, longDayWords(entry.day), today)}`);
 		if (entry.waits) lines.push(entry.waits);
 	} else if (entry.task.step) {
 		lines.push(`Left at: ${entry.task.step}`);

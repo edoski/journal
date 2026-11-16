@@ -266,7 +266,7 @@ describe("lessons", () => {
 		assert.equal(review.title, "Review Linear independence, Rank, Span");
 		assert.equal(review.detail, "Then Problem sheet 4");
 		assert.equal(review.action, "Review");
-		assert.equal(review.exam, "Exam in 21 days");
+		assert.equal(review.exam, "Exam 29 Nov");
 		assert.equal(review.place, null);
 		const topic = lesson(PROB);
 		assert.deepEqual([topic.title, topic.detail, topic.action, topic.place], ["Continue Bayes' rule", null, "Continue", null]);

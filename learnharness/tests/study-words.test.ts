@@ -205,10 +205,10 @@ describe("why a review waits", () => {
 		assert.equal(startsAfterWords(["Probability", "Linear Algebra"]), "After Probability's and Linear Algebra's new topics");
 		assert.equal(startsAfterWords(undefined), null);
 	});
-	it("says how far a day is in days, one form for an exam and a review", () => {
+	it("names a near day, one form for an exam and a review, and never counts days (round 14, m9)", () => {
 		assert.deepEqual(
 			["2026-11-08", "2026-11-09", "2026-11-07", "2026-11-26", "2026-11-01"].map((d) => distanceWords(d, "2026-11-08")),
-			["Today", "Tomorrow", "Yesterday", "In 18 days", "7 days ago"],
+			["Today", "Tomorrow", "Yesterday", null, null],
 		);
 	});
 });
