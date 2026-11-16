@@ -191,14 +191,18 @@ Reason = Literal["no_study_day", "not_ready", "full", "too_late"]
 """Why the plan leaves a topic out before its exam, by its own rule.
 
 A topic it cannot start (``does_not_fit``): ``no_study_day``, no day he
-studies is left before the exam; ``not_ready``, on no study day before it
-were its prerequisites solid and its competing methods settled
-(``_Course.ready``); ``full``, it was ready, and every day it could start
-went to other topics at his limit. A taught topic with no review in the
-final review (``unreviewed``): ``no_study_day``, no day he studies is left
-in the final review; ``too_late``, the plan starts it so near the exam that
-its first review falls on the exam day or after; ``full``, every study day
-of the final review went to other reviews at his limit."""
+studies is left before the exam; ``not_ready``, on no study day before its
+eve were its prerequisites solid and its competing methods settled
+(``_Course.ready``), as when one it needs starts in the days left; ``full``,
+it was ready, and every study day from then went to new topics at his
+limit. A taught topic with no review in the final review (``unreviewed``):
+``no_study_day``, no day he studies is left in the final review;
+``too_late``, the plan starts it so near the exam that its first review
+falls on the exam day or after; ``full``, every study day of the final
+review left went to reviews at his limit. A topic left out for none of
+these has no reason: "full" is said only of days at his limit (round 13,
+1 n4: "your pace fills every day of the final review" while two of its
+days held room)."""
 
 
 def waiting(
@@ -250,8 +254,9 @@ class _Course:
     why: dict[str, Why] = field(default_factory=dict)
     missed: list[str] | None = None
     began: date | None = None
-    ready_once: set[str] = field(default_factory=set)
-    """The exam's untaught topics ready on some study day before it."""
+    ready_on: dict[str, date] = field(default_factory=dict)
+    """The exam's untaught topics ready on some study day before it, each
+    with the first."""
     moving: set[str] | None = None
     """With work saved today, the topics it touched: only these take new
     days, every other keeps the day the plan as today began gave it
@@ -1082,7 +1087,9 @@ def _new(
         course.fresh.clear()
         course.watch(course.startable(day))
         if week.studies(day) and course.ahead(day):
-            course.ready_once.update(t for t in course.scoped if course.ready(t))
+            for topic in course.scoped:
+                if course.ready(topic):
+                    course.ready_on.setdefault(topic, day)
 
     def take(
         course: _Course,
@@ -1254,7 +1261,9 @@ def _kept_new(
     for course in courses:
         course.fresh.clear()
         if week.studies(day) and course.ahead(day):
-            course.ready_once.update(t for t in course.scoped if course.ready(t))
+            for topic in course.scoped:
+                if course.ready(topic):
+                    course.ready_on.setdefault(topic, day)
     return {course.name: [] for course in courses}
 
 
@@ -1964,6 +1973,7 @@ def _planned(
             if (
                 reasons := _reasons(
                     course,
+                    courses,
                     week,
                     today,
                     late.get(course.name, []),
@@ -1977,6 +1987,7 @@ def _planned(
 
 def _reasons(
     course: _Course,
+    courses: list[_Course],
     week: Capacity,
     today: date,
     late: list[str],
@@ -1991,10 +2002,13 @@ def _reasons(
     reasons: dict[str, Reason] = {}
     no_day = not _study_days(week, today, eve)
     for topic in late:
+        ready = course.ready_on.get(topic)
         if no_day:
             reasons[topic] = "no_study_day"
-        else:
-            reasons[topic] = "full" if topic in course.ready_once else "not_ready"
+        elif ready is None or ready >= eve:
+            reasons[topic] = "not_ready"
+        elif _full(courses, week, ready, eve, "new"):
+            reasons[topic] = "full"
     starts = {t: date.fromisoformat(d["date"]) for d in course.days for t in d["new"]}
     for topic, replayed in course.replayed.items():
         if topic not in starts and (taught := _learned_on(replayed)):
@@ -2004,9 +2018,33 @@ def _reasons(
         first = starts.get(topic)
         if first and first + timedelta(days=progress.FIRST_RETRIEVAL_DAYS) >= exam.day:
             reasons[topic] = "too_late"
-        else:
-            reasons[topic] = "no_study_day" if no_review_day else "full"
+        elif no_review_day:
+            reasons[topic] = "no_study_day"
+        elif _full(courses, week, max(exam.final, today), eve, "reviews"):
+            reasons[topic] = "full"
     return reasons
+
+
+def _full(
+    courses: list[_Course], week: Capacity, first: date, last: date, kind: str
+) -> bool:
+    """Whether every study day from ``first`` to ``last`` holds as many
+    items of ``kind``, of every course, as his limit gives it; never while
+    he has shown no limit of that kind, when the plan proposes all that is
+    owed."""
+    held: dict[str, int] = {}
+    for course in courses:
+        for planned in course.days:
+            held[planned["date"]] = held.get(planned["date"], 0) + len(planned[kind])
+    for offset in range((last - first).days + 1):
+        day = first + timedelta(days=offset)
+        if not week.studies(day):
+            continue
+        if not getattr(week.on(day), kind).shown:
+            return False
+        if held.get(day.isoformat(), 0) < _whole(week, day, kind):
+            return False
+    return True
 
 
 def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[str]:

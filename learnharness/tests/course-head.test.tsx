@@ -147,6 +147,14 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.doesNotMatch(both.textContent ?? "", /\d/, "no counts");
 	});
 
+	it("says no reason the engine does not give, never a default 'your pace fills' (round 13, 1 n4)", () => {
+		const review = gapLine(gapped([], ["binomial", "poisson"]))!;
+		assert.ok(review.querySelector("[data-slot=exam-gaps-why]") === null, "no why for a gap the engine gives no reason for");
+		assert.doesNotMatch(review.textContent ?? "", /pace/);
+		const start = gapLine(gapped(["variance"], []))!;
+		assert.doesNotMatch(start.textContent ?? "", /pace/);
+	});
+
 	it("names the one topic it offers when the line names two (round 12, 1 m2: \"No room… for Inner products and Orthogonal projection… Start it today\")", () => {
 		const needs = [{ kind: "needs" as const, topic: h("projection"), prerequisite: h("inner") }];
 		const c = gapped(["inner", "projection"], [], { inner: "full", projection: "full" });

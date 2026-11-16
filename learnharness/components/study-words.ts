@@ -386,7 +386,9 @@ export function examWayWords(verb: ExamWayVerb): string {
 }
 
 /** A topic the exam's plan leaves out, by title, with the engine's reason
- *  (`exam.reasons`); a topic with no reason reads as `full`. */
+ *  (`exam.reasons`); a topic with no reason is left out for none the
+ *  engine names, and no words give it one (round 13, 1 n4: "your pace
+ *  fills every day of the final review" while two of its days had room). */
 export interface ExamGapTopic {
 	title: string;
 	reason?: ExamGapReason;
@@ -408,8 +410,8 @@ const startsWord = (titles: readonly string[]) => (titles.length === 1 ? "starts
  * cause as study days full at your pace. Null with nothing left out. Pure.
  */
 export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly ExamGapTopic[]): string | null {
-	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => (t.reason ?? "full") === reason).map((t) => t.title);
-	const reasons = (topics: readonly ExamGapTopic[]) => new Set(topics.map((t) => t.reason ?? "full")).size;
+	const by = (topics: readonly ExamGapTopic[], reason: ExamGapReason) => topics.filter((t) => t.reason === reason).map((t) => t.title);
+	const reasons = (topics: readonly ExamGapTopic[]) => new Set(topics.map((t) => t.reason)).size;
 	const sentence = (clauses: readonly string[]) => (clauses.length > 0 ? `${clauses.join(", and ").replace(/^./, (c) => c.toUpperCase())}.` : null);
 	const name = start.length > 1 && reasons(start) > 1;
 	const startFull = by(start, "full");
@@ -447,8 +449,10 @@ export function examGapPickWords(verb: ExamWayVerb, title: string): string {
  *  so the two never disagree (round 9: "No room in it for Poisson" beside
  *  the head's "starts too close to the exam"). Pure. */
 export function finalReviewGapWords(topics: readonly ExamGapTopic[]): string[] {
-	const by = (reason: ExamGapReason) => topics.filter((t) => (t.reason ?? "full") === reason).map((t) => t.title);
-	const [full, late, noDay] = [by("full"), by("too_late"), by("no_study_day")];
+	const by = (reason: ExamGapReason) => topics.filter((t) => t.reason === reason).map((t) => t.title);
+	// "No room in it" is the plain fact: a topic with no reason, or with days full at his pace.
+	const full = topics.filter((t) => t.reason === undefined || t.reason === "full").map((t) => t.title);
+	const [late, noDay] = [by("too_late"), by("no_study_day")];
 	return [
 		...(full.length > 0 ? [`No room in it for ${listWords(full)}`] : []),
 		...(late.length > 0 ? [`${listWords(late)} ${startsWord(late)} too close to the exam for a review`] : []),

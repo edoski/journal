@@ -32,7 +32,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	const { workspace } = course.map;
 	const titles = (topics: readonly CourseMapTopic[]) => topics.map((t) => t.title);
 	const reasoned = (topics: readonly CourseMapTopic[]) => topics.map((t) => ({ title: t.title, reason: course.map.exam?.reasons?.[t.handle] }));
-	const why = examGapWhyWords(reasoned(gaps.start), reasoned(gaps.review)) ?? "";
+	const why = examGapWhyWords(reasoned(gaps.start), reasoned(gaps.review));
 	const { ways } = gaps;
 	const named = [...gaps.start, ...gaps.review];
 	const press = (topic: CourseMapTopic) => topicPress(topic, course.map, chats);
@@ -52,9 +52,11 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	const [pick, ...others] = ways;
 	return (
 		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-body system-current:text-row font-normal system-current:font-normal text-muted-foreground">
-			<span data-slot="exam-gaps-why" className="mr-1">
-				<MathText>{why}</MathText>
-			</span>
+			{why && (
+				<span data-slot="exam-gaps-why" className="mr-1">
+					<MathText>{why}</MathText>
+				</span>
+			)}
 			{ways.length === 0 ? null : only ? (
 				<Button variant="quiet" size="xs" className={PRESS} disabled={starting !== null} onClick={() => open(only.topic)}>
 					{EXAM_GAP_WORDS[verb(only)]}
