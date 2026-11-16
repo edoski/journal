@@ -8,7 +8,7 @@ export function Kbd({ className, children, ...props }: React.ComponentProps<"kbd
 	return (
 		<kbd
 			data-slot="kbd"
-			className={cn("inline-flex shrink-0 items-center gap-px font-sans text-callout system-current:text-label tabular-nums text-muted-foreground", className)}
+			className={cn("inline-flex shrink-0 items-center gap-px font-sans text-callout tabular-nums text-muted-foreground", className)}
 			{...props}
 		>
 			{children}

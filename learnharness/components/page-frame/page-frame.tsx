@@ -61,11 +61,11 @@ export function PageHead({
 } & Omit<ComponentProps<"header">, "title">) {
 	return (
 		<header data-slot="page-head" className={cn("flex shrink-0 flex-col gap-1 border-b border-border/60 pb-4", className)} {...rest}>
-			<p data-slot="page-eyebrow" aria-hidden={eyebrow ? undefined : true} className="h-4 truncate text-callout system-current:text-label text-muted-foreground">
+			<p data-slot="page-eyebrow" aria-hidden={eyebrow ? undefined : true} className="h-4 truncate text-callout text-muted-foreground">
 				{eyebrow}
 			</p>
 			<div className="flex min-h-8 items-center justify-between gap-4">
-				<h1 data-slot="page-title" className="min-w-0 text-title-1 system-current:text-heading system-current:font-medium text-pretty text-foreground">
+				<h1 data-slot="page-title" className="min-w-0 text-title-1 text-pretty text-foreground">
 					{title}
 				</h1>
 				{actions && (
@@ -76,12 +76,12 @@ export function PageHead({
 			</div>
 			<div data-slot="page-lines" className="mt-1 flex min-h-12 flex-col gap-2">
 				{lead && (
-					<div data-slot="page-lead" className="flex min-h-5 min-w-0 items-center text-headline system-current:text-control system-current:font-medium text-foreground">
+					<div data-slot="page-lead" className="flex min-h-5 min-w-0 items-center text-headline text-foreground">
 						{lead}
 					</div>
 				)}
 				{standing && (
-					<div data-slot="page-standing" className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-body system-current:text-row text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
+					<div data-slot="page-standing" className={cn("flex min-h-5 min-w-0 flex-wrap items-center gap-y-1 text-body text-muted-foreground tabular-nums", BETWEEN_FACTS)}>
 						{standing}
 					</div>
 				)}
@@ -112,7 +112,7 @@ export function PageAction({
 	className,
 	...button
 }: { href?: string; children: ReactNode } & Omit<ComponentProps<typeof Button>, "asChild" | "variant" | "size" | "children">) {
-	const press = cn("group/press system-current:font-medium text-link hover:text-link", className);
+	const press = cn("group/press text-link hover:text-link", className);
 	const words = (
 		<>
 			{children}

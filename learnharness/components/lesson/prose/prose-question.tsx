@@ -22,7 +22,7 @@ const SMALL = `text-muted-foreground ${SMALL_SIZE}`;
  *  question had no mark at all). */
 export function YourTurn({ above = false, afterHint = false }: { above?: boolean; afterHint?: boolean }) {
 	return (
-		<p data-slot="your-turn" className="mb-1 text-body system-current:text-row text-muted-foreground">
+		<p data-slot="your-turn" className="mb-1 text-body text-muted-foreground">
 			{/* A hint may end in a question of its own, so "above" would name it (round 12, 3 D11). */}
 			{above ? (afterHint ? "Your turn, on the question you pressed Hint on" : "Your turn, on the question above") : "Your turn"}
 		</p>
@@ -69,7 +69,7 @@ export function QuestionWords({ spec, compact = false }: { spec: ProseQuestionSp
 	return (
 		<>
 			<ToolContentResponse className={compact ? SMALL_SIZE : undefined}>{spec.data.question}</ToolContentResponse>
-			{spec.mode === "multi-select" && !compact && <p className="mt-1 text-body system-current:text-row text-muted-foreground">Select all that apply.</p>}
+			{spec.mode === "multi-select" && !compact && <p className="mt-1 text-body text-muted-foreground">Select all that apply.</p>}
 		</>
 	);
 }
@@ -110,7 +110,7 @@ export function ChoiceRows({ options, multi, selected, onPick, compact = false }
 				const on = selected.has(i);
 				const words = (
 					<>
-						<span aria-hidden className={cn("w-4 shrink-0 text-body system-current:text-row tabular-nums", compact ? "leading-5" : "leading-[26px]", on ? "text-foreground" : "text-muted-foreground")}>
+						<span aria-hidden className={cn("w-4 shrink-0 text-body tabular-nums", compact ? "leading-5" : "leading-[26px]", on ? "text-foreground" : "text-muted-foreground")}>
 							{i + 1}
 						</span>
 						<span className="min-w-0">
@@ -169,7 +169,7 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 		return (
 			<>
 				{question}
-				<p data-testid="prose-question-left" className="text-body system-current:text-row text-muted-foreground">
+				<p data-testid="prose-question-left" className="text-body text-muted-foreground">
 					{answer.reason === "tonight" ? LESSON_WORDS.leftForTonight : LESSON_WORDS.skippedQuestion}
 				</p>
 			</>
@@ -206,7 +206,7 @@ export function Disclosure({ label, children, defaultOpen = false }: { label: st
 		<Collapsible open={open} onOpenChange={setOpen} data-slot="prose-disclosure" className="my-1">
 			<CollapsibleTrigger
 				data-testid="prose-disclosure"
-				className="-ms-2 flex h-8 items-center gap-1 rounded-md px-2 text-body system-current:text-row text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
+				className="-ms-2 flex h-8 items-center gap-1 rounded-md px-2 text-body text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
 			>
 				<ChevronRightIcon aria-hidden className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-90")} />
 				{label}

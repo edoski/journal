@@ -20,7 +20,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "flex size-full flex-col overflow-hidden bg-transparent text-body system-current:text-row text-popover-foreground",
+        "flex size-full flex-col overflow-hidden bg-transparent text-body text-popover-foreground",
         className
       )}
       {...props}
@@ -42,7 +42,7 @@ function CommandInput({
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "h-full w-full min-w-0 bg-transparent text-body system-current:text-row text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          "h-full w-full min-w-0 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         {...props}
@@ -75,7 +75,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className={cn("px-2 py-1.5 text-callout system-current:text-label text-muted-foreground", className)}
+      className={cn("px-2 py-1.5 text-callout text-muted-foreground", className)}
       {...props}
     />
   )
@@ -144,7 +144,7 @@ function CommandShortcut({
   return (
     <span
       data-slot="command-shortcut"
-      className={cn("ml-auto text-callout system-current:text-label text-muted-foreground tabular-nums", className)}
+      className={cn("ml-auto text-callout text-muted-foreground tabular-nums", className)}
       {...props}
     />
   )

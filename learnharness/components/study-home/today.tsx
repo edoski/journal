@@ -21,7 +21,7 @@ export function Today({ done, exam = null, ...props }: RowsProps & { done: reado
 		<section aria-labelledby="today-heading" data-slot="today" className="flex shrink-0 flex-col gap-2">
 			<DayHeading id="today-heading" studied={words !== null} exam={exam} empty={props.rows.length === 0} />
 			{words && (
-				<p data-slot="today-done" className="-mt-1 flex h-5 min-w-0 items-center gap-1.5 text-callout system-current:text-label text-muted-foreground">
+				<p data-slot="today-done" className="-mt-1 flex h-5 min-w-0 items-center gap-1.5 text-callout text-muted-foreground">
 					<CircleCheckIcon aria-hidden="true" className="size-3.5 shrink-0" />
 					<MathLine className="min-w-0">{words}</MathLine>
 				</p>

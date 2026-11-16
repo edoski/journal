@@ -1,6 +1,5 @@
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
-import { CourseBadge, ProgressRing } from "@/components/study-home/agenda-rows/progress-ring";
-import { useSystemVariant } from "@/components/design-variant";
+import { CourseBadge } from "@/components/study-home/agenda-rows/progress-ring";
 import { courseTitle, foldLines, lessonTitle, lineKey, pointProps, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
@@ -16,18 +15,15 @@ import { MathText } from "@/components/ui/math-text";
  *  hover fill's corners are at 8, as every other row with a hover fill
  *  (the sidebar's, the course page's, Settings'). */
 const ROW =
-	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-md px-3 text-left font-normal system-current:font-normal whitespace-normal data-[pointed]:bg-fill-hover";
-/** The status column as wide as its words, so they show whole (round 11,
- *  1 N14: "Not right last time: Matrix multipli…" cut beside an empty
- *  column). */
-const COLUMNS = "grid-cols-[1rem_minmax(0,1fr)_auto]";
-
-/** The same columns with the first at the badge's width (40px), so both
- *  lines start at one edge beside it. */
-const COLUMNS_BADGE = "grid-cols-[2.5rem_minmax(0,1fr)_auto]";
+	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-md px-3 text-left font-normal whitespace-normal data-[pointed]:bg-fill-hover";
+/** The first column at the badge's width (40px), so both lines start at
+ *  one edge beside it, and the status column as wide as its words, so they
+ *  show whole (round 11, 1 N14: "Not right last time: Matrix multipli…" cut
+ *  beside an empty column). */
+const COLUMNS = "grid-cols-[2.5rem_minmax(0,1fr)_auto]";
 
 /** A standing fact: a 14px mark, as the reason's, then its words. */
-const FACT = "flex items-center justify-self-end gap-1.5 text-callout system-current:text-label text-muted-foreground";
+const FACT = "flex items-center justify-self-end gap-1.5 text-callout text-muted-foreground";
 
 /** A hairline above every row but the first, inset to the text's edges. */
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
@@ -39,22 +35,17 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  */
 export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 	const { shown, also } = foldLines(rows);
-	// The visual system's Proposed: the course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox.
-	const badge = useSystemVariant() === "proposed";
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
 			{shown.map((row) => {
 				const status = rowStatus(row);
 				return (
 					<li key={lineKey(row)} className={HAIRLINE}>
-						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, badge ? COLUMNS_BADGE : COLUMNS)} {...pointProps(row, point)}>
-							{badge ? (
-								<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
-							) : (
-								<span className="row-span-2">{row.course && <ProgressRing course={row.course} />}</span>
-							)}
-							<MathLine className="col-span-2 text-callout system-current:text-label text-muted-foreground">{courseTitle(row)}</MathLine>
-							<MathLine className="text-headline system-current:text-control system-current:font-medium text-foreground">{lessonTitle(row)}</MathLine>
+						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, COLUMNS)} {...pointProps(row, point)}>
+							{/* The course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox. */}
+							<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
+							<MathLine className="col-span-2 text-callout text-muted-foreground">{courseTitle(row)}</MathLine>
+							<MathLine className="text-headline text-foreground">{lessonTitle(row)}</MathLine>
 							{status?.kind === "standing" ? <StandingFact facts={status.facts} /> : <WhyMark why={status?.why ?? null} whole />}
 						</LineTarget>
 					</li>

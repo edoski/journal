@@ -9,9 +9,9 @@ import { LESSON_WORDS } from "@/components/study-words";
 export function ReplyCut({ cut, onRetry }: { cut: "stopped" | "stopped-mid" | "lost"; onRetry: () => void }) {
 	const words = cut === "stopped-mid" ? LESSON_WORDS.youStoppedMidReply : cut === "stopped" ? LESSON_WORDS.youStoppedReply : LESSON_WORDS.stoppedBeforeReply;
 	return (
-		<div role="status" data-testid="reply-cut" className="flex flex-wrap items-center gap-1 text-body system-current:text-row">
+		<div role="status" data-testid="reply-cut" className="flex flex-wrap items-center gap-1 text-body">
 			<span className="mr-2 min-w-0 text-muted-foreground">{words}</span>
-			<Button variant="quiet" size="sm" data-testid="reply-cut-retry" onClick={onRetry} className="h-8 px-2 text-body system-current:text-row system-current:font-medium text-foreground">
+			<Button variant="quiet" size="sm" data-testid="reply-cut-retry" onClick={onRetry} className="h-8 px-2 text-body text-foreground">
 				{LESSON_WORDS.tryAgain}
 			</Button>
 		</div>

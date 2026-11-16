@@ -5,11 +5,6 @@
 @import "@fullcalendar/react/skeleton.css" layer(base);
 
 @custom-variant dark (&:is(.dark *));
-/* Current's type, kept while the Visual system switch compares it with
-   macOS's text styles (components/design-variant.ts): shipping deletes this
-   variant and every class it prefixes. Production builds set no switch, so
-   they draw Current. */
-@custom-variant system-current (&:where(html:not([data-polish-system="proposed"]) *));
 
 /*
  * THE SKIN — wave 5. Design tokens, the single place to restyle the app.
@@ -175,8 +170,7 @@
 	/* macOS's own text styles, as published: size, line height, weight
 	   (Apple HIG, Typography, "macOS built-in text styles",
 	   developer.apple.com/design/human-interface-guidelines/typography).
-	   Only the styles the app uses; behind the Visual system switch every
-	   use names one of these. */
+	   Only the styles the app uses; every use names one of these. */
 	--text-large-title: 26px;
 	--text-large-title--line-height: calc(32 / 26);
 	--text-large-title--font-weight: 400;

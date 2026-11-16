@@ -5,7 +5,7 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body system-current:text-sm system-current:font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -24,11 +24,11 @@ const buttonVariants = cva(
         // A list's full-width row (the sidebar's shelves, the course page's
         // groups): left-aligned regular text, the hover fill, the 2px ring.
         list:
-          "w-full min-w-0 justify-start text-left font-normal system-current:font-normal text-muted-foreground transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+          "w-full min-w-0 justify-start text-left font-normal text-muted-foreground transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        xs: "h-6 gap-1 rounded-md px-2 text-subheadline system-current:text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        xs: "h-6 gap-1 rounded-md px-2 text-subheadline has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
         icon: "size-9",
@@ -40,8 +40,8 @@ const buttonVariants = cva(
         // The design's own sizes: the 13px row text on a 32px row, the
         // docks' 32px pill, the settings rows' 28px action, and the 28px
         // icon of the sidebar's and the lesson's bars.
-        row: "h-8 gap-1.5 rounded-md px-2 text-body system-current:text-row",
-        pill: "h-8 gap-1.5 rounded-full px-3.5 text-body system-current:text-row system-current:font-medium has-[>svg]:px-2.5",
+        row: "h-8 gap-1.5 rounded-md px-2 text-body",
+        pill: "h-8 gap-1.5 rounded-full px-3.5 text-body has-[>svg]:px-2.5",
         compact: "h-7 gap-1.5 rounded-md px-3",
         "icon-bar": "size-7 rounded-md [&_svg:not([class*='size-'])]:size-4",
       },

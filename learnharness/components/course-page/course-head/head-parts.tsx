@@ -65,12 +65,12 @@ export function ExamFact({ course, runup, words, ready }: { course: StudyCourse;
 			</PopoverTrigger>
 			<PopoverContent data-slot="course-exam-runup" align="start" collisionPadding={12} className="flex flex-col gap-3">
 				<div className="flex flex-col gap-1">
-					<p className="text-headline system-current:text-row system-current:font-medium text-foreground">{map.title} exam</p>
-					<p className="text-callout system-current:text-label text-muted-foreground">
+					<p className="text-headline text-foreground">{map.title} exam</p>
+					<p className="text-callout text-muted-foreground">
 						{longDayWords(exam.date)}, {distanceWords(exam.date, map.today).toLowerCase()}
 					</p>
 					{ready && (
-						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-1 text-callout system-current:text-label", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>
+						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-1 text-callout", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>
 							<ReadyWords ready={ready} workspace={map.workspace} />
 							{ready.kind === "notYet" && ready.arcs.map((arc) => <ArcPill key={arc.handle} arc={arc} href={arcOnPage(map.workspace, arc.handle)} />)}
 						</p>
@@ -78,11 +78,11 @@ export function ExamFact({ course, runup, words, ready }: { course: StudyCourse;
 				</div>
 				{(road.length > 0 || finalReview) && (
 					<div data-slot="course-exam-road" className="flex flex-col gap-1.5 border-t border-border pt-3">
-						<p className="text-callout system-current:text-label system-current:font-medium text-muted-foreground">The road to it</p>
+						<p className="text-callout text-muted-foreground">The road to it</p>
 						<ol className="flex flex-col gap-1.5">
 							{roadLines(road, runup?.finalReview ?? null).map((line) =>
 								line.kind === "week" ? (
-									<li key={line.week.from} className="flex gap-2 text-callout system-current:text-label">
+									<li key={line.week.from} className="flex gap-2 text-callout">
 										<BookOpenIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
 										<span className="min-w-0">
 											<span className="text-muted-foreground">{spanWords(line.week)}</span>{" "}
@@ -92,7 +92,7 @@ export function ExamFact({ course, runup, words, ready }: { course: StudyCourse;
 										</span>
 									</li>
 								) : (
-									<li key="final" className="flex gap-2 text-callout system-current:text-label text-muted-foreground">
+									<li key="final" className="flex gap-2 text-callout text-muted-foreground">
 										<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
 										{finalReview}
 									</li>
@@ -151,7 +151,7 @@ export function CourseAction({ view, busy, onContinue }: { view: CourseView; bus
 export function LessonError() {
 	const error = useContext(CourseLessonError);
 	return error ? (
-		<p role="alert" data-slot="course-lesson-error" className="flex min-h-5 items-center text-body system-current:text-row text-danger">
+		<p role="alert" data-slot="course-lesson-error" className="flex min-h-5 items-center text-body text-danger">
 			{error}
 		</p>
 	) : null;

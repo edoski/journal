@@ -16,11 +16,11 @@ export function NavSection({
 			<h2
 				id={id}
 				data-slot="nav-section-header"
-				className="flex h-7 items-center gap-2 px-2 text-callout system-current:text-label system-current:font-medium text-muted-foreground"
+				className="flex h-7 items-center gap-2 px-2 text-callout text-muted-foreground"
 			>
 				<span className="min-w-0 flex-1 truncate">{title}</span>
 				{trailing && (
-					<span data-slot="nav-section-trailing" className="shrink-0 font-normal system-current:font-normal tabular-nums">
+					<span data-slot="nav-section-trailing" className="shrink-0 font-normal tabular-nums">
 						{trailing}
 					</span>
 				)}

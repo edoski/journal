@@ -17,7 +17,7 @@ import { continueHref } from "@/components/nav/session-state";
 
 /** Today's hybrid row, at the list's width: the mark beside the topic and
  *  what went wrong, which runs to two lines (round 9, 2 m2: cut at one). */
-const ROW = "-mx-3 flex h-auto min-h-12 w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-1.5 text-left font-normal system-current:font-normal whitespace-normal";
+const ROW = "-mx-3 flex h-auto min-h-12 w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-1.5 text-left font-normal whitespace-normal";
 
 /** One open mistake (spec: standing/standing.md): its slip's mark, the
  *  topic and its arc's bubble, then what went wrong in the tutor's words
@@ -31,10 +31,10 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 			<Icon aria-hidden className={cn("size-4 shrink-0", row.slip === "confident" ? "text-warning" : "text-muted-foreground")} />
 			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<span className="flex min-w-0 items-center gap-3">
-					<MathLine className="min-w-0 flex-1 text-headline system-current:text-row system-current:font-medium text-foreground">{row.topic.title}</MathLine>
+					<MathLine className="min-w-0 flex-1 text-headline text-foreground">{row.topic.title}</MathLine>
 					{row.arc && <ArcPill arc={row.arc} className="max-w-3/5 shrink-0" />}
 				</span>
-				<span className="flex min-w-0 items-start gap-3 text-callout system-current:text-label text-muted-foreground">
+				<span className="flex min-w-0 items-start gap-3 text-callout text-muted-foreground">
 					<span data-slot="mistake-words" className="line-clamp-2 min-w-0 flex-1">
 						<LineText>{row.words}</LineText>
 					</span>

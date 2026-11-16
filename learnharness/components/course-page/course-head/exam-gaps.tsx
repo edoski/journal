@@ -10,7 +10,7 @@ import { examGapAskCreation, topicPress, useStartSession } from "@/components/un
 import { examGaps } from "@/components/course-page/course-head/head-facts";
 import { continueHref } from "@/components/nav/session-state";
 
-const PRESS = "text-body system-current:text-row text-link hover:text-link";
+const PRESS = "text-body text-link hover:text-link";
 
 /**
  * Under the head's first line, when the exam's plan leaves topics out
@@ -52,7 +52,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	// and 11: the tutor's and Home's order).
 	const [pick, ...others] = ways;
 	return (
-		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-body system-current:text-row font-normal system-current:font-normal text-muted-foreground">
+		<p data-slot="course-exam-gaps" className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-1 text-body font-normal text-muted-foreground">
 			{why && (
 				<span data-slot="exam-gaps-why" className="mr-1">
 					<MathText>{why}</MathText>

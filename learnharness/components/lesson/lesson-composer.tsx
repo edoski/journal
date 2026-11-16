@@ -131,7 +131,7 @@ export function LessonComposer({
 					rows={1}
 					aria-label={answer ? "Your answer" : "Message"}
 					data-slot="composer-field"
-					className="-m-1 block field-sizing-content max-h-52 min-h-[calc(2lh+0.5rem)] w-[calc(100%+0.5rem)] resize-none overflow-y-auto bg-transparent p-1 text-body system-current:text-control leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+					className="-m-1 block field-sizing-content max-h-52 min-h-[calc(2lh+0.5rem)] w-[calc(100%+0.5rem)] resize-none overflow-y-auto bg-transparent p-1 text-body leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
 				/>
 			</div>
 			<div data-slot="composer-toolbar" className="flex min-w-0 items-center px-2 pb-2">

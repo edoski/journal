@@ -20,7 +20,7 @@ export function LessonCard({
 	return (
 		<div data-slot="lesson-card" className={cn("rounded-xl border bg-card p-4 text-card-foreground", className)} {...props}>
 			{(label || note) && (
-				<div data-slot="lesson-card-label" className="mb-2 flex items-center gap-1.5 text-body system-current:text-row text-muted-foreground">
+				<div data-slot="lesson-card-label" className="mb-2 flex items-center gap-1.5 text-body text-muted-foreground">
 					{label}
 					{label && note && <span aria-hidden>·</span>}
 					{note}

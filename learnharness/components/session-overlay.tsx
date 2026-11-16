@@ -74,10 +74,10 @@ export function chartSize(svg: string): { w: number; h: number } {
 /** The overlay's classes: a translucent surface, quiet controls. */
 const L = {
 	root: "absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm",
-	title: "text-headline system-current:text-row system-current:font-medium text-foreground",
-	sub: "text-body system-current:text-row text-muted-foreground",
-	hint: "text-callout system-current:text-label text-muted-foreground",
-	loading: "flex h-full items-center justify-center gap-2 text-body system-current:text-row text-muted-foreground",
+	title: "text-headline text-foreground",
+	sub: "text-body text-muted-foreground",
+	hint: "text-callout text-muted-foreground",
+	loading: "flex h-full items-center justify-center gap-2 text-body text-muted-foreground",
 } as const;
 
 /** The diagram focus: the chart at natural size inside a pan/zoom viewport

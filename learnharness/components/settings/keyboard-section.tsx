@@ -90,7 +90,7 @@ export function KeyboardSection() {
 
 	const overridden = (id: KeyAction) => overrides[id] !== undefined;
 
-	const action = "h-7 px-2 font-normal system-current:font-normal";
+	const action = "h-7 px-2 font-normal";
 	// Settings lists what can be changed; the keys a screen owns (the
 	// question's) stay in the cheat sheet.
 	const changeable = KEYBOARD_ACTIONS.filter((a) => !a.displayOnly);

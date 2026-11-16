@@ -76,7 +76,7 @@ export function TopicHead({ facts, children }: { facts: TopicFacts; children?: R
 			}
 		>
 			{mistake && (
-				<p data-slot="unit-gap" className="text-body system-current:text-row text-foreground/90">
+				<p data-slot="unit-gap" className="text-body text-foreground/90">
 					<MathText>{mistake}</MathText>
 				</p>
 			)}

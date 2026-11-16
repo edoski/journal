@@ -24,7 +24,7 @@ export const rowSurface = (active: boolean) =>
  * one 16px line (`py-0.5` in 20px, `py-1` in 24px).
  */
 export const TRAILING_SLOT =
-	"ml-auto flex shrink-0 items-center justify-end gap-x-1 whitespace-nowrap text-callout system-current:text-label tabular-nums text-muted-foreground";
+	"ml-auto flex shrink-0 items-center justify-end gap-x-1 whitespace-nowrap text-callout tabular-nums text-muted-foreground";
 
 /**
  * The sidebar's one row rule (spec: row-card.md): every row is its title,
@@ -38,7 +38,7 @@ export const ROW_FRAME = "flex flex-col px-2.5 py-2";
 
 /** Every row's title: 14px on a 20px line, wrapping onto a second line
  *  and cut only past it. */
-export const ROW_TITLE = "line-clamp-2 min-w-0 text-body system-current:text-control text-pretty";
+export const ROW_TITLE = "line-clamp-2 min-w-0 text-body text-pretty";
 
 /** A shelf row's first line: the course mark beside the title. */
 export const ROW_BODY = "flex min-w-0 items-start gap-2";
@@ -57,7 +57,7 @@ export const STATUS_SLOT = cn(
 /** A row's one action, over its status slot: hidden until the row is
  *  hovered or the action has keyboard focus. The caller places it. */
 export const ROW_ACTION =
-	"pointer-events-none absolute inline-flex items-center gap-1 rounded-md px-1.5 text-callout system-current:text-label system-current:font-medium text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 hover:bg-transparent disabled:opacity-0 group-hover/sidebar-row:disabled:opacity-100 motion-reduce:transition-none [&>svg]:size-3";
+	"pointer-events-none absolute inline-flex items-center gap-1 rounded-md px-1.5 text-callout text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 hover:bg-transparent disabled:opacity-0 group-hover/sidebar-row:disabled:opacity-100 motion-reduce:transition-none [&>svg]:size-3";
 
 /** Every row's list item: 2px above and below, so every row's pitch is
  *  its height plus 4. */
@@ -111,7 +111,7 @@ export function RowCard({
 			<span className="flex h-5 items-center gap-2">
 					<span className="flex h-5 shrink-0 items-center">{mark}</span>
 					{/* The name whole or not at all: too long for the room beside the status, it wraps onto a second line the 20px line hides, after an empty first item, and the badge names the course (round 10, 1 m8: "Linear Alg…"). */}
-					<span data-slot="unit-card-course" className="flex h-5 min-w-0 flex-1 flex-wrap overflow-hidden text-callout system-current:text-label text-muted-foreground">
+					<span data-slot="unit-card-course" className="flex h-5 min-w-0 flex-1 flex-wrap overflow-hidden text-callout text-muted-foreground">
 						<span aria-hidden="true" className="h-5 w-0" />
 						<span className="whitespace-nowrap leading-5">{course}</span>
 					</span>
@@ -119,7 +119,7 @@ export function RowCard({
 						{status}
 					</span>
 				</span>
-			<span data-slot="unit-row-title" className={cn(ROW_TITLE, "mt-1 pl-6 text-headline system-current:font-medium text-foreground")}>
+			<span data-slot="unit-row-title" className={cn(ROW_TITLE, "mt-1 pl-6 text-headline text-foreground")}>
 				<MathText>{title}</MathText>
 			</span>
 		</>

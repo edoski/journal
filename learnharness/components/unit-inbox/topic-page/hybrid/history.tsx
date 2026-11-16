@@ -47,7 +47,7 @@ const DATED = "grid-cols-[1rem_minmax(0,1fr)_auto_4.5rem]";
 /** The day in the date column, or its room. */
 function DateCell({ date, className }: { date: string | null; className?: string }) {
 	return date ? (
-		<span data-slot="topic-history-date" className={cn("col-start-4 justify-self-end text-callout system-current:text-label text-muted-foreground tabular-nums", className)}>
+		<span data-slot="topic-history-date" className={cn("col-start-4 justify-self-end text-callout text-muted-foreground tabular-nums", className)}>
 			{date}
 		</span>
 	) : null;
@@ -74,12 +74,12 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 			    320px column beside an empty half-pane); Earlier moves the days
 			    that do not fit behind "Show the rest". Each formula is one box
 			    (round 13, 2 n1), so a line never breaks inside one. */}
-			<p data-slot="topic-attempt-text" className={cn("text-body system-current:text-row text-muted-foreground [&_.katex]:inline-block", date !== undefined && "col-span-2")}>
+			<p data-slot="topic-attempt-text" className={cn("text-body text-muted-foreground [&_.katex]:inline-block", date !== undefined && "col-span-2")}>
 				<LineText>{title ?? attempt.text}</LineText>
 			</p>
 			{date !== undefined && <DateCell date={date} />}
 			{how && (
-				<span data-slot="topic-attempt-how" className={cn("col-start-2 text-callout system-current:text-label text-muted-foreground", date !== undefined && "col-span-2")}>
+				<span data-slot="topic-attempt-how" className={cn("col-start-2 text-callout text-muted-foreground", date !== undefined && "col-span-2")}>
 					<LineText>{how}</LineText>
 				</span>
 			)}
@@ -120,13 +120,13 @@ export function SessionItem({
 				data-testid="unit-page-session"
 				className={cn(
 					// Its fill reaches back over the row's gutter and 12px past the column, as every row's does (`BLEED`).
-					"col-span-full row-start-1 -mr-3 -ml-[1.875rem] grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg pr-3 pl-[1.875rem] text-left font-normal system-current:font-normal whitespace-normal has-[>svg]:pr-3 has-[>svg]:pl-[1.875rem]",
+					"col-span-full row-start-1 -mr-3 -ml-[1.875rem] grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg pr-3 pl-[1.875rem] text-left font-normal whitespace-normal has-[>svg]:pr-3 has-[>svg]:pl-[1.875rem]",
 					shown && "bg-fill-selected hover:bg-fill-selected",
 				)}
 			>
 				<Link href={`/chat/${chat.id}`} onPointerEnter={planned ? () => onShow(chat.id) : undefined} onFocus={planned ? () => onShow(chat.id) : undefined}>
 					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />}
-					<span className="truncate text-body system-current:text-row text-foreground">
+					<span className="truncate text-body text-foreground">
 						<LineText>{chat.title}</LineText>
 					</span>
 					{why && <span className="flex items-center gap-2 justify-self-end">{why}</span>}

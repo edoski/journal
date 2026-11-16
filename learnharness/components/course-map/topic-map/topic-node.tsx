@@ -63,7 +63,7 @@ export const RECEDED = 0.8;
 function LineMark({ line }: { line: CardFact }) {
 	const Icon = factIcon(line);
 	return (
-		<span data-slot="topic-need" data-kind={line.kind} className="flex h-lh min-w-0 items-center gap-1 text-callout system-current:text-caption text-muted-foreground">
+		<span data-slot="topic-need" data-kind={line.kind} className="flex h-lh min-w-0 items-center gap-1 text-callout text-muted-foreground">
 			{Icon ? <Icon aria-hidden="true" className="size-3 shrink-0" /> : <BrailleSpinner />}
 			<span className="truncate">
 				<MathText>{line.words}</MathText>
@@ -84,9 +84,9 @@ export function NodeBody({ topic, standing, line, from = null }: { topic: Course
 		<span className="flex w-full min-w-0 items-center gap-4">
 			<TopicGlyph standing={standing} />
 			<span className="flex min-w-0 flex-1 flex-col gap-1">
-				<MathLine className={cn("h-4.5 text-body system-current:text-row system-current:font-medium", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{topic.title}</MathLine>
+				<MathLine className={cn("h-4.5 text-body", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{topic.title}</MathLine>
 				{from ? (
-					<span data-slot="topic-from" className="flex h-lh min-w-0 items-center gap-1 text-callout system-current:text-caption text-muted-foreground">
+					<span data-slot="topic-from" className="flex h-lh min-w-0 items-center gap-1 text-callout text-muted-foreground">
 						<CornerLeftUpIcon aria-hidden="true" className="size-3 shrink-0" />
 						<span className="truncate">
 							<MathText>{entryCaption(from)}</MathText>
@@ -95,7 +95,7 @@ export function NodeBody({ topic, standing, line, from = null }: { topic: Course
 				) : line ? (
 					<LineMark line={line} />
 				) : (
-					<span data-slot="topic-standing" className="block h-lh truncate text-callout system-current:text-caption text-muted-foreground">
+					<span data-slot="topic-standing" className="block h-lh truncate text-callout text-muted-foreground">
 						{standing.words}
 					</span>
 				)}
@@ -117,7 +117,7 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 	return (
 		<div className="relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none" style={receded ? { opacity: RECEDED } : undefined}>
 			{current && (
-				<span data-slot="course-map-current-tag" className="absolute -top-5 left-0 text-callout system-current:text-caption system-current:font-medium text-foreground">
+				<span data-slot="course-map-current-tag" className="absolute -top-5 left-0 text-callout text-foreground">
 					{CURRENT_TAG}
 				</span>
 			)}

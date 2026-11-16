@@ -53,7 +53,7 @@ function PopoverContent({
         className={cn(
           OVERLAY_LAYER,
           OVERLAY_MOTION,
-          "w-80 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-body system-current:text-row text-popover-foreground shadow-lg outline-none",
+          "w-80 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-body text-popover-foreground shadow-lg outline-none",
           className
         )}
         {...props}
@@ -83,7 +83,7 @@ function PopoverTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="popover-title"
-      className={cn("text-headline system-current:text-row system-current:font-semibold text-foreground", className)}
+      className={cn("text-headline text-foreground", className)}
       {...props}
     />
   )
@@ -97,7 +97,7 @@ function PopoverDescription({
   return (
     <p
       data-slot="popover-description"
-      className={cn("text-callout system-current:text-label text-muted-foreground", className)}
+      className={cn("text-callout text-muted-foreground", className)}
       {...props}
     />
   )

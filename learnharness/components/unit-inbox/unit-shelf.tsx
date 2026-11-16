@@ -59,7 +59,7 @@ export function UnitShelf<T>({
 					data-sidebar-row={`shelf:${id}`}
 					aria-expanded={!folded}
 					onClick={() => onFoldedChange(!folded)}
-					className="h-8 gap-2 px-2 text-callout system-current:text-label system-current:font-medium hover:bg-transparent focus-visible:ring-inset"
+					className="h-8 gap-2 px-2 text-callout hover:bg-transparent focus-visible:ring-inset"
 				>
 					<span className="min-w-0 truncate">{label}</span>
 					<span aria-hidden className="flex-1" />
@@ -85,7 +85,7 @@ export function UnitShelf<T>({
 							data-sidebar-row={`more:${id}`}
 							data-sidebar-parent={`shelf:${id}`}
 							onClick={() => setWhole(true)}
-							className="h-9 gap-2 px-2.5 text-body system-current:text-control focus-visible:ring-inset"
+							className="h-9 gap-2 px-2.5 text-body focus-visible:ring-inset"
 						>
 							<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
 							{moreWords(rest, Infinity)}

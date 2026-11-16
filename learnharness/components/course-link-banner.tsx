@@ -18,7 +18,7 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 	return (
 		<div data-testid="course-link-banner" data-slot="dock-surface" className={`pointer-events-auto p-2 pl-4 ${DOCK_SURFACE}`}>
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-				<p className="min-w-0 flex-1 text-body system-current:text-row text-muted-foreground">Link this session to a course to continue.</p>
+				<p className="min-w-0 flex-1 text-body text-muted-foreground">Link this session to a course to continue.</p>
 				{choice.state.status === "unavailable" ? (
 					<CoursesUnavailable reason={choice.state.reason} />
 				) : (
@@ -37,7 +37,7 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 					</Button>
 				)}
 			</div>
-			{error && <p role="alert" className="px-0 pb-1 pt-2 text-body system-current:text-row text-danger">{error}</p>}
+			{error && <p role="alert" className="px-0 pb-1 pt-2 text-body text-danger">{error}</p>}
 		</div>
 	);
 }

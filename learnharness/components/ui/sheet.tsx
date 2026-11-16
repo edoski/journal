@@ -76,12 +76,12 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
 
 /** 18/24 at 600, as a dialog's. */
 function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Title>) {
-	return <SheetPrimitive.Title data-slot="sheet-title" className={cn("text-title-1 system-current:text-subheading system-current:font-semibold text-foreground", className)} {...props} />;
+	return <SheetPrimitive.Title data-slot="sheet-title" className={cn("text-title-1 text-foreground", className)} {...props} />;
 }
 
 /** 14/20, muted. */
 function SheetDescription({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Description>) {
-	return <SheetPrimitive.Description data-slot="sheet-description" className={cn("text-body system-current:text-control text-muted-foreground", className)} {...props} />;
+	return <SheetPrimitive.Description data-slot="sheet-description" className={cn("text-body text-muted-foreground", className)} {...props} />;
 }
 
 export { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription };

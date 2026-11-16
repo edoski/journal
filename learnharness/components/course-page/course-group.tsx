@@ -76,13 +76,13 @@ export function CourseGroup<T>({
 								id={headerId}
 								data-slot="course-group-header"
 								onKeyDown={onHeaderKeyDown}
-								className="-mx-3 h-7 w-[calc(100%+1.5rem)] gap-1 px-3 text-callout system-current:text-label system-current:font-medium duration-150 hover:bg-transparent"
+								className="-mx-3 h-7 w-[calc(100%+1.5rem)] gap-1 px-3 text-callout duration-150 hover:bg-transparent"
 							>
 								{label(<ChevronDownIcon aria-hidden className={cn("size-3.5 shrink-0 transition-transform duration-150 motion-reduce:transition-none", !shownOpen && "-rotate-90")} />)}
 							</Button>
 						</CollapsibleTrigger>
 					) : (
-						<span id={headerId} data-slot="course-group-header" className="flex h-7 items-center gap-1 rounded-md text-callout system-current:text-label system-current:font-medium text-muted-foreground">
+						<span id={headerId} data-slot="course-group-header" className="flex h-7 items-center gap-1 rounded-md text-callout text-muted-foreground">
 							{label(null)}
 						</span>
 					)}

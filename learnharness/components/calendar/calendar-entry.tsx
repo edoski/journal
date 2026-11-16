@@ -81,16 +81,16 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 			<span data-slot="calendar-entry-title" className="line-clamp-2 min-w-0 text-foreground">
 				<LineText>{entry.title}</LineText>
 			</span>
-			<span className="flex min-w-0 items-center gap-1.5 text-callout system-current:text-label text-muted-foreground">
+			<span className="flex min-w-0 items-center gap-1.5 text-callout text-muted-foreground">
 				<Mark entry={entry} />
 				<Icon aria-hidden={!waits} aria-label={waits ? LOOKS[look].words : undefined} className={cn("size-3.5 shrink-0", ICON_INK[look])} />
 				{!waits && (
-					<span className={cn("truncate", LOOK_INK[look], look === "exam" && "system-current:font-medium")}>
+					<span className={cn("truncate", LOOK_INK[look], look === "exam" && "")}>
 						{entry.kind === "exam" ? `Exam, ${distanceWords(entry.day, today).toLowerCase()}` : lookWords(entry, today)}
 					</span>
 				)}
 				{waits && (
-					<span className="flex shrink-0 items-center gap-1 system-current:font-medium text-link">
+					<span className="flex shrink-0 items-center gap-1 text-link">
 						<MessageCircleQuestionIcon aria-hidden className="size-3.5" />
 						Your turn
 					</span>
@@ -102,7 +102,7 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 
 /** An exam in the month grid, the one entry that must stand out among a
  *  day's reviews: a tinted chip with its title in weight. */
-const EXAM_CHIP = "bg-foreground/10 system-current:font-medium hover:bg-foreground/15";
+const EXAM_CHIP = "bg-foreground/10 hover:bg-foreground/15";
 
 /** Every panel the calendar opens, an entry's and a day's, is this wide:
  *  the exam's road reads in it, and one width keeps them one family
@@ -110,7 +110,7 @@ const EXAM_CHIP = "bg-foreground/10 system-current:font-medium hover:bg-foregrou
 export const PANEL_WIDTH = "w-80";
 
 const FACE =
-	"flex w-full min-w-0 rounded-md px-1.5 text-left text-body system-current:text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=open]:bg-fill-selected motion-reduce:transition-none";
+	"flex w-full min-w-0 rounded-md px-1.5 text-left text-body outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=open]:bg-fill-selected motion-reduce:transition-none";
 
 /** One thing on one day (spec: calendar.md). A session opens its lesson;
  *  a review, an open task or an exam opens a popover with what it is and
@@ -173,20 +173,20 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	}
 	return (
 		<>
-			<div className="flex min-w-0 items-center gap-1.5 text-callout system-current:text-label text-muted-foreground">
+			<div className="flex min-w-0 items-center gap-1.5 text-callout text-muted-foreground">
 				<CourseMark title={entry.course.title} />
 				<span className="truncate">{entry.course.title}</span>
 			</div>
 			<div className="flex flex-col gap-1">
-				<p className="text-headline system-current:text-row system-current:font-medium text-foreground">
+				<p className="text-headline text-foreground">
 					<LineText>{entry.title}</LineText>
 				</p>
-				<p className={cn("flex items-center gap-1 text-callout system-current:text-label text-muted-foreground", LOOK_INK[look])}>
+				<p className={cn("flex items-center gap-1 text-callout text-muted-foreground", LOOK_INK[look])}>
 					<Icon aria-hidden className={cn("size-3.5 shrink-0", ICON_INK[look])} />
 					{lookWords(entry, today)}
 				</p>
 				{lines.map((line) => (
-					<p key={line} className="text-callout system-current:text-label text-muted-foreground">
+					<p key={line} className="text-callout text-muted-foreground">
 						<MathText>{line}</MathText>
 					</p>
 				))}
@@ -205,11 +205,11 @@ function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }
 	if (entry.road.length === 0 && !finalReview) return null;
 	return (
 		<div data-slot="exam-road" className="flex flex-col gap-1.5 border-t border-border pt-3">
-			<p className="text-callout system-current:text-label system-current:font-medium text-muted-foreground">The road to it</p>
+			<p className="text-callout text-muted-foreground">The road to it</p>
 			<ol className="flex flex-col gap-1.5">
 				{roadLines(entry.road, entry.finalReview).map((line) =>
 					line.kind === "week" ? (
-						<li key={line.week.from} className="flex gap-2 text-callout system-current:text-label">
+						<li key={line.week.from} className="flex gap-2 text-callout">
 							<BookOpenIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
 							<span className="min-w-0">
 								<span className="text-muted-foreground">{spanWords(line.week)}</span>{" "}
@@ -219,7 +219,7 @@ function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }
 							</span>
 						</li>
 					) : (
-						<li key="final" className="flex gap-2 text-callout system-current:text-label text-muted-foreground">
+						<li key="final" className="flex gap-2 text-callout text-muted-foreground">
 							<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
 							<span className="min-w-0">
 								{finalReview}
@@ -247,8 +247,8 @@ function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, {
 	return (
 		<div data-slot="exam-next" className="flex flex-col gap-3">
 			<div className="flex flex-col gap-1.5">
-				<p className="text-callout system-current:text-label system-current:font-medium text-muted-foreground">Next step</p>
-				<p data-slot="exam-next-what" className="text-callout system-current:text-label text-foreground">
+				<p className="text-callout text-muted-foreground">Next step</p>
+				<p data-slot="exam-next-what" className="text-callout text-foreground">
 					<MathText>{next.on ? `${next.verb} ${next.what}, ${planDay(next.on)}` : next.what}</MathText>
 				</p>
 			</div>

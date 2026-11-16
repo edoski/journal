@@ -195,9 +195,9 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 				<div data-slot="cheat-sheet-columns" className="columns-2 gap-8">
 					{cheatSheetSections().map(({ label, actions }) => (
 						<section key={label} aria-label={label} className="flex break-inside-avoid flex-col pb-4 last:pb-0">
-							<h3 className="flex h-7 items-center text-callout system-current:text-label system-current:font-medium text-muted-foreground">{label}</h3>
+							<h3 className="flex h-7 items-center text-callout text-muted-foreground">{label}</h3>
 							{actions.map((a) => (
-								<div key={a.id} data-slot="cheat-sheet-row" className="flex min-h-8 items-center justify-between gap-4 py-1.5 text-body system-current:text-row">
+								<div key={a.id} data-slot="cheat-sheet-row" className="flex min-h-8 items-center justify-between gap-4 py-1.5 text-body">
 									<span className="min-w-0 text-pretty text-foreground">{a.label}</span>
 									<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
 								</div>

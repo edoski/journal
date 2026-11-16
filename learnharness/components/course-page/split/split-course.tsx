@@ -111,7 +111,7 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 				<CourseHead view={view} standing={standing} busy={busy} onContinue={onContinue} />
 			</div>
 			{map.topics.length === 0 ? (
-				<p data-slot="course-notice" className="flex min-h-8 items-center text-body system-current:text-row text-muted-foreground">
+				<p data-slot="course-notice" className="flex min-h-8 items-center text-body text-muted-foreground">
 					Topics appear as you study this course.
 				</p>
 			) : (

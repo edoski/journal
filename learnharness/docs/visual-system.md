@@ -4,7 +4,7 @@ The app's visual system on one page: what every page draws with, where each valu
 
 ## Type
 
-**Proposed (the Visual system switch): macOS's own text styles,** as Apple publishes them for macOS (Apple HIG, Typography, "macOS built-in text styles", developer.apple.com/design/human-interface-guidelines/typography): size, line height and weight, nothing of our own. Tokens in `app/globals.css` (`@theme`, `--text-*`), only the styles the app uses.
+**macOS's own text styles,** as Apple publishes them for macOS (Apple HIG, Typography, "macOS built-in text styles", developer.apple.com/design/human-interface-guidelines/typography): size, line height and weight, nothing of our own. Tokens in `app/globals.css` (`@theme`, `--text-*`), only the styles the app uses.
 
 | Token | Apple style | Size / line / weight | Job |
 |---|---|---|---|
@@ -19,27 +19,12 @@ The app's visual system on one page: what every page draws with, where each valu
 
 Weight comes with the style, never from a `font-*` class: emphasis is Headline, and meta that was 500 is Callout at 400 with its ink saying the rest. A map card's title is Body, since Headline's bold cut the current topic's name on its fixed card. Lesson prose stays at his reading size (`text-prose`, Settings), and its markdown headings, tables and KaTeX are the prose's own.
 
-**How the switch works.** Each use names its macOS style and keeps Current's classes under the `system-current:` variant (`text-body system-current:text-row system-current:font-medium`), which applies while `<html>` has no `data-polish-system="proposed"`, so production draws Current. Tokens alone could not switch it: Current's styles fold into macOS's unevenly (14/500 is Body for nav and Headline for a title), and Tailwind's `font-medium` is one number for every role. Shipping deletes every `system-current:` class and the variant: a deletion diff.
-
-**Current:** one name per job, two weights in the chrome, 400 and 500.
-
-| Token | Size / line | Job |
-|---|---|---|
-| `text-caption` | 11 / 14 | a map card's line, "You are here" (500) |
-| `text-label` | 12 / 16 | meta: a row's course line, its standing, slip and reason, a page's eyebrow |
-| `text-row` | 13 / 18 | a topic's title on the map and the course page, page facts, tabs |
-| `text-control` | 14 / 20 | a lesson's title on Today and the sidebar, a page's lead |
-| `text-prose` | 16 / 26 | lesson prose |
-| `text-subheading` | 18 / 24 | a dialog's title (600, shadcn's `DialogTitle`) |
-| `text-heading` | 20 / 26 | a page's title and Home's question (500) |
-| `text-display` | 30 / 36 | the composer's question |
-
-The older `text-xs`…`text-3xl` names resolve to the same sizes (`--lh-text-*`). Maths renders at 1.1em (KaTeX).
+**Shipped** (Edo, 17 Nov 2026: "Ship it"): the Visual system switch and Current's type are deleted, and every use names its macOS style. The older names (`text-caption`, `text-label`, `text-row`, `text-control`, `text-subheading`, `text-heading`, `text-display`, and `text-xs`…`text-3xl` through `--lh-text-*`) remain only where no switch ever named a macOS style; a new use takes a macOS style. Maths renders at 1.1em (KaTeX).
 
 ## Space, corners, surfaces
 
 - **Space:** Tailwind's 4px steps; the app uses 2, 4, 6, 8, 12, 16, 20, 24, 32. A row's icon to its words is 6 (a 14 mark) or 4 (a 12 mark); a page's head to its body is 20.
-- **Corners** (`--radius-*`): 8 for controls and every row with a hover fill (nav, sidebar, course page, Settings, Home's Today on Proposed); 12 for cards and dialogs (map nodes, Settings); 16 and 20 on the lesson's composer and message bubbles.
+- **Corners** (`--radius-*`): 8 for controls and every row with a hover fill (nav, sidebar, course page, Settings, Home's Today); 12 for cards and dialogs (map nodes, Settings); 16 and 20 on the lesson's composer and message bubbles.
 - **Surfaces:** the background, the sidebar, `card` with a 1px `border` (map nodes, dialogs). Rows have no surface at rest, a `fill-hover` on hover, and a 1px `border` hairline at 50% between them.
 
 ## Rows
@@ -48,7 +33,7 @@ The older `text-xs`…`text-3xl` names resolve to the same sizes (`--lh-text-*`)
 |---|---|---|---|
 | nav | 32 | 16 icon, 8, words | `nav/nav-row.tsx` |
 | course page topic | 32 (36 roomy) | pie 16, 16, title, fact at the end | `course-page/course-topic-row.tsx` |
-| Today | 64 | course ring (on the Visual system's Proposed, the course's badge on the course line, `CourseMark`), two lines; standing column (Proposed); reason column flush right | `study-home/agenda-rows/hybrid` |
+| Today | 64 | the course's badge (`CourseBadge`) beside two lines; standing column; reason column flush right | `study-home/agenda-rows/hybrid` |
 | sidebar card | 60 or 80 | course badge, course and status, title | `unit-inbox/row-card.tsx` |
 | Settings nav | 32, 2 apart | words | `settings/settings-dialog.tsx` |
 

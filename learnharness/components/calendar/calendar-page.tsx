@@ -23,7 +23,7 @@ export function CalendarPage() {
 	if (read.status !== "ready") {
 		return (
 			<div className="flex h-dvh items-center justify-center px-6">
-				{read.status === "loading" ? <p className="text-body system-current:text-row text-muted-foreground">Reading your courses…</p> : <CoursesUnavailable reason={read.reason} />}
+				{read.status === "loading" ? <p className="text-body text-muted-foreground">Reading your courses…</p> : <CoursesUnavailable reason={read.reason} />}
 			</div>
 		);
 	}
@@ -41,7 +41,7 @@ export function CalendarPage() {
 				onStart={lesson.start}
 			/>
 			{lesson.error && (
-				<p role="alert" className="absolute bottom-4 left-1/2 -translate-x-1/2 text-body system-current:text-row text-danger">
+				<p role="alert" className="absolute bottom-4 left-1/2 -translate-x-1/2 text-body text-danger">
 					{lesson.error}
 				</p>
 			)}

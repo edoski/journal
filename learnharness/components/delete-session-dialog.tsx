@@ -120,15 +120,15 @@ export function DeleteSessionBody({
 		<AlertDialogContent data-testid="delete-session-dialog">
 			<AlertDialogHeader>
 				<AlertDialogTitle>Delete this lesson?</AlertDialogTitle>
-				<p data-testid="session-name-code" className="text-headline system-current:text-control system-current:font-medium text-foreground">
+				<p data-testid="session-name-code" className="text-headline text-foreground">
 					{chat.title}
 				</p>
 				<AlertDialogDescription>Its messages are deleted for good. What you learned in it stays in your course.</AlertDialogDescription>
 			</AlertDialogHeader>
 			{failure && (
-				<p role="alert" data-testid="delete-failure" className="text-body system-current:text-row text-danger">
+				<p role="alert" data-testid="delete-failure" className="text-body text-danger">
 					{FAILURE_WORDS[failure.code] ?? failure.error}{" "}
-					<Button type="button" variant="link" data-testid="delete-retry" onClick={onRun} disabled={busy} className="h-auto p-0 text-body system-current:text-row font-normal system-current:font-normal text-foreground underline-offset-2">
+					<Button type="button" variant="link" data-testid="delete-retry" onClick={onRun} disabled={busy} className="h-auto p-0 text-body font-normal text-foreground underline-offset-2">
 						Try again
 					</Button>
 				</p>

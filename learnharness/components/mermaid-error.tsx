@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 function DiagramSource({ chart }: { chart: string }) {
 	return (
 		<Collapsible className="mt-3">
-			<CollapsibleTrigger className="-mx-1 rounded-md px-1 text-body system-current:text-row text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground motion-reduce:transition-none">
+			<CollapsibleTrigger className="-mx-1 rounded-md px-1 text-body text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground motion-reduce:transition-none">
 				Show diagram source
 			</CollapsibleTrigger>
 			<CollapsibleContent>
@@ -38,7 +38,7 @@ export const MermaidError = ({
 		)}
 		data-streamdown="mermaid-error"
 	>
-		<p className="text-headline system-current:text-sm system-current:font-medium text-destructive">
+		<p className="text-headline text-destructive">
 			Diagram failed to render
 		</p>
 		<p className="mt-1 font-mono text-xs break-words text-muted-foreground">

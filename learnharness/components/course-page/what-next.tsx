@@ -20,7 +20,7 @@ export const THEN_WORDS = "Then";
 
 /** Today's hybrid row (../study-home/agenda-rows/hybrid/hybrid.md): the
  *  pie beside two lines, each line's end flush right. */
-const ROW = "-mx-3 flex h-14 w-[calc(100%+1.5rem)] items-center gap-4 rounded-lg px-3 text-left font-normal system-current:font-normal whitespace-normal";
+const ROW = "-mx-3 flex h-14 w-[calc(100%+1.5rem)] items-center gap-4 rounded-lg px-3 text-left font-normal whitespace-normal";
 const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
 
 /** A row's two lines: what the row is and why now (the reason's icon and
@@ -30,14 +30,14 @@ function Lines({ label, why, title, arc }: { label: string; why: Why | null; tit
 	return (
 		<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 			<span className="flex min-w-0 items-center gap-3">
-				<span className="shrink-0 text-callout system-current:text-label text-muted-foreground">{label}</span>
+				<span className="shrink-0 text-callout text-muted-foreground">{label}</span>
 				{/* The line holds only the label and the reason, so the reason takes the line, past Today's row cap. */}
 				<span className="ml-auto flex min-w-0 justify-end [&>*]:min-w-0 [&_[data-slot=today-why]]:max-w-full">
 					<WhyMark why={why} />
 				</span>
 			</span>
 			<span className="flex min-w-0 items-center gap-3">
-				<MathLine className="min-w-0 flex-1 text-headline system-current:text-row system-current:font-medium text-foreground">{title}</MathLine>
+				<MathLine className="min-w-0 flex-1 text-headline text-foreground">{title}</MathLine>
 				{arc && <ArcPill arc={arc} className="max-w-3/5 shrink-0" />}
 			</span>
 		</span>

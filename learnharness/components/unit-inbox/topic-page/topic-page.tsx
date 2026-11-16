@@ -73,7 +73,7 @@ export function TopicPage({
 export function TopicNotice({ children }: { children: React.ReactNode }) {
 	return (
 		<PageFrame>
-			<p data-slot="topic-notice" className="flex min-h-8 items-center text-body system-current:text-row text-muted-foreground">
+			<p data-slot="topic-notice" className="flex min-h-8 items-center text-body text-muted-foreground">
 				{children}
 			</p>
 		</PageFrame>

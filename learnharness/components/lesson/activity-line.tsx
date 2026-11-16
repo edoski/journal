@@ -5,7 +5,7 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
  *  Shimmering text only; no spinner, no tool arguments. */
 export function ActivityLine({ label, testId }: { label: string; testId?: string }) {
 	return (
-		<div data-slot="activity-line" data-testid={testId} role="status" className="flex h-6 items-center text-body system-current:text-row">
+		<div data-slot="activity-line" data-testid={testId} role="status" className="flex h-6 items-center text-body">
 			<Shimmer as="span" duration={1.6}>{label}</Shimmer>
 		</div>
 	);

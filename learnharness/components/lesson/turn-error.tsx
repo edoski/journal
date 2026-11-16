@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { turnErrorText } from "./turn-error-text";
 
-const ACTION = "h-8 px-2 text-body system-current:text-row";
+const ACTION = "h-8 px-2 text-body";
 
 /** A failed reply under the Proposed design (spec: turn-error.md): one plain
  *  sentence in the danger colour, then Retry, Sign in for a signed-out
@@ -35,19 +35,19 @@ export function TurnError({ message, again = false, kept = false, onRetry, retry
 	const [open, setOpen] = useState(false);
 	const detailsId = useId();
 	return (
-		<div role="alert" data-testid="turn-error" data-kind={text.kind} className={cn("flex flex-wrap items-center gap-1 text-body system-current:text-row", again && "lh-card-enter")}>
+		<div role="alert" data-testid="turn-error" data-kind={text.kind} className={cn("flex flex-wrap items-center gap-1 text-body", again && "lh-card-enter")}>
 			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">
 				{text.sentence}
 				{text.then === "sign-in-retry" && (onRetry ? " Sign in, then press Retry." : " Sign in, then send again.")}
 			</span>
 			{children}
 			{onRetry && text.kind !== "gone" && (
-				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "system-current:font-medium text-foreground")}>
+				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "text-foreground")}>
 					{retryLabel}
 				</Button>
 			)}
 			{text.kind === "signed-out" && onSignIn && (
-				<Button variant="quiet" size="sm" data-testid="turn-error-sign-in" onClick={onSignIn} className={cn(ACTION, "system-current:font-medium text-foreground")}>
+				<Button variant="quiet" size="sm" data-testid="turn-error-sign-in" onClick={onSignIn} className={cn(ACTION, "text-foreground")}>
 					Sign in to Claude
 				</Button>
 			)}
@@ -57,7 +57,7 @@ export function TurnError({ message, again = false, kept = false, onRetry, retry
 				</Button>
 			)}
 			{text.kind === "gone" && (
-				<Button asChild variant="quiet" size="sm" data-testid="turn-error-home" className={cn(ACTION, "system-current:font-medium text-foreground")}>
+				<Button asChild variant="quiet" size="sm" data-testid="turn-error-home" className={cn(ACTION, "text-foreground")}>
 					<Link href="/">Go to Home</Link>
 				</Button>
 			)}

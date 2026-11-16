@@ -95,7 +95,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 	const { status } = line;
 	const reason =
 		status?.kind === "standing" ? (
-			<span data-slot="why-mark" data-kind="standing" className="contents text-callout system-current:text-label text-muted-foreground">
+			<span data-slot="why-mark" data-kind="standing" className="contents text-callout text-muted-foreground">
 				<span className="flex h-4 shrink-0 items-center">
 					<TopicGlyph standing={status.facts.standing} className="size-3" />
 				</span>

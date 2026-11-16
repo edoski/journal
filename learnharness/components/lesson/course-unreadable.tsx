@@ -48,7 +48,7 @@ export function CourseUnreadableLine({ workspace }: { workspace: string | undefi
 	const problem = useUnreadable(workspace);
 	if (!problem) return null;
 	return (
-		<p role="status" data-testid="course-unreadable" className="text-body system-current:text-row text-muted-foreground">
+		<p role="status" data-testid="course-unreadable" className="text-body text-muted-foreground">
 			{unreadableLine(problem)} {LESSON_WORDS.unreadableNotSaved}
 		</p>
 	);

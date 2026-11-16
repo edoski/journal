@@ -1543,7 +1543,7 @@ export function Chat({
 									onBlur={() => void commitRename(titleDraft)}
 									spellCheck={false}
 									aria-label="Session title"
-									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-headline system-current:text-control system-current:font-medium text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
+									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-headline text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
 								/>
 							) : topicCrumb && !topicCrumbShown(topicCrumb.title, titleText) ? null : (
 								<Hint label="Rename session" action="rename-session" side="bottom">
@@ -1553,7 +1553,7 @@ export function Chat({
 											setTitleDraft(titleText);
 											setRenaming(true);
 										}}
-										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-headline system-current:text-control system-current:font-medium text-inherit hover:text-inherit"
+										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-headline text-inherit hover:text-inherit"
 									>
 										{titleText}
 									</Button>
@@ -1775,7 +1775,7 @@ export function Chat({
 							    fallback. Never collapsible itself. */}
 							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : idleLine} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
-							{openingError && <p role="alert" className="text-body system-current:text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
+							{openingError && <p role="alert" className="text-body text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
@@ -2041,7 +2041,7 @@ function DockOverlay({
 						    lands (visibleQueuedSteers). */}
 						<QueuedSteersBody steers={queuedSteers} />
 						{overtakenLine && (
-							<p data-testid="answered-elsewhere" className="px-4 pb-2 text-body system-current:text-row text-muted-foreground">{overtakenLine}</p>
+							<p data-testid="answered-elsewhere" className="px-4 pb-2 text-body text-muted-foreground">{overtakenLine}</p>
 						)}
 						{/* No clip around it: the composer draws its own 16px outline,
 						    and a wrapper's larger rounded clip cut its corners. */}

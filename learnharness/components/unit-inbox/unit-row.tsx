@@ -30,7 +30,7 @@ export function CourseMark({ title, className }: { title: string; className?: st
 			aria-hidden
 			data-slot="course-mark"
 			className={cn(
-				"flex size-4 shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-sans text-caption-2 system-current:text-[9px] system-current:font-medium leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
+				"flex size-4 shrink-0 items-center justify-center rounded-[25%] bg-current/14 font-sans text-caption-2 leading-none text-muted-foreground transition-[opacity,filter] motion-reduce:transition-none",
 				className,
 			)}
 		>
@@ -217,12 +217,12 @@ export function SessionSlimRow({
 					className={cn(
 						ROW_TITLE,
 						active || state === "your-turn" ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground",
-						state === "your-turn" && "system-current:font-medium",
+						state === "your-turn" && "",
 					)}
 				>
 					<MathText>{chat.title}</MathText>
 					{twin && (
-						<span data-slot="session-twin" className="ml-1.5 text-callout system-current:text-label font-normal system-current:font-normal whitespace-nowrap text-muted-foreground">
+						<span data-slot="session-twin" className="ml-1.5 text-callout font-normal whitespace-nowrap text-muted-foreground">
 							<span className="sr-only">, </span>
 							{twin}
 						</span>
