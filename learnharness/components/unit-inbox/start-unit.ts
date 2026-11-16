@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SessionStarter, type SessionCreation } from "@/components/start-session";
 import type { Unit } from "@/components/unit-inbox/units";
 import { topicOpening } from "@/src/core";
+import { examGapAsk } from "@/components/study-words";
 
 /** The row action that starts a session on a unit, worded as the course map's. */
 export const STUDY_WORDS = "Study";
@@ -46,6 +47,18 @@ export function topicCreation(workspace: string, topic: Pick<Unit["topic"], "tit
 export function useStartUnit(): { start: (unit: StartableUnit) => void; starting: string | null } {
 	const { start, starting } = useStartSession();
 	return { start: useCallback((unit: StartableUnit) => start(unit.key, topicCreation(unit.course.workspace, unit.topic, unit.course.today)), [start]), starting };
+}
+
+/** The name of the session Ask the tutor opens from a course head that
+ *  warns of topics with no room before the exam. */
+export const EXAM_GAP_NAME = "Fitting the exam's topics in";
+
+/** The session Ask the tutor opens from such a head: his question as its
+ *  opening, linked to the topics it names, under a short name of its own,
+ *  never the question (round 11, 1 N14: the breadcrumb read "My exam plan
+ *  has no room for Geometric distribution, Expectation and…"). Pure. */
+export function examGapAskCreation(workspace: string, titles: readonly string[], topics: readonly string[]): SessionCreation {
+	return { title: examGapAsk(titles), name: EXAM_GAP_NAME, course: { workspace }, topics: [...topics] };
 }
 
 /** The session a Check it press creates (spec: course-page.md, "Arcs"):
