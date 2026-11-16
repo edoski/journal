@@ -61,7 +61,7 @@ const RESULT = {
 	wrong: { Icon: CircleXIcon, words: ATTEMPT_WORDS.wrong },
 } as const;
 
-/** One scored attempt: how it went and the tutor's sentence. Not a
+/** One scored attempt: how it went and the tutor's sentence, whole. Not a
  *  control. The icon sits on the first line, and the sentence and the
  *  date share its baseline. Given `date`, it carries the date column. */
 export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt: TopicAttempt; title?: string; titleOf: (handle: string) => string; ends: Ends; date?: string | null }) {
@@ -70,10 +70,11 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 	return (
 		<li data-slot="topic-attempt" data-result={result} className={cn("grid min-h-10 items-baseline gap-x-4 gap-y-0.5 py-2.75", GUTTER, date === undefined ? "grid-cols-[1rem_minmax(0,1fr)]" : DATED, spine(ends))}>
 			<Icon role="img" aria-label={how ? `${words}, ${how}` : words} className={cn(ICON, "mt-px self-start")} />
-			{/* Each formula is one box (round 13, 2 n1): one that does not fit
-			    goes to the hidden line whole, never leaving its exponents
-			    above the cut without their bases. */}
-			<p data-slot="topic-attempt-text" className={cn("line-clamp-2 text-body system-current:text-row text-muted-foreground [&_.katex]:inline-block", date !== undefined && "col-span-2")}>
+			{/* The sentence wraps whole (round 13, 1 n11: "…4, n…" cut in the
+			    320px column beside an empty half-pane); Earlier moves the days
+			    that do not fit behind "Show the rest". Each formula is one box
+			    (round 13, 2 n1), so a line never breaks inside one. */}
+			<p data-slot="topic-attempt-text" className={cn("text-body system-current:text-row text-muted-foreground [&_.katex]:inline-block", date !== undefined && "col-span-2")}>
 				<LineText>{title ?? attempt.text}</LineText>
 			</p>
 			{date !== undefined && <DateCell date={date} />}
