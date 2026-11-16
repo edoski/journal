@@ -42,9 +42,9 @@
   "starts": {
     "invertibility": "2026-11-13",
     "change-basis": "2026-11-18",
-    "inner-product": "2026-11-20",
-    "projection": "2026-11-23",
-    "diagonalization": "2026-11-25"
+    "inner-product": "2026-11-19",
+    "diagonalization": "2026-11-20",
+    "projection": "2026-11-23"
   },
   "starts_why": {
     "invertibility": {
@@ -63,20 +63,21 @@
     },
     "inner-product": {
       "arc": "orthogonality",
-      "kind": "next"
+      "kind": "early",
+      "behind": "eigenvalues"
+    },
+    "diagonalization": {
+      "arc": "eigenvalues",
+      "kind": "after",
+      "needs": [
+        "eigen"
+      ]
     },
     "projection": {
       "arc": "orthogonality",
       "kind": "after",
       "needs": [
         "inner-product"
-      ]
-    },
-    "diagonalization": {
-      "arc": "eigenvalues",
-      "kind": "after",
-      "needs": [
-        "change-basis"
       ]
     }
   },

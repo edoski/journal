@@ -41,7 +41,7 @@
   "due_later_more": 4,
   "starts": {
     "invertibility": "2026-11-13",
-    "inner-product": "2026-11-19",
+    "inner-product": "2026-11-18",
     "projection": "2026-11-20",
     "change-basis": "2026-11-25",
     "diagonalization": "2026-11-26"
@@ -54,7 +54,7 @@
       ]
     },
     "inner-product": {
-      "kind": "next"
+      "kind": "early"
     },
     "projection": {
       "kind": "after",

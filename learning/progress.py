@@ -1016,6 +1016,18 @@ def opens(
     return key == front or bool(needs(record, key))
 
 
+def stood_on(
+    record: dict[str, Any], ready: list[str], untaught: Collection[str]
+) -> list[str]:
+    """``ready`` with the topics another of ``untaught`` needs first, each
+    group in its own order: within a final review a start is late, and one
+    the rest of the exam stands on keeps more of it open than one nothing
+    needs (round 11: the Probability exam's eve started Poisson, first in
+    the path, while Expectation, which Variance needs, never fit)."""
+    needed = {need for key in untaught for need in needs(record, key)}
+    return sorted(ready, key=lambda key: key not in needed)
+
+
 def holding_raises(
     left: int, rest: int, before: int, room: float | None = None
 ) -> bool:

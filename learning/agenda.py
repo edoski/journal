@@ -1018,8 +1018,9 @@ def _new(
         second: bool = False,
     ) -> int:
         """Up to ``count`` ready topics of ``among`` in path order from the
-        window (``_Course.opens``; all of them when not ``bound``), those
-        related to one it starts today first: a second topic on one day builds
+        window (``_Course.opens``; all of them when not ``bound``), within a
+        final review those the exam's other untaught topics need first, and
+        those related to one it starts today first: a second topic on one day builds
         on what the first does, within the arc it would take anyway, so a
         later arc's topic never passes the earlier arc's next one for sharing
         a prerequisite. A ``second`` takes only such a topic, or none. The
@@ -1031,8 +1032,9 @@ def _new(
             front = course.front(among if pool is None else pool)
             # Ready topics go in path order, arc by arc, so a strand later in
             # the path gives one only when no earlier arc in the window has one
-            # ready. capacity._opened mirrors this order: change the two
-            # together.
+            # ready; within a final review, one the exam's other untaught
+            # topics need goes first (``progress.stood_on``).
+            # capacity._opened mirrors this order: change the two together.
             ready = [
                 topic
                 for topic in course.untaught
@@ -1041,6 +1043,8 @@ def _new(
                 and course.ready(topic)
                 and (not bound or course.opens(topic, front))
             ]
+            if course.reviewing(day):
+                ready = progress.stood_on(course.record, ready, course.scoped)
             if not ready:
                 break
             near = [

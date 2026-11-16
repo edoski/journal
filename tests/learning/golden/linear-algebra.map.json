@@ -294,9 +294,9 @@
       ],
       "contrasts": [],
       "level": "new",
-      "starts": "2026-11-19",
+      "starts": "2026-11-18",
       "starts_why": {
-        "kind": "next"
+        "kind": "early"
       },
       "weak": false,
       "tasks": []

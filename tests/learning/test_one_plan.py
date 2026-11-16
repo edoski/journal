@@ -232,3 +232,23 @@ def test_a_moved_day_names_the_day_he_was_told(
     }
     assert {why["by"] for why in moved.values()} == {"missed"}
     assert {why["on"] for why in moved.values()} == {"2026-11-10"}
+
+
+def test_the_exam_eve_starts_what_the_rest_of_the_exam_stands_on(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Two days before the Probability exam, its final review has room for
+    one start: Expectation, which Variance needs, not Poisson, which nothing
+    on the exam needs and which comes first in the path (round 11, 1 N6)."""
+    world = World(tmp_path, "day-after", monkeypatch, capsys)
+    days = world.plan("2026-11-17")["probability"]["plan"]
+    starts = [
+        topic
+        for day in days["days"]
+        for topic in day["new"]
+        if day["date"] < "2026-11-19"
+    ]
+    assert starts == ["expectation"]
+    assert "expectation" not in days.get("does_not_fit", [])
