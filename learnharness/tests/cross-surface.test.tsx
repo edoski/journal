@@ -285,7 +285,11 @@ function openTasks(app: DemoApp, s: Survey): Array<{ course: CalendarCourse; tas
 	);
 }
 
+/** Whether a link opens a session's chat, however it asks the chat to open. */
+const opensChat = (href: string | null | undefined, id: string) => href?.split("?")[0] === `/chat/${id}`;
+
 async function assertContinueOpensTask(app: DemoApp, s: Survey) {
+	const { continueHref } = await import("../components/nav/session-state.ts");
 	const problems: string[] = [];
 	// The session list credits a session with a task only when its own saves opened it (round 12, 1 D1: a
 	// close that moved the course's focus to the sheet made the Eigen lesson hold it, and Continue opened it).
@@ -300,20 +304,22 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 		}
 	}
 	for (const { course, task, holder } of openTasks(app, s)) {
-		const want = holder ? `/chat/${holder.id}` : NEW_SESSION;
+		// Its session, asked to take the task up when it can (`continueHref`, round 13, 2 M1: Continue on sheet 4 opened the
+		// chat and the tutor never went on to part (c)).
+		const want = holder ? continueHref(holder) : NEW_SESSION;
 		const went = (surface: string, to: string | null) => {
-			if (to !== want) problems.push(`Continue ${task.title} on ${surface} opens ${to ?? "nothing"}, not ${holder ? `its session ${holder.id}` : "a new session"}`);
+			if (to !== want) problems.push(`Continue ${task.title} on ${surface} opens ${to ?? "nothing"}, not ${holder ? `its session, ${want}` : "a new session"}`);
 		};
 		let offered = false;
 		// Home and the sidebar.
 		if (!document.querySelector('[data-slot="study-home"]')) await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 });
-		const line = app.homeLines().find((l) => l.title === `Continue ${task.title}` || (holder && l.el.getAttribute("href") === `/chat/${holder.id}`));
+		const line = app.homeLines().find((l) => l.title === `Continue ${task.title}` || (holder && opensChat(l.el.getAttribute("href"), holder.id)));
 		if (line) {
 			offered = true;
 			went("Home", await app.lookAt(line.el));
 		}
 		const card = app.sidebarCards().find(
-			(c) => c.title === `Continue ${task.title}` || c.title === task.title || (holder && c.el.querySelector('[data-slot="row-action"]')?.getAttribute("href") === `/chat/${holder.id}`),
+			(c) => c.title === `Continue ${task.title}` || c.title === task.title || (holder && opensChat(c.el.querySelector('[data-slot="row-action"]')?.getAttribute("href"), holder.id)),
 		);
 		const action = card?.el.querySelector('[data-slot="row-action"]');
 		if (action) {
@@ -325,7 +331,7 @@ async function assertContinueOpensTask(app: DemoApp, s: Survey) {
 			const titles = new Set([task.title, `Continue ${task.title}`, ...(task.topics ?? []).map((h) => course.map.topics.find((t) => t.handle === h)?.title ?? h)]);
 			for (const c of app.sidebarCards()) {
 				const a = c.el.querySelector('[data-slot="row-action"]');
-				if (a?.getAttribute("href") === `/chat/${holder.id}` && !titles.has(c.title)) problems.push(`the sidebar files ${task.title}'s session under "${c.title}"${c.shelf ? ` (${c.shelf})` : ""}, a topic the task does not hold`);
+				if (opensChat(a?.getAttribute("href"), holder.id) && !titles.has(c.title)) problems.push(`the sidebar files ${task.title}'s session under "${c.title}"${c.shelf ? ` (${c.shelf})` : ""}, a topic the task does not hold`);
 			}
 		}
 		// Its topic pages.
