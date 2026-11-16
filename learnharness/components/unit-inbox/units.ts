@@ -234,16 +234,22 @@ export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string):
 
 /** A topic row's one status. `live`, the lesson open on the page while it
  *  waits on him or the tutor writes (`liveChat`), gives its own topic's
- *  card "Your turn" ahead of a slip. Pure. */
-export function unitStatus(unit: Unit, today: string, live: string | null = null): UnitStatus {
+ *  card "Your turn" ahead of a slip. `asked`: Today reviews the topic
+ *  (`plannedKeys`). Pure. */
+export function unitStatus(unit: Unit, today: string, live: string | null = null, asked = false): UnitStatus {
 	const { topic } = unit;
 	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
 	// The lesson he is on says it waits on him, on its own topic's card, while it does (round 11, 3 n4: "Mistake to fix" while a question waited).
 	if (live && (unit.now === "your-turn" || unit.now === "working") && unit.sessions.some((c) => c.id === live && ownsTopic(c, topic.handle))) return { kind: unit.now };
 	// A wrong answer still open outranks a session that waits on him or
 	// was left for next time (round 8: Eigen's mistake hid behind "Left for
-	// next time"; round 9, 3 m13: Determinants' behind "Your turn").
-	if (slip && topic.signals.mistake && unit.now !== "working") return slip;
+	// next time"; round 9, 3 m13: Determinants' behind "Your turn"), except
+	// a lesson he left today with the mistake for its next session while
+	// Today does not review the topic: Home has no line for it and the close
+	// said where he picks up, so it says it is left off, never "Mistake to
+	// fix" while Today asks nothing (round 13, 3 N4).
+	const leftToday = unit.now === "left" && unit.sessions.some((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left" && dayOf(c.updatedAt) >= today);
+	if (slip && topic.signals.mistake && unit.now !== "working" && !(leftToday && !asked)) return slip;
 	if (unit.now === "left") {
 		const left = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left");
 		return { kind: "task", words: left ? leftWords(left, today) : leftOffWords(null, today) };
