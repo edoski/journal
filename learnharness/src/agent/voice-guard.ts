@@ -247,6 +247,29 @@ const RULING_WORDS = (slip: string): AgentToolResult<unknown> => ({
 	details: { withheld: "card-words" },
 });
 
+/** A ruling as the reply and the card compare it: case, spacing and the
+ *  closing stop aside. Whether `message` says `ruling` word for word. */
+function sameRuling(message: string, ruling: string): boolean {
+	const plain = (t: string) => t.toLowerCase().replace(/\s+/g, " ").replace(/[.\s]+$/, "").trim();
+	const said = plain(ruling);
+	return said.length > 0 && plain(message).includes(said);
+}
+
+/** His card's Disputed stamp shows the saved ruling: the reply tells him
+ *  the same words (round 13, 2 n6: the reply said "so the answer counts as
+ *  given after help", the stamp "so your answer came after help on the
+ *  very part that was missing"). */
+const RULING_SAID = (ruling: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not shown to him: his answer card shows the ruling you saved, "${ruling}", and your reply words it differently, so he would read two rulings. Send your ruling as you saved it, word for word.` }],
+	isError: true,
+	details: { withheld: "ruling-said" },
+});
+const RULING_UNSAID = (ruling: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not saved: his answer card shows \`ruling\` as his Disputed stamp, and "${ruling}" words it differently from the ruling you told him, so he would read two rulings. Send the save again with \`ruling\` the words you told him, word for word.` }],
+	isError: true,
+	details: { withheld: "ruling-said" },
+});
+
 const DEMO_TOOL = "demo";
 
 /** Words that point at a demo or its controls. */
@@ -631,6 +654,10 @@ export class VoiceGuard {
 	private building = false;
 	/** The last message shown this turn ended on a question. */
 	private lastAsked = false;
+	/** The rulings this turn saved, and whether a reply or a save that
+	 *  worded one differently was held back (once a turn). */
+	private readonly rulings: string[] = [];
+	private heldRulingSaid = false;
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -758,6 +785,11 @@ export class VoiceGuard {
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
 			if (this.lastAsked && !this.owed) return AFTER_ASKING(text);
+			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
+			if (ruled) {
+				this.heldRulingSaid = true;
+				return RULING_SAID(this.rulings[0]!);
+			}
 			const kind = this.messageKind();
 			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
@@ -782,12 +814,19 @@ export class VoiceGuard {
 			if (!refused) this.building = true;
 			return refused;
 		}
-		if (call.name === SAVE_TOOL && this.input.ruling && !this.heldRuling) {
-			const slip = savedRulings(call.arguments).map(recordConfidenceWord).find(Boolean);
+		if (call.name === SAVE_TOOL && this.input.ruling) {
+			const rulings = savedRulings(call.arguments);
+			const unsaid = this.sent > 0 && !this.heldRulingSaid ? rulings.find((r) => !this.said.some((t) => sameRuling(t, r))) : undefined;
+			if (unsaid) {
+				this.heldRulingSaid = true;
+				return RULING_UNSAID(unsaid);
+			}
+			const slip = this.heldRuling ? undefined : rulings.map(recordConfidenceWord).find(Boolean);
 			if (slip) {
 				this.heldRuling = true;
 				return RULING_WORDS(slip);
 			}
+			this.rulings.push(...rulings);
 		}
 		if (this.probeEnded && (QUESTION_TOOLS as readonly string[]).includes(call.name)) return ASKED_AFTER_PROBE(questionText(call) ?? "");
 		// A question beside a refused message is read by its own rules and
