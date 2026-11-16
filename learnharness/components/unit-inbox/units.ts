@@ -222,9 +222,14 @@ export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string):
 	return leftOffWords(Math.max(0, daysBetween(dayOf(chat.updatedAt), today)), today);
 }
 
-export function unitStatus(unit: Unit, today: string): UnitStatus {
+/** A topic row's one status. `live`, the lesson open on the page while it
+ *  waits on him or the tutor writes (`liveChat`), gives its own topic's
+ *  card "Your turn" ahead of a slip. Pure. */
+export function unitStatus(unit: Unit, today: string, live: string | null = null): UnitStatus {
 	const { topic } = unit;
 	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
+	// The lesson he is on says it waits on him, on its own topic's card, while it does (round 11, 3 n4: "Mistake to fix" while a question waited).
+	if (live && (unit.now === "your-turn" || unit.now === "working") && unit.sessions.some((c) => c.id === live && ownsTopic(c, topic.handle))) return { kind: unit.now };
 	// A wrong answer still open outranks a session that waits on him or
 	// was left for next time (round 8: Eigen's mistake hid behind "Left for
 	// next time"; round 9, 3 m13: Determinants' behind "Your turn").
