@@ -100,6 +100,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// the app says when the record can't be read (round 12, 4 minor 2: "so
 	// it stays unsaved", of an answer saved on 4 Nov).
 	{ rule: "unsaved", re: /\bunsaved\b|\b(?:is|are|was|were|stays?|remains?)(?: still)? not (?:yet )?(?:saved|recorded|kept)\b|\b(?:isn't|aren't|wasn't|weren't)(?: yet)? (?:saved|recorded|kept)\b|\b(?:can't|cannot|couldn't|could not) be (?:saved|recorded|kept)\b/i },
+	// The open question is above him, never below (round 13, 4 minor 1:
+	// "the question is still open below", over "Your turn, on the question
+	// above").
+	{ rule: "reprint", re: /\b(?:still|stays|remains) (?:open )?below\b|\bopen below\b/i },
 	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
 ];
 
