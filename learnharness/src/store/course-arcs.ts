@@ -89,6 +89,8 @@ export function startsWhyOf(value: unknown, listed: ReadonlySet<string>, arcOf: 
 	const at = arc ? { arc } : {};
 	const handles = (v: unknown) => strings(v).filter((h) => listed.has(h)) as TopicHandle[];
 	switch (w.kind) {
+		case "begun":
+			return { kind: "begun", ...at };
 		case "next":
 			return { kind: "next", ...at };
 		case "after":

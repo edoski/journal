@@ -19,10 +19,11 @@ export const WHY_ICON: Record<Why["kind"], LucideIcon> = {
 	next: ArrowRightIcon,
 };
 
-/** Why a new topic starts now, one icon each: next in its arc, the
- *  arrow; after what it needs, a turn that follows on; early, ahead of
- *  its place. */
+/** Why a new topic starts now, one icon each: a lesson he began, the
+ *  bookmark of work left open; next in its arc, the arrow; after what it
+ *  needs, a turn that follows on; early, ahead of its place. */
 export const STARTS_ICON: Record<StartsWhy["kind"], LucideIcon> = {
+	begun: BookmarkIcon,
 	next: ArrowRightIcon,
 	after: CornerDownRightIcon,
 	early: FastForwardIcon,

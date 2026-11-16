@@ -4,6 +4,7 @@ import { continueMove, sessionState, type SessionState } from "@/components/nav/
 import { SOLID, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { localDay } from "@/components/day-change";
+import { lessonBegun } from "@/components/study-words";
 
 /** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
  *  in order, joined by commas only, since a title may hold its own "and"
@@ -79,8 +80,9 @@ export function todaySteps(course: StudyCourse): NextStep[] {
 		steps.push({ kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] });
 	}
 	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
-	if (planned.length > 0) {
-		steps.push({ kind: "topic", title: titleList(planned.map((t) => t.title)), topics: planned.map((t) => t.handle), fresh: true, planned: true });
+	// A lesson he began goes on today: Continue, never Start (round 12, 1 D3).
+	for (const group of [planned.filter(lessonBegun), planned.filter((t) => !lessonBegun(t))]) {
+		if (group.length > 0) steps.push({ kind: "topic", title: titleList(group.map((t) => t.title)), topics: group.map((t) => t.handle), fresh: !lessonBegun(group[0]!), planned: true });
 	}
 	if (steps.length > 0) return steps;
 	if (current && current.level !== "new" && !SOLID.has(current.level) && !current.review) {

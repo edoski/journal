@@ -951,6 +951,34 @@ def excluded(record: dict[str, Any]) -> set[str]:
     return {key for key, topic in record["topics"].items() if "excluded" in topic}
 
 
+def lessons(record: dict[str, Any]) -> dict[str, dict[str, str | None]]:
+    """The lessons he has begun: each topic an open task holds, with the
+    days he worked on it there: each day the task was made or moved (None:
+    a task holds no time) and each other day with his first prediction on
+    it, at that prediction's time. A topic whose only answers are predictions is not taught yet
+    (``schema.counts``), but a lesson he began on it is begun: its first day
+    is his start (round 12, 1 D3: after two Poisson sessions the plan still
+    put its first lesson days later and said there was no room to start
+    it). A prediction still counts for nothing; it only dates the work."""
+    found: dict[str, dict[str, str | None]] = {}
+    for task in record["tasks"].values():
+        for topic in task.get("topics", ()):
+            if topic in record["topics"]:
+                days = found.setdefault(topic, {})
+                for name in ("created", "updated"):
+                    if day := task.get(name):
+                        days.setdefault(day, None)
+    for item in effective(record["observations"]).values():
+        if not item.get("predicted"):
+            continue
+        for topic in item["topics"]:
+            days = found.get(topic, {})
+            day, stamp = item["date"], item.get("recorded")
+            if topic in found and (day not in days or (days[day] or "") > stamp):
+                days[day] = stamp
+    return {topic: dict(sorted(days.items())) for topic, days in found.items() if days}
+
+
 def needs(record: dict[str, Any], key: str) -> list[str]:
     """A topic's prerequisites that the course still studies."""
     topics = record["topics"]

@@ -223,12 +223,19 @@ def pace(rest: int, left: int, day: date, studies: Callable[[date], bool]) -> in
 # --- what each day shows ------------------------------------------------------
 
 
-def first_day(replayed: progress.Replay, topic: dict[str, Any]) -> date | None:
-    """The day he started the topic: its first lesson on record, or the day
-    it was introduced."""
+def first_day(
+    replayed: progress.Replay,
+    topic: dict[str, Any],
+    lesson: Mapping[str, str | None] | None = None,
+) -> date | None:
+    """The day he started the topic: its first lesson on record, the day it
+    was introduced, or the first day of a lesson he began on it
+    (``progress.lessons``), whichever came first."""
     started = topic.get("introduced")
     learning = [day for day, kind in replayed.days.items() if kind == progress.LEARNING]
-    first = min([*learning, *([started] if started else [])], default=None)
+    first = min(
+        [*learning, *([started] if started else []), *(lesson or {})], default=None
+    )
     return date.fromisoformat(first) if first else None
 
 
@@ -302,10 +309,12 @@ def _new_short(
     exam = progress.exam_plan(record)
     if exam is None:
         return set()
+    lessons = progress.lessons(record)
     starts = {
         key: first
         for key, replay in replayed.items()
-        if (first := first_day(replay, record["topics"][key])) is not None
+        if (first := first_day(replay, record["topics"][key], lessons.get(key)))
+        is not None
     }
     order = progress.path_order(record)
     partners = progress.contrasts(record)
@@ -378,8 +387,9 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
     new: dict[date, int] = defaultdict(int)
     replayed = [progress.replays(record) for record in records]
     for record, replays in zip(records, replayed, strict=True):
+        lessons = progress.lessons(record)
         for key, replay in replays.items():
-            first = first_day(replay, record["topics"][key])
+            first = first_day(replay, record["topics"][key], lessons.get(key))
             if first is not None:
                 new[first] += 1
             for day, kind in replay.days.items():

@@ -50,10 +50,10 @@ export interface PickupSections {
 	now: NowItem;
 	/** Empty when nothing else waits. */
 	next: NextItem[];
-	/** What the engine's plan dates ahead: the next review, or a topic's
-	 *  first lesson; its day, "Fri 13 Nov", and why it waits that long when
+	/** What the engine's plan dates ahead: the next review, a topic's
+	 *  first lesson, or the day a lesson he began goes on; its day, "Fri 13 Nov", and why it waits that long when
 	 *  something comes first; null when it dated none ahead. */
-	scheduled: { kind: "review" | "start"; day: string; waits: string | null; why?: StartsReason | null } | null;
+	scheduled: { kind: "review" | "start" | "lesson"; day: string; waits: string | null; why?: StartsReason | null } | null;
 	/** The sessions neither Now nor Next hold, and every scored attempt, by day. */
 	earlier: TrailDay[];
 	/** Why the topic comes now, while Now starts it: what it builds on and
@@ -175,7 +175,7 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 			review?.kind === "scheduled"
 				? { kind: "review", day: dayOf(review.date), waits: facts.waits }
 				: facts.starts && now.kind !== "start"
-					? { kind: "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
+					? { kind: facts.topic.startsWhy?.kind === "begun" ? "lesson" : "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
 					: null,
 		earlier: trailDays(
 			facts.sessions.filter((entry) => !held.has(entry.chat.id)),

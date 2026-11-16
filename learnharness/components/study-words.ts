@@ -51,7 +51,8 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  words. A weak topic he could do on his own says how he answered it
  *  since its miss: right on his own, or with help when help repaired it.
  *  A topic that slips says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
-export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals">>): string {
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals" | "tasks">>): string {
+	if (lessonBegun(topic)) return LESSON_BEGUN;
 	const learning = topic.level === "assisted" || topic.level === "attempted";
 	const unaided = () => (topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
 	if (learning && topic.right) return topic.right === "unaided" ? unaided() : RIGHT_WORDS[topic.right];
@@ -62,6 +63,21 @@ export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | 
 	if (fill === 0.75 && !learning) return topic.signals?.mistake ? WRONG_LAST_WORDS : topic.signals?.repairedWithHelp ? RIGHT_WORDS.helped : unaided();
 	return STANDING_WORDS[fill];
 }
+
+/** A topic not taught yet that an open task holds: a lesson he began,
+ *  which the plan carries on (the engine's `begun`), never "Not started"
+ *  (round 12, 1 D3: "Poisson distribution, Not started · Left off 10 Nov"
+ *  after two Poisson lessons). Pure. */
+export function lessonBegun(topic: Pick<CourseMapTopic, "level"> & Partial<Pick<CourseMapTopic, "tasks">>): boolean {
+	return topic.level === "new" && (topic.tasks?.length ?? 0) > 0;
+}
+
+/** Where he stands on a lesson he began (`lessonBegun`). */
+export const LESSON_BEGUN = "Lesson in progress";
+
+/** What the plan dates for a lesson he began: the day it goes on, as a
+ *  topic page's Scheduled line says it in place of `FIRST_LESSON`. */
+export const LESSON_GOES_ON = "Lesson continues";
 
 /** A topic whose newest answer that counts was not right, and none right
  *  since. */
@@ -520,6 +536,7 @@ function behindHere(arc: ArcHandle, map: StartsMap): boolean {
 export function startsWhyWords(why: StartsWhy, map: StartsMap): string {
 	const titles = (handles: readonly TopicHandle[]) => listWords(handles.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h));
 	const arc = why.arc && (map.arcs?.find((a) => a.handle === why.arc)?.title ?? why.arc);
+	if (why.kind === "begun") return LESSON_BEGUN;
 	if (why.kind === "early") {
 		const early = arc ? `Early, from ${arc}` : "Early, ahead of its place";
 		if (why.exam) return `${early}, to keep pace with the exam`;
@@ -536,8 +553,10 @@ export function startsWhyWords(why: StartsWhy, map: StartsMap): string {
 
 /** Whether a start's reason tells him anything its planned day does not:
  *  every reason but "next" in a course without arcs, which would only say
- *  "Next in Linear Algebra" beside the course's own name. Pure. */
+ *  "Next in Linear Algebra" beside the course's own name, and a lesson he
+ *  began, whose row and Scheduled line already say it goes on. Pure. */
 export function startsWhyTells(why: StartsWhy): boolean {
+	if (why.kind === "begun") return false;
 	if (why.arc !== undefined || why.kind === "early") return true;
 	return why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0);
 }

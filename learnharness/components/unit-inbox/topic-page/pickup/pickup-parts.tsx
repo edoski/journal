@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, ChevronDownIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FIRST_LESSON, moreWords } from "@/components/study-words";
+import { FIRST_LESSON, LESSON_GOES_ON, moreWords } from "@/components/study-words";
 import { daysThatFit } from "@/components/unit-inbox/topic-page/pickup/earlier-fit";
 import { Button } from "@/components/ui/button";
 import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/topic-page/hybrid/history";
@@ -191,12 +191,12 @@ export function StartsWhyLine({ why, className }: { why: StartsReason; className
 /** Scheduled: the engine's next review or a topic's first lesson, why it
  *  waits when something comes first, and its day in the date column; a
  *  first lesson also says why it comes then. A date, not a control. */
-export function ScheduledEntry({ kind, day, waits, why }: { kind: "review" | "start"; day: string; waits: string | null; why?: StartsReason | null }) {
+export function ScheduledEntry({ kind, day, waits, why }: { kind: "review" | "start" | "lesson"; day: string; waits: string | null; why?: StartsReason | null }) {
 	const Icon = kind === "review" ? HistoryIcon : BookOpenIcon;
 	return (
 		<p data-slot="pickup-scheduled" data-kind={kind} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", GUTTER, (waits || why) && "py-2")}>
 			<Icon aria-hidden className={ICON} />
-			<span className="truncate text-body system-current:text-row text-muted-foreground">{kind === "review" ? "Review" : FIRST_LESSON}</span>
+			<span className="truncate text-body system-current:text-row text-muted-foreground">{kind === "review" ? "Review" : kind === "lesson" ? LESSON_GOES_ON : FIRST_LESSON}</span>
 			<span data-slot="topic-history-date" className="text-callout system-current:text-label text-muted-foreground tabular-nums">
 				{day}
 			</span>
