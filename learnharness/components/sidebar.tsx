@@ -167,8 +167,9 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 	return (
 		<SidebarContext.Provider value={{ open: open && !narrow, toggle }}>
 			<ServerSidebarWidth.Provider value={initial.width}>
-				{/* transitions gated on mount: no slide-in flash on page load */}
-				<div className={cn("flex h-dvh", mounted && "[&_.sidebar-motion]:transition-[width,margin,opacity]")}>{children}</div>
+				{/* The sidebar's fold moves only once mounted, so nothing slides in
+				    on page load (.lh-sidebar-motion, app/globals.css). */}
+				<div className={cn("flex h-dvh", mounted && "lh-sidebar-motion")}>{children}</div>
 			</ServerSidebarWidth.Provider>
 		</SidebarContext.Provider>
 	);
@@ -187,7 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			{/* The folded rail's open button, after the page: in the Mac app it
 			    stands over the page's drag band, and Electron resolves drag
 			    regions in page order (unit-inbox.md, "Folded"). */}
-			{!open && <RailOpenButton onOpen={toggle} />}
+			<RailOpenButton shown={!open} onOpen={toggle} />
 			{/* The single document-level keydown listener (keyboard wave A) —
 			    after the content in the tree, but it's window-level so order only
 			    matters for the events it dispatches, never for DOM priority. */}

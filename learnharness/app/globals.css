@@ -500,6 +500,14 @@ body {
 .lh-electron .lh-drag :is(button, input, textarea, select, a, summary, [contenteditable]) {
 	-webkit-app-region: no-drag;
 }
+/* The sidebar's hidden layer (its panel while folded, its rail and open
+   button while open) stays mounted and inert: it marks no drag or no-drag
+   region, so it never changes what the shown layer and the page mark,
+   whatever their page order. `initial`, not `none`: Electron 44 computes a
+   declared `none` as no-drag. */
+.lh-electron [inert] :is(.lh-drag, .lh-no-drag, button, input, textarea, select, a, summary, [contenteditable]) {
+	-webkit-app-region: initial;
+}
 /* 92px = measured lights' right edge (~75pt) + the lights' own 16px
    inset from the window edge — comfortable, symmetric air (owner).
    PHYSICAL-CONSTANT under zoom (owner round 7, 2026-10-05): ⌘±/⌘0 scale
@@ -555,6 +563,18 @@ body {
 }
 .lh-electron main[data-sidebar="folded"] .lh-band-start {
 	padding-left: calc(90px / var(--lh-zoom) + 1.75rem + 0.75rem - 3rem);
+}
+
+/* The sidebar's fold (unit-inbox.md, "Folded"): its panel slides, its rail
+   and the rail's open button fade, 200ms linear as shadcn's sidebar, and
+   nothing else moves: no width, so the page beside it never re-lays out
+   frame by frame. On only once SidebarProvider has mounted
+   (.lh-sidebar-motion), so nothing slides in on page load, and never under
+   reduced motion, where the sidebar folds at once. */
+@media (prefers-reduced-motion: no-preference) {
+	.lh-sidebar-motion .sidebar-motion {
+		transition: translate 200ms linear, opacity 200ms linear, visibility 200ms linear;
+	}
 }
 
 .lh-electron .lh-wco-gutter {

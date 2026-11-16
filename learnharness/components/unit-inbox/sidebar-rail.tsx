@@ -63,9 +63,10 @@ function RailButton({
  * app the page's own drag band, which it stands over, cannot take its clicks
  * (Electron resolves drag regions in page order).
  */
-export function RailOpenButton({ onOpen }: { onOpen: () => void }) {
+export function RailOpenButton({ shown, onOpen }: { shown: boolean; onOpen: () => void }) {
+	// Mounted open or folded, it fades with the rail (`sidebar-motion`).
 	return (
-		<div className="lh-rail-toggle">
+		<div inert={!shown} className={cn("lh-rail-toggle sidebar-motion", !shown && "invisible opacity-0")}>
 			<RailButton icon={PanelLeftOpenIcon} label="Open sidebar" action="toggle-sidebar" onClick={onOpen} testId="sidebar-open" />
 		</div>
 	);

@@ -90,7 +90,7 @@ describe("the folded sidebar", () => {
 			<AppRouterContext.Provider value={router as never}>
 				<TooltipProvider>
 					<SidebarRail pathname="/" onNewLesson={() => {}} onSettings={() => {}} />
-					<RailOpenButton onOpen={() => {}} />
+					<RailOpenButton shown onOpen={() => {}} />
 				</TooltipProvider>
 			</AppRouterContext.Provider>,
 		)}</body></html>`,

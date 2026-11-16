@@ -76,3 +76,60 @@ describe("the folded rail in the Mac app", () => {
 		assert.ok(m.afterPage, "drawn after the page: Electron resolves drag regions in page order");
 	});
 });
+
+/** Folds or unfolds with the sidebar's own button and samples every frame
+ *  of the next 300ms: what the sidebar mounts and drops, what animates in
+ *  it, where the rail's Home icon and the page's left edge stand. */
+const press = (page: Page, button: "Close sidebar" | "Open sidebar") =>
+	page.evaluate(async (label: string) => {
+		const aside = document.querySelector('[data-testid="sidebar"]')!;
+		const main = document.querySelector("main")!;
+		let changed = 0;
+		const watch = new MutationObserver((records) => records.forEach((r) => (changed += r.addedNodes.length + r.removedNodes.length)));
+		watch.observe(aside, { childList: true, subtree: true });
+		const railHome: number[] = [];
+		const pageLeft: number[] = [];
+		const animated = new Set<string>();
+		const t0 = performance.now();
+		document.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click();
+		await new Promise<void>((done) => {
+			const frame = (t: number) => {
+				const home = document.querySelector('[data-slot="sidebar-rail"] a[href="/"]');
+				if (home && getComputedStyle(home).visibility === "visible") railHome.push(home.getBoundingClientRect().left);
+				pageLeft.push(main.getBoundingClientRect().left);
+				for (const a of document.getAnimations()) if (a instanceof CSSTransition && aside.contains((a.effect as KeyframeEffect).target)) animated.add(a.transitionProperty);
+				if (t - t0 < 300) requestAnimationFrame(frame);
+				else done();
+			};
+			requestAnimationFrame(frame);
+		});
+		watch.disconnect();
+		return { changed, railHome: [...new Set(railHome)], pageLeft: [...new Set(pageLeft)], animated: [...animated].sort(), state: aside.getAttribute("data-state") };
+	}, button);
+
+describe("the fold", () => {
+	it("rebuilds nothing and slides by transform and opacity alone: the rail's icons stay put and the page moves once, never frame by frame", async () => {
+		const page = await shell.open("browser", { sidebar: "open" });
+		const fold = await press(page, "Close sidebar");
+		await new Promise((done) => setTimeout(done, 100));
+		const unfold = await press(page, "Open sidebar");
+		await page.close();
+		for (const [name, run, settled, left] of [["fold", fold, "folded", RAIL], ["unfold", unfold, "open", 256]] as const) {
+			assert.equal(run.state, settled, `${name} settles ${settled}`);
+			assert.equal(run.changed, 0, `${name}: the panel and the rail stay mounted (round 14 swapped them, rebuilding the panel on every unfold)`);
+			assert.ok(run.animated.length > 0, `${name} animates`);
+			assert.deepEqual(run.animated.filter((p) => !["translate", "opacity", "visibility"].includes(p)), [], `${name}: only transform and opacity move, never the width (${run.animated})`);
+			assert.deepEqual(run.pageLeft, [left], `${name}: the page takes its new place once, on the first frame, not frame by frame (${run.pageLeft.join(", ")})`);
+		}
+		assert.deepEqual(fold.railHome, [(RAIL - 1 - 28) / 2], `the rail's icons stay where they settle while it folds (round 14: they slid in from the middle, x ${fold.railHome.join(", ")})`);
+	});
+
+	it("happens at once under reduced motion", async () => {
+		const page = await shell.open("browser", { sidebar: "open", reducedMotion: true });
+		const fold = await press(page, "Close sidebar");
+		await page.close();
+		assert.equal(fold.state, "folded");
+		assert.deepEqual(fold.animated, [], "nothing animates");
+		assert.deepEqual(fold.pageLeft, [RAIL], "the page is in place on the first frame");
+	});
+});
