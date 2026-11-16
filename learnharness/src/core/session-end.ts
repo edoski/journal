@@ -1,7 +1,7 @@
 import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
-import { endsInDismissal, nativeInputCause, needsContinuation, NEUTRAL_MARKERS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTasksOf, type LhMessage } from "./native-messages.ts";
+import { danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTasksOf, type LhMessage } from "./native-messages.ts";
 import { phaseAt3Lh } from "./phases.ts";
 import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
 
@@ -22,9 +22,12 @@ import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
  * holds, or a session that waited on him) leaves it for next time: "left". Words that
  * end without a question ("Good place to stop") end the session there,
  * like anything else, as does the tutor's own close, and a practice round
- * with its work done: "closed". Pure.
+ * with its work done: "closed". The questions the app posed again after
+ * his Done for today (`leftQuestionRepose`) are not the tutor's turn, so
+ * they leave the session as it was: left. Pure.
  */
-export function sessionEndOf(messages: readonly LhMessage[], tree: PlanTree | undefined, initial: SessionMode = "teach", topics: readonly string[] = []): SessionEnd {
+export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | undefined, initial: SessionMode = "teach", topics: readonly string[] = []): SessionEnd {
+	const messages = record.at(-1) && isQuestionRepose(record.at(-1)!) ? record.slice(0, -1) : record;
 	const last = [...messages].reverse().find((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
 	if (!last) return "closed";
 	if (last.role === "toolResult") {
@@ -56,9 +59,16 @@ export function sessionEndOf(messages: readonly LhMessage[], tree: PlanTree | un
  *  read up to just before he pressed it, waited on him or owed him a
  *  reply. `at` is the Done for today's index. Pure. */
 function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | undefined, initial: SessionMode, topics: readonly string[]): boolean {
+	// The turn's course brief rides just before the marker, after what it set aside.
 	let start = at;
-	while (start > 0 && setAsideByDone(messages[start - 1]!)) start--;
-	if (start < at || (tree && stepsLeft(tree, messages)) || sessionTasksOf(messages).length > 0) return true;
+	let setAside = false;
+	for (; start > 0; start--) {
+		const m = messages[start - 1]!;
+		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
+		if (!setAsideByDone(m)) break;
+		setAside = true;
+	}
+	if (setAside || (tree && stepsLeft(tree, messages)) || sessionTasksOf(messages).length > 0) return true;
 	const before = messages.slice(0, start);
 	const end = before.length > 0 ? sessionEndOf(before, tree, initial, topics) : "closed";
 	return end === "mid-lesson" || end === "cut";
@@ -152,25 +162,34 @@ function doneTonightAt(messages: readonly LhMessage[]): number | null {
 	return null;
 }
 
-/** The question he left open when he pressed Done for today, while that
- *  Done is still his latest input: its words and its call. His next
- *  message picks the lesson up there (round 10, 3 m2: Resume landed on the
- *  closed lesson with no question, and his half-typed answer waited unseen
- *  for the tutor to ask it again). Null otherwise. Pure. */
-export function questionLeftForToday(messages: readonly LhMessage[]): { question: string; toolCallId: string } | null {
+/** The questions he left open when he pressed Done for today, asked
+ *  again once the tutor's close has settled: one app-made message whose
+ *  calls pose each, as the tutor did, so the box serves it after Resume as
+ *  before Done, Hint, Show me and his confidence included (round 12,
+ *  3 n10: they worked only once the tutor asked it again). No tutor turn
+ *  poses it, and his Done for today stays his latest input. Empty unless
+ *  that Done set a question aside, the close after it finished, and nothing
+ *  is posed yet. Pure. */
+export function leftQuestionRepose(messages: readonly LhMessage[]): LhMessage[] {
 	const done = doneTonightAt(messages);
-	if (done === null) return null;
+	if (done === null || danglingQuestionOf(messages)) return [];
+	const close = messages.findLast((m, i) => i > done && m.role === "assistant");
+	if (close?.role !== "assistant" || close.stopReason !== "stop") return [];
+	const left: string[] = [];
 	for (let i = done - 1; i >= 0; i--) {
 		const m = messages[i]!;
 		// The turn's course brief rides just before the marker.
 		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
 		if (m.role !== "toolResult") break;
-		const details = m.details as { dismissed?: unknown; reason?: unknown; questionText?: unknown } | undefined;
-		if (details?.dismissed === true && details.reason === "tonight" && typeof details.questionText === "string" && details.questionText.trim()) {
-			return { question: details.questionText, toolCallId: m.toolCallId };
-		}
+		const details = m.details as { dismissed?: unknown; reason?: unknown } | undefined;
+		if (details?.dismissed === true && details.reason === "tonight") left.unshift(m.toolCallId);
 	}
-	return null;
+	const calls = left.flatMap((id) => {
+		const asked = messages.findLast((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.id === id));
+		const call = asked?.role === "assistant" ? asked.content.find((b) => b.type === "toolCall" && b.id === id) : undefined;
+		return call?.type === "toolCall" ? [{ tool: call.name, input: call.arguments }] : [];
+	});
+	return calls.length > 0 ? [newQuestionRepose(calls)] : [];
 }
 
 function isDoneTonight(m: LhMessage): boolean {

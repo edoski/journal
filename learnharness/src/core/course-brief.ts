@@ -188,7 +188,7 @@ function startNote(why: StartsWhy | undefined, title: (handle: TopicHandle) => s
 	if (!why) return null;
 	switch (why.kind) {
 		case "begun":
-			return "the lesson he began goes on";
+			return "the lesson he began";
 		case "next":
 			return why.arc ? "next in its arc" : "next in the course";
 		case "after": {
@@ -207,6 +207,11 @@ function startNote(why: StartsWhy | undefined, title: (handle: TopicHandle) => s
 }
 
 const noted = (title: string, note: string | null) => (note ? `${title} (${note})` : title);
+
+/** A lesson he began on a topic not yet taught (the engine's `begun`
+ *  start): the plan carries it on, so it is never a start or "not started"
+ *  (the app's "Lesson continues"). */
+const lessonBegun = (topic: Pick<CourseMapTopic, "startsWhy">): boolean => topic.startsWhy?.kind === "begun";
 
 /** The course's overdue reviews, counted and named, most overdue first,
  *  each with the day the plan now puts it. */
@@ -235,12 +240,16 @@ function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boole
 			if (!review || review.date !== d.date) return title(h);
 			return noted(title(h), moved ? movedNote(moved, map.today) : reviewNote(review, map.today));
 		});
-		const starts = d.new.filter(shown).map((h) => {
+		const newTopic = (h: TopicHandle) => {
 			const { moved, startsWhy, starts: day } = byHandle.get(h)!;
 			return noted(title(h), moved && day === d.date ? movedNote(moved, map.today) : startNote(startsWhy, title));
-		});
-		if (reviews.length + starts.length === 0) return [];
-		const parts = [reviews.length > 0 ? `review ${reviews.join(", ")}` : null, starts.length > 0 ? `start ${starts.join(", ")}` : null];
+		};
+		// A lesson he began goes on that day, as the app says it, never a start.
+		const shownNew = d.new.filter(shown);
+		const goesOn = shownNew.filter((h) => lessonBegun(byHandle.get(h)!)).map(newTopic);
+		const starts = shownNew.filter((h) => !lessonBegun(byHandle.get(h)!)).map(newTopic);
+		if (reviews.length + goesOn.length + starts.length === 0) return [];
+		const parts = [reviews.length > 0 ? `review ${reviews.join(", ")}` : null, goesOn.length > 0 ? `continue ${goesOn.join(", ")}` : null, starts.length > 0 ? `start ${starts.join(", ")}` : null];
 		return [`- ${shortDay(d.date)}: ${parts.filter(Boolean).join("; ")}`];
 	});
 	const exam = map.exam;
@@ -369,8 +378,14 @@ export function projectCourseBrief(
 	// The level word "new" read as "not planned yet" (round 8: "they're the
 	// only ones you haven't started" named two of four untaught topics), so
 	// the untaught ones are named in plain words too.
+	// A lesson he began is neither (round 12 follow-up: "You start the
+	// Poisson distribution tomorrow" after he began it).
+	const begun = new Set(plan?.courses.find((c) => c.map.workspace === plan.workspace)?.map.topics.filter(lessonBegun).map((t) => t.handle as string) ?? []);
 	const untaught = list(path.topics).flatMap((t) => (Array.isArray(t) && t[1] === "new" ? [String(t[0])] : []));
-	if (untaught.length > 0) lines.push(`Not started yet (never taught, whatever their planned day): ${untaught.join(", ")}`);
+	const notStarted = untaught.filter((h) => !begun.has(h));
+	const goesOn = untaught.filter((h) => begun.has(h));
+	if (notStarted.length > 0) lines.push(`Not started yet (never taught, whatever their planned day): ${notStarted.join(", ")}`);
+	if (goesOn.length > 0) lines.push(`Begun, not finished (its lesson continues, never a start): ${goesOn.join(", ")}`);
 	const excluded = handles(path.excluded);
 	if (excluded.length > 0) lines.push(`Left out of the course: ${excluded.join(", ")}`);
 	const health = pathHealthLine(r.path_health);

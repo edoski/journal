@@ -45,12 +45,13 @@ async function introduceLessonTopics(course: CourseToolContext, candidates: read
 	return saved.ok ? `Marked introduced: ${fresh.join(", ")}.` : `The lesson's topics could not be marked introduced (${saved.message}).`;
 }
 
-type LessonDay = { planned: string; planned_words: string } | { starts: string; starts_words: string };
+type LessonDay = { planned: string; planned_words: string } | { starts: string; starts_words: string } | { continues: string; continues_words: string };
 
 /** Each of the lesson's topics on the plan as the engine holds it after the
- *  close's save: its next review, or its start while untaught, in the words
- *  the close copies. Read after the save, so the close never names a day
- *  its own save has already moved. */
+ *  close's save: its next review, its start while untaught, or the day a
+ *  lesson he began continues, in the words the close copies. Read after
+ *  the save, so the close never names a day its own save has already
+ *  moved. */
 async function lessonDays(course: CourseToolContext, candidates: readonly string[]): Promise<Record<string, LessonDay> | undefined> {
 	if (candidates.length === 0) return undefined;
 	const mapped = await course.records.map(course.course.workspace);
@@ -60,6 +61,8 @@ async function lessonDays(course: CourseToolContext, candidates: readonly string
 	for (const topic of mapped.map.topics) {
 		if (!wanted.has(topic.handle)) continue;
 		if (topic.review) days[topic.handle] = { planned: topic.review.date, planned_words: plannedDayWords(topic.review.date, mapped.map.today) };
+		// A lesson he began continues that day, as the app says it.
+		else if (topic.starts && topic.startsWhy?.kind === "begun") days[topic.handle] = { continues: topic.starts, continues_words: plannedDayWords(topic.starts, mapped.map.today) };
 		else if (topic.starts) days[topic.handle] = { starts: topic.starts, starts_words: plannedDayWords(topic.starts, mapped.map.today) };
 	}
 	return days;
