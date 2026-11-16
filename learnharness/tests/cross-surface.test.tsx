@@ -17,7 +17,18 @@
  * 4. the lesson he is in is on Today as soon as the session list has it,
  *    even while the course reads are still under way;
  * 5. a topic the exam's plan leaves out says so on its own page exactly
- *    when the course head and the calendar's exam panel name it.
+ *    when the course head and the calendar's exam panel name it;
+ * 6. every surface that opens a session (Home, the sidebar, the calendar,
+ *    its topic page) gives it the one status, and Home and the sidebar's
+ *    top give each session one line (round 14, 1 M3: the begun Poisson
+ *    lesson twice, as its task and as its topic; 1 n5: the calendar's
+ *    "Your turn" beside Home's "Left off 10 Nov");
+ * 7. the course page's Needs you holds only what Home's Today asks
+ *    (round 14, 1 n5, 2: "Random variables · Your turn", asked nowhere);
+ * 8. a lesson he left with Done for today reads "Left off today" on every
+ *    surface and leaves Today, however the close's record ends, and its
+ *    page holds the left question once, posed again with Hint, Show me and
+ *    his confidence as before (round 14, M1: 1 M1, 2 D2, 3 M1, 4 minor 5).
  *
  * It seeds its own copy of the world each run (about a minute) and reads
  * the real engine, so it runs where the seed and the engine are installed.
@@ -25,8 +36,10 @@
 import { demoWorldMissing, NEW_SESSION, openDemoApp, text, type DemoApp } from "./helpers/demo-app.tsx";
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { sessionState } from "../components/nav/session-state.ts";
 import type { CalendarEntry } from "../components/calendar/calendar-facts.ts";
 import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic } from "../src/core/index.ts";
+import type { HomeLine, SidebarCard } from "./helpers/demo-app.tsx";
 
 const missing = demoWorldMissing();
 // CI sets LH_REQUIRE_REAL_ENGINE, so a moved seed or venv fails the gate instead of skipping this.
@@ -79,26 +92,31 @@ interface Survey {
 	today: string;
 	courses: readonly CalendarCourse[];
 	chats: readonly ChatListItem[];
-	home: ReturnType<DemoApp["homeLines"]>;
-	sidebar: ReturnType<DemoApp["sidebarCards"]>;
+	home: Array<HomeLine & { opens: string | null }>;
+	sidebar: Array<SidebarCard & { opens: string | null }>;
 	calendar: Awaited<ReturnType<DemoApp["calendar"]>>["drawn"];
 	pages: Map<string, TopicPage>;
 	heads: Map<string, string>;
 	rows: Map<string, string>;
+	/** Each course page's Needs you: its rows' topics and words. */
+	needsYou: Map<string, Array<{ handle: string; text: string }>>;
 	briefs: Map<string, string>;
 }
 
 const keyOf = (workspace: string, handle: string) => `${workspace}#${handle}`;
 
-/** The topics worth a visit to their page: what is due, the next three days' plan, the exam's gaps, the open tasks'. */
-function topicsToVisit(courses: readonly CalendarCourse[], today: string): Array<{ course: CalendarCourse; topic: CourseMapTopic }> {
+/** The topics worth a visit to their page: what is due, the next three days' plan, the exam's gaps, the open
+ *  tasks', and the own topics of each session not finished. */
+function topicsToVisit(courses: readonly CalendarCourse[], today: string, chats: readonly ChatListItem[]): Array<{ course: CalendarCourse; topic: CourseMapTopic }> {
 	const week = addDays(today, 3);
+	const open = chats.filter((c) => sessionState(c) !== "finished");
 	return courses.flatMap((course) => {
 		const exam = course.map.exam;
 		const gaps = new Set([...(exam?.doesNotFit ?? []), ...(exam?.unreviewed ?? []), ...(exam?.leavesOut ?? [])]);
 		const tasks = new Set(course.map.tasks.flatMap((t) => t.topics ?? []));
 		const soon = new Set(course.planned.filter((d) => d.date >= today && d.date <= week).flatMap((d) => [...d.reviews, ...d.new]));
-		return course.map.topics.filter((t) => gaps.has(t.handle) || tasks.has(t.handle) || soon.has(t.handle) || t.review?.kind === "due").map((topic) => ({ course, topic }));
+		const sessions = new Set(open.filter((c) => c.course?.workspace === course.map.workspace).flatMap((c) => c.ownTopics ?? []));
+		return course.map.topics.filter((t) => gaps.has(t.handle) || tasks.has(t.handle) || soon.has(t.handle) || sessions.has(t.handle) || t.review?.kind === "due").map((topic) => ({ course, topic }));
 	});
 }
 
@@ -113,13 +131,19 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 	const { stores } = await import("../src/server/stores.ts");
 
 	await app.visit("/", { fresh: true, ready: () => app.homeLines().length > 0 || !!document.querySelector('[data-slot="day-heading"]') });
-	const home = app.homeLines();
-	const sidebar = app.sidebarCards();
+	// Where each line and card goes, read where it is drawn.
+	const home: Survey["home"] = [];
+	for (const line of app.homeLines()) home.push({ ...line, opens: await app.lookAt(line.el) });
+	const sidebar: Survey["sidebar"] = [];
+	for (const card of app.sidebarCards()) {
+		const action = card.el.querySelector('[data-slot="row-action"]');
+		sidebar.push({ ...card, opens: action ? await app.lookAt(action) : null });
+	}
 
 	const { today, courses, chats, drawn: calendar } = await app.calendar((e, day) => e.kind !== "session" || e.day === day || e.status !== null);
 
 	const pages = new Map<string, TopicPage>();
-	const visits = topicsToVisit(courses, today);
+	const visits = topicsToVisit(courses, today, chats);
 	await app.visitEach(
 		visits.map(({ course, topic }) => unitHref(course.map.workspace, topic.handle)),
 		(page) => !!page.querySelector('[data-slot="pickup-now"]'),
@@ -139,12 +163,17 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 
 	const heads = new Map<string, string>();
 	const rows = new Map<string, string>();
+	const needsYou = new Map<string, Array<{ handle: string; text: string }>>();
 	await app.visitEach(
 		courses.map((course) => courseHref(course.map.workspace)),
 		(page) => !!page.querySelector('[data-slot="course-topic-row"]'),
 		(page, pathname) => {
 			const course = courses.find((c) => courseHref(c.map.workspace) === pathname)!;
 			heads.set(course.map.workspace, text(page.querySelector('[data-slot="page-head"]')));
+			needsYou.set(
+				course.map.workspace,
+				[...page.querySelectorAll('[data-slot="course-topic-row"][data-group="needs-you"]')].map((row) => ({ handle: row.getAttribute("data-topic") ?? "", text: text(row) })),
+			);
 			for (const row of page.querySelectorAll('[data-slot="course-topic-row"]')) {
 				const title = text(row.querySelector('[data-slot="course-topic-title"]')).replace(/, [^,]*$/, "");
 				const topic = course.map.topics.find((t) => t.title === title);
@@ -163,7 +192,7 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 			if (brief) briefs.set(course.map.workspace, brief.text);
 		}),
 	);
-	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, briefs };
+	return { label, today, courses, chats, home, sidebar, calendar, pages, heads, rows, needsYou, briefs };
 }
 
 // ─── 1. one day per topic ──────────────────────────────────────────────────
@@ -180,12 +209,15 @@ function dayClaims(s: Survey): Claims {
 		const ws = course.map.workspace;
 		const titled = [...course.map.topics].sort((a, b) => b.title.length - a.title.length);
 		// The calendar: the first day on or after today it draws the topic's review or first lesson on.
+		// A lesson he began goes on as its task's entry (the engine's `begun`), so that entry is its day too.
+		const begun = new Set(course.map.topics.filter((t) => t.startsWhy?.kind === "begun").map((t) => t.handle));
 		for (const { entry } of s.calendar) {
-			if ((entry.kind === "review" || entry.kind === "new") && entry.course.workspace === ws && entry.day >= s.today) {
-				const by = claims.get(keyOf(ws, entry.topic.handle));
+			const day = entry.kind === "review" || entry.kind === "new" ? entry.topic : entry.kind === "task" && entry.topic && begun.has(entry.topic.handle) ? entry.topic : null;
+			if (day && entry.course?.workspace === ws && entry.day >= s.today) {
+				const by = claims.get(keyOf(ws, day.handle));
 				const had = by?.get("calendar");
 				if (!had || entry.day < had) {
-					claims.set(keyOf(ws, entry.topic.handle), new Map([...(by ?? []), ["calendar", entry.day]]));
+					claims.set(keyOf(ws, day.handle), new Map([...(by ?? []), ["calendar", entry.day]]));
 				}
 			}
 		}
@@ -388,6 +420,135 @@ function assertExamWarnings(s: Survey) {
 	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);
 }
 
+// ─── 6. one status and one line per session ────────────────────────────────
+
+/** The words that say where a session stands (session-state.md), as every surface draws them. */
+const SESSION_STATUS = /^(Your turn|Left off .+|Tutor writing|Reply cut off|You stopped the tutor)$/;
+/** A status without the topic a card's slip adds ("Not right last time: …"). */
+const statusWords = (words: string) => words.replace(/:\s.*$/, "").trim();
+/** The session a link opens, never a new one (`/chat/new`). */
+const chatOf = (href: string | null | undefined) => {
+	const id = href?.startsWith("/chat/") ? href.slice(6).split("?")[0]! : null;
+	return id === "new" ? null : id;
+};
+
+/** What each surface that opens a session says of where it stands, by session. */
+async function sessionStatuses(s: Survey): Promise<Map<string, Array<[string, string]>>> {
+	const { lookWords } = await import("../components/calendar/calendar-facts.ts");
+	const said = new Map<string, Array<[string, string]>>();
+	const say = (id: string | null, surface: string, words: string) => {
+		if (!id || !SESSION_STATUS.test(statusWords(words))) return;
+		said.set(id, [...(said.get(id) ?? []), [surface, statusWords(words)]]);
+	};
+	for (const line of s.home) say(chatOf(line.opens), `Home ("${line.title}")`, line.status);
+	for (const card of s.sidebar) say(chatOf(card.opens), `the sidebar ("${card.title}"${card.shelf ? `, ${card.shelf}` : ""})`, card.status);
+	for (const { entry, opens } of s.calendar) {
+		const id = entry.kind === "session" ? entry.chat.id : entry.kind === "task" ? chatOf(opens) : null;
+		say(id, `the calendar (${entry.kind} "${entry.title}", ${short(entry.day)})`, lookWords(entry, s.today));
+	}
+	for (const [key, page] of s.pages) say(chatOf(page.opens), `its topic page (${key.split("#")[1]})`, page.note);
+	return said;
+}
+
+async function assertOneStatusEverywhere(s: Survey) {
+	const problems: string[] = [];
+	for (const [id, said] of await sessionStatuses(s)) {
+		if (new Set(said.map(([, words]) => words)).size < 2) continue;
+		const title = s.chats.find((c) => c.id === id)?.title ?? id;
+		problems.push(`"${title}": ${said.map(([surface, words]) => `${surface} "${words}"`).join(", ")}`);
+	}
+	// One line per session: Home's Today and the sidebar's top each open a session from one line (round 14, 1 M3).
+	for (const [where, lines] of [
+		["Home's Today", s.home],
+		["the sidebar's top", s.sidebar.filter((c) => c.shelf === "" && !c.el.matches('[data-testid="session-row"]'))],
+	] as const) {
+		const by = Map.groupBy(lines as ReadonlyArray<{ title: string; status: string; opens: string | null }>, (l) => chatOf(l.opens));
+		for (const [id, same] of by) {
+			if (id && same.length > 1) problems.push(`${where} opens "${s.chats.find((c) => c.id === id)?.title ?? id}" from ${same.length} lines: ${same.map((l) => `"${l.title} · ${l.status}"`).join(", ")}`);
+		}
+	}
+	assert.ok(problems.length === 0, `${s.label}: one session, two statuses or two lines:\n  ${problems.join("\n  ")}`);
+}
+
+// ─── 7. Needs you is what Today asks ───────────────────────────────────────
+
+function assertNeedsYouOnToday(s: Survey) {
+	const problems: string[] = [];
+	for (const course of s.courses) {
+		const ws = course.map.workspace;
+		for (const row of s.needsYou.get(ws) ?? []) {
+			const topic = course.map.topics.find((t) => t.handle === row.handle);
+			if (!topic) continue;
+			const asked = s.home.some((line) => {
+				if (line.course !== course.map.title) return false;
+				if (names(line.title, topic.title)) return true;
+				const chat = s.chats.find((c) => c.id === chatOf(line.opens));
+				if (chat && [...(chat.ownTopics ?? []), ...(chat.topics ?? [])].includes(topic.handle)) return true;
+				const task = course.map.tasks.find((t) => line.title === `Continue ${t.title}`);
+				return !!task?.topics?.includes(topic.handle);
+			});
+			if (!asked) problems.push(`${course.map.title}'s Needs you lists "${row.text}", which no line of Home's Today asks: ${s.home.map((l) => `${l.title} · ${l.status}`).join(" | ") || "(Today is empty)"}`);
+		}
+	}
+	assert.ok(problems.length === 0, `${s.label}:\n  ${problems.join("\n  ")}`);
+}
+
+// ─── 8. a lesson left for today stays left ──────────────────────────────────
+
+/** What a lesson's page offers on its open question: how often its words and "Your turn" are drawn, and
+ *  whether the box gives Hint, Show me and his confidence. */
+interface LessonView {
+	asked: number;
+	yourTurn: number;
+	hint: boolean;
+	showMe: boolean;
+	sure: boolean;
+	tail: string;
+}
+
+/** Reads a lesson's page; `words` is a stretch of the question's own words, past any maths. */
+function lessonView(page: Element, words: string): LessonView {
+	const transcript = text(page.querySelector("main") ?? page);
+	return {
+		asked: transcript.split(words).length - 1,
+		yourTurn: page.querySelectorAll('[data-slot="your-turn"]').length,
+		hint: !!page.querySelector('[data-testid="question-hint"]'),
+		showMe: !!page.querySelector('[data-testid="question-show"]'),
+		sure: !!page.querySelector('[data-testid="confidence-choice"]'),
+		tail: transcript.slice(-240),
+	};
+}
+
+/** The left lesson `id`, the day he pressed Done for today on it with its question (`words`) open: it is
+ *  left (session-state.md), leaves Today, reads "Left off today" wherever it is drawn, and its page, opened
+ *  again, holds the question once and serves it as `before` did (round 14, M1). */
+async function assertLeftToday(app: DemoApp, s: Survey, id: string, words: string, before: LessonView) {
+	const { continueHref } = await import("../components/nav/session-state.ts");
+	const { unitHref } = await import("../components/unit-inbox/unit-href.ts");
+	const problems: string[] = [];
+	const chat = s.chats.find((c) => c.id === id)!;
+	const state = sessionState(chat);
+	if (state !== "left") problems.push(`it reads ${state}, not left (ended ${chat.ended}, pendingQuestion ${chat.pendingQuestion})`);
+	for (const line of s.home) if (chatOf(line.opens) === id) problems.push(`Home's Today still asks it: "${line.title} · ${line.status}"`);
+	const said = (await sessionStatuses(s)).get(id) ?? [];
+	for (const [surface, status] of said) if (status !== "Left off today") problems.push(`${surface} says "${status}", not "Left off today"`);
+	if (!said.some(([surface]) => surface.startsWith("the sidebar"))) problems.push(`no sidebar card opens it with "Left off today": ${s.sidebar.filter((c) => c.title === chat.title).map((c) => `"${c.title} · ${c.status}"`).join(", ") || "none has its title"}`);
+	// Its topic page's Now picks it up as left.
+	for (const handle of chat.ownTopics ?? []) {
+		const page = s.pages.get(keyOf(chat.course!.workspace, handle));
+		if (!page) problems.push(`its topic page (${unitHref(chat.course!.workspace, handle)}) was not read`);
+		else if (chatOf(page.opens) === id && page.note !== "Left off today") problems.push(`its topic page's Now says "${page.now} · ${page.note}", not "Left off today"`);
+	}
+	// Opened again (its Continue, Resume or Home's line all go here), the question is there once, his to answer.
+	const again = await app.lesson(continueHref(chat), (page) => lessonView(page, words));
+	if (again.asked !== 1) problems.push(`opened again, its page draws the left question ${again.asked} times (before Done: ${before.asked}): …${again.tail}`);
+	if (again.yourTurn !== 1) problems.push(`opened again, its page says "Your turn" ${again.yourTurn} times: …${again.tail}`);
+	for (const control of ["hint", "showMe", "sure"] as const) {
+		if (again[control] !== before[control]) problems.push(`opened again, the box ${again[control] ? "offers" : "lacks"} ${control === "sure" ? "his confidence" : control === "hint" ? "Hint" : "Show me"}, which it ${before[control] ? "offered" : "lacked"} before Done for today`);
+	}
+	assert.ok(problems.length === 0, `${s.label}: ${chat.title}, left for today:\n  ${problems.join("\n  ")}`);
+}
+
 // ─── the journey ───────────────────────────────────────────────────────────
 
 describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 900_000 }, () => {
@@ -397,25 +558,26 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 	});
 	after(() => app?.close());
 
-	/** Every invariant but the live lesson's, on what the surfaces draw now. */
-	async function holds(label: string) {
+	/** Every invariant but the live lesson's, on what the surfaces draw now, and `also`'s. */
+	async function holds(label: string, also: (s: Survey) => Promise<void> | void = () => {}) {
 		const s = await survey(app, label);
 		const failures: string[] = [];
-		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s)]) {
+		for (const check of [() => assertOneDay(s), () => assertOneStatus(s), () => assertExamWarnings(s), () => assertNeedsYouOnToday(s), () => assertOneStatusEverywhere(s), () => also(s), () => assertContinueOpensTask(app, s)]) {
 			try {
-				check();
+				await check();
 			} catch (err) {
 				failures.push((err as Error).message);
 			}
 		}
-		try {
-			await assertContinueOpensTask(app, s);
-		} catch (err) {
-			failures.push((err as Error).message);
-		}
 		assert.ok(failures.length === 0, failures.join("\n\n"));
 		return s;
 	}
+
+	/** What the lesson's page offers on its open question now (`lessonView`). */
+	const viewOf = (id: string, words: string) => app.lesson(`/chat/${id}`, (page) => lessonView(page, words));
+
+	/** The Invertible lesson started from its topic page (the live-lesson step), its question still open. */
+	let invertible: { id: string; call: { tool: string; input: unknown } } | null = null;
 
 	const sessionOf = (title: string) => app.chats().find((c) => c.title === title);
 
@@ -433,7 +595,7 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		assert.ok(opened?.startsWith("/chat/"), `Start opens a session (${opened})`);
 		const id = opened!.slice(6);
 		await app.navigate(opened!);
-		app.pose(id, "Which inputs does $A$ send to zero?");
+		invertible = { id, call: app.pose(id, "Which inputs does $A$ send to zero?") };
 		const title = app.record(id).title;
 		await app.settle(() => app.sidebarCards().some((c) => c.title === title), 20_000);
 		// Back on Home while the engine's course reads are slow (round 13: 6.5 s and more under load).
@@ -452,6 +614,16 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		if (!app.homeLines().some((l) => l.title === title)) problems.push(`once read, Home's Today has no line for the live lesson "${title}": ${app.homeLines().map((l) => l.title).join(" | ")}`);
 		await app.unmount();
 		assert.ok(problems.length === 0, problems.join("\n"));
+	});
+
+	it("Sun 8 Nov, Done for today on the Invertible lesson, its close followed by the app's re-pose of the left question (round 14, M1: 3 M1, 4 minor 5)", async () => {
+		assert.ok(invertible, "the live-lesson step started the Invertible lesson");
+		const { id, call } = invertible;
+		const words = "send to zero";
+		const before = await viewOf(id, words);
+		app.leave(id);
+		app.closes(id, "We'll stop here for today. Next time you pick up the lesson at the question on what $A$ sends to $0$, which is still open.", { repose: [call] });
+		await holds("Sun 8 Nov, after Done for today on the Invertible lesson", (s) => assertLeftToday(app, s, id, words, before));
 	});
 
 	it("Sun 8 Nov, after Problem sheet 4 is continued and left for next time (lens 2, steps 30 to 32)", async () => {
@@ -479,9 +651,14 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 			// The close hands the course's focus back to the open sheet, as round 12's did (1 D1).
 			focus: "sheet-4",
 		});
-		app.pose("chat_demo_eigen", "Find an eigenvector for $\\lambda = 3$.");
-		app.doneForToday("chat_demo_eigen", "Next time you pick up the eigenvalue lesson at the eigenvector question you left open.");
-		await holds("Sun 8 Nov, after the Eigen lesson");
+		// His Done for today, then the close lens 1 and lens 2 recorded (round 14, M1: 1 M1, 2 D2): the tutor's
+		// closing words, then the left question posed again as its own last call, against the marker.
+		const words = "Find an eigenvector for";
+		const left = app.pose("chat_demo_eigen", "Find an eigenvector for $\\lambda = 3$.");
+		const before = await viewOf("chat_demo_eigen", words);
+		app.leave("chat_demo_eigen");
+		app.closes("chat_demo_eigen", "We'll stop here for today. Next time you pick up the eigenvalue lesson at the eigenvector question you left open.", left);
+		await holds("Sun 8 Nov, after the Eigen lesson", (s) => assertLeftToday(app, s, "chat_demo_eigen", words, before));
 	});
 
 	it("Sun 8 Nov, after the Probability review from Home (lens 1, step 9)", async () => {
@@ -521,9 +698,45 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await holds("Mon 9 Nov, after the Linear Algebra review");
 	});
 
+	it("Mon 9 Nov, a lesson started from its topic page and closed with its first question open, its reply never finished (round 14, m28: 1 n5, 2)", async () => {
+		const { unitHref } = await import("../components/unit-inbox/unit-href.ts");
+		// Sunday's planned Linear Algebra start, so the session is not the Poisson lesson the Tue 10 step begins.
+		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
+		const course = courses.find((c) => c.map.title === "Linear Algebra")!.map;
+		const handle = course.topics.find((t) => t.title === "Linear maps and their matrices")!.handle;
+		await app.visit(unitHref(course.workspace, handle), { ready: () => !!document.querySelector('[data-slot="pickup-now-press"]') });
+		const opened = await app.press(document.querySelector('[data-slot="pickup-now-press"]')!);
+		assert.ok(opened?.startsWith("/chat/"), `its page starts a lesson (${opened})`);
+		// The tutor's first question, its turn never settled: the record ends on its call (\`cut\`, \`pendingQuestion\`).
+		app.pose(opened!.slice(6), "What do you expect this to look like, before we start?");
+		await app.unmount();
+		await holds("Mon 9 Nov, after a lesson left mid-question");
+	});
+
 	it("Tue 10 Nov, overnight", async () => {
 		app.day("2026-11-10");
 		await holds("Tue 10 Nov, overnight");
+	});
+
+	it("Tue 10 Nov, the Poisson lesson begun from its page, its task saved, then Done for today and the tutor's re-ask (round 14, M7: 1 M3)", async () => {
+		const { unitHref } = await import("../components/unit-inbox/unit-href.ts");
+		const { courses } = (await (await fetch("/api/calendar")).json()) as { courses: CalendarCourse[] };
+		const course = courses.find((c) => c.map.title === "Probability")!.map;
+		const poisson = course.topics.find((t) => t.title === "Poisson distribution")!.handle;
+		await app.visit(unitHref(course.workspace, poisson), { ready: () => !!document.querySelector('[data-slot="pickup-now-press"]') });
+		const opened = await app.press(document.querySelector('[data-slot="pickup-now-press"]')!);
+		assert.ok(opened?.startsWith("/chat/"), `its page starts a lesson (${opened})`);
+		const id = opened!.slice(6);
+		await app.unmount();
+		// What the lesson leaves, as lens 1's 10 Nov record has it: predictions only, and the lesson's task.
+		await app.save(id, {
+			observations: [{ topics: [poisson], text: "Predicted that rare events in a fixed window are spread evenly", result: "incorrect", help: "none", sure: "guess", predicted: true }],
+			tasks: { "poisson-lesson": { title: "Poisson distribution lesson", topics: [poisson], goal: "Learn the Poisson distribution as the limit of binomials", step: "The bookshop question: the chance of no customers in an hour" } },
+		});
+		const left = app.pose(id, "A bookshop gets 3 customers an hour on average. What is the chance of none in the next hour?");
+		app.leave(id);
+		app.closes(id, "We'll stop here for today. Next time you pick up the Poisson lesson at the bookshop question.", left);
+		await holds("Tue 10 Nov, after the Poisson lesson's Done for today");
 	});
 
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
