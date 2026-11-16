@@ -166,10 +166,14 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 
 /** The app frame: sidebar inline + content. Rendered once in the root layout. */
 export function AppShell({ children }: { children: React.ReactNode }) {
+	const { open } = useSidebar();
 	return (
 		<SettingsDialogProvider>
 			<UnitSidebar />
-			<main className="min-w-0 flex-1">{children}</main>
+			{/* `data-sidebar` keys the page's band gutter in the Mac app (`.lh-band-start`). */}
+			<main data-sidebar={open ? "open" : "folded"} className="min-w-0 flex-1">
+				{children}
+			</main>
 			{/* The single document-level keydown listener (keyboard wave A) —
 			    after the content in the tree, but it's window-level so order only
 			    matters for the events it dispatches, never for DOM priority. */}

@@ -194,7 +194,7 @@ export function CalendarView({
 	return (
 		<div data-slot="calendar" className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<header data-slot="calendar-toolbar" className="relative z-10 flex h-13 shrink-0 items-center gap-3 px-3">
+			<header data-slot="calendar-toolbar" className="lh-band-start relative z-10 flex h-13 shrink-0 items-center gap-3 px-3">
 				<div className="lh-no-drag flex items-center gap-1">
 					<Button variant="quiet" size="sm" onClick={() => controller.today()} className="text-foreground">
 						Today

@@ -146,7 +146,7 @@ export function UnitSidebar() {
 				ref={sidebarRef}
 				id={sidebarId}
 				style={{ "--sidebar-width": `${width}px` } as React.CSSProperties}
-				className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-(--sidebar-width)" : "lh-rail w-12")}
+				className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-(--sidebar-width)" : "w-12")}
 				data-testid="sidebar"
 				data-state={open ? "open" : "folded"}
 			>
