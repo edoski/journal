@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { UNREADABLE_CONTROLS_PROBE } from "../../core/demo-frame.ts";
 import { createRequire } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -27,6 +28,10 @@ export interface DemoRunResult {
 	pageErrors: string[];
 	/** Network requests that failed (CDN scripts that didn't load, …). */
 	failedRequests: string[];
+	/** Controls whose words read below the contrast they need, as
+	 *  "Pause: 1.0:1" (`UNREADABLE_CONTROLS_PROBE`), checked in his app's
+	 *  dark preference; a fake may leave it out. */
+	unreadable?: string[];
 	/** Value of the optional probe expression, when requested and successful. */
 	probeResult?: unknown;
 	/** True when nothing above recorded anything. */
@@ -272,6 +277,7 @@ async function runDemo(html: string, opts: RunDemoOptions = {}): Promise<DemoRun
 	const failedRequests: string[] = [];
 	let probeResult: unknown;
 	let probed = false;
+	let unreadable: string[] = [];
 
 	try {
 		await withBrowserPage(async (page) => {
@@ -282,8 +288,16 @@ async function runDemo(html: string, opts: RunDemoOptions = {}): Promise<DemoRun
 		page.on("requestfailed", (req) => failedRequests.push(`${req.url()} (${req.failure()?.errorText ?? "failed"})`));
 
 		try {
+			// His app is dark only: a control left to the browser's colours is read as he would see it (round 12, 2 M2).
+			await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "dark" }]);
 			await page.goto(pathToFileURL(file).href, { waitUntil: "load", timeout: 30_000 });
 			await new Promise((resolve) => setTimeout(resolve, settleMs));
+			try {
+				const found = await page.evaluate(UNREADABLE_CONTROLS_PROBE);
+				unreadable = Array.isArray(found) ? found.map(String) : [];
+			} catch (err) {
+				pageErrors.push(`contrast check failed: ${err instanceof Error ? err.message : String(err)}`);
+			}
 			if (opts.probe) {
 				try {
 					probeResult = await page.evaluate(opts.probe);
@@ -308,8 +322,9 @@ async function runDemo(html: string, opts: RunDemoOptions = {}): Promise<DemoRun
 		consoleErrors,
 		pageErrors,
 		failedRequests,
+		unreadable,
 		...(probed ? { probeResult } : {}),
-		ok: consoleErrors.length === 0 && pageErrors.length === 0 && failedRequests.length === 0,
+		ok: consoleErrors.length === 0 && pageErrors.length === 0 && failedRequests.length === 0 && unreadable.length === 0,
 	};
 }
 

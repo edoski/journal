@@ -649,6 +649,24 @@ describe("demo builder (fake model + fake headless)", () => {
 		assert.match(result.notes ?? "", /^FAILED: .*Chrome/);
 	});
 
+	// Round 12 (2 M2, 3 D10): the Eigen demo's presets and Pause read as empty boxes.
+	const EIGEN_DEMO = `<!doctype html><html><head><style>button { background:#fff; border:1px solid #cbd5e1; }</style></head><body><button id="pause">❚❚ Pause</button></body></html>`;
+	it("fail the builder's test run when a control does not read, naming it, and the builder runs the demo on the base", async () => {
+		const runs: string[] = [];
+		const unreadable: DemoRunResult = { consoleErrors: [], pageErrors: [], failedRequests: [], unreadable: ["❚❚ Pause: 1.0:1"], ok: false };
+		const headless = { available: () => true, unavailableReason: () => null, runDemo: async (html: string) => (runs.push(html), unreadable), renderSvg: async () => Buffer.alloc(0), renderPdfPages: async () => [] } as unknown as HeadlessApi;
+		const model = scriptedModel([
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_demo", input: { html: EIGEN_DEMO } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "run_demo", input: {} }] },
+			{ text: "Press a preset." },
+		]);
+		const result = await runDemoBuilder({ title: "Eigen", brief: "Presets and Pause." }, { engine: model, headless });
+		assert.equal(result.html, "", "never delivered");
+		assert.match(result.notes ?? "", /unreadable control/);
+		assert.match(result.notes ?? "", /Pause: 1\.0:1/);
+		assert.ok(runs.length > 0 && runs.every((html) => html.includes("data-demo-base")), "tested as his app shows it");
+	});
+
 	it("fails when the model never writes a demo", async () => {
 		const model = scriptedModel([{ text: "I cannot build this." }]);
 		const result = await runDemoBuilder({ title: "T", brief: "b" }, { engine: model, headless: fakeHeadless() });
