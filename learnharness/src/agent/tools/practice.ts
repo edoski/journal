@@ -140,6 +140,12 @@ function byTopicField() {
 	);
 }
 
+/** The record sentence's ask, on the conclusion and its first try: the
+ *  line his topic's history reads for the answer (round 11, 2 n5: the
+ *  history showed the whole problem, and a first try as "First try"). */
+const RECORD_DESCRIPTION =
+	"What he did on this answer, as one short line for his course record in the words a lesson save uses, with math in `$…$` LaTeX: what he got right or where it broke (\"Subtracted the rank from the rows instead of the columns\"), never the problem's statement. His topic's history reads it.";
+
 export const concludeInputObject = Type.Object({
 	outcome: Type.Union(
 		[
@@ -175,6 +181,7 @@ export const concludeInputObject = Type.Object({
 			"REQUIRED — the attempt's result for his course record: correct, partial (part of it right: some of its parts right and others not, or a right answer reached by reasoning that does not hold; a verdict that names a part he got right is never incorrect) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
 	}),
 	response: Type.String({ description: "REQUIRED — his final answer, in a short line, with math in `$…$` LaTeX (it is recorded as the attempt the learner reads later)." }),
+	record: Type.Optional(Type.String({ minLength: 1, description: RECORD_DESCRIPTION })),
 	chose: Type.Optional(
 		Type.String({
 			minLength: 1,
@@ -189,6 +196,7 @@ export const concludeInputObject = Type.Object({
 			{
 				result: attemptResult("REQUIRED — the result of his first answer."),
 				response: Type.String({ description: "REQUIRED — his first answer, in a short line, with math in `$…$` LaTeX." }),
+				record: Type.Optional(Type.String({ minLength: 1, description: RECORD_DESCRIPTION })),
 				sure: Type.Union([...CONFIDENCE_STATES.map((s) => Type.Literal(s)), Type.Null()], {
 					description:
 						"REQUIRED — the Confidence line of the submission that made this first claim (guessing, neutral or confident), or null when it had none. A working note before the claim is not the claim.",
@@ -244,6 +252,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 		rung: input.rung,
 		result: input.result,
 		response: input.response,
+		...(input.record ? { record: input.record } : {}),
 		...(input.chose ? { chose: input.chose } : {}),
 		...(input.byTopic ? { byTopic: input.byTopic } : {}),
 		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
