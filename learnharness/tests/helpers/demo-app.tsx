@@ -102,6 +102,8 @@ export interface HomeLine {
 	course: string;
 	title: string;
 	status: string;
+	/** The kind of a new topic's reason its mark gives in place of its plain words (`data-starts`), else null. */
+	starts: string | null;
 	text: string;
 }
 
@@ -355,7 +357,8 @@ export async function openDemoApp(day = "2026-11-08") {
 		return [...document.querySelectorAll('[data-slot="today-line"]')].map((el) => {
 			const [course, title] = [...el.children].filter((c) => c.matches("span.block")).map(text);
 			const status = text(el.querySelector('[data-slot="why-mark"], [data-slot="today-standing"], [data-slot="today-why"]'));
-			return { el, course: course ?? "", title: title ?? "", status, text: text(el) };
+			const starts = el.querySelector('[data-slot="today-why"]')?.getAttribute("data-starts") ?? null;
+			return { el, course: course ?? "", title: title ?? "", status, starts, text: text(el) };
 		});
 	}
 
