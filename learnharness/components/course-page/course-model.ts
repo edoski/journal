@@ -25,8 +25,7 @@ import { lastSessionOf } from "@/components/course-page/course-head/head-facts";
 export const GROUP_IDS = ["needs-you", "learning", "not-started", "on-your-own"] as const;
 export type GroupId = (typeof GROUP_IDS)[number];
 
-/** Each group's name on the page: Needs you is Home's Today, the others
- *  the sidebar's shelves. */
+/** Each group's name on the page: Needs you is Home's Today. */
 export const GROUP_WORDS: Record<GroupId, string> = {
 	"needs-you": "Needs you",
 	learning: "Learning",
@@ -66,11 +65,12 @@ const HERE: TopicFact = { kind: "here", words: CURRENT_TAG };
  * (spec: course-page.md, "The groups"):
  *   - Needs you: the topics Home's Today takes up (the sidebar's top,
  *     `todayTop` over every course), in Today's order, with Today's reason;
- *   - Learning: the sidebar's Working and Learning shelves, in their order;
+ *   - Learning: taught and not solid, or solid but weak (`restTopics`'
+ *     working, then learning), in that order;
  *   - Not started: the rest of the path, in the order the plan starts
  *     them (`starts`), those it has no day for last, in the engine's path
  *     order;
- *   - On your own: the sidebar's On your own shelf, in its order.
+ *   - On your own: solid and not weak (`restTopics`' known), in its order.
  * Each row ends in the sidebar's fact for it (`sidebarSays`). `chats`
  * are every session (with those started on a topic's page linked to it);
  * `courses` every course, since Today weighs them together. Always the

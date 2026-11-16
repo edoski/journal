@@ -28,7 +28,7 @@ async function mount(count: number) {
 	await act(async () =>
 		root!.render(
 			<ul>
-				<UnitShelf id="other" label="Other sessions" items={items} folded={false} onFoldedChange={() => {}} isActive={() => false} waits={() => false} renderItem={(item) => <li key={item} data-testid="row">{item}</li>} />
+				<UnitShelf id="other" label="Other sessions" items={items} folded={false} onFoldedChange={() => {}} keep={() => false} waits={() => false} renderItem={(item) => <li key={item} data-testid="row">{item}</li>} />
 			</ul>,
 		),
 	);

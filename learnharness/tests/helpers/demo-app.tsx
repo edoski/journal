@@ -140,7 +140,7 @@ export async function openDemoApp(day = "2026-11-08") {
 		});
 	}
 	// Every sidebar shelf open, so each card can be read where it is filed.
-	localStorage.setItem("lh:topic-sidebar-folded", JSON.stringify({ working: false, learning: false, known: false, other: false }));
+	localStorage.setItem("lh:topic-sidebar-folded", JSON.stringify({ sessions: false }));
 	Object.assign(process.env, {
 		HOME: path.join(world, "home"),
 		VAULT_DIR: path.join(world, "vault"),

@@ -22,7 +22,7 @@ import { CourseGroup } from "../components/course-page/course-group.tsx";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { courseHref, unitHref, workspaceOf } from "../components/unit-inbox/unit-href.ts";
 import { buildInbox, unitStatus, type Unit } from "../components/unit-inbox/units.ts";
-import { nowFor, plannedKeys, restShelves, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
+import { nowFor, plannedKeys, restTopics, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
 import { claimedKeys, todayTop } from "../components/unit-inbox/today/today-top.ts";
 import { cardLine } from "../components/course-map/topic-map/topic-standing.ts";
 import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
@@ -114,7 +114,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 		const top = todayTop(nowFor([c], chats, null, c.map.today), inbox, chats);
 		const said = new Map<string, string>();
 		for (const item of top) for (const key of claimedKeys(item)) if (!said.has(key)) said.set(key, `Today: ${item.line.slot}`);
-		const shelves = restShelves(inbox, new Set(said.keys()));
+		const shelves = restTopics(inbox, new Set(said.keys()));
 		const words = (u: Unit) => {
 			const status = shelfStatus(u, c.map.today, plannedKeys([c]));
 			return status.kind === "your-turn" ? "Your turn" : status.kind === "working" ? "Working" : "words" in status ? status.words : "";
