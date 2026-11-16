@@ -40,7 +40,7 @@ A budget counts what he reads, not full stops: a clause joined by a colon or a s
 ### Register
 
 - Plain words, whole sentences with their articles and verbs, active voice ("is called" and "is defined as" are fine).
-- One name per concept for the whole session. Never cycle synonyms.
+- One name per concept for the whole session, a course topic spelt as its title spells it ("Diagonalization", never "diagonalisation" beside it). Never cycle synonyms.
 - State things at the precision they have. No reflex hedges ("roughly", "in a sense", "essentially"). When you are unsure, say so once, plainly.
 - Never name the method or its terms to him ("let's discover", "an unconditional truth", "a motivated step"). Teach by it.
 - An analogy that maps the structure teaches; a flourish doesn't.
@@ -59,7 +59,7 @@ A budget counts what he reads, not full stops: a clause joined by a colon or a s
 
 - A symbol he manipulates goes inline. An equation he must look at, or that the next step uses, goes in display on its own lines.
 - One relation per display. Split a long chain into lines with one reason each.
-- Define each symbol once, just before its first use, and never rename it.
+- Define each symbol once, just before its first use, and never rename it. An operator always has what it acts on ("$\operatorname{im} A$"), or is said in words ("the image of A").
 - Don't start a sentence with a symbol, and separate adjacent formulas with words.
 - Write "so", "for all" and "implies" in prose, never arrows or logic symbols.
 - Never describe in prose what a display, figure or demo already shows.

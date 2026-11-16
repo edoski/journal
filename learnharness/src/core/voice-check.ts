@@ -51,6 +51,7 @@ export type VoiceRule =
 	| "confidence"
 	| "letter"
 	| "reprint"
+	| "operand"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -220,6 +221,10 @@ export function clausesOf(text: string): { words: number; clauses: number; short
 
 /** Every rule one tutor turn breaks. `kind` adds its budget and, after a
  *  right answer, the feedback rule; without it only the phrase rules apply. */
+/** Inline maths that is an operator alone, acting on nothing (round 11,
+ *  2 n9: "the dimension of im," from a lone `$\operatorname{im}$`). */
+const LONE_OPERATOR = /(?<!\$)\$\s*\\(?:ker|det|dim|operatorname\{[A-Za-z]+\}|mathrm\{(?:im|rank|span|tr)\})\s*\$(?!\$)/;
+
 export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const { text: plain, displays } = prose(text);
 	const out = phraseBreaks(plain, new Set(kind === "direct" ? ["offer"] : []));
@@ -227,6 +232,8 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const said = sentences(plain);
 	const asked = said.filter((s) => s.trim().endsWith("?"));
 	if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });
+	const lone = LONE_OPERATOR.exec(text);
+	if (lone) out.push({ rule: "operand", excerpt: lone[0] });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
 	if (load > SENTENCES[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCES[kind]}` });
