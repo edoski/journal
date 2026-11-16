@@ -105,7 +105,9 @@ weekday holds two: two unrelated topics in
 one sitting split his attention, and nothing but a pace asks for them. A pace
 that needs two still takes two, related ones first. A topic a course cannot start before its exam does not
 fit, and the plan says why (``Reason``). Before any pace, an untaught topic that a taught topic needs starts first,
-nearest exam first: what he has already started stands on it. A start that
+nearest exam first: what he has already started stands on it; but a course
+in its final review takes its own starts, gaps and pace, before any other
+course's, since its exam is days away. A start that
 waits while other courses' new topics take the days names them
 (``When.starts_after``).
 
@@ -1181,32 +1183,54 @@ def _new(
     if begun is not None:
         room = max(room, sum(paces.values()) - begun)
     others = [course for course in courses if course.new_end(day) is None]
-    for course in [*exams, *others]:
+
+    def gap(course: _Course) -> int:
+        """Its untaught topics a taught one stands on (``_gaps``)."""
         startable = course.startable(day)
         gaps = course.gaps.intersection(startable)
         if room > 0 and gaps:
-            room -= take(course, room, gaps, pool=startable, bound=False)
+            return take(course, room, gaps, pool=startable, bound=False)
+        return 0
+
+    def paced(course: _Course) -> int:
+        """Its exam's pace, past the window when holding would raise it."""
+        if room <= 0 or course.name not in paces:
+            return 0
+        pace = paces[course.name]
+        taken = take(course, min(room, pace), set(course.scoped))
+        end = course.new_end(day)
+        assert end is not None
+        left = _study_days(week, day, end)
+        if (
+            room - taken > 0
+            and taken < pace
+            and progress.holding_raises(
+                left,
+                len(course.scoped),
+                before[course.name],
+                _room_after(week, day, end),
+            )
+        ):
+            more = min(room - taken, pace - taken)
+            taken += take(course, more, set(course.scoped), bound=False, pace=True)
+        return taken
+
+    # A final review owns the day's starts: its exam's topics, those the rest
+    # of the exam stands on first, come before any other course's, even a
+    # topic another course already stands on (round 12, 1 D2: two days
+    # before the Probability exam Linear Algebra started Linear maps, and
+    # Expectation, which Variance needs, started on the eve, too late for a
+    # review).
+    reviewing = [course for course in exams if course.reviewing(day)]
+    for course in reviewing:
+        room -= gap(course)
+        room -= paced(course)
+    for course in [*exams, *others]:
+        if course not in reviewing:
+            room -= gap(course)
     for course in exams:
-        if room > 0 and course.name in paces:
-            pace = paces[course.name]
-            taken = take(course, min(room, pace), set(course.scoped))
-            room -= taken
-            end = course.new_end(day)
-            assert end is not None
-            left = _study_days(week, day, end)
-            if (
-                room > 0
-                and taken < pace
-                and progress.holding_raises(
-                    left,
-                    len(course.scoped),
-                    before[course.name],
-                    _room_after(week, day, end),
-                )
-            ):
-                scoped = set(course.scoped)
-                more = min(room, pace - taken)
-                room -= take(course, more, scoped, bound=False, pace=True)
+        if course not in reviewing:
+            room -= paced(course)
     open_ = [course for course in others if course.exam is None or course.outside(day)]
     if not any(course.reviewing(day) for course in exams):
         room -= share(open_)

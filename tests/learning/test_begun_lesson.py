@@ -115,3 +115,19 @@ def test_a_begun_lesson_is_started_the_day_he_began_it() -> None:
     lesson = progress.lessons(record)["poisson"]
     first = capacity.first_day(replayed, record["topics"]["poisson"], lesson)
     assert first == date(2026, 11, 9)
+
+
+def test_the_final_review_owns_the_days_starts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Two days before the Probability exam, its start that Variance stands
+    on, Expectation, takes the day and is reviewed before the exam; Linear
+    Algebra's Linear maps, which its own taught topics stand on but whose
+    exam is weeks away, waits until after it (round 12, 1 D2)."""
+    plan = world(tmp_path, "d17", monkeypatch, capsys).plan("2026-11-17")
+    probability = plan["probability"]["plan"]
+    assert starts(plan["probability"])["expectation"] == "2026-11-17"
+    assert "expectation" not in probability.get("unreviewed", [])
+    assert starts(plan["linear-algebra"])["linear-maps"] > "2026-11-19"
