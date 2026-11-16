@@ -80,8 +80,11 @@ export function todaySteps(course: StudyCourse): NextStep[] {
 		steps.push({ kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] });
 	}
 	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
-	// A lesson he began goes on today: Continue, never Start (round 12, 1 D3).
-	for (const group of [planned.filter(lessonBegun), planned.filter((t) => !lessonBegun(t))]) {
+	// A lesson he began goes on today: Continue, never Start (round 12, 1 D3),
+	// and the open task holding it is that Continue (round 14, M7: Home listed
+	// the begun Poisson lesson twice on the exam eve, as its task and its topic).
+	const held = new Set(steps.flatMap((s) => (s.kind === "task" ? s.topics : [])));
+	for (const group of [planned.filter((t) => lessonBegun(t) && !held.has(t.handle)), planned.filter((t) => !lessonBegun(t))]) {
 		if (group.length > 0) steps.push({ kind: "topic", title: titleList(group.map((t) => t.title)), topics: group.map((t) => t.handle), fresh: !lessonBegun(group[0]!), planned: true });
 	}
 	if (steps.length > 0) return steps;

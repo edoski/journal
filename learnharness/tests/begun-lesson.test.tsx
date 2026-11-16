@@ -56,7 +56,8 @@ describe("a lesson he began", () => {
 	});
 
 	it("goes on today on Home as Continue, never Start", () => {
-		const steps = todaySteps({ ...COURSE, newToday: ["poisson" as never] });
+		// With no open task holding it: one that does is its Continue (round 14, M7).
+		const steps = todaySteps({ ...COURSE, map: { ...MAP, tasks: [] }, newToday: ["poisson" as never] });
 		const words = steps.map(stepWords);
 		assert.ok(words.includes("Continue Poisson distribution"), words.join(" | "));
 		assert.ok(!words.some((w) => w.startsWith("Start Poisson")), words.join(" | "));
