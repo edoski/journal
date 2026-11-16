@@ -156,7 +156,7 @@ describe("calendar entries", () => {
 			{ planned: [{ date: "2026-11-11", reviews: ["eigen" as TopicHandle], new: [] }] },
 		);
 		const [review] = calendarEntries({ courses: [MOVED], chats: [], scope: null }).filter((e) => e.kind === "review");
-		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", null, "Earlier days are full"]);
+		assert.deepEqual(review?.kind === "review" && [review.day, review.since, review.waits], ["2026-11-11", null, null], "nor that earlier days are full (round 11)");
 	});
 
 	it("says from which told day a review or a start moved and what of his study moved it", () => {

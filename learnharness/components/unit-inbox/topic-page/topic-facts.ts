@@ -1,6 +1,6 @@
 import { isReviewSession, markHow, topicOpening, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
 import { cardLine, slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, examGapTopicWords, heldWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, examGapTopicWords, heldExamWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -122,7 +122,7 @@ export interface TopicFacts {
 	 *  calls weak when that attempt was not right, in the tutor's words. */
 	mistake: string | null;
 	/** Why its next review waits past the day memory asks for it
-	 *  (`heldWords`); null when nothing holds it back. */
+	 *  (`waitsWords`); null when nothing holds it back. */
 	waits: string | null;
 	/** A topic not started that the engine's plan starts later: the day of
 	 *  its first lesson and, when it waits behind other courses' new
@@ -192,8 +192,8 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap, said?: ReadonlyM
 }
 
 /** Why the review waits past the day memory asked for it, after from
- *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
- *  from 9 Nov, earlier days are full". */
+ *  when (`movedWords`): "Due since 1 Oct, waits for your Probability exam",
+ *  "Due since 1 Oct"; an exam is the only why it names (`heldExamWords`). */
 /** What the exam ahead means for the topic: it leaves it out, or its plan
  *  has no room to start or review it; null otherwise. */
 const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam);
@@ -208,9 +208,9 @@ function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | nul
 
 function waitsWords(topic: CourseMapTopic, today: string): string | null {
 	if (topic.moved && topic.review) return movedWords(topic.review, today, topic.moved);
-	const why = heldWords(topic.review);
+	const why = heldExamWords(topic.review);
 	const moved = movedWords(topic.review, today);
-	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : why;
+	return why && moved ? `${moved}, ${why.charAt(0).toLowerCase()}${why.slice(1)}` : (why ?? moved);
 }
 
 /** The open tasks that hold the topic: the focused one first, then the

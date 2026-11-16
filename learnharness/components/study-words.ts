@@ -232,6 +232,15 @@ export function heldWords(review: CourseMapTopic["review"]): string | null {
 	return review.held.exam ? HELD_WORDS.exam(review.held.exam) : HELD_WORDS.full;
 }
 
+/** Why a review waits, as a page or the calendar says it: only when
+ *  another course's exam took its day (`HELD_WORDS.exam`). That earlier
+ *  days are full explains a gap from memory's day, a day he was never told,
+ *  so a row says nothing of it (round 11: "Earlier days are full" under
+ *  a review read as noise). */
+export function heldExamWords(review: CourseMapTopic["review"]): string | null {
+	return review?.kind === "scheduled" && review.held?.exam ? HELD_WORDS.exam(review.held.exam) : null;
+}
+
 /** A day that moved, from when: one he was told ("Moved from 10 Nov after
  *  your Probability study today", round 7: a told day moved in silence),
  *  else a review the plan holds past a day memory asked for that has
