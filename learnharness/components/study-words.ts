@@ -352,11 +352,22 @@ export const EXAM_GAP_WORDS = {
 	review: "Review it today",
 	/** The menu of the other topics he can take up today, beside the pick. */
 	another: "Or another",
+	/** A topic he began, whose press picks its session or task up (round 12, 1 D5). */
+	continue: "Continue it today",
 	ask: "Ask the tutor",
-	/** Each topic in Start one today's menu: "Start Variance", "Review Rank". */
+	/** Each topic in Start one today's menu: "Start Variance", "Review Rank", "Continue Poisson distribution". */
 	startTopic: "Start",
 	reviewTopic: "Review",
+	continueTopic: "Continue",
 } as const;
+
+/** What a way in does: start a topic, review one, or continue one he began. */
+export type ExamWayVerb = "start" | "review" | "continue";
+
+/** A way in's verb before its topic: "Start", "Review", "Continue". */
+export function examWayWords(verb: ExamWayVerb): string {
+	return verb === "start" ? EXAM_GAP_WORDS.startTopic : verb === "review" ? EXAM_GAP_WORDS.reviewTopic : EXAM_GAP_WORDS.continueTopic;
+}
 
 /** A topic the exam's plan leaves out, by title, with the engine's reason
  *  (`exam.reasons`); a topic with no reason reads as `full`. */
@@ -409,8 +420,8 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 /** The pick among the topics he can take up today, as its press says it:
  *  "Start Expectation and linearity today", "Review Binomial distribution
  *  today". */
-export function examGapPickWords(starts: boolean, title: string): string {
-	return `${starts ? EXAM_GAP_WORDS.startTopic : EXAM_GAP_WORDS.reviewTopic} ${title} today`;
+export function examGapPickWords(verb: ExamWayVerb, title: string): string {
+	return `${examWayWords(verb)} ${title} today`;
 }
 
 /** The taught topics the final review leaves out, a line per reason,

@@ -1,11 +1,12 @@
 "use client";
 
-import type { CourseMapTopic, StudyCourse } from "@/src/core";
+import { useRouter } from "next/navigation";
+import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MathText } from "@/components/ui/math-text";
-import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords } from "@/components/study-words";
-import { examGapAskCreation, topicCreation, useStartSession } from "@/components/unit-inbox/start-unit";
+import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, examWayWords, type ExamWayVerb } from "@/components/study-words";
+import { examGapAskCreation, topicPress, useStartSession } from "@/components/unit-inbox/start-unit";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
 
 const PRESS = "text-body system-current:text-row text-link hover:text-link";
@@ -18,10 +19,13 @@ const PRESS = "text-body system-current:text-row text-link hover:text-link";
  * topics left out). Start it (or Review it) today opens a lesson on the one
  * topic the line names; otherwise the first is the pick, named on its press
  * ("Review Binomial distribution today"), and Or another opens a menu of
- * the rest; with none he can take today, Ask alone. Ask the tutor opens a lesson that asks, in his
- * words, how to fit them in. Engine facts only; nothing otherwise.
+ * the rest; with none he can take today, Ask alone. A topic he began
+ * reads Continue and opens its session, as its topic page does
+ * (`topicPress`; round 12, 1 D5). Ask the tutor opens a lesson that asks,
+ * in his words, how to fit them in. Engine facts only; nothing otherwise.
  */
-export function ExamGapLine({ course }: { course: StudyCourse }) {
+export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: readonly ChatListItem[] }) {
+	const router = useRouter();
 	const { start, starting } = useStartSession();
 	const gaps = examGaps(course.map);
 	if (!gaps) return null;
@@ -31,7 +35,13 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 	const why = examGapWhyWords(reasoned(gaps.start), reasoned(gaps.review)) ?? "";
 	const { ways } = gaps;
 	const named = [...gaps.start, ...gaps.review];
-	const open = (topic: CourseMapTopic) => start(`gap:${topic.handle}`, topicCreation(workspace, topic, course.map.today));
+	const press = (topic: CourseMapTopic) => topicPress(topic, course.map, chats);
+	const open = (topic: CourseMapTopic) => {
+		const { resume, creation } = press(topic);
+		if (resume) router.push(`/chat/${resume.id}`);
+		else start(`gap:${topic.handle}`, creation);
+	};
+	const verb = (way: { topic: CourseMapTopic; starts: boolean }): ExamWayVerb => (!way.starts ? "review" : press(way.topic).continues ? "continue" : "start");
 	const only = ways.length === 1 && !ways[0]!.planned ? ways[0]! : null;
 	// The pick: the first way, today's plan before the topics left out, a
 	// review before a start (round 8: eight options and no pick; rounds 10
@@ -44,12 +54,12 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 			</span>
 			{ways.length === 0 ? null : only ? (
 				<Button variant="quiet" size="xs" className={PRESS} disabled={starting !== null} onClick={() => open(only.topic)}>
-					{only.starts ? EXAM_GAP_WORDS.start : EXAM_GAP_WORDS.review}
+					{EXAM_GAP_WORDS[verb(only)]}
 				</Button>
 			) : (
 				<>
 					<Button variant="quiet" size="xs" data-slot="exam-gaps-pick" className={PRESS} disabled={starting !== null} onClick={() => open(pick!.topic)}>
-						<MathText>{examGapPickWords(pick!.starts, pick!.topic.title)}</MathText>
+						<MathText>{examGapPickWords(verb(pick!), pick!.topic.title)}</MathText>
 					</Button>
 				{others.length > 0 && (
 				<DropdownMenu>
@@ -59,9 +69,9 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
-						{others.map(({ topic, starts }) => (
-							<DropdownMenuItem key={topic.handle} onSelect={() => open(topic)}>
-								<MathText>{`${starts ? EXAM_GAP_WORDS.startTopic : EXAM_GAP_WORDS.reviewTopic} ${topic.title}`}</MathText>
+						{others.map((way) => (
+							<DropdownMenuItem key={way.topic.handle} onSelect={() => open(way.topic)}>
+								<MathText>{`${examWayWords(verb(way))} ${way.topic.title}`}</MathText>
 							</DropdownMenuItem>
 						))}
 					</DropdownMenuContent>
