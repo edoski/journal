@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, ChevronDownIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FIRST_LESSON } from "@/components/study-words";
+import { FIRST_LESSON, moreWords } from "@/components/study-words";
+import { daysThatFit } from "@/components/unit-inbox/topic-page/pickup/earlier-fit";
 import { Button } from "@/components/ui/button";
 import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
@@ -208,29 +210,79 @@ export function ScheduledEntry({ kind, day, waits, why }: { kind: "review" | "st
 	);
 }
 
+/** The "Show the rest" row's height, which the days that fit leave room for. */
+const MORE_ROW = 36;
+
 /** Earlier: the history's sessions and attempts on its line, newest
  *  first, each session followed by the attempts it saved (`trailDays`),
- *  each day's words in the date column of its first row. */
+ *  each day's words in the date column of its first row. The days that
+ *  fit the pane whole (`daysThatFit`), then "Show the rest" for the older
+ *  ones, so the list never runs off the window's bottom edge (round 11,
+ *  1, shot 41); measured with every day drawn, again when the pane's
+ *  height or the days change. */
 export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly TrailDay[]; titleOf: (handle: string) => string } & Pick<HybridPaneProps, "shown" | "onShow">) {
-	const count = days.reduce((n, day) => n + day.rows.length, 0);
+	const list = useRef<HTMLOListElement>(null);
+	const [fit, setFit] = useState<number | null>(null);
+	const [expanded, setExpanded] = useState(false);
+	const signature = days.map((day) => `${day.day}:${day.rows.length}`).join(",");
+	const [measured, setMeasured] = useState(signature);
+	if (measured !== signature) {
+		setMeasured(signature);
+		setFit(null);
+	}
+	useLayoutEffect(() => {
+		if (expanded || fit !== null) return;
+		const ol = list.current;
+		const pane = ol?.closest<HTMLElement>('[data-slot="topic-history"]');
+		if (!ol || !pane) return;
+		const top = pane.getBoundingClientRect().top - pane.scrollTop;
+		let at = 0;
+		const ends = days.map((day) => {
+			at += day.rows.length;
+			return (ol.children[at - 1]?.getBoundingClientRect().bottom ?? top) - top;
+		});
+		setFit(daysThatFit(ends, pane.clientHeight, MORE_ROW));
+	}, [days, expanded, fit]);
+	useLayoutEffect(() => {
+		const pane = list.current?.closest<HTMLElement>('[data-slot="topic-history"]');
+		if (!pane) return;
+		let height = pane.clientHeight;
+		const observer = new ResizeObserver(() => {
+			if (pane.clientHeight === height) return;
+			height = pane.clientHeight;
+			setFit(null);
+		});
+		observer.observe(pane);
+		return () => observer.disconnect();
+	}, []);
+	const drawn = expanded || fit === null ? days : days.slice(0, fit);
+	const count = drawn.reduce((n, day) => n + day.rows.length, 0);
 	let at = 0;
 	const ends = (): Ends => {
 		const i = at++;
 		return { above: i > 0, below: i < count - 1 };
 	};
 	return (
-		<ol aria-label="Earlier" className="flex flex-col">
-			{days.flatMap((day) =>
-				day.rows.map((row, i) => {
-					const date = i === 0 ? day.label : null;
-					return row.kind === "session" ? (
-						<SessionItem key={row.entry.chat.id} entry={row.entry} shown={row.entry.chat.id === shown} onShow={onShow} ends={ends()} date={date} writing="Tutor writing" />
-					) : (
-						<AttemptEntry key={row.attempt.id} attempt={row.attempt} title={row.title} titleOf={titleOf} ends={ends()} date={date} />
-					);
-				}),
+		<>
+			<ol ref={list} aria-label="Earlier" className="flex flex-col">
+				{drawn.flatMap((day) =>
+					day.rows.map((row, i) => {
+						const date = i === 0 ? day.label : null;
+						return row.kind === "session" ? (
+							<SessionItem key={row.entry.chat.id} entry={row.entry} shown={row.entry.chat.id === shown} onShow={onShow} ends={ends()} date={date} writing="Tutor writing" />
+						) : (
+							<AttemptEntry key={row.attempt.id} attempt={row.attempt} title={row.title} titleOf={titleOf} ends={ends()} date={date} />
+						);
+					}),
+				)}
+			</ol>
+			{drawn.length < days.length && (
+				<Button variant="list" size="row" data-slot="pickup-earlier-more" onClick={() => setExpanded(true)} className={cn(BLEED, "h-9 justify-start gap-4 duration-150")}>
+					<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
+					{moreWords(1, Infinity)}
+				</Button>
 			)}
-		</ol>
+		</>
 	);
 }
 
