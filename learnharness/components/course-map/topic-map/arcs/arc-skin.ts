@@ -1,11 +1,11 @@
-import { Position, type Edge, type Node } from "@xyflow/react";
+import { Position, type Node } from "@xyflow/react";
 import type { MapSkin } from "../map-skin";
 import type { TopicMapLayout } from "../topic-map-layout";
 import { layoutCanvas } from "../canvas/canvas-layout";
 import { TREE_SKIN, canvasEdges } from "../canvas/canvas-skin";
 import { layoutArcRegions, arcRing, type ArcDrawing } from "./arc-layout";
 import { ArcRegionNode, type ArcRegionFlowNode } from "./arc-region";
-import { ArcLinkEdge, type ArcLinkFlowEdge } from "./arc-link";
+import type { CanvasLine } from "../canvas/canvas-lines";
 
 /** Each drawing's arcs, kept beside the layout it was laid out with. */
 const drawings = new WeakMap<TopicMapLayout, ArcDrawing>();
@@ -24,7 +24,6 @@ export function arcRegionsSkin(fold: boolean): MapSkin {
 		...TREE_SKIN,
 		grouped: true,
 		nodeTypes: { ...TREE_SKIN.nodeTypes, arcRegion: ArcRegionNode },
-		edgeTypes: { ...TREE_SKIN.edgeTypes, arcLink: ArcLinkEdge },
 		layout: (topics, edges, top, arcs) => {
 			if (!arcs) return layoutCanvas(topics, edges, top);
 			const { layout, drawing } = layoutArcRegions(topics, edges, fold ? arcs : { ...arcs, open: new Set(arcs.arcs.map((a) => a.handle)) });
@@ -52,21 +51,15 @@ export function arcRegionsSkin(fold: boolean): MapSkin {
 					data: { region, share: arcRing(map, region.arc.handle) },
 				}),
 			),
-		edges: (_map, layout) => [
-			...canvasEdges(layout),
-			...(drawings.get(layout)?.links ?? []).map(
-				(link): ArcLinkFlowEdge & Edge => ({
-					id: `arc:${link.from}>${link.to}`,
-					source: arcNode(link.from),
-					target: arcNode(link.to),
-					type: "arcLink",
-					data: { link },
-					focusable: false,
-					selectable: false,
-					domAttributes: { "aria-hidden": true },
-				}),
-			),
-		],
+		edges: (_map, layout) => {
+			const links = drawings.get(layout)?.links ?? [];
+			const first = links[0];
+			return canvasEdges(
+				layout,
+				links.map((link): CanvasLine => ({ key: `arc:${link.from}>${link.to}`, points: link.points, needs: link.needs })),
+				first ? { source: arcNode(first.from), target: arcNode(first.to) } : null,
+			);
+		},
 		handles: { source: Position.Bottom, target: Position.Top },
 	};
 }

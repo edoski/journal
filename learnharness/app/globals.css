@@ -108,6 +108,12 @@
 	--lh-danger: oklch(0.7 0.19 22);
 	--lh-success: oklch(0.76 0.15 155);
 	--lh-warning: oklch(0.82 0.15 80);
+	/* The course map's lines, opaque so a track several lines share reads
+	   as one line, never brighter (Edo, 16 Nov 2026). White over the page at
+	   33% at rest (3:1, WCAG 1.4.11), 70% lit, 10% receded. */
+	--lh-map-line: color-mix(in srgb, white 33%, var(--background));
+	--lh-map-line-lit: color-mix(in srgb, white 70%, var(--background));
+	--lh-map-line-receded: color-mix(in srgb, white 10%, var(--background));
 
 	/* Shape: 8 controls and rows, 12 cards, docks and menus, 20 the composer. */
 	--lh-radius-sm: 8px;
@@ -298,6 +304,9 @@ body {
  * bg-sidebar / border-sidebar): map it onto the app's card surface. */
 @theme inline {
 	--color-sidebar: var(--card);
+	--color-map-line: var(--lh-map-line);
+	--color-map-line-lit: var(--lh-map-line-lit);
+	--color-map-line-receded: var(--lh-map-line-receded);
 }
 
 /* Mermaid diagrams: keep wide charts inside the content column. Mermaid

@@ -20,6 +20,6 @@ Research (16 Nov, the pass's scratchpad): common region (a bounded area) groups 
 | Arc regions layout: each arc alone, the arcs as boxes, one line per pair of arcs | `arc-layout.ts` |
 | An arc's number and pill | `arc-mark.tsx` |
 | A region, or a folded arc's card | `arc-region.tsx` |
-| The line between two arcs | `arc-link.tsx` |
+| The line between two arcs: drawn with the needs, in their inks and paths | `../canvas/canvas-lines.tsx` |
 | The skin for regions and overview | `arc-skin.ts` |
 | An arc opened on the map, for the overview | `arc-open.ts` |

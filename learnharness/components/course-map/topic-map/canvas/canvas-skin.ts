@@ -4,37 +4,25 @@ import type { TopicMapLayout } from "../topic-map-layout";
 import { neighbourOf } from "../topic-map-layout";
 import { layoutCanvas } from "./canvas-layout";
 import { CanvasNode } from "./canvas-node";
-import { CanvasEdge } from "./canvas-edge";
+import { CanvasLinesEdge, linesEdge, type CanvasLine } from "./canvas-lines";
 import { CanvasChrome } from "./canvas-chrome";
 import { CanvasFrame } from "./canvas-frame";
 
-/** The canvas's lines: one per drawn need, none for a need its chain implies (canvas.md, Tree). */
-export function canvasEdges(layout: TopicMapLayout): Edge[] {
-	return layout.routes.flatMap((route): Edge[] =>
-		route.points.length === 0
-			? []
-			: [
-					{
-						id: `${route.prerequisite}>${route.topic}`,
-						source: route.prerequisite,
-						target: route.topic,
-						type: "canvasNeed",
-						data: { points: route.points },
-						focusable: false,
-						selectable: false,
-						domAttributes: { "aria-hidden": true },
-					},
-				],
-	);
+/** The canvas's lines: each drawn need, none for a need its chain implies (canvas.md, Tree), with any `extra` lines
+ *  (between arcs), as the one edge that draws them all (`CanvasLinesEdge`). */
+export function canvasEdges(layout: TopicMapLayout, extra: readonly CanvasLine[] = [], extraEnds: { source: string; target: string } | null = null): Edge[] {
+	const needs = layout.routes.map((route): CanvasLine => ({ key: `${route.prerequisite}>${route.topic}`, points: route.points, prerequisite: route.prerequisite, topic: route.topic }));
+	const first = layout.routes.find((route) => route.points.length > 0);
+	return linesEdge([...needs, ...extra], first ? { source: first.prerequisite, target: first.topic } : extraEnds);
 }
 
 /** Canvas tree (canvas.md): a diagram canvas top to bottom, drawing only the needs no longer path implies. */
 export const TREE_SKIN: MapSkin = {
 	layout: layoutCanvas,
 	nodeTypes: { canvasTopic: CanvasNode },
-	edgeTypes: { canvasNeed: CanvasEdge },
+	edgeTypes: { canvasLines: CanvasLinesEdge },
 	topicType: "canvasTopic",
-	edgeType: "canvasNeed",
+	edgeType: "canvasLines",
 	handles: { source: Position.Bottom, target: Position.Top },
 	tagRoom: 20,
 	edges: (_map, layout) => canvasEdges(layout),
