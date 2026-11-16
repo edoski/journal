@@ -69,6 +69,7 @@ function SkinnedMap({
 	framed = null,
 	onOpensWhole,
 	opensOn,
+	onOpenArc,
 }: {
 	skin: MapSkin;
 	map: CourseMap;
@@ -100,6 +101,8 @@ function SkinnedMap({
 	 *  3 m9: Invertible matrices' page opened on the top of the map,
 	 *  without it). */
 	opensOn?: TopicHandle | null;
+	/** Shows another arc of the course, which a card's "From <arc>" line asks for; unset, that line is words only. */
+	onOpenArc?: (arc: ArcHandle) => void;
 }) {
 	// An arc he opens on the map (a `grouped` style's folded arc), until the page shows another.
 	const [opened, setOpened] = useState<ArcHandle | null>(null);
@@ -172,7 +175,7 @@ function SkinnedMap({
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
 			<ArcOpenContext.Provider value={arcOpen}>
-				<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed ?? arcFramed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} />
+				<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed ?? arcFramed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
 			</ArcOpenContext.Provider>
 		</ReactFlowProvider>
 	);
@@ -193,6 +196,7 @@ function Flow({
 	framed,
 	onOpensWhole,
 	opensOn,
+	onOpenArc,
 }: {
 	skin: MapSkin;
 	map: CourseMap;
@@ -208,6 +212,7 @@ function Flow({
 	framed: ReadonlySet<TopicHandle> | null;
 	onOpensWhole: ((fits: boolean) => void) | undefined;
 	opensOn: TopicHandle | null;
+	onOpenArc: ((arc: ArcHandle) => void) | undefined;
 }) {
 	const captionId = useId();
 	const TAG_ROOM = skin.tagRoom;
@@ -342,8 +347,9 @@ function Flow({
 				if (el) links.current.set(handle, el);
 				else links.current.delete(handle);
 			},
+			openArc: onOpenArc,
 		}),
-		[lit, marked, tabStop, layout, map.edges, follow, skin],
+		[lit, marked, tabStop, layout, map.edges, follow, skin, onOpenArc],
 	);
 
 	const current = map.current ? titleOf(map.current) : null;

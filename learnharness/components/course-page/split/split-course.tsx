@@ -157,6 +157,7 @@ function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; sta
 							reveal={revealOf(pointed)}
 							onPoint={pointFrom("map")}
 							onLeave={(to) => list.current?.focus(to)}
+							onOpenArc={showArc}
 						/>
 					}
 				/>

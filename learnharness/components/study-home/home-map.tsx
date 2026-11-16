@@ -181,6 +181,10 @@ export function HomeMap({
 								highlight={shown ? highlight : null}
 								framed={shown ? framed : null}
 								whole={shown && zoomedOut}
+								onOpenArc={(arc) => {
+									setPicked((was) => new Map(was).set(course.map.workspace, arc));
+									setWhole(false);
+								}}
 								onOpensWhole={(fits) =>
 									setOpensWhole((was) => (was.get(course.map.workspace) === fits ? was : new Map(was).set(course.map.workspace, fits)))
 								}
@@ -279,6 +283,7 @@ function CourseDrawing({
 	highlight,
 	framed,
 	whole,
+	onOpenArc,
 	onOpensWhole,
 }: {
 	course: StudyCourse;
@@ -287,12 +292,13 @@ function CourseDrawing({
 	highlight: ReadonlySet<TopicHandle> | null;
 	framed: ReadonlySet<TopicHandle> | null;
 	whole: boolean;
+	onOpenArc: (arc: ArcHandle) => void;
 	onOpensWhole: (fits: boolean) => void;
 }) {
 	const { map } = course;
 	if (map.topics.length === 0) return <p className="m-auto text-body text-muted-foreground">Topics appear as you study this course.</p>;
 	// As much room as the fade, so a topic at the edge scrolls clear of it.
-	return <TopicMap map={map} arc={arc} said={said} margin={FADE} highlight={highlight} framed={framed} whole={whole} onOpensWhole={onOpensWhole} />;
+	return <TopicMap map={map} arc={arc} said={said} margin={FADE} highlight={highlight} framed={framed} whole={whole} onOpenArc={onOpenArc} onOpensWhole={onOpensWhole} />;
 }
 
 /** The one arc a set of lit topics lies in, or undefined when they span

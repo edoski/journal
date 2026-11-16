@@ -64,6 +64,7 @@ export function SplitMap({
 	reveal,
 	onPoint,
 	onLeave,
+	onOpenArc,
 	ref,
 }: {
 	map: CourseMap;
@@ -84,6 +85,8 @@ export function SplitMap({
 	reveal: TopicHandle | null;
 	onPoint: (handle: TopicHandle | null) => void;
 	onLeave: (handle: TopicHandle) => void;
+	/** Shows another arc, which a card's "From <arc>" line asks for. */
+	onOpenArc?: (arc: ArcHandle) => void;
 	ref?: Ref<SplitMapHandle>;
 }) {
 	const root = useRef<HTMLElement>(null);
@@ -282,7 +285,7 @@ export function SplitMap({
 				<div ref={scroller} data-slot="course-split-map-scroller" className="size-full overflow-auto overscroll-contain">
 					{/* The surface's size, from the course's layout: the map fits it whole. */}
 					<div className="flex flex-col" style={{ width: surface.width, height: surface.height }}>
-						<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} />
+						<TopicMap map={map} arc={zoomedOut ? undefined : arc} said={said} margin={FADE} highlight={lit} marked={reveal} zoom={surface.zoom} onOpenArc={onOpenArc} />
 					</div>
 				</div>
 			</div>

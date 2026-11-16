@@ -4,7 +4,7 @@ import { useContext } from "react";
 import Link from "next/link";
 import { CornerLeftUpIcon } from "lucide-react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import type { TopicHandle } from "@/src/core";
+import type { ArcHandle, TopicHandle } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { MathLine } from "@/components/ui/math-line";
 import { MathText } from "@/components/ui/math-text";
@@ -57,6 +57,8 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	const role = focus ? focusRole(focus, topic.handle) : null;
 	const receded = focus ? role === null : state?.lit ? !state.lit.has(topic.handle) : from !== null;
 	const marked = state?.marked === topic.handle;
+	// An entry card's "From <arc>" line opens that arc on the map, where the page can show it (Edo, 16 Nov 2026).
+	const openFrom = from !== null && topic.arc && state?.openArc ? { arc: topic.arc, open: state.openArc } : null;
 	return (
 		<div
 			data-focus={role ?? undefined}
@@ -70,11 +72,12 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 			)}
 			<BaseNode
 				className={cn(
-					"size-full overflow-hidden transition-[border-color,box-shadow] duration-150 motion-reduce:transition-none",
+					"flex size-full flex-col overflow-hidden transition-[border-color,box-shadow] duration-150 motion-reduce:transition-none",
 					current ? "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)]" : "hover:border-white/20",
 					marked && "lh-card-mark",
 				)}
 			>
+				{openFrom && <FromLink title={from!} arc={openFrom.arc} onOpen={openFrom.open} />}
 				<Link
 					ref={(el) => state?.register(topic.handle, el)}
 					href={href}
@@ -106,8 +109,9 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 						canvas?.point(null);
 					}}
 					onKeyDown={(event) => state?.onKeyDown(topic.handle, event)}
-					className="pointer-events-auto flex size-full cursor-pointer flex-col rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+					className="pointer-events-auto flex min-h-0 w-full flex-1 cursor-pointer flex-col rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 				>
+					{!openFrom && (
 					<BaseNodeHeader className={cn("h-6 shrink-0 border-b border-white/6", headerTone(from ? null : line))}>
 						{from ? (
 							<span data-slot="topic-from" className="flex min-w-0 items-center gap-1 text-callout text-muted-foreground">
@@ -124,6 +128,7 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 							</span>
 						)}
 					</BaseNodeHeader>
+					)}
 					<BaseNodeContent className="min-h-0 flex-1">
 						<TopicGlyph standing={standing} />
 						<MathLine className={cn("h-4.5 min-w-0 flex-1 text-body", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{topic.title}</MathLine>
@@ -133,5 +138,32 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 			<Handle type="target" position={Position.Top} isConnectable={false} className="invisible" />
 			<Handle type="source" position={Position.Bottom} isConnectable={false} className="invisible" />
 		</div>
+	);
+}
+
+/**
+ * An entry card's "From <arc>" line as a press of its own, above the
+ * card's link: it shows the arc the topic comes from on the map (Edo, 16
+ * Nov 2026: "make perhaps the From... header in cards clickable"). The
+ * line keeps its words and place; under the pointer it reads in the
+ * foreground ink. Pointer only, like the card's other shortcuts: the arc
+ * selector above the map is the keyboard's way to another arc.
+ */
+function FromLink({ title, arc, onOpen }: { title: string; arc: ArcHandle; onOpen: (arc: ArcHandle) => void }) {
+	return (
+		<button
+			type="button"
+			data-slot="topic-from"
+			data-arc={arc}
+			tabIndex={-1}
+			aria-label={`Open ${title}`}
+			onClick={() => onOpen(arc)}
+			className="group/from pointer-events-auto flex h-6 w-full shrink-0 cursor-pointer items-center gap-1 border-b border-white/6 px-3 text-left text-callout text-muted-foreground transition-colors hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none"
+		>
+			<CornerLeftUpIcon aria-hidden="true" className="size-3 shrink-0" />
+			<span className="truncate">
+				<MathText>{entryCaption(title)}</MathText>
+			</span>
+		</button>
 	);
 }

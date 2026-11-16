@@ -53,6 +53,6 @@ A dot grid (24px, white 10%) under the cards everywhere, and nothing else: no mi
 
 ## Behaviour
 
-- A click or Enter opens the topic's page. The arrows walk it as they walk the map (`neighbourOf`): Up to the nearest prerequisite, Down to the nearest topic that needs it, Left and Right along the layer.
+- A click or Enter opens the topic's page. An entry card's "From <arc>" line is a press of its own beside the card's link (`FromLink`): it shows that arc on the map, where the page can show one (Home, the course page), and reads in the foreground ink under the pointer (Edo, 16 Nov 2026: "make perhaps the From... header in cards clickable"). Pointer only; the arc selector is the keyboard's way to another arc. The arrows walk it as they walk the map (`neighbourOf`): Up to the nearest prerequisite, Down to the nearest topic that needs it, Left and Right along the layer.
 - Camera, framing, follow, highlight and mark are the map's own (`../topic-map.md`). Scroll pans, pinch zooms.
 - Reduced motion: every hover change is at once.
