@@ -7,6 +7,7 @@ import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type T
 import { ArcStrip } from "@/components/course-map/arc-strip";
 import { ArcSelector } from "@/components/course-map/arc-selector";
 import { useArcKeys } from "@/components/course-map/arc-keys";
+import { ArcIndex } from "@/components/course-map/arc-index";
 import { arcShare, shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
@@ -82,7 +83,8 @@ export function HomeMap({
 	const arcs = shownArcs(chosenCourse.map);
 	// Every map style but Current names the arcs with the quiet selector (arc-selector.md); Stacked arcs with its rail.
 	const style = useMapSkin().style;
-	const quietSelector = style !== "current";
+	const quietSelector = style !== "current" && style !== "stack";
+	const indexed = arcs !== null && style === "stack";
 	// The arc he picked on the strip, per course, for the visit.
 	const [picked, setPicked] = useState<ReadonlyMap<string, ArcHandle>>(new Map());
 	const follow = (followed === undefined ? litArc(chosenCourse, highlight) : followed) ?? null;
@@ -162,7 +164,19 @@ export function HomeMap({
 					}}
 				/>
 			)}
-			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
+			{indexed && (
+				<ArcIndex
+					className="absolute top-10 left-0 z-10 w-56"
+					arcs={arcs}
+					value={zoomedOut ? null : (shownArc ?? null)}
+					onSelect={(arc) => {
+						setPicked((was) => new Map(was).set(chosen, arc));
+						setWhole(false);
+					}}
+				/>
+			)}
+			{/* Stacked arcs keeps its arc list in a column of its own, so the map frames each arc beside it. */}
+			<div data-slot="home-map-frame" className={cn("relative flex min-h-0 flex-1 flex-col", indexed && "ml-60")} style={VIGNETTE}>
 				{courses.map((course) => {
 					const shown = course.map.workspace === chosen;
 					return (
