@@ -198,9 +198,42 @@ function repeatedOutputCalls(messages: readonly LhMessage[]): ReadonlySet<string
 	return repeated;
 }
 
+/** A finished demo, visual, research or PDF result, or its abort notice. */
+const isJobMarker = (m: LhMessage): boolean => m.role === "custom" && (m.customType === "subagent-steer" || m.customType === "subagent-abort");
+
+/** The record in the order the lesson reads it: a job's result that
+ *  joined a run partway (drained at the start of the run his answer
+ *  began, or steered in between its messages) is drawn after that run's
+ *  last message, so a demo never lands between his answer and the reply
+ *  to it, behind "New reply" (round 12, 3 D1); one that opened a wake
+ *  run of its own stays where it is, above the words that introduce it.
+ *  The record keeps the order the tutor read it in. Pure. */
+export function inReadingOrder(messages: readonly LhMessage[]): readonly LhMessage[] {
+	const out: LhMessage[] = [];
+	let held: LhMessage[] = [];
+	let ended = true;
+	for (const m of messages) {
+		if (isJobMarker(m) && !ended) {
+			held.push(m);
+			continue;
+		}
+		// The next input ends the run the held results joined, a question that ended it included.
+		if (opensTurn(m) && held.length > 0) {
+			out.push(...held);
+			held = [];
+		}
+		out.push(m);
+		if (m.role === "assistant") ended = m.stopReason === "stop" || m.stopReason === "error" || m.stopReason === "aborted";
+		else if (opensTurn(m)) ended = false;
+	}
+	return held.length > 0 ? [...out, ...held] : out;
+}
+
 /** Project the native record (+ live turn working list) into the client's
- *  view messages. Pure: the same input always projects to the same list. */
-export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
+ *  view messages, in reading order (`inReadingOrder`). Pure: the same
+ *  input always projects to the same list. */
+export function projectView(record: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
+	const messages = inReadingOrder(record);
 	const out: LhViewMessage[] = [];
 	// Output calls become text rather than tool parts, so read settled
 	// failures up front: a failed call must retain the normal error path.
