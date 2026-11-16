@@ -3,7 +3,6 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_MAP_CAP, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
-import type { ChatRecord } from "../../core/contracts/chat.ts";
 import { createTree, planDropsSteps, planMapTooBig, planStepIsTheTopic, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
 import type { CourseToolContext } from "./course.ts";
@@ -204,57 +203,42 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				const { chatId, chatStore } = ctx;
 				const record = chatStore.getChat(chatId);
 				if (!record) return { ok: false, error: `Chat not found: ${chatId}` };
-				const checked = checkPlanInit(record, mermaid, goal);
-				if (!checked.ok) return checked;
-				const next = checked.tree;
-				chatStore.saveTree(chatId, next);
-				if (goal && !record.tree) chatStore.nameSession(chatId, goal);
-				// Context diet: content = the validated nodeIds + the reminder (the
+
+				const parsed = parseMermaidPlan(mermaid);
+				if (!parsed.ok || !parsed.plan) {
+					// The parser collects every problem; the teacher fixes and retries.
+					// No tree echo — the model needs the problems, not a restatement of
+					// the map it is rewriting (owner, context diet 2026-10-09).
+					return { ok: false, error: parsed.problems.join("\n") };
+				}
+				try {
+					// createTree validates the structure (duplicate ids, missing
+					// edge endpoints, self-loops, cycles → PlanTreeError).
+					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
+					// Every problem at once, so one rewrite fixes them all.
+					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title].filter((t): t is string => typeof t === "string") };
+					const taught = record.tree ? derivePlanStatusesLh(record.tree, record.messages) : null;
+					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set())].filter((p): p is string => p !== null);
+					if (problems.length > 0) return { ok: false, error: problems.join("\n") };
+					chatStore.saveTree(chatId, next);
+					if (goal && !record.tree) chatStore.nameSession(chatId, goal);
+					// Context diet: content = the validated nodeIds + the reminder (the
 				// ids just became binding for every explain call); details =
-				// the full tree for the record/UI — the plan popup's latestTree
-				// seam, agent-invisible (the serializer sends content only).
-				return planInitResult(next);
+					// the full tree for the record/UI — the plan popup's latestTree
+					// seam, agent-invisible (the serializer sends content only).
+					return {
+						text: JSON.stringify({
+							ok: true,
+							nodeIds: next.nodes.map((n) => n.id),
+							reminder: PLAN_NODE_IDS_REMINDER,
+						}),
+						details: { ok: true, tree: next },
+					};
+				} catch (err) {
+					if (err instanceof PlanTreeError) return { ok: false, error: err.message };
+					throw err;
+				}
 			}),
 		},
 	};
-}
-
-/** What a clean plan_init tells the tutor: the map's ids, now binding. */
-export function planInitResult(next: PlanTree) {
-	return {
-		text: JSON.stringify({
-			ok: true,
-			nodeIds: next.nodes.map((n) => n.id),
-			reminder: PLAN_NODE_IDS_REMINDER,
-		}),
-		details: { ok: true, tree: next },
-	};
-}
-
-/** plan_init's checks on a map for this lesson, every problem at once, so
- *  one rewrite fixes them all. Pure: the plan draft (server/plan-draft.ts)
- *  runs the same checks and saves nothing. */
-export function checkPlanInit(
-	record: Pick<ChatRecord, "tree" | "messages" | "title">,
-	mermaid: string,
-	goal: { title: string; topic?: string } | undefined,
-): { ok: false; error: string } | { ok: true; tree: PlanTree } {
-	const parsed = parseMermaidPlan(mermaid);
-	// The parser collects every problem; the teacher fixes and retries. No
-	// tree echo — the model needs the problems, not a restatement of the map
-	// it is rewriting (owner, context diet 2026-10-09).
-	if (!parsed.ok || !parsed.plan) return { ok: false, error: parsed.problems.join("\n") };
-	try {
-		// createTree validates the structure (duplicate ids, missing edge
-		// endpoints, self-loops, cycles → PlanTreeError).
-		const next = createTree(parsed.plan.nodes, parsed.plan.edges);
-		const lesson = { topic: goal?.topic, titles: [goal?.title, record.title].filter((t): t is string => typeof t === "string") };
-		const taught = record.tree ? derivePlanStatusesLh(record.tree, record.messages) : null;
-		const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set())].filter((p): p is string => p !== null);
-		if (problems.length > 0) return { ok: false, error: problems.join("\n") };
-		return { ok: true, tree: next };
-	} catch (err) {
-		if (err instanceof PlanTreeError) return { ok: false, error: err.message };
-		throw err;
-	}
 }

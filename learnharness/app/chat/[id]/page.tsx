@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
 import { openedByApp } from "@/src/core";
-import { considerPlanDraft, courseDeleted, getChat, isTurnRunning, lessonPlace, reposeLeftQuestions, turnFailure } from "@/src/server";
+import { courseDeleted, getChat, isTurnRunning, lessonPlace, reposeLeftQuestions, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,6 @@ export default async function ChatPage({
 	reposeLeftQuestions(id);
 	const chat = getChat(id);
 	if (!chat) notFound();
-	// The probe's last question waits for him: its plan draft runs (after a
-	// restart too), unless one already does.
-	void considerPlanDraft(chat.id);
 	// Where the lesson sits in its course, for the top bar's links.
 	const place = await lessonPlace(chat);
 	return (

@@ -43,11 +43,6 @@ export interface SdkAgentConfig {
 	effort?: "high" | "medium";
 	/** A background job: no session file, at most this many model calls. */
 	ephemeral?: { maxTurns: number };
-	/** A side query on the lesson's own session (the plan draft): Claude
-	 *  Code resumes it as a fork, with `ephemeral` writing nothing back, and
-	 *  the app keeps no copy of it. A lesson with no session to fork from
-	 *  runs nothing (no session is seeded for it). */
-	fork?: boolean;
 	onUsage?: (usage: Usage) => void;
 	/** Reads each call as it finishes streaming, before any view sees it
 	 *  (the voice guard, voice-guard.ts). */
@@ -173,7 +168,6 @@ export class SdkAgent {
 		// A record its session cannot carry (a lesson from before sessions, or
 		// one whose session file and app copy are both gone) gets a session
 		// seeded from the record, once: the map the turn leaves moves from it.
-		if (this.config.fork && (owed === null || !resume.resume || !restoreSession(sessionStore, launch.configDir, resume.resume))) return this.fail(SESSION_GONE);
 		if (owed === null || (resume.resume && !restoreSession(sessionStore, launch.configDir, resume.resume))) {
 			const why = owed === null ? "no session of its own holds its replies" : `its session ${resume.resume} is gone from Claude Code and from the app's copy`;
 			let seeded: ChatSession | undefined;
@@ -268,7 +262,6 @@ export class SdkAgent {
 			abortController: this.controller,
 			...(this.config.ephemeral ? { persistSession: false, maxTurns: this.config.ephemeral.maxTurns } : {}),
 			...(resume.resume ? { resume: resume.resume } : {}),
-			...(this.config.fork ? { forkSession: true } : {}),
 			...(resume.at ? { resumeSessionAt: resume.at } : {}),
 		};
 
@@ -449,7 +442,7 @@ export class SdkAgent {
 		this.end = outcome === "success"
 			? { id: sessionId, anchor, held: "all", ...seeded }
 			: { id: sessionId, anchor: keptAnchor, held: heldThrough ? { through: heldThrough } : "none", ...seeded };
-		if (sessionStore && !this.config.fork) {
+		if (sessionStore) {
 			try { keepSession(sessionStore, launch.configDir, sessionId); } catch (error) { console.error("[sdk] session copy failed:", error); }
 		}
 	}

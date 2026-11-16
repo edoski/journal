@@ -29,7 +29,6 @@
  */
 
 import type { PiTurnHandle } from "./pi/ui-stream.ts";
-import { cancelPlanDraft } from "./plan-draft.ts";
 
 interface LhTurnRunsGlobal {
 	__lhTurnRuns?: Map<string, PiTurnHandle>;
@@ -91,10 +90,8 @@ export function registerTurn(chatId: string, handle: PiTurnHandle): void {
 	if (stopping().delete(chatId)) handle.abort();
 }
 
-/** Stops the chat's running turn, registered or still starting, and the
- *  plan draft beside it. */
+/** Stops the chat's running turn, registered or still starting. */
 export function stopTurn(chatId: string): void {
-	cancelPlanDraft(chatId, "the turn was stopped");
 	const handle = runs().get(chatId);
 	if (handle) handle.abort();
 	else stopping().add(chatId);
@@ -120,8 +117,6 @@ export function runningTurn(chatId: string): PiTurnHandle | undefined {
  *  surfaces) may stop a running turn. not_running mirrors abortJob's
  *  honest 409 — there was nothing to abort, the caller refetches. */
 export function abortTurn(chatId: string): { ok: true } | { ok: false; reason: "not_running" } {
-	// His Stop stops the plan's draft too (core/plan-draft.ts).
-	cancelPlanDraft(chatId, "his Stop");
 	const handle = runs().get(chatId);
 	if (handle) handle.abort();
 	else if (waking().has(chatId)) stopping().add(chatId);

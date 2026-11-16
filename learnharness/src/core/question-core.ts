@@ -174,23 +174,6 @@ export const explainInputBase = Type.Object({
 	}),
 });
 
-/** The probe's question (`recall`): the base, and `last` on the question
- *  the prober expects to conclude on, so the lesson's plan starts drafting
- *  while he answers it (server/plan-draft.ts; round 14, M9). */
-export const recallInputObject = Type.Object({
-	...explainInputBase.properties,
-	last: Type.Optional(Type.Boolean({
-		description:
-			"true on the question you expect to be the probe's last: once he answers it, every strand is bracketed and you conclude with probe_done, whatever the answer shows. " +
-			"The lesson's plan starts drafting while he answers. Leave it out on every other question.",
-	})),
-});
-
-/** Whether a probe question call was marked the probe's last. */
-export function isLastProbeQuestion(call: { name: string; arguments?: unknown }): boolean {
-	return call.name === "recall" && (call.arguments as { last?: unknown } | undefined)?.last === true;
-}
-
 /** The guess's own rule where the teach question is written (round 12,
  *  2 M1: "Go ahead, guess." posed as a check, and his guess became the
  *  topic's open mistake). The voice guard's `guessAsked` holds a draft to
