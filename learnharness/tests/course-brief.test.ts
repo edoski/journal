@@ -454,6 +454,34 @@ describe("the brief fetch reads every course's plan", () => {
 		}
 	});
 
+	it("reads a first turn's opening from the turn itself, which the record does not hold yet (round 14, m1)", async () => {
+		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
+		process.env.FAKE_ENGINE_PLAN = JSON.stringify({
+			today: "2026-11-08",
+			courses: [{ workspace: "/study/probability", title: "Probability", plan: { days: [{ date: "2026-11-08", reviews: ["binomial"], new: [] }, { date: "2026-11-20", reviews: [], new: ["variance"] }] } }],
+		});
+		process.env.FAKE_ENGINE_MAP = JSON.stringify({
+			today: "2026-11-08",
+			revision: 1,
+			title: "Probability",
+			topics: [
+				{ topic: "binomial", title: "Binomial distribution", level: "assisted", review: "2026-11-08", overdue: 2 },
+				{ topic: "variance", title: "Variance", level: "new", starts: "2026-11-20", starts_why: { kind: "next" } },
+			],
+		});
+		recordsChanged();
+		try {
+			const record = { ...linked("/study/probability"), topics: ["variance"], messages: [] };
+			const first = await fetchCourseBrief(record, "Variance");
+			assert.match(first!.text, /\("Variance is ahead of your plan, which starts it on Friday 20 November: today's plan still holds your Binomial distribution review\."\)/);
+			assert.doesNotMatch((await fetchCourseBrief(record, "My exam plan has no room for Variance. How can I still fit it in before the exam?"))!.text, /Ahead of plan/);
+		} finally {
+			delete process.env.FAKE_ENGINE_PLAN;
+			delete process.env.FAKE_ENGINE_MAP;
+			recordsChanged();
+		}
+	});
+
 	it("a failed map costs the turn nothing: the brief comes without the plan", async () => {
 		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
 		process.env.FAKE_ENGINE_FAIL = "map";

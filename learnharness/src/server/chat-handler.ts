@@ -282,7 +282,7 @@ export async function handleChatInput(
 	// A mode handoff starts the other agent, whose brief differs.
 	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
 	const [courseBrief, courseArcs] = await Promise.all([
-		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
+		learnerInput || handoffWake ? fetchCourseBrief(record, input.type === "text" ? input.text : null) : null,
 		fetchCourseArcs(record),
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
