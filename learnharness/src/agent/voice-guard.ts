@@ -35,11 +35,12 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
+import { LESSON_PROGRESS_TOOL } from "../core/contracts/plan.ts";
 import { normalizeQuestionType } from "../core/question-core.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, partialDay, afterQuestion, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -436,12 +437,27 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
+		case "day-part":
+			return `A day you name with what it holds is named whole, or by itself alone: ${b.excerpt.replace(/: /, " also holds ")}. Name every item of that day from the close's \`day_items\`, or only the day.`;
 		case "unbuilt":
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
 			return quoted(b.excerpt);
+	}
+}
+
+type DayItems = Record<string, { day_words: string; items: string[]; lesson: string[] }>;
+
+/** The close result's `day_items` (lesson_progress), or null. */
+function dayItemsIn(result: AgentToolResult<unknown>): DayItems | null {
+	const text = result.content.find((c): c is { type: "text"; text: string } => c.type === "text")?.text;
+	try {
+		const parsed = text ? (JSON.parse(text) as { day_items?: unknown }) : null;
+		return isRecord(parsed?.day_items) ? (parsed.day_items as DayItems) : null;
+	} catch {
+		return null;
 	}
 }
 
@@ -658,6 +674,8 @@ export class VoiceGuard {
 	 *  worded one differently was held back (once a turn). */
 	private readonly rulings: string[] = [];
 	private heldRulingSaid = false;
+	/** The close's `day_items`: what each day it names holds. */
+	private dayItems: DayItems | null = null;
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -681,7 +699,7 @@ export class VoiceGuard {
 	/** Whether a tool's calls pass through the guard: the probe's end too,
 	 *  which it reads only once the probe has ended. */
 	guards(toolName: string): boolean {
-		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === DEMO_TOOL || this.endsTurn(toolName);
+		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === DEMO_TOOL || toolName === LESSON_PROGRESS_TOOL || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
@@ -740,6 +758,7 @@ export class VoiceGuard {
 				if (partial && this.toldWrong) return SAVED_AGAINST_WORDS;
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
+				if (tool.name === LESSON_PROGRESS_TOOL && !result.isError) this.dayItems = dayItemsIn(result) ?? this.dayItems;
 				if (this.kept?.call.id === toolCallId) {
 					if (result.isError) this.letGo();
 					else { this.kept.ran = true; return KEPT(tool.name); }
@@ -962,6 +981,8 @@ export class VoiceGuard {
 		if (recordWord) out.push({ rule: "card-words", excerpt: recordWord });
 		const sure = kind === "close" ? narratedConfidence(text) : null;
 		if (sure) out.push({ rule: "confidence", excerpt: sure });
+		const part = this.dayItems ? partialDay(text, this.dayItems) : null;
+		if (part) out.push({ rule: "day-part", excerpt: part });
 		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
 			const { words, clauses } = clausesOf(text);
 			const draft = this.lengthDraft;
