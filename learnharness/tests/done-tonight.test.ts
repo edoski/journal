@@ -114,6 +114,11 @@ describe("the tonight input", () => {
 		assert.doesNotMatch(DONE_TONIGHT_TEXT.practice, /the kernel problem/, "no dropped problem offered as the example of what he picks up");
 	});
 
+	it("names only this session's open work, never another session's (round 12, 3 D7: Rank practice closed on \"Part (c) of Problem sheet 4 is still open\")", () => {
+		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps for next time from this session, an open task this session worked on at its place/);
+		assert.match(DONE_TONIGHT_TEXT.practice, /never another session's open work/);
+	});
+
 	it("carries the conclude pair a discard left waiting", () => {
 		const record = { messages: [...problemPose(), newProblemDismissedMarker("call_p1")], kind: "practice" as const };
 		const appends = inputAppends(record, { type: "tonight" });
