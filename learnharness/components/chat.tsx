@@ -84,7 +84,7 @@ import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
-import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
+import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
 import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
@@ -228,6 +228,9 @@ export function Chat({
 	// What another window did to the question he was typing in, while the
 	// line about his words still applies (stranded-draft.ts).
 	const [overtaken, setOvertaken] = useState<"answered" | LeftOpen | null>(null);
+	// Words of his in the message box that an open question or problem
+	// hides behind Esc, until he sees them or they go (stranded-draft.ts).
+	const [messageHidden, setMessageHidden] = useState(false);
 	// The dock this window last sent from: its question leaving is his doing.
 	const dockKeyRef = useRef<string | null>(null);
 	const sentFromDockRef = useRef<string | null>(null);
@@ -498,6 +501,10 @@ export function Chat({
 	// The Prose composer swaps between the message field and the answer
 	// field: focus follows to where he types next (focus-home.ts).
 	const proseFocusKey = `${proseOpenKey(proseOpen)}:${proseAnswer.mode}`;
+	// Esc showed him the message box: its words are no longer hidden.
+	useEffect(() => {
+		if (proseAnswer.mode === "ask") setMessageHidden(false);
+	}, [proseAnswer.mode]);
 	useEffect(() => {
 		setFocusEpoch((n) => n + 1);
 	}, [proseFocusKey]);
@@ -575,19 +582,25 @@ export function Chat({
 	const applyText = useCallback((v: string) => {
 		textRef.current = v;
 		keepWords(composerScope, { text: v });
+		if (!v.trim()) setMessageHidden(false);
 		setComposerDraftRevision((revision) => revision + 1);
 	}, [composerScope]);
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
 		keepWords(composerScope, { text: v });
+		// He is in the message box, so nothing in it is hidden from him.
+		setMessageHidden(false);
 		// An emptied box no longer holds the words another window overtook.
 		if (!v.trim()) setOvertaken((was) => (was === "answered" ? null : was));
 	}, [composerScope]);
 	// What he typed before a reload comes back after mount, so the server's
-	// page and the first client render agree.
+	// page and the first client render agree; behind an open question it
+	// gets its line (round 11, 4 minor 2).
 	useEffect(() => {
 		const kept = keptWords(composerScope)?.text;
-		if (kept && !textRef.current) applyText(kept);
+		if (!kept || textRef.current) return;
+		applyText(kept);
+		if (kept.trim() && dockKeyRef.current !== null) setMessageHidden(true);
 	}, [composerScope, applyText]);
 
 	// OVERTAKEN IN ANOTHER WINDOW (stranded-draft.ts): the open question or
@@ -638,6 +651,10 @@ export function Chat({
 				setOvertaken("answered");
 			}
 		}
+		// A question or problem opening over words in the message box hides
+		// them behind Esc, so one line says they are kept (round 11, 4
+		// minor 2: a message kept while the app was down, after the restart).
+		setMessageHidden(dockKey !== null && textRef.current.trim() !== "");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
 	const { unconnected, status: modelStatus, read: statusRead } = useModelSetup(busy);
@@ -1768,7 +1785,7 @@ export function Chat({
 					busy={busy}
 					replyingToDock={busy && sentFromDockRef.current !== null}
 					focusEpoch={focusEpoch}
-					overtakenLine={overtakenLine(overtaken, proseOpen !== null)}
+					overtakenLine={boxLine(overtaken, proseOpen !== null, messageHidden && proseAnswer.mode === "answer" && !busy)}
 					replyAnchorRef={replyAnchorRef}
 					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
@@ -1897,15 +1914,6 @@ export function escAbortTarget(s: {
 	if (s.pending) return "question";
 	if (s.problem) return "problem";
 	if (s.busy) return "turn";
-	return null;
-}
-
-/** The line under the transcript about his overtaken words: where they
- *  are, given whether a question or problem now holds the box. */
-function overtakenLine(overtaken: "answered" | LeftOpen | null, open: boolean): string | null {
-	if (overtaken === "answered") return open ? LESSON_WORDS.answeredElsewhereOpen : LESSON_WORDS.answeredElsewhere;
-	if (overtaken === "hint" && !open) return LESSON_WORDS.hintElsewhere;
-	if (overtaken === "asked" && !open) return LESSON_WORDS.askedElsewhere;
 	return null;
 }
 

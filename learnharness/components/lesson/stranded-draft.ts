@@ -15,6 +15,7 @@
  */
 
 import { joinAsTyped, keepWords, keptWords } from "@/components/lesson/kept-drafts";
+import { LESSON_WORDS } from "@/components/study-words";
 
 /** What he has typed in the open dock, keyed by the question or problem. */
 export interface LiveDraft {
@@ -48,6 +49,17 @@ export function overtakenDraft(before: string | null, after: string | null, draf
 export function typedAfterSend(before: string | null, after: string | null, draft: LiveDraft | null): string | null {
 	if (before === null || before === after || draft === null || draft.key !== before) return null;
 	return draft.text.trim() === "" ? null : draft.text;
+}
+
+/** The line under the transcript about where his words are: another
+ *  window's doing (`overtaken`), given whether a question or problem now
+ *  holds the box; else, while one holds it, words of his waiting in the
+ *  message box behind it (`hidden`, round 11, 4 minor 2). Pure. */
+export function boxLine(overtaken: "answered" | LeftOpen | null, open: boolean, hidden: boolean): string | null {
+	if (overtaken === "answered") return open ? LESSON_WORDS.answeredElsewhereOpen : LESSON_WORDS.answeredElsewhere;
+	if (overtaken === "hint" && !open) return LESSON_WORDS.hintElsewhere;
+	if (overtaken === "asked" && !open) return LESSON_WORDS.askedElsewhere;
+	return open && hidden ? LESSON_WORDS.messageKept : null;
 }
 
 const rescueScope = (chatId: string) => `${chatId}:rescued`;

@@ -186,3 +186,16 @@ test("words he typed in the box after sending from it go to the message box when
 	assert.equal(typedAfterSend("p:1", null, { key: "p:1", text: " " }), null);
 	assert.equal(typedAfterSend("p:1", "p:1", { key: "p:1", text: "x" }), null, "the box is still open");
 });
+
+// Round 11 (4 minor 2): a message kept while the app was down sat hidden in
+// the Ask box once the resumed turn asked its question, with no line.
+test("words in the message box that a question now hides get one line saying where they are", async () => {
+	const { boxLine } = await import("../components/lesson/stranded-draft.ts");
+	const { LESSON_WORDS } = await import("../components/study-words.ts");
+	assert.equal(boxLine(null, true, true), LESSON_WORDS.messageKept);
+	assert.equal(boxLine(null, true, false), null, "nothing hidden, no line");
+	assert.equal(boxLine(null, false, true), null, "with nothing open the box shows them");
+	assert.equal(boxLine("answered", true, true), LESSON_WORDS.answeredElsewhereOpen, "another window's rescue keeps its own line");
+	assert.equal(boxLine("answered", false, false), LESSON_WORDS.answeredElsewhere);
+	assert.equal(boxLine("hint", false, false), LESSON_WORDS.hintElsewhere);
+});

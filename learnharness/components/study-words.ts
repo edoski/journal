@@ -573,6 +573,10 @@ export const LESSON_WORDS = {
 	answeredElsewhereOpen: "Answered in another window. Press Esc to see what you typed here.",
 	hintElsewhere: "Another window asked for a hint. What you typed here comes back when the tutor asks the question again.",
 	askedElsewhere: "Another window asked the tutor something. What you typed here comes back when the tutor asks the question again.",
+	/** A question or problem opened over words still in the message box
+	 *  (round 11, 4 minor 2: a message kept while the app was down sat
+	 *  hidden there after the restart). */
+	messageKept: "Your unsent message is kept. Press Esc to see it.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
 	skippedProblem: "You skipped this problem.",
