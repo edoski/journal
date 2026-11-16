@@ -25,6 +25,7 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { normalizeQuestionType } from "../core/question-core.ts";
+import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { adviceSentences, afterQuestion, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
@@ -232,6 +233,58 @@ const RULING_WORDS = (slip: string): AgentToolResult<unknown> => ({
 	content: [{ type: "text", text: `Not saved: the ruling words his confidence as the record does, "${slip}", but his card says "Guessing" or "Confident". Send the save again with the ruling in the card's words.` }],
 	isError: true,
 	details: { withheld: "card-words" },
+});
+
+const DEMO_TOOL = "demo";
+
+/** Maths as a key that ignores how it was typed: TeX or Unicode, spaces,
+ *  braces and `\\left`/`\\right` aside, so "(1 − λ/n)^n" in a brief and
+ *  "$(1-\\lambda/n)^n$" in a step's title read the same. */
+function formulaKey(text: string): string {
+	return text
+		.replace(/\\(?:left|right|,|;|!|quad|qquad)(?![A-Za-z])/g, "")
+		.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2")
+		.replace(/\\lambda(?![A-Za-z])/g, "λ").replace(/\\mu(?![A-Za-z])/g, "μ").replace(/\\sigma(?![A-Za-z])/g, "σ").replace(/\\theta(?![A-Za-z])/g, "θ")
+		.replace(/[−–]/g, "-")
+		.replace(/[\s${}]/g, "")
+		.toLowerCase();
+}
+
+/** The formulas a step's title names, each as a key. */
+function formulasOf(title: string): string[] {
+	return [...title.matchAll(/\$([^$]+)\$/g)].map((m) => formulaKey(m[1]!));
+}
+
+/** The latest plan's steps that no `lesson_progress` has marked done. */
+function stepsNotDone(messages: readonly LhMessage[]): Array<{ id: string; title: string }> {
+	const failed = failedOutputCallIds(messages);
+	let steps: Array<{ id: string; title: string }> = [];
+	const done = new Set<string>();
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const b of m.content) {
+			if (b.type !== "toolCall" || failed.has(b.id) || !isRecord(b.arguments)) continue;
+			if (b.name === "plan_init" && typeof b.arguments.mermaid === "string") {
+				const plan = parseMermaidPlan(b.arguments.mermaid).plan;
+				if (plan) steps = plan.nodes.map((node) => ({ id: node.id, title: node.title }));
+			} else if (b.name === "lesson_progress" && Array.isArray(b.arguments.done)) {
+				for (const id of b.arguments.done) if (typeof id === "string") done.add(id);
+			}
+		}
+	}
+	return steps.filter((step) => !done.has(step.id));
+}
+
+/** A demo brief that prints a step ahead's formula. */
+const DEMO_GIVES_AWAY = (title: string): AgentToolResult<unknown> => ({
+	content: [
+		{
+			type: "text",
+			text: `Not built: the brief prints the formula of "${title}", a step he has not done yet, so the demo would hand him what the lesson is about to ask. A demo shows what he has been taught and lets him find the rest: label each control and readout by what it is ("chance per slot"), never by a formula or value he is still to find, and send the brief again.`,
+		},
+	],
+	isError: true,
+	details: { withheld: "demo-gives-away" },
 });
 
 /** A save of a partly right answer after he was told it was not right:
@@ -520,6 +573,10 @@ export class VoiceGuard {
 	 *  held back for it (once a turn). */
 	private unsaved: string | null;
 	private heldUnsaved = false;
+	/** The lesson plan's steps not yet done, each with its title. */
+	private readonly stepsAhead: Array<{ id: string; title: string }>;
+	/** A demo brief that gave away a step ahead was held back once. */
+	private heldDemo = false;
 	/** A ruling saved with the record's confidence word was held back once. */
 	private heldRuling = false;
 
@@ -532,6 +589,7 @@ export class VoiceGuard {
 		saves = false,
 	) {
 		this.input = turnInputOf(messages);
+		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
 		const earlier = earlierTexts(messages);
 		this.earlier = earlier.map((e) => e.text);
@@ -544,7 +602,7 @@ export class VoiceGuard {
 	/** Whether a tool's calls pass through the guard: the probe's end too,
 	 *  which it reads only once the probe has ended. */
 	guards(toolName: string): boolean {
-		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || this.endsTurn(toolName);
+		return toolName === SEND_TO_USER_TOOL || toolName === PROBE_DONE_TOOL || toolName === SAVE_TOOL || toolName === DEMO_TOOL || this.endsTurn(toolName);
 	}
 
 	/** Read a call as it finishes streaming. A refused message's text leaves
@@ -646,6 +704,7 @@ export class VoiceGuard {
 			this.sent++;
 			return null;
 		}
+		if (call.name === DEMO_TOOL) return this.judgeDemo(call);
 		if (call.name === SAVE_TOOL && this.input.ruling && !this.heldRuling) {
 			const slip = savedRulings(call.arguments).map(recordConfidenceWord).find(Boolean);
 			if (slip) {
@@ -758,6 +817,20 @@ export class VoiceGuard {
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
 		return [...out, ...this.letters(text), ...this.repeats(text)];
+	}
+
+	/** A demo brief that prints the formula a step not yet done is about:
+	 *  the demo would hand him what the lesson is about to ask (round 12,
+	 *  3 D1: the Poisson demo printed (1 − λ/n)^n beside e^{−λ} before the
+	 *  limit was taught). Held back once a turn. */
+	private judgeDemo(call: ToolCall): AgentToolResult<unknown> | null {
+		if (this.heldDemo) return null;
+		const brief = isRecord(call.arguments) ? [call.arguments.title, call.arguments.brief].filter((v) => typeof v === "string").join("\n") : "";
+		const said = formulaKey(brief);
+		const ahead = this.stepsAhead.find((step) => formulasOf(step.title).some((f) => f.length >= 5 && said.includes(f)));
+		if (!ahead) return null;
+		this.heldDemo = true;
+		return DEMO_GIVES_AWAY(ahead.title);
 	}
 
 	/** A lesson question posed after he asked to guess first, or under the

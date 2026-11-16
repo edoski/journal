@@ -58,6 +58,7 @@ Runtime contract (the document runs in a sandboxed iframe, sandbox="allow-script
 Build quality:
 - The demo must directly serve the brief: every control named in the brief must exist and do the thing.
 - Controls need labels; sliders/inputs need current-value readouts. A learner should operate it unguided.
+- Show only what the brief asks it to show: add no readout, header line or footer of your own, and never print a formula or computed result the brief does not ask for (a learner finds those himself).
 - Smooth enough interaction; requestAnimationFrame for animation, not setInterval when it matters.
 - Dark-mode neutral: pick a clean light background for the demo area so it reads on any card.
 
