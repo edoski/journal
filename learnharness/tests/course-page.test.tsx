@@ -223,7 +223,7 @@ describe("every topic once, in the group the sidebar puts it in, with the sideba
 
 describe("the header's facts and next lesson", () => {
 	it("counts what Home's pie counts, names the exam once and when he last studied", () => {
-		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam in 21 days", studied: "Studied 6 Nov", lastSession: null });
+		assert.deepEqual(courseFacts(course()), { progress: "Some topics on your own", exam: "Exam 29 Nov", studied: "Studied 6 Nov", lastSession: null });
 	});
 
 	it("leaves out an exam that is not set and a count for a course with no topics", () => {

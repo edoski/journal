@@ -5,6 +5,7 @@ import type { ChatListItem, StudyCourse, StudyListing, UnreadableCourse } from "
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
 import { buildInbox, type FoldedShelf, type UnitInbox } from "@/components/unit-inbox/units";
+import { withLessonHere } from "@/components/study-home/study-facts";
 
 /** Without the engine every session is listed under Other, and
  *  `unavailable` says the courses could not be read. `chats` is the
@@ -121,7 +122,8 @@ export function useUnitInbox(chats: readonly ChatListItem[] | null) {
 	const scope = read?.courses.some((c) => c.map.workspace === storedScope) ? storedScope : null;
 	const state = useMemo<InboxState>(() => {
 		if (courses === null || chats === null) return { status: "loading" };
-		const listed = read?.courses ?? [];
+		// "You are here" as Home places it (round 14, m6).
+		const listed = withLessonHere(read?.courses ?? [], chats);
 		const unreadable = scope === null ? (read?.failed ?? []) : [];
 		return { status: "ready", inbox: buildInbox(listed, chats, scope), courses: listed, unreadable, chats, unavailable: courses === "unavailable" };
 	}, [courses, read, chats, scope]);

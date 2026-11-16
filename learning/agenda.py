@@ -35,8 +35,10 @@ Reviews, when there are more than fit:
      lighter day takes less of it and a day off none; its not-yet-solid
      topics come back as their short intervals ask. Every taught topic is due
      by the final review, so each is reviewed before the exam whenever his
-     limit leaves room for it; the plan names those it leaves without one
-     (``Plan.unreviewed``), each with why (``Reason``).
+     limit leaves room for it, a day he was told keeping what it holds while
+     its free room takes what the final review left out (``_left_out``); the
+     plan names those it leaves without one (``Plan.unreviewed``), each with
+     why (``Reason``).
   2. a review an exam's untaught topics wait on (a topic not yet solid that
      they need, or a competing method of theirs), nearest exam first: the
      rest of that exam's path cannot start before it is solid, so it carries
@@ -168,7 +170,8 @@ class Why(TypedDict, total=False):
     """Why the plan starts a topic when it does, in the material's terms.
 
     ``kind`` is ``begun`` (a lesson he began and has not finished, which goes
-    on: ``_continued``), ``next`` (the next topic of its arc, or of the path, he can
+    on: ``_continued``; ``then``, on a lesson he worked on today, the study
+    day it goes on after today), ``next`` (the next topic of its arc, or of the path, he can
     start), ``after`` (on a day the plan reached it, it waited for ``needs``,
     prerequisites not yet solid, or ``partners``, competing methods not yet
     solid, to be told apart from them), or ``early`` (ahead of its place:
@@ -180,6 +183,7 @@ class Why(TypedDict, total=False):
 
     kind: str
     arc: str
+    then: str
     behind: str
     needs: list[str]
     partners: list[str]
@@ -954,12 +958,24 @@ def _kept_reviews(
     earlier one told him, and a day may hold more than his limit by what a
     save moved past the reviews it found there. A topic moves when the step's save touched it, or
     when its start, kept from the plan before, is no longer ready: its
-    reviews then follow its new start, never one before it."""
+    reviews then follow its new start, never one before it.
+
+    A final review's free room also takes, in the same order, the exam's
+    topics it left out, those the plan before gave no day before the exam
+    (``_left_out``): placing one moves no day he was told, and leaving the room empty
+    sent him into the exam with topics never reviewed (round 14, M10: 14 and
+    17 Nov held no Probability item while Binomial, Poisson and Geometric
+    read "No room in the final review")."""
     chosen = {
         c.name: [t for t in told.kept(c.name, day, "reviews") if not c.moves(t)]
         for c in courses
     }
-    if not any(course.due_moving(day) for course in courses):
+    filling = (
+        week.studies(day)
+        and sum(len(topics) for topics in chosen.values()) < room
+        and any(c.reviewing(day) and not c.none_due(day) for c in courses)
+    )
+    if not filling and not any(course.due_moving(day) for course in courses):
         return chosen
     candidates, quota = _candidates(courses, day, week)
     for course in courses:
@@ -975,8 +991,18 @@ def _kept_reviews(
         for topic in topics
     ]
     moved = 0
+    taken = len(kept)
+    told_ahead: dict[str, set[str]] = {}
     for key, name, owner, topic in candidates:
         if not owner.moves(topic):
+            if not filling or taken >= room or not owner.reviewing(day):
+                continue
+            if name not in told_ahead:
+                told_ahead[name] = _told_before_exam(owner, day, told)
+            if topic not in chosen[name] and _left_out(owner, topic, told_ahead[name]):
+                chosen[name].append(topic)
+                moved += 1
+                taken += 1
             continue
         ahead = (
             len(kept) if told.yields else sum(other < key for other in kept)
@@ -985,11 +1011,38 @@ def _kept_reviews(
         if week.studies(day) and ahead < room and (not final or quota[name] > 0):
             chosen[name].append(topic)
             moved += 1
+            taken += 1
             if final:
                 quota[name] -= 1
         else:
             owner.wait(topic, None)
     return chosen
+
+
+def _told_before_exam(course: _Course, day: date, told: _Told) -> set[str]:
+    """The topics the plan before the step reviews from ``day`` to the day
+    before ``course``'s exam."""
+    assert course.exam is not None
+    return {
+        topic
+        for planned in told.plan.days[course.name][
+            (day - told.on).days : (course.exam.day - told.on).days
+        ]
+        for topic in planned["reviews"]
+    }
+
+
+def _left_out(course: _Course, topic: str, told_ahead: set[str]) -> bool:
+    """A review of the exam's that its final review left out: due, examined,
+    untouched by the step, and given no day before the exam by the plan
+    before it (``told_ahead``). Its only day is the spaced one after the exam
+    that being left out gave it, so placing it moves no day of the final
+    review he was told."""
+    return (
+        not course.moves(topic)
+        and course.exam_of(topic) is not None
+        and topic not in told_ahead
+    )
 
 
 @dataclass
@@ -1050,24 +1103,41 @@ def _select(
 
 
 def _continued(
-    courses: list[_Course], day: date, week: Capacity
+    courses: list[_Course], day: date, week: Capacity, today: date
 ) -> dict[str, list[str]]:
     """Each lesson he began and has not finished goes on on ``day`` when it
-    is a study day after the last day he worked on it: its start is the one
+    is a study day after the last day he worked on it, or today when he
+    worked on it today: its start is the one
     he made the day he began it, so it takes no new topic's room, waits for
     nothing it needs and never moves to a later day for want of one. Its
     first review is the day after, as for any start (round 12, 1 D3: two
     Poisson sessions in, the plan put its first lesson on Sat 14 Nov and
-    the course head said there was no room to start it)."""
+    the course head said there was no room to start it). A lesson he works
+    on today is today's: a save inside it never moves it to a later day
+    while he is in it, and its ``then`` is the study day it goes on after
+    today, the day a close names, its first review the day after that; it
+    is never work he left that day (``_day``), since he worked on it
+    (round 14, m2: the review inside the Poisson lesson moved the lesson
+    from 10 to 11 Nov while it was open)."""
     found: dict[str, list[str]] = {course.name: [] for course in courses}
     if not week.studies(day):
         return found
     for course in courses:
         for topic, worked in course.lessons.items():
-            if topic in course.untaught and day > worked:
+            if topic in course.untaught and (day > worked or day == worked == today):
                 course.start(topic, day)
                 arc = course.arc(topic)
-                course.why[topic] = {"kind": "begun", **({"arc": arc} if arc else {})}
+                why: Why = {"kind": "begun", **({"arc": arc} if arc else {})}
+                if day == worked == today:
+                    later = day + timedelta(days=1)
+                    while not week.studies(later) and (later - day).days < MAX_DAYS:
+                        later += timedelta(days=1)
+                    why["then"] = later.isoformat()
+                    if course.asks:
+                        course._set_due(
+                            topic, later, progress.FIRST_RETRIEVAL_DAYS, solid=False
+                        )
+                course.why[topic] = why
                 found[course.name].append(topic)
     return found
 
@@ -1078,10 +1148,16 @@ def _new(
     room: float,
     week: Capacity,
     begun: int | None,
+    passed: int = 0,
 ) -> dict[str, list[str]]:
     """New topics within ``room``. Until he has shown a limit (``begun`` is not
     None), every exam course's pace is proposed even past ``room``, less the
-    ``begun`` topics he already started today."""
+    ``begun`` topics he already started today. ``passed`` is the starts a
+    save's step kept on the day: a final review's starts the save moved come
+    before them, as a moved review comes before the reviews it passes, so the
+    day may hold that many more than his limit (round 14, m7: Random
+    variables slipped, and Poisson's start went past the told starts of
+    three days to the Saturday inside the final review)."""
     chosen: dict[str, list[str]] = {course.name: [] for course in courses}
     for course in courses:
         course.fresh.clear()
@@ -1184,9 +1260,13 @@ def _new(
             rest = len(course.scoped)
             after = _room_after(week, day, end)
             before[course.name] = rest
-            paces[course.name] = max(
-                capacity.pace(rest, left, day, week.studies),
-                rest - after if after is not None else 0,
+            paces[course.name] = (
+                rest
+                if course.reviewing(day)
+                else max(
+                    capacity.pace(rest, left, day, week.studies),
+                    rest - after if after is not None else 0,
+                )
             )
     if begun is not None:
         room = max(room, sum(paces.values()) - begun)
@@ -1230,9 +1310,13 @@ def _new(
     # Expectation, which Variance needs, started on the eve, too late for a
     # review).
     reviewing = [course for course in exams if course.reviewing(day)]
+    if reviewing:
+        room += passed
     for course in reviewing:
         room -= gap(course)
         room -= paced(course)
+    if reviewing:
+        room = max(room - passed, 0)
     for course in [*exams, *others]:
         if course not in reviewing:
             room -= gap(course)
@@ -1615,6 +1699,7 @@ def _day(
             topic
             for planned in ended.days.get(name, [])[: (day - studied).days]
             for topic in (*planned["reviews"], *planned["new"])
+            if studied.isoformat() not in _lessons(morning[name]).get(topic, {})
         }
         for name in kept
     }
@@ -1906,7 +1991,8 @@ def _planned(
             for topic in reviews[course.name]:
                 course.place(topic)
                 course.reviewed(topic, day)
-        starts = _continued(courses, day, week)
+        starts = _continued(courses, day, week, today)
+        passed = 0
         if told is not None:
             for course in courses:
                 assert course.moving is not None
@@ -1918,10 +2004,11 @@ def _planned(
                         course.why[topic] = told.plan.why[course.name][topic]
                         starts[course.name].append(topic)
                         new_room -= 1
+                        passed += not told.yields
                     else:
                         course.moving.add(topic)
         new = (
-            _new(courses, day, max(new_room, 0), week, begun)
+            _new(courses, day, max(new_room, 0), week, begun, passed)
             if told is None or any(course.starts_moving() for course in courses)
             else _kept_new(courses, day, week)
         )

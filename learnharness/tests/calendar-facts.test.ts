@@ -314,10 +314,10 @@ describe("calendar words", () => {
 		assert.equal(finalReviewWords(null, TODAY), null);
 	});
 
-	it("says how far a day is from the engine's", () => {
+	it("says today, tomorrow or yesterday beside a day, and never counts days (round 14, m9)", () => {
 		assert.deepEqual(
 			["2026-11-08", "2026-11-09", "2026-11-07", "2026-11-19", "2026-11-29", "2026-11-01"].map((d) => distanceWords(d, TODAY)),
-			["Today", "Tomorrow", "Yesterday", "In 11 days", "In 21 days", "7 days ago"],
+			["Today", "Tomorrow", "Yesterday", null, null, null],
 		);
 	});
 });

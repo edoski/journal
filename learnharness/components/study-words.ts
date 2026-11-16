@@ -595,16 +595,23 @@ export function startsWhyShort(why: StartsWhy, map: StartsMap): string {
 	return arc ? `Back to ${arc}` : startsWhyWords(why, map);
 }
 
-/** How far a day is from the engine's, one form wherever a distance shows
- *  (an exam, a planned review): "Today", "Tomorrow", "In 18 days",
- *  "Yesterday", "3 days ago". Always days, never rounded to weeks, so the
- *  same exam reads the same on the course page and in the calendar. */
-export function distanceWords(day: string, today: string): string {
+/** A day beside the engine's, one form wherever a day shows (an exam, a
+ *  planned review): "Today", "Tomorrow" or "Yesterday", else null, since
+ *  the day itself says when and a count is not his words (round 14, m9:
+ *  "Exam in 11 days", "in 16 days"). */
+export function distanceWords(day: string, today: string): string | null {
 	const days = daysBetween(today, day);
 	if (days === 0) return "Today";
 	if (days === 1) return "Tomorrow";
 	if (days === -1) return "Yesterday";
-	return days > 0 ? `In ${days} days` : `${-days} days ago`;
+	return null;
+}
+
+/** "Thursday 19 November", with "today", "tomorrow" or "yesterday" after
+ *  it when it is one of those: never a count of days. */
+export function dayAndNearWords(day: string, long: string, today: string): string {
+	const near = distanceWords(day, today);
+	return near ? `${long}, ${near.toLowerCase()}` : long;
 }
 
 /** Whole days from `from` to `to`, both "YYYY-MM-DD". */

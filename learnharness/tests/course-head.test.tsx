@@ -96,7 +96,7 @@ describe("the course head", () => {
 		assert.ok(document.querySelector("[data-slot=course-next]") === null);
 		assert.doesNotMatch(text, /on your own/i);
 		assert.equal(document.querySelector("[data-slot=course-studied]")?.getAttribute("href"), "/chat/b");
-		assert.match(document.querySelector("[data-slot=course-exam]")?.textContent ?? "", /Exam in 11 days/);
+		assert.match(document.querySelector("[data-slot=course-exam]")?.textContent ?? "", /Exam 19 Nov/);
 	});
 });
 

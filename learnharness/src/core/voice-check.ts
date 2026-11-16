@@ -58,7 +58,8 @@ export type VoiceRule =
 	| "maths-words"
 	| "reason-twice"
 	| "card-words"
-	| "unbuilt";
+	| "unbuilt"
+	| "day-part";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -691,4 +692,25 @@ export function echoOf(text: string, answer: string | null): string | null {
 	const said = bare(answer);
 	const maths = [...raw.matchAll(/\$([^$\n]+)\$/g)].map((m) => bare(m[1]!)).filter(Boolean);
 	return maths.some((m) => said.includes(m)) ? raw : null;
+}
+
+/** A day the close names with part of what it holds: the close lists one
+ *  of the day's items that is not the lesson's own (`own`, titles) and
+ *  leaves out another, so he would plan that day on half of it (round 14,
+ *  m4: Wed 11's close named the Matrix multiplication review and Linear
+ *  maps, and left out the Determinants review). `days` is the close
+ *  result's `day_items`, each day with the lesson's own topics' titles. The excerpt names the day and what it left out. */
+export function partialDay(text: string, days: Readonly<Record<string, { day_words: string; items: readonly string[]; lesson: readonly string[] }>>): string | null {
+	const said = text.toLowerCase();
+	for (const { day_words: words, items, lesson } of Object.values(days)) {
+		const mine = lesson.map((t) => t.toLowerCase());
+		const long = (words.split(", ").find((w) => /\d/.test(w)) ?? words).toLowerCase();
+		const named = said.includes(long) || (words.startsWith("tomorrow") && /\btomorrow\b/.test(said));
+		if (!named) continue;
+		const titles = items.map((item) => item.replace(/ (?:review|starts|lesson continues)$/, ""));
+		const listed = titles.filter((t) => said.includes(t.toLowerCase()));
+		const missing = items.filter((_, i) => !said.includes(titles[i]!.toLowerCase()));
+		if (missing.length > 0 && listed.some((t) => !mine.includes(t.toLowerCase()))) return `${words}: ${missing.join(", ")}`;
+	}
+	return null;
 }
