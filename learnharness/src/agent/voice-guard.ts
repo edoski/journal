@@ -14,6 +14,12 @@
  * call (the refusal's details keep it). A refused question never showed:
  * the question dock waits for the call's result.
  *
+ * A question sent beside a refused message is read by its own rules and,
+ * well-formed, kept rather than refused (round 12, 3 M1: 25 of the
+ * evaluators' 81 refusals were a question refused only because the message
+ * before it was): `settle` takes it out of the reply that asked it, and
+ * poses it under the rewrite once that passes, which ends the turn.
+ *
  * Ordinary text never reaches him (round 7: an answer written as plain
  * text skipped every rule): `screenText` takes it out of the reply as it
  * ends, and a turn that would end having given him nothing of what it
@@ -22,8 +28,9 @@
  */
 
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
-import type { ToolCall } from "@earendil-works/pi-ai";
+import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
+import { parseQuestionInput } from "../core/tool-parts.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { adviceSentences, afterQuestion, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
@@ -351,6 +358,14 @@ const OWED = (tool: string): AgentToolResult<unknown> => ({
 	details: { withheld: "owed" },
 });
 
+/** A question kept for the rewrite of the message refused beside it. Not
+ *  an error, and it does not end the turn: the rewrite poses it. */
+const KEPT = (tool: string): AgentToolResult<null> => ({
+	content: [{ type: "text", text: `Kept: he reads this question right under your rewritten message, which poses it. Send the rewrite with send_to_user, and do not call ${tool} again.` }],
+	details: null,
+	terminate: false,
+});
+
 /** A turn-ending call after ordinary text: he never reads that text. */
 const PLAIN_OWED = (tool: string): AgentToolResult<unknown> => ({
 	content: [{ type: "text", text: `Not done: he never sees ordinary text, only what you send with send_to_user. If your text before this held anything for him, send it with send_to_user first; then call ${tool} again.` }],
@@ -458,6 +473,16 @@ export class VoiceGuard {
 	 *  was already held back for it (once a turn). */
 	private owed = false;
 	private heldForOwed = 0;
+	/** The question kept for the owed rewrite: its call, its words, whether
+	 *  its tool ran it cleanly, and the reply it was taken out of. */
+	private kept: { call: ToolCall; text: string; ran: boolean; from?: { message: AssistantMessage; index: number } } | null = null;
+	/** The questions kept this turn, taken out of the replies that asked them. */
+	private readonly keptIds = new Set<string>();
+	/** The rewrite that poses the kept question, and the one that posed it:
+	 *  its result ends the turn, whether it runs before the reply settles or
+	 *  after. */
+	private releasing: string | null = null;
+	private posedUnder: string | null = null;
 	private heldUnsure = false;
 	/** Ordinary text this turn took out of a reply, and whether the turn
 	 *  posed a question he can answer, and was already told at its end. */
@@ -531,7 +556,7 @@ export class VoiceGuard {
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
-		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
+		const note = (!shown || this.kept) && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -548,6 +573,12 @@ export class VoiceGuard {
 				const partial = tool.name === SAVE_TOOL && savedResults(tool.name, params).includes("partial");
 				if (partial && this.toldWrong) return SAVED_AGAINST_WORDS;
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
+				if (this.kept?.call.id === toolCallId) {
+					if (result.isError) this.letGo();
+					else { this.kept.ran = true; return KEPT(tool.name); }
+				}
+				const poses = (this.releasing === toolCallId && this.kept?.ran) || this.posedUnder === toolCallId;
+				if (poses && !result.isError) return { ...result, terminate: true };
 				if (partial && !result.isError) this.savedPartial = true;
 				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				return result;
@@ -590,6 +621,7 @@ export class VoiceGuard {
 			}
 			this.owed = false;
 			this.lengthDraft = null;
+			if (this.kept) this.releasing = call.id;
 			this.toldNow.push(text);
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
@@ -598,9 +630,12 @@ export class VoiceGuard {
 			return null;
 		}
 		if (this.probeEnded && (QUESTION_TOOLS as readonly string[]).includes(call.name)) return ASKED_AFTER_PROBE(questionText(call) ?? "");
-		// Held once for each refused message (a rewrite may be refused again),
-		// or once for ordinary text.
-		if ((this.owed || (this.plain && this.sent === 0)) && this.heldForOwed < Math.max(1, this.refused.get("message") ?? 0) && this.endsTurn(call.name)) {
+		// A question beside a refused message is read by its own rules and
+		// kept for the rewrite; any other turn-ending call is held once for
+		// each refused message (a rewrite may be refused again), or once for
+		// ordinary text.
+		const keeps = this.owed && (QUESTION_TOOLS as readonly string[]).includes(call.name);
+		if (!keeps && (this.owed || (this.plain && this.sent === 0)) && this.heldForOwed < Math.max(1, this.refused.get("message") ?? 0) && this.endsTurn(call.name)) {
 			this.heldForOwed++;
 			return this.owed ? OWED(call.name) : PLAIN_OWED(call.name);
 		}
@@ -608,7 +643,7 @@ export class VoiceGuard {
 		if (!(QUESTION_TOOLS as readonly string[]).includes(call.name)) return null;
 		const text = questionText(call);
 		if (!text) return null;
-		if (this.input.unsure && this.sent === 0 && !this.heldUnsure) {
+		if (this.input.unsure && this.sent === 0 && !this.owed && !this.heldUnsure) {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
@@ -617,9 +652,50 @@ export class VoiceGuard {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
 		}
+		if (keeps && parseQuestionInput(call.name, call.arguments)) {
+			this.letGo();
+			this.kept = { call, text, ran: false };
+			this.keptIds.add(call.id);
+			return null;
+		}
+		// A question posed anew lets go of the one kept.
+		this.letGo();
 		this.said.push(text);
 		this.posed = true;
 		return null;
+	}
+
+	/** Read a reply as it ends, before the record keeps it or a view draws
+	 *  it: a question kept in it leaves it, and the reply whose rewrite
+	 *  passed, asking no question of its own, poses the kept one under it. */
+	settle(message: AssistantMessage): void {
+		if (this.kept?.from && this.kept.from.message !== message && !this.kept.ran) this.letGo();
+		for (let i = message.content.length - 1; i >= 0; i--) {
+			const block = message.content[i]!;
+			if (block.type !== "toolCall" || !this.keptIds.has(block.id)) continue;
+			message.content.splice(i, 1);
+			if (this.kept?.call.id === block.id) this.kept = { ...this.kept, call: block, from: { message, index: i } };
+		}
+		const kept = this.kept;
+		const rewrite = this.releasing !== null && message.content.some((b) => b.type === "toolCall" && b.id === this.releasing);
+		const asks = message.content.some((b) => b.type === "toolCall" && (QUESTION_TOOLS as readonly string[]).includes(b.name) && this.decisions.get(b.id) === null);
+		if (!kept?.ran || !rewrite || asks) return;
+		message.content.push(kept.call);
+		this.said.push(kept.text);
+		this.posed = true;
+		this.posedUnder = this.releasing;
+		this.kept = null;
+		this.releasing = null;
+	}
+
+	/** Lets go of the kept question. One whose tool refused it goes back
+	 *  where it was asked, beside its refusal; one never posed is only gone
+	 *  (its clean result is the question's placeholder, never a record fact). */
+	private letGo(): void {
+		const kept = this.kept;
+		this.kept = null;
+		this.releasing = null;
+		if (kept?.from && !kept.ran) kept.from.message.content.splice(kept.from.index, 0, kept.call);
 	}
 
 	/** A posed problem's statement holds no advice and no instruction to
