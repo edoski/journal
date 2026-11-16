@@ -70,6 +70,12 @@ function memoryStorage(): Storage {
 		clear: () => kept.clear(),
 	};
 }
+// The lesson's page reads the window's address for a message to jump to: it opens with none.
+if (!(dom.window as { location?: unknown }).location) {
+	const location = new URL("http://localhost/");
+	Object.defineProperty(dom.window, "location", { value: location, configurable: true, writable: true });
+	Object.defineProperty(globalThis, "location", { value: location, configurable: true, writable: true });
+}
 const media = () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
 for (const [key, value] of Object.entries({ localStorage: memoryStorage(), sessionStorage: memoryStorage(), matchMedia: media })) {
 	Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
@@ -172,6 +178,9 @@ export async function openDemoApp(day = "2026-11-08") {
 	const { calendarEntries } = await import("../../components/calendar/calendar-facts.ts");
 	const { CalendarEntryView } = await import("../../components/calendar/calendar-entry.tsx");
 	const { TooltipProvider } = await import("../../components/ui/tooltip.tsx");
+	const { default: ChatPage } = await import("../../app/chat/[id]/page.tsx");
+	const { tonightAppends } = await import("../../src/core/input-events.ts");
+	const { newQuestionRepose } = await import("../../src/core/native-messages.ts");
 
 	// Every fetch the pages make, answered by the route that answers it in the app. A read can be held
 	// (`hold`) to stand for a slow engine read.
@@ -185,6 +194,8 @@ export async function openDemoApp(day = "2026-11-08") {
 	let shared: Map<string, Promise<{ status: number; body: string }>> | null = null;
 	/** The sessions a look-only press asked to start, oldest first. */
 	const started: Record<string, unknown>[] = [];
+	/** The tutor turns a page asked for (`POST /api/chat`), each refused: no turn runs in this world. */
+	const turns: Array<{ chatId: string; body: Record<string, unknown> }> = [];
 	const fetchApp = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
 		const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url, "http://localhost");
 		const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
@@ -193,6 +204,11 @@ export async function openDemoApp(day = "2026-11-08") {
 		if (looking && method === "POST" && url.pathname === "/api/chats") {
 			started.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
 			return Response.json({ error: "a look, not a start", code: "look" }, { status: 409 });
+		}
+		if (method === "POST" && url.pathname === "/api/chat") {
+			const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+			turns.push({ chatId: String(body.chatId ?? body.id ?? ""), body });
+			return Response.json({ error: "no tutor turn runs in the demo world", code: "demo" }, { status: 503 });
 		}
 		// A held read is not in flight: the page is meant to settle without it.
 		if (holding.has(url.pathname)) await new Promise<void>((resolve) => held.set(url.pathname, [...(held.get(url.pathname) ?? []), resolve]));
@@ -234,12 +250,14 @@ export async function openDemoApp(day = "2026-11-08") {
 	let mounted: { root: ReturnType<typeof createRoot>; host: HTMLElement } | null = null;
 	/** Every page the router was asked to open, oldest first. */
 	const pushed: string[] = [];
+	/** The lesson's own page while `lesson` has one open, as app/chat/[id]/page.tsx makes it; else a stand-in. */
+	let lessonPage: React.ReactNode = null;
 	const router = { push: (href: string) => void pushed.push(href), replace: (href: string) => void pushed.push(href), prefetch() {}, back() {}, forward() {}, refresh() {} };
 
 	function page(pathname: string): React.ReactNode {
 		if (pathname === "/") return <StudyHome />;
 		// A lesson's own page is not drawn here: he is in it, and the rest of the window is the shell's.
-		if (pathname.startsWith("/chat/")) return <main data-slot="lesson-stand-in" />;
+		if (pathname.startsWith("/chat/")) return lessonPage ?? <main data-slot="lesson-stand-in" />;
 		const unit = /^\/unit\/([^/]+)(?:\/([^/]+))?$/.exec(pathname);
 		const workspace = unit && workspaceOf(unit[1]!);
 		if (unit && workspace) return unit[2] ? <UnitPage key={pathname} workspace={workspace} handle={decodeURIComponent(unit[2])} /> : <CoursePage key={pathname} workspace={workspace} />;
@@ -492,6 +510,21 @@ export async function openDemoApp(day = "2026-11-08") {
 		lookAt,
 		click,
 		started,
+		turns,
+		/** Opens session `id`'s own page in a new window, its record as it is now, and hands its page to `read`
+		 *  once it has settled. Any turn it asks for is refused and recorded (`turns`). */
+		async lesson<T>(href: string, read: (page: Element) => T | Promise<T>): Promise<T> {
+			const [pathname, search = ""] = href.split("?");
+			const id = pathname!.replace(/^\/chat\//, "");
+			lessonPage = await ChatPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve(Object.fromEntries(new URLSearchParams(search))) });
+			try {
+				await visit(pathname!, { ready: () => !!document.querySelector('[data-slot="composer"], [data-slot="prose-question"], [data-slot="learner-bubble"]') });
+				return await read(mounted!.host);
+			} finally {
+				lessonPage = null;
+				await unmount();
+			}
+		},
 		chats,
 		record,
 		/** Turns the study day over, as the next morning does. */
@@ -515,9 +548,37 @@ export async function openDemoApp(day = "2026-11-08") {
 			);
 			return result.json as Record<string, unknown>;
 		},
-		/** The tutor poses a question in session `id` and waits on him. */
+		/** The tutor poses a question in session `id` and waits on him; returns the call, its tool and arguments. */
 		pose(id: string, question: string) {
-			append(id, assistant([{ type: "text", text: "Next one." }, { type: "toolCall", id: `toolu_n6_${++n}`, name: "explain", arguments: { type: "check", question, correctAnswer: "-" } }], "toolUse"));
+			const call = { tool: "explain", input: { type: "check", question, correctAnswer: "-" } };
+			append(id, assistant([{ type: "text", text: "Next one." }, { type: "toolCall", id: `toolu_n6_${++n}`, name: call.tool, arguments: call.input }], "toolUse"));
+			return call;
+		},
+		/** His Done for today in session `id`, as the app writes it (`tonightAppends`): each open question set
+		 *  aside, an open problem dropped, then the marker. The tutor's close is `closes`. */
+		leave(id: string) {
+			append(id, ...tonightAppends(record(id)).map((m) => ({ ...m, timestamp: stamp() })));
+		},
+		/** The tutor's close in session `id`, as eb91503c's turns recorded it (round 14, 2 D2): its
+		 *  `lesson_progress` with `close`, then its closing words through `send_to_user`, each with its receipt.
+		 *  Then the turn ends (`end: "stop"`); or the tutor poses `end`, a question, as its last call, waiting
+		 *  on him (1 M1, 2 D2: "course_save → lesson_progress {close: true} → send_to_user → explain"); or the
+		 *  turn ends and the app poses the calls `end.repose` again from their own call under a new id, as
+		 *  eb91503c's server did once the close settled (round 12, 3 n10; round 14, 3 M1, 4 minor 5). */
+		closes(id: string, words: string, end: "stop" | { tool: string; input: unknown } | { repose: Array<{ tool: string; input: unknown }> } = "stop") {
+			const receipt = (name: string, call: string, text: string) => ({ id: `msg_n6_${++n}`, role: "toolResult", toolCallId: call, toolName: name, content: [{ type: "text", text }], details: {}, isError: false, timestamp: stamp() });
+			const progress = `toolu_n6_${++n}`;
+			const send = `toolu_n6_${++n}`;
+			append(
+				id,
+				assistant([{ type: "toolCall", id: progress, name: "lesson_progress", arguments: { done: [], close: true } }], "toolUse"),
+				receipt("lesson_progress", progress, "Progress recorded."),
+				assistant([{ type: "toolCall", id: send, name: "send_to_user", arguments: { message: words } }], "toolUse"),
+				receipt("send_to_user", send, "Message received for display."),
+				...(typeof end === "object" && "tool" in end
+					? [assistant([{ type: "toolCall", id: `toolu_n6_${++n}`, name: end.tool, arguments: end.input }], "toolUse")]
+					: [assistant([{ type: "text", text: "" }], "stop"), ...(typeof end === "object" ? [{ ...newQuestionRepose(end.repose as never), timestamp: stamp() }] : [])]),
+			);
 		},
 		/** His message in session `id`. */
 		say(id: string, words: string) {
