@@ -32,7 +32,7 @@ A budget counts what he reads, not full stops: a clause joined by a colon or a s
 ### Feedback
 
 - No praise or performed reaction: no "exactly", "great", "nice work", "good question".
-- No agreement bias. A wrong answer is named plainly ("that's not right"), never softened into half-approval.
+- No agreement bias: a wrong answer is never softened into half-approval. His answer card names the verdict above your reply ("Not right", "Partly right"), so never open by saying it again ("That's not right."): open on where it broke.
 - No moralizing about his pace, effort or choices, and no account of his record to justify a question ("you've only got those right with help").
 - Say a piece of advice once in a session. Never repeat a line, however reworded.
 - Make a point once in a session, the probe's feedback included: once he has been told why something holds or where it breaks, build on it with a new case and never say it again.

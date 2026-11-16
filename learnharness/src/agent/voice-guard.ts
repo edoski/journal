@@ -213,6 +213,14 @@ const SESSION_AS_LESSON = /\b(?:this|today'?s|the|our|your)(?: [a-z]+)? lesson\b
  *  right: …", "No, …", with no part named right ("but", "partly"). */
 const FLAT_MISS = /^(?:(?:that|this|it)(?:'s| is) not (?:right|correct)\b|not (?:quite )?(?:right|correct)\b|no(?=[,.]))(?![^.?!]*\b(?:but|partly|part of)\b)/i;
 
+/** An opening that restates the verdict his answer card shows above the
+ *  reply, by the result this turn saved (round 14, m19: "That's not
+ *  right." under a "Not right" card). */
+const RESTATED_VERDICT: Readonly<Record<string, { card: string; re: RegExp }>> = {
+	incorrect: { card: "Not right", re: /^(?:no[,.]\s+)?(?:(?:that|this|it|your answer)(?:'s| is) (?:not (?:quite )?(?:right|correct)|wrong|incorrect)|not (?:quite )?(?:right|correct)|wrong|incorrect)\b/i },
+	partial: { card: "Partly right", re: /^(?:(?:that|this|it|your answer)(?:'s| is) )?(?:only )?(?:partly|partially|half) (?:right|correct)\b/i },
+};
+
 /** The results a save or a conclude records for his answers. */
 function savedResults(name: string, args: unknown): string[] {
 	if (!isRecord(args)) return [];
@@ -441,6 +449,10 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
+		case "card": {
+			const [card, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
+			return `His answer card already says "${card}" above your reply, and your opening says it again: ${quoted(said)}. Open on where it broke, the fact itself, never on the verdict, and never soften it.`;
+		}
 		case "predict":
 			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
@@ -645,6 +657,9 @@ export class VoiceGuard {
 	 *  was not right: the mark and the words must agree. */
 	private savedPartial = false;
 	private toldWrong = false;
+	/** The results this turn saved for his answers, which his answer
+	 *  cards show above the reply. */
+	private readonly savedVerdicts = new Set<string>();
 	private readonly noted = new Set<string>();
 	/** His answer this turn that no save has named yet, in a session with
 	 *  a course record to save it to, and whether a turn-ending call was
@@ -699,6 +714,7 @@ export class VoiceGuard {
 			this.sentAtConclude = this.sent;
 			if (savedResults(call.name, call.arguments).includes("partial")) this.savedPartial = true;
 		}
+		if (call.name === SAVE_TOOL || call.name === PRACTICE_CONCLUDE_TOOL) for (const result of savedResults(call.name, call.arguments)) this.savedVerdicts.add(result);
 		const refused = this.decide(call);
 		if (refused && call.name === SEND_TO_USER_TOOL) call.arguments = {};
 	}
@@ -954,6 +970,8 @@ export class VoiceGuard {
 		}
 		const first = sentences(text)[0]?.trim() ?? "";
 		if (this.savedPartial && FLAT_MISS.test(first)) out.push({ rule: "verdict", excerpt: first });
+		const restated = [...this.savedVerdicts].map((result) => RESTATED_VERDICT[result]).find((v) => v?.re.test(first));
+		if (restated) out.push({ rule: "card", excerpt: `${restated.card}|${first}` });
 		const compound = compoundAsk(sentences(text).filter((s) => s.trim().endsWith("?")).join(" "));
 		if (compound) out.push(compound);
 		const under = afterQuestion(text);
