@@ -68,6 +68,8 @@ function dueLine(d: Json, role: BriefRole): string {
 		.filter(Boolean)
 		.join(", ");
 	let line = `- ${str(d.topic) ?? "?"}${facts ? ` (${facts})` : ""}`;
+	const asked = list(d.asked).filter((a): a is string => typeof a === "string");
+	if (asked.length > 0) line += `\n  asked in its earlier reviews, newest first: ${asked.map((a) => `"${a}"`).join("; ")}`;
 	if (role === "practice") {
 		if (str(d.prompt)) line += `\n  prompt: ${d.prompt}`;
 		const points = list(d.points).filter((p): p is string => typeof p === "string");

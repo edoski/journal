@@ -275,6 +275,23 @@ def _brief(item: dict[str, Any], shown: Collection[str]) -> dict[str, Any]:
     return {name: value for name, value in item.items() if name not in TOPIC_DETAIL}
 
 
+def _asked(record: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
+    """A due review with what each earlier day's review of its topic asked,
+    newest first: the first counted answer of each day, the one that
+    counts, by its ``text``. Each review asks another part of the topic
+    (round 14, m5: Edo, one question a review, on a different part each
+    time)."""
+    first: dict[str, tuple[str, str]] = {}
+    for observation in record["observations"].values():
+        if item["topic"] not in observation["topics"] or not schema.counts(observation):
+            continue
+        day, stamp = observation["date"], observation.get("recorded", "")
+        if day not in first or stamp < first[day][0]:
+            first[day] = (stamp, observation["text"])
+    asked = [first[day][1] for day in sorted(first, reverse=True)]
+    return {**item, "asked": asked} if asked else item
+
+
 def _is_weak(topic: dict[str, Any], standing: dict[str, Any]) -> bool:
     return "gap" in topic or any(flag in standing for flag in WEAK_FLAGS)
 
@@ -467,7 +484,7 @@ def resume(
         "course": _course(record, today, planned),
         "last_activity": last_activity(record, today),
         "new_week": True if new_week(record, today) else None,
-        "due": [_brief(item, topics) for item in due[:DUE_LIMIT]],
+        "due": [_asked(record, _brief(item, topics)) for item in due[:DUE_LIMIT]],
         "due_more": max(0, len(due) - DUE_LIMIT) or None,
         "due_oldest": _oldest_unlisted(due),
         "due_later": later[:DUE_LIMIT] or None,

@@ -494,6 +494,15 @@ describe("a topic started ahead of plan (round 13, 1 n7; round 14, m1)", () => {
 	});
 });
 
+describe("a due review's earlier questions (round 14, m5)", () => {
+	it("lists what each earlier review asked, newest first, so this one asks another part", () => {
+		const resume = { today: "2026-11-08", due: [{ topic: "rank", overdue: 0, level: "assisted", asked: ["Found the rank of a 3 by 3 matrix by counting pivots", "Counted nonzero entries instead of pivots"] }] };
+		for (const role of ["teach", "practice"] as const) {
+			assert.match(projectCourseBrief(resume, role).text, /\n- rank \(assisted\)\n {2}asked in its earlier reviews, newest first: "Found the rank of a 3 by 3 matrix by counting pivots"; "Counted nonzero entries instead of pivots"/);
+		}
+	});
+});
+
 describe("the lesson's own topics in the plan (round 14, m2)", () => {
 	it("carry no moved note or start reason, so the tutor never announces the live lesson's day mid-lesson", () => {
 		const moving = courseMap("/study/probability", "Probability", null, [topic("poisson", "Poisson distribution", { ...untaught("2026-11-11", { kind: "next" }), moved: { from: "2026-11-09", by: "study", courses: ["Probability"], day: "today" } }), topic("binomial", "Binomial distribution", { review: scheduled("2026-11-12"), moved: { from: "2026-11-10", by: "answered" } })]);
