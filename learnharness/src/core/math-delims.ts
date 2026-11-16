@@ -174,10 +174,13 @@ function trailing(markdown: string, end: number): { punct: string; swallow: numb
 	return { punct: match?.[1] ?? "", swallow: match?.[0].length ?? 0, after: rest === markdown.length || markdown[rest] === "\n" ? "" : "\n\n" };
 }
 
-/** A word joined to inline maths by a hyphen ("$x$-axis"): it goes into
- *  the formula as text, so the line never breaks between "x" and "-axis"
- *  (round 10, 2 m6). */
+/** A word joined to inline maths by a hyphen ("$x$-axis"): a word joiner
+ *  holds it to the formula, so the line never breaks between "x" and
+ *  "-axis" (round 10, 2 m6), and the word stays prose, in the prose's type
+ *  (round 11, 2 n9: `\text{-dimensional}` set "4-dimensional" in maths
+ *  type). */
 const JOINED_WORD = /^-[A-Za-z]+(?:-[A-Za-z]+)*/;
+const WORD_JOINER = "\u2060";
 
 function transformDelimiters(markdown: string): string {
 	let offset = 0;
@@ -203,9 +206,8 @@ function transformDelimiters(markdown: string): string {
 			return `$$${span.body.trimEnd()}${punct}\n${span.close}${after}`;
 		}
 		if (span.open === "$") {
-			const joined = JOINED_WORD.exec(markdown.slice(start + span.raw.length))?.[0];
-			if (joined) swallow = joined.length;
-			return "$" + inlineSized(replaceEscapedDollars(span.body)) + (joined ? `\\text{${joined}}` : "") + span.close;
+			const joined = JOINED_WORD.test(markdown.slice(start + span.raw.length));
+			return "$" + inlineSized(replaceEscapedDollars(span.body)) + span.close + (joined ? WORD_JOINER : "");
 		}
 		if (span.open === "$$" && !span.display) {
 			// A formula alone on its line is a display, though written as
