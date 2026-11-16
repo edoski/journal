@@ -56,7 +56,8 @@ export type VoiceRule =
 	| "guess"
 	| "unsaved"
 	| "maths-words"
-	| "reason-twice";
+	| "reason-twice"
+	| "card-words";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -455,6 +456,12 @@ export function asksAreHis(text: string, words: string | null): boolean {
 	const his = stems(prose(words).text);
 	const asks = questionAsks(text);
 	return asks.length > 0 && asks.every((ask) => contentStems(ask).every((w) => his.has(w)));
+}
+
+/** A mark said with the record's confidence word, not the card's: "on
+ *  your own, sure" where the card says "Confident" (round 12, 2 n5). */
+export function recordConfidenceWord(text: string): string | null {
+	return /\b(?:on your own|with help|partly right|not right|right|gave up)\s*,\s*(?:(?:not )?sure|unsure|a guess|guess|guessed)\b/i.exec(text)?.[0] ?? null;
 }
 
 /** A "Show that…" or "Prove…" that also ends ", and why?": it already asks

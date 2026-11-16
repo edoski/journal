@@ -26,7 +26,7 @@ import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { normalizeQuestionType } from "../core/question-core.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, asksAreHis, reasonAskedTwice, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -211,6 +211,29 @@ function savedResults(name: string, args: unknown): string[] {
 	return listed.flatMap((o) => (isRecord(o) && typeof o.result === "string" && !("corrects" in o) ? [o.result] : []));
 }
 
+/** The rulings a save records on a dispute (`ruling` on each re-mark). */
+function savedRulings(args: unknown): string[] {
+	if (!isRecord(args)) return [];
+	let changes: unknown = args.changes;
+	if (typeof changes === "string") {
+		try {
+			changes = JSON.parse(changes);
+		} catch {
+			return [];
+		}
+	}
+	const listed = isRecord(changes) && Array.isArray(changes.observations) ? changes.observations : [];
+	return listed.flatMap((o) => (isRecord(o) && typeof o.ruling === "string" ? [o.ruling] : []));
+}
+
+/** A ruling saved in the record's confidence word, not his card's: the
+ *  card's "Disputed:" line would read "sure" beside "Confident". */
+const RULING_WORDS = (slip: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not saved: the ruling words his confidence as the record does, "${slip}", but his card says "Guessing" or "Confident". Send the save again with the ruling in the card's words.` }],
+	isError: true,
+	details: { withheld: "card-words" },
+});
+
 /** A save of a partly right answer after he was told it was not right:
  *  the mark under the card would contradict the words above it (round 7:
  *  "Partly right" under "That's not right."). */
@@ -312,6 +335,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 			return `Closing words never tell him how sure he was, which his card already shows, and never restate the break your feedback named: drop ${quoted(b.excerpt)} and keep only the one move that was not obvious.`;
 		case "letter":
 			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
+		case "card-words":
+			return `His card words his confidence "Guessing" or "Confident", so the ruling does too, never the record's "sure" or "guess": ${quoted(b.excerpt)}.`;
 		case "reason-twice":
 			return `A "Show that…" already asks for his reason, so it takes no ", and why?": ${quoted(b.excerpt)}. End it with a full stop, and pose a part he typed in his words, all of it.`;
 		case "maths-words":
@@ -495,6 +520,8 @@ export class VoiceGuard {
 	 *  held back for it (once a turn). */
 	private unsaved: string | null;
 	private heldUnsaved = false;
+	/** A ruling saved with the record's confidence word was held back once. */
+	private heldRuling = false;
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -619,6 +646,13 @@ export class VoiceGuard {
 			this.sent++;
 			return null;
 		}
+		if (call.name === SAVE_TOOL && this.input.ruling && !this.heldRuling) {
+			const slip = savedRulings(call.arguments).map(recordConfidenceWord).find(Boolean);
+			if (slip) {
+				this.heldRuling = true;
+				return RULING_WORDS(slip);
+			}
+		}
 		if (this.probeEnded && (QUESTION_TOOLS as readonly string[]).includes(call.name)) return ASKED_AFTER_PROBE(questionText(call) ?? "");
 		// Held once for each refused message (a rewrite may be refused again),
 		// or once for ordinary text.
@@ -695,6 +729,8 @@ export class VoiceGuard {
 		if (unsureEcho && !echo) out.push({ rule: "reason", excerpt: unsureEcho });
 		const moral = kind === "direct" ? closingMoral(text) : null;
 		if (moral) out.push({ rule: "moral", excerpt: moral });
+		const recordWord = this.input.ruling ? recordConfidenceWord(text) : null;
+		if (recordWord) out.push({ rule: "card-words", excerpt: recordWord });
 		const sure = kind === "close" ? narratedConfidence(text) : null;
 		if (sure) out.push({ rule: "confidence", excerpt: sure });
 		if (this.owed && this.lengthDraft && !out.some((b) => b.rule === "length")) {
