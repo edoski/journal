@@ -53,7 +53,8 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 		assert.equal(workingLine([probeEnd, firstStep]), "Thinking…", "once his first step arrives, the line is Thinking… again");
 		const asked = msg("assistant", [toolPart("explain", "input-available")]);
 		assert.equal(planningLesson([probeEnd, asked]), false);
-		assert.equal(planningLesson([msg("assistant", [toolPart("probe_done", "input-streaming")])]), false, "a probe_done still being written is its own card");
+		assert.equal(planningLesson([msg("assistant", [toolPart("probe_done", "input-available")])]), true, "a probe_done still settling keeps the line (live run 3: a 0.3 s Thinking… blink)");
+		assert.equal(planningLesson([msg("assistant", [toolPart("probe_done", "output-error")])]), false, "a refused probe_done is not the probe's end");
 		assert.equal(planningLesson([msg("user", [{ type: "text", text: "hi" }])]), false);
 	});
 

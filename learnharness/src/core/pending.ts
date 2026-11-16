@@ -105,15 +105,16 @@ const WAIT_LINES: Record<string, string> = {
 	visual: "Making a visual…",
 };
 
-/** Whether the probe has ended and the lesson's first step has not yet
- *  reached him: no words of the tutor's and no question after the
- *  concluded `probe_done`. Pure. */
+/** Whether the probe is ending or has ended and the lesson's first step
+ *  has not yet reached him: no words of the tutor's and no question after
+ *  a `probe_done` that was not refused (one still settling counts, so the
+ *  line does not blink to Thinking… as the probe's turn closes). Pure. */
 export function planningLesson(messages: readonly UIMessage[]): boolean {
 	for (let m = messages.length - 1; m >= 0; m--) {
 		const parts = messages[m]!.parts;
 		for (let p = parts.length - 1; p >= 0; p--) {
 			const part = parts[p]!;
-			if (part.type === "tool-probe_done") return part.state === "output-available";
+			if (part.type === "tool-probe_done") return part.state !== "output-error";
 			if (part.type === "text" && typeof part.text === "string" && part.text.trim()) return false;
 			if (isToolUIPart(part) && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) return false;
 		}
