@@ -235,6 +235,26 @@ export function cameraAt(layout: TopicMapLayout, point: Point, zoom: number, fra
 	return { x: along(point[0], layout.width, frame.width, room.x, zoom), y: along(point[1], layout.height, frame.height, room.y, zoom), zoom };
 }
 
+/** How far past the whole drawing's zoom still counts as showing it whole: a zoom React Flow rounds. */
+const FIT_SLACK = 0.001;
+
+/** Whether the camera at `zoom` shows the whole drawing, which `fitted` (`wholeZoom`, never past 100%) fits: then
+ *  nothing is off screen, and a style held still while the map fits pans neither by drag nor by scroll. Pure. */
+export function showsWhole(zoom: number, fitted: number): boolean {
+	return zoom <= fitted + FIT_SLACK;
+}
+
+/** The furthest a camera may look for a map held still while it fits: the view that shows the drawing whole at
+ *  `fitted`, around its middle. At that zoom it is the frame's own size, so React Flow centres the drawing; zoomed
+ *  in, the camera pans within it. Pure. */
+export function wholeExtent(layout: TopicMapLayout, frame: Frame, fitted: number): [[number, number], [number, number]] {
+	const half = { x: frame.width / fitted / 2, y: frame.height / fitted / 2 };
+	return [
+		[layout.width / 2 - half.x, layout.height / 2 - half.y],
+		[layout.width / 2 + half.x, layout.height / 2 + half.y],
+	];
+}
+
 /** A topic's centre in a drawing. */
 export function centreOf(layout: TopicMapLayout, placed: PlacedTopic): Point {
 	return [placed.x + layout.node.width / 2, placed.y + layout.node.height / 2];

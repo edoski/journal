@@ -5,7 +5,7 @@ import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateEx
 import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
-import { READABLE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, slackOf, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
+import { READABLE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, type TopicMapState } from "./topic-node";
 import { cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
@@ -245,13 +245,18 @@ function Flow({
 		const smallest = Math.min(READABLE_ZOOM, minZoom);
 		return { x: margin.x / smallest + slack.x, y: margin.y / smallest + slack.y };
 	}, [layout.node, margin.x, margin.y, minZoom]);
-	const extent = useMemo<CoordinateExtent>(
-		() => [
+	const extent = useMemo<CoordinateExtent>(() => {
+		// A style held still while the map fits looks no further than the view that shows it whole, so zooming
+		// back out to that view lands on it, centred.
+		if (skin.fixedWhenFits && frameWidth > 0 && frameHeight > 0) return wholeExtent(layout, { width: frameWidth, height: frameHeight }, fitted);
+		return [
 			[-reach.x, -reach.y],
 			[layout.width + reach.x, layout.height + reach.y],
-		],
-		[layout, reach],
-	);
+		];
+	}, [skin.fixedWhenFits, frameWidth, frameHeight, fitted, layout, reach]);
+	// All of it on screen: nothing to pan to, so only a pinch moves the map (`fixedWhenFits`).
+	const zoomNow = useStore((s) => s.transform[2]);
+	const still = skin.fixedWhenFits === true && frame !== null && showsWhole(zoomNow, fitted);
 	const opensWhole = frame ? wholeZoom(layout, frame, margin) >= READABLE_ZOOM : null;
 	const told = useRef(onOpensWhole);
 	told.current = onOpensWhole;
@@ -370,9 +375,13 @@ function Flow({
 						// Hidden only until the frame is measured and the opening view set, in the same frame.
 						className={cn(!placed && "invisible")}
 						minZoom={minZoom}
-						maxZoom={1}
+						maxZoom={skin.maxZoom ?? 1}
 						translateExtent={extent}
-						panOnScroll={skin.panOnScroll}
+						panOnScroll={skin.panOnScroll && !still}
+						panOnDrag={!still}
+						// Held still, a scroll is the page's and a pinch still zooms.
+						zoomOnScroll={!still}
+						preventScrolling={!still}
 						// A pan or zoom of his own (an event; the camera's own moves have none) keeps the map where he leaves it.
 						onMoveStart={(event) => event && follower.stay()}
 						zoomOnDoubleClick={false}

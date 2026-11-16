@@ -74,6 +74,13 @@ export interface MapSkin {
 	Chrome?: ComponentType<ChromeProps>;
 	/** Whether a scroll pans (a canvas) and a pinch zooms. */
 	panOnScroll: boolean;
+	/** Holds the map still while all of it is on screen (Edo, 16 Nov 2026: "fixed without the user being able to
+	 *  drag it… when the graph itself cleanly fits on screen… The only navigation… zooming in… and zooming out"):
+	 *  no drag or scroll pans until a pinch zooms in past the whole drawing, and the camera never looks past the
+	 *  view that shows it whole, so zooming back out lands on that view. */
+	fixedWhenFits?: boolean;
+	/** How far a pinch zooms in; 1 unset. */
+	maxZoom?: number;
 }
 
 /** Where a handle sits on a node of a given size. */

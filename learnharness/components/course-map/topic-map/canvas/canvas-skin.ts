@@ -30,4 +30,7 @@ export const TREE_SKIN: MapSkin = {
 	Frame: CanvasFrame,
 	Chrome: CanvasChrome,
 	panOnScroll: true,
+	fixedWhenFits: true,
+	// A pinch reads a card closer, past its own size, even where the whole course fits at 100%.
+	maxZoom: 1.5,
 };

@@ -49,10 +49,10 @@ No card names them (Edo, 16 Nov 2026: the fixed focus card beside the enlarged m
 
 ## Chrome
 
-A dot grid (24px, white 10%) under the cards everywhere, and nothing else: no minimap and no zoom bar (Edo, 16 Nov 2026: "get rid of this"). Scroll pans and a pinch zooms, as on every map; the enlarged map's own button shows the whole course.
+A dot grid (24px, white 10%) under the cards everywhere, and nothing else: no minimap and no zoom bar (Edo, 16 Nov 2026: "get rid of this"). Scroll pans and a pinch zooms, as on every map, and a map that fits its frame holds still until a pinch zooms in (`../topic-map.md`, Held still while it fits); the enlarged map's own button shows the whole course.
 
 ## Behaviour
 
 - A click or Enter opens the topic's page. An entry card's "From <arc>" line is a press of its own beside the card's link (`FromLink`): it shows that arc on the map, where the page can show one (Home, the course page), and reads in the foreground ink under the pointer (Edo, 16 Nov 2026: "make perhaps the From... header in cards clickable"). Pointer only; the arc selector is the keyboard's way to another arc. The arrows walk it as they walk the map (`neighbourOf`): Up to the nearest prerequisite, Down to the nearest topic that needs it, Left and Right along the layer.
-- Camera, framing, follow, highlight and mark are the map's own (`../topic-map.md`). Scroll pans, pinch zooms.
+- Camera, framing, follow, highlight and mark are the map's own (`../topic-map.md`). Scroll pans, pinch zooms, held still while it fits.
 - Reduced motion: every hover change is at once.
