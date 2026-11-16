@@ -532,6 +532,48 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
 	};
 }
 
+/**
+ * His work on the open problem that no reply has answered yet: his newest
+ * input on it is his work, and no reply since ended its turn (each one
+ * stopped, failed, or is a step of the turn Done for today stops). By the
+ * rule Done for today states, an answer he sent before pressing it is
+ * still graded, so this problem is graded, not dropped (round 13, 4 M2:
+ * ⌘⇧D 2.5 s after a right answer dropped the problem, and the closing
+ * turn saved the attempt on no card and without his Guessing). Pure.
+ */
+export function workAwaitingGradeOf(messages: readonly LhMessage[], problemCallId: string): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "user") return false;
+		if (m.role === "assistant") {
+			if (m.content.some((b) => b.type === "toolCall" && b.id === problemCallId)) return false;
+			if (m.stopReason !== "aborted" && m.stopReason !== "error" && m.stopReason !== "toolUse") return false;
+			continue;
+		}
+		if (m.role !== "custom") continue;
+		if ((m.details as { problemCallId?: unknown } | null)?.problemCallId !== problemCallId) continue;
+		if (m.customType === "practice-thinking") return true;
+		if (m.customType === "practice-request") return false;
+	}
+	return false;
+}
+
+/** The note Done for today carries for `workAwaitingGradeOf`: grade his
+ *  work through `conclude`, so the attempt is saved with his confidence
+ *  and its card shows the mark. Model-facing only. */
+export function newUngradedWorkMessage(): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: UNGRADED_ANSWER,
+		content:
+			"[UNGRADED WORK] His work on the open problem was sent before he pressed Done for today, and your turn stopped before you answered it, so that problem is still open, not dropped. Grade it now with `conclude`, as you would have: a claimed answer concludes with its result, and the attempt is saved with the confidence he gave it; work that claims no answer concludes `movedOn` with `result: null`, and nothing is recorded. Never save it with course_save. Then close as the next message says.",
+		display: false,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
 /** The note riding his first message after Done for today left a question
  *  open (`questionLeftForToday`): it picks the lesson up at that question.
  *  Model-facing only. */

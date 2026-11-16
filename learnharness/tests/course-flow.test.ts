@@ -381,6 +381,60 @@ describe("a course-linked turn", () => {
 		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
 	});
 
+	it("practice: Done for today pressed while his answer is graded saves it through conclude, with his Guessing, and its card shows the mark (round 13, 4 M2)", async () => {
+		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: LINALG } })).json()) as { id: string };
+		const pose = { statement: "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.", mode: "recall", topics: ["rank"], modelSolution: "Row 2 is twice row 1, so the rank is 1." };
+		const histories: string[] = [];
+		let thinking: () => void = () => {};
+		const graded = new Promise<void>((resolve) => (thinking = resolve));
+		const faux = createFauxCore({});
+		faux.setResponses([
+			() => fauxAssistantMessage([fauxToolCall("problem", pose, { id: "p1" })], { stopReason: "toolUse" }),
+			// The grading turn: still thinking when he presses Done for today.
+			((_ctx: unknown, opts: { signal?: AbortSignal } | undefined) =>
+				new Promise((resolve) => {
+					thinking();
+					const cut = () => resolve(fauxAssistantMessage([], { stopReason: "aborted" }));
+					if (opts?.signal?.aborted) return cut();
+					opts?.signal?.addEventListener("abort", cut, { once: true });
+				})) as unknown as FauxResponseStep,
+			(context: TranscriptContext) => {
+				histories.push(JSON.stringify(context.messages));
+				return fauxAssistantMessage([fauxToolCall("conclude", { outcome: "solved", verdict: "Right: row 2 is twice row 1.", rung: null, missClass: null, retest: false, result: "correct", response: "1" }, { id: "c1" })], { stopReason: "toolUse" });
+			},
+			() => sendToUser("Your Rank review comes back on Thursday."),
+			() => fauxAssistantMessage(""),
+		]);
+		const engine: ScriptedModel = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const factory: Factory = (opts) => createPracticeAgent({ chatId: id, chatStore }, { ...opts, ...onFake(engine, opts) });
+		await turn(id, { type: "text", text: "practice rank" }, factory);
+		const saves = () => engineCalls().filter((c) => c.args[1] === LINALG && c.args[2] === "save");
+		const before = saves().length;
+
+		const ask = (input: unknown) => handleChatRequest(post("/api/chat", { chatId: id, input }), factory);
+		assert.equal((await ask({ type: "thinking", problemCallId: "p1", text: "1, the rows are dependent", confidence: "guessing" })).status, 200);
+		const grading = runningTurn(id);
+		assert.ok(grading, "the tutor is grading his answer");
+		const cut = new Response(grading.subscribe()).text();
+		await graded;
+		assert.equal((await ask({ type: "tonight" })).status, 200);
+		await cut;
+		const closing = runningTurn(id);
+		if (closing) await new Response(closing.subscribe()).text();
+
+		const messages = chatStore.getChat(id)!.messages;
+		assert.equal(messages.some((m) => (m as { customType?: string }).customType === "problem-dismissed"), false, "the answer he sent is not left for next time");
+		assert.match(histories[0]!, /UNGRADED WORK/, "the closing turn is told to grade it");
+		const [observation] = JSON.parse(saves()[before]!.stdin).observations as Record<string, unknown>[];
+		assert.equal(saves().length, before + 1, "one save");
+		assert.equal(observation!.result, "correct");
+		assert.equal(observation!.sure, "guess", "his Guessing is saved with the attempt");
+		const { markLinks } = await import("../src/core/answer-marks.ts");
+		const links = markLinks(chatStore.getChat(id)!);
+		assert.deepEqual(Object.keys(links), ["c1"], "the attempt marks his answer's card, the problem's conclusion");
+		assert.equal(links.c1!.length, 1);
+	});
+
 	it("practice: a message sent from Ask concludes nothing and carries no confidence (round 5)", async () => {
 		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: LINALG } })).json()) as { id: string };
 		const pose = { statement: "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.", mode: "recall", topics: ["rank"], modelSolution: "Row 2 is twice row 1, so the rank is 1." };
