@@ -64,9 +64,9 @@ function RailButton({
  * (Electron resolves drag regions in page order).
  */
 export function RailOpenButton({ shown, onOpen }: { shown: boolean; onOpen: () => void }) {
-	// Mounted open or folded, it fades with the rail (`sidebar-motion`).
+	// Mounted open or folded; it shows once the panel's edge has swept past it, and goes as the edge comes back (`rail-toggle-motion`).
 	return (
-		<div inert={!shown} className={cn("lh-rail-toggle sidebar-motion", !shown && "invisible opacity-0")}>
+		<div inert={!shown} className={cn("lh-rail-toggle rail-toggle-motion", !shown && "invisible")}>
 			<RailButton icon={PanelLeftOpenIcon} label="Open sidebar" action="toggle-sidebar" onClick={onOpen} testId="sidebar-open" />
 		</div>
 	);
@@ -82,10 +82,10 @@ export function RailOpenButton({ shown, onOpen }: { shown: boolean; onOpen: () =
 export function SidebarRail({ pathname, onNewLesson, onSettings }: { pathname: string; onNewLesson: () => void; onSettings: () => void }) {
 	return (
 		<nav aria-label="Sidebar" data-slot="sidebar-rail" className="flex h-full w-full flex-col items-center border-r bg-background pb-2">
-			<div className="lh-drag lh-rail-head relative flex h-13 w-full shrink-0 items-center justify-center">
+			<div className="lh-drag lh-rail-head relative flex w-full shrink-0 items-center justify-center">
 				<span aria-hidden data-slot="sidebar-rail-rule" className="absolute bottom-0 left-1/2 h-px w-5 -translate-x-1/2 bg-border" />
 			</div>
-			<div className="lh-drag flex w-full flex-1 flex-col items-center gap-1 pt-2">
+			<div className="lh-drag flex w-full flex-1 flex-col items-center gap-1 pt-0.5">
 				<RailButton icon={HouseIcon} label="Home" href="/" here={pathname === "/"} />
 				<RailButton icon={CalendarDaysIcon} label="Calendar" href="/calendar" here={pathname === "/calendar"} />
 				<RailButton icon={SearchIcon} label="Search" action="sessions-search" onClick={() => window.dispatchEvent(new Event(kbdEventForAction("sessions-search")))} />

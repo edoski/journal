@@ -45,11 +45,13 @@ export function StudyHome() {
  *  2026, N1). The map enlarged takes the whole window's width. */
 export const HOME_WIDTH = "max-w-[80rem]";
 
-/** Home's edges: the pages' own column (`PAGE_COLUMN`), so its tabs, map
- *  and Today start where a course or topic page's head and columns do,
- *  24px under the window's title band, which only the Mac app has
- *  (`.lh-lights-band`, in `HomeFrame`). */
-const HOME_FRAME = cn(PAGE_COLUMN, "pt-6");
+/** Home's edges: the pages' own column (`PAGE_COLUMN`). Its first row, the
+ *  course tabs (32px), is centred on the band's centre line
+ *  (`--lh-band-centre`), as a lesson's top bar and the calendar's toolbar are, so the folded rail's
+ *  open button and the traffic lights stand on the same line (Edo, 16 Nov
+ *  2026: the button "should be vertically aligned with the course page
+ *  titles on the homepage"). */
+const HOME_FRAME = cn(PAGE_COLUMN, "pt-[calc(var(--lh-band-centre)-1rem)]");
 
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };

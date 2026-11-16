@@ -89,6 +89,8 @@ const press = (page: Page, button: "Close sidebar" | "Open sidebar") =>
 		watch.observe(aside, { childList: true, subtree: true });
 		const railHome: number[] = [];
 		const pageLeft: number[] = [];
+		const panelHome: number[] = [];
+		const edges: number[] = [];
 		const animated = new Set<string>();
 		const t0 = performance.now();
 		document.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click();
@@ -97,6 +99,11 @@ const press = (page: Page, button: "Close sidebar" | "Open sidebar") =>
 				const home = document.querySelector('[data-slot="sidebar-rail"] a[href="/"]');
 				if (home && getComputedStyle(home).visibility === "visible") railHome.push(home.getBoundingClientRect().left);
 				pageLeft.push(main.getBoundingClientRect().left);
+				const panel = document.querySelector('[data-slot="sidebar-panel"]')!;
+				if (getComputedStyle(panel).visibility === "visible") {
+					panelHome.push(Math.round(document.querySelector('[data-slot="sidebar-home"]')!.getBoundingClientRect().left));
+					edges.push(Math.round(panel.getBoundingClientRect().right));
+				}
 				for (const a of document.getAnimations()) if (a instanceof CSSTransition && aside.contains((a.effect as KeyframeEffect).target)) animated.add(a.transitionProperty);
 				if (t - t0 < 300) requestAnimationFrame(frame);
 				else done();
@@ -104,11 +111,11 @@ const press = (page: Page, button: "Close sidebar" | "Open sidebar") =>
 			requestAnimationFrame(frame);
 		});
 		watch.disconnect();
-		return { changed, railHome: [...new Set(railHome)], pageLeft: [...new Set(pageLeft)], animated: [...animated].sort(), state: aside.getAttribute("data-state") };
+		return { changed, railHome: [...new Set(railHome)], pageLeft: [...new Set(pageLeft)], panelHome: [...new Set(panelHome)], edges: [...new Set(edges)], animated: [...animated].sort(), state: aside.getAttribute("data-state") };
 	}, button);
 
 describe("the fold", () => {
-	it("rebuilds nothing and slides by transform and opacity alone: the rail's icons stay put and the page moves once, never frame by frame", async () => {
+	it("rebuilds nothing and folds in one motion: the panel's edge sweeps while everything in it holds still, nothing fades, the rail's icons stay put and the page glides with it", async () => {
 		const page = await shell.open("browser", { sidebar: "open" });
 		const fold = await press(page, "Close sidebar");
 		await new Promise((done) => setTimeout(done, 100));
@@ -118,8 +125,11 @@ describe("the fold", () => {
 			assert.equal(run.state, settled, `${name} settles ${settled}`);
 			assert.equal(run.changed, 0, `${name}: the panel and the rail stay mounted (round 14 swapped them, rebuilding the panel on every unfold)`);
 			assert.ok(run.animated.length > 0, `${name} animates`);
-			assert.deepEqual(run.animated.filter((p) => !["translate", "opacity", "visibility"].includes(p)), [], `${name}: only transform and opacity move, never the width (${run.animated})`);
-			assert.deepEqual(run.pageLeft, [left], `${name}: the page takes its new place once, on the first frame, not frame by frame (${run.pageLeft.join(", ")})`);
+			assert.deepEqual(run.animated.filter((p) => !["translate", "visibility", "width"].includes(p)), [], `${name}: nothing fades (Edo, 16 Nov 2026: the fade made the rail and the panel "two separate entities"; ${run.animated})`);
+			assert.equal(run.panelHome.length, 1, `${name}: the panel's rows hold still while its edge sweeps (x ${run.panelHome.join(", ")})`);
+			assert.ok(run.edges.length > 3, `${name}: the panel's edge travels frame by frame (${run.edges.join(", ")})`);
+			assert.equal(run.pageLeft.at(-1), left, `${name}: the page settles beside the sidebar`);
+			assert.ok(run.pageLeft.length > 3, `${name}: the page glides there with the sidebar's edge, never in one jump (Edo, 16 Nov 2026: "this weird static layout shift that jumps from one frame to the next"; ${run.pageLeft.join(", ")})`);
 		}
 		assert.deepEqual(fold.railHome, [(RAIL - 1 - 28) / 2], `the rail's icons stay where they settle while it folds (round 14: they slid in from the middle, x ${fold.railHome.join(", ")})`);
 	});

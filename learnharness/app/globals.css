@@ -551,15 +551,30 @@ body {
    electron/main.cjs). Both lengths are physical under zoom, as the lights
    are. The page's band content starts a 12px gap past it (T3 Code's
    `--workspace-titlebar-control-gap`) while the sidebar is folded. */
+/* The band's centre line: half the window's 52px band in a browser, the
+   traffic lights' centre in the Mac app. The rail's open button, Home's
+   course tabs and the rail's rule all take their places from it, so the
+   button stands level with the tabs and the rule falls on their underline. */
+:root {
+	--lh-band-centre: 1.625rem;
+}
+.lh-electron {
+	--lh-band-centre: calc(var(--lh-lights-centre) / var(--lh-zoom));
+}
+/* The rail's head ends half a 32px row under the centre line, where Home's
+   tab underline runs; its first icon is then one 32px step under the
+   button, the step between all its icons. */
+.lh-rail-head {
+	height: calc(var(--lh-band-centre) + 1rem);
+}
 .lh-rail-toggle {
 	position: fixed;
-	top: 1.625rem;
+	top: var(--lh-band-centre);
 	left: calc((3rem - 1px) / 2);
 	z-index: 20;
 	transform: translate(-50%, -50%);
 }
 .lh-electron .lh-rail-toggle {
-	top: calc(var(--lh-lights-centre) / var(--lh-zoom));
 	left: calc(90px / var(--lh-zoom));
 	transform: translateY(-50%);
 }
@@ -574,15 +589,27 @@ body {
 	padding-left: calc(90px / var(--lh-zoom) + 1.75rem + 0.75rem - 3rem);
 }
 
-/* The sidebar's fold (unit-inbox.md, "Folded"): its panel slides, its rail
-   and the rail's open button fade, 200ms linear as shadcn's sidebar, and
-   nothing else moves: no width, so the page beside it never re-lays out
-   frame by frame. On only once SidebarProvider has mounted
-   (.lh-sidebar-motion), so nothing slides in on page load, and never under
-   reduced motion, where the sidebar folds at once. */
+/* The sidebar's fold (unit-inbox.md, "Folded"): the panel's edge sweeps
+   over the rail while its contents hold still (the panel and its contents
+   translate by the same length in opposite directions, on one curve, so
+   they cancel), 200ms as shadcn's sidebar, and nothing fades. The rail's
+   open button shows once the sweep has passed and goes as it starts back.
+   No width moves, so the page beside it never re-lays out frame by frame.
+   On only once SidebarProvider has mounted (.lh-sidebar-motion), so
+   nothing slides in on page load, and never under reduced motion, where
+   the sidebar folds at once. */
 @media (prefers-reduced-motion: no-preference) {
 	.lh-sidebar-motion .sidebar-motion {
-		transition: translate 200ms linear, opacity 200ms linear, visibility 200ms linear;
+		transition: translate 200ms ease-in-out, visibility 200ms;
+	}
+	.lh-sidebar-motion .rail-toggle-motion {
+		transition: visibility 0s 200ms;
+	}
+	.lh-sidebar-motion .sidebar-width-motion {
+		transition: width 200ms ease-in-out;
+	}
+	.lh-sidebar-motion .rail-toggle-motion[inert] {
+		transition: visibility 0s;
 	}
 }
 

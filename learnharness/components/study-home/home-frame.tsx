@@ -55,7 +55,6 @@ export function HomeFrame({
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			<div className="lh-lights-band shrink-0" aria-hidden="true" />
 			<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
 				<div className={className}>
 					<HomeBody state={state} onRetry={retry} quiet={quiet} busy={lesson.busy} onStart={lesson.start}>
