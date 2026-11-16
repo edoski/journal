@@ -15,7 +15,7 @@ const quoted = (text: string) => [...text.matchAll(/"([^"]+)"/g)].map((m) => m[1
 
 describe("a question's field states the one-ask rule (round 11: a reason asked as a second question)", () => {
 	it("the question field of recall and explain carries it", () => {
-		assert.ok(explainInputBase.properties.question.description!.includes(ONE_ASK_RULE));
+		assert.ok(String((explainInputBase.properties.question as { description?: string }).description).includes(ONE_ASK_RULE));
 	});
 
 	it("its example is one ask, and the round-11 drafts it replaces are refused", () => {
@@ -38,7 +38,7 @@ describe("a question's field states the one-ask rule (round 11: a reason asked a
 
 describe("send_to_user's message field states the symbol rule and how length is counted", () => {
 	it("the field carries them", () => {
-		assert.ok(sendToUserTool.parameters.properties.message.description!.includes(MESSAGE_DRAFT_RULES));
+		assert.ok(String((sendToUserTool.parameters.properties.message as { description?: string }).description).includes(MESSAGE_DRAFT_RULES));
 	});
 
 	it("its sentence opening on a word passes, and the one opening on a formula is refused", () => {
