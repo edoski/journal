@@ -331,6 +331,18 @@ body {
    each relation, which split "R₃ = / R₂ − R₁" over two lines (round 8). */
 .katex { white-space: nowrap; }
 
+/* Except in an Earlier row of the topic page, whose column is narrower than
+   some of his formulas: there a formula wider than the row breaks after a
+   top-level relation or operator, KaTeX's own break points, each part whole,
+   rather than run past the column and be clipped (round 14, m37: "P(X≥2) =
+   1 − P(X=0) − P(X=1) ≈ 0.756" read "≈ 0.7"). One that fits stays on one line. */
+[data-slot="topic-attempt-text"] .katex { white-space: normal; }
+
+/* The pieces between a bracket and its close stay on one line wherever a
+   formula may wrap (math-text.tsx, `holdBrackets`): "P(X =" | "0)" broke
+   inside one (round 14, m37). */
+.katex-hold { white-space: nowrap; }
+
 /* Display math: long equations scroll instead of overflowing the column. */
 .katex-display {
 	overflow-x: auto;

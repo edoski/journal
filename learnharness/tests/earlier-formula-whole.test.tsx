@@ -30,7 +30,7 @@ describe("an Earlier row keeps each formula whole (2 n1)", () => {
 		assert.ok(text !== null, "the row's sentence");
 		const classes = (text.getAttribute("class") ?? "").split(/\s+/);
 		assert.ok(!classes.some((c) => /^(line-clamp-\d|truncate)$/.test(c)), `never cut while the pane has room: ${classes.join(" ")}`);
-		assert.ok(classes.includes("[&_.katex]:inline-block"), "each formula is one box");
+		assert.ok(!classes.includes("[&_.katex]:inline-block"), "a formula wider than the row may break at its relations (round 14, m37)");
 		assert.ok(text.querySelector(".katex") !== null, "the formula is typeset");
 	});
 });

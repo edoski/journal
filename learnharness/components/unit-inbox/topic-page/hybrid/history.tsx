@@ -72,9 +72,11 @@ export function AttemptEntry({ attempt, title, titleOf, ends, date }: { attempt:
 			<Icon role="img" aria-label={how ? `${words}, ${how}` : words} className={cn(ICON, "mt-px self-start")} />
 			{/* The sentence wraps whole (round 13, 1 n11: "…4, n…" cut in the
 			    320px column beside an empty half-pane); Earlier moves the days
-			    that do not fit behind "Show the rest". Each formula is one box
-			    (round 13, 2 n1), so a line never breaks inside one. */}
-			<p data-slot="topic-attempt-text" className={cn("text-body text-muted-foreground [&_.katex]:inline-block", date !== undefined && "col-span-2")}>
+			    that do not fit behind "Show the rest". A formula wider than the
+			    row breaks after a top-level relation, KaTeX's own break points,
+			    never inside a power or a fraction (globals.css; round 14, m37:
+			    one box ran past the column and was clipped to "≈ 0.7"). */}
+			<p data-slot="topic-attempt-text" className={cn("text-body text-muted-foreground", date !== undefined && "col-span-2")}>
 				<LineText>{title ?? attempt.text}</LineText>
 			</p>
 			{date !== undefined && <DateCell date={date} />}
