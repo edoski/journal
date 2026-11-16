@@ -334,11 +334,11 @@ describe("the course topic row and group", () => {
 		assert.equal(document.querySelector('[data-slot="course-topic-fact"]')!.textContent, "Sure, but wrong");
 	});
 
-	it("keeps a compact row's words for a screen reader and marks where he is", () => {
+	it("shows a compact row's words and marks where he is (round 11, 1 N8)", () => {
 		const cramer = groupOf(groups, "learning").topics.find((t) => t.topic.handle === "cramer")!;
 		const document = render(<ul><CourseTopicRow row={cramer} compact /></ul>);
 		assert.equal(document.querySelector('[data-slot="course-topic-row"]')!.getAttribute("aria-current"), "location");
-		assert.equal(document.querySelector('[data-slot="course-topic-fact"] .sr-only')!.textContent, "You are here");
+		assert.equal(document.querySelector('[data-slot="course-topic-fact-words"]')!.textContent, "You are here");
 	});
 
 	it("heads a group with its name and no count, folds it, and shows the first rows then Show the rest", () => {
@@ -403,48 +403,40 @@ describe("the sidebar's search", () => {
 	});
 });
 
-describe("a topic row's title with room (round 10, 1 m8)", () => {
-	// Shot 56b: "Binomial distribut…" and "Expectation and line…" cut beside a status that kept its whole width.
-	it("keeps the title at its own width and lets the status give way first, the title cut only past what leaves the status's icon", () => {
-		const row = { topic: topic("binomial", { title: "Binomial distribution", level: "assisted" }), group: "learning" as const, standing: standingOf(topic("binomial", { level: "assisted" })), current: false, fact: { kind: "review" as const, words: "Due since 6 Nov, back 11 Nov" }, href: "/" };
-		const document = render(<ul><CourseTopicRow row={row as never} /></ul>);
-		const title = document.querySelector('[data-slot="course-topic-title"]')!.parentElement!;
-		const fact = document.querySelector('[data-slot="course-topic-fact"]')!;
-		assert.doesNotMatch(title.className, /\bflex-1\b/, "a zero basis gave the title only what the status left");
-		assert.match(title.className, /\bshrink-0\b/);
-		assert.match(title.className, /max-w-\[calc\(100%-4rem\)\]/, "room kept for the pie, the gaps and the status's icon");
-		assert.doesNotMatch(fact.className, /\bshrink-0\b/, "the status shrinks, its words cut");
-		assert.match(fact.className, /\bmin-w-0\b/);
-	});
-});
-
-describe("a topic row's status whole (round 10, integration)", () => {
-	// After 1 m8 the course page's rows cut the status instead: "Due since 6 Nov, ba…", "No…", "Planned …".
+describe("a topic row's status in words, whole (round 11, 1 N8 and 2 n9)", () => {
+	// Shots 42, 61b: rows showed a bare arrow, bookmark or check-circle beside rows with words, and "Cramer's rule · Due 6 Nov" read as overdue while the map said "back 20 Nov".
 	const held = topic("matmul", { title: "Matrix multiplication as composition", level: "assisted", introduced: "2026-10-01", review: { kind: "scheduled", date: "2026-11-20", held: { exam: null, since: "2026-11-06" } } });
 	const rowOf = (handle: string, c: StudyCourse) => courseGroups(c).flatMap((g) => g.topics).find((t) => t.topic.handle === handle)!;
 
-	it("shows a review that came due by its day alone, the sidebar's whole sentence kept as its fact for the hint", () => {
+	it("cuts the title before the status, whose words always show", () => {
 		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
-		assert.deepEqual(row.fact, { kind: "review", words: "Due since 6 Nov, back 20 Nov" }, "the fact stays the sidebar's");
-		assert.equal(row.factWords, "Due 6 Nov");
-		const span = rowOf("span", course());
-		assert.deepEqual([span.fact?.words, span.factWords], ["Due since 29 Oct", "Due 29 Oct"]);
-		const later = rowOf("vectors", course());
-		assert.equal(later.factWords, later.fact?.words, "any other fact as the sidebar says it");
-	});
-
-	it("shows the status's words whole or not at all, its icon staying with the full sentence in its hint", () => {
-		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
-		const document = render(<ul><CourseTopicRow row={row} /></ul>);
+		const document = render(<ul><CourseTopicRow row={row} className="h-8" /></ul>);
+		const title = document.querySelector('[data-slot="course-topic-title"]')!.parentElement!;
 		const fact = document.querySelector('[data-slot="course-topic-fact"]')!;
 		const words = fact.querySelector('[data-slot="course-topic-fact-words"]')!;
-		assert.equal(words.textContent, "Due 6 Nov");
-		assert.doesNotMatch(words.className, /\btruncate\b/, "never cut mid-word");
+		assert.match(title.className, /\bmin-w-0\b/);
+		assert.match(title.className, /\bflex-1\b/, "the title takes what the status leaves");
+		assert.doesNotMatch(title.className, /\bshrink-0\b/);
+		assert.match(fact.className, /\bshrink-0\b/, "the status keeps its width");
+		assert.doesNotMatch(fact.className, /\b(flex-wrap|overflow-hidden)\b/, "no slot hides its words");
+		assert.doesNotMatch(words.className, /\b(sr-only|truncate)\b/);
 		assert.match(words.className, /\bwhitespace-nowrap\b/);
-		assert.match(fact.className, /\bflex-wrap\b/, "words that do not fit beside the icon drop to a second line…");
-		assert.match(fact.className, /\boverflow-hidden\b/, "…which the 20px slot hides");
-		assert.match(fact.className, /\bjustify-end\b/, "the icon alone stays flush right");
-		assert.match(fact.querySelector("svg")!.getAttribute("class")!, /\bbox-content\b.*\bpy-\[3px\]/, "the icon's line is the slot's 20px, so the wrapped words start below it");
 		assert.equal(fact.getAttribute("data-state"), "closed", "the slot is the trigger of its hint, which says the whole sentence");
+	});
+
+	it("says a held review by the day it comes back, a due one by the day it came due, and a planned start by its date", () => {
+		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
+		assert.deepEqual(row.fact, { kind: "review", words: "Due since 6 Nov, back 20 Nov" }, "the fact stays the sidebar's, for the hint");
+		assert.equal(row.factWords, "Back 20 Nov");
+		const span = rowOf("span", course());
+		assert.deepEqual([span.fact?.words, span.factWords], ["Due since 29 Oct", "Due 29 Oct"]);
+		const fresh = rowOf("eigen", course({ topics: TOPICS.map((t) => (t.handle === "eigen" ? { ...t, starts: "2026-11-18" } : t)) }));
+		assert.equal(fresh.factWords, "Planned 18 Nov");
+	});
+
+	it("shows the words on every row, the compact one included", () => {
+		const row = rowOf("matmul", course({ topics: [...TOPICS, held] }));
+		const document = render(<ul><CourseTopicRow row={row} compact /></ul>);
+		assert.doesNotMatch(document.querySelector('[data-slot="course-topic-fact-words"]')!.className, /\bsr-only\b/);
 	});
 });

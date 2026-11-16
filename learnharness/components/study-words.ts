@@ -255,13 +255,15 @@ export function reviewWords(review: NonNullable<CourseMapTopic["review"]>, today
 	return returnWords(review.date);
 }
 
-/** A review that came due by its day alone, for a row too narrow for the
- *  sentence (`reviewWords` stays its hint): "Due 6 Nov" for "Due since 6
- *  Nov" and "Due since 6 Nov, back 20 Nov"; "Due today" and any other
- *  dated review as `reviewWords`. */
+/** A review by its one day, for a row too narrow for the sentence
+ *  (`reviewWords` stays its hint): "Due 6 Nov" for "Due since 6 Nov"; a
+ *  review the plan holds past memory's day by the day it comes back,
+ *  "Back 20 Nov" for "Due since 6 Nov, back 20 Nov" (round 11, 2 n9: "Due
+ *  6 Nov" read as overdue while the map said back 20 Nov); "Due today" and
+ *  any other dated review as `reviewWords`. */
 export function shortReviewWords(review: NonNullable<CourseMapTopic["review"]>, today: string): string {
 	if (review.kind === "due" && review.overdue > 0) return `Due ${shortDay(dayBefore(today, review.overdue))}`;
-	if (review.kind === "scheduled" && review.held && review.held.since < today) return `Due ${shortDay(review.held.since)}`;
+	if (review.kind === "scheduled" && review.held && review.held.since < today) return `Back ${shortDay(review.date)}`;
 	return reviewWords(review, today);
 }
 

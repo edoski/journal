@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortReviewWords, startsWhyShort } from "@/components/study-words";
+import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, reviewWords, shortDay, shortReviewWords, startsWhyShort } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -42,9 +42,10 @@ export interface CourseTopic {
 	standing: Standing;
 	current: boolean;
 	fact: TopicFact | null;
-	/** The fact's words as the row shows them: a review that came due by
-	 *  its day alone ("Due 6 Nov", `shortReviewWords`), its whole sentence
-	 *  (`fact.words`, the sidebar's) kept for the row's hover hint. */
+	/** The fact's words as the row shows them, its shortest whole words
+	 *  ("Due 6 Nov", "Back 20 Nov", "Planned 18 Nov", `shownWords`), its
+	 *  whole sentence (`fact.words`, the sidebar's) kept for the row's
+	 *  hover hint. */
 	factWords: string | null;
 	/** The topic's page. */
 	href: string;
@@ -102,19 +103,25 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5).
 		const planned: TopicFact | null = group === "not-started" && fact === null && topic.starts ? { kind: "next", words: topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` } : null;
 		const shown = here ? HERE : (planned ?? fact);
-		return { topic, group, fact: shown, factWords: shownWords(shown, topic, map.today), standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
+		const words = planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
+		return { topic, group, fact: shown, factWords: words, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };
 }
 
-/** A row's fact in words that fit the row whole: a review that came due
- *  by its day alone (round 10: "Due since 6 Nov, ba…" once the title kept
- *  its width), any other fact as the sidebar says it. */
+/** A row's fact in its shortest whole words, the sidebar's sentence kept
+ *  for the hint (round 11, 1 N8: rows showed a bare icon where the words
+ *  did not fit): a review by its one day (`shortReviewWords`), a method
+ *  he mixed up as "Mixed up", any other fact as the sidebar says it. */
 function shownWords(fact: TopicFact | null, topic: CourseMapTopic, today: string): string | null {
 	if (!fact) return null;
+	if (fact.kind === "slip" && fact.slip === "mixed") return MIXED_UP;
 	const review = fact.kind === "review" || fact.kind === "back" ? topic.review : null;
 	return review && fact.words === reviewWords(review, today) ? shortReviewWords(review, today) : fact.words;
 }
+
+/** A mixed-up method's slip on a row, the method named in its hint. */
+const MIXED_UP = "Mixed up";
 
 /** The arcs the course page leads with: the map's, when it has two or more
  *  he can see; null otherwise, and the page shows its four groups as a
