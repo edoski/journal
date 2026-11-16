@@ -18,6 +18,22 @@ export function turnStatePatch(chats: ChatListItem[] | null, id: string, running
 	return chats.map((c) => (c.id === id ? { ...c, busy: true } : c));
 }
 
+/** A turn settled in this window: the server's fresh snapshot replaces
+ *  the one the start patched (turnStatePatch). When the app cannot be
+ *  reached it never lands, and no turn runs there that the card could
+ *  show: the card stops saying the tutor writes, and the server's own
+ *  state replaces it once the app is back (round 12, 4 minor 4: offline,
+ *  "Still can't reach the app…" in the lesson and "Tutor writing" on its
+ *  card; after the server died mid-turn, the same until the restart). */
+export async function settleSnapshot(
+	refresh: () => Promise<boolean>,
+	setChats: (patch: (chats: ChatListItem[] | null) => ChatListItem[] | null) => void,
+	id: string,
+): Promise<void> {
+	if (await refresh()) return;
+	setChats((chats) => chats?.map((c) => (c.id === id && c.busy ? { ...c, busy: false } : c)) ?? chats);
+}
+
 /** The items whose title matches the query, best first, by cmdk's own
  *  ranking (a subsequence match where a prefix beats a word start beats
  *  scattered letters). An empty query keeps the list's own order. */
@@ -67,23 +83,30 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 	const pathname = usePathname();
 	const router = useRouter();
 
-	const refreshInFlightRef = useRef(false);
-	const refresh = useCallback(async () => {
+	// Whether the server's snapshot landed (settleSnapshot reads it).
+	const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
+	const refresh = useCallback((): Promise<boolean> => {
 		// In-flight coalesce (S6): event bursts may land several refresh
 		// calls at once — one fetch serves them all; anything newer arrives
 		// with the next event's fetch.
-		if (refreshInFlightRef.current) return;
-		refreshInFlightRef.current = true;
-		try {
-			const res = await fetch("/api/chats", { cache: "no-store" });
-			const d = (await res.json()) as { chats: ChatListItem[] };
-			setChats(d.chats);
-		} catch {
-			// a transient failure keeps the last snapshot
-			setChats((prev) => prev ?? []);
-		} finally {
-			refreshInFlightRef.current = false;
-		}
+		if (refreshInFlightRef.current) return refreshInFlightRef.current;
+		const reading = (async () => {
+			try {
+				const res = await fetch("/api/chats", { cache: "no-store" });
+				if (!res.ok) throw new Error(`the sessions list failed: ${res.status}`);
+				const d = (await res.json()) as { chats: ChatListItem[] };
+				setChats(d.chats);
+				return true;
+			} catch {
+				// a transient failure keeps the last snapshot
+				setChats((prev) => prev ?? []);
+				return false;
+			} finally {
+				refreshInFlightRef.current = null;
+			}
+		})();
+		refreshInFlightRef.current = reading;
+		return reading;
 	}, []);
 
 	/* Instant rename propagation (2026-09-17): the chat header's rename
@@ -119,7 +142,7 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 			}
 			setChats((prev) => turnStatePatch(prev, id, running));
 			// Settle: the server snapshot is now truthful — land it now.
-			if (!running) void refresh();
+			if (!running) void settleSnapshot(refresh, setChats, id);
 		};
 		window.addEventListener("lh:turn-state", onTurnState);
 		return () => window.removeEventListener("lh:turn-state", onTurnState);

@@ -110,3 +110,16 @@ test("a concluded probe owes no continuation: its hand-off starts the teacher's 
 	const refused = { ...recorded, id: "r7", isError: true, details: { ok: false } } as unknown as LhMessage;
 	assert.equal(needsContinuation([ask, answer, courseNote, done, sent, refused]), true, "a refused probe_done still owes its retry");
 });
+
+test("a retry or Try again stopped before its first word reads as stopped before it replied, whatever the failed or stopped attempt before it said", () => {
+	// Round 12, 4 minor 5: a turn failed after its mark, Try again ran and
+	// was stopped 0.16 s in, and the marker read "You stopped the tutor
+	// mid-reply." though this reply had written nothing.
+	const marked = { id: "a5", role: "assistant", content: [{ type: "toolCall", id: "s1", name: "course_save", arguments: { observations: [{ topic: "eigen" }] } }], stopReason: "toolUse", timestamp: 6 } as unknown as LhMessage;
+	const markedAck = { id: "r5", role: "toolResult", toolCallId: "s1", toolName: "course_save", isError: false, content: [{ type: "text", text: "saved" }], timestamp: 7 } as unknown as LhMessage;
+	const failed = { id: "a6", role: "assistant", content: [{ type: "text", text: "Two different eigenvalues are enough" }], stopReason: "error", errorMessage: "Claude Code stopped", timestamp: 8 } as unknown as LhMessage;
+	assert.equal(replyCutOf([reply, message, marked, markedAck, failed, stoppedEmpty]), "stopped");
+	const stoppedSaying = { id: "a7", role: "assistant", content: [{ type: "text", text: "Two different eigenvalues" }], stopReason: "aborted", timestamp: 8 } as unknown as LhMessage;
+	assert.equal(replyCutOf([reply, message, stoppedSaying, stoppedEmpty]), "stopped");
+	assert.equal(replyCutOf([reply, message, marked, markedAck, stoppedEmpty]), "stopped-mid", "the same run's mark still makes it mid-reply");
+});

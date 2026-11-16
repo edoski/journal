@@ -10,7 +10,7 @@
 | Another question opens while the carry waits | It opens empty, and the carry keeps waiting for its own question (round 6: the Done-for-today draft filled an unrelated Yes/No question). A newer carry replaces it. |
 | A question or problem closes | Its box is forgotten. A sent message empties the message box. |
 | Another window answers the question he was typing in | His words go to the message box with a line saying so, and stay there while the next question is open: the line then says Esc shows them, and Esc back to the answer never moves them into it (`stranded-draft.ts`, kept as `<chat>:rescued` with the question they came from). Once a question after theirs closes, words he left untouched leave the box, and a newer rescue replaces untouched older words rather than merging with them (round 8: they came back during a later hint and merged into the next rescue). |
-| Another window asks for a hint on it, or asks the tutor something | His words go to this window's carry, and a line says they come back when the tutor asks the question again. |
+| Another window asks for a hint on it, or asks the tutor something | His words go to this window's carry, and a line says they come back when the hint is done, or when the tutor asks the question again. |
 | New lesson with photos | The photos go with the lesson's first message. |
 
 ## Scopes

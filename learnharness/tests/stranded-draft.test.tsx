@@ -199,3 +199,11 @@ test("words in the message box that a question now hides get one line saying whe
 	assert.equal(boxLine("answered", false, false), LESSON_WORDS.answeredElsewhere);
 	assert.equal(boxLine("hint", false, false), LESSON_WORDS.hintElsewhere);
 });
+
+// Round 12 (4 minor 8): during another window's hint the line promised the
+// tutor would ask the question again, but a hint asks nothing again: the
+// question stays open and the words come back when the hint is done.
+test("the line during another window's hint says the words come back when the hint is done", async () => {
+	const { boxLine } = await import("../components/lesson/stranded-draft.ts");
+	assert.equal(boxLine("hint", false, false), "Another window asked for a hint. What you typed here comes back when the hint is done.");
+});

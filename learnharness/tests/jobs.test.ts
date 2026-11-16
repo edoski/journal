@@ -667,11 +667,11 @@ describe("research runner (async protocol §3)", () => {
 		assert.equal(errored.status, "error");
 		// A provider failure reaches the app through Claude Code, which reads
 		// it as Claude's plain failure line, not the raw provider text.
-		assert.match(errored.error ?? "", /^Claude request failed\./);
+		assert.match(errored.error ?? "", /^Claude Code stopped with an error/);
 
 		const steer = delivery.steers[0]!;
 		assert.ok(steer, "failure still delivers a steer");
-		assert.ok(steer.content.includes("Research failed: Claude request failed."), "failure brief on the steer text");
+		assert.ok(steer.content.includes("Research failed: Claude Code stopped with an error"), "failure brief on the steer text");
 		assert.deepEqual(((steer.details as { result: ResearchResult }).result).sources, []);
 	});
 

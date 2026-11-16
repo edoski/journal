@@ -289,6 +289,9 @@ export class SessionModel {
 	/** Retain the latest request across stop(): an opening POST still owns
 	 * its refusal after view detachment, but never after a newer request. */
 	private latestRequest: AbortController | null = null;
+	/** His send whose POST is on its way: resolves with whether the app
+	 *  took it, the turn it starts then live (steer's early window). */
+	private taking: Promise<boolean> | null = null;
 	/** Synchronous ready check for the gate (send/read mount logic). */
 	readyRef = true;
 
@@ -786,6 +789,10 @@ export class SessionModel {
 			this.tail = [...this.tail, ...optimistic];
 		});
 		let accepted = false;
+		let taken: (ok: boolean) => void = () => {};
+		const taking = new Promise<boolean>((resolve) => (taken = resolve));
+		this.taking = taking;
+		void taking.then(() => { if (this.taking === taking) this.taking = null; });
 		try {
 			// SUBMITS ARE NOT ABORTABLE BY VIEW TEARDOWN (owner, 2026-10-10 —
 			// the dead-session-start postmortem): the POST must NOT ride
@@ -802,6 +809,7 @@ export class SessionModel {
 			const res = await this.postInputEvent(input);
 			if (res.status === 409 && input.type === "continue") {
 				await res.body?.cancel().catch(() => {});
+				taken(true); // the running turn is the reply it asked for
 				if (this.consumeAbort !== controller) return false;
 				await this.resumeStream(true);
 				return false;
@@ -823,6 +831,7 @@ export class SessionModel {
 				throw new Error(message);
 			}
 			accepted = true;
+			taken(true);
 			// Opening-message handover ends at acceptance, not stream completion.
 			onAccepted?.();
 			// CONNECTION DIET B (owner, 2026-10-10 — parallel-session freeze
@@ -867,6 +876,9 @@ export class SessionModel {
 			// NOT prove non-delivery: a network failure may hide acceptance.
 			// Opening-message callers restore a draft, never automatically retry.
 			return accepted;
+		} finally {
+			// Refused: settled only now, so a waiting steer finds its refusal shown.
+			taken(accepted);
 		}
 	}
 
@@ -878,10 +890,15 @@ export class SessionModel {
 	 *  steer route, which hands it to the live agent's steering queue.
 	 *  When pi drains it at the next response boundary, the verbatim
 	 *  message events upsert the real card (the client-minted id is the
-	 *  key) and the indicator's fold drops the line. A 409 means the turn
-	 *  settled mid-send (the race): fall back to the plain text send —
-	 *  the entry is dropped and send() pushes its own optimistic card.
-	 *  `onAccepted` fires once the app took it, either way.
+	 *  key) and the indicator's fold drops the line. A 409 while his own
+	 *  send is still being taken means its turn is not live yet (the
+	 *  server reads the course brief first): the steer waits for that send
+	 *  and goes again, and a refused send gives the words back under its
+	 *  refusal (round 12, 4 major 1: the words sat in the box, unsaid, while
+	 *  the reply ignored them). Otherwise a 409 means the turn settled
+	 *  mid-send (the race): fall back to the plain text send — the entry is
+	 *  dropped and send() pushes its own optimistic card. `onAccepted`
+	 *  fires once the app took it, either way.
 	 */
 	async steer(text: string, photos?: Photo[], onAccepted?: () => void): Promise<boolean> {
 		const t = text.trim();
@@ -893,12 +910,22 @@ export class SessionModel {
 			this.steerQueueValue = this.steerQueueValue.filter((s) => s.id !== id);
 			this.onChange?.();
 		};
+		const sending = this.taking;
+		const post = () => this.fetch(`/api/chats/${this.chatId}/steer`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ input: { type: "steer", id, text: t, ...(photos?.length ? { photos } : {}) } }),
+		});
 		try {
-			const res = await this.fetch(`/api/chats/${this.chatId}/steer`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ input: { type: "steer", id, text: t, ...(photos?.length ? { photos } : {}) } }),
-			});
+			let res = await post();
+			if (res.status === 409 && sending) {
+				await res.body?.cancel().catch(() => {});
+				if (!(await sending)) {
+					dropSteer();
+					return false;
+				}
+				res = await post();
+			}
 			if (res.ok) {
 				onAccepted?.();
 				return true; // parked or delivered — the stream lands the card
