@@ -22,7 +22,8 @@ import { pickupSections } from "../components/unit-inbox/topic-page/pickup/picku
 import { ScheduledEntry } from "../components/unit-inbox/topic-page/pickup/pickup-parts.tsx";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
-import { stepWords, todaySteps } from "../components/study-home/study-facts.ts";
+import { stepWords, todayRows, todaySteps } from "../components/study-home/study-facts.ts";
+import { chat } from "./fixtures/now-demo.ts";
 import type { StudyCourse } from "../src/core/contracts/study.ts";
 
 const FIXTURE = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "plan", "probability-lesson-begun.map.json");
@@ -54,6 +55,16 @@ describe("a lesson he began", () => {
 		const words = steps.map(stepWords);
 		assert.ok(words.includes("Continue Poisson distribution"), words.join(" | "));
 		assert.ok(!words.some((w) => w.startsWith("Start Poisson")), words.join(" | "));
+	});
+
+	it("goes on above the day's new starts on Home, as the plan lists it (round 13, 1 n3)", () => {
+		const lesson = chat("poisson", { title: "Poisson distribution", ended: "left", tasks: ["poisson-lesson"], topics: ["poisson"], updatedAt: "2026-11-10T10:00:00.000Z", course: { workspace: "/study/probability", title: "Probability" } });
+		const course = { ...COURSE, map: { ...MAP, today: "2026-11-11" }, newToday: ["poisson", "geometric"] as never[] };
+		const rows = todayRows([course], [lesson], "2026-11-11");
+		assert.deepEqual(
+			rows.map((row) => (row.kind === "session" ? `session ${row.chat.id}` : `course ${row.step.kind} ${row.step.topics?.join(",")}`)),
+			["session poisson", "course topic geometric"],
+		);
 	});
 
 	it("is a lesson on the calendar, never a new topic", () => {

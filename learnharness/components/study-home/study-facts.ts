@@ -260,7 +260,10 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	for (const course of ordered) {
 		const own = (chats: readonly ChatListItem[], step: NextStep) => chats.find((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
 		for (const step of todaySteps(course)) {
-			const rows = planned(step) ? plan : tasks;
+			// A task that holds a lesson the plan goes on with today is the plan's, ahead of its new starts
+			// (round 13, 1 n3: "Start Geometric" sat above "Continue Poisson distribution lesson").
+			const goesOn = step.kind === "task" && step.topics.some((h) => course.newToday.includes(h));
+			const rows = planned(step) || goesOn ? plan : tasks;
 			if (own(ended, step)) continue;
 			const active = own(waiting, step);
 			if (active) {
