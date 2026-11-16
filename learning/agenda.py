@@ -1728,9 +1728,12 @@ def _at(
 
 
 def _last_studied(records: Mapping[str, dict[str, Any]], today: date) -> date | None:
-    """The last day before today he answered, with an answer that counts,
-    started a topic, or worked on a lesson he began (``_lessons``), in any
-    course."""
+    """The last day before today he studied, in any course: he answered
+    with an answer that counts, started a topic, or worked in a lesson,
+    whether its answers were predictions or it is taught since
+    (``progress.lessons``; round 12, 1 m7: the tutor said "you haven't
+    studied since Monday 9 November" of a Poisson lesson on 10 Nov whose
+    answers were all predictions)."""
     when = today.isoformat()
     days = (
         {
@@ -1748,9 +1751,15 @@ def _last_studied(records: Mapping[str, dict[str, Any]], today: date) -> date | 
         | {
             day
             for record in records.values()
-            for lesson in _lessons(record).values()
+            for lesson in progress.lessons(record).values()
             for day in lesson
             if day < when
+        }
+        | {
+            item["date"]
+            for record in records.values()
+            for item in record["observations"].values()
+            if item["date"] < when and item.get("predicted")
         }
     )
     return date.fromisoformat(max(days)) if days else None

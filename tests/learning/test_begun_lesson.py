@@ -166,3 +166,22 @@ def test_a_first_review_in_its_own_final_review_comes_first(
     plan = world(tmp_path, "d17-post-poisson", monkeypatch, capsys).plan("2026-11-17")
     days = plan["probability"]["plan"]["days"]
     assert [d["date"] for d in days if "poisson" in d["reviews"]][0] == "2026-11-18"
+
+
+def test_a_lesson_day_of_predictions_is_a_day_he_studied(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """After 17 Nov's Poisson answer that counts, 10 Nov's lesson, all
+    predictions, is still the last day he studied before the week he missed:
+    every moved day names it, never 9 Nov (round 12, 1 m7: the tutor said
+    "you haven't studied since Monday 9 November")."""
+    days = world(tmp_path, "d17-post-poisson", monkeypatch, capsys)
+    moved = [
+        topic["moved"]
+        for topic in days.maps("2026-11-17")["probability"]["topics"]
+        if topic.get("moved")
+    ]
+    assert moved
+    assert {why["on"] for why in moved} == {"2026-11-10"}
