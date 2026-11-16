@@ -58,6 +58,16 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 		assert.equal(planningLesson([msg("user", [{ type: "text", text: "hi" }])]), false);
 	});
 
+	it("a question refused beside a refused plan never reached him, so the line stays Planning the lesson… (round 11 integration: Thinking… blinked twice at 225.6 s and 233 s)", () => {
+		const probeEnd = msg("assistant", [{ type: "text", text: "That's not right." }, toolPart("probe_done", "output-available")]);
+		const refusedPair = msg("assistant", [toolPart("plan_init", "output-error"), toolPart("demo", "output-available"), toolPart("explain", "output-error")]);
+		assert.equal(workingLine([probeEnd, refusedPair]), "Planning the lesson…", "thinking after the refusals");
+		const replanned = msg("assistant", [toolPart("plan_init", "output-available")]);
+		assert.equal(workingLine([probeEnd, refusedPair, replanned]), "Planning the lesson…", "thinking between the saved plan and its first step");
+		const asked = msg("assistant", [toolPart("explain", "input-available")]);
+		assert.equal(planningLesson([probeEnd, refusedPair, replanned, asked]), false, "the question that reaches him ends the wait");
+	});
+
 	it("no activity once the call settles or the turn ends", () => {
 		// output-available = done executing → no shimmer (the transcript
 		// shows the settled card instead).

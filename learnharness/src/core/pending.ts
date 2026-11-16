@@ -108,7 +108,9 @@ const WAIT_LINES: Record<string, string> = {
 /** Whether the probe is ending or has ended and the lesson's first step
  *  has not yet reached him: no words of the tutor's and no question after
  *  a `probe_done` that was not refused (one still settling counts, so the
- *  line does not blink to Thinking… as the probe's turn closes). Pure. */
+ *  line does not blink to Thinking… as the probe's turn closes). A refused
+ *  question never reached him (round 11 integration: the question sent
+ *  beside a refused plan blinked the line to Thinking… twice). Pure. */
 export function planningLesson(messages: readonly UIMessage[]): boolean {
 	for (let m = messages.length - 1; m >= 0; m--) {
 		const parts = messages[m]!.parts;
@@ -116,7 +118,7 @@ export function planningLesson(messages: readonly UIMessage[]): boolean {
 			const part = parts[p]!;
 			if (part.type === "tool-probe_done") return part.state !== "output-error";
 			if (part.type === "text" && typeof part.text === "string" && part.text.trim()) return false;
-			if (isToolUIPart(part) && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) return false;
+			if (isToolUIPart(part) && part.state !== "output-error" && (QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) return false;
 		}
 	}
 	return false;
