@@ -74,6 +74,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "praise", re: /\b(?:is|was) (?:the|a) (?:right|good|great|nice) (?:instinct|idea|start|move|approach|thought)\b/i },
 	{ rule: "preview", re: /\b(?:next (?:is|up|comes|you'?ll|we'?ll)|next,? (?:we|you)(?:'ll| will)|the next (?:question|step|problem) (?:tests|is|will)|here(?:'s| is) a fresh|now (?:we|you)(?:'ll| will)|coming up next)\b/i },
 	{ rule: "narration", re: /\b(?:I(?:'ll| will| am going to|'m going to) (?:save|record|ask|check|build|verify|now|start|move|give|stop|wait)|I(?:'ve| have) (?:saved|recorded|noted|told you)|let me (?:verify|check|build|save|record|ask|start)|I'?m (?:having|waiting|saving|recording|building)|I'?ll stop)\b/i },
+	// A handoff between teaching and practice needs no words of its own
+	// (round 12, 3 D4: "Switching to an explanation of when three vectors
+	// form a basis of ℝ³.").
+	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:(?:let'?s|now,?|ok(?:ay)?,?) (?:switch|move|turn|go|head)|(?:now,? )?(?:switching|moving|turning|going|heading)|back)(?: (?:back|over|on|now))?(?: (?:to|into))? (?:(?:an?|the|some|your|more) )?(?:explanation|explaining|teaching|practice|practising|practicing|problems?|exercises?|lesson|review)\b/i },
 	{ rule: "plan", re: /(?:^|\n)\s*(?:today|this lesson|in this lesson|the goal)\s*:/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
