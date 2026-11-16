@@ -59,9 +59,16 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
  *  read up to just before he pressed it, waited on him or owed him a
  *  reply. `at` is the Done for today's index. Pure. */
 function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | undefined, initial: SessionMode, topics: readonly string[]): boolean {
+	// The turn's course brief rides just before the marker, after what it set aside.
 	let start = at;
-	while (start > 0 && setAsideByDone(messages[start - 1]!)) start--;
-	if (start < at || (tree && stepsLeft(tree, messages)) || sessionTasksOf(messages).length > 0) return true;
+	let setAside = false;
+	for (; start > 0; start--) {
+		const m = messages[start - 1]!;
+		if (m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)) continue;
+		if (!setAsideByDone(m)) break;
+		setAside = true;
+	}
+	if (setAside || (tree && stepsLeft(tree, messages)) || sessionTasksOf(messages).length > 0) return true;
 	const before = messages.slice(0, start);
 	const end = before.length > 0 ? sessionEndOf(before, tree, initial, topics) : "closed";
 	return end === "mid-lesson" || end === "cut";

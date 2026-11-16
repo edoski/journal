@@ -27,7 +27,9 @@ const { createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
 const { handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
-const { pendingQuestionOf } = await import("../src/core/native-messages.ts");
+const { newCourseContextMessage, newUserMessage, pendingQuestionOf } = await import("../src/core/native-messages.ts");
+const { inputAppends } = await import("../src/core/input-events.ts");
+const { leftQuestionRepose } = await import("../src/core/session-end.ts");
 const { closedTonight, doneTonightAtEnd, sessionEndOf } = await import("../src/core/session-end.ts");
 const { projectView } = await import("../src/core/view.ts");
 const { findPendingToolCall } = await import("../src/core/pending.ts");
@@ -133,6 +135,17 @@ describe("the question Done for today left, after the close", () => {
 });
 
 describe("a session left for today with a question posed", () => {
+	it("reads left with the course brief between the question it set aside and his Done, and no plan yet (live, 16 Nov: it read closed, so Your turn)", () => {
+		const asked = [newUserMessage("Teach me linear maps"), { id: "a1", role: "assistant", content: [{ type: "toolCall", id: "q1", name: "explain", arguments: CHECK }], api: "faux", provider: "test", model: "m", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "toolUse", timestamp: 1 }] as never[];
+		const appends = inputAppends({ messages: asked }, { type: "tonight" });
+		const withBrief = [...appends.slice(0, -1), newCourseContextMessage("[Course record] Linear Algebra", "k1"), ...appends.slice(-1)];
+		const close = { ...(asked[1] as unknown as object), id: "a2", content: [{ type: "text", text: "Good place to stop." }], stopReason: "stop" } as never;
+		const record = [...asked, ...withBrief, close];
+		const reposed = [...record, ...leftQuestionRepose(record)];
+		assert.ok(pendingQuestionOf(reposed), "the question is posed again");
+		assert.equal(sessionEndOf(reposed, undefined), "left");
+	});
+
 	it("reads left, not your turn: he said he is done for today", () => {
 		assert.equal(sessionState(item({ ended: "left", pendingQuestion: true })), "left");
 		assert.equal(sessionState(item({ ended: "left", pendingQuestion: true, busy: true })), "working");
