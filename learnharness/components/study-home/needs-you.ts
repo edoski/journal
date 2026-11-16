@@ -92,7 +92,10 @@ export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Wh
 	return topics[0] ?? null;
 }
 
-function nowLine(row: TodayRow): NowLine {
+/** A line as Today and the sidebar draw it, its one status included
+ *  (`rowStatus`), for any session or course step: the calendar's open
+ *  work reads its status here too (round 12, 2 n2). Pure. */
+export function nowLine(row: TodayRow): NowLine {
 	const byHandle = new Map((row.course?.map.topics ?? []).map((t) => [t.handle, t]));
 	const taken = lineTopics(row).flatMap((h) => byHandle.get(h) ?? []);
 	const why = whyOf(row);

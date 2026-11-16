@@ -3,7 +3,8 @@ import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
 import { distanceWords, heldExamWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
-import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import { courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import { nowLine } from "@/components/study-home/needs-you";
 
 /**
  * What the calendar draws (spec: calendar.md): the engine's dates and the
@@ -52,7 +53,18 @@ export type CalendarEntry =
 			action: TopicAction;
 	  }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; waits: string | null; action: TopicAction }
-	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
+	| {
+			kind: "task";
+			id: string;
+			day: string;
+			title: string;
+			course: CourseRef;
+			task: CourseMapTask;
+			topic: CourseMapTopic | null;
+			opening: string;
+			/** Home's one status for this work (`openWorkStatus`), or null. */
+			status: string | null;
+	  }
 	| {
 			kind: "session";
 			id: string;
@@ -64,9 +76,12 @@ export type CalendarEntry =
 			waits: boolean;
 			topic: CourseMapTopic | null;
 			/** The open task this session of today left (`holdsTask`): one
-			 *  piece of work, so one entry, Unfinished, under the session's
-			 *  name. */
+			 *  piece of work, so one entry under the session's name, saying
+			 *  Home's status for it (`status`). */
 			task: CourseMapTask | null;
+			/** Home's one status for the session's open work
+			 *  (`openWorkStatus`), or null. */
+			status: string | null;
 	  };
 
 /** The next step toward an exam: the course's step as Home's line takes it
@@ -201,7 +216,23 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
  *  and "Overdue" here (round 5). Pure. */
 export function lookWords(entry: CalendarEntry, today: string): string {
 	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;
-	return review?.kind === "due" ? overdueWords(review.overdue, today) : LOOKS[lookOf(entry)].words;
+	if (review?.kind === "due") return overdueWords(review.overdue, today);
+	// Open work says Home's status for it ("Left off today", "Your turn"), never a word of its own (round 12, 2 n2).
+	if ((entry.kind === "task" || entry.kind === "session") && lookOf(entry) === "task" && entry.status) return entry.status;
+	return LOOKS[lookOf(entry)].words;
+}
+
+/** Home's one status for open work (`nowLine`, the function Home's rows
+ *  and the sidebar's cards share): an unfinished session holding it is
+ *  that session's line ("Your turn", "Left off today"), else the course's
+ *  step for the task ("Left off 6 Nov"). Null when neither says anything,
+ *  and the entry reads Unfinished (round 12, 2 n2: Problem sheet 4 read
+ *  "Left off today" on Home and in the sidebar, "Unfinished" here). Pure. */
+function openWorkStatus(course: CalendarCourse | undefined, chat: ChatListItem | null, task: CourseMapTask | null): string | null {
+	const session = chat && sessionState(chat) !== "finished" ? nowLine({ kind: "session", chat, course: course ?? null }).slot : null;
+	if (session || !course || !task) return session;
+	const step = todaySteps(course).find((s) => s.kind === "task" && s.key === task.key);
+	return step ? nowLine({ kind: "course", course, step }).slot : null;
 }
 
 export function lookOf(entry: CalendarEntry): EntryLook {
@@ -373,7 +404,7 @@ export function calendarEntries({
 			// A review he left for next time rides with its topics' next review,
 			// which opens it, never an Unfinished row of its own (round 10, 1 m7).
 			if (holder && isReviewSession(holder) && sessionState(holder) === "left") continue;
-			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}` });
+			entries.push({ kind: "task", id: `task:${map.workspace}#${task.key}`, day: today, title: holder?.title ?? task.title, course, task, topic: holders[0] ?? null, opening: `Continue ${task.title}`, status: openWorkStatus(studied, holder ?? null, task) });
 		}
 	}
 	for (const chat of chats) {
@@ -383,6 +414,7 @@ export function calendarEntries({
 		if (day === today && workspace && inReview(sessionTopics(chat, courses), reviewedToday.get(workspace))) continue;
 		const listed = courses.find((c) => c.map.workspace === workspace);
 		const course = workspace ? { workspace, title: listed?.map.title ?? chat.course!.title } : null;
+		const held = heldBy.get(chat.id) ?? null;
 		entries.push({
 			kind: "session",
 			id: `session:${chat.id}`,
@@ -393,7 +425,8 @@ export function calendarEntries({
 			type: sessionType(chat),
 			waits: sessionState(chat) === "your-turn",
 			topic: sessionTopic(chat, courses),
-			task: heldBy.get(chat.id) ?? null,
+			task: held,
+			status: held ? openWorkStatus(listed, chat, held) : null,
 		});
 	}
 	return entries.sort((a, b) => a.day.localeCompare(b.day) || rankOf(a) - rankOf(b));
