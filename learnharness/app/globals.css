@@ -461,8 +461,9 @@ body {
    Electron merged chrome (owner, 2026-09-17). The system title bar is
    hidden (hiddenInset in electron/main.cjs); the app's 60px bands are the
    drag surface.
-   Everything here is inert in the plain browser — it keys off <html class="lh-electron">, which
-   SidebarProvider sets after mount when it detects the Electron shell.
+   Everything here is inert in a browser — it keys off <html class="lh-electron">, which
+   SidebarProvider sets after mount when the Mac app's preload bridge is there
+   (window.lh), never from the user agent: T3 Code's preview is Electron too.
 
    - .lh-drag        window-drag region — on a dedicated mask div
                        placed FIRST in the page DOM (the mask
@@ -520,21 +521,29 @@ body {
 	display: block;
 	height: calc(52px / var(--lh-zoom));
 }
-/* The folded rail stays 48px in the Mac app too (Edo, 16 Nov 2026: the
-   92px rail looked "extremely thick"). The lights sit over its 52px head,
-   so its open button stands where T3 Code's sidebar toggle stands on
-   macOS: in the window's band beside the lights, 90px in
-   (`--desktop-window-controls-inset`, the T3 Code app's bundle), level
-   with the lights (Edo, 16 Nov 2026: "yes lined up"): centred on their
-   centre (--lh-lights-centre, from electron/main.cjs). Both lengths are
-   physical under zoom, as the lights are. The page's band content starts
-   a 12px gap past it (T3 Code's `--workspace-titlebar-control-gap`) while
-   the sidebar is folded. */
-.lh-electron .lh-rail-toggle {
+/* The folded rail's open button (RailOpenButton, drawn after the page).
+   In a browser it is centred in the rail's 52px head, at the top of the
+   48px rail where T3 Code's web build puts its toggle, level with the
+   rail's icons inside its 1px border.
+   The rail stays 48px in the Mac app too (Edo, 16 Nov 2026: the 92px rail
+   looked "extremely thick"). The lights sit over its head, so the button
+   stands where T3 Code's sidebar toggle stands on macOS: in the window's
+   band beside the lights, 90px in (`--desktop-window-controls-inset`, the
+   T3 Code app's bundle), level with the lights (Edo, 16 Nov 2026: "yes
+   lined up"): centred on their centre (--lh-lights-centre, from
+   electron/main.cjs). Both lengths are physical under zoom, as the lights
+   are. The page's band content starts a 12px gap past it (T3 Code's
+   `--workspace-titlebar-control-gap`) while the sidebar is folded. */
+.lh-rail-toggle {
 	position: fixed;
+	top: 1.625rem;
+	left: calc((3rem - 1px) / 2);
+	z-index: 20;
+	transform: translate(-50%, -50%);
+}
+.lh-electron .lh-rail-toggle {
 	top: calc(var(--lh-lights-centre) / var(--lh-zoom));
 	left: calc(90px / var(--lh-zoom));
-	z-index: 20;
 	transform: translateY(-50%);
 }
 /* The lights sit over the rail's head, so its edge starts under the band:

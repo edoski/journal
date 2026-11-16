@@ -151,7 +151,7 @@ export function UnitSidebar() {
 				data-state={open ? "open" : "folded"}
 			>
 				{!open ? (
-					<SidebarRail pathname={s.pathname} onOpen={toggle} onNewLesson={() => s.router.push("/chat/new")} onSettings={openSettings} />
+					<SidebarRail pathname={s.pathname} onNewLesson={() => s.router.push("/chat/new")} onSettings={openSettings} />
 				) : (
 				<div className="flex h-full w-(--sidebar-width) flex-col border-r bg-background">
 					<div className="lh-drag lh-lights-band shrink-0" />
