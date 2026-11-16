@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { sessionEndOf } from "../src/core/session-end.ts";
-import { newSessionModeMessage, newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
+import { newDoneTonightMessage, newSessionModeMessage, newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
 
 const USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 let n = 0;
@@ -99,5 +99,24 @@ describe("a review left between problems", () => {
 
 	it("a round opened on no topics is his to end", () => {
 		assert.equal(sessionEndOf(review(solve("1", ["a"], "solvedWithHints")), undefined, "practice"), "closed");
+	});
+});
+
+describe("Done for today on a session holding an open task (round 12, 1 m10)", () => {
+	// 17 Nov: the session continued the Poisson lesson's task with no plan of its own, answered the chips question, and he pressed Done; the task stayed open.
+	const continued = (task: unknown): LhMessage[] => [
+		newUserMessage("Continue Poisson distribution lesson"),
+		assistant([call("q17", "explain", { type: "check", question: "How many chips?", correctAnswer: "Poisson(2)" })]),
+		result("q17", "explain", { kind: "explain", text: "Poisson(2)", confidence: "confident" }),
+		assistant([call("s17", "course_save", { changes: { tasks: { "poisson-lesson": task } } })]),
+		result("s17", "course_save", { ok: true }),
+		assistant([text("Right.")], "stop"),
+		newDoneTonightMessage("teacher") as LhMessage,
+		assistant([text("Tomorrow you start Expectation and linearity. The help desk question in your Poisson distribution lesson is still open.")], "stop"),
+	];
+
+	it("leaves it for next time while the task stays open, and closes it once the task is finished", () => {
+		assert.equal(sessionEndOf(continued({ title: "Poisson distribution lesson", step: "The help desk question" }), undefined), "left");
+		assert.equal(sessionEndOf(continued(null), undefined), "closed");
 	});
 });
