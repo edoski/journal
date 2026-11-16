@@ -1014,6 +1014,20 @@ export class SessionModel {
 		this.setStatus("ready");
 	}
 
+	/** His stop of the running reply: the view reads it as stopped at once,
+	 *  as the record will once the server's abort settles, so the lesson's
+	 *  stop line shows on his press, not 2 to 3 s later (round 14, 4
+	 *  minor 10). The settle's sync replaces this with the record. */
+	stopReply(): void {
+		const streaming = this.streamingMessageId;
+		this.mutate(() => {
+			const idx = streaming === null ? -1 : this.tail.findIndex((m) => m.id === streaming);
+			const stopped = { role: "assistant", content: [], stopReason: "aborted", timestamp: Date.now() } as unknown as LhMessage;
+			this.tail = idx === -1 ? [...this.tail, { ...stopped, id: localId() } as LhMessage] : this.tail.with(idx, { ...this.tail[idx]!, stopReason: "aborted" } as LhMessage);
+		});
+		this.stop();
+	}
+
 	/** Submission snapshots outlive the dock, not the session mount. */
 	questionDraft(questionKey: string): QuestionDraft | undefined {
 		return this.questionDrafts.get(questionKey);

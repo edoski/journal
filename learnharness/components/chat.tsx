@@ -222,7 +222,7 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
@@ -303,7 +303,7 @@ export function Chat({
 	// turn it sets up itself and his stop. The lesson's line, Stop and box
 	// all follow it, so a handoff between agents never looks finished.
 	const attachIfRunningRef = useRef<() => void>(() => {});
-	const { busy, serverTurnRef, noTurnRunning } = useSessionBusy({
+	const { busy, serverTurnRef, askStop, stopSpent, noTurnRunning } = useSessionBusy({
 		chatId,
 		status,
 		attached: turnInFlight,
@@ -400,6 +400,26 @@ export function Chat({
 		// 409 not_running is the benign raced-settle: the stream's finish
 			// already settled the view (or the poll fallback adopts) — nothing owed.
 	}, [chatId, stop]);
+	// His Stop of the reply itself: it reads as stopped from the press.
+	const syncFromServerRef = useRef<() => Promise<unknown>>(async () => undefined);
+	const stopTheReply = useCallback(() => {
+		askStop();
+		setTurnInFlight(false);
+		stopReply();
+		void fetch("/api/activity/abort", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ kind: "turn", id: chatId }),
+		}).then((res) => {
+			// Nothing ran to stop (it settled first): the record decides.
+			if (res.status === 409) {
+				stopSpent();
+				void syncFromServerRef.current();
+			}
+		}).catch(() => {
+			/* transient — the turn settles on its own and its settle syncs */
+		});
+	}, [chatId, stopReply, askStop, stopSpent]);
 	// ESC-abort guard (owner, 2026-10-02): the abort chain opens a confirm
 	// popup EVERYWHERE (streams and pending questions alike). Both window
 	// listeners fire per Esc, so the state gate here — not stopPropagation
@@ -451,7 +471,7 @@ export function Chat({
 		(mode: AbortMode) => {
 			setAbortAsk(null);
 			if (mode === "turn") {
-				abortInFlightTurn();
+				stopTheReply();
 				return;
 			}
 			// From a pending question the dismiss is silent (A2, 2026-10-03):
@@ -479,7 +499,7 @@ export function Chat({
 				if (busyRef.current) abortInFlightTurn();
 			}
 		},
-		[abortInFlightTurn, dismissQuestion, dismissProblem],
+		[abortInFlightTurn, stopTheReply, dismissQuestion, dismissProblem],
 	);
 	// Mount continuation: if the stored transcript ends with a fulfilled tool
 	// (a job result landed while no client was open), resume the lesson — the
@@ -1013,6 +1033,7 @@ export function Chat({
 		setTurnInFlight(false);
 		void syncFromServer();
 	};
+	syncFromServerRef.current = syncFromServer;
 
 	// ── Append-only record adoption (owner ground rules, 2026-09-15) ──
 	// Content delivered into the record server-side — sub-agent
