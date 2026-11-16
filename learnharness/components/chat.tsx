@@ -84,10 +84,10 @@ import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
-import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, type LeftOpen } from "@/components/lesson/stranded-draft";
+import { boxAfterClose, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { carriedForm, carryBox, carryWords, forgetClosedBoxes, keepForNewLesson, keepWords, keptWords, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone } from "@/components/lesson/done-tonight";
@@ -622,16 +622,22 @@ export function Chat({
 		liveDraftRef.current = null;
 		if (dockKey !== null) setOvertaken((was) => (was === "answered" ? was : null));
 		const why = before.callId ? leftOpenOf(viewRef.current, before.callId) : null;
-		const moved = before.key === sentFromDockRef.current ? null : overtakenDraft(before.key, dockKey, live, why);
-		if (moved === null) return;
-		if (moved.to === "carry") {
-			if (carryScope && before.callId) carryWords(carryScope, { question: before.question, from: before.callId }, { text: moved.words }, []);
-			if (dockKey === null) setOvertaken(moved.why);
-			return;
+		if (before.key === sentFromDockRef.current) {
+			// What he typed there after sending from it is his next message
+			// (round 11, 4 major 1: it was erased with the closed problem).
+			const own = typedAfterSend(before.key, dockKey, live);
+			if (own !== null) applyText(joinAsTyped([textRef.current, own]));
+		} else {
+			const moved = overtakenDraft(before.key, dockKey, live, why);
+			if (moved?.to === "carry") {
+				if (carryScope && before.callId) carryWords(carryScope, { question: before.question, from: before.callId }, { text: moved.words }, []);
+				if (dockKey === null) setOvertaken(moved.why);
+			} else if (moved) {
+				applyText(rescuedBox(chatId, textRef.current, moved.words));
+				keepRescue(chatId, moved.words, before.key);
+				setOvertaken("answered");
+			}
 		}
-		applyText(rescuedBox(chatId, textRef.current, moved.words));
-		keepRescue(chatId, moved.words, before.key);
-		setOvertaken("answered");
 		// `dock` is derived from the render that changed dockKey.
 	}, [chatId, dockKey, applyText, carryScope]);
 	const { unconnected, status: modelStatus, read: statusRead } = useModelSetup(busy);
@@ -1798,6 +1804,7 @@ export function Chat({
 							onSaveDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
 							onSubmitAnswer={submitPendingAnswer}
 							onSubmitThinking={submitThinking}
+							onSteer={(text, photos) => steer(text, photos)}
 							onRequest={sendPracticeRequest}
 							onDraftChange={recordDockDraft}
 						/>

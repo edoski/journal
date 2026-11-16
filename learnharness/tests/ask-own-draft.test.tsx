@@ -59,6 +59,7 @@ async function mount(start: { box: string; mode: "answer" | "ask" }) {
 					onSaveDraft={noop}
 					onSubmitAnswer={noop}
 					onSubmitThinking={async () => true}
+					onSteer={async () => true}
 					onRequest={noop}
 					onDraftChange={noop}
 				/>

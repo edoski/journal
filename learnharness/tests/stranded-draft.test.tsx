@@ -105,6 +105,7 @@ test("Esc back to the answer never moves rescued words into the next question's 
 					onSaveDraft={noop}
 					onSubmitAnswer={noop}
 					onSubmitThinking={async () => true}
+					onSteer={async () => true}
 					onRequest={noop}
 					onDraftChange={noop}
 				/>
@@ -139,6 +140,7 @@ test("the composer answering a question reports what he types as he types it", a
 					onSaveDraft={noop}
 					onSubmitAnswer={noop}
 					onSubmitThinking={async () => true}
+					onSteer={async () => true}
 					onRequest={noop}
 					onDraftChange={(key: string, text: string) => seen.push([key, text])}
 				/>
@@ -172,4 +174,15 @@ test("the rescue leaves the box once the question after it closes, unless he mad
 	assert.equal(keptWords("c8:rescued"), undefined, "and forgets it");
 	keepRescue("c8", "so 2x + y = 0", "q:k1");
 	assert.equal(boxAfterClose("c8", "so 2x + y = 0, so v = (1, −2)", "q:k2"), null, "words he typed on are his message");
+});
+
+// Round 11 (4 major 1): after he sent his work on a problem, words he typed
+// in its box while the tutor replied were erased when the problem closed.
+test("words he typed in the box after sending from it go to the message box when it closes", async () => {
+	const { typedAfterSend } = await import("../components/lesson/stranded-draft.ts");
+	assert.equal(typedAfterSend("p:1", null, { key: "p:1", text: "also, does it work for sin(1/n)? " }), "also, does it work for sin(1/n)? ", "as he typed them");
+	assert.equal(typedAfterSend("p:1", "q:2", { key: "p:1", text: "why 1/e?" }), "why 1/e?", "a question opening straight after takes nothing");
+	assert.equal(typedAfterSend("p:1", null, null), null, "nothing typed since the send");
+	assert.equal(typedAfterSend("p:1", null, { key: "p:1", text: " " }), null);
+	assert.equal(typedAfterSend("p:1", "p:1", { key: "p:1", text: "x" }), null, "the box is still open");
 });

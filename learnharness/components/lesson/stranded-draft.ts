@@ -41,6 +41,15 @@ export function overtakenDraft(before: string | null, after: string | null, draf
 	return leftOpen ? { to: "carry", words, why: leftOpen } : { to: "box", words };
 }
 
+/** Words he typed in the dock after this window sent from it, when the
+ *  dock moves on, or null: they go to the message box as typed (round 11,
+ *  4 major 1: words typed in a problem's box while the tutor replied to
+ *  his work were erased when the problem closed). Pure. */
+export function typedAfterSend(before: string | null, after: string | null, draft: LiveDraft | null): string | null {
+	if (before === null || before === after || draft === null || draft.key !== before) return null;
+	return draft.text.trim() === "" ? null : draft.text;
+}
+
 const rescueScope = (chatId: string) => `${chatId}:rescued`;
 
 /** Notes the words just rescued into the lesson's message box, and the

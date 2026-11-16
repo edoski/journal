@@ -53,6 +53,7 @@ async function mount(open: { tool: string; input: unknown }, picks: { count: num
 					onSaveDraft={noop}
 					onSubmitAnswer={(a) => sent.push(a)}
 					onSubmitThinking={async () => true}
+					onSteer={async () => true}
 					onRequest={noop}
 					onDraftChange={noop}
 				/>

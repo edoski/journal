@@ -135,6 +135,7 @@ describe("the Prose composer", () => {
 		onSaveDraft: noop,
 		onSubmitAnswer: noop,
 		onSubmitThinking: async () => true,
+		onSteer: async () => true,
 		onRequest: noop,
 		onDraftChange: noop,
 		...over,
