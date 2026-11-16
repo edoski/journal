@@ -24,7 +24,8 @@ export interface SdkAgentConfig {
 	/** The record the turn runs on (the record is what every page reads). */
 	messages: AgentMessage[];
 	/** A clean call of this tool ends the turn, once every such call in the
-	 *  same reply resolved cleanly (a failed one is retried within the turn). */
+	 *  same reply resolved cleanly (a failed one is retried within the turn).
+	 *  A result's own `terminate` overrides it either way. */
 	endsTurn: (toolName: string) => boolean;
 	/** The record's map to its Claude Code session; absent on a new lesson
 	 *  and on one from before sessions (the turn seeds one from the record). */
@@ -45,6 +46,10 @@ export interface SdkAgentConfig {
 	/** Reads each call as it finishes streaming, before any view sees it
 	 *  (the voice guard, voice-guard.ts). */
 	screen?: (call: ToolCall) => void;
+	/** Reads each reply as it ends, before the record keeps it or a view
+	 *  draws it (the voice guard poses a question it kept under the rewrite
+	 *  it waited for). */
+	settle?: (message: AssistantMessage) => void;
 	/** Reads each block of ordinary text as it ends; true takes its text out
 	 *  of the reply, so the record and every view keep none of it. */
 	screenText?: (text: string) => boolean;
@@ -199,7 +204,7 @@ export class SdkAgent {
 				afterReply(() => this.emit({ type: "tool_execution_end", toolCallId: outcome.toolCall.id, toolName: outcome.toolCall.name, result: outcome.result, isError: outcome.isError, ...(outcome.durationMs === undefined ? {} : { durationMs: outcome.durationMs }) }));
 			},
 			endsTurn: (call, outcome) => {
-				if (outcome.isError || !(outcome.result.terminate === true || this.config.endsTurn(call.name))) return false;
+				if (outcome.isError || !(outcome.result.terminate ?? this.config.endsTurn(call.name))) return false;
 				const siblings = calls.get(call.id)?.assistant.content.filter((b): b is ToolCall => b.type === "toolCall" && b.id !== call.id && this.config.endsTurn(b.name)) ?? [];
 				const ends = siblings.every((b) => outcomes.get(b.id)?.isError === false);
 				if (ends) endedByTool = true;
@@ -276,6 +281,7 @@ export class SdkAgent {
 			for (const event of events) {
 				if (event.type === "start") this.emit({ type: "message_start", message: stream.message });
 				else if (event.type === "done" || event.type === "error") {
+					if (event.type === "done") this.config.settle?.(stream.message);
 					this.state.messages.push(stream.message);
 					this.emit({ type: "message_end", message: stream.message });
 					if (event.type === "done") {

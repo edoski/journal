@@ -53,3 +53,13 @@ describe("send_to_user's message field states the symbol rule and how length is 
 		assert.equal(sentenceLoad(sentences(`${"word ".repeat(SENTENCE_WORDS)}ends here.`)), 2);
 	});
 });
+
+describe("send_to_user's message field states round 12's most broken rule (round 12, 3 M1)", () => {
+	it("a point is made once, in the words the refusal uses, one line of the list", async () => {
+		const { MESSAGE_DRAFT_LINES } = await import("../src/agent/tools/send-to-user.ts");
+		const line = MESSAGE_DRAFT_LINES.find((l) => l.startsWith("A point is made once"));
+		assert.ok(line && MESSAGE_DRAFT_RULES.includes(line), "the field carries it");
+		const fs = await import("node:fs");
+		assert.match(fs.readFileSync(new URL("../src/agent/voice-guard.ts", import.meta.url), "utf-8"), /a point is made once/, "the refusal says the same");
+	});
+});

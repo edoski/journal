@@ -156,6 +156,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
 		].map(spoken),
 		screen: (call) => voice.screen(call),
+		settle: (message) => voice.settle(message),
 		// Ordinary text never reaches him where send_to_user is his channel.
 		...(opts.tools === undefined ? { screenText: (text: string) => voice.screenText(text), beforeEnd: () => voice.beforeEnd() } : {}),
 		builtins: FILE_TOOLS,

@@ -27,3 +27,12 @@ test("a tool running after the words shows the line again", () => {
 test("nothing shows when no turn runs", () => {
 	assert.equal(showsWorking([learner, tutor({ type: "reasoning", text: "" })], false), false);
 });
+
+test("a posed question ends the line: what is left is the turn closing, and he can already answer (round 12, 3 D6)", () => {
+	// Round 12: "Thinking…" and Stop showed for 1–4 s under every posed question.
+	const asked = tutor({ type: "text", text: "Right." }, { type: "tool-explain", state: "input-available", toolCallId: "q1" });
+	assert.equal(showsWorking([learner, asked], true), false);
+	assert.equal(showsWorking([learner, tutor({ type: "tool-ask_user_question", state: "input-available", toolCallId: "q2" })], true), false);
+	assert.equal(showsWorking([learner, tutor({ type: "tool-problem", state: "output-available", toolCallId: "p1" })], true), false, "a posed problem too");
+	assert.equal(showsWorking([learner, tutor({ type: "tool-explain", state: "output-error", toolCallId: "q3" })], true), true, "a refused question never reached him");
+});

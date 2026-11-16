@@ -362,10 +362,12 @@ describe("a course-linked turn", () => {
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });
 		const linked = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === LINALG);
 		const verbs = linked.map((c) => c.args[2]);
-		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
-		assert.equal(verbs.filter((v) => v === "map").length, 2, "each brief reads every course's daily plan");
+		// The second turn's brief reads nothing: no course changed since the
+		// first read them (round 12, 3 D8: eleven engine processes a turn).
+		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "save"], "turn brief, the agent's resume, conclude's save");
+		assert.equal(verbs.filter((v) => v === "map").length, 1, "the brief reads every course's daily plan, once");
 		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
-		assert.equal(verbs.filter((v) => v === "plan").length, 2, "each brief reads the daily plan, practice's exam run-up with it");
+		assert.equal(verbs.filter((v) => v === "plan").length, 1, "the brief reads the daily plan, practice's exam run-up with it, once");
 		const save = linked.find((c) => c.args[2] === "save")!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
 		assert.deepEqual(JSON.parse(save.stdin), {

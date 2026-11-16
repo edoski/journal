@@ -32,6 +32,10 @@ const { buildModeHandoffSteer } = await import("../src/core/contracts/jobs.ts");
 const { handleChatInput, handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
+const { emit } = await import("../src/core/events.ts");
+/** The fake engine's records changed, as a save announces it: the brief's
+ *  kept reads are read again. */
+const recordsChanged = () => emit("courses-changed", {});
 const { createPracticeAgent, createProberAgent } = await import("../src/agent/teacher-agent.ts");
 
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
@@ -224,6 +228,7 @@ describe("course brief injection", () => {
 	it("a handoff to practice re-sends the brief for practice, with the run-up", async () => {
 		const workspace = "/study/linalg";
 		process.env.FAKE_ENGINE_PLAN = JSON.stringify({ today: "2026-11-07", courses: [{ workspace, runup: { days_left: 12, unready: ["rank"] } }] });
+		recordsChanged();
 		const chat = chatStore.createChat("practise rank", { workspace, title: "Linear Algebra" });
 		const handoff = { id: "h1", role: "assistant", content: [{ type: "toolCall", id: "call-h1", name: "practice", arguments: { scope: "rank", reason: "asked" } }], api: "faux", provider: "t", model: "t", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "toolUse", timestamp: 1 };
 		const result = { id: "r1", role: "toolResult", toolCallId: "call-h1", toolName: "practice", content: [{ type: "text", text: "ok" }], details: { ok: true, mode: "practice" }, isError: false, timestamp: 2 };
@@ -241,6 +246,7 @@ describe("course brief injection", () => {
 		const handle = runningTurn(chat.id);
 		if (handle) await new Response(handle.subscribe()).text();
 		delete process.env.FAKE_ENGINE_PLAN;
+		recordsChanged();
 		const messages = chatStore.getChat(chat.id)!.messages;
 		const brief = messages.find((m) => (m as { customType?: string }).customType === "course-context") as { content: string; details: { key: string } } | undefined;
 		assert.ok(brief, "the wake carries a brief");
@@ -432,6 +438,7 @@ describe("the brief fetch reads every course's plan", () => {
 			],
 		});
 		process.env.FAKE_ENGINE_MAP = JSON.stringify(MAP);
+		recordsChanged();
 		const log = path.join(TMP, "plan-log.jsonl");
 		process.env.FAKE_ENGINE_LOG = log;
 		try {
@@ -443,18 +450,21 @@ describe("the brief fetch reads every course's plan", () => {
 			delete process.env.FAKE_ENGINE_PLAN;
 			delete process.env.FAKE_ENGINE_MAP;
 			delete process.env.FAKE_ENGINE_LOG;
+			recordsChanged();
 		}
 	});
 
 	it("a failed map costs the turn nothing: the brief comes without the plan", async () => {
 		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
 		process.env.FAKE_ENGINE_FAIL = "map";
+		recordsChanged();
 		try {
 			const brief = await fetchCourseBrief(linked("/study/probability"));
 			assert.match(brief!.text, /Due today:/);
 			assert.doesNotMatch(brief!.text, /Daily plan/);
 		} finally {
 			delete process.env.FAKE_ENGINE_FAIL;
+			recordsChanged();
 		}
 	});
 });
