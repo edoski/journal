@@ -91,7 +91,7 @@ import { LESSON_WORDS } from "@/components/study-words";
 import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
-import { DoneTonightButton, DoneTonightLine, doneTonightGone } from "@/components/lesson/done-tonight";
+import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
 import { CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
@@ -882,6 +882,11 @@ export function Chat({
 		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, { question: (pending.input as { question?: string } | null)?.question ?? "", from: pending.toolCallId });
 		void send({ type: "tonight" });
 	}, [doneTonight, send, pending, carryScope, chatId, stop]);
+	// Once the close has settled, his keys go back to the box (round 12, 1 m9).
+	useEffect(() => {
+		const frame = requestAnimationFrame(() => focusAfterDone(document, doneTonight, !busy));
+		return () => cancelAnimationFrame(frame);
+	}, [doneTonight, busy]);
 	const sendTonightRef = useRef(sendTonight);
 	sendTonightRef.current = sendTonight;
 	useEffect(() => {
