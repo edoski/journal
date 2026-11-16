@@ -189,6 +189,9 @@ function namedQuestions(
 			);
 			return rest;
 		}
+		if (questions.slice(0, -1).includes(named) && !("corrects" in rest)) {
+			refuse(`observations[${i}].question: ${JSON.stringify(named)} is named by an earlier observation of this save, and one answer is one observation with one result: list every topic it was asked on in that observation's topics, and send it once.`);
+		}
 		if ((answer.recorded || saved.has(named)) && !("corrects" in rest)) {
 			refuse(`observations[${i}].question: ${JSON.stringify(named)} is already saved, so it is not saved again. Leave it out and send the rest; a re-mark of it names its attempt with corrects.`);
 		}

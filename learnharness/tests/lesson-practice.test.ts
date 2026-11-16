@@ -15,16 +15,10 @@ import { composeInstructions } from "../src/agent/teacher-agent.ts";
 const chain = { statement: "Find the eigenvalues, the eigenspaces, then diagonalize.", topics: ["characteristic-polynomial", "eigenspaces", "diagonalization"] };
 
 describe("a failed problem that runs the whole chain", () => {
-	it("is charged only to the topic where his answer first broke; the steps before it keep their own result", () => {
-		const failed: PracticeConclusion = {
-			outcome: "movedOn", rung: null, result: "incorrect", response: "eigenspace for 3 came out empty",
-			brokeAt: "eigenspaces", byTopic: { "characteristic-polynomial": "correct" },
-		};
+	it("is charged only to the topic where his answer first broke, as one observation (round 14, M2)", () => {
+		const failed: PracticeConclusion = { outcome: "movedOn", rung: null, result: "incorrect", response: "eigenspace for 3 came out empty", brokeAt: "eigenspaces" };
 		assert.equal(conclusionProblem(failed, chain.topics), null);
-		assert.deepEqual(practiceObservations(chain, failed, "neutral").map((o) => [o.topics, o.result]), [
-			[["characteristic-polynomial"], "correct"],
-			[["eigenspaces"], "incorrect"],
-		]);
+		assert.deepEqual(practiceObservations(chain, failed, "neutral").map((o) => [o.topics, o.result]), [[["eigenspaces"], "incorrect"]]);
 	});
 
 	it("is refused when it would charge every topic with the miss", () => {

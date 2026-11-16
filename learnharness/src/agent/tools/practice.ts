@@ -126,16 +126,7 @@ function brokeAtField() {
 		Type.String({
 			minLength: 1,
 			description:
-				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone; give the topics answered right before the break their result in byTopic.",
-		}),
-	);
-}
-
-function byTopicField() {
-	return Type.Optional(
-		Type.Record(Type.String(), attemptResult("correct, partial or incorrect"), {
-			description:
-				"When the pose's topics went differently in this answer (a multi-part problem with one part right): the result of each topic that differs from result, by its handle in the pose's topics. Topics left out take result.",
+				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone. One answer has one result: never a result per topic.",
 		}),
 	);
 }
@@ -189,7 +180,6 @@ export const concludeInputObject = Type.Object({
 				"When his final answer used a wrongly chosen method: that method's course topic handle. A wrong method he later corrected goes in firstTry.chose.",
 		}),
 	),
-	byTopic: byTopicField(),
 	brokeAt: brokeAtField(),
 	firstTry: Type.Optional(
 		Type.Object(
@@ -204,7 +194,6 @@ export const concludeInputObject = Type.Object({
 				chose: Type.Optional(
 					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
 				),
-				byTopic: byTopicField(),
 				brokeAt: brokeAtField(),
 			},
 			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
@@ -254,7 +243,8 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 		response: input.response,
 		...(input.record ? { record: input.record } : {}),
 		...(input.chose ? { chose: input.chose } : {}),
-		...(input.byTopic ? { byTopic: input.byTopic } : {}),
+		// A result per topic, sent unasked, gives one answer two results.
+		...("byTopic" in input ? { byTopic: (input as { byTopic?: unknown }).byTopic } : {}),
 		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};

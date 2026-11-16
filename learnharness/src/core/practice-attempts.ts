@@ -27,8 +27,10 @@ export interface PracticePose {
 	topics: readonly string[];
 }
 
-/** One graded answer. `byTopic` gives the result of each posed topic that
- *  went differently from `result`; `chose` rides on the topics not correct. */
+/** One graded answer: one response, so one result on the topics it is
+ *  charged to (round 14, M2: "t = 4" was saved twice, incorrect on rank and
+ *  correct on kernel, and Kernel gained false credit). A part answered
+ *  right beside a part answered wrong makes the answer partial. */
 export interface GradedAnswer {
 	result: AttemptResult;
 	response: string;
@@ -37,10 +39,8 @@ export interface GradedAnswer {
 	 *  stands in when absent. */
 	record?: string;
 	chose?: string;
-	byTopic?: Readonly<Record<string, AttemptResult>>;
 	/** A combined problem that failed: the topic where the answer first
-	 *  broke. The miss is charged to it alone; the other posed topics are
-	 *  charged only with what byTopic gives them. */
+	 *  broke. The miss is charged to it alone. */
 	brokeAt?: string;
 }
 
@@ -55,26 +55,28 @@ export interface PracticeConclusion extends Omit<GradedAnswer, "result"> {
 	firstTry?: GradedAnswer & { sure: Confidence | null };
 }
 
-/** Each charged topic's result, in pose order. With `brokeAt`, a topic
- *  the answer never reached, or reached on the way to the break with no
- *  result of its own, is not charged. */
-export function topicResults(topics: readonly string[], answer: GradedAnswer): [string, AttemptResult][] {
-	if (answer.brokeAt !== undefined) {
-		return topics.flatMap((topic): [string, AttemptResult][] => {
-			if (topic === answer.brokeAt) return [[topic, answer.byTopic?.[topic] ?? answer.result]];
-			const own = answer.byTopic?.[topic];
-			return own ? [[topic, own]] : [];
-		});
-	}
-	return topics.map((topic) => [topic, answer.byTopic?.[topic] ?? answer.result]);
+/** The topics an answer is charged to, in pose order: the topic where it
+ *  broke when it names one, else every posed topic but a wrongly chosen
+ *  method, since a wrong choice is evidence on the topic that should have
+ *  been chosen, never on the method chosen, even when both were posed. */
+export function chargedTopics(topics: readonly string[], answer: GradedAnswer): string[] {
+	if (answer.brokeAt !== undefined) return topics.filter((topic) => topic === answer.brokeAt);
+	const chose = answer.chose && answer.result !== "correct" ? answer.chose : undefined;
+	return chose && topics.length > 1 ? topics.filter((t) => t !== chose) : [...topics];
+}
+
+/** Why an answer gives one response more than one result (round 14, M2),
+ *  or null. A conclusion from before the rule may still carry `byTopic`. */
+function secondResult(answer: object, label: string): string | null {
+	return "byTopic" in answer && answer.byTopic !== undefined
+		? `${label}byTopic gives one answer a second result, and one answer has one result: when some parts were right and others not, its result is partial on the posed topics, or brokeAt names the topic where it first broke`
+		: null;
 }
 
 function answerProblem(topics: readonly string[], answer: GradedAnswer, label: string): string | null {
-	const unknown = Object.keys(answer.byTopic ?? {}).filter((t) => !topics.includes(t));
-	if (unknown.length > 0) {
-		return `${label}byTopic names ${unknown.join(", ")}, which the problem was not posed with (its topics: ${topics.join(", ")})`;
-	}
-	if (answer.chose !== undefined && topicResults(topics, answer).every(([, r]) => r === "correct")) {
+	const second = secondResult(answer, label);
+	if (second) return second;
+	if (answer.chose !== undefined && answer.result === "correct") {
 		return `${label}chose marks a wrongly chosen method, so the result is not correct on every topic`;
 	}
 	if (answer.brokeAt !== undefined) {
@@ -82,8 +84,8 @@ function answerProblem(topics: readonly string[], answer: GradedAnswer, label: s
 		if (answer.result === "correct") return `${label}brokeAt marks where a failed answer broke, so the result is not correct`;
 	}
 	const uncharged = answer.result === "incorrect" && topics.length > 1 && answer.chose === undefined && answer.brokeAt === undefined;
-	if (uncharged && Object.keys(answer.byTopic ?? {}).length === 0) {
-		return `${label}an incorrect answer on a problem with several topics names brokeAt, the topic where it first broke, so the miss is charged to that topic alone (or byTopic splits the parts that went differently)`;
+	if (uncharged) {
+		return `${label}an incorrect answer on a problem with several topics names brokeAt, the topic where it first broke, so the miss is charged to that topic alone (or its result is partial when some parts were right)`;
 	}
 	return null;
 }
@@ -96,42 +98,27 @@ export function conclusionProblem(c: PracticeConclusion, topics: readonly string
 		return c.outcome === "movedOn" ? null : "a solved problem's result is correct or partial; only moving on with no answer claimed takes result null";
 	}
 	const answer = { ...c, result: c.result };
-	if (c.outcome === "solved" || c.outcome === "solvedWithHints") {
-		const unsolved = topicResults(topics, answer).filter(([, r]) => r === "incorrect").map(([t]) => t);
-		if (unsolved.length > 0) {
-			return answer.result === "incorrect"
-				? "a solved problem's result is correct or partial"
-				: `a solved problem is correct or partial on every topic, but byTopic marks ${unsolved.join(", ")} incorrect`;
-		}
-	}
+	if ((c.outcome === "solved" || c.outcome === "solvedWithHints") && answer.result === "incorrect") return "a solved problem's result is correct or partial";
 	if (c.outcome === "solvedWithHints" && c.rung === null) return "solvedWithHints needs the rung of the strongest hint given";
 	if (c.outcome === "solved" && c.rung !== null) return "a problem solved after a hint is solvedWithHints";
 	return answerProblem(topics, answer, "") ?? (c.firstTry ? answerProblem(topics, c.firstTry, "firstTry.") : null);
 }
 
-/** One observation per distinct result among the posed topics, so a part
- *  answered right is never charged with the part answered wrong. */
-function answerObservations(
+/** One answer's observation: one response, one result, on the topics it
+ *  is charged to. */
+function answerObservation(
 	pose: PracticePose,
 	answer: GradedAnswer,
 	help: string,
 	marks: { sure?: string; shown?: true; gave_up?: true },
-): Record<string, unknown>[] {
-	const groups = new Map<AttemptResult, string[]>();
-	for (const [topic, result] of topicResults(pose.topics, answer)) groups.set(result, [...(groups.get(result) ?? []), topic]);
-	return [...groups].map(([result, topics]) => {
-		const chose = answer.chose && result !== "correct" ? answer.chose : undefined;
-		// A wrong choice is evidence on the topic that should have been
-		// chosen, never on the method chosen, even when both were posed.
-		const charged = chose && topics.length > 1 ? topics.filter((t) => t !== chose) : topics;
-		const gaveUp = marks.gave_up && result === "incorrect" ? { gave_up: true } : {};
-		return { topics: charged, text: answer.record?.trim() || pose.statement, response: answer.response, help, result, ...(chose ? { chose } : {}), ...(marks.sure ? { sure: marks.sure } : {}), ...(marks.shown ? { shown: true } : {}), ...gaveUp };
-	});
+): Record<string, unknown> {
+	const chose = answer.chose && answer.result !== "correct" ? answer.chose : undefined;
+	const gaveUp = marks.gave_up && answer.result === "incorrect" ? { gave_up: true } : {};
+	return { topics: chargedTopics(pose.topics, answer), text: answer.record?.trim() || pose.statement, response: answer.response, help, result: answer.result, ...(chose ? { chose } : {}), ...(marks.sure ? { sure: marks.sure } : {}), ...(marks.shown ? { shown: true } : {}), ...gaveUp };
 }
 
 function sameResults(topics: readonly string[], a: GradedAnswer, b: GradedAnswer): boolean {
-	const key = (answer: GradedAnswer) => JSON.stringify(topicResults(topics, answer));
-	return a.chose === b.chose && key(a) === key(b);
+	return a.chose === b.chose && a.result === b.result && JSON.stringify(chargedTopics(topics, a)) === JSON.stringify(chargedTopics(topics, b));
 }
 
 /** The observations a concluded problem adds to the course record: the
@@ -148,8 +135,8 @@ export function practiceObservations(
 	if (c.result === null) return [];
 	const answer = { ...c, result: c.result };
 	const marks = { ...engineConfidence(lastConfidence), ...(c.rung === "R5" ? { shown: true as const } : {}), ...(c.outcome === "surrendered" ? { gave_up: true as const } : {}) };
-	const final = answerObservations(pose, answer, c.rung ? RUNG_HELP[c.rung] : "none", marks);
+	const final = answerObservation(pose, answer, c.rung ? RUNG_HELP[c.rung] : "none", marks);
 	const first = c.firstTry;
-	if (!first || (c.rung === null && sameResults(pose.topics, first, answer))) return final;
-	return [...answerObservations(pose, first, "none", engineConfidence(first.sure ?? undefined)), ...final];
+	if (!first || (c.rung === null && sameResults(pose.topics, first, answer))) return [final];
+	return [answerObservation(pose, first, "none", engineConfidence(first.sure ?? undefined)), final];
 }
