@@ -152,7 +152,7 @@ from datetime import UTC, date, datetime, timedelta
 import math
 from typing import Any, Literal, TypedDict
 
-from learning import arc_rules, capacity, progress, schema
+from learning import arc_rules, capacity, memo, progress, schema
 from learning.capacity import Capacity
 
 # The longest plan the engine makes: a year from today, so every review on
@@ -258,6 +258,29 @@ class _Course:
     """The lessons he has begun on topics not yet taught, each with the last
     day he worked on it (``_lessons``): each goes on on the next study day
     (``_continued``)."""
+
+    soonest: str | None = field(default=None, init=False)
+    """The earliest review day on record, read again after a review moves
+    (``_set_due``): a day before it has none due, which most of a year's
+    plan is, so the day needs no look at each topic."""
+    sought: bool = field(default=False, init=False)
+    listed: dict[date, list[dict[str, Any]]] = field(default_factory=dict, init=False)
+    """Each day's reviews due (``due_items``) until a review moves."""
+
+    def none_due(self, day: date) -> bool:
+        """No review on record is due by ``day``."""
+        if not self.sought:
+            self.soonest = min(
+                (
+                    due
+                    for topic in self.record["topics"].values()
+                    if "excluded" not in topic
+                    and (due := topic.get("review", {}).get("due")) is not None
+                ),
+                default=None,
+            )
+            self.sought = True
+        return self.soonest is None or self.soonest > day.isoformat()
 
     def moves(self, topic: str) -> bool:
         return self.moving is None or topic in self.moving
@@ -432,8 +455,14 @@ class _Course:
     def due_items(self, day: date) -> list[dict[str, Any]]:
         """The reviews due on ``day``, in the course's own order. A course that
         takes no questions has none."""
-        if not self.asks or (self.exam is not None and self.exam.day == day):
+        if (
+            not self.asks
+            or (self.exam is not None and self.exam.day == day)
+            or self.none_due(day)
+        ):
             return []
+        if day in self.listed:
+            return self.listed[day]
         items = progress.due(
             self.record,
             day,
@@ -442,7 +471,10 @@ class _Course:
             limit=0,
             replayed=self.replayed,
         )
-        return [item for item in items if self.levels[item["topic"]]["level"] != "new"]
+        self.listed[day] = [
+            item for item in items if self.levels[item["topic"]]["level"] != "new"
+        ]
+        return self.listed[day]
 
     def due_moving(self, day: date) -> bool:
         """Whether a topic that moves has a review due on ``day``
@@ -613,6 +645,8 @@ class _Course:
         entry = dict(self.record["topics"][topic])
         entry["review"] = {**entry.get("review", {}), "due": due.isoformat()}
         self.record["topics"][topic] = entry
+        self.sought = False
+        self.listed.clear()
 
     def wait(self, topic: str, final: str | None) -> None:
         """A full day left it out; ``final`` is the course whose final review
@@ -1507,7 +1541,8 @@ def replay(
     day, is study past the plan, and takes no place from a review still
     planned today.
     """
-    return _day(records, today, days, week, today, told=True)
+    with memo.scope():
+        return _day(records, today, days, week, today, told=True)
 
 
 def _day(

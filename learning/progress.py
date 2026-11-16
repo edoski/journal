@@ -27,7 +27,7 @@ import math
 from itertools import groupby
 from typing import Any
 
-from learning import arc_rules, preferences
+from learning import arc_rules, memo, preferences
 from learning.schema import PatchResult, counts, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
@@ -583,7 +583,14 @@ def _repaired(
 
 
 def replays(record: dict[str, Any]) -> dict[str, Replay]:
-    """Every topic's replayed verdicts and next expected review."""
+    """Every topic's replayed verdicts and next expected review; once per
+    read of the plan for the same record (``memo``)."""
+    if not memo.active():
+        return _replays(record)
+    return dict(memo.once("replays", memo.content(record), lambda: _replays(record)))
+
+
+def _replays(record: dict[str, Any]) -> dict[str, Replay]:
     histories = _histories(record["observations"])
     exam_of = examining(record)
     return {
@@ -593,7 +600,16 @@ def replays(record: dict[str, Any]) -> dict[str, Replay]:
 
 
 def standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Every topic's standing, in one pass over the observations."""
+    """Every topic's standing, in one pass over the observations; once per
+    read of the plan for the same record (``memo``)."""
+    if not memo.active():
+        return _standings(record)
+    return dict(
+        memo.once("standings", memo.content(record), lambda: _standings(record))
+    )
+
+
+def _standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     histories = _histories(record["observations"])
     exam_of = examining(record)
     return {
