@@ -279,6 +279,10 @@ export const NEXT_PROBLEM_TEXT =
  *  what he picks up and when: a cue toward its answer would make the
  *  pick-up count as helped (round 5, 14 Nov 2026). */
 const DONE_LIMITS = "Never a step, cue, method or hint toward anything he left open, and no praise or summary of the session.";
+/** An answer he sent just before pressing Done is graded in the closing
+ *  turn; its card said "Partly right" with no reason, straight before the
+ *  close (round 11, 4 minor 1). */
+const DONE_GRADED = "An answer he sent before pressing it is still graded and saved as usual; when it was not fully right, first say in one sentence what it missed, as its own message, then close.";
 const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel question, part (c) of the sheet), never by what it asks, and its day when the plan gives one. ${DONE_LIMITS}`;
 /** Practice keeps nothing of a problem dropped at Done for today, so its
  *  close names only what the record keeps (round 9, 3 m7: "You still have
@@ -288,13 +292,13 @@ const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: only what his 
 export const DONE_TONIGHT_TEXT = {
 	prober:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. " +
-		DONE_CLOSE,
+		`${DONE_GRADED} ${DONE_CLOSE}`,
 	teacher:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
-		DONE_CLOSE,
+		`${DONE_GRADED} ${DONE_CLOSE}`,
 	practice:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so never name it as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
-		DONE_CLOSE_PRACTICE,
+		`${DONE_GRADED} ${DONE_CLOSE_PRACTICE}`,
 } as const;
 
 /** The mark he thinks is right, in the record's words and his. */
