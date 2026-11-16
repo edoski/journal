@@ -1,9 +1,9 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-import { LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_MAP_CAP, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
+import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_MAP_CAP, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
-import { createTree, planMapTooBig, planStepIsTheTopic, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
+import { createTree, planDropsSteps, planMapTooBig, planStepIsTheTopic, planTitlesGiveAway, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
 import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
@@ -151,7 +151,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 			description:
 				"Write or REWRITE this session's plan map — the dependency graph the learner follows live in the plan window. " +
 				"Call once right after the probe concludes, then start teaching the first step in the same turn: he sees the map live and needs to approve nothing. " +
-				"Re-call whenever the map is wrong (the new block replaces the old tree). " +
+				"Re-call whenever the map is wrong (the new block replaces the old tree); once a step is taught, a rewrite of the same lesson keeps every step not marked done, with its id (refused otherwise): mark one he holds done with lesson_progress. " +
 				"A mermaid graph block (any direction): one node per line (`slug[Short Title]` — slugs are permanent lowercase ids: a-z, 0-9, hyphens/underscores), " +
 				"each title naming the question the step answers, never its result: he sees it before the step is taught, so no relation in a title (=, ≠, →, ≤, ∈ or their TeX, an equation that names a problem too: `inverse-solve[Solving a system with the inverse]`, never \"Solving $Ax = b$ with $A^{-1}$\"; refused), no condition in words (in every, for every, always, never, only if, iff, exactly when; refused), and maths in `$…$` only names a thing, with no relation sign inside it, an event's notation included (`pmf[The probability of $k$ events]`, never \"The formula for $P(X=k)$\"; refused). " +
 				"A title holding square brackets is quoted: `row-reduce[\"Row reducing $[A \\mid I]$\"]`. " +
@@ -178,7 +178,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
 					// Every problem at once, so one rewrite fixes them all.
 					const lesson = { topic: goal?.topic, titles: [goal?.title, record.title].filter((t): t is string => typeof t === "string") };
-					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson)].filter((p): p is string => p !== null);
+					const taught = record.tree ? derivePlanStatusesLh(record.tree, record.messages) : null;
+					const problems = [planMapTooBig(next), planTitlesGiveAway(next), planStepIsTheTopic(next, lesson), planDropsSteps(record.tree, next, (taught?.visited.size ?? 0) > 0 || taught?.current != null, taught?.done ?? new Set())].filter((p): p is string => p !== null);
 					if (problems.length > 0) return { ok: false, error: problems.join("\n") };
 					chatStore.saveTree(chatId, next);
 					if (goal && !record.tree) chatStore.nameSession(chatId, goal);

@@ -504,14 +504,14 @@ describe("derivePlanStatuses (the map tracks position, not completion)", () => {
 		assert.equal(again.visited.size, 0, "one correct answer on a does not finish it");
 	});
 
-	it("revisits keep both: A→B→A gives current A, visited {A,B}", () => {
+	it("a revisit of a step behind marks it, and the strip stays on the later step: A→B→A gives current B, visited {A} (round 13, 2 n5)", () => {
 		const st = derivePlanStatuses(tree, [
 			msg(quizPart("output-available", "a", true)),
 			msg(quizPart("output-available", "b", true)),
 			msg(quizPart("input-available", "a")),
 		]);
-		assert.equal(st.current, "a");
-		assert.deepEqual([...st.visited].sort(), ["a", "b"]);
+		assert.equal(st.current, "b");
+		assert.deepEqual([...st.visited].sort(), ["a"]);
 	});
 
 	it("several checks on one node hold the map still", () => {
