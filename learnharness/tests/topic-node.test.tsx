@@ -82,7 +82,8 @@ describe("the card", () => {
 		assert.ok(pie(topic({ level: "retained" })).querySelector("circle[r='5']"), "full once he can do it on his own");
 		assert.ok(pie(topic()).querySelector('[data-part="outline"]:not([stroke-dasharray])'), "a solid outline, never a dashed spinner");
 		assert.ok(pie(topic()).querySelector("path, circle[r='5']") === null, "empty before he starts");
-		assert.match(pie(weak("attempted", { lapsed: true })).getAttribute("class")!, /text-warning/);
+		assert.match(pie(weak("retained", { lapsed: true, mistake: true })).getAttribute("class")!, /text-warning/);
+		assert.doesNotMatch(pie(weak("attempted", { confidentErrors: 1, mistake: true })).getAttribute("class")!, /text-warning/, "a topic still being learned never slips (round 11, 3 N1)");
 	});
 
 	it("centres the pie beside the two lines, as Home's row does", () => {

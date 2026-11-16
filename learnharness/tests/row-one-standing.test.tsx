@@ -44,10 +44,12 @@ const practice = chat({ id: "rank", title: "Rank practice", kind: "practice", pe
 
 describe("one status word per row (round 10, 1 m4)", () => {
 	for (const [signals, words] of [
-		[{ gap: "Pivots" }, "Check on your own"],
+		// A gap with no mistake open slips no more (round 11, 3 N1): its
+		// standing says what is left, and no slip sits beside it.
+		[{ gap: "Pivots" }, "Right on your own, check another day"],
 		[{ gap: "Counts entries, not pivots", mistake: true }, "Mistake to fix"],
 	] as const) {
-		it(`says "${words}" alone beside the warning pie, never with Slipping`, () => {
+		it(`says "${words}" alone beside the pie, never with Slipping`, () => {
 			const line = draw(rankCourse(signals), [practice]).querySelector('[data-slot="today-line"]')!;
 			const text = line.textContent ?? "";
 			assert.equal(text.split(words).length - 1, 1, `"${words}" once: ${text}`);
@@ -55,7 +57,7 @@ describe("one status word per row (round 10, 1 m4)", () => {
 			assert.ok(line.querySelector('[data-slot="today-slip"]') === null, "no slip on the course line");
 			const standing = line.querySelector('[data-slot="today-standing"]')!;
 			assert.equal(standing.textContent, words);
-			assert.equal(standing.getAttribute("data-slip"), signals.mistake ? "gap" : "check");
+			assert.equal(standing.getAttribute("data-slip"), "mistake" in signals ? "gap" : null);
 			assert.equal(standing.querySelector('[data-slot="topic-glyph"]')?.getAttribute("data-fill"), "0.75", "the warning pie, a quarter short");
 		});
 	}

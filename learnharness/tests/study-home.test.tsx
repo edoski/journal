@@ -323,7 +323,7 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesOn your ownDue since 7 Nov", "Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last timeNext up", "Linear AlgebraContinue Problem sheet 4Check on your ownLeft off 5 Nov"],
+			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesOn your ownDue since 7 Nov", "Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last timeNext up", "Linear AlgebraContinue Problem sheet 4Not right last timeLeft off 5 Nov"],
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
@@ -438,7 +438,7 @@ describe("what a line of Today reads", () => {
 			"Real AnalysisReview SequencesOn your ownDue since 7 Nov",
 			"Linear AlgebraStudied todayEigen lessonYour turn",
 			"ProbabilityContinue Bayes' ruleNot right last timeNext up",
-			"Linear AlgebraContinue Problem sheet 4Check on your ownLeft off 5 Nov",
+			"Linear AlgebraContinue Problem sheet 4Not right last timeLeft off 5 Nov",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["next", 1], ["task", 1]]);

@@ -65,7 +65,7 @@ One mark, one ink and one phrase per state, on Home's Today rows, the topic map'
 | not started | the pie's outline alone (`TopicGlyph`, `ui/pie.tsx`) | muted at 60% | Not started (Home's row says it with "Start …" instead) |
 | being learned | a quarter, a half, three quarters | muted | Taught, not tried · Tried, not right yet · Right with help, and the other `RIGHT_WORDS` |
 | on his own | full | muted | On your own |
-| slipping | the pie, a quarter short of full when he could do it on his own | `warning` | Slipping (`SLIPPING_WORDS`), and the slip beside it, each with its own icon (`SLIP_ICON`): Check on your own, Mistake to fix, Not right last time, Check again another day, Sure, but wrong, Mixed up with … |
+| slipping | the pie, a quarter short of full, on a topic he could do on his own whose newest counted answer is not right (`slipsNow`) | `warning` | Slipping (`SLIPPING_WORDS`), and the slip beside it, each with its own icon (`SLIP_ICON`): Check on your own, Mistake to fix, Not right last time, Check again another day, Sure, but wrong, Mixed up with … |
 | review due | History (`WHY_ICON.review`) | muted | Due today · Due since 5 Nov |
 
 Words come from `study-words.ts` and `topic-standing.ts` (`standingOf`, `slipBeside`) only.

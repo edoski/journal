@@ -112,11 +112,12 @@ describe("one standing legend on every surface", () => {
 
 	it("says Slipping beside every pie in the warning ink, and only there, on every surface", () => {
 		for (const { t, words } of table) {
-			assert.equal(words.card === "Slipping", t.weak, `${t.handle}: Slipping exactly when the engine calls it weak`);
+			assert.equal(words.card === "Slipping", standingOf(t).slipping, `${t.handle}: Slipping exactly on the warning ink`);
+			assert.equal(standingOf(t).slipping, t.weak && t.level !== "assisted" && t.signals.mistake === true, `${t.handle}: a topic he had, with a mistake open (round 11, 3 N1)`);
 			assert.deepEqual([words.row, words.head], [words.card, words.card], t.handle);
 			assert.notEqual(words.home, "Slipping", `${t.handle}: Home's row says why it slips instead`);
 		}
-		assert.ok(table.some((r) => r.t.weak && r.t.level === "independent") && table.some((r) => r.t.weak && r.t.level === "assisted"), "Slipping on a pie short of full and on one he could do on his own");
+		assert.ok(table.some((r) => r.t.weak && r.t.level === "assisted" && r.words.card !== "Slipping"), "a topic still being learned never slips");
 	});
 
 	it("says a slip in the same words on Home and the topic page, the head with the sidebar's and the map's icon", () => {
@@ -127,7 +128,7 @@ describe("one standing legend on every surface", () => {
 			if (slip) assert.equal(slips.head?.icon, lucideName(factIcon({ kind: "slip", words: slip.words, slip: slip.key })!), `${t.handle}: the sidebar's and the map's icon`);
 		}
 		const keys = new Set(table.flatMap((r) => (r.slips.home ? [slipBeside(r.t, titleOf)!.key] : [])));
-		assert.deepEqual([...keys].sort(), ["check", "confident", "gap", "lapsed", "mixed", "repaired"], "every slip, beside Slipping");
+		assert.deepEqual([...keys].sort(), ["confident", "gap", "lapsed", "mixed"], "every slip of a mistake still open; a fixed one or a check left is said by the standing");
 	});
 
 	it("marks a review due with one icon: Home's reason, the map, the sidebar and the topic page", () => {
