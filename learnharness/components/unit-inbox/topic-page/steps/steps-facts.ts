@@ -1,5 +1,6 @@
 import type { CourseMapEdge, CourseMapTopic, PlanNodeStatus, SessionPlan, TopicHandle } from "@/src/core";
-import { layoutTopicMap, WHOLE_COURSE_ZOOM, type Camera, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { layoutTopicMap, NODE_GAP, WHOLE_COURSE_ZOOM, type Camera, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { PLAN_MAP_CAP } from "@/src/core";
 import { dayWords } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /**
@@ -32,7 +33,7 @@ export interface StepsDrawing {
  * repeated edge and an edge that would close a loop are left out. The one
  * place a plan's ids become the map's handles.
  */
-export function stepsLayout(plan: SessionPlan): StepsDrawing {
+export function stepsLayout(plan: SessionPlan, size: NodeSize = STEP_SIZE): StepsDrawing {
 	const ids = [...new Set(plan.tree.nodes.map((node) => node.id))];
 	const known = new Set(ids);
 	const above = new Map<string, Set<string>>(ids.map((id) => [id, new Set()]));
@@ -57,12 +58,36 @@ export function stepsLayout(plan: SessionPlan): StepsDrawing {
 	}
 	// The layout reads a topic's handle and nothing else.
 	const steps = ids.map((id) => ({ handle: id as TopicHandle }) as CourseMapTopic);
-	return { layout: layoutTopicMap(steps, needs, STEP_SIZE), needs };
+	return { layout: layoutTopicMap(steps, needs, size), needs };
 }
 
-/** A step's card: narrower than a course topic's, so a lesson three steps
- *  wide fits the topic page's map column whole at 1512×982. */
+/** A step's card before the pane is measured, and the least it is: as
+ *  wide as a lesson three steps wide leaves at 1512×982, and two lines of
+ *  title tall. `stepCard` sizes it to the pane. */
 export const STEP_SIZE: NodeSize = { width: 184, height: 64 };
+
+/** How many steps side by side a card is sized for: the plan's widest
+ *  row, at most four (`PLAN_MAP_CAP.across`). Pure. */
+export function stepsAcross(layout: TopicMapLayout): number {
+	return Math.max(1, Math.min(PLAN_MAP_CAP.across, Math.max(0, ...layout.layers.map((layer) => layer.length))));
+}
+
+/**
+ * A step's card for a pane `frameWidth` wide (round 14, m34: fixed cards
+ * cut "One-to-one against onto for square…" and "What random variables
+ * and…"): the pane's clear middle, inside the fade, split into `across`
+ * columns, so the plan's widest row fits at full size; no wider than its
+ * longest title needs on one line (`oneLine`, the widest card measured
+ * with its title unwrapped), nor narrower than `STEP_SIZE` while the
+ * column allows it. Every card is as tall as the tallest one at that
+ * width (`heightAt`, measured with each title wrapping whole), at least
+ * `STEP_SIZE`'s height, so every title shows whole. Pure.
+ */
+export function stepCard(across: number, frameWidth: number, fade: { x: number }, oneLine: number, heightAt: (width: number) => number): NodeSize {
+	const column = Math.floor((frameWidth - fade.x * 2 - (across - 1) * NODE_GAP) / across);
+	const width = Math.max(1, Math.min(column, Math.max(STEP_SIZE.width, Math.ceil(oneLine))));
+	return { width, height: Math.max(STEP_SIZE.height, Math.ceil(heightAt(width))) };
+}
 /** A step's tag ("Next", "Left off here") sits this far above its card. */
 export const TAG_ROOM = 20;
 
