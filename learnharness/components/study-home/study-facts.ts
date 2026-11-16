@@ -279,7 +279,10 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 				}
 				continue;
 			}
-			const lesson = own(leftovers, step);
+			// An older session still open on the step's task is its line, so Home says that session's own status,
+			// as the calendar and the topic page do (round 14, m28: "Left off 10 Nov" here, "Your turn" there).
+			const holder = step.kind === "task" ? open.find((c) => !left(c) && c.course?.workspace === course.map.workspace && c.tasks?.includes(step.key)) : undefined;
+			const lesson = own(leftovers, step) ?? holder;
 			if (laterOnly(step)) {
 				if (!lesson) later.push({ kind: "course", course, step });
 			} else if (!lesson) {
