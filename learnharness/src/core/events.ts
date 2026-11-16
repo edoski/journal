@@ -41,8 +41,12 @@ export interface ServerEvents {
 	 *  shows the one name the list does. `deleted` names a session just
 	 *  deleted, so a window that has it open says so at once. */
 	"chats-changed": { named?: { id: string; title: string }; deleted?: string };
-	/** The course list changed: a course was created, renamed or deleted. */
-	"courses-changed": Record<string, never>;
+	/** The course list changed: a course was created, renamed or deleted.
+	 *  `deleted` names a course just deleted, so a lesson of it says so at
+	 *  once, with no read of the list (round 13, 4 #4: the other window
+	 *  learned of a delete 8.6 s later, after an engine read of every
+	 *  course). */
+	"courses-changed": { deleted?: string };
 	/** A course's engine record changed: a save through the app, or another
 	 *  host's (Claude Code, Claude Desktop) seen on disk. Views of that
 	 *  course's levels, reviews and tasks refetch. */

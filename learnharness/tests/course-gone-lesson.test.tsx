@@ -28,8 +28,15 @@ Object.assign(globalThis, { window: dom.window, document: dom.document, HTMLElem
 
 const { isCourseDeletedRefusal } = await import("../components/lesson/turn-error-text.ts");
 const { keepForNewLesson, keepWords, keptWords, NEW_LESSON_BOX, setKeptWindow } = await import("../components/lesson/kept-drafts.ts");
-const { CourseGoneLine } = await import("../components/lesson/course-gone.tsx");
+const { CourseGoneLine, courseDeletedBy } = await import("../components/lesson/course-gone.tsx");
 setKeptWindow("w-one", { live: ["w-one"] });
+
+test("a delete that names the lesson's course makes it history at once; any other change asks the list (round 13, 4 #4)", () => {
+	assert.equal(courseDeletedBy({ deleted: "/s/calculus" }, "/s/calculus"), true);
+	assert.equal(courseDeletedBy({ deleted: "/s/algebra" }, "/s/calculus"), null);
+	assert.equal(courseDeletedBy({}, "/s/calculus"), null);
+	assert.equal(courseDeletedBy({ deleted: "/s/calculus" }, undefined), null);
+});
 
 test("the chat route's refusal for a deleted course is told apart from other failures", () => {
 	assert.equal(isCourseDeletedRefusal(JSON.stringify({ error: "This course was deleted. Its lessons stay as history.", code: "course_deleted" })), true);

@@ -291,8 +291,15 @@ describe("rename and delete a course", () => {
 	it("DELETE has the engine forget the course record; it leaves the list and its folder stays", async () => {
 		const { stores } = await import("../src/server/stores.ts");
 		stores.courseMapLedgers.save(RUST, { done: [{ fingerprint: "f", files: ["notes.md"], at: "2026-11-08T10:00:00Z" }] } as never);
+		const { subscribe } = await import("../src/core/events.ts");
+		const changes: unknown[] = [];
+		const off = subscribe((e) => {
+			if (e.type === "courses-changed") changes.push(e);
+		});
 		const res = await deleteCourseRoute(send("DELETE", { workspace: RUST }));
+		off();
 		assert.equal(res.status, 200, await res.clone().text());
+		assert.deepEqual(changes, [{ type: "courses-changed", deleted: RUST }], "the change names the course, so its open lessons say so with no read of the list (round 13, 4 #4)");
 		assert.deepEqual(engineCalls().filter((c) => c.args[1] === RUST).at(-1)!.args.slice(2), ["forget", "--course"]);
 		assert.ok(!(await listed()).some((c) => c.workspace === RUST));
 		assert.ok(fs.existsSync(RUST));

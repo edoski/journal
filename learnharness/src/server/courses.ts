@@ -233,7 +233,7 @@ export async function deleteCourse(workspace: string): Promise<CourseChange> {
 	if (!forgotten.ok) return engineFailure("delete", forgotten.message);
 	stores.courseMapLedgers.forget(workspace);
 	stores.arcPassLedgers.forget(workspace);
-	emit("courses-changed", {});
+	emit("courses-changed", { deleted: workspace });
 	return { ok: true };
 }
 
