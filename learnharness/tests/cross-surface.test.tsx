@@ -136,7 +136,8 @@ async function surveyNow(app: DemoApp, label: string): Promise<Survey> {
 	for (const line of app.homeLines()) home.push({ ...line, opens: await app.lookAt(line.el) });
 	const sidebar: Survey["sidebar"] = [];
 	for (const card of app.sidebarCards()) {
-		const action = card.el.querySelector('[data-slot="row-action"]');
+		// A Sessions row is itself the press that opens its session (since the shelves went, 16 Nov 2026).
+		const action = card.el.matches('[data-testid="session-row"]') ? card.el : card.el.querySelector('[data-slot="row-action"]');
 		sidebar.push({ ...card, opens: action ? await app.lookAt(action) : null });
 	}
 
@@ -209,10 +210,13 @@ function dayClaims(s: Survey): Claims {
 		const ws = course.map.workspace;
 		const titled = [...course.map.topics].sort((a, b) => b.title.length - a.title.length);
 		// The calendar: the first day on or after today it draws the topic's review or first lesson on.
-		// A lesson he began goes on as its task's entry (the engine's `begun`), so that entry is its day too.
+		// A lesson he began goes on as its task's entry (the engine's `begun`), so that entry is its day too, and so is
+		// the entry of today's session that holds the task in its place (one piece of work, one entry): a lesson he
+		// worked on today stays today's (round 14, m2).
 		const begun = new Set(course.map.topics.filter((t) => t.startsWhy?.kind === "begun").map((t) => t.handle));
 		for (const { entry } of s.calendar) {
-			const day = entry.kind === "review" || entry.kind === "new" ? entry.topic : entry.kind === "task" && entry.topic && begun.has(entry.topic.handle) ? entry.topic : null;
+			const goesOn = (entry.kind === "task" || (entry.kind === "session" && entry.task !== null)) && entry.topic && begun.has(entry.topic.handle);
+			const day = entry.kind === "review" || entry.kind === "new" ? entry.topic : goesOn ? entry.topic : null;
 			if (day && entry.course?.workspace === ws && entry.day >= s.today) {
 				const by = claims.get(keyOf(ws, day.handle));
 				const had = by?.get("calendar");
