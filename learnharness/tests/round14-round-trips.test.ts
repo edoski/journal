@@ -18,6 +18,7 @@ const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "u
 test("the probe's last answer is saved in the reply that concludes it", () => {
 	assert.match(read("src/agent/prompts/prober/10-probe-doctrine.md"), /Save his last answer in the same reply: `course_save`, then `probe_done` after it/);
 	assert.match(read("src/agent/tools/probe.ts"), /Call it in the same reply as the course_save of his last answer/);
+	assert.match(read("src/agent/prompts/course/10-record.md"), /the probe's last save goes in the reply that calls `probe_done`, before it/, "the record's own save rule says so, since it alone read as a reply of its own (one measured run)");
 });
 
 test("the plan and the first step are one reply", () => {
