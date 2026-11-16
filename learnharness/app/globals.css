@@ -180,6 +180,16 @@
 	--text-title-3: 15px;
 	--text-title-3--line-height: calc(20 / 15);
 	--text-title-3--font-weight: 400;
+	/* The sidebar's row titles follow T3 Code's sidebar, not a macOS style
+	   (Edo, 16 Nov 2026): its thread row's title is `text-sm` at
+	   `font-medium` in full ink, `font-normal` at 75% ink on a quiet row
+	   (the T3 Code app's own bundle, `sidebar-row-card`). */
+	--text-sidebar-title: 14px;
+	--text-sidebar-title--line-height: calc(20 / 14);
+	--text-sidebar-title--font-weight: 500;
+	--text-sidebar-title-quiet: 14px;
+	--text-sidebar-title-quiet--line-height: calc(20 / 14);
+	--text-sidebar-title-quiet--font-weight: 400;
 	--text-headline: 13px;
 	--text-headline--line-height: calc(16 / 13);
 	--text-headline--font-weight: 700;
