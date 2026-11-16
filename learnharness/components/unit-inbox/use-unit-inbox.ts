@@ -100,18 +100,19 @@ const parseScope = (raw: string | null): string | null => {
 	return typeof v === "string" ? v : null;
 };
 
-/** Which shelves are folded. Every shelf starts folded, as T3 Code's do:
+/** Whether Sessions is folded. It starts folded, as T3 Code's shelves do:
  *  the list shows what to do, the rest one click away. */
 export type Folded = Readonly<Record<FoldedShelf, boolean>>;
-const FOLDED: Folded = { working: true, learning: true, known: true, other: true };
+const FOLDED: Folded = { sessions: true };
 const parseFolded = (raw: string | null): Folded => {
 	const v = json(raw);
-	return typeof v === "object" && v !== null ? { ...FOLDED, ...(v as Partial<Folded>) } : FOLDED;
+	const sessions = typeof v === "object" && v !== null ? (v as Record<string, unknown>).sessions : undefined;
+	return typeof sessions === "boolean" ? { sessions } : FOLDED;
 };
 
 /** The sidebar's topics over the session list it already holds, with the
  *  sessions started on a topic's page linked to it: the course filter
- *  (every course, or one), and the folded shelves. */
+ *  (every course, or one), and whether Sessions is folded. */
 export function useUnitInbox(chats: readonly ChatListItem[] | null) {
 	const courses = useStudyCourses();
 	const [storedScope, setScope] = useStored("lh:unit-inbox-scope", parseScope);

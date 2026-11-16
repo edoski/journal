@@ -18,7 +18,7 @@ import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { buildInbox, type Unit } from "../components/unit-inbox/units.ts";
 import { sidebarSays } from "../components/unit-inbox/sidebar-says.ts";
-import { nowFor, plannedKeys, restShelves, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
+import { nowFor, plannedKeys, restTopics, shelfStatus } from "../components/unit-inbox/now-inbox.ts";
 import { claimedKeys, todayTop } from "../components/unit-inbox/today/today-top.ts";
 import { back, CHATS, COURSES, due, LINALG, PROB, TODAY, topic } from "./fixtures/now-demo.ts";
 import { SLIP_ICON } from "../components/slip-icons.ts";
@@ -34,7 +34,7 @@ function sidebarWords(courses: readonly StudyCourse[], chats: readonly ChatListI
 	const top = todayTop(nowFor(courses, chats, null, courses[0]!.map.today), inbox, chats);
 	const said = new Map<string, { words: string; when: boolean }>();
 	for (const item of top) for (const key of claimedKeys(item)) if (!said.has(key) && item.line.slot) said.set(key, { words: item.line.slot, when: false });
-	const shelves = restShelves(inbox, new Set(said.keys()));
+	const shelves = restTopics(inbox, new Set(said.keys()));
 	for (const u of [...shelves.working, ...shelves.learning, ...shelves.known]) {
 		const status = shelfStatus(u as Unit, inbox.today, plannedKeys(courses));
 		const words = status.kind === "your-turn" ? "Your turn" : status.kind === "working" ? "Tutor writing" : ("words" in status ? status.words : undefined) ?? "";

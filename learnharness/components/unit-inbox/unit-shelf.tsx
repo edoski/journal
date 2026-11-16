@@ -12,11 +12,11 @@ import { moreWords } from "@/components/study-words";
  *  "Show more" were two names for it). */
 export const SHELF_TAIL = 10;
 
-/** One folded shelf at the sidebar's foot (spec: unit-inbox.md), T3 Code's
+/** One folded shelf at the sidebar's foot (spec: now-shelves.md), T3 Code's
  *  shelf: a 32px header with the name and a trailing chevron (no count: a
  *  bare number told him nothing, 13 Nov 2026),
- *  then its rows. A folded shelf still shows the open row, and a dot when
- *  a hidden row waits on the learner. Open, it shows its first rows, then
+ *  then its rows. A folded shelf still shows the rows it keeps (`keep`),
+ *  and a dot when a hidden row waits on the learner. Open, it shows its first rows, then
  *  "Show the rest" (`moreWords`), which shows them all. */
 export function UnitShelf<T>({
 	id,
@@ -24,7 +24,7 @@ export function UnitShelf<T>({
 	items,
 	folded,
 	onFoldedChange,
-	isActive,
+	keep,
 	waits,
 	renderItem,
 	className,
@@ -35,8 +35,9 @@ export function UnitShelf<T>({
 	items: readonly T[];
 	folded: boolean;
 	onFoldedChange: (folded: boolean) => void;
-	/** The row whose page is open, kept in view while folded. */
-	isActive: (item: T) => boolean;
+	/** A row kept in view while folded: the open page's, or one that is
+	 *  running. */
+	keep: (item: T) => boolean;
 	/** The row waits on the learner. */
 	waits: (item: T) => boolean;
 	renderItem: (item: T) => React.ReactNode;
@@ -45,8 +46,8 @@ export function UnitShelf<T>({
 	const headerId = React.useId();
 	const [whole, setWhole] = React.useState(false);
 	if (items.length === 0) return null;
-	const shown = folded ? items.filter(isActive) : whole ? items : items.slice(0, SHELF_TAIL);
-	const hidden = folded ? items.filter((i) => !isActive(i)) : [];
+	const shown = folded ? items.filter(keep) : whole ? items : items.slice(0, SHELF_TAIL);
+	const hidden = folded ? items.filter((i) => !keep(i)) : [];
 	const rest = folded ? 0 : items.length - shown.length;
 	return (
 		<li data-slot="unit-shelf" className={cn("flex list-none flex-col", className)}>

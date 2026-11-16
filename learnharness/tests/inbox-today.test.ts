@@ -2,7 +2,8 @@
  * The Inbox candidate "today" (components/unit-inbox/today/): the sidebar's
  * top is exactly Home's Today, one card per line, a session's line as the
  * session under its one title and a course's line as the topic it leads
- * with, and every other topic on exactly one shelf.
+ * with, every other topic in exactly one group, and every session not on
+ * top as its own card under Sessions.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -14,7 +15,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { lessonTitle } from "../components/study-home/agenda-rows/row-facts.ts";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { nowFor, restShelves, sessionKey } from "../components/unit-inbox/now-inbox.ts";
+import { nowFor, restSessions, restTopics, sessionKey } from "../components/unit-inbox/now-inbox.ts";
 import type { NowListProps } from "../components/unit-inbox/now-list-props.ts";
 import { TodayList } from "../components/unit-inbox/today/today-list.tsx";
 import { claimedKeys, steadyTop, itemKey, todayTop, type NowItem } from "../components/unit-inbox/today/today-top.ts";
@@ -132,15 +133,15 @@ describe("todayTop", () => {
 		);
 	});
 
-	it("puts every listed topic and every session on the top or on exactly one shelf", () => {
+	it("puts every listed topic on the top or in exactly one group, and every session once: its own card or a Sessions row", () => {
 		const { inbox, top } = topOf(COURSES);
-		const shelves = restShelves(inbox, new Set(top.flatMap(claimedKeys)));
-		const units = [...top.flatMap((i) => claimedKeys(i).filter((k) => k !== sessionKey(i.line.key))), ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.key)];
+		const onTop = new Set(top.flatMap(claimedKeys));
+		const rest = restTopics(inbox, onTop);
+		const units = [...top.flatMap((i) => claimedKeys(i).filter((k) => k !== sessionKey(i.line.key))), ...[...rest.learning, ...rest.working, ...rest.known].map((u) => u.key)];
 		assert.equal(new Set(units).size, units.length, "no topic twice");
 		for (const u of [...inbox.active, ...inbox.working, ...inbox.known]) assert.ok(units.includes(u.key), `${u.key} placed`);
-		const shown = new Set([...top, ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => ({ kind: "topic" as const, unit: u }))].flatMap((i) => (i.kind === "topic" ? i.unit.sessions.map((c) => c.id) : i.kind === "session" ? [i.chat.id] : [])));
-		for (const c of shelves.other) shown.add(c.id);
-		for (const c of CHATS) assert.ok(shown.has(c.id), `${c.id} reachable`);
+		const sessions = [...top.flatMap((i) => (i.kind === "session" ? [i.chat.id] : [])), ...restSessions(CHATS, null, onTop).map((c) => c.id)];
+		assert.deepEqual([...sessions].sort(), CHATS.map((c) => c.id).sort(), "every session once");
 	});
 
 	it("draws the engine-down list as the waiting sessions' own cards", () => {
@@ -185,7 +186,7 @@ describe("one lesson, one card", () => {
 		assert.equal(now.independence, null);
 		assert.equal("diag" in now ? now.diag : null, null);
 		const { top } = topOf([LINALG], chats);
-		const shelves = restShelves(inbox, new Set(top.flatMap(claimedKeys)));
+		const shelves = restTopics(inbox, new Set(top.flatMap(claimedKeys)));
 		assert.ok(!shelves.learning.some((u) => u.topic.handle === "eigen"), "the lesson's own topic is not a second row");
 	});
 });
@@ -196,7 +197,7 @@ describe("one review, one row", () => {
 		for (const chats of [[review], [{ ...review, pendingProblem: false, busy: true }]]) {
 			const { inbox, top } = topOf([LINALG], chats);
 			const drawn = steadyTop(topOf([LINALG], [review]).top, top, inbox, chats);
-			const shelves = restShelves(inbox, new Set(drawn.flatMap(claimedKeys)));
+			const shelves = restTopics(inbox, new Set(drawn.flatMap(claimedKeys)));
 			const rows = [...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.topic.handle);
 			assert.ok(!rows.includes("rank" as TopicHandle) && !rows.includes("independence" as TopicHandle), `no second row (${chats[0]!.busy ? "writing" : "his turn"})`);
 		}
@@ -272,7 +273,7 @@ describe("steadyTop", () => {
 });
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
-const FOLDED = { working: true, learning: true, known: true, other: true };
+const FOLDED = { sessions: true };
 
 function renderList(over: Partial<NowListProps> = {}, courses: readonly StudyCourse[] = COURSES, chats = CHATS) {
 	const props: NowListProps = {
@@ -294,7 +295,7 @@ function renderList(over: Partial<NowListProps> = {}, courses: readonly StudyCou
 }
 
 describe("TodayList", () => {
-	it("draws the demo's four cards with Home's reasons in order, then the folded shelves", () => {
+	it("draws the demo's cards with Home's reasons in order, then the folded Sessions list", () => {
 		const doc = renderList();
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
@@ -312,10 +313,10 @@ describe("TodayList", () => {
 		);
 		assert.deepEqual(
 			[...doc.querySelectorAll('[data-slot="unit-section-header"]')].map((h) => h.textContent),
-			["Learning, your turn", "On your own", "Other sessions"],
+			["Sessions, your turn"],
 		);
-		assert.ok(doc.querySelector('[data-slot="unit-shelf-attention"]'), "Learning's dot: a session from before yesterday waits");
-		assert.ok(doc.querySelector('[data-slot="unit-slim"]') === null, "every shelf folded");
+		assert.ok(doc.querySelector('[data-slot="unit-shelf-attention"]'), "the dot: a session from before yesterday waits");
+		assert.ok(doc.querySelector('[data-testid="session-row"]') === null, "Sessions folded");
 		assert.ok(doc.querySelector('[data-slot="sidebar-note"]') === null);
 	});
 
@@ -347,8 +348,8 @@ describe("TodayList", () => {
 		const down = renderList({ unavailable: true }, [], CHATS);
 		assert.equal(down.querySelectorAll('[data-slot="unit-card"]').length, 2);
 		assert.equal(down.querySelector('[data-slot="sidebar-note"]')?.textContent, "Couldn’t read your courses");
-		// A session waiting since before yesterday lights Other's dot.
-		assert.match(down.querySelector('[data-slot="unit-section-header"]')?.textContent ?? "", /^Other sessions, your turn$/);
+		// A session waiting since before yesterday lights the dot.
+		assert.match(down.querySelector('[data-slot="unit-section-header"]')?.textContent ?? "", /^Sessions, your turn$/);
 	});
 
 	it("keeps a course whose record can't be read as a card under Today's, named, that opens its course page", () => {

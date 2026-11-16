@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { NowCard } from "@/components/unit-inbox/now-card";
-import { restShelves } from "@/components/unit-inbox/now-inbox";
+import { restSessions, saidOnTop } from "@/components/unit-inbox/now-inbox";
 import type { NowListProps } from "@/components/unit-inbox/now-list-props";
-import { NowShelves } from "@/components/unit-inbox/now-shelves";
+import { SessionsShelf } from "@/components/unit-inbox/now-shelves";
 import { SidebarNote } from "@/components/unit-inbox/sidebar-note";
 import { claimedKeys, steadyTop, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
 import { courseHref } from "@/components/unit-inbox/unit-href";
@@ -24,7 +24,7 @@ function noteOf({ unavailable, courses, unreadable }: Pick<NowListProps, "unavai
  * is exactly Home's Today, one card per line in Today's order with Today's
  * reason, each drawn as the topic its line leads with (a waiting session on
  * no topic as itself, a course line on no topic as its course), then a card for each course whose record can't be
- * read; everything else folds onto the shelves at the foot.
+ * read; then one folded Sessions list, every session newest first.
  * No header and no totals on top: cards leave as the day's plan empties,
  * and a card stays in its place, at 70% with Working, while the tutor
  * writes in its session.
@@ -40,7 +40,8 @@ export function TodayList(props: NowListProps) {
 		top = steadyTop(drawn.top, fresh, inbox, chats);
 		setDrawn({ fresh, top });
 	}
-	const shelves = useMemo(() => restShelves(inbox, new Set(top.flatMap(claimedKeys))), [inbox, top]);
+	const sessions = useMemo(() => restSessions(chats, inbox.scope ?? null, new Set(top.flatMap(claimedKeys))), [chats, inbox.scope, top]);
+	const said = useMemo(() => saidOnTop(top), [top]);
 	const isOpen = (item: NowItem) => {
 		if (item.kind === "topic") return isUnitOpen(item.unit, pathname);
 		if (item.kind === "session") return pathname === `/chat/${item.chat.id}`;
@@ -58,7 +59,7 @@ export function TodayList(props: NowListProps) {
 				<UnreadableCard key={course.workspace} course={course} active={pathname === courseHref(course.workspace)} />
 			))}
 			{note && <SidebarNote>{note}</SidebarNote>}
-			<NowShelves shelves={shelves} {...props} />
+			<SessionsShelf sessions={sessions} said={said} {...props} />
 		</>
 	);
 }
