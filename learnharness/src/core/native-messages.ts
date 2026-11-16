@@ -996,9 +996,13 @@ export function sessionSavesOf(messages: readonly LhMessage[]): Record<string, u
 }
 
 /** The engine tasks a session holds: each task key its saves that went
- *  through last wrote as open (a task patch, or the `focus`), or that the
- *  lesson it picked up held, and never removed after (a `null` entry). Which of them the engine still has open,
- *  and at which step, is the engine's to say. Pure. */
+ *  through last wrote as open (a task patch), or that the lesson it picked
+ *  up held, and never removed after (a `null` entry). Never the `focus`:
+ *  it is the course's pointer, and a close that ends its own task moves it
+ *  to another session's work (round 12, 1 D1: the Eigen lesson's Done for
+ *  today then held Problem sheet 4, so Continue on the sheet opened it).
+ *  Which of them the engine still has open, and at which step, is the
+ *  engine's to say. Pure. */
 export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
 	const clean = cleanToolCallIds(messages);
 	const held = new Map<string, boolean>();
@@ -1014,7 +1018,6 @@ export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
 			if (typeof changes.tasks === "object" && changes.tasks !== null) {
 				for (const [key, patch] of Object.entries(changes.tasks)) held.set(key, patch !== null);
 			}
-			if (typeof changes.focus === "string") held.set(changes.focus, true);
 		}
 	}
 	return [...held].filter(([, open]) => open).map(([key]) => key);
