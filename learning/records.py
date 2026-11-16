@@ -17,6 +17,8 @@ of ``resume`` dropping entries later.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime, timezone
+import os
 from typing import Any
 
 from learning import arcs, capacity, clock, packing, preferences, progress
@@ -27,6 +29,8 @@ from learning.workspace import Workspace
 # Half of resume's knowledge budget: every pinned entry loads, with room left for
 # the knowledge of the topics in play.
 PINNED_BYTES = 1536
+# A deleted course's kept record is named for the UTC instant it was deleted.
+FORGOTTEN_NAME = "%Y%m%dT%H%M%S%fZ"
 
 
 def _readable(workspace: Workspace, stored: dict[str, Any] | None) -> dict[str, Any]:
@@ -66,6 +70,27 @@ def read(workspace: Workspace) -> dict[str, Any]:
     return _readable(workspace, storage.load(workspace.record))
 
 
+def history() -> dict[str, dict[str, Any]]:
+    """Every deleted course's record (``forget --course``), by its kept file,
+    each with the instant it was deleted (``capacity.FORGOTTEN``). Deleting a
+    course is not study: the study he did in it stays his, so his pace and
+    the days he was told keep it up to that instant, and from then on it holds
+    nothing in the plan (round 13, 4 M1: deleting Calculus I took 38 days of
+    study out of his pace, and 35 days he was told moved in the other three
+    courses). A kept record that cannot be read is left out."""
+    found: dict[str, dict[str, Any]] = {}
+    for item in workspaces.registered():
+        for path in sorted(item.forgotten.glob("*.json")):
+            try:
+                record = _readable(item, storage.load(path))
+                at = datetime.strptime(path.stem, FORGOTTEN_NAME)
+            except (ValueError, OSError):
+                continue
+            stamp = at.replace(tzinfo=timezone.utc).isoformat()
+            found[str(path)] = {**record, capacity.FORGOTTEN: stamp}
+    return found
+
+
 def courses(workspace: Workspace | None) -> list[Workspace]:
     """Registered workspaces with a course, plus the selected one, by directory.
 
@@ -84,10 +109,10 @@ def courses(workspace: Workspace | None) -> list[Workspace]:
 
 
 def _others(workspace: Workspace) -> dict[str, dict[str, Any]]:
-    """Every other course's stored record that can be read, by directory: his
-    pace is learned from all of them, and a nearer exam's final review comes
-    first."""
-    others = {}
+    """Every other course's stored record that can be read, by directory, and
+    every deleted course's (``history``): his pace is learned from all of
+    them, and a nearer exam's final review comes first."""
+    others = history()
     for other in courses(workspace):
         if other.directory == workspace.directory:
             continue
@@ -296,7 +321,10 @@ def forget(
             )
         with storage.lock(storage.lock_path(workspace.record)):
             existed = workspace.record.is_file()
-            workspace.record.unlink(missing_ok=True)
+            if existed:
+                workspace.forgotten.mkdir(exist_ok=True)
+                kept = clock.now().strftime(FORGOTTEN_NAME)
+                os.replace(workspace.record, workspace.forgotten / f"{kept}.json")
         return {"removed": ["course"] if existed else [], "revision": 0}
     if not handles:
         raise ValueError("forget needs handles, --lesson UUID or --course")

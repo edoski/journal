@@ -128,6 +128,10 @@ export interface TopicFacts {
 	 *  its first lesson and, when it waits behind other courses' new
 	 *  topics, which (`startsAfterWords`); null otherwise. */
 	starts: { day: string; waits: string | null } | null;
+	/** For a topic not started, what the exam ahead means for it
+	 *  (`examWords`): it leaves it out, or its plan has no room to start
+	 *  it; null otherwise. */
+	exam: string | null;
 	/** Why the plan starts a topic not started then ("After Expectation
 	 *  and linearity, which it needs", "Early, ahead of its place, while
 	 *  earlier topics wait on Change of basis"), or for a topic the exam leaves out ("Not on
@@ -426,6 +430,7 @@ export function topicFacts({
 		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam, map.today) : null) ?? waitsWords(topic, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
+		exam: topic.level === "new" ? examWords(topic, map) : null,
 		action: topicAction(topic, map, chats),
 		pickups,
 		tasks: heldTasks(topic, map),

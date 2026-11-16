@@ -247,9 +247,12 @@ def plan(
             loaded.append(_load(workspace))
     readable = capacity.final_reviews(
         {
-            str(target.directory): record
-            for target, record, _ in loaded
-            if record is not None
+            **records.history(),
+            **{
+                str(target.directory): record
+                for target, record, _ in loaded
+                if record is not None
+            },
         },
         today,
     )
@@ -259,8 +262,8 @@ def plan(
     ]
     ahead = [
         left
-        for record in readable.values()
-        if (left := _days_left(record, today)) is not None
+        for _, record, _ in loaded
+        if record is not None and (left := _days_left(record, today)) is not None
     ]
     near = any(0 <= left <= progress.RUNUP_DAYS for left in ahead)
     shown = max(days, progress.RUNUP_DAYS) if near else days

@@ -185,6 +185,21 @@ describe("the topic page", () => {
 		assert.deepEqual(facts.startsWhy, { kind: "after", words: "Not on the exam; after it" });
 		assert.equal(pickupSections(facts).now.why, facts.startsWhy);
 	});
+
+	it("gives a start the exam leaves out, or has no room for, the head's and calendar's exam words in Now's note (round 13, 1 N1)", () => {
+		// Covariance: not on the exam, planned after it, and waiting behind other courses' new topics too; the exam is why.
+		const covariance = { ...LINALG.map.topics.find((t) => t.handle === "diag")!, starts: "2026-11-24", startsAfter: ["Real Analysis"] };
+		const left = { ...LINALG.map, exam: { date: "2026-11-19", daysLeft: 11, leavesOut: h("diag") }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? covariance : t)) };
+		const leftFacts = topicFacts({ course: { ...LINALG, map: left }, topic: covariance, chats: [], read: null });
+		assert.equal(pickupSections(leftFacts).now.note, "Planned Tue 24 Nov · Not on the exam; after it");
+		// Geometric: on the exam, and no room before it to start.
+		const geometric = { ...covariance, startsAfter: undefined, starts: "2026-11-28" };
+		const full = { ...LINALG.map, exam: { date: "2026-11-19", daysLeft: 11, doesNotFit: h("diag"), reasons: { diag: "full" as const } }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? geometric : t)) };
+		const fullFacts = topicFacts({ course: { ...LINALG, map: full }, topic: geometric, chats: [], read: null });
+		const doc = render(<SectionsPane facts={fullFacts} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
+		assert.equal(doc.querySelector('[data-slot="pickup-now-note"]')?.textContent, "Planned Sat 28 Nov · Not before the exam, every study day is full at your pace");
+		assert.ok(doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]') === null, "still no reason line under Now (round 12, 3 n9)");
+	});
 });
 
 describe("search", () => {

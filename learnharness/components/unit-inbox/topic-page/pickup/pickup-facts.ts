@@ -64,7 +64,10 @@ export interface PickupSections {
 }
 
 /** When the plan starts a topic not started, as Now's note: "Planned
- *  today", "Planned Wed 11 Nov", then which courses' new topics come first
+ *  today", "Planned Wed 11 Nov", then what the exam ahead means for it,
+ *  as the head and the calendar say it ("Planned Sat 28 Nov · Not before
+ *  the exam, every study day is full at your pace", "Planned Tue 24 Nov ·
+ *  Not on the exam; after it"), else which courses' new topics come first
  *  when it waits behind them (`startsAfterWords`); for a topic the course
  *  leaves out, which the plan never starts, the reason it is left out;
  *  null when the plan has no day for it. */
@@ -73,6 +76,9 @@ export function plannedWords(facts: TopicFacts): string | null {
 	// The plan starts no topic the course leaves out; its reason says why (round 5: Covariance read as ordinary work).
 	if (!starts) return excluded ?? null;
 	const day = starts <= facts.today ? "Planned today" : `Planned ${dayOf(starts)}`;
+	// The exam is why it comes when it does, whatever else it waits behind (round 13, 1 N1: Geometric read only
+	// "Planned Sat 28 Nov" while the head said no room before the exam to start it).
+	if (facts.exam) return `${day} · ${facts.exam}`;
 	const after = startsAfterWords(startsAfter);
 	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
 }

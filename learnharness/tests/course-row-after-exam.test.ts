@@ -39,4 +39,11 @@ describe("a start with no room before the exam (1 m11)", () => {
 		assert.match(geometric.fact?.words ?? "", /Planned .*29 Nov/);
 		assert.equal(rows.find((r) => r.topic.handle === "covariance")!.factWords, "Planned 1 Dec", "a topic the exam does not leave out keeps its day");
 	});
+
+	it("reads After the exam for the topic he is at too, never You are here (round 13, 1 n2)", () => {
+		const here = { ...course, map: { ...course.map, current: h("geometric") } };
+		const geometric = courseGroups(here).flatMap((g) => g.topics).find((r) => r.topic.handle === "geometric")!;
+		assert.equal(geometric.factWords, "After the exam");
+		assert.match(geometric.fact?.words ?? "", /Planned .*29 Nov/);
+	});
 });
