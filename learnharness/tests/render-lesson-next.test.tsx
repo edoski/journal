@@ -104,7 +104,7 @@ describe("agent chrome out of the lesson", () => {
 	it("a running tool is one muted activity line with no arguments", () => {
 		const document = documentFor(<LiveToolCard part={part({ type: "tool-Read", state: "input-streaming", toolCallId: "t", input: { file_path: "secret/notes.md" } })} />);
 		const line = document.querySelector('[data-slot="activity-line"]')!;
-		assert.equal(line.textContent, "Reading a file…");
+		assert.equal(line.textContent, "Thinking…");
 		assert.doesNotMatch(document.body.textContent!, /secret\/notes\.md/);
 	});
 

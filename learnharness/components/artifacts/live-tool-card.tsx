@@ -11,9 +11,10 @@ import { ActivityLine } from "@/components/lesson/activity-line";
  * input-available to tool_execution_end), so this line IS the working
  * state: one muted activity line, no arguments, no input to open. The
  * moment the call settles, the part re-renders through the artifact
- * registry.
+ * registry. `idle` is the turn's own working line (`workingLine`), which a
+ * tool whose work he will not see shows instead of its own name.
  */
-export function LiveToolCard({ part }: ArtifactPartProps) {
+export function LiveToolCard({ part, idle }: ArtifactPartProps & { idle?: string }) {
 	const tool = part.type.replace(/^tool-/, "");
-	return <ActivityLine testId="live-tool-card" label={toolActivityLabel(tool)} />;
+	return <ActivityLine testId="live-tool-card" label={toolActivityLabel(tool, idle)} />;
 }

@@ -139,10 +139,20 @@ const predictCheckType = Type.Union([Type.Literal("predict"), Type.Literal("chec
 // on submit, and is restated in the answer result the model grades against;
 // the client never grades free text).
 
+/** The ask's own rule where the question is written (round 11: 11 refusals
+ *  of a reason asked as a second ask, "…, and why does each factor of your
+ *  expression belong there?"). Said in its positive form only: the
+ *  counterexample the voice gave was the very ask drafts kept writing.
+ *  voice-check's `compoundAsk` holds the example to it. */
+export const ONE_ASK_RULE =
+	"It asks one thing. His reason is asked by ending that one ask with \", and why?\" " +
+	"(\"What is the probability that exactly one of 12 bulbs fails, and why?\"), which covers each factor of a formula too; " +
+	"the question ends there.";
+
 export const explainInputBase = Type.Object({
 	question: Type.String({
 		description:
-			"The single question to ask. ONE question per turn: ask, then end your turn — the answer determines the next.",
+			`The single question to ask. ${ONE_ASK_RULE} ONE question per turn: ask, then end your turn — the answer determines the next.`,
 	}),
 	correctAnswer: Type.String({
 		description:

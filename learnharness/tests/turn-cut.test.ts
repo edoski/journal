@@ -94,3 +94,19 @@ test("a stop after the tutor had marked his work or shown a model solution reads
 	const posed = { id: "a10", role: "assistant", content: [{ type: "toolCall", id: "p10", name: "problem", arguments: { statement: "Find the rank of A." } }], stopReason: "toolUse", timestamp: 6 } as unknown as LhMessage;
 	assert.equal(replyCutOf([reply, message, posed, stoppedEmpty]), "stopped-mid");
 });
+
+test("a concluded probe owes no continuation: its hand-off starts the teacher's run", () => {
+	// Round 11, report 2 step 32: the probe ended with send_to_user and
+	// probe_done; before the hand-off's wake ran, the lesson's sync asked
+	// for the owed continuation, and a stray turn ran on "Continue from
+	// where you stopped." (9 s, "Please type out part (d)") ahead of the plan.
+	const done = { id: "a5", role: "assistant", stopReason: "toolUse", timestamp: 6, content: [
+		{ type: "toolCall", id: "s1", name: "send_to_user", arguments: { message: "The matrix $A$ takes vectors with 5 entries." } },
+		{ type: "toolCall", id: "p1", name: "probe_done", arguments: { assessment: { summary: "Part (c) done." } } },
+	] } as unknown as LhMessage;
+	const sent = { id: "r5", role: "toolResult", toolCallId: "s1", toolName: "send_to_user", isError: false, timestamp: 7, content: [{ type: "text", text: "Message received for display." }] } as unknown as LhMessage;
+	const recorded = { id: "r6", role: "toolResult", toolCallId: "p1", toolName: "probe_done", isError: false, timestamp: 7, content: [{ type: "text", text: "Assessment recorded." }], details: { ok: true } } as unknown as LhMessage;
+	assert.equal(needsContinuation([ask, answer, courseNote, done, sent, recorded]), false);
+	const refused = { ...recorded, id: "r7", isError: true, details: { ok: false } } as unknown as LhMessage;
+	assert.equal(needsContinuation([ask, answer, courseNote, done, sent, refused]), true, "a refused probe_done still owes its retry");
+});

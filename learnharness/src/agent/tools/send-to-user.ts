@@ -2,12 +2,22 @@ import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { SEND_TO_USER_TOOL } from "../../core/native-messages.ts";
 import { serverExecute } from "../tool-execute.ts";
+import { SENTENCE_WORDS } from "../../core/voice-check.ts";
+
+/** The voice rules a first draft broke most often, stated where the draft is
+ *  written (round 11: 22 refusals for a sentence opening on a formula or a
+ *  turn past its budget, each one more model round trip); voice-check holds
+ *  both examples and the count to them. */
+export const MESSAGE_DRAFT_RULES =
+	"Every sentence opens with a word, never a symbol or a formula (\"The matrix $A$ takes vectors with 5 entries.\", " +
+	"never \"$A$ takes vectors with 5 entries.\"). Its length is the voice's budget for this kind of turn, counted as he reads it: " +
+	`a clause after a colon or a semicolon is one more sentence, and a sentence over ${SENTENCE_WORDS} words is two.`;
 
 const sendToUserInput = Type.Object({
 	message: Type.String({
 		minLength: 1,
 		pattern: "\\S",
-		description: "The complete content to display to the learner. Markdown and LaTeX are supported.",
+		description: `The complete content to display to the learner. Markdown and LaTeX are supported. ${MESSAGE_DRAFT_RULES}`,
 	}),
 });
 

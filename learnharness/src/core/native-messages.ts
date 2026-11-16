@@ -1430,9 +1430,10 @@ export function needsContinuation(record: readonly LhMessage[]): boolean {
 	);
 	if (posedProblem) return false;
 	// A mode handoff ends its turn the same way: its wake starts the next
-	// agent's run, so a continuation here would run that agent twice.
+	// agent's run, so a continuation here would run that agent twice. A
+	// concluded probe is the same seam: its hand-off starts the teacher.
 	const handedOff = results.some(
-		(m) => MODE_HANDOFF_TOOLS[m.toolName] !== undefined && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true,
+		(m) => (MODE_HANDOFF_TOOLS[m.toolName] !== undefined || m.toolName === "probe_done") && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true,
 	);
 	if (handedOff) return false;
 	const answered = new Set(results.map((m) => m.toolCallId));
