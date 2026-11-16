@@ -1,4 +1,4 @@
-import { courseLabel, type ChatListItem } from "@/src/core";
+import { courseLabel, type ChatListItem, type StudyCourse } from "@/src/core";
 import { localDay } from "@/components/day-change";
 
 /**
@@ -10,20 +10,27 @@ import { localDay } from "@/components/day-change";
  * on him. Round 4 found a 40-minute lesson missing because it ended with
  * Done for today. A session he only opened, with no answer and nothing he
  * wrote after its opening, is not study (`studied`; round 10, 1 m2: a
- * plan question and Problem sheet 4's opening were listed). Each is named as the sidebar names it, by its title;
- * a title another session shares ("Review") carries its course too
- * ("Review in Linear Algebra"), the way the sidebar's row carries its
- * course's mark. Pure.
+ * plan question and Problem sheet 4's opening were listed). Each is named as the sidebar names it, by its title,
+ * or by the title of the open task it holds (`courses`' tasks), and each
+ * name once, so two sessions of one lesson read as one (round 11, 1 N9:
+ * "Eigenvalues and eigenvectors, Eigenvalues lesson: eigenvectors step");
+ * a title a session in another course shares ("Review") carries its
+ * course too ("Review in Linear Algebra"), the way the sidebar's row
+ * carries its course's mark. Pure.
  */
-export function doneToday(chats: readonly ChatListItem[], now: Date): string[] {
+export function doneToday(chats: readonly ChatListItem[], now: Date, courses: readonly StudyCourse[] = []): string[] {
 	const today = localDay(now);
-	const name = (chat: ChatListItem) => chat.title.trim().toLowerCase();
-	const shared = new Map<string, number>();
-	for (const chat of chats) shared.set(name(chat), (shared.get(name(chat)) ?? 0) + 1);
-	return chats
+	const tasks = new Map(courses.flatMap((course) => course.map.tasks.map((task) => [`${course.map.workspace}#${task.key}`, task.title] as const)));
+	// A session holding an open task is named by it, so two sessions of one lesson read as one (round 11, 1 N9).
+	const title = (chat: ChatListItem) => (chat.tasks ?? []).map((key) => tasks.get(`${chat.course?.workspace}#${key}`)).find((t) => t !== undefined) ?? chat.title;
+	const name = (chat: ChatListItem) => title(chat).trim().toLowerCase();
+	const shared = new Map<string, Set<string>>();
+	for (const chat of chats) shared.set(name(chat), (shared.get(name(chat)) ?? new Set()).add(chat.course?.workspace ?? ""));
+	const named = chats
 		.filter((chat) => chat.studied === true && localDay(new Date(chat.updatedAt)) === today)
 		.sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0))
-		.map((chat) => (shared.get(name(chat))! > 1 && chat.course ? `${chat.title} in ${courseLabel(chat.course)}` : chat.title));
+		.map((chat) => (shared.get(name(chat))!.size > 1 && chat.course ? `${title(chat)} in ${courseLabel(chat.course)}` : title(chat)));
+	return [...new Set(named)];
 }
 
 /** The part of the learner's day an hour falls in, in words: "this

@@ -20,6 +20,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { foldLines } from "../components/study-home/agenda-rows/row-facts.ts";
 import { todayRows } from "../components/study-home/study-facts.ts";
+import { doneToday } from "../components/study-home/day-record.ts";
 import type { ChatListItem, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { LA, chat, map, topic } from "./fixtures/round8-home.ts";
 
@@ -94,5 +95,15 @@ describe("the lesson he is in stays on Today (3 n5)", () => {
 		assert.ok(shown.some((row) => row.kind === "session" && row.chat.id === "inv"), "the lesson he is in has its own line");
 		assert.ok(also.every((row) => row.kind !== "session" || row.chat.id !== "inv"));
 		assert.ok(also.some((row) => row.kind === "session" && row.chat.id === "sheet"), "a lesson left on an earlier day still folds after the plan");
+	});
+});
+
+describe("Studied today names a lesson once (1 N9)", () => {
+	it("names two sessions of one lesson's task once, by the task's title", () => {
+		const TASK = { key: "eigen-lesson", title: "Eigenvalues lesson: eigenvectors step", step: null, updated: TODAY };
+		const course: StudyCourse = { map: map({ today: TODAY, topics: [EIGEN], tasks: [TASK] }), unready: null, due: [], newToday: [], lastActiveDaysAgo: 0 };
+		const first = chat({ id: "first", title: "Eigenvalues and eigenvectors", studied: true, tasks: [TASK.key], ended: "left", updatedAt: at(9), course: LA });
+		const second = chat({ id: "second", title: "Eigenvalues lesson: eigenvectors step", studied: true, tasks: [TASK.key], ended: "closed", updatedAt: at(10), course: LA });
+		assert.deepEqual(doneToday([second, first], new Date(2026, 10, 8, 11), [course]), ["Eigenvalues lesson: eigenvectors step"]);
 	});
 });

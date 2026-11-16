@@ -115,7 +115,7 @@ function HomeBody({
 						lessons: rows.map(lessonOf),
 						courses: todayCourses(rows, state.courses),
 						chats: state.chats,
-						done: doneToday(state.chats, new Date()),
+						done: doneToday(state.chats, new Date(), state.courses),
 						exam: nearExam(state.courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
 						busy,
 						onContinue: (workspace, step) => {
