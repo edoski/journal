@@ -4,7 +4,7 @@ import { reviewAsked, type ChatListItem, type TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
 import { pausedWords } from "@/components/nav/session-state";
-import { FIRST_LESSON, TUTOR_WRITING, overdueWords, reviewWords, startsAfterWords } from "@/components/study-words";
+import { FIRST_LESSON, TUTOR_WRITING, overdueWords, startsAfterWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -82,11 +82,14 @@ export function plannedWords(facts: TopicFacts): string | null {
  *  "Nothing planned today" beside the sidebar's "Due since 13 Nov"). */
 export const NOTHING_DUE = "Nothing due";
 
-/** Since when a review the plan holds past the day memory asked for it
- *  is due ("Due since 6 Nov", "Due today"); null for any other. */
+/** Now's words on a review memory asked for already that the plan holds
+ *  for a later day: nothing today, since Scheduled gives the plan's day and
+ *  the head memory's ("Due since 10 Nov, back 20 Nov"), never "Due today"
+ *  beside "Review Mon 9 Nov" (round 12, 1 m1 and 2 n1). */
+export const NOTHING_TODAY = "Nothing today";
+
 function heldPastDue(review: TopicFacts["topic"]["review"], today: string): string | null {
-	if (review?.kind !== "scheduled" || !review.held || !reviewAsked(review, today)) return null;
-	return review.held.since < today ? reviewWords(review, today) : overdueWords(0, today);
+	return review?.kind === "scheduled" && review.held && reviewAsked(review, today) ? NOTHING_TODAY : null;
 }
 
 /** A session's one name, as Home's line names it: the title of the open
