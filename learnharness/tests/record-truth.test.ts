@@ -54,11 +54,13 @@ function savingCourse(messages: LhMessage[]) {
 	const ctx: CourseToolContext = {
 		course: { workspace: "/study/la", title: "Linear Algebra" },
 		records: {
-			run: async (_w, verb) => {
+			run: async (_w: string, verb: { verb: string; changes?: unknown }) => {
 				if (verb.verb === "save") saves.push(verb.changes as never);
 				return { ok: true, json: { observations: ["o41"], saved: ["o41"], notes: [] } };
 			},
-		} as CourseToolContext["records"],
+			// Eigen is taught, so a probe's answer on it counts (round 11, 3 N1).
+			map: async () => ({ ok: true, map: { topics: [{ handle: "eigen", introduced: "2026-11-01" }] } }),
+		} as unknown as CourseToolContext["records"],
 		arcs: false,
 		answers: answeredQuestionsOf(messages),
 		remarkable: remarkableOf(messages),
