@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ArcHandle, CourseMap, CourseMapArc, CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/index.ts";
 import { layoutArcRegions } from "../components/course-map/topic-map/arcs/arc-layout.ts";
-import { layoutBands } from "../components/course-map/topic-map/bands/bands-layout.ts";
+import { layoutBands, ruleStretches } from "../components/course-map/topic-map/bands/bands-layout.ts";
 import { drawingOf } from "../components/course-map/topic-map/map-skin.ts";
 import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin.ts";
 import { REGIONS_SKIN } from "../components/course-map/topic-map/regions/regions-skin.ts";
@@ -104,6 +104,29 @@ describe("arc bands", () => {
 
 	it("keeps every card right of the margin, where the arcs are named", () => {
 		for (const at of drawn.layout.topics.values()) assert.ok(at.x >= drawn.margin);
+	});
+
+	it("stops every chapter's rule short of each line crossing it, and runs no line along a rule (Edo, 16 Nov 2026)", () => {
+		for (const band of drawn.bands.slice(1)) {
+			const rule = ruleStretches(0, drawn.layout.width, band.crossings);
+			for (const route of drawn.layout.routes) {
+				route.points.slice(1).forEach(([x, y], k) => {
+					const [x0, y0] = route.points[k]!;
+					if (y0 === y) assert.ok(Math.abs(y - band.top) >= 16, `${route.prerequisite}>${route.topic} runs clear of ${band.arc.handle}'s rule`);
+					else if (Math.min(y0, y) < band.top && Math.max(y0, y) > band.top)
+						assert.ok(rule.every(([from, to]) => x < from - 8 || x > to + 8), `${band.arc.handle}'s rule stops short of ${route.prerequisite}>${route.topic}`);
+				});
+			}
+		}
+	});
+
+	it("draws only the needs inside a chapter and from the chapter just before", () => {
+		const order = new Map(ARCS.map((x, i) => [x.handle, i]));
+		for (const route of drawn.layout.routes.filter((r) => r.points.length > 0)) {
+			const step = order.get(arcOf.get(route.topic)!)! - order.get(arcOf.get(route.prerequisite)!)!;
+			assert.ok(step <= 1, `${route.prerequisite}>${route.topic} spans ${step} chapters`);
+		}
+		assert.ok(drawn.layout.routes.some((r) => r.points.length === 0 && order.get(arcOf.get(r.topic)!)! - order.get(arcOf.get(r.prerequisite)!)! > 1), "the fixture has a need from further back");
 	});
 
 	it("draws no band when a need runs from a later arc to an earlier one", () => {

@@ -31,6 +31,23 @@ export interface Band {
 	bottom: number;
 	topics: readonly TopicHandle[];
 	here: boolean;
+	/** Where lines cross the rule at its top, left to right: the rule stops short of each (`RULE_CLEAR`). */
+	crossings: readonly number[];
+}
+
+/** How far a chapter's rule stops short of a line crossing it, on each side. */
+export const RULE_CLEAR = 12;
+
+/** The rule over a chapter as the stretches left between the lines crossing it, from `from` to `to`. Pure. */
+export function ruleStretches(from: number, to: number, crossings: readonly number[]): Array<[number, number]> {
+	const out: Array<[number, number]> = [];
+	let at = from;
+	for (const x of [...crossings].sort((a, b) => a - b)) {
+		if (x - RULE_CLEAR > at) out.push([at, x - RULE_CLEAR]);
+		at = Math.max(at, x + RULE_CLEAR);
+	}
+	if (to > at) out.push([at, to]);
+	return out;
 }
 
 /**
@@ -45,7 +62,10 @@ export function layoutBands(topics: readonly CourseMapTopic[], edges: readonly C
 	const arcOf = arcsOfTopics(topics, edges, shown.arcs);
 	const order = new Map<ArcHandle, number>(shown.arcs.map((a, i) => [a.handle, i]));
 	if (needs.some((n) => order.get(arcOf.get(n.prerequisite)!)! > order.get(arcOf.get(n.topic)!)!)) return null;
-	const drawn = transitiveReduction(needs);
+	// Only needs inside a chapter and from the chapter just before are drawn (Edo, 16 Nov 2026: long lines through
+	// the chapters "just looks weird"); a need from further back lights with its topic in focus.
+	const step = (n: Need) => order.get(arcOf.get(n.topic)!)! - order.get(arcOf.get(n.prerequisite)!)!;
+	const drawn = transitiveReduction(needs).filter((n) => step(n) <= 1);
 	const depthIn = new Map<TopicHandle, number>();
 	const local = (t: TopicHandle): number => {
 		const known = depthIn.get(t);
@@ -77,6 +97,12 @@ export function layoutBands(topics: readonly CourseMapTopic[], edges: readonly C
 	const height = drawing.height;
 	// A chapter starts at the hairline over its first layer, so the room above its cards is its own.
 	const tops = shown.arcs.map((_, i) => drawing.layerTops[firstLayer[i]!]! - BAND_HEAD);
+	/** Where the drawn lines cross a height: their vertical runs over it. */
+	const crossingsAt = (y: number) =>
+		routes.flatMap((r) => r.points.slice(1).flatMap(([x, y1], k) => {
+			const [x0, y0] = r.points[k]!;
+			return x0 === x && Math.min(y0, y1) < y && Math.max(y0, y1) > y ? [x] : [];
+		}));
 	const bands: Band[] = shown.arcs.map((arc, i) => ({
 		arc,
 		number: i + 1,
@@ -84,6 +110,7 @@ export function layoutBands(topics: readonly CourseMapTopic[], edges: readonly C
 		bottom: i + 1 < tops.length ? tops[i + 1]! : height,
 		topics: topics.filter((t) => arcOf.get(t.handle) === arc.handle).map((t) => t.handle),
 		here: arc.handle === shown.current,
+		crossings: [...new Set(crossingsAt(tops[i]!))],
 	}));
 	return { layout: { node: CANVAS_NODE, width: drawing.width + margin, height, topics: placed, routes, layers: drawing.layers as TopicHandle[][] }, bands, margin };
 }
