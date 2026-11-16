@@ -213,34 +213,6 @@ function namedQuestions(
 	return { observations, questions, refused };
 }
 
-/** A probe's answers ruled by what the record holds taught (round 11, 3
- *  N1: the Poisson probe's limit question, answered "1" before Poisson was
- *  taught, was saved on Poisson as Sure, but wrong and started the topic).
- *  A prediction never counts, never starts a topic and never writes a
- *  mistake (Edo), so an answer to the probe's question on topics the record
- *  has never seen taught is saved as a prediction; one on taught topics as
- *  well keeps only those. A topic this save marks taught counts as taught.
- *  The record is read only for a save that names a probe answer. */
-async function probeAnswersRuled(ctx: CourseToolContext, patch: Record<string, unknown>, observations: unknown[], questions: readonly (string | null)[], answers: ReadonlyMap<string, AnsweredQuestion>): Promise<unknown[]> {
-	const probed = observations.map((o, i) => {
-		const answer = questions[i] ? answers.get(questions[i]!) : undefined;
-		return isObject(o) && answer?.probe === true && o.predicted !== true && recordsAnAnswer(o) && Array.isArray(o.topics);
-	});
-	if (!probed.includes(true)) return observations;
-	const mapped = await ctx.records.map(ctx.course.workspace);
-	if (!mapped.ok) return observations;
-	const taughtHere = isObject(patch.topics) ? Object.entries(patch.topics).filter(([, t]) => isObject(t) && t.introduced === true).map(([h]) => h) : [];
-	const taught = new Set([...mapped.map.topics.filter((t) => t.introduced !== null).map((t) => t.handle as string), ...taughtHere]);
-	return observations.map((o, i) => {
-		if (!probed[i]) return o;
-		const obs = o as Record<string, unknown>;
-		const topics = (obs.topics as unknown[]).filter((t): t is string => typeof t === "string");
-		const kept = topics.filter((t) => taught.has(t));
-		if (kept.length === topics.length) return obs;
-		return kept.length === 0 ? { ...obs, predicted: true } : { ...obs, topics: kept };
-	});
-}
-
 /** Why a re-mark the tutor makes unasked is refused: it brings another
  *  response than the attempt it corrects, so it is a new answer saved over
  *  an old mark (round 11, 2 n4: his new answer on the eigen-equation raised
@@ -315,8 +287,7 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	if (named.refused) return { ok: false, kind: "validation", message: named.refused };
 	const newAnswer = await remarkWithNewAnswer(ctx, named.observations);
 	if (newAnswer) return { ok: false, kind: "validation", message: newAnswer };
-	const probed = problem ? named.observations : await probeAnswersRuled(ctx, patch, named.observations, named.questions, answers);
-	const ruled = withShownHelp(probed, (_o, i) => {
+	const ruled = withShownHelp(named.observations, (_o, i) => {
 		const question = named.questions[i];
 		return question ? answers.get(question)?.seenBefore === true : problem?.seen === true;
 	});

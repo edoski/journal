@@ -35,7 +35,7 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { normalizeQuestionType } from "../core/question-core.ts";
+import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
@@ -85,6 +85,11 @@ const GUESS_ASK = /\b(?:let me|i(?:'ll| will| want to| wanna|'d like to| would l
  *  "What's your guess?", "Make a prediction". Never words about a guess
  *  he already made ("your guess fails there"). */
 const GUESS_INVITE = /\b(?:go ahead(?:,| and)?\s+guess|guess (?:first|away)|(?:take|make|have) a (?:quick |first )?guess|what(?:'s| is| would be) your (?:best )?guess|what would you guess|(?:make|give) (?:me )?(?:a|your) prediction)\b/i;
+
+/** A question's words asking for his guess, as his box does ("Your
+ *  prediction, and why"): "What do you expect…", "Guess…", "Before
+ *  computing anything…". */
+const ASKS_A_GUESS = /\b(?:guess(?:es|ing)?|expect(?:s|ed|ing)?|predict(?:s|ion)?|hunch|bet|intuition|instinct|suspect)\b|\bwhat do you (?:think|imagine)\b|\bbefore (?:computing|calculating|working|checking|trying|we|you)\b/i;
 
 /** Words in his answer that say he is not sure of it or of its reason. */
 const DOUBT = /\b(?:not sure|unsure|no idea|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
@@ -196,7 +201,7 @@ const KIND_WORDS: Readonly<Record<TurnKind, string>> = {
 /** The rules a rewrite is still read against after its call was refused
  *  once: a question asks one thing, so no rewrite passes by asking two
  *  (round 7: a rewrite that fixed advice added a second question). */
-const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict", "guess"]);
+const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict", "guess", "predict"]);
 
 const SAVE_TOOL = "course_save";
 
@@ -436,6 +441,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
+		case "predict":
+			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "review-lesson":
@@ -853,7 +860,7 @@ export class VoiceGuard {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -1022,6 +1029,19 @@ export class VoiceGuard {
 		if (this.input.guess) return [{ rule: "guess", excerpt: `he wrote "${this.input.guess}"` }];
 		const invited = [...this.toldNow, text].map((t) => GUESS_INVITE.exec(t)?.[0]).find(Boolean);
 		return invited ? [{ rule: "guess", excerpt: invited }] : [];
+	}
+
+	/** A lesson question typed a prediction whose words never ask for his
+	 *  guess: his box says "Your prediction, and why", and his worked answer
+	 *  would be kept as "Prediction, not counted" (round 14, M3: "For the
+	 *  hour to average 3 calls whatever n we pick, what should p be, and
+	 *  why?" and "If you tried to build a map that undoes C, what would go
+	 *  wrong?" were predictions, and his derivations never counted). A guess
+	 *  invited in this turn's message is asked for. */
+	private predictUnworded(call: ToolCall, text: string): VoiceBreak[] {
+		if (call.name !== "explain" || normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) !== "predict") return [];
+		if ([...this.toldNow, text].some((t) => ASKS_A_GUESS.test(t) || GUESS_INVITE.test(t)) || this.input.guess) return [];
+		return [{ rule: "predict", excerpt: text }];
 	}
 
 	/** A matrix named with a letter an earlier one of the session has. */

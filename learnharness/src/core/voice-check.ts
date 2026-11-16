@@ -54,6 +54,7 @@ export type VoiceRule =
 	| "operand"
 	| "asks-banned"
 	| "guess"
+	| "predict"
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"
