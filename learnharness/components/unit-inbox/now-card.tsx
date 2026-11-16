@@ -13,7 +13,7 @@ import type { NowLine } from "@/components/study-home/needs-you";
 import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import type { ChatListItem } from "@/src/core";
 import { useContinueCourse } from "@/components/unit-inbox/continue-course";
-import { CARD_ACTION_PLACE, ROW_ACTION, RowCard } from "@/components/unit-inbox/row-card";
+import { CARD_ACTION_PLACE, ROW_ACTION, RowCard, SLOT_WORDS } from "@/components/unit-inbox/row-card";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { courseKey, sessionKey } from "@/components/unit-inbox/now-inbox";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -100,7 +100,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 					<TopicGlyph standing={status.facts.standing} className="size-3" />
 				</span>
 				<span className="sr-only">, </span>
-				<span className="whitespace-nowrap">
+				<span className={SLOT_WORDS}>
 					<MathText>{line.slot ?? ""}</MathText>
 				</span>
 			</span>

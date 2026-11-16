@@ -6,6 +6,7 @@ import type { StartsWhy } from "@/src/core";
 import { cn } from "@/lib/utils";
 import type { Why } from "@/components/study-home/agenda-rows/row-facts";
 import { MathText } from "@/components/ui/math-text";
+import { SLOT_WORDS } from "@/components/unit-inbox/row-card";
 
 /** One icon per kind of reason, everywhere a reason shows: Home's rows,
  *  the course page's header and the sidebar's status slot. */
@@ -30,7 +31,8 @@ export const STARTS_ICON: Record<StartsWhy["kind"], LucideIcon> = {
 };
 
 /** "row": Home's line end, a 14px icon; "slot": a sidebar row's status
- *  slot, a 12px icon, T3 Code's status label, its words always whole. */
+ *  slot, a 12px icon, T3 Code's status label, its words whole while the
+ *  line holds them (`SLOT_WORDS`). */
 export type WhyMarkSize = "row" | "slot";
 
 /**
@@ -52,7 +54,7 @@ export function WhyMark({ why, size = "row", words, whole = false }: { why: Why 
 				<Icon aria-hidden className="size-3" />
 			</span>
 			<span className="sr-only">, </span>
-			<span className="whitespace-nowrap">
+			<span className={SLOT_WORDS}>
 				<MathText>{words ?? why.short}</MathText>
 			</span>
 		</span>
