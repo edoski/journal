@@ -25,6 +25,33 @@ input,select,textarea{color:#0a0a0a;background:#fff;border:1px solid #e5e5e5;bor
 input[type="range"],input[type="checkbox"],input[type="radio"]{accent-color:#171717}
 </style>`;
 
+/**
+ * The same controls on his dark page (round 13, 3 N9): in the lesson a demo
+ * that leaves its page to the app is drawn on the lesson's own dark, where
+ * the light base's white buttons glare, and a demo the base never reached
+ * showed the browser's grey square buttons and its native select. These
+ * are shadcn's dark variants in the app's own tokens (`--input`,
+ * `--primary`, `--secondary`, `--ring`, handed to the demo as `:root`
+ * variables): the outline button, the filled and the soft one, and the
+ * select and input as shadcn's trigger draws them. A demo that paints its
+ * own light page keeps the light base, since the lesson turns that whole
+ * page dark (`data-lh-light`, set by the lesson's bridge).
+ */
+export const DEMO_DARK_STYLE = `<style data-demo-dark>
+:root:not([data-lh-light]){color-scheme:dark}
+:root:not([data-lh-light]) button{border-color:var(--input);background:color-mix(in srgb,var(--input) 30%,transparent);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.05)}
+:root:not([data-lh-light]) button:hover{background:color-mix(in srgb,var(--input) 50%,transparent)}
+:root:not([data-lh-light]) button.primary,:root:not([data-lh-light]) button[data-variant="default"]{background:var(--primary);border-color:var(--primary);color:var(--primary-foreground)}
+:root:not([data-lh-light]) button.primary:hover,:root:not([data-lh-light]) button[data-variant="default"]:hover{background:color-mix(in srgb,var(--primary) 90%,transparent)}
+:root:not([data-lh-light]) button.secondary,:root:not([data-lh-light]) button[data-variant="secondary"]{background:var(--secondary);border-color:transparent;color:var(--secondary-foreground);box-shadow:none}
+:root:not([data-lh-light]) button.secondary:hover,:root:not([data-lh-light]) button[data-variant="secondary"]:hover{background:color-mix(in srgb,var(--secondary) 80%,transparent)}
+:root:not([data-lh-light]) button:focus-visible,:root:not([data-lh-light]) select:focus-visible,:root:not([data-lh-light]) input:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in srgb,var(--ring) 50%,transparent)}
+:root:not([data-lh-light]) input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=color]),:root:not([data-lh-light]) select,:root:not([data-lh-light]) textarea{min-height:32px;padding:0 10px;border:1px solid var(--input);border-radius:6px;background:color-mix(in srgb,var(--input) 30%,transparent);color:var(--foreground);font-size:14px}
+:root:not([data-lh-light]) select{appearance:none;-webkit-appearance:none;padding-right:30px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+:root:not([data-lh-light]) select option{background:var(--card);color:var(--foreground)}
+:root:not([data-lh-light]) input[type="range"],:root:not([data-lh-light]) input[type="checkbox"],:root:not([data-lh-light]) input[type="radio"]{accent-color:var(--primary)}
+</style>`;
+
 /** A demo's document with the base first: right after `<head>`, else
  *  before everything. Pure. */
 export function withDemoBase(html: string): string {
@@ -59,4 +86,23 @@ export const UNREADABLE_CONTROLS_PROBE = `(() => {
 		if (ratio < ${DEMO_MIN_CONTRAST}) bad.push(words(el).slice(0, 40) + ": " + ratio.toFixed(1) + ":1");
 	}
 	return bad;
+})()`;
+
+/** A matrix or table written as nested code lists, "[[a, b], [c, d]]". */
+const NESTED_LIST = /\[\s*\[[^\[\]]*\](?:\s*,\s*\[[^\[\]]*\])+\s*\]/g;
+
+/**
+ * Maths written as code in a demo's words (round 13, 3 N9: the Invertible
+ * demo printed "M = [[a, b], [c, d]]"): he reads a matrix by its columns
+ * or entries, never as a programmer's nested list. Pure.
+ */
+export function codeNotationIn(text: string): string[] {
+	return [...text.matchAll(NESTED_LIST)].map((m) => m[0]);
+}
+
+/** The script the builder's test run evaluates in the demo: the maths its
+ *  visible words write as code (`codeNotationIn`). Plain JS, run in the page. */
+export const CODE_NOTATION_PROBE = `(() => {
+	const text = (document.body && document.body.innerText) || "";
+	return text.match(new RegExp(${JSON.stringify(NESTED_LIST.source)}, "g")) || [];
 })()`;

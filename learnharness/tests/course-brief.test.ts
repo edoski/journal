@@ -468,3 +468,18 @@ describe("the brief fetch reads every course's plan", () => {
 		}
 	});
 });
+
+describe("a topic started ahead of plan (round 13, 1 n7)", () => {
+	const linalg = { workspace: "/study/linalg", courses: [{ map: LINEAR_ALGEBRA, days: DAYS["/study/linalg"]! }], unread: [] };
+	it("tells the tutor he starts it early and the day his plan gave, so the lesson's first words say so", () => {
+		const { text } = projectCourseBrief(TODAY, "teach", { plan: linalg, opened: ["inner-product"] });
+		assert.match(text, /\nAhead of plan: his plan starts Inner products on Tuesday 17 November, and he starts it today\. Your first message to him says so in one plain sentence \("Inner products is ahead of your plan, which starts it on Tuesday 17 November\."\), with no reason of your own/);
+	});
+
+	it("says nothing for a topic his plan starts today, one already taught, or his review", () => {
+		const onDay = courseMap("/study/linalg", "Linear Algebra", null, [topic("inner-product", "Inner products", untaught("2026-11-08", { kind: "next" }))]);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: { ...linalg, courses: [{ map: onDay, days: [] }] }, opened: ["inner-product"] }).text, /Ahead of plan/);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: linalg, opened: ["kernel"] }).text, /Ahead of plan/);
+		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: linalg, opened: ["inner-product"], review: true }).text, /Ahead of plan/);
+	});
+});

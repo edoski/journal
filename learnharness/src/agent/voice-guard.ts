@@ -247,7 +247,33 @@ const RULING_WORDS = (slip: string): AgentToolResult<unknown> => ({
 	details: { withheld: "card-words" },
 });
 
+/** A ruling as the reply and the card compare it: case, spacing and the
+ *  closing stop aside. Whether `message` says `ruling` word for word. */
+function sameRuling(message: string, ruling: string): boolean {
+	const plain = (t: string) => t.toLowerCase().replace(/\s+/g, " ").replace(/[.\s]+$/, "").trim();
+	const said = plain(ruling);
+	return said.length > 0 && plain(message).includes(said);
+}
+
+/** His card's Disputed stamp shows the saved ruling: the reply tells him
+ *  the same words (round 13, 2 n6: the reply said "so the answer counts as
+ *  given after help", the stamp "so your answer came after help on the
+ *  very part that was missing"). */
+const RULING_SAID = (ruling: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not shown to him: his answer card shows the ruling you saved, "${ruling}", and your reply words it differently, so he would read two rulings. Send your ruling as you saved it, word for word.` }],
+	isError: true,
+	details: { withheld: "ruling-said" },
+});
+const RULING_UNSAID = (ruling: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: `Not saved: his answer card shows \`ruling\` as his Disputed stamp, and "${ruling}" words it differently from the ruling you told him, so he would read two rulings. Send the save again with \`ruling\` the words you told him, word for word.` }],
+	isError: true,
+	details: { withheld: "ruling-said" },
+});
+
 const DEMO_TOOL = "demo";
+
+/** Words that point at a demo or its controls. */
+const DEMO_WORD = /\bdemo(?:'s|s)?\b/i;
 
 /** Maths as a key that ignores how it was typed: TeX or Unicode, spaces,
  *  braces and `\\left`/`\\right` aside, so "(1 − λ/n)^n" in a brief and
@@ -410,6 +436,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
+		case "unbuilt":
+			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -431,6 +459,16 @@ function refusal(family: Family, tool: string, text: string, breaks: VoiceBreak[
 		details: { withheld: "voice", rules: breaks.map((b) => b.rule), text },
 	};
 }
+
+/** A message after one of this turn's that ended on a question: the
+ *  question is the turn's last word (round 13, 1 n8: "Want to start with
+ *  your Independent events review now?", then "The Independent events
+ *  review is ready whenever you want to start."). */
+const AFTER_ASKING = (text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: "Not shown to him: your message above ended on a question, and a question is the turn's last word. Send nothing more this turn." }],
+	isError: true,
+	details: { withheld: "after-asking", text },
+});
 
 const DUPLICATE: AgentToolResult<unknown> = {
 	content: [{ type: "text", text: "Not shown again: he already has this message from this turn. Send nothing more of it." }],
@@ -612,6 +650,14 @@ export class VoiceGuard {
 	private heldDemo = false;
 	/** A ruling saved with the record's confidence word was held back once. */
 	private heldRuling = false;
+	/** This turn called for a demo, which is built after the turn moves on. */
+	private building = false;
+	/** The last message shown this turn ended on a question. */
+	private lastAsked = false;
+	/** The rulings this turn saved, and whether a reply or a save that
+	 *  worded one differently was held back (once a turn). */
+	private readonly rulings: string[] = [];
+	private heldRulingSaid = false;
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -738,6 +784,12 @@ export class VoiceGuard {
 				this.duplicates++;
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
+			if (this.lastAsked && !this.owed) return AFTER_ASKING(text);
+			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
+			if (ruled) {
+				this.heldRulingSaid = true;
+				return RULING_SAID(this.rulings[0]!);
+			}
 			const kind = this.messageKind();
 			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
@@ -753,16 +805,28 @@ export class VoiceGuard {
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
+			this.lastAsked = text.trim().endsWith("?");
 			this.sent++;
 			return null;
 		}
-		if (call.name === DEMO_TOOL) return this.judgeDemo(call);
-		if (call.name === SAVE_TOOL && this.input.ruling && !this.heldRuling) {
-			const slip = savedRulings(call.arguments).map(recordConfidenceWord).find(Boolean);
+		if (call.name === DEMO_TOOL) {
+			const refused = this.judgeDemo(call);
+			if (!refused) this.building = true;
+			return refused;
+		}
+		if (call.name === SAVE_TOOL && this.input.ruling) {
+			const rulings = savedRulings(call.arguments);
+			const unsaid = this.sent > 0 && !this.heldRulingSaid ? rulings.find((r) => !this.said.some((t) => sameRuling(t, r))) : undefined;
+			if (unsaid) {
+				this.heldRulingSaid = true;
+				return RULING_UNSAID(unsaid);
+			}
+			const slip = this.heldRuling ? undefined : rulings.map(recordConfidenceWord).find(Boolean);
 			if (slip) {
 				this.heldRuling = true;
 				return RULING_WORDS(slip);
 			}
+			this.rulings.push(...rulings);
 		}
 		if (this.probeEnded && (QUESTION_TOOLS as readonly string[]).includes(call.name)) return ASKED_AFTER_PROBE(questionText(call) ?? "");
 		// A question beside a refused message is read by its own rules and
@@ -909,7 +973,17 @@ export class VoiceGuard {
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
 		const boxed = restatingCallout(text);
 		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
-		return [...out, ...this.letters(text), ...this.repeats(text, true)];
+		return [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
+	}
+
+	/** Words that point at a demo this turn called for: it is built after
+	 *  the turn moves on, so he would read of a demo that is not there
+	 *  (round 13, 3 N1: "In the demo, slide d until the columns line up"
+	 *  with no demo on screen, and a question that needed it). */
+	private unbuilt(text: string): VoiceBreak[] {
+		if (!this.building) return [];
+		const said = sentences(text).find((s) => DEMO_WORD.test(s));
+		return said ? [{ rule: "unbuilt", excerpt: said.trim() }] : [];
 	}
 
 	private questionBreaks(text: string): VoiceBreak[] {
@@ -922,7 +996,7 @@ export class VoiceGuard {
 		if (twice) out.push({ rule: "reason-twice", excerpt: twice });
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
-		return [...out, ...this.letters(text), ...this.repeats(text)];
+		return [...out, ...this.letters(text), ...this.repeats(text), ...this.unbuilt(text)];
 	}
 
 	/** A demo brief that prints the formula a step not yet done is about:

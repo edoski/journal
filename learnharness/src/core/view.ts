@@ -47,7 +47,7 @@ import {
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import { photosOf } from "./photos.ts";
-import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
+import { isSubagentFailure, type SubagentArtifactData, type SubagentResultMeta } from "./contracts/jobs.ts";
 import type { PlanBlockData } from "./contracts/chat.ts";
 
 /** A view part — the loose part vocabulary the renderers consume (the same
@@ -494,6 +494,29 @@ function applyResultTo(part: LhViewPart | undefined, result: ToolResultMessage):
 }
 
 /** A marker's projected message (handoff/steers) or splice (plan block). */
+/** A delivered demo or figure, joined onto the tool part that called for
+ *  it (`artifact`): the steer's id carries its saved invert switch. */
+export interface PlacedArtifact {
+	messageId: string;
+	data: SubagentArtifactData;
+}
+
+/** A built demo or figure: what the lesson draws at its call. A failure
+ *  keeps its own note where it was read. */
+function placedAtCall(artifact: { kind: SubagentArtifactData["kind"]; result: SubagentArtifactData["result"] }): boolean {
+	return (artifact.kind === "demo" || artifact.kind === "visual") && artifact.result !== undefined && !isSubagentFailure(artifact.kind, artifact.result);
+}
+
+/** The tool part of a call, newest first. */
+function callPart(out: readonly LhViewMessage[], toolCallId: string | undefined): LhViewPart | undefined {
+	if (!toolCallId) return undefined;
+	for (let i = out.length - 1; i >= 0; i--) {
+		const part = out[i]!.parts.findLast((p) => p.type.startsWith("tool-") && p.toolCallId === toolCallId);
+		if (part) return part;
+	}
+	return undefined;
+}
+
 function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 	switch (marker.customType) {
 		case "course-context":
@@ -544,6 +567,15 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				result: SubagentArtifactData["result"];
 				ui?: SubagentArtifactData["ui"];
 			};
+			// A built demo or figure is drawn where the tutor called for it,
+			// from its job the moment the job is done, before the tutor reads
+			// it (round 13, 3 N1): its result draws there, never again here.
+			const call = placedAtCall(artifact) ? callPart(out, meta.toolCallId) : undefined;
+			if (call) {
+				call.artifact = { messageId: marker.id, data: { kind: artifact.kind, result: artifact.result, ui: artifact.ui } } satisfies PlacedArtifact;
+				out.push({ id: marker.id, role: "user", metadata: { subagentResult: meta, atCall: true }, parts: [textPart(marker.content)] });
+				return;
+			}
 			out.push({
 				id: marker.id,
 				role: "user",

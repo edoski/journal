@@ -5,8 +5,9 @@ import { useContext } from "react";
 import { CircleSlashIcon, SettingsIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
-import { isProviderKeyRefusal, type JobKind } from "@/src/core";
+import { isProviderKeyRefusal, isSubagentFailure, type JobKind, type JobRecord, type PlacedArtifact, type SubagentArtifactData } from "@/src/core";
 import { ActivityLine } from "@/components/lesson/activity-line";
+import { InlineDemo, InlineVisual } from "@/components/artifacts/inline-figure";
 
 /**
  * The dispatch card (contracts.ts "THE ASYNC PROTOCOL" §4): the tool-call
@@ -16,8 +17,11 @@ import { ActivityLine } from "@/components/lesson/activity-line";
  *
  *   unknown or running → one muted activity line
  *   refused            → the setup deep-link (models or a sign-in)
- *   done               → nothing: the artifact itself arrives in the steer
- *                        message right below, so the box must not duplicate it
+ *   done, a demo or a figure → the artifact itself, at once: from the
+ *                        delivered result the view joined onto the part, else
+ *                        from the job, whose delivery may still wait on his
+ *                        open question (round 13, 3 N1 and 2 M2)
+ *   done, else         → nothing: the result arrives in the steer message
  *   error              → one plain failure line
  */
 /** The one muted line while a helper works. */
@@ -43,10 +47,24 @@ const KIND_LABEL: Record<JobKind, string> = {
 	pdf: "PDF reader",
 };
 
-export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: JobKind }) {
+/** The built demo or figure to draw at the call: the delivered result
+ *  first, else the finished job's. Pure. */
+export function artifactAtCall(placed: unknown, job: JobRecord | null): PlacedArtifact | null {
+	const delivered = placed as PlacedArtifact | undefined;
+	if (delivered?.data) return delivered;
+	if (!job || job.status !== "done" || !job.result || (job.kind !== "demo" && job.kind !== "visual")) return null;
+	const result = job.result as SubagentArtifactData["result"];
+	if (isSubagentFailure(job.kind, result)) return null;
+	return { messageId: `steer_${job.id}`, data: { kind: job.kind, result } };
+}
+
+export function DispatchCard({ toolCallId, kind, artifact }: { toolCallId: string; kind: JobKind; artifact?: unknown }) {
 	const jobs = useContext(JobsContext);
 	const job = jobs.find((j) => j.toolCallId === toolCallId) ?? null;
 	const label = KIND_LABEL[kind];
+	const built = artifactAtCall(artifact, job);
+	if (built?.data.kind === "demo") return <InlineDemo output={built.data.result} messageId={built.messageId} initialInverted={built.data.ui?.inverted} />;
+	if (built?.data.kind === "visual") return <InlineVisual output={built.data.result} messageId={built.messageId} initialInverted={built.data.ui?.inverted ?? true} />;
 
 	if (!job || job.status === "running") return <ActivityLine testId="dispatch-card" label={KIND_ACTIVITY[kind]} />;
 	// A job refused because the Claude account is signed out is INFO, not

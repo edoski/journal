@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import { UNREADABLE_CONTROLS_PROBE } from "../../core/demo-frame.ts";
+import { CODE_NOTATION_PROBE, UNREADABLE_CONTROLS_PROBE } from "../../core/demo-frame.ts";
 import { createRequire } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -32,6 +32,9 @@ export interface DemoRunResult {
 	 *  "Pause: 1.0:1" (`UNREADABLE_CONTROLS_PROBE`), checked in his app's
 	 *  dark preference; a fake may leave it out. */
 	unreadable?: string[];
+	/** Maths its visible words write as code, "[[a, b], [c, d]]"
+	 *  (`CODE_NOTATION_PROBE`); a fake may leave it out. */
+	codeNotation?: string[];
 	/** Value of the optional probe expression, when requested and successful. */
 	probeResult?: unknown;
 	/** True when nothing above recorded anything. */
@@ -278,6 +281,7 @@ async function runDemo(html: string, opts: RunDemoOptions = {}): Promise<DemoRun
 	let probeResult: unknown;
 	let probed = false;
 	let unreadable: string[] = [];
+	let codeNotation: string[] = [];
 
 	try {
 		await withBrowserPage(async (page) => {
@@ -297,6 +301,12 @@ async function runDemo(html: string, opts: RunDemoOptions = {}): Promise<DemoRun
 				unreadable = Array.isArray(found) ? found.map(String) : [];
 			} catch (err) {
 				pageErrors.push(`contrast check failed: ${err instanceof Error ? err.message : String(err)}`);
+			}
+			try {
+				const found = await page.evaluate(CODE_NOTATION_PROBE);
+				codeNotation = Array.isArray(found) ? found.map(String) : [];
+			} catch (err) {
+				pageErrors.push(`notation check failed: ${err instanceof Error ? err.message : String(err)}`);
 			}
 			if (opts.probe) {
 				try {
@@ -323,8 +333,9 @@ async function runDemo(html: string, opts: RunDemoOptions = {}): Promise<DemoRun
 		pageErrors,
 		failedRequests,
 		unreadable,
+		codeNotation,
 		...(probed ? { probeResult } : {}),
-		ok: consoleErrors.length === 0 && pageErrors.length === 0 && failedRequests.length === 0 && unreadable.length === 0,
+		ok: consoleErrors.length === 0 && pageErrors.length === 0 && failedRequests.length === 0 && unreadable.length === 0 && codeNotation.length === 0,
 	};
 }
 

@@ -520,6 +520,9 @@ export interface ArtifactPartProps {
 		 *  the modelSolution committed at POSE time, folded onto the part by
 		 *  projectView — the reveal is never re-authored. */
 		reveal?: unknown;
+		/** A demo or figure call's delivered result, joined onto the part
+		 *  by projectView (view.ts `PlacedArtifact`): drawn at the call. */
+		artifact?: unknown;
 	};
 }
 

@@ -40,7 +40,7 @@ export function svgNaturalWidth(svg: string): number | null {
 
 export function VisualCard({ part }: ArtifactPartProps) {
 	if (part.state !== "output-available") return null;
-	return <DispatchCard toolCallId={part.toolCallId} kind="visual" />;
+	return <DispatchCard toolCallId={part.toolCallId} kind="visual" artifact={part.artifact} />;
 }
 
 /** The figure itself — exported: the steer card renders the delivered artifact. */

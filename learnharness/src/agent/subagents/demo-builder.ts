@@ -67,6 +67,8 @@ Build quality:
   words do not read against what lies under it.
 - One screen: the whole demo, controls and readouts included, is seen at once in a frame about 700px wide
   and 600px tall, with no scrolling.
+- Maths reads as he writes it on paper: a matrix by its columns ("columns (a, c) and (b, d)") or its entries'
+  names, never as code ("[[a, b], [c, d]]"); run_demo fails maths written as code.
 - Labels say what each control and readout is. No helper lines, footers or instructions under the demo
   ("Hover a bar to see…", "Resets when n changes…").
 
@@ -160,6 +162,7 @@ function summarizeCounts(result: DemoRunResult): string {
 		result.pageErrors.length > 0 ? `${result.pageErrors.length} page error${result.pageErrors.length === 1 ? "" : "s"}` : null,
 		result.failedRequests.length > 0 ? `${result.failedRequests.length} failed request${result.failedRequests.length === 1 ? "" : "s"}` : null,
 		(result.unreadable?.length ?? 0) > 0 ? `${result.unreadable!.length} unreadable control${result.unreadable!.length === 1 ? "" : "s"}` : null,
+		(result.codeNotation?.length ?? 0) > 0 ? `maths written as code` : null,
 	].filter(Boolean);
 	return counts.length > 0 ? counts.join(", ") : "ok";
 }
@@ -170,7 +173,7 @@ function formatRunResult(result: DemoRunResult): string {
 			result.probeResult !== undefined
 				? ` Probe result: ${JSON.stringify(result.probeResult) ?? "undefined"}.`
 				: "";
-		return `PASSED: no console errors, no uncaught errors, no failed requests, every control readable.${probe} If you are satisfied, finish with your notes; otherwise keep improving and re-test.`;
+		return `PASSED: no console errors, no uncaught errors, no failed requests, every control readable, no maths written as code.${probe} If you are satisfied, finish with your notes; otherwise keep improving and re-test.`;
 	}
 	const sections: string[] = [`FAILED: ${summarizeCounts(result)}.`];
 	if (result.consoleErrors.length > 0)
@@ -181,6 +184,8 @@ function formatRunResult(result: DemoRunResult): string {
 		sections.push(`Failed requests:\n${result.failedRequests.slice(0, 10).map((r) => `- ${r}`).join("\n")}`);
 	if (result.unreadable?.length)
 		sections.push(`Unreadable controls (their words against what lies under them; 4.5:1 is the least):\n${result.unreadable.slice(0, 10).map((r) => `- ${r}`).join("\n")}\nLeave a button's colours to the page's base (a plain <button>, class="primary" or class="secondary"), or set its text colour with its background.`);
+	if (result.codeNotation?.length)
+		sections.push(`Maths written as code in its words:\n${result.codeNotation.slice(0, 5).map((r) => `- ${r}`).join("\n")}\nWrite a matrix as he reads it: by its columns ("columns (a, c) and (b, d)") or its entries' names, never as a nested list.`);
 	sections.push("Fix the document (write_demo) and re-test (run_demo).");
 	return sections.join("\n");
 }
@@ -188,7 +193,7 @@ function formatRunResult(result: DemoRunResult): string {
 /** Short summary of a run for failure notes. */
 function failureSummary(result: DemoRunResult | null): string {
 	if (!result) return "never tested";
-	const details = [...result.consoleErrors, ...result.pageErrors, ...result.failedRequests, ...(result.unreadable ?? [])].slice(0, 5);
+	const details = [...result.consoleErrors, ...result.pageErrors, ...result.failedRequests, ...(result.unreadable ?? []), ...(result.codeNotation ?? [])].slice(0, 5);
 	return details.length > 0 ? `${summarizeCounts(result)} — ${details.join(" | ")}` : summarizeCounts(result);
 }
 

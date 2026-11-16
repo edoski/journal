@@ -90,7 +90,7 @@ export function reduceDemoBridgeState(state: DemoBridgeState, data: unknown): De
  * itself renders from the steer message via DemoOutputCard. */
 export function DemoCard({ part }: ArtifactPartProps) {
 	if (part.state !== "output-available") return null;
-	return <DispatchCard toolCallId={part.toolCallId} kind="demo" />;
+	return <DispatchCard toolCallId={part.toolCallId} kind="demo" artifact={part.artifact} />;
 }
 
 /** The demo artifact — exported: the steer card renders the delivered
