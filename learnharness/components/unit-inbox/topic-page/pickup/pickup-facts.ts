@@ -1,7 +1,7 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { reviewAsked, type ChatListItem, type TopicRef } from "@/src/core";
-import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
+import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
 import { continueHref, pausedWords } from "@/components/nav/session-state";
 import { FIRST_LESSON, TUTOR_WRITING, overdueWords, startsAfterWords } from "@/components/study-words";
@@ -183,11 +183,7 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 				: facts.starts && now.kind !== "start"
 					? { kind: facts.topic.startsWhy?.kind === "begun" ? "lesson" : "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
 					: null,
-		earlier: trailDays(
-			facts.sessions.filter((entry) => !held.has(entry.chat.id)),
-			facts.attempts,
-			facts.today,
-		),
+		earlier: trailDays(earlierSessions(facts.sessions, held, facts.attempts), facts.attempts, facts.today),
 		why: now.kind === "start" ? { builds: facts.builds, refs: facts.refs } : null,
 	};
 }
