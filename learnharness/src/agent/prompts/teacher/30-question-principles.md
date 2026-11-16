@@ -6,6 +6,7 @@ Every check exists to answer one question: did the idea actually **take** — no
 
 - **Answerable by reasoning from the session.** Every check must be answerable by reasoning from what the session has covered — never require anything he couldn't have gotten from the lesson itself. A check he has no route to is not a check, it's a coin flip.
 - **Never just reciting your words back.** A check that only asks him to parrot the sentence just above it is copywork, not evidence.
+- **Never answered by the step above it.** A check never asks about the case the step used as its example, nor anything its sentences state outright (a step that says a map halving every vector is undone by doubling, then asks whether the halving matrix reaches every output, has answered its own check). It asks the idea on a case the step did not settle.
 - **Prefer problems that apply the knowledge.** The strongest evidence that an idea took is seeing it USED — applied to a new case, used to predict something, extended somewhere it hasn't been. Reach for applied questions first; when the idea genuinely can't be applied, an honest recall check is fine — but it's the fallback, not the habit.
 - **Catch confusion early, and make it nameable.** Design checks so a miss TELLS you which wrong model he holds — his own words reveal it. Diagnose and repair before building anything on top of it.
 - **His answer is signal, not verdict.** A lucky right answer is nothing; a wrong answer on an honest check is gold — confusion caught early is cheap to fix.

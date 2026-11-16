@@ -91,11 +91,11 @@ describe("the topic head", () => {
 	it("says where he stands, when he last studied it and what went wrong", () => {
 		const document = head(factsOf(RANK));
 		assert.equal(document.querySelector("h1")!.textContent, "Rank and the column space");
-		assert.equal(document.querySelector('[data-slot="page-standing"]')!.textContent, "Slipping. Mistake to fix. Due since 5 Nov. Studied 30 Oct");
+		assert.equal(document.querySelector('[data-slot="page-standing"]')!.textContent, "Not right last time. Mistake to fix. Due since 5 Nov. Studied 30 Oct");
 		const facts = Array.from(document.querySelectorAll('[data-slot="page-fact"]'));
 		assert.deepEqual(
 			facts.map((fact) => [fact.getAttribute("data-kind"), fact.textContent, fact.firstElementChild!.tagName.toLowerCase()]),
-			[["standing", "Slipping", "svg"], ["slip", ". Mistake to fix", "svg"], ["review", ". Due since 5 Nov", "svg"], ["studied", ". Studied 30 Oct", "svg"]],
+			[["standing", "Not right last time", "svg"], ["slip", ". Mistake to fix", "svg"], ["review", ". Due since 5 Nov", "svg"], ["studied", ". Studied 30 Oct", "svg"]],
 			"each fact a mark, then its words",
 		);
 		assert.equal(document.querySelector('[data-slot="unit-gap"]')!.textContent, "Counts nonzero entries instead of pivots");
@@ -111,7 +111,7 @@ describe("the topic head", () => {
 		const pie = words.firstElementChild!;
 		assert.equal(pie.getAttribute("data-slot"), "topic-glyph", "the pie leads the standing");
 		assert.equal(pie.getAttribute("data-fill"), "0.75");
-		assert.equal(words.textContent, "Slipping", "a pie in the warning ink says Slipping");
+		assert.equal(words.textContent, "Not right last time", "a topic still being learned never slips (round 11, 3 N1)");
 	});
 
 	it("draws no head line for a topic not started whose lesson waits on him", () => {

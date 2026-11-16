@@ -15,6 +15,7 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { todayRows } from "../components/study-home/study-facts.ts";
+import { rowStanding, rowWords } from "../components/study-home/agenda-rows/row-standing.ts";
 import { headMarks } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { slipOf } from "../components/unit-inbox/units.ts";
 import type { StudyCourse, TopicHandle } from "../src/core/index.ts";
@@ -43,22 +44,34 @@ const rankCourse = (signals: object): StudyCourse => ({
 const practice = chat({ id: "rank", title: "Rank practice", kind: "practice", pendingProblem: true, topics: ["rank"], ownTopics: ["rank"], updatedAt: "2026-11-09T09:00:00.000Z" });
 
 describe("one status word per row (round 10, 1 m4)", () => {
-	for (const [signals, words] of [
-		[{ gap: "Pivots" }, "Check on your own"],
-		[{ gap: "Counts entries, not pivots", mistake: true }, "Mistake to fix"],
-	] as const) {
-		it(`says "${words}" alone beside the warning pie, never with Slipping`, () => {
-			const line = draw(rankCourse(signals), [practice]).querySelector('[data-slot="today-line"]')!;
-			const text = line.textContent ?? "";
-			assert.equal(text.split(words).length - 1, 1, `"${words}" once: ${text}`);
-			assert.doesNotMatch(text, /Slipping/);
-			assert.ok(line.querySelector('[data-slot="today-slip"]') === null, "no slip on the course line");
-			const standing = line.querySelector('[data-slot="today-standing"]')!;
-			assert.equal(standing.textContent, words);
-			assert.equal(standing.getAttribute("data-slip"), signals.mistake ? "gap" : "check");
-			assert.equal(standing.querySelector('[data-slot="topic-glyph"]')?.getAttribute("data-fill"), "0.75", "the warning pie, a quarter short");
-		});
-	}
+	it('says "Mistake to fix" alone beside the warning pie, never with Slipping', () => {
+		const words = "Mistake to fix";
+		const line = draw(rankCourse({ gap: "Counts entries, not pivots", mistake: true }), [practice]).querySelector('[data-slot="today-line"]')!;
+		const text = line.textContent ?? "";
+		assert.equal(text.split(words).length - 1, 1, `"${words}" once: ${text}`);
+		assert.doesNotMatch(text, /Slipping/);
+		assert.ok(line.querySelector('[data-slot="today-slip"]') === null, "no slip on the course line");
+		const standing = line.querySelector('[data-slot="today-standing"]')!;
+		assert.equal(standing.textContent, words);
+		assert.equal(standing.getAttribute("data-slip"), "gap");
+		assert.equal(standing.querySelector('[data-slot="topic-glyph"]')?.getAttribute("data-fill"), "0.75", "the warning pie, a quarter short");
+	});
+
+	// A gap with no mistake open slips no more (round 11, 3 N1): its standing
+	// says what is left, with no slip; with no slip the row's one status is
+	// why it is on Today (round 11, 1 N9), here the practice problem waiting.
+	it("a gap with no mistake open is no slip: the row says its reason alone, never Slipping", () => {
+		const course = rankCourse({ gap: "Pivots" });
+		const [row] = todayRows([course], [practice], TODAY);
+		assert.equal(rowStanding(row!)?.slip ?? null, null);
+		assert.equal(rowStanding(row!) && rowWords(rowStanding(row!)!), "Right on your own, check another day");
+		const line = draw(course, [practice]).querySelector('[data-slot="today-line"]')!;
+		const text = line.textContent ?? "";
+		assert.doesNotMatch(text, /Slipping|Check on your own/);
+		assert.ok(line.querySelector('[data-slot="today-slip"]') === null, "no slip on the course line");
+		assert.ok(line.querySelector('[data-slot="today-standing"]') === null, "one status: the reason, not the standing beside it");
+		assert.equal(line.querySelector('[data-slot="today-why"]')?.textContent, "Your turn");
+	});
 });
 
 describe("an open mistake on a topic not weak (round 10, 1 m4)", () => {

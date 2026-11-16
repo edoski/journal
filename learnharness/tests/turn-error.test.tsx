@@ -34,9 +34,15 @@ describe("turnErrorText", () => {
 		assert.equal(turnErrorText(claude).kind, "written");
 	});
 
-	it("reads a turn refused because Claude is signed out as one plain sentence that says his words are kept", () => {
+	it("reads a turn refused because Claude is signed out as one plain sentence that says his words are kept, only when he wrote some", () => {
 		const refusal = JSON.stringify({ error: "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts", code: "provider_key_missing", provider: "claude" });
-		assert.deepEqual(turnErrorText(refusal), { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null });
+		assert.deepEqual(turnErrorText(refusal, false, true), { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null });
+		// Round 11, 4 minor 3: after a press on Next problem the line said so over an empty box.
+		assert.deepEqual(turnErrorText(refusal), { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply.", details: null });
+		const pressed = parseHTML(renderToStaticMarkup(<TurnError message={refusal} onOpenSettings={() => {}} />)).document;
+		assert.doesNotMatch(pressed.querySelector("[data-testid=turn-error-sentence]")!.textContent!, /still in the box/);
+		const typed = parseHTML(renderToStaticMarkup(<TurnError message={refusal} kept onOpenSettings={() => {}} />)).document;
+		assert.match(typed.querySelector("[data-testid=turn-error-sentence]")!.textContent!, /What you wrote is still in the box\.$/);
 		const html = renderToStaticMarkup(<TurnError message={refusal} onOpenSettings={() => {}} onSignIn={() => {}} />);
 		const { document } = parseHTML(html);
 		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in to Claude", "one label, as the pill and the dialog say it (round 10, 4 minor 7)");

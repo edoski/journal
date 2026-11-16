@@ -67,7 +67,7 @@ describe("the standing", () => {
 			const slip = topic && whyOf(row)?.kind !== "missed" ? slipBeside(topic, titleOf(row) as never) : null;
 			assert.deepEqual(rowStanding(row)?.slip ?? null, slip, `row ${i}`);
 		});
-		assert.ok(rows.some((row) => rowStanding(row)?.slip), "the demo day has a row on a weak topic");
+		assert.ok(rows.some((row) => topicOf(row)?.weak), "the demo day has a row on a weak topic");
 	});
 });
 

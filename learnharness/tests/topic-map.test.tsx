@@ -128,14 +128,14 @@ describe("where he stands on a topic", () => {
 
 	it("takes a quarter off a topic he could do on his own that the engine now calls weak, says what the pie shows, and marks every weak topic", () => {
 		assert.deepEqual(standingOf(byHandle("matmul")), { fill: 0.75, slipping: true, words: "Slipping" }, "a 3/4 pie never says On your own");
-		assert.deepEqual(standingOf(byHandle("rank")), { fill: 0.75, slipping: true, words: "Slipping" });
+		assert.deepEqual(standingOf(byHandle("rank")), { fill: 0.75, slipping: false, words: "Right with help" }, "still being learned: it never slips (round 11, 3 N1)");
 		assert.equal(standingOf(byHandle("determinant")).slipping, false);
 	});
 
-	it("says it in the pie's words, Slipping on a weak topic, with no engine level names", () => {
+	it("says it in the pie's words, Slipping on a topic he is losing, with no engine level names", () => {
 		assert.deepEqual(
-			["eigen", "cramer", "kernel", "determinant", "span"].map((handle) => standingOf(byHandle(handle)).words),
-			["Not started", "Taught, not tried", "Slipping", "Right with help", "On your own"],
+			["eigen", "cramer", "kernel", "determinant", "span", "matmul"].map((handle) => standingOf(byHandle(handle)).words),
+			["Not started", "Taught, not tried", "Tried, not right yet", "Right with help", "On your own", "Slipping"],
 		);
 	});
 });
@@ -165,7 +165,7 @@ describe("why a topic needs him", () => {
 	});
 
 	it("names a node for a screen reader: title, that he is there, the standing, the card's line", () => {
-		assert.equal(topicLabel(byHandle("rank"), true, { kind: "your-turn", words: "Your turn" }), "Rank, You are here, Slipping, Your turn");
+		assert.equal(topicLabel(byHandle("rank"), true, { kind: "your-turn", words: "Your turn" }), "Rank, You are here, Right with help, Your turn");
 		assert.equal(topicLabel(byHandle("vectors"), false, null), "Vectors, On your own");
 	});
 });
@@ -421,7 +421,7 @@ describe("topic map drawing", () => {
 		assert.equal(nodes.length, 16);
 		assert.ok(nodes.every((n) => n.tagName === "A"));
 		assert.equal(node("rank").getAttribute("href"), unitHref(MAP.workspace, "rank"));
-		assert.equal(node("rank").getAttribute("aria-label"), "Rank, You are here, Slipping, Check on your own");
+		assert.equal(node("rank").getAttribute("aria-label"), "Rank, You are here, Right with help");
 		assert.equal(node("rank").getAttribute("aria-description"), "Needs Basis and dimension, Matrix multiplication, Gaussian elimination");
 		assert.equal(node("eigen").getAttribute("aria-label"), "eigen, Not started");
 	});
@@ -430,7 +430,7 @@ describe("topic map drawing", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
-			["Due since 29 Oct", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Check on your own", "Sure, but wrong"],
+			["Due since 29 Oct", "Mistake to fix", "Due today", "Not right last time", "Mixed up with Cramer's rule", "Sure, but wrong"],
 		);
 		assert.ok(node("determinant").querySelector('[data-slot="topic-need"]') === null);
 		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, "Right with help");

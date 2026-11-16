@@ -20,9 +20,9 @@ export const STANDING_WORDS: Record<Fill, string> = {
 	1: "On your own",
 };
 
-/** A topic the engine calls weak, whatever its pie: the warning ink's words,
- *  as every other state has its own (Edo, 15 Nov 2026), with the slip
- *  beside it saying why (`slipMark`). */
+/** A topic he is losing (`slipsNow`): the warning ink's words, as every
+ *  other state has its own (Edo, 15 Nov 2026), with the slip beside it
+ *  saying why (`slipMark`). */
 export const SLIPPING_WORDS = "Slipping";
 
 /** A topic he cannot yet do on his own, by how he answered it since his
@@ -48,12 +48,18 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
  *  (round 8: Eigen read "Right with help" after a Show me). Right on his
  *  own drops "check another day" once that day has come, beside the review
  *  due (round 8). `attempted` with no right answer since keeps its pie's
- *  words. A weak topic says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
-export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review">>): string {
+ *  words. A weak topic he could do on his own says how he answered it
+ *  since its miss: right on his own, or with help when help repaired it.
+ *  A topic that slips says `SLIPPING_WORDS` instead (`standingOf`). Pure. */
+export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right"> & Partial<Pick<CourseMapTopic, "review" | "signals">>): string {
 	const learning = topic.level === "assisted" || topic.level === "attempted";
-	if (learning && topic.right) return topic.right === "unaided" && topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS[topic.right];
+	const unaided = () => (topic.review?.kind === "due" ? RIGHT_ON_YOUR_OWN : RIGHT_WORDS.unaided);
+	if (learning && topic.right) return topic.right === "unaided" ? unaided() : RIGHT_WORDS[topic.right];
 	// No right answer since his newest wrong one, on a topic still being learned.
 	if (topic.level === "assisted") return WRONG_LAST_WORDS;
+	// A weak topic he could do on his own that does not slip (`slipsNow`):
+	// its miss answered right since, with help or on his own, or a check left.
+	if (fill === 0.75 && !learning) return topic.signals?.mistake ? WRONG_LAST_WORDS : topic.signals?.repairedWithHelp ? RIGHT_WORDS.helped : unaided();
 	return STANDING_WORDS[fill];
 }
 

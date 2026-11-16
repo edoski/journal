@@ -24,9 +24,10 @@ describe("a matrix inside a sentence (2 m6)", () => {
 });
 
 describe("a word joined to inline maths by a hyphen (2 m6)", () => {
-	it("goes into the formula as text, so the line never breaks inside it", () => {
-		assert.equal(transformMathDelimiters("whose only eigenline is the $x$-axis."), "whose only eigenline is the $x\\text{-axis}$.");
-		assert.equal(transformMathDelimiters("a $2 \\times 2$-matrix-like case"), "a $2 \\times 2\\text{-matrix-like}$ case");
+	it("stays prose held to the formula by a word joiner, so the line never breaks inside it and the word keeps the prose's type (round 11, 2 n9)", () => {
+		assert.equal(transformMathDelimiters("whose only eigenline is the $x$-axis."), "whose only eigenline is the $x$\u2060-axis.");
+		assert.equal(transformMathDelimiters("a $2 \\times 2$-matrix-like case"), "a $2 \\times 2$\u2060-matrix-like case");
+		assert.equal(transformMathDelimiters("a $4$-dimensional subspace"), "a $4$\u2060-dimensional subspace", "never \\text{-dimensional}, set in maths type");
 		assert.equal(transformMathDelimiters("the $x$ - axis"), "the $x$ - axis", "a spaced dash is not a joined word");
 	});
 });

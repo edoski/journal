@@ -219,7 +219,7 @@ describe("a topic not started", () => {
 			why?.builds.map((b) => [b.topic.handle, b.standing.words]),
 			[
 				["rank", "Not right last time"],
-				["kernel", "Slipping"],
+				["kernel", "Tried, not right yet"],
 			],
 		);
 		assert.deepEqual(why?.refs, [{ source: "Blitzstein and Hwang", locator: "Section 4.7" }]);

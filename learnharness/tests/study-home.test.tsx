@@ -323,11 +323,11 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesDue since 7 Nov", "Linear AlgebraEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last time", "Linear AlgebraContinue Problem sheet 4Check on your own"],
+			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesDue since 7 Nov", "Linear AlgebraEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last time", "Linear AlgebraContinue Problem sheet 4Left off 5 Nov"],
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["task", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|today)\?$/);
@@ -438,10 +438,10 @@ describe("what a line of Today reads", () => {
 			"Real AnalysisReview SequencesDue since 7 Nov",
 			"Linear AlgebraEigen lessonYour turn",
 			"ProbabilityContinue Bayes' ruleNot right last time",
-			"Linear AlgebraContinue Problem sheet 4Check on your own",
+			"Linear AlgebraContinue Problem sheet 4Left off 5 Nov",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["task", 1]]);
 		plain(doc);
 	});
 });

@@ -13,8 +13,10 @@ const ACTION = "h-8 px-2 text-body system-current:text-row";
  *  Claude, Open Settings for a rejected
  *  key, Home for a lesson deleted elsewhere, and Details for the provider's
  *  own text. */
-export function TurnError({ message, again = false, onRetry, retryLabel = "Retry", onOpenSettings, onSignIn, children }: {
+export function TurnError({ message, again = false, kept = false, onRetry, retryLabel = "Retry", onOpenSettings, onSignIn, children }: {
 	message: string;
+	/** The refused turn carried words he typed, now back in the box. */
+	kept?: boolean;
 	/** The press before failed the same way: the line says so and enters
 	 *  again, so every press shows (round 9). */
 	again?: boolean;
@@ -29,7 +31,7 @@ export function TurnError({ message, again = false, onRetry, retryLabel = "Retry
 	/** A provider-specific prompt shown beside the sentence (the Claude plan limit). */
 	children?: ReactNode;
 }) {
-	const text = turnErrorText(message, again);
+	const text = turnErrorText(message, again, kept);
 	const [open, setOpen] = useState(false);
 	const detailsId = useId();
 	return (

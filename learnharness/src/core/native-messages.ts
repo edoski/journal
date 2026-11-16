@@ -42,6 +42,7 @@ import {
 	DONE_TONIGHT_TEXT,
 	HANDOFF_TEXT,
 	REVIEW_HANDOFF_TEXT,
+	TASK_HANDOFF_TEXT,
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
 	PRACTICE_REQUEST_TEXT,
@@ -237,14 +238,15 @@ export function newAnswerResult(
 }
 
 /** The probe→teach handoff wake: scaffolding, not speech — the model reads
- *  HANDOFF_TEXT, with a review's own line in a review, and the UI renders
- *  the quiet system line. */
-export function newHandoffMessage(chatId: string, review = false): LhMarkerMessage {
+ *  HANDOFF_TEXT, with a review's own line in a review, or TASK_HANDOFF_TEXT
+ *  in a session that continues an open task, and the UI renders the quiet
+ *  system line. */
+export function newHandoffMessage(chatId: string, review = false, task = false): LhMarkerMessage {
 	return {
 		id: `steer_probe_${chatId}`,
 		role: "custom",
 		customType: "probe-handoff",
-		content: review ? `${HANDOFF_TEXT} ${REVIEW_HANDOFF_TEXT}` : HANDOFF_TEXT,
+		content: task ? TASK_HANDOFF_TEXT : review ? `${HANDOFF_TEXT} ${REVIEW_HANDOFF_TEXT}` : HANDOFF_TEXT,
 		display: true,
 		details: { chatId },
 		timestamp: Date.now(),
@@ -832,6 +834,10 @@ export interface AnsweredQuestion {
 	confidence?: Exclude<Confidence, "neutral"> | null;
 	/** He pressed Show me on it: he gave up and was shown its answer. */
 	showMe?: boolean;
+	/** Asked by the probe (`recall`), before any teaching of the session:
+	 *  on a topic not yet taught it is saved as a prediction (round 11,
+	 *  3 N1). Absent for every other question. */
+	probe?: true;
 	/** The question he answered, as `sameQuestionKey` reads it; absent for
 	 *  an answer in words or a problem's conclude. */
 	asked?: string;
@@ -845,6 +851,10 @@ export interface AnsweredQuestion {
  *  and showed no mark). It stands for his newest message before the save:
  *  the message the turn answers. */
 export const HIS_MESSAGE = "his-message";
+
+/** The probe's graded question: the prober's alone, asked before any
+ *  teaching of the session. */
+export const PROBE_QUESTION_TOOL = "recall";
 
 /** The graded question tools: an answer to one is an attempt. */
 export const GRADED_QUESTION_TOOLS: readonly string[] = ["explain", "recall"];
@@ -934,7 +944,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			revealed.add(asked.key);
 			const details = m.details as { confidence?: unknown; showMe?: unknown };
 			const confidence = chosenConfidence(details.confidence) ?? null;
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, recorded: false });
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), ...(m.toolName === PROBE_QUESTION_TOOL ? { probe: true as const } : {}), asked: asked.key, recorded: false });
 		}
 	}
 	for (const [key, answer] of answered) answer.recorded = recorded.has(key);

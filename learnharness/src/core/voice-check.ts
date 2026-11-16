@@ -50,6 +50,8 @@ export type VoiceRule =
 	| "review-lesson"
 	| "confidence"
 	| "letter"
+	| "reprint"
+	| "operand"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -83,6 +85,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// The app's own parts are nothing he talks about (round 9: "Your message
 	// arrived in the answer field…, so that question is now closed").
 	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
+	// The open question stays above, unchanged, and the app shows no copy of
+	// it (round 11, 4 minor 6: "Here is the question again." and nothing).
+	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
 ];
 
 /** Requests in an instruction text for a form the voice bans: each names
@@ -216,6 +221,10 @@ export function clausesOf(text: string): { words: number; clauses: number; short
 
 /** Every rule one tutor turn breaks. `kind` adds its budget and, after a
  *  right answer, the feedback rule; without it only the phrase rules apply. */
+/** Inline maths that is an operator alone, acting on nothing (round 11,
+ *  2 n9: "the dimension of im," from a lone `$\operatorname{im}$`). */
+const LONE_OPERATOR = /(?<!\$)\$\s*\\(?:ker|det|dim|operatorname\{[A-Za-z]+\}|mathrm\{(?:im|rank|span|tr)\})\s*\$(?!\$)/;
+
 export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const { text: plain, displays } = prose(text);
 	const out = phraseBreaks(plain, new Set(kind === "direct" ? ["offer"] : []));
@@ -223,6 +232,8 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const said = sentences(plain);
 	const asked = said.filter((s) => s.trim().endsWith("?"));
 	if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });
+	const lone = LONE_OPERATOR.exec(text);
+	if (lone) out.push({ rule: "operand", excerpt: lone[0] });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
 	if (load > SENTENCES[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCES[kind]}` });
