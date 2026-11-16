@@ -19,7 +19,7 @@ import { runningTurn } from "../src/server/turn-runs.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
 import { buildAnswer, type QuestionData } from "../src/core/question-core.ts";
-import { draftBasisHolds, lastProbeQuestionOpen, PLAN_DRAFT_TEXT } from "../src/core/plan-draft.ts";
+import { draftBasisHolds, lastProbeQuestionOpen, PLAN_DRAFT_TEXT, planDraftNote } from "../src/core/plan-draft.ts";
 import { newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
 import type { SteerMessage } from "../src/core/contracts.ts";
 import { fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
@@ -131,7 +131,7 @@ describe("the plan's early draft", () => {
 		await handleChatInput(chatId, { type: "steers", steers: [handoff] }, (opts) => createTeacherAgent(undefined, { ...onFake(model, opts), tools: bareQuestionTools() }));
 		const handle = runningTurn(chatId);
 		if (handle) await new Response(handle.subscribe()).text();
-		assert.match(seen.teacherSaw ?? "", /A draft of this plan, written from the probe while my last answer was still open/);
+		assert.match(seen.teacherSaw ?? "", /A draft of this plan, written from the probe before my last answer and before the assessment above/);
 		assert.match(seen.teacherSaw ?? "", /Calls in an hour as many tiny trials/, "the draft's map is what the teacher amends");
 		assert.equal(planDraftOf(chatId), null, "taken once");
 		const marker = chatStore.getChat(chatId)!.messages.find((m) => m.role === "custom" && (m as { customType?: string }).customType === "probe-handoff");
@@ -210,6 +210,7 @@ describe("when a draft fits (core/plan-draft.ts)", () => {
 
 	it("the draft is asked to plan at the plan turn's own height, and to save nothing", () => {
 		assert.match(PLAN_DRAFT_TEXT, /Take your time here and really think this through/);
+		assert.match(planDraftNote({ mermaid: MAP }), /check it against the assessment strand by strand[^.]*\. Every gap the assessment names gets its step, a step for what I already hold goes/, "the teacher checks the draft against the assessment written after it (round 14 judge: drafted plans missed the gap the assessment flagged)");
 		assert.match(PLAN_DRAFT_TEXT, /call plan_init once, with the map and the lesson's goal, and nothing else: no message to me, no question, no save/);
 	});
 });

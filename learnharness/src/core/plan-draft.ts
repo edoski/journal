@@ -65,9 +65,10 @@ export const PLAN_DRAFT_TEXT =
 export function planDraftNote(draft: PlanDraft): string {
 	const goal = draft.goal ? `Its goal: ${draft.goal.title}${draft.goal.topic ? ` (topic ${draft.goal.topic})` : ""}.\n` : "";
 	return (
-		"A draft of this plan, written from the probe while my last answer was still open. " +
-		"It is a draft, not my plan: start from it, amend it to my last answer and the assessment above, keep what still holds and change what my answer moves, " +
-		"then call plan_init with the map as amended and teach its first step, as above.\n" +
+		"A draft of this plan, written from the probe before my last answer and before the assessment above. " +
+		"It is a draft, not my plan: check it against the assessment strand by strand, as the planning rules ask of any map. " +
+		"Every gap the assessment names gets its step, a step for what I already hold goes, and the tree stays the minimal one the goal needs. " +
+		"Keep what survives that check and rebuild what does not, never a step only because the draft had it; then call plan_init with the map and teach its first step, as above.\n" +
 		goal +
 		"```mermaid\n" + draft.mermaid.trim() + "\n```"
 	);
