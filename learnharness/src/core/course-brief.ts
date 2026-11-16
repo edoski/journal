@@ -22,7 +22,7 @@
 
 import type { PlannedDay } from "./contracts/calendar.ts";
 import type { CourseMap, CourseMapTopic, StartsWhy, TopicHandle, TopicMoved } from "./contracts/course-map.ts";
-import { shortDay } from "./day-words.ts";
+import { longDay, shortDay } from "./day-words.ts";
 import { movedWhy } from "./moved-words.ts";
 
 export type BriefRole = "teach" | "practice";
@@ -343,6 +343,21 @@ function studiedLine({ date, daysAgo }: LastStudied): string {
 	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
 }
 
+/** A topic he opened that his plan starts on a later day: he starts it
+ *  ahead of plan, and the lesson's first words say so (round 13, 1 n7: a
+ *  start 11 days early opened on a bare probe). Never a reason the plan
+ *  does not give. */
+function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[]): string[] {
+	const map = plans?.courses.find((c) => c.map.workspace === plans.workspace)?.map;
+	if (!map) return [];
+	return opened.flatMap((handle) => {
+		const topic = map.topics.find((t) => t.handle === handle);
+		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today) return [];
+		const day = longDay(topic.starts);
+		return [`Ahead of plan: his plan starts ${topic.title} on ${day}, and he starts it today. Your first message to him says so in one plain sentence ("${topic.title} is ahead of your plan, which starts it on ${day}."), with no reason of your own, then the lesson goes on.`];
+	});
+}
+
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
@@ -362,6 +377,7 @@ export function projectCourseBrief(
 	if (studied) lines.push(studiedLine(studied));
 	if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
+	if (!review) lines.push(...aheadOfPlanLines(plan, opened));
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
