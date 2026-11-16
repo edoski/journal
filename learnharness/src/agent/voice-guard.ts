@@ -40,7 +40,7 @@ import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, partialDay, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, partialDay, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, questionBelow, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -190,6 +190,21 @@ function hisWordsOf(messages: readonly LhMessage[]): string[] {
 		if (m.role === "custom" && m.customType === "practice-thinking") return [textOf(m.content)];
 		return [];
 	});
+}
+
+/** Whether the last question he was asked before this turn is still open:
+ *  no answer came back, or he set it aside (Hint, Ask, Done for today). */
+function standingQuestion(messages: readonly LhMessage[]): boolean {
+	const failed = failedOutputCallIds(messages);
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") continue;
+		const call = m.content.findLast((b): b is ToolCall => b.type === "toolCall" && (QUESTION_TOOLS as readonly string[]).includes(b.name) && !failed.has(b.id));
+		if (!call) continue;
+		const result = messages.find((r) => r.role === "toolResult" && r.toolCallId === call.id);
+		return result?.role !== "toolResult" || !isRealAnswer(result.details);
+	}
+	return false;
 }
 
 /** Every text he read from the tutor before this turn: its delivered
@@ -402,6 +417,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `An operator stands alone, acting on nothing: ${quoted(b.excerpt)}. Write what it acts on ("$\\operatorname{im} A$"), or say it in words ("the image of A").`;
 		case "reprint":
 			return `His open question stays above as it was, and the app shows no copy of it: ${quoted(b.excerpt)}. Say it is still open above ("Your question is still open above."), never that you give it again.`;
+		case "below":
+			return `His open question is above this message, where he reads it, never below: ${quoted(b.excerpt)}. Say it is still open above, or name the question with no direction.`;
 		case "machinery":
 			return `Never name the app's parts or how his words reached you: ${quoted(b.excerpt)}. Speak to what he wrote.`;
 		case "exclamation":
@@ -655,6 +672,9 @@ function mathsShown(text: string, displaysOnly: boolean): Array<{ key: string; l
  *  names the calls that end the turn (a question, a pose, a handoff). */
 export class VoiceGuard {
 	private readonly input: TurnInput;
+	/** A question he was asked before this turn is still open: the turn
+	 *  asks it again, drawn above as "Your turn, on the question above". */
+	private readonly standing: boolean;
 	private readonly earlier: string[];
 	/** The messages he read before this turn, questions aside. */
 	private readonly told: string[];
@@ -725,8 +745,15 @@ export class VoiceGuard {
 	private heldRuling = false;
 	/** This turn called for a demo, which is built after the turn moves on. */
 	private building = false;
-	/** The last message shown this turn ended on a question. */
+	/** A message shown this turn ended on a question: it stays the turn's
+	 *  last ask. */
 	private lastAsked = false;
+	/** His messages this turn read mid-reply that no message ending on a
+	 *  statement has followed yet: each lets one message answer it, after
+	 *  the question too (round 14, 4 major 1: "also, does the ratio test
+	 *  need the terms to be positive?" sent while it graded, and its answer
+	 *  refused under the grade's nudge question). */
+	private unanswered = 0;
 	/** The rulings this turn saved, and whether a reply or a save that
 	 *  worded one differently was held back (once a turn). */
 	private readonly rulings: string[] = [];
@@ -743,6 +770,7 @@ export class VoiceGuard {
 		saves = false,
 	) {
 		this.input = turnInputOf(messages);
+		this.standing = standingQuestion(messages);
 		this.stepsAhead = stepsNotDone(messages);
 		this.unsaved = saves ? unsavedAnswerOf(messages) : null;
 		const earlier = earlierTexts(messages);
@@ -752,6 +780,11 @@ export class VoiceGuard {
 		// The question his answer replies to is the last one he read: a reply
 		// works on its matrix, so only what came before it counts as shown.
 		this.answeredAt = this.input.answers ? Math.max(0, this.earlier.length - 1) : this.earlier.length;
+	}
+
+	/** He sent a message the running turn has now read (a steer). */
+	heard(): void {
+		this.unanswered++;
 	}
 
 	/** Whether a tool's calls pass through the guard: the probe's end too,
@@ -862,7 +895,8 @@ export class VoiceGuard {
 				this.duplicates++;
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
-			if (this.lastAsked && !this.owed) return AFTER_ASKING(text);
+			const answersHim = this.unanswered > 0 && !text.trim().endsWith("?");
+			if (this.lastAsked && !this.owed && !answersHim) return AFTER_ASKING(text);
 			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
 			if (ruled) {
 				this.heldRulingSaid = true;
@@ -883,7 +917,8 @@ export class VoiceGuard {
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
-			this.lastAsked = text.trim().endsWith("?");
+			if (text.trim().endsWith("?")) this.lastAsked = true;
+			else if (this.unanswered > 0) this.unanswered--;
 			this.sent++;
 			return null;
 		}
@@ -1059,6 +1094,8 @@ export class VoiceGuard {
 		const credited = creditedLetter(text, [...this.his, ...(answered ? [answered] : [])]);
 		if (credited) out.push({ rule: "credit", excerpt: `${credited.letter}|${credited.said}` });
 		if (this.input.demo && this.sent === 0 && !POINTS_AT_DEMO.test(text)) out.push({ rule: "demo-unused", excerpt: first });
+		const below = this.standing ? questionBelow(text) : null;
+		if (below) out.push({ rule: "below", excerpt: below });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;

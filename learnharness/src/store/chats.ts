@@ -22,6 +22,7 @@ import { sessionEndOf } from "../core/session-end.ts";
 import { openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
+import { failedResponseAtEnd } from "../core/input-events.ts";
 import { onFirstTurn } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
@@ -131,6 +132,7 @@ function listChats(): ChatSummary[] {
 						ownTopics: own,
 						ended: sessionEndOf(messages, tree, summary.kind, own),
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
+						...(failedResponseAtEnd(messages) ? { failed: true as const } : {}),
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),

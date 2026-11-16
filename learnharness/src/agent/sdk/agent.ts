@@ -58,6 +58,9 @@ export interface SdkAgentConfig {
 	 *  ended: words it must read first, which keep the turn going (the voice
 	 *  guard's `beforeEnd`). */
 	beforeEnd?: () => string | undefined;
+	/** Told of each message of his the running turn reads (a steer), as it
+	 *  joins the record: the voice guard lets one message answer it. */
+	heard?: (message: AgentMessage) => void;
 }
 
 type Listener = (event: AgentEvent | CompactionEvent) => void;
@@ -184,7 +187,7 @@ export class SdkAgent {
 			session = this.seeded = seeded;
 			resume = sessionResume(seeded);
 		}
-		for (const steer of this.queued.splice(0)) this.append(steer.message);
+		for (const steer of this.queued.splice(0)) { this.append(steer.message); this.config.heard?.(steer.message); }
 		const queuedSteers = this.state.messages.slice(this.config.messages.length) as LhMessage[];
 		const blocks = sdkInputBlocks([...owed, ...queuedSteers]);
 		const prompt = userMessage(blocks.length ? blocks : [{ type: "text", text: CONTINUE_TEXT }], randomUUID());
@@ -360,7 +363,7 @@ export class SdkAgent {
 					if (uuid) anchor = uuid;
 					if ((message as { isReplay?: boolean }).isReplay) {
 						const steer = uuid ? this.inFlight.get(uuid) : undefined;
-						if (steer) { this.inFlight.delete(uuid!); this.append(steer.message); }
+						if (steer) { this.inFlight.delete(uuid!); this.append(steer.message); this.config.heard?.(steer.message); }
 						return true;
 					}
 					const content = message.message.content;

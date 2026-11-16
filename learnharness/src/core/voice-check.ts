@@ -65,7 +65,8 @@ export type VoiceRule =
 	| "reason-twice"
 	| "card-words"
 	| "unbuilt"
-	| "day-part";
+	| "day-part"
+	| "below";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -123,6 +124,14 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "reprint", re: /\b(?:still|stays|remains) (?:open )?below\b|\bopen below\b/i },
 	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
 ];
+
+/** A sentence that puts a question or his answer to it below the message
+ *  ("…the question about P is ready for your answer below."). Right only
+ *  for a question posed under it, never for one already posed, which is
+ *  above him (round 14, 4 minor 1): the guard reads which. */
+export function questionBelow(text: string): string | null {
+	return sentences(text).map((s) => s.trim()).find((s) => /\bbelow\b/i.test(s) && /\b(?:question|answer|check|prediction)s?\b/i.test(s)) ?? null;
+}
 
 /** Requests in an instruction text for a form the voice bans: each names
  *  what it asks for, so the fix is to ask within the voice instead. */

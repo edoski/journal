@@ -352,15 +352,16 @@ describe("TodayList", () => {
 		assert.match(down.querySelector('[data-slot="unit-section-header"]')?.textContent ?? "", /^Sessions, your turn$/);
 	});
 
-	it("keeps a course whose record can't be read as a card under Today's, named, that opens its course page", () => {
+	it("says a course whose record can't be read as a quiet note under Today's cards, never a card that reads as a session (round 14, 4 free)", () => {
 		const broken = { workspace: "/s/analysis", title: "Real Analysis", problem: "damaged" as const };
 		const doc = renderList({ unreadable: [broken] });
-		const card = [...doc.querySelectorAll('[data-slot="unit-card"]')].at(-1)!;
-		assert.equal(card.querySelector('[data-testid="unit-row"] > span:first-child')?.textContent, "RAReal Analysis");
-		assert.equal(card.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent, "Couldn't read this course's record");
-		assert.match(card.querySelector("a")?.getAttribute("href") ?? "", /^\/unit\//);
+		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
+		assert.equal(cards.some((card) => /record/.test(card.textContent ?? "")), false, "no card for it among the sessions");
+		const note = doc.querySelector('[data-slot="unreadable-note"]');
+		assert.equal(note?.textContent, "Couldn’t read Real Analysis’s record");
+		assert.match(note?.getAttribute("href") ?? "", /^\/unit\//, "it opens its course page, which says why");
 		const alone = renderList({ unreadable: [broken] }, [], []);
-		assert.equal(alone.querySelectorAll('[data-slot="unit-card"]').length, 1);
-		assert.ok(alone.querySelector('[data-slot="sidebar-note"]') === null, "not No courses yet");
+		assert.equal(alone.querySelectorAll('[data-slot="unit-card"]').length, 0);
+		assert.equal([...alone.querySelectorAll('[data-slot="sidebar-note"]')].map((n) => n.textContent).join(" | "), "Couldn’t read Real Analysis’s record", "not No courses yet");
 	});
 });

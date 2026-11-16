@@ -78,7 +78,8 @@ import { partKey, predictionOpenOn, roadmapSteps, stepAnchors } from "@/componen
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { pausePlaceholder, practicePause } from "@/components/lesson/practice-pause";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
@@ -92,6 +93,7 @@ import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keep
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
+import { marksBeforeDone } from "@/components/lesson/marks-before-done";
 import { courseDeletedBy, CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
@@ -791,7 +793,7 @@ export function Chat({
 	// (turn-error-text.ts refusalWatch).
 	const refusalSinceRef = useRef<number | null>(null);
 	useEffect(() => {
-		const watch = refusalWatch(refusalSinceRef.current, !!error && parseProviderKeyRefusal(error.message), modelStatus?.connected, statusRead);
+		const watch = refusalWatch(refusalSinceRef.current, isSignedOutLine(error?.message), modelStatus?.connected, statusRead);
 		refusalSinceRef.current = watch.since;
 		if (!watch.clear) return;
 		clearError();
@@ -919,19 +921,20 @@ export function Chat({
 		return () => window.removeEventListener(kbdEventForChat("dispute-mark"), onDispute);
 	}, []);
 
-	const nextReady =
-		!doneTonight &&
-		mode === "practice" &&
-		!pending &&
-		!activeProblem &&
-		!busy &&
-		nativeMessages.some(
+	const nextReady = practicePause({
+		practice: mode === "practice",
+		closed: doneTonight,
+		open: !!pending || !!activeProblem,
+		busy,
+		posed: nativeMessages.some(
 			(m) => (m as { role?: string }).role === "assistant" &&
 				Array.isArray((m as { content?: unknown[] }).content) &&
 				(m as { content: Array<{ type?: string; name?: string }> }).content.some(
 					(b) => b.type === "toolCall" && b.name === "problem",
 				),
-		);
+		),
+		retry: !!tryAgain,
+	});
 	const sendNext = useCallback(() => {
 		if (!nextReady) return;
 		void send({ type: "next" });
@@ -1029,6 +1032,9 @@ export function Chat({
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
+	// A problem's close that marks his answer from before Done for today is
+	// drawn above its line, beside the answer (marks-before-done.ts).
+	const doneMarks = useMemo(() => marksBeforeDone(messages), [messages]);
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
 	const reaskedAfterHint = useMemo(() => askedAfterHint(messages), [messages]);
 	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
@@ -1631,7 +1637,15 @@ export function Chat({
 												// The learner's move-on signal (owner round 16).
 												return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
 											case "data-done-tonight":
-												return <DoneTonightLine key={pi} />;
+												return (
+													<Fragment key={pi}>
+														{doneMarks.before.get(mi)?.map(({ message, part: at }) => {
+															const conclude = messages[message]!.parts[at]!;
+															return <ProseConclude key={`${message}:${at}`} toolCallId={conclude.toolCallId!} input={conclude.input} output={conclude.output} reveal={conclude.reveal} />;
+														})}
+														<DoneTonightLine />
+													</Fragment>
+												);
 											case "data-dispute":
 												return <DisputeBubble key={pi} data={part.data as DisputeDetails} />;
 											// Compaction (the moment and the cut) is the tutor's
@@ -1739,6 +1753,7 @@ export function Chat({
 															return <ProseProblem key={pi} input={part.input} active={part.toolCallId === activeProblemCallId} />;
 														}
 														if (part.type === "tool-conclude") {
+															if (doneMarks.moved.has(partKey(mi, pi))) return null;
 															return <ProseConclude key={pi} toolCallId={part.toolCallId!} input={part.input} output={part.output} reveal={part.reveal} />;
 														}
 														// Artifact extension point (contracts.ts): job
@@ -1827,7 +1842,7 @@ export function Chat({
 								nextProblem: nextReady,
 								onNext: sendNext,
 								onEmptyEnter: tryAgain,
-								placeholder: nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined,
+								placeholder: pausePlaceholder(nextReady, !!tryAgain),
 								photos: composerPhotos,
 							}}
 							onAskInstead={() => void askInstead()}
