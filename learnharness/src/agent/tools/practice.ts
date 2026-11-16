@@ -131,6 +131,25 @@ function brokeAtField() {
 	);
 }
 
+/** A problem's labelled parts that went differently (round 8's per-part
+ *  charging, kept one result per topic by round 14's M2). */
+function partsField() {
+	return Type.Optional(
+		Type.Array(
+			Type.Object({
+				part: Type.String({ minLength: 1, description: "The part's label as the problem's statement writes it: \"(a)\", \"2)\"." }),
+				topics: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, description: "The posed topics this part tests, each in this part alone." }),
+				result: attemptResult("This part's result."),
+			}),
+			{
+				minItems: 2,
+				description:
+					"Only when the problem's statement has labelled parts ((a), (b)… or 1), 2)…) that test different topics and went differently: each part, the topics it tests and its result, so each topic takes its own part's result. Each topic in one part at most; a topic in no part takes result, which is the whole answer's (partial when the parts differ). A problem with no labelled parts has one result: never parts. Leave brokeAt out.",
+			},
+		),
+	);
+}
+
 /** The record sentence's ask, on the conclusion and its first try: the
  *  line his topic's history reads for the answer (round 11, 2 n5: the
  *  history showed the whole problem, and a first try as "First try"). */
@@ -181,6 +200,7 @@ export const concludeInputObject = Type.Object({
 		}),
 	),
 	brokeAt: brokeAtField(),
+	parts: partsField(),
 	firstTry: Type.Optional(
 		Type.Object(
 			{
@@ -195,6 +215,7 @@ export const concludeInputObject = Type.Object({
 					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
 				),
 				brokeAt: brokeAtField(),
+				parts: partsField(),
 			},
 			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
 		),
@@ -246,9 +267,10 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 		// A result per topic, sent unasked, gives one answer two results.
 		...("byTopic" in input ? { byTopic: (input as { byTopic?: unknown }).byTopic } : {}),
 		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
+		...(input.parts ? { parts: input.parts } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};
-	const problem = conclusionProblem(conclusion, topics);
+	const problem = conclusionProblem(conclusion, topics, pose.statement);
 	if (problem) return { refused: problem, text: "" };
 	// His newest message came from Ask: a question, never his answer, and
 	// the confidence of an earlier note is not its (round 5).

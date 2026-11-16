@@ -3,7 +3,7 @@ import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
 import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTasksOf, type LhMessage } from "./native-messages.ts";
 import { phaseAt3Lh } from "./phases.ts";
-import { chargedTopics, type PracticeConclusion } from "./practice-attempts.ts";
+import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
 
 /**
  * How the tutor's last turn left the session, folded from the record (the
@@ -112,7 +112,7 @@ function practiceUnfinished(messages: readonly LhMessage[], topics: readonly str
 			if (c?.outcome !== "solved" || !c.result) continue;
 			const posed = problemInputForConclude(messages, block.id)?.topics;
 			const on = Array.isArray(posed) ? posed.filter((t): t is string => typeof t === "string") : [];
-			if (c.result === "correct") for (const topic of chargedTopics(on, { response: "", ...c, result: c.result })) solved.add(topic);
+			for (const [topic, result] of topicResults(on, { response: "", ...c, result: c.result })) if (result === "correct") solved.add(topic);
 		}
 	}
 	return topics.some((topic) => !solved.has(topic));
