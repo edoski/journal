@@ -52,7 +52,8 @@ export type VoiceRule =
 	| "letter"
 	| "reprint"
 	| "operand"
-	| "asks-banned";
+	| "asks-banned"
+	| "guess";
 
 export interface VoiceBreak {
 	rule: VoiceRule;

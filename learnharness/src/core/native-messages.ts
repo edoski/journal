@@ -557,7 +557,7 @@ export function newAskedMessage(open: "question" | "problem"): LhMarkerMessage {
 		id: newMessageId(),
 		role: "custom",
 		customType: "asked",
-		content: `[ASKED] He sent his next message from Ask, ${beside}: a question to you, not his answer. Answer it. Never grade it, save it as an attempt or conclude a problem from it as solved; his answer comes as his work. Only when it asks nothing and only answers the open question (a guess, a value, a choice) is it his answer to it: save it as his attempt naming "his-message", a prediction when the question asked for one.`,
+		content: `[ASKED] He sent his next message from Ask, ${beside}: a question to you, not his answer. Answer it. Never grade it, save it as an attempt or conclude a problem from it as solved; his answer comes as his work. When it asks to guess first, his guess is a prediction: pose it as one, so it is kept and never counts. Only when it asks nothing and only answers the open question (a guess, a value, a choice) is it his answer to it: save it as his attempt naming "his-message", a prediction when the question asked for one.`,
 		display: false,
 		details: {},
 		timestamp: Date.now(),

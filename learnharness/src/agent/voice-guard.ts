@@ -24,6 +24,7 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
+import { normalizeQuestionType } from "../core/question-core.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
 import { adviceSentences, afterQuestion, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
@@ -58,7 +59,19 @@ export interface TurnInput {
 	/** A ruling on his dispute of a mark: each ruling is news, however much
 	 *  it reads like an earlier one ("The mark stays …"). */
 	ruling?: boolean;
+	/** His message asks to guess first ("let me guess first"): the guess
+	 *  is a prediction, never a counted attempt (round 12, 2 M1). */
+	guess?: string;
 }
+
+/** His words asking to guess before he is told: "let me guess first",
+ *  "can I guess", "I want to predict it". */
+const GUESS_ASK = /\b(?:let me|i(?:'ll| will| want to| wanna|'d like to| would like to)|can i|could i|may i)\s+(?:first\s+)?(?:try\s+(?:to\s+)?|have\s+a\s+|take\s+a\s+|make\s+a\s+)?(?:guess|predict)\b|\b(?:guess|predict)(?:ing)?\s+first\b/i;
+
+/** The tutor's words inviting a guess: "Go ahead, guess.", "Take a guess",
+ *  "What's your guess?", "Make a prediction". Never words about a guess
+ *  he already made ("your guess fails there"). */
+const GUESS_INVITE = /\b(?:go ahead(?:,| and)?\s+guess|guess (?:first|away)|(?:take|make|have) a (?:quick |first )?guess|what(?:'s| is| would be) your (?:best )?guess|what would you guess|(?:make|give) (?:me )?(?:a|your) prediction)\b/i;
 
 /** Words in his answer that say he is not sure of it or of its reason. */
 const DOUBT = /\b(?:not sure|unsure|no idea|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
@@ -100,7 +113,8 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 		// A session's first message is the topic it opens on, unless he asks.
 		const words = textOf(input.content);
 		const opens = !messages.slice(0, at).some((m) => m.role === "assistant") && !words.trim().endsWith("?");
-		return { kind: opens ? "teach" : "direct", answers: false, words };
+		const guess = GUESS_ASK.exec(words)?.[0];
+		return { kind: opens ? "teach" : "direct", answers: false, words, ...(guess ? { guess } : {}) };
 	}
 	if (input.role === "toolResult") {
 		const details = isRecord(input.details) ? input.details : {};
@@ -169,7 +183,7 @@ const KIND_WORDS: Readonly<Record<TurnKind, string>> = {
 /** The rules a rewrite is still read against after its call was refused
  *  once: a question asks one thing, so no rewrite passes by asking two
  *  (round 7: a rewrite that fixed advice added a second question). */
-const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict"]);
+const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict", "guess"]);
 
 const SAVE_TOOL = "course_save";
 
@@ -298,6 +312,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 			return `Closing words never tell him how sure he was, which his card already shows, and never restate the break your feedback named: drop ${quoted(b.excerpt)} and keep only the one move that was not obvious.`;
 		case "letter":
 			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
+		case "guess":
+			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -612,7 +628,7 @@ export class VoiceGuard {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -696,6 +712,17 @@ export class VoiceGuard {
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
 		return [...out, ...this.letters(text), ...this.repeats(text)];
+	}
+
+	/** A lesson question posed after he asked to guess first, or under the
+	 *  tutor's own invitation to guess, that is not a prediction: his guess
+	 *  would count as an attempt (round 12, 2 M1: "Go ahead, guess." and a
+	 *  check, and his guess became the topic's open mistake). */
+	private guessAsked(call: ToolCall, text: string): VoiceBreak[] {
+		if (call.name !== "explain" || normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) === "predict") return [];
+		if (this.input.guess) return [{ rule: "guess", excerpt: `he wrote "${this.input.guess}"` }];
+		const invited = [...this.toldNow, text].map((t) => GUESS_INVITE.exec(t)?.[0]).find(Boolean);
+		return invited ? [{ rule: "guess", excerpt: invited }] : [];
 	}
 
 	/** A matrix named with a letter an earlier one of the session has. */
