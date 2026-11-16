@@ -33,12 +33,12 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * back. Enlarged, a course too big to open whole has the maps' Whole course
  * control (`WholeCourseButton`, and "-") that zooms out to every topic, and back to where he is. Enlarged or not, it is only the map: no List view and no More menu
  * (Edo, 12 Nov 2026). A course with arcs draws one arc (`TopicMap`'s
- * `arc`), with the arc strip under the course tabs: the arc Home's follow
- * names (`arc`, the Today row he points at, as the course tab slides to
- * its course; without it, the one arc `highlight`'s topics lie in), else
- * the arc he picked on the strip, else where he is (`currentArc`). Once
- * the follow names an arc, a pick is dropped, so leaving the row returns
- * to the arc of You are here. Enlarged, its Whole course shows every arc.
+ * `arc`), with the arc strip under the course tabs: the arc he picked on
+ * the strip, else the arc Home's follow names (`arc`, the Today row he
+ * points at, as the course tab slides to its course; without it, the one
+ * arc `highlight`'s topics lie in), else where he is (`currentArc`). Once
+ * the follow names another arc, a pick is dropped: a press always shows
+ * its arc, and pointing at another row follows it again. Enlarged, its Whole course shows every arc.
  * `framed` (the topics of the Today row he points at) brings them into
  * view on the chosen course's map (`TopicMap`'s `framed`).
  */
@@ -93,7 +93,8 @@ export function HomeMap({
 		const own = shownArcs(course.map);
 		if (!own) return undefined;
 		const followedHere = shown && follow && own.some((a) => a.handle === follow) ? follow : null;
-		return followedHere ?? picked.get(course.map.workspace) ?? currentArc(course.map) ?? undefined;
+		// His press wins over the row Home follows (the top one at rest), until he points at another row.
+		return picked.get(course.map.workspace) ?? followedHere ?? currentArc(course.map) ?? undefined;
 	};
 	const shownArc = arcOf(chosenCourse, true);
 	const canZoomOut = enlarged && (arcs !== null || opensWhole.get(chosen) === false);
