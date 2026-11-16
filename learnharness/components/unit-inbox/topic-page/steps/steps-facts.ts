@@ -69,11 +69,14 @@ export const TAG_ROOM = 20;
 type Frame = { width: number; height: number };
 type Fade = { x: number; y: number };
 
-/** One axis of the opening view: the plan's span `lo`..`hi` centred in
- *  the frame's clear middle when it fits there, else `at` at the frame's
- *  middle, pulled back so the plan's edge never leaves the clear middle. */
-function along(lo: number, hi: number, at: number, frame: number, fade: number, zoom: number): number {
-	if ((hi - lo) * zoom <= frame - fade * 2) return frame / 2 - ((lo + hi) / 2) * zoom;
+/** One axis of the opening view: the plan's span `lo`..`hi` in the
+ *  frame's clear middle when it fits there, centred, or on its start edge
+ *  with `top` (the vertical axis: a plan sits at the top of the pane, by
+ *  the list's first row, never floating mid-pane; round 14, m39, Kernel's
+ *  two sheet parts); else `at` at the frame's middle, pulled back so the
+ *  plan's edge never leaves the clear middle. */
+function along(lo: number, hi: number, at: number, frame: number, fade: number, zoom: number, top = false): number {
+	if ((hi - lo) * zoom <= frame - fade * 2) return top ? fade - lo * zoom : frame / 2 - ((lo + hi) / 2) * zoom;
 	return Math.min(fade - lo * zoom, Math.max(frame - fade - hi * zoom, frame / 2 - at * zoom));
 }
 
@@ -87,9 +90,10 @@ function fitZoom(layout: TopicMapLayout, frame: Frame, fade: Fade): number {
 /**
  * Where a lesson's step map opens in a frame whose edges fade by `fade`:
  * the whole plan, tags included, clear of the fade at the largest scale up
- * to full size; never below the topic map's whole-course scale, where a
- * plan still too big is framed on the step `current` (the first step when
- * none), the plan's edges kept inside the clear middle. Pure.
+ * to full size, centred across and at the top of the frame; never below
+ * the topic map's whole-course scale, where a plan still too big is framed
+ * on the step `current` (the first step when none), the plan's edges kept
+ * inside the clear middle. Pure.
  */
 export function stepsCamera(layout: TopicMapLayout, current: TopicHandle | null, frame: Frame, fade: Fade): Camera {
 	const zoom = Math.max(WHOLE_COURSE_ZOOM, fitZoom(layout, frame, fade));
@@ -97,7 +101,7 @@ export function stepsCamera(layout: TopicMapLayout, current: TopicHandle | null,
 	const [cx, cy] = at ? [at.x + layout.node.width / 2, at.y + layout.node.height / 2] : [layout.width / 2, layout.height / 2];
 	return {
 		x: along(0, layout.width, cx, frame.width, fade.x, zoom),
-		y: along(-TAG_ROOM, layout.height, cy, frame.height, fade.y, zoom),
+		y: along(-TAG_ROOM, layout.height, cy, frame.height, fade.y, zoom, true),
 		zoom,
 	};
 }
