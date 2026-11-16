@@ -166,9 +166,10 @@ export function HomeMap({
 			)}
 			{indexed && (
 				<ArcIndex
-					className="absolute top-10 left-0 z-10 w-56"
+					className="absolute top-16 left-0 z-10 w-64"
 					arcs={arcs}
 					value={zoomedOut ? null : (shownArc ?? null)}
+					here={currentArc(chosenCourse.map)}
 					onSelect={(arc) => {
 						setPicked((was) => new Map(was).set(chosen, arc));
 						setWhole(false);
@@ -176,7 +177,7 @@ export function HomeMap({
 				/>
 			)}
 			{/* Stacked arcs keeps its arc list in a column of its own, so the map frames each arc beside it. */}
-			<div data-slot="home-map-frame" className={cn("relative flex min-h-0 flex-1 flex-col", indexed && "ml-60")} style={VIGNETTE}>
+			<div data-slot="home-map-frame" className={cn("relative flex min-h-0 flex-1 flex-col", indexed && "ml-72")} style={VIGNETTE}>
 				{courses.map((course) => {
 					const shown = course.map.workspace === chosen;
 					return (
