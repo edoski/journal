@@ -437,6 +437,16 @@ function refusal(family: Family, tool: string, text: string, breaks: VoiceBreak[
 	};
 }
 
+/** A message after one of this turn's that ended on a question: the
+ *  question is the turn's last word (round 13, 1 n8: "Want to start with
+ *  your Independent events review now?", then "The Independent events
+ *  review is ready whenever you want to start."). */
+const AFTER_ASKING = (text: string): AgentToolResult<unknown> => ({
+	content: [{ type: "text", text: "Not shown to him: your message above ended on a question, and a question is the turn's last word. Send nothing more this turn." }],
+	isError: true,
+	details: { withheld: "after-asking", text },
+});
+
 const DUPLICATE: AgentToolResult<unknown> = {
 	content: [{ type: "text", text: "Not shown again: he already has this message from this turn. Send nothing more of it." }],
 	isError: true,
@@ -619,6 +629,8 @@ export class VoiceGuard {
 	private heldRuling = false;
 	/** This turn called for a demo, which is built after the turn moves on. */
 	private building = false;
+	/** The last message shown this turn ended on a question. */
+	private lastAsked = false;
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -745,6 +757,7 @@ export class VoiceGuard {
 				this.duplicates++;
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
+			if (this.lastAsked && !this.owed) return AFTER_ASKING(text);
 			const kind = this.messageKind();
 			const breaks = this.held("message", this.messageBreaks(text, kind));
 			if (breaks.length > 0) {
@@ -760,6 +773,7 @@ export class VoiceGuard {
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
+			this.lastAsked = text.trim().endsWith("?");
 			this.sent++;
 			return null;
 		}
