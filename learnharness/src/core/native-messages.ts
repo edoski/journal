@@ -35,7 +35,7 @@
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { sameQuestionKey } from "./shown-help.ts";
-import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Message, ToolCall, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
@@ -91,8 +91,7 @@ export interface LhMarkerMessage {
 		| "compaction"
 		| "session-resume"
 		| "ungraded-answer"
-		| "asked"
-		| "left-question";
+		| "asked";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -532,19 +531,27 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
 	};
 }
 
-/** The note riding his first message after Done for today left a question
- *  open (`questionLeftForToday`): it picks the lesson up at that question.
- *  Model-facing only. */
-export function newLeftQuestionMessage(question: string): LhMarkerMessage {
+/** The questions Done for today left open, posed again once the close
+ *  has settled (`leftQuestionRepose`): an app-made message whose calls ask
+ *  each one as the tutor posed it, its tool and arguments, under a new id,
+ *  so the box serves it after Resume as before Done (round 12, 3 n10). The
+ *  model reads it as a note beside his answer (sdk-session.ts). */
+export function newQuestionRepose(calls: ReadonlyArray<{ tool: string; input: ToolCall["arguments"] }>): LhMessage & AssistantMessage {
 	return {
 		id: newMessageId(),
-		role: "custom",
-		customType: "left-question",
-		content: `[PICKED UP] He is back on this lesson, which he left for today with your question "${question}" open; the box he answers in held it. If his message answers it, it is his answer: grade it and save it as his attempt naming "his-message", a prediction when the question asked for one. If it only asks you something, answer that, then ask the question again, word for word, with a fresh call.`,
-		display: false,
-		details: {},
+		role: "assistant",
+		content: calls.map((call) => ({ type: "toolCall" as const, id: `call_again_${newMessageId()}`, name: call.tool, arguments: call.input })),
 		timestamp: Date.now(),
+		...syntheticStamps(REPOSE_MODEL),
 	};
+}
+
+const REPOSE_MODEL = "synthetic-repose";
+
+/** Whether a message is the app's re-pose of his left questions
+ *  (`newQuestionRepose`). */
+export function isQuestionRepose(m: LhMessage): boolean {
+	return m.role === "assistant" && m.provider === "synthetic" && m.model === REPOSE_MODEL;
 }
 
 /** The note riding a message he sent from Ask (round 5: an answer typed
@@ -649,6 +656,28 @@ export function newProblemDismissedMarker(problemCallId: string): LhMarkerMessag
 	};
 }
 
+/** The stamps of an app-made assistant message. They are placeholders by
+ *  design: history serialization reads ONLY the content blocks (verified
+ *  in pi-ai's converters), and the app's money channel is the parallel
+ *  turns log, never message objects — so "synthetic" never corrupts a wire
+ *  view or a cost fold. */
+function syntheticStamps(model: string) {
+	return {
+		api: "faux",
+		provider: "synthetic",
+		model,
+		usage: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
+		stopReason: "toolUse",
+	} as const;
+}
+
 /** The dismissal's deferred conclude (owner ruling 2026-10-04): the pair
  *  prepended to the user's NEXT input — a synthetic assistant message
  *  carrying a conclude call (outcome "dismissed") plus its ack result, so
@@ -664,31 +693,13 @@ export function concludedByDismissalPair(
 ): [LhMessage & AssistantMessage, LhMessage & ToolResultMessage] {
 	const callId = `call_conc_${problemCallId}`;
 	const now = Date.now();
-	// The stamps are placeholders by design: history serialization reads
-	// ONLY the content blocks (verified in pi-ai's converters), and the
-	// app's money channel is the parallel turns log, never message
-	// objects — so "synthetic" never corrupts a wire view or a cost fold.
-	const syntheticStamps = {
-		api: "faux",
-		provider: "synthetic",
-		model: "synthetic-conclude",
-		usage: {
-			input: 0,
-			output: 0,
-			cacheRead: 0,
-			cacheWrite: 0,
-			totalTokens: 0,
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-		},
-		stopReason: "toolUse",
-	} as const;
 	return [
 		{
 			id: newMessageId(),
 			role: "assistant",
 			content: [{ type: "toolCall", id: callId, name: PRACTICE_CONCLUDE_TOOL, arguments: { outcome: "dismissed" } }],
 			timestamp: now,
-			...syntheticStamps,
+			...syntheticStamps("synthetic-conclude"),
 		},
 		{
 			id: newMessageId(),

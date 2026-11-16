@@ -12,7 +12,8 @@ import type { ChatListItem } from "@/src/core";
  *     owes the next word and picks the turn back up when it is opened;
  *   - left: he pressed Done for today on work still open (a question or
  *     problem it set aside, plan steps still to teach, a review not yet
- *     done), so it waits for next time;
+ *     done), so it waits for next time, even with the question the app
+ *     posed again for him there (round 12, 3 n10): he said he is done;
  *   - finished: the tutor ended the lesson (a sign-off such as "Good place
  *     to stop" included), the practice round or the answer.
  */
@@ -20,8 +21,8 @@ export type SessionState = "working" | "your-turn" | "paused" | "left" | "finish
 
 export function sessionState(chat: ChatListItem): SessionState {
 	if (chat.busy) return "working";
-	if (chat.pendingQuestion || chat.pendingProblem || chat.ended === "mid-lesson") return "your-turn";
 	if (chat.ended === "left") return "left";
+	if (chat.pendingQuestion || chat.pendingProblem || chat.ended === "mid-lesson") return "your-turn";
 	return chat.ended === "cut" ? "paused" : "finished";
 }
 

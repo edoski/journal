@@ -62,7 +62,6 @@ import {
 	toolQuestionKind,
 	closedTonight,
 	doneTonightAtEnd,
-	questionLeftForToday,
 	replyCutOf,
 	latestMarkedAnswer,
 	appOpeningAt,
@@ -857,20 +856,6 @@ export function Chat({
 	// Stopped for today, by him or by the tutor's close, until he writes
 	// again: the top bar says so, and has nothing left to stop.
 	const closedForToday = closedTonight(nativeMessages);
-	// The question Done for today left open: his next message picks the
-	// lesson up at it, so the box says so and holds what he had typed in it
-	// (round 10, 3 m1 and m2: Resume showed no question, and his half answer
-	// waited unseen for the tutor to ask it again).
-	const leftQuestion = useMemo(() => questionLeftForToday(nativeMessages), [nativeMessages]);
-	useEffect(() => {
-		if (!leftQuestion || !carryScope || textRef.current.trim()) return;
-		const carried = takeCarry(carryScope, leftQuestion.question, leftQuestion.toolCallId);
-		const text = carried ? carriedForm(carried.words, true)?.text : undefined;
-		if (text) applyText(text);
-		void carried?.photos.then((list) => {
-			if (list.length > 0) restoreComposerPhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
-		});
-	}, [leftQuestion, carryScope, applyText, restoreComposerPhotos]);
 	// Done for today wins over the tutor at work (round 7): the server stops
 	// the running turn, its partial saved, then closes the lesson; this
 	// window lets go of the reply it was reading first.
@@ -1822,7 +1807,7 @@ export function Chat({
 								nextProblem: nextReady,
 								onNext: sendNext,
 								onEmptyEnter: tryAgain,
-								placeholder: nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : leftQuestion ? LESSON_WORDS.leftQuestionPlaceholder : undefined,
+								placeholder: nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined,
 								photos: composerPhotos,
 							}}
 							onAskInstead={() => void askInstead()}
