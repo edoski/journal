@@ -30,6 +30,7 @@ import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-stee
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { useSessionBusy } from "@/components/lesson/session-busy";
 import {
 	firstSourceTextParts,
 	messageAnchorId,
@@ -297,6 +298,18 @@ export function Chat({
 	// the composer, shows the pre-first-chunk shimmer, and drives the 1500ms
 	// record poll that adopts at settle if the stream can't attach.
 	const [turnInFlight, setTurnInFlight] = useState(initiallyInFlight ?? false);
+	// THE SESSION'S BUSY FACT (round 14, 3 M2; session-busy.ts): the
+	// server's own, the one the sidebar's "Tutor writing" reads, with a
+	// turn it sets up itself and his stop. The lesson's line, Stop and box
+	// all follow it, so a handoff between agents never looks finished.
+	const attachIfRunningRef = useRef<() => void>(() => {});
+	const { busy, serverTurnRef, noTurnRunning } = useSessionBusy({
+		chatId,
+		status,
+		attached: turnInFlight,
+		initiallyInFlight: initiallyInFlight ?? false,
+		attachIfRunning: () => attachIfRunningRef.current(),
+	});
 
 	// Session title: click-to-rename (owner, 2026-09-17). Clicking the header
 	// title opens edit mode with everything selected — typing replaces, arrows
@@ -537,7 +550,6 @@ export function Chat({
 	}, [proseFocusKey]);
 
 	const localStream = status === "submitted" || status === "streaming";
-	const busy = localStream || turnInFlight;
 	const busyRef = useRef(busy);
 	busyRef.current = busy;
 	// The attach handoff (stream-reattach wave): the moment a resumed
@@ -562,6 +574,22 @@ export function Chat({
 		setTurnInFlight(true);
 		void resumeStream();
 	}, [resumeStream]);
+	// Our stream ended with the server's busy fact still up: attach if a
+	// turn still runs, or let the fact go (a settle this view missed). A
+	// turn this read finds settled is the cheap terminal's to adopt.
+	const attachIfRunning = useCallback(async () => {
+		try {
+			const res = await fetch(`/api/chats/${chatId}`);
+			if (!res.ok) return;
+			const record = (await res.json()) as { turnInFlight?: boolean };
+			if (record.turnInFlight === true) {
+				if (!localStreamRef.current && !turnInFlightRef.current) attachToRunningTurn();
+			} else noTurnRunning();
+		} catch {
+			/* unreachable: the resync asks again */
+		}
+	}, [chatId, attachToRunningTurn, noTurnRunning]);
+	attachIfRunningRef.current = () => void attachIfRunning();
 
 	// The practice dock's send (ONE lane, owner 2026-10-05): POSTs the
 	// thinking against the ACTIVE problem — whether it claims an answer is
@@ -847,10 +875,9 @@ export function Chat({
 	// a pending question still owns the interaction (the dock replaces the
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
-	// A turn the server is setting up itself (turn-waking): the line shows
-	// from the start of its setup, not only once it runs.
-	const [waking, setWaking] = useState(false);
-	const thinking = showsWorking(messages, busy || waking);
+	// A turn the server is setting up itself (turn-waking) is busy too
+	// (useSessionBusy): the line shows from the start of its setup.
+	const thinking = showsWorking(messages, busy);
 	const idleLine = workingLine(messages);
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
@@ -1235,6 +1262,9 @@ export function Chat({
 	// Reconnect catch-up: events missed while the channel was down.
 	useServerResync(() => {
 		fetchJobsRef.current();
+		// Turn events missed while the channel was down: the record says
+		// whether a turn still runs.
+		if (serverTurnRef.current && !localStreamRef.current) void attachIfRunning();
 		// The channel came back after the app restarted: a turn the restart
 		// cut never settles, so the dropped stream's line would stand
 		// forever. Ask the record what is true now.
@@ -1291,7 +1321,9 @@ export function Chat({
 		// gets a settled response — unwinnable by a network round-trip,
 		// self-healing via the eventual turn-settled. Do not engineer around.
 		if (p.chatId !== chatId) return;
-		if (localStreamRef.current) return; // our OWN turn — the 409-race guard
+		// Our own turn, or one that began as ours closes (a handoff's next
+		// agent): the end of our stream attaches to it (useSessionBusy).
+		if (localStreamRef.current) return; // the 409-race guard
 		if (turnInFlightRef.current) return; // already attached
 		attachToRunningTurn();
 	});
@@ -1323,9 +1355,6 @@ export function Chat({
 		}
 		// Fully idle — a turn we never saw (every window missed): adopt now.
 		void syncFromServer();
-	});
-	useServerEvent("turn-waking", (p) => {
-		if (p.chatId === chatId) setWaking(p.waking);
 	});
 	useServerEvent("chats-changed", (p) => {
 		// The first plan named this session (ChatStore.nameSession): the
