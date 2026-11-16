@@ -1,7 +1,8 @@
 "use client";
 
 import { useContext } from "react";
-import { useStore, type Node, type NodeProps } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
+import { useFrameLeft } from "../frame-left";
 import type { ArcHandle, CourseMapTopic } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { MathLine } from "@/components/ui/math-line";
@@ -15,9 +16,10 @@ import { BAND_LABEL, PEEK, type NeighbourBand } from "./neighbours-layout";
 
 /** How strong a neighbour's card and band name read: clearly behind the arc drawn, its title still legible. */
 export const NEIGHBOUR_STRENGTH = 0.55;
-/** A band's name: 16 in from its own start, or 24 in from the frame's left edge while that is out of view. */
+/** A band's name: 16 in from its own start, or 64 in from the visible left edge while that is out of view. */
 const LABEL_IN = 16;
-const STICK_IN = 24;
+/** Clear of the map's edge fade (Home's vignette is 64 across). */
+const STICK_IN = 64;
 
 export type NeighbourBandFlowNode = Node<{ band: NeighbourBand }, "neighbourBand">;
 export type NeighbourCardFlowNode = Node<{ topic: CourseMapTopic; arc: ArcHandle; arcTitle: string; side: NeighbourBand["side"] }, "neighbourCard">;
@@ -31,8 +33,8 @@ export type NeighbourCardFlowNode = Node<{ topic: CourseMapTopic; arc: ArcHandle
 export function NeighbourBandNode({ data, positionAbsoluteX }: NodeProps<NeighbourBandFlowNode>) {
 	const { band } = data;
 	const openArc = useContext(TopicMapContext)?.openArc;
-	// The name stays whole on screen: 24 in from the frame's left edge while the band's own start is out of view.
-	const left = useStore((s) => Math.max(LABEL_IN, -s.transform[0] / s.transform[2] + STICK_IN / s.transform[2] - positionAbsoluteX));
+	// The name stays whole on screen: 64 in from the frame's left edge while the band's own start is out of view.
+	const left = Math.max(LABEL_IN, useFrameLeft(STICK_IN) - positionAbsoluteX);
 	const label = (
 		<ArcLabel number={band.number} handle={band.arc.handle} title={band.arc.title} className="transition-colors group-hover/band:text-foreground motion-reduce:transition-none" />
 	);

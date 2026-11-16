@@ -1,6 +1,7 @@
 "use client";
 
-import { useStore, type Node, type NodeProps } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
+import { useFrameLeft } from "../frame-left";
 import { cn } from "@/lib/utils";
 import { useCanvas } from "../canvas/canvas-context";
 import { ArcLabel } from "../arcs/arc-label";
@@ -9,7 +10,8 @@ import { ruleStretches, type Band } from "./bands-layout";
 export type BandFlowNode = Node<{ band: Band; share: number | null; margin: number }, "arcBand">;
 
 /** How far in from the frame's left edge a chapter's name stays while its margin is out of view. */
-const STICK_IN = 24;
+/** Clear of the map's edge fade (Home's vignette is 64 across). */
+const STICK_IN = 64;
 
 /**
  * One chapter of the course (bands.md): a hairline across the drawing over
@@ -26,7 +28,7 @@ export function BandNode({ data, width }: NodeProps<BandFlowNode>) {
 	const focus = useCanvas()?.focus ?? null;
 	const lit = focus !== null && band.topics.includes(focus.topic);
 	// The frame's left edge in the drawing's units: the label slides to it, never left of the margin's start.
-	const left = useStore((s) => Math.max(0, -s.transform[0] / s.transform[2] + STICK_IN / s.transform[2]));
+	const left = Math.max(0, useFrameLeft(STICK_IN));
 	return (
 		<div data-slot="arc-band" data-arc={band.arc.handle} data-here={band.here || undefined} className="relative size-full">
 			{band.number > 1 &&

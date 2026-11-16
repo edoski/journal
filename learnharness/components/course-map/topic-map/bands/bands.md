@@ -10,7 +10,7 @@ Edo, 16 Nov 2026: "the band lines overlap with the edges visually and it just ma
 - **Rules clear of lines:** a chapter's hairline stops 12 short of every line crossing it, on each side (`ruleStretches`), and no line runs along a rule (lanes sit at least 16 from it).
 
 - Layers: each topic's layer is its chapter's first layer plus the longest chain of its own chapter's needs above it (`layoutBands`), so every chapter starts below the last one ends; d3-dag then orders and places them as Canvas tree does.
-- Label: while the margin is out of view (the camera frames "You are here"), a chapter's number and name stay 24 in from the frame's left edge, in its strip, as a sticky section header does, so every chapter on screen is named; the arc he is in reads in the foreground ink.
+- Label: while the margin is out of view (the camera frames "You are here"), a chapter's number and name stay 64 in from the visible left edge, clear of the map's edge fade, on Home as the camera moves and on the course page as the pane scrolls (`../frame-left.ts`), in its strip, as a sticky section header does, so every chapter on screen is named; the arc he is in reads in the foreground ink.
 - Margin: wide enough for the widest name whole (7px a character at 12px, plus 60 for the number and padding), and 32 before the cards.
 - Header strip: 56 above every chapter's first cards, under the lanes of the lines leaving the chapter before: the hairline at its top (white 10%; 20% while the chapter holds the topic in focus, none over the first), the number and name 8 under it, on the page's surface, over any line passing through. No card sits in the strip, so the name never covers one.
 - A course whose needs run from a later arc to an earlier one draws as Canvas tree.
