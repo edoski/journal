@@ -6,6 +6,7 @@ import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
 import { ArcStrip } from "@/components/course-map/arc-strip";
 import { ArcSelector } from "@/components/course-map/arc-selector";
+import { ArcTravel } from "@/components/course-map/arc-travel";
 import { arcShare, shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
@@ -79,8 +80,9 @@ export function HomeMap({
 	const [opensWhole, setOpensWhole] = useState<ReadonlyMap<string, boolean>>(new Map());
 	const chosenCourse = courses.find((c) => c.map.workspace === chosen)!;
 	const arcs = shownArcs(chosenCourse.map);
-	// Every map style but Current names the arcs with the quiet selector (arc-selector.md).
-	const quietSelector = useMapSkin().style !== "current";
+	// Every map style but Current names the arcs with the quiet selector (arc-selector.md); Stacked arcs with its rail.
+	const style = useMapSkin().style;
+	const quietSelector = style !== "current" && style !== "stack";
 	// The arc he picked on the strip, per course, for the visit.
 	const [picked, setPicked] = useState<ReadonlyMap<string, ArcHandle>>(new Map());
 	const follow = (followed === undefined ? litArc(chosenCourse, highlight) : followed) ?? null;
@@ -147,7 +149,21 @@ export function HomeMap({
 					}}
 				/>
 			)}
-			{arcs && !quietSelector && (
+			{arcs && style === "stack" && (
+				<>
+					{/* The selector's row stays as room: the rail runs down over it into the map's top fade, clear of every card. */}
+					<div aria-hidden="true" className="h-7 shrink-0" />
+					{!zoomedOut && (
+						<ArcTravel
+							className="absolute top-10 left-0 z-10"
+							arcs={arcs}
+							value={shownArc ?? null}
+							onSelect={(arc) => setPicked((was) => new Map(was).set(chosen, arc))}
+						/>
+					)}
+				</>
+			)}
+			{arcs && style === "current" && (
 				<ArcStrip
 					quiet
 					className="shrink-0"

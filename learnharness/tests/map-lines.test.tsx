@@ -19,6 +19,7 @@ import { layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-l
 import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin.ts";
 import { BANDS_SKIN } from "../components/course-map/topic-map/bands/bands-skin.ts";
 import { REGIONS_SKIN } from "../components/course-map/topic-map/regions/regions-skin.ts";
+import { STACK_SKIN } from "../components/course-map/topic-map/stack/stack-skin.ts";
 import { LinePaths, inkPaths, snapTo, trackPieces, type CanvasLine } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
 import { focusOf } from "../components/course-map/topic-map/canvas/canvas-focus.ts";
 import type { MapSkin } from "../components/course-map/topic-map/map-skin.ts";
@@ -55,7 +56,7 @@ const draw = (skin: MapSkin, topics: readonly CourseMapTopic[], needs: readonly 
 };
 
 describe("the map's lines", () => {
-	for (const [name, skin] of [["tree", TREE_SKIN], ["regions", REGIONS_SKIN], ["bands", BANDS_SKIN]] as const) {
+	for (const [name, skin] of [["tree", TREE_SKIN], ["regions", REGIONS_SKIN], ["bands", BANDS_SKIN], ["stack", STACK_SKIN]] as const) {
 		it(`${name}: draws every line as one edge, not one stroke per need`, () => {
 			const { edges } = draw(skin, TOPICS, NEEDS);
 			assert.equal(edges.length, 1);
@@ -89,15 +90,15 @@ describe("the map's lines", () => {
 	});
 
 	it("draws a stretch two inks share once, in the brighter ink", () => {
-		// A faded line from a neighbour's card and a resting line run down the same stretch into one card.
+		// A receded line and a lit one (the chain of a and c) run down the same stretch into one card.
 		const lines: CanvasLine[] = [
-			{ key: "near:x>c", points: [[100, 0], [100, 200]], prerequisite: h("x"), topic: h("c"), faded: true },
+			{ key: "x>c", points: [[100, 0], [100, 200]], prerequisite: h("x"), topic: h("c") },
 			{ key: "a>c", points: [[100, 120], [100, 200]], prerequisite: h("a"), topic: h("c") },
 		];
-		const pieces = trackPieces(lines, null, null);
-		const runs = (ink: "rest" | "context") => (pieces.get(ink) ?? []).map((p) => (p.kind === "run" ? [p.at, p.from, p.to] : null));
-		assert.deepEqual(runs("rest"), [[100, 120, 200]]);
-		assert.deepEqual(runs("context"), [[100, 0, 120]], "the faded ink stops where the resting line takes the stretch");
+		const pieces = trackPieces(lines, null, new Set([h("a"), h("c")]));
+		const runs = (ink: "lit" | "receded") => (pieces.get(ink) ?? []).map((p) => (p.kind === "run" ? [p.at, p.from, p.to] : null));
+		assert.deepEqual(runs("lit"), [[100, 120, 200]]);
+		assert.deepEqual(runs("receded"), [[100, 0, 120]], "the receded ink stops where the lit line takes the stretch");
 	});
 
 	it("draws a run several lines share once, whatever their corners", () => {

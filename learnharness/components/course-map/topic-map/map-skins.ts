@@ -6,7 +6,7 @@ import { TREE_SKIN } from "./canvas/canvas-skin";
 import { REGIONS_SKIN } from "./regions/regions-skin";
 import { OVERVIEW_SKIN } from "./overview/overview-skin";
 import { BANDS_SKIN } from "./bands/bands-skin";
-import { NEIGHBOURS_SKIN } from "./neighbours/neighbours-skin";
+import { STACK_SKIN } from "./stack/stack-skin";
 
 /** Every map style's drawing, Current first. */
 const SKINS: Record<MapStyle, MapSkin> = {
@@ -15,7 +15,7 @@ const SKINS: Record<MapStyle, MapSkin> = {
 	regions: REGIONS_SKIN,
 	bands: BANDS_SKIN,
 	overview: OVERVIEW_SKIN,
-	neighbours: NEIGHBOURS_SKIN,
+	stack: STACK_SKIN,
 };
 
 /** The drawing every course map uses, from the map's switch (map-style.ts). */

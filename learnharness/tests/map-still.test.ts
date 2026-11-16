@@ -17,7 +17,7 @@ import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin
 import { REGIONS_SKIN } from "../components/course-map/topic-map/regions/regions-skin.ts";
 import { BANDS_SKIN } from "../components/course-map/topic-map/bands/bands-skin.ts";
 import { OVERVIEW_SKIN } from "../components/course-map/topic-map/overview/overview-skin.ts";
-import { NEIGHBOURS_SKIN } from "../components/course-map/topic-map/neighbours/neighbours-skin.ts";
+import { STACK_SKIN } from "../components/course-map/topic-map/stack/stack-skin.ts";
 
 const layout = { width: 760, height: 420 } as TopicMapLayout;
 const frame = { width: 1192, height: 866 };
@@ -25,10 +25,14 @@ const room = { x: 64, y: 60 };
 
 describe("a map held still while it fits", () => {
 	it("holds every candidate style still, and leaves Current's pan as it was", () => {
-		for (const [name, skin] of Object.entries({ tree: TREE_SKIN, regions: REGIONS_SKIN, bands: BANDS_SKIN, overview: OVERVIEW_SKIN, neighbours: NEIGHBOURS_SKIN })) {
+		for (const [name, skin] of Object.entries({ tree: TREE_SKIN, regions: REGIONS_SKIN, bands: BANDS_SKIN, overview: OVERVIEW_SKIN, stack: STACK_SKIN })) {
 			assert.equal(skin.fixedWhenFits, true, name);
 			assert.ok((skin.maxZoom ?? 1) > 1, `${name}: a pinch zooms in even where the whole course fits at 100%`);
 		}
+		// Stacked arcs holds still through Canvas tree's own rule, not a copy of it.
+		assert.equal(STACK_SKIN.fixedWhenFits, TREE_SKIN.fixedWhenFits);
+		assert.equal(STACK_SKIN.maxZoom, TREE_SKIN.maxZoom);
+		assert.equal(STACK_SKIN.panOnScroll, TREE_SKIN.panOnScroll);
 		assert.equal(CURRENT_SKIN.fixedWhenFits, undefined);
 		assert.equal(CURRENT_SKIN.maxZoom, undefined);
 	});

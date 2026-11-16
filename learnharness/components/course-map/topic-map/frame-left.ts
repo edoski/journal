@@ -36,7 +36,7 @@ const subscribeNever = () => () => {};
 /**
  * The left edge of what shows of the map, in the drawing's units, `stickIn`
  * pixels in: where a name that must stay whole on screen is held (a
- * chapter's in Bands, a band's in Tree and neighbours), whether the map's
+ * chapter's in Bands), whether the map's
  * camera moves it (Home) or the page scrolls it (the course page).
  */
 export function useFrameLeft(stickIn: number): number {

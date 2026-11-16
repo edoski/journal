@@ -19,23 +19,20 @@ export interface CanvasLine {
 	topic?: TopicHandle;
 	/** For a line between arcs, the needs it stands for, `prerequisite>topic`. */
 	needs?: readonly string[];
-	/** A line to or from a neighbouring arc's card (Tree and neighbours), always in the context ink. */
-	faded?: boolean;
 }
 
 /** How a line reads: at rest, lit with the topic in focus or the lit
  *  chain, or receded while something else is. */
-export type LineInk = "rest" | "lit" | "receded" | "context";
+export type LineInk = "rest" | "lit" | "receded";
 /** Drawn in this order, so a lit line passes over the rest. */
-export const LINE_INKS: readonly LineInk[] = ["context", "receded", "rest", "lit"];
+export const LINE_INKS: readonly LineInk[] = ["receded", "rest", "lit"];
 /** Which ink a stretch several lines share takes: the brightest of theirs. */
-const RANK: Record<LineInk, number> = { receded: 0, context: 1, rest: 2, lit: 3 };
+const RANK: Record<LineInk, number> = { receded: 0, rest: 1, lit: 2 };
 
 export type CanvasLinesFlowEdge = Edge<{ lines: readonly CanvasLine[] }, "canvasLines">;
 
 /** Each line's ink, from the topic in focus or else the lit chain. Pure. */
 export function inkOf(line: CanvasLine, focus: Focus | null, chain: ReadonlySet<TopicHandle> | null): LineInk {
-	if (line.faded) return "context";
 	if (focus) {
 		const on = line.needs ? line.needs.some((key) => key.split(">").includes(focus.topic)) : focus.lines.has(lineKey(line.prerequisite!, line.topic!));
 		return on ? "lit" : "receded";
@@ -88,7 +85,7 @@ const pointKey = (p: Point) => `${key3(p[0])},${key3(p[1])}`;
  * Every stretch of track drawn once (canvas.md, Lines): the lines' pieces,
  * where several lines run along the same stretch, merged into one, in the
  * brightest ink among them, so no stretch is ever painted twice in two inks
- * (a faded line under a resting one widened its rim). Pure.
+ * (a receded line under a lit one widened its rim). Pure.
  */
 export function trackPieces(lines: readonly CanvasLine[], focus: Focus | null, chain: ReadonlySet<TopicHandle> | null): Map<LineInk, Piece[]> {
 	const runs = new Map<string, { vertical: boolean; at: number; spans: { from: number; to: number; ink: LineInk }[] }>();
@@ -174,7 +171,7 @@ export function inkPaths(lines: readonly CanvasLine[], focus: Focus | null, chai
 	return paths;
 }
 
-const STROKE: Record<LineInk, string> = { rest: "stroke-map-line", lit: "stroke-map-line-lit", receded: "stroke-map-line-receded", context: "stroke-map-line-context" };
+const STROKE: Record<LineInk, string> = { rest: "stroke-map-line", lit: "stroke-map-line-lit", receded: "stroke-map-line-receded" };
 
 /** The screen's device pixels per CSS pixel; 0 on a server render, which draws unsnapped. */
 function subscribeDpr(onChange: () => void): () => void {
@@ -215,8 +212,7 @@ export function LinePaths({ pieces, snap, scale = 1, ref }: { pieces: ReadonlyMa
  * same width and grey (Edo, 16 Nov 2026: "a difference in the edges when
  * there's just one line versus two lines going through them, both in terms
  * of thickness and colour"). Off the pixel grid a line spread over three
- * device pixels at a lower grey; a faded line under a resting one widened
- * its rim.
+ * device pixels at a lower grey; two inks on one stretch widened its rim.
  */
 export function CanvasLinesEdge({ data }: EdgeProps<CanvasLinesFlowEdge>) {
 	const focus = useCanvas()?.focus ?? null;

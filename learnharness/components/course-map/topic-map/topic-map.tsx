@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent, type Edge, type Node } from "@xyflow/react";
+import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, useStoreApi, type CoordinateExtent, type Edge, type Node } from "@xyflow/react";
 import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,8 @@ import { TopicMapContext, type TopicMapState } from "./topic-node";
 import { cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { litCamera, litFollow } from "./lit-camera";
-import { drawingOf, handleAt, type FrameProps, type MapSkin, type TopicData } from "./map-skin";
+import { drawingOf, handleAt, trailOf, type FrameProps, type MapSkin, type TopicData, type Trail } from "./map-skin";
+import type { ArcView } from "./arc-view";
 import { ArcOpenContext, type ArcOpen } from "./arcs/arc-open";
 import { useMapSkin } from "./map-skins";
 
@@ -19,6 +20,15 @@ import { useMapSkin } from "./map-skins";
 const ROOM = { x: 48, y: 32 };
 /** How long the camera takes to follow the keyboard to a topic out of view, or a page to the topics it points at. */
 const FOLLOW_MS = 200;
+/** How long the camera takes to glide from one arc to the next (`MapSkin.travel`). */
+const TRAVEL_MS = 420;
+/** Every place the camera may look while it glides between arcs. */
+const ANYWHERE: CoordinateExtent = [
+	[-Infinity, -Infinity],
+	[Infinity, Infinity],
+];
+/** The glide between arcs: eased in and out, as a camera moving between two fixed views. */
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 /** The course page pane's glide (split-map.tsx): fast out, settling in. */
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
@@ -107,58 +117,32 @@ function SkinnedMap({
 	// An arc he opens on the map (a `grouped` style's folded arc), until the page shows another.
 	const [opened, setOpened] = useState<ArcHandle | null>(null);
 	const [shownArc, setShownArc] = useState(arc);
+	// The arc the map just left, drawn beside the shown one while the camera glides over (`travel`).
+	const [trailArc, setTrailArc] = useState<ArcHandle | null>(null);
 	if (shownArc !== arc) {
 		setShownArc(arc);
 		setOpened(null);
+		setTrailArc(skin.travel && zoom === undefined && !whole && shownArc && arc && !reducedMotion() ? shownArc : null);
 	}
 	const drawing = useMemo(() => drawingOf(skin, course, arc, opened), [skin, course, arc, opened]);
 	const { view, layout, framedArc } = drawing;
+	const trail = useMemo(() => (trailArc && arc ? trailOf(skin, course, trailArc, arc, layout) : null), [skin, course, trailArc, arc, layout]);
+	const endTravel = useCallback((from: ArcHandle) => setTrailArc((was) => (was === from ? null : was)), []);
 	const map = view.map;
-	const node = layout.node;
 	const arcFramed = useMemo(() => (framedArc ? new Set(map.topics.filter((t) => t.arc === framedArc).map((t) => t.handle)) : null), [framedArc, map.topics]);
 	const arcOpen = useMemo<ArcOpen>(() => ({ opened, open: setOpened, ownCamera: zoom === undefined, workspace: course.workspace }), [opened, zoom, course.workspace]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
 	const nodes = useMemo<Node[]>(
 		() => [
-			...map.topics.flatMap((topic): Node<TopicData>[] | Node<TopicData> => {
-				const placed = layout.topics.get(topic.handle);
-				if (!placed) return [];
-				const line = cardLine(said.get(topic.handle));
-				const needs = map.edges.flatMap((e) => (e.kind === "needs" && e.topic === topic.handle ? [titleOf(e.prerequisite)] : []));
-				return {
-					id: topic.handle,
-					type: skin.topicType,
-					position: { x: placed.x, y: placed.y },
-					width: node.width,
-					height: node.height,
-					// A server render has no measured handles; these let it draw the needs.
-					handles: [
-						{ type: "target" as const, position: skin.handles.target, ...handleAt(skin.handles.target, node) },
-						{ type: "source" as const, position: skin.handles.source, ...handleAt(skin.handles.source, node) },
-					],
-					draggable: false,
-					selectable: false,
-					focusable: false,
-					ariaRole: "none" as const,
-					data: {
-						topic,
-						current: map.current === topic.handle,
-						standing: standingOf(topic),
-						line,
-						label: topicLabel(topic, map.current === topic.handle, line),
-						needs: needs.length ? `Needs ${needs.join(", ")}` : null,
-						href: unitHref(map.workspace, topic.handle),
-						from: view.entry.get(topic.handle) ?? null,
-					},
-				};
-			}),
+			...topicNodes(skin, map, view, layout, said, titleOf),
+			...(trail ? topicNodes(skin, trail.view.map, trail.view, trail.layout, said, titleOf, trail) : []),
 			...(skin.decorations?.(map, layout) ?? []),
 		],
-		[skin, map, said, layout, node, titleOf, view.entry],
+		[skin, map, said, layout, titleOf, view, trail],
 	);
 	const edges = useMemo<Edge[]>(
 		() =>
-			skin.edges?.(map, layout) ??
+			skin.edges?.(map, layout, trail) ??
 			layout.routes.map((route) => ({
 				id: `${route.prerequisite}>${route.topic}`,
 				source: route.prerequisite,
@@ -169,13 +153,13 @@ function SkinnedMap({
 				selectable: false,
 				domAttributes: { "aria-hidden": true },
 			})),
-		[skin, map, layout],
+		[skin, map, layout, trail],
 	);
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
 		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
 			<ArcOpenContext.Provider value={arcOpen}>
-				<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed ?? arcFramed} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
+				<Flow skin={skin} map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed ?? arcFramed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
 			</ArcOpenContext.Provider>
 		</ReactFlowProvider>
 	);
@@ -194,6 +178,8 @@ function Flow({
 	zoom: fixedZoom,
 	whole,
 	framed,
+	trail,
+	onTravelled,
 	onOpensWhole,
 	opensOn,
 	onOpenArc,
@@ -201,6 +187,9 @@ function Flow({
 	skin: MapSkin;
 	map: CourseMap;
 	layout: TopicMapLayout;
+	/** The arc the camera glides away from, drawn beside this one (`travel`); null at rest. */
+	trail: Trail | null;
+	onTravelled: (from: ArcHandle) => void;
 	nodes: Node[];
 	edges: Edge[];
 	titleOf: (handle: TopicHandle) => string;
@@ -218,6 +207,7 @@ function Flow({
 	const TAG_ROOM = skin.tagRoom;
 	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y, TAG_ROOM]);
 	const flow = useReactFlow();
+	const store = useStoreApi();
 	const frameWidth = useStore((s) => s.width);
 	const frameHeight = useStore((s) => s.height);
 
@@ -237,7 +227,8 @@ function Flow({
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
 	// Zoomed out as far as the whole course, however small: the enlarged map's overview.
 	const fitted = frame ? Math.min(1, wholeZoom(layout, frame, margin)) : 1;
-	const minZoom = fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
+	// While the camera glides between arcs it may look anywhere and at any scale the two views need.
+	const minZoom = trail ? Math.min(fitted, 0.1) : fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
 	// As far as the camera may look: the room (in the frame's pixels) at the smallest scale the map shows, and one
 	// topic past it for a pan or a follow (`slackOf`).
 	const reach = useMemo(() => {
@@ -248,12 +239,13 @@ function Flow({
 	const extent = useMemo<CoordinateExtent>(() => {
 		// A style held still while the map fits looks no further than the view that shows it whole, so zooming
 		// back out to that view lands on it, centred.
+		if (trail) return ANYWHERE;
 		if (skin.fixedWhenFits && frameWidth > 0 && frameHeight > 0) return wholeExtent(layout, { width: frameWidth, height: frameHeight }, fitted);
 		return [
 			[-reach.x, -reach.y],
 			[layout.width + reach.x, layout.height + reach.y],
 		];
-	}, [skin.fixedWhenFits, frameWidth, frameHeight, fitted, layout, reach]);
+	}, [trail, skin.fixedWhenFits, frameWidth, frameHeight, fitted, layout, reach]);
 	// All of it on screen: nothing to pan to, so only a pinch moves the map (`fixedWhenFits`).
 	const zoomNow = useStore((s) => s.transform[2]);
 	const still = skin.fixedWhenFits === true && frame !== null && showsWhole(zoomNow, fitted);
@@ -270,6 +262,8 @@ function Flow({
 	const wasWhole = useRef(whole);
 	/** The opening view, where the camera returns once a page points at nothing. */
 	const opening = useRef<Camera | null>(null);
+	/** The arc change the camera last glided for, so a render during the glide does not start it again. */
+	const travelled = useRef<Trail | null>(null);
 	/** What the follow reads when it fires, as of the last render. */
 	const now = useRef({ layout, frame, frameMargin, reach, minZoom, current: map.current, tag: TAG_ROOM });
 	now.current = { layout, frame, frameMargin, reach, minZoom, current: map.current, tag: TAG_ROOM };
@@ -303,9 +297,19 @@ function Flow({
 		wasWhole.current = whole;
 		opening.current = camera;
 		follower.stay();
-		void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
+		const from = trail?.arc;
+		if (trail && travelled.current !== trail) {
+			// Another arc: the camera stays on the arc it left, now drawn beside this one, and glides over to this one.
+			// React Flow takes the glide's bounds from its props only after this effect, so they are set first.
+			travelled.current = trail;
+			const was = flow.getViewport();
+			store.getState().setMinZoom(minZoom);
+			store.getState().setTranslateExtent(ANYWHERE);
+			void flow.setViewport({ x: was.x - trail.dx * was.zoom, y: was.y - trail.dy * was.zoom, zoom: was.zoom });
+			void flow.setViewport(camera, { duration: TRAVEL_MS, ease: easeInOut }).then(() => from && onTravelled(from));
+		} else if (!trail) void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
 		setPlaced(true);
-	}, [flow, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, TAG_ROOM]);
+	}, [flow, store, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, TAG_ROOM, trail, onTravelled]);
 
 	// The topics a page points at on this drawing, which the camera follows; none while it shows the whole course.
 	const pointedAt = useMemo(() => {
@@ -409,4 +413,52 @@ function Flow({
 /** The style's own frame around the drawing, or the drawing as it is. */
 function SkinFrame({ skin, children, ...props }: Omit<FrameProps, "children"> & { skin: MapSkin; children: React.ReactNode }) {
 	return skin.Frame ? <skin.Frame {...props}>{children}</skin.Frame> : children;
+}
+
+/** A drawing's topic nodes: each topic the layout places, with what its card says and where a click goes. A `trail`
+ *  (the arc the map is leaving) draws its cards beside the shown arc, out of the map's focus and keys. */
+function topicNodes(
+	skin: MapSkin,
+	map: CourseMap,
+	view: ArcView,
+	layout: TopicMapLayout,
+	said: ReadonlyMap<TopicHandle, Said>,
+	titleOf: (handle: TopicHandle) => string,
+	trail: Trail | null = null,
+): Node<TopicData>[] {
+	const node = layout.node;
+	return map.topics.flatMap((topic): Node<TopicData>[] => {
+		const placed = layout.topics.get(topic.handle);
+		if (!placed) return [];
+		const line = cardLine(said.get(topic.handle));
+		const needs = map.edges.flatMap((e) => (e.kind === "needs" && e.topic === topic.handle ? [titleOf(e.prerequisite)] : []));
+		return [
+			{
+				id: trail ? `trail:${topic.handle}` : topic.handle,
+				type: trail ? "trailTopic" : skin.topicType,
+				position: { x: placed.x + (trail?.dx ?? 0), y: placed.y + (trail?.dy ?? 0) },
+				width: node.width,
+				height: node.height,
+				// A server render has no measured handles; these let it draw the needs.
+				handles: [
+					{ type: "target" as const, position: skin.handles.target, ...handleAt(skin.handles.target, node) },
+					{ type: "source" as const, position: skin.handles.source, ...handleAt(skin.handles.source, node) },
+				],
+				draggable: false,
+				selectable: false,
+				focusable: false,
+				ariaRole: "none" as const,
+				data: {
+					topic,
+					current: map.current === topic.handle,
+					standing: standingOf(topic),
+					line,
+					label: topicLabel(topic, map.current === topic.handle, line),
+					needs: needs.length ? `Needs ${needs.join(", ")}` : null,
+					href: unitHref(map.workspace, topic.handle),
+					from: view.entry.get(topic.handle) ?? null,
+				},
+			},
+		];
+	});
 }

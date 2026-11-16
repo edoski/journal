@@ -59,11 +59,12 @@ export interface MapSkin {
 	/** Room the "You are here" tag takes above its node. */
 	tagRoom: number;
 	/** The edges it draws, when not one per need along the layout's routes
-	 *  (`routes` stay the needs: the camera frames a topic's next topics by them). */
-	edges?: (map: CourseMap, layout: TopicMapLayout) => Edge[];
-	/** Grows a one-arc drawing (`base`, laid out on `view`) with what it shows around the arc: its neighbouring
-	 *  arcs (Tree and neighbours). */
-	around?: (course: CourseMap, view: ArcView, arc: ArcHandle | undefined, base: TopicMapLayout) => TopicMapLayout;
+	 *  (`routes` stay the needs: the camera frames a topic's next topics by them), with a `trail`'s lines while the
+	 *  camera glides away from it (`travel`). */
+	edges?: (map: CourseMap, layout: TopicMapLayout, trail?: Trail | null) => Edge[];
+	/** Glides between arcs (Stacked arcs): when the page shows another arc, the one it left stays drawn beside it,
+	 *  above or below as they stand in study order (`trailOf`), while the camera glides from one to the other. */
+	travel?: boolean;
 	/** Nodes that are not topics (arc regions, headers), placed in the drawing. */
 	decorations?: (map: CourseMap, layout: TopicMapLayout) => Node[];
 	/** Where an arrow key goes from a topic; null at the drawing's edge. */
@@ -91,6 +92,20 @@ export function handleAt(position: Position, size: { width: number; height: numb
 	return { x: size.width, y: size.height / 2 };
 }
 
+/** The arc a map left, drawn beside the arc it shows while the camera glides over (`MapSkin.travel`): its own
+ *  drawing, placed `dx`, `dy` from the shown arc's. */
+export interface Trail {
+	arc: ArcHandle;
+	view: ArcView;
+	layout: TopicMapLayout;
+	dx: number;
+	dy: number;
+}
+
+/** Room between two arcs stacked one over the other, so the camera's glide reads as one arc leaving and the next
+ *  arriving. */
+export const ARC_GAP = 160;
+
 /** The map as it is (topic-map.md): layered cards, top to bottom. */
 export const CURRENT_SKIN: MapSkin = {
 	layout: (topics, edges, top) => layoutTopicMap(topics, edges, TOPIC_NODE_SIZE, top),
@@ -112,8 +127,7 @@ export const CURRENT_SKIN: MapSkin = {
 export function drawingOf(skin: MapSkin, course: CourseMap, arc: ArcHandle | undefined, opened: ArcHandle | null = null): { view: ArcView; layout: TopicMapLayout; framedArc: ArcHandle | null } {
 	if (!skin.grouped || !course.arcs || course.arcs.length < 2) {
 		const view = arcView(course, arc);
-		const base = skin.layout(view.map.topics, view.map.edges, new Set(view.entry.keys()));
-		return { view, layout: skin.around?.(course, view, arc, base) ?? base, framedArc: null };
+		return { view, layout: skin.layout(view.map.topics, view.map.edges, new Set(view.entry.keys())), framedArc: null };
 	}
 	const current = currentArc(course);
 	const shown = opened ?? (arc && course.arcs.some((a) => a.handle === arc) ? arc : null);
@@ -123,4 +137,23 @@ export function drawingOf(skin: MapSkin, course: CourseMap, arc: ArcHandle | und
 		layout: skin.layout(course.topics, course.edges, new Set(), { arcs: course.arcs, open, current }),
 		framedArc: shown !== current ? shown : null,
 	};
+}
+
+/** The arc `from` drawn beside `to`'s drawing (`shown`), as the arcs stack in study order: above it when it comes
+ *  first, below when it comes after, both on one vertical axis, `ARC_GAP` apart. Null when either is not one of the
+ *  course's arcs. Pure. */
+export function trailOf(skin: MapSkin, course: CourseMap, from: ArcHandle, to: ArcHandle, shown: TopicMapLayout): Trail | null {
+	const arcs = course.arcs ?? [];
+	const a = arcs.findIndex((arc) => arc.handle === from);
+	const b = arcs.findIndex((arc) => arc.handle === to);
+	if (a < 0 || b < 0 || a === b) return null;
+	const { view, layout } = drawingOf(skin, course, from);
+	return { arc: from, view, layout, dx: (shown.width - layout.width) / 2, dy: a < b ? -(layout.height + ARC_GAP) : shown.height + ARC_GAP };
+}
+
+/** The arc `step` places from `arc` in study order; null past either end. Pure. */
+export function arcStep(course: CourseMap, arc: ArcHandle | null | undefined, step: -1 | 1): CourseMapArc | null {
+	const arcs = course.arcs ?? [];
+	const at = arcs.findIndex((a) => a.handle === arc);
+	return at < 0 ? null : (arcs[at + step] ?? null);
 }
