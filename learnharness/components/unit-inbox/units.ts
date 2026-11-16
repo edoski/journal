@@ -2,7 +2,7 @@ import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCours
 import { leftOffWords, overdueWords, reviewWords, slipMark, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { slipBeside } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { currentSessions, sessionState } from "@/components/nav/session-state";
+import { currentSessions, resumableSession, sessionState } from "@/components/nav/session-state";
 
 /**
  * The sidebar's topics. Each unit (a course map topic the learner has
@@ -106,6 +106,16 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
  *  reads it. Pure. */
 export function nowOf(sessions: readonly ChatListItem[], handle: string, course: readonly ChatListItem[] = []): UnitNow {
 	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)), course);
+}
+
+/** The session a topic's row resumes: of those that belong to it
+ *  (`ownsTopic`), the one to pick up, as its status (`nowOf`) and its
+ *  page's Now read it; never one that only touched it on the way (round
+ *  13, 2 M1: Problem sheet 4, left for next time, was Vectors' Resume
+ *  under On your own, since the sheet's first check was on vectors).
+ *  Pure. */
+export function rowResume(unit: Pick<Unit, "sessions" | "topic">): ChatListItem | null {
+	return resumableSession(unit.sessions.filter((c) => ownsTopic(c, unit.topic.handle)));
 }
 
 /** What any of these sessions is doing now: one waits on the learner, the

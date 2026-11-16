@@ -54,10 +54,15 @@ const PICK_UP_ORDER: readonly SessionState[] = ["your-turn", "working", "paused"
  *  before he said anything in it once he has started another session in
  *  its course (`course`, any sessions: those of its course are read), as
  *  that study moved past it (round 10, 2 m4: the same preview, with no
- *  later session on its own topic). A turn running now stays. Pure. */
+ *  later session on its own topic). A session holding an open task is
+ *  moved past only by a later session on that task, since the task is its
+ *  work, not the topic's (round 13, 2 M1: the morning's Kernel review
+ *  moved past Problem sheet 4, so after its close Learning had no Kernel).
+ *  A turn running now stays. Pure. */
 export function currentSessions(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): ChatListItem[] {
+	const sameWork = (of: ChatListItem, chat: ChatListItem) => chat.kind === of.kind && (!of.tasks?.length || (chat.tasks ?? []).some((key) => of.tasks!.includes(key)));
 	// Only another session moves past one: a seeded session can carry a start later than his clock (round 11, 1 N5).
-	const started = (of: ChatListItem) => sessions.reduce((last, chat) => (chat.id !== of.id && chat.kind === of.kind && chat.createdAt > last ? chat.createdAt : last), "");
+	const started = (of: ChatListItem) => sessions.reduce((last, chat) => (chat.id !== of.id && sameWork(of, chat) && chat.createdAt > last ? chat.createdAt : last), "");
 	const movedOn = (chat: ChatListItem) =>
 		chat.untouched === true && chat.ended === "cut" && course.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && other.createdAt > chat.updatedAt);
 	return sessions.filter((chat) => chat.busy || (chat.updatedAt >= started(chat) && !movedOn(chat)));
