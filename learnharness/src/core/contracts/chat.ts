@@ -479,6 +479,9 @@ export interface ChatSummary {
 	/** The tutor's last turn ended because he stopped it (`stoppedByHim`),
 	 *  not because the app restarted: a cut session then says he stopped it. */
 	stopped?: true;
+	/** The tutor's last turn failed (Claude Code refused or broke off), so
+	 *  it never replied: a paused session says it couldn't reply. */
+	failed?: true;
 	/** He has said nothing in it past the words it opened with, so it
 	 *  holds nothing of his to pick up (`currentSessions`). */
 	untouched?: true;

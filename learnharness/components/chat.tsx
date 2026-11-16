@@ -78,7 +78,8 @@ import { partKey, predictionOpenOn, roadmapSteps, stepAnchors } from "@/componen
 import { scrollSessionTarget } from "@/components/session-navigation";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
-import { isCourseDeletedRefusal, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { isCourseDeletedRefusal, isSignedOutLine, parseProviderKeyRefusal, refusalWatch, UNREACHABLE_APP } from "@/components/lesson/turn-error-text";
+import { pausePlaceholder, practicePause } from "@/components/lesson/practice-pause";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
@@ -791,7 +792,7 @@ export function Chat({
 	// (turn-error-text.ts refusalWatch).
 	const refusalSinceRef = useRef<number | null>(null);
 	useEffect(() => {
-		const watch = refusalWatch(refusalSinceRef.current, !!error && parseProviderKeyRefusal(error.message), modelStatus?.connected, statusRead);
+		const watch = refusalWatch(refusalSinceRef.current, isSignedOutLine(error?.message), modelStatus?.connected, statusRead);
 		refusalSinceRef.current = watch.since;
 		if (!watch.clear) return;
 		clearError();
@@ -919,19 +920,20 @@ export function Chat({
 		return () => window.removeEventListener(kbdEventForChat("dispute-mark"), onDispute);
 	}, []);
 
-	const nextReady =
-		!doneTonight &&
-		mode === "practice" &&
-		!pending &&
-		!activeProblem &&
-		!busy &&
-		nativeMessages.some(
+	const nextReady = practicePause({
+		practice: mode === "practice",
+		closed: doneTonight,
+		open: !!pending || !!activeProblem,
+		busy,
+		posed: nativeMessages.some(
 			(m) => (m as { role?: string }).role === "assistant" &&
 				Array.isArray((m as { content?: unknown[] }).content) &&
 				(m as { content: Array<{ type?: string; name?: string }> }).content.some(
 					(b) => b.type === "toolCall" && b.name === "problem",
 				),
-		);
+		),
+		retry: !!tryAgain,
+	});
 	const sendNext = useCallback(() => {
 		if (!nextReady) return;
 		void send({ type: "next" });
@@ -1827,7 +1829,7 @@ export function Chat({
 								nextProblem: nextReady,
 								onNext: sendNext,
 								onEmptyEnter: tryAgain,
-								placeholder: nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined,
+								placeholder: pausePlaceholder(nextReady, !!tryAgain),
 								photos: composerPhotos,
 							}}
 							onAskInstead={() => void askInstead()}
