@@ -93,6 +93,7 @@ import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keep
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
+import { marksBeforeDone } from "@/components/lesson/marks-before-done";
 import { courseDeletedBy, CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
@@ -1031,6 +1032,9 @@ export function Chat({
 	// was first taught, for the top bar's roadmap (lesson-roadmap.md).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
 	const anchors = useMemo(() => (planTree ? stepAnchors(messages, new Set(planTree.nodes.map((n) => n.id))) : new Map<string, string>()), [planTree, messages]);
+	// A problem's close that marks his answer from before Done for today is
+	// drawn above its line, beside the answer (marks-before-done.ts).
+	const doneMarks = useMemo(() => marksBeforeDone(messages), [messages]);
 	const reasked = useMemo(() => askedAgain(messages), [messages]);
 	const reaskedAfterHint = useMemo(() => askedAfterHint(messages), [messages]);
 	const openingAt = useMemo(() => appOpeningAt(messages, appOpening), [messages, appOpening]);
@@ -1633,7 +1637,15 @@ export function Chat({
 												// The learner's move-on signal (owner round 16).
 												return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
 											case "data-done-tonight":
-												return <DoneTonightLine key={pi} />;
+												return (
+													<Fragment key={pi}>
+														{doneMarks.before.get(mi)?.map(({ message, part: at }) => {
+															const conclude = messages[message]!.parts[at]!;
+															return <ProseConclude key={`${message}:${at}`} toolCallId={conclude.toolCallId!} input={conclude.input} output={conclude.output} reveal={conclude.reveal} />;
+														})}
+														<DoneTonightLine />
+													</Fragment>
+												);
 											case "data-dispute":
 												return <DisputeBubble key={pi} data={part.data as DisputeDetails} />;
 											// Compaction (the moment and the cut) is the tutor's
@@ -1741,6 +1753,7 @@ export function Chat({
 															return <ProseProblem key={pi} input={part.input} active={part.toolCallId === activeProblemCallId} />;
 														}
 														if (part.type === "tool-conclude") {
+															if (doneMarks.moved.has(partKey(mi, pi))) return null;
 															return <ProseConclude key={pi} toolCallId={part.toolCallId!} input={part.input} output={part.output} reveal={part.reveal} />;
 														}
 														// Artifact extension point (contracts.ts): job
