@@ -43,6 +43,7 @@ import {
 	HANDOFF_TEXT,
 	REVIEW_HANDOFF_TEXT,
 	TASK_HANDOFF_TEXT,
+	taskContinueText,
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
 	PRACTICE_REQUEST_TEXT,
@@ -86,6 +87,7 @@ export interface LhMarkerMessage {
 		| "practice-next"
 		| "practice-request"
 		| "done-tonight"
+		| "task-continue"
 		| "dispute"
 		| "problem-dismissed"
 		| "compaction"
@@ -648,6 +650,21 @@ export function newDoneTonightMessage(agent: keyof typeof DONE_TONIGHT_TEXT): Lh
 	};
 }
 
+/** His Continue on an open task the session holds, with nothing in it
+ *  waiting on him (round 13, 2 M1): the turn carries on at the task's step.
+ *  The transcript draws nothing for it; the tutor's step is the reply. */
+export function newTaskContinueMessage(tasks: readonly string[]): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "task-continue",
+		content: taskContinueText(tasks),
+		display: true,
+		details: { tasks: [...tasks] },
+		timestamp: Date.now(),
+	};
+}
+
 /** His dispute of an answer's mark (Edo, 14 Nov 2026), the transcript's
  *  record of it: which answer, the attempts that stood for it, and what he
  *  said or the mark he picked. */
@@ -1076,6 +1093,32 @@ export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
 	return [...held].filter(([, open]) => open).map(([key]) => key);
 }
 
+/** The title the session's saves gave the first task they opened, the
+ *  newest title it gave that task, kept after the task closes, so the day's
+ *  record names the session one way all day (round 13, 1 n9: "Eigenvalues
+ *  and eigenvectors lesson", then "Eigenvalues and eigenvectors" once its
+ *  task closed). Null when its saves titled no task. Pure. */
+export function sessionTaskTitleOf(messages: readonly LhMessage[]): string | null {
+	const clean = cleanToolCallIds(messages);
+	let first: string | null = null;
+	let title: string | null = null;
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const tasks = saveChanges(block.arguments as Record<string, unknown>)?.tasks;
+			if (typeof tasks !== "object" || tasks === null) continue;
+			for (const [key, patch] of Object.entries(tasks)) {
+				const named = (patch as { title?: unknown } | null)?.title;
+				if (typeof named !== "string" || !named.trim()) continue;
+				first ??= key;
+				if (key === first) title = named.trim();
+			}
+		}
+	}
+	return title;
+}
+
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
  *  conclude card is the modelSolution committed at POSE time — the newest
  *  cleanly-posed problem BEFORE this conclude call. The reveal is never
@@ -1426,7 +1469,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request", "done-tonight", UNGRADED_ANSWER, "dispute", "task-continue"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {

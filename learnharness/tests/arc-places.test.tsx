@@ -93,14 +93,15 @@ describe("Home's rows", () => {
 		assert.ok(!doc.querySelector('[data-slot="today-line"]')!.textContent!.startsWith("Linear Algebra ·"), "never on the course line");
 	});
 
-	it("leave the sidebar card's status with its plain words", () => {
+	it("give the sidebar card a new topic's reason in Home's words when it names topics, never an arc (round 13, 1 n5)", () => {
 		const after = planned(LINALG_ARCS, { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] });
 		const [line] = needsYouNow([after], [], TODAY).lines;
-		assert.equal(line!.slot, "Planned today");
+		assert.equal(line!.slot, "After Eigenvalues and eigenvectors");
 		const doc = render(<NowCard line={line!} unit={topicUnit(buildInbox([after], [], null), after, line!.lead!, [])} active={false} />);
 		const mark = doc.querySelector('[data-slot="why-mark"]')!;
-		assert.equal(mark.textContent?.replace(", ", ""), "Planned today");
-		assert.equal(mark.getAttribute("data-starts"), null);
+		assert.equal(mark.textContent?.replace(", ", ""), "After Eigenvalues and eigenvectors");
+		const next = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
+		assert.equal(needsYouNow([next], [], TODAY).lines[0]!.slot, "Planned today", "Next in Eigenvalues names an arc: the card keeps its plain words");
 	});
 
 	it("keep today's words for a planned topic in a course without arcs", () => {

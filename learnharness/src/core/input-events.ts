@@ -38,6 +38,9 @@ import type { LhMessage } from "./native-messages.ts";
 import type { AnswerSaves, SessionMode } from "./contracts/chat.ts";
 import {
 	activeProblemOf,
+	newTaskContinueMessage,
+	sessionTasksOf,
+	needsContinuation,
 	sessionModeOf,
 	concludedByDismissalPair,
 	danglingQuestionOf,
@@ -96,6 +99,10 @@ export type ChatInput =
 	| { type: "next" }
 	/** Done for tonight: he stops now, whatever is open. */
 	| { type: "tonight" }
+	/** Continue pressed on an open task the session holds, with nothing
+	 *  in it waiting on him: the tutor carries on at the task's step
+	 *  (round 13, 2 M1). */
+	| { type: "task" }
 	/** His dispute of an answer's mark (Edo, 14 Nov 2026): the answer's
 	 *  call, the attempts that stood for it when he pressed Dispute, and
 	 *  what he said is wrong or the mark he thinks is right (at least one). */
@@ -284,6 +291,8 @@ export function parseChatInput(input: unknown): ChatInput {
 			return { type: "next" };
 		case "tonight":
 			return { type: "tonight" };
+		case "task":
+			return { type: "task" };
 		case "dispute": {
 			if (typeof i.answerId !== "string" || i.answerId.length === 0) throw new ChatInputError("dispute input requires answerId");
 			const observations = Array.isArray(i.observations) ? i.observations : [];
@@ -369,6 +378,8 @@ export function inputAppends(
 		}
 		case "tonight":
 			return tonightAppends(record);
+		case "task":
+			return taskContinueAppends(record);
 		case "dispute":
 			return disputeAppends(record, input);
 	}
@@ -550,4 +561,20 @@ function dismissalConclusion(record: { messages: LhMessage[] }): LhMessage[] {
 /** Is this tool name a question tool (dock-owned, answer-gated)? */
 export function isQuestionTool(name: string): boolean {
 	return (QUESTION_TOOLS as readonly string[]).includes(name);
+}
+
+/** Whether Continue on the task a session holds starts a turn: it holds an
+ *  open task, nothing in it waits on him, and no reply is owed (pure). */
+export function taskTurnOwed(messages: LhMessage[]): boolean {
+	return sessionTasksOf(messages).length > 0 && !danglingQuestionOf(messages) && !activeProblemOf(messages) && !needsContinuation(messages);
+}
+
+/** Continue on a task's appends (pure): refused unless the session holds
+ *  an open task and nothing in it waits on him, since a posed question or
+ *  problem is where he goes on, and his answer is the next input. */
+export function taskContinueAppends(record: { messages: LhMessage[] }): LhMessage[] {
+	const tasks = sessionTasksOf(record.messages);
+	if (tasks.length === 0) throw new ChatInputError("task input requires a session holding an open task");
+	if (danglingQuestionOf(record.messages) || activeProblemOf(record.messages)) throw new ChatInputError("task input requires nothing waiting on him");
+	return [...dismissalConclusion(record), newTaskContinueMessage(tasks)];
 }

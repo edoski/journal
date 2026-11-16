@@ -4,11 +4,11 @@ import Link from "next/link";
 import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
 import type { ChatListItem } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { resumableSession, sessionState } from "@/components/nav/session-state";
+import { sessionState, continueHref } from "@/components/nav/session-state";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { monogram, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { monogram, rowResume, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
 import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, ROW_TITLE, RowCard, rowSurface, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,11 +40,11 @@ export function CourseMark({ title, className }: { title: string; className?: st
 }
 
 /** The row's one action, over its status slot: Resume opens the session
- *  waiting on the learner (or running), else Study starts a new one on the
- *  topic. Shown on hover and on keyboard focus. */
+ *  of its own waiting on the learner (or running), else Study starts a new
+ *  one on the topic. Shown on hover and on keyboard focus. */
 function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 	const { start, starting } = useStartUnit();
-	const resume = resumableSession(unit.sessions);
+	const resume = rowResume(unit);
 	const label = resume ? "Resume" : STUDY_WORDS;
 	const Icon = resume ? PlayIcon : SquarePenIcon;
 	const props = {
@@ -55,7 +55,7 @@ function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 	if (resume) {
 		return (
 			<Button asChild variant="quiet" size="xs" {...props}>
-				<Link href={`/chat/${resume.id}`} onClick={blurAfterPointerClick}>
+				<Link href={continueHref(resume)} onClick={blurAfterPointerClick}>
 					<Icon aria-hidden />
 					{label}
 				</Link>

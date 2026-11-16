@@ -91,7 +91,7 @@ const NONE: ReadonlySet<string> = new Set();
  *  pressing says its review is due, in Home's words ("Due today", "3d
  *  overdue"). Pure. */
 export function shelfStatus(unit: Unit, today: string, planned: ReadonlySet<string> = NONE, live: string | null = null): UnitStatus {
-	const own = unitStatus(unit, today, live);
+	const own = unitStatus(unit, today, live, planned.has(unit.key));
 	const dated = own.kind === "returns" || (own.kind === "review" && unit.topic.review?.kind === "scheduled");
 	if (!planned.has(unit.key) || !(dated || own.kind === "studied" || own.kind === "none")) return own;
 	return { kind: "review", words: overdueWords(unit.topic.review?.kind === "due" ? unit.topic.review.overdue : 0, today) };

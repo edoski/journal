@@ -54,6 +54,15 @@ function retitled(attempts: readonly TopicAttempt[]): TrailRow[] {
 	});
 }
 
+/** The sessions Earlier lists: every one but those Now and Next hold,
+ *  which keep their line here when they saved answers on the topic, so
+ *  each answer sits under its own session's line (round 13, 2 n2: Problem
+ *  sheet 4, Kernel's Now, left its answer with no line, on top of the
+ *  morning review's). Pure. */
+export function earlierSessions(sessions: readonly SessionEntry[], held: ReadonlySet<string | null>, attempts: readonly TopicAttempt[]): SessionEntry[] {
+	return sessions.filter((entry) => !held.has(entry.chat.id) || attempts.some((attempt) => attempt.session === entry.chat.id));
+}
+
 /** One entry per day that has a session or an attempt, newest day first. */
 export function trailDays(sessions: readonly SessionEntry[], attempts: readonly TopicAttempt[], today: string): TrailDay[] {
 	const listed = new Set(sessions.map((entry) => entry.chat.id));

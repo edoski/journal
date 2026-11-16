@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { NextStep, TodayRow } from "@/components/study-home/study-facts";
 import { lineKey } from "@/components/study-home/agenda-rows/row-facts";
+import { continueHref } from "@/components/nav/session-state";
 
 /** A whole line of Today as one control: a link to the session that waits,
  *  or a button that takes up the line's step, marked with its line's key
@@ -21,7 +22,7 @@ export function LineTarget({
 	if (row.kind === "session") {
 		return (
 			<Button variant="quiet" asChild data-line={lineKey(row)} {...button}>
-				<Link href={`/chat/${row.chat.id}`} aria-disabled={busy || undefined}>
+				<Link href={continueHref(row.chat)} aria-disabled={busy || undefined}>
 					{children}
 				</Link>
 			</Button>

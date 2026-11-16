@@ -13,6 +13,7 @@ import { LineText } from "@/components/line-text";
 import { useStartSession } from "@/components/unit-inbox/start-unit";
 import type { MistakeRow } from "@/components/course-page/standing/standing-model";
 import { cn } from "@/lib/utils";
+import { continueHref } from "@/components/nav/session-state";
 
 /** Today's hybrid row, at the list's width: the mark beside the topic and
  *  what went wrong, which runs to two lines (round 9, 2 m2: cut at one). */
@@ -48,7 +49,7 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 	const label = `${row.resume ? "Resume" : "Fix"}: ${mathPlain(row.topic.title)}`;
 	const control = row.resume ? (
 		<Button variant="quiet" asChild data-slot="mistake-row" aria-label={label} className={ROW}>
-			<Link href={`/chat/${row.resume.id}`}>{body}</Link>
+			<Link href={continueHref(row.resume)}>{body}</Link>
 		</Button>
 	) : (
 		<Button

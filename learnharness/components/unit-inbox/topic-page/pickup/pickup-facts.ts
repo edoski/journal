@@ -1,9 +1,9 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { reviewAsked, type ChatListItem, type TopicRef } from "@/src/core";
-import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
+import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
-import { pausedWords } from "@/components/nav/session-state";
+import { continueHref, pausedWords } from "@/components/nav/session-state";
 import { FIRST_LESSON, TUTOR_WRITING, overdueWords, startsAfterWords } from "@/components/study-words";
 
 /**
@@ -35,6 +35,8 @@ export interface NowItem {
 	press: string;
 	/** The session the press opens, which the map can show; null when the press starts one. */
 	chat: string | null;
+	/** Where the press goes when it opens a session (`continueHref`). */
+	href?: string;
 	/** While it starts a topic, why the plan starts it then; absent otherwise. */
 	why?: StartsReason | null;
 }
@@ -120,14 +122,15 @@ export function nowItem(facts: TopicFacts): NowItem {
 				words: sessionName(action.chat, facts),
 				note: action.kind === "open" ? TUTOR_WRITING : left ? leftWords(action.chat, facts.today) : entry?.state === "paused" ? pausedWords(action.chat) : "Your turn",
 				chat: action.chat.id,
+				href: continueHref(action.chat),
 			};
 		}
 		case "review":
-			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), chat: "chat" in action ? action.chat.id : null };
+			return { ...base, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? overdueWords(0, facts.today), chat: "chat" in action ? action.chat.id : null, ...("chat" in action ? { href: continueHref(action.chat) } : {}) };
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
-				return { ...base, icon: action.task ? "task" : "standing", words: action.task?.title ?? sessionName(action.chat, facts), note: action.task?.step ?? (entry ? `Left off ${dayWords(entry.day, facts.today).toLowerCase()}` : null), chat: action.chat.id };
+				return { ...base, icon: action.task ? "task" : "standing", words: action.task?.title ?? sessionName(action.chat, facts), note: action.task?.step ?? (entry ? `Left off ${dayWords(entry.day, facts.today).toLowerCase()}` : null), chat: action.chat.id, href: continueHref(action.chat) };
 			}
 			if (action.task) return { ...base, icon: "task", words: action.task.title, note: action.task.step };
 			const last = facts.sessions.find((entry) => entry.own && isPlanned(entry));
@@ -180,11 +183,7 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 				: facts.starts && now.kind !== "start"
 					? { kind: facts.topic.startsWhy?.kind === "begun" ? "lesson" : "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
 					: null,
-		earlier: trailDays(
-			facts.sessions.filter((entry) => !held.has(entry.chat.id)),
-			facts.attempts,
-			facts.today,
-		),
+		earlier: trailDays(earlierSessions(facts.sessions, held, facts.attempts), facts.attempts, facts.today),
 		why: now.kind === "start" ? { builds: facts.builds, refs: facts.refs } : null,
 	};
 }

@@ -158,6 +158,25 @@ export function planMapTooBig(tree: Pick<PlanTree, "nodes" | "edges">): string |
 	);
 }
 
+/** What a rewrite of the plan mid-lesson drops: the steps of the plan he
+ *  has on his strip, once one was taught, that the rewrite leaves out and
+ *  no lesson_progress marked done (round 13, 2 n5: the Eigen strip went
+ *  from 7 dots to 6, "Every step taught", when a rewrite dropped the
+ *  eigenbasis step still to come). A map that keeps none of its steps is a
+ *  lesson on something else and drops nothing. Words the tutor can act on,
+ *  or null. */
+export function planDropsSteps(before: Pick<PlanTree, "nodes"> | null | undefined, next: Pick<PlanTree, "nodes">, taughtOn: boolean, done: ReadonlySet<string>): string | null {
+	if (!before || !taughtOn) return null;
+	const kept = new Set(next.nodes.map((n) => n.id));
+	const dropped = before.nodes.filter((n) => !kept.has(n.id) && !done.has(n.id));
+	// A map with none of the old steps is a lesson on something else, as a handoff back from practice moves to.
+	if (dropped.length === 0 || dropped.length === before.nodes.filter((n) => !done.has(n.id)).length && !before.nodes.some((n) => kept.has(n.id))) return null;
+	return (
+		`This rewrite drops steps of the lesson he already sees on his strip: ${dropped.map((n) => `${n.id} (${JSON.stringify(n.title)})`).join(", ")}. ` +
+		"Keep them, with the same ids: a step left for another session stays on the plan, and one he has shown he holds is marked done with lesson_progress."
+	);
+}
+
 /** A relation between two things, in plain text or TeX: a title holding
  *  one states a result rather than naming an idea. */
 const RELATION = /[=≠≈≡∼≃≅∝→↦⇒⟹⇔⟺≤≥<>∈⊂⊆~]|->|\\(?:to|rightarrow|Rightarrow|longrightarrow|Longrightarrow|implies|iff|Leftrightarrow|mapsto|leq?|geq?|neq?|approx|sim|simeq|cong|equiv|propto|in|subset|subseteq|lt|gt)(?![A-Za-z])/;

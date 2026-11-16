@@ -207,6 +207,21 @@ export const TASK_HANDOFF_TEXT =
 	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away. " +
 	"I have already read the probe's feedback above, so never say it again.";
 
+/** The model-facing words of Continue pressed on an open task this session
+ *  holds, when nothing in it waits on him (round 13, 2 M1): Continue
+ *  Problem sheet 4 opened the sheet's finished chat with no turn, and his
+ *  "let us continue the sheet" was planned as a lesson from the basics, so
+ *  part (c) was put off to next time. The task's step is the record's, in
+ *  the course brief above. */
+export function taskContinueText(tasks: readonly string[]): string {
+	const named = tasks.map((key) => `\`${key}\``).join(" and ");
+	return (
+		`[CONTINUE MY TASK] I pressed Continue on my open task ${named}. Carry on at its saved step, as the course record above gives it. ` +
+		"It is my task, not a lesson: never a lesson on the topic from its basics, and a step before it only for a gap the record names. If you plan, plan only that step with plan_init, one node named for the part it is. " +
+		"If the step needs something from me first, such as a part's text, ask me for it in one plain line and end your turn; otherwise pose the step straight away. Never say this message."
+	);
+}
+
 /** What a review's wake adds (round 9, 2 m4): a review that turns into
  *  teaching said nothing of the switch and closed on "the lesson", since
  *  the wake asked only to start teaching. */
@@ -470,6 +485,9 @@ export interface ChatSummary {
 	/** The engine tasks the session last saved as open, by key
 	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
 	tasks?: readonly string[];
+	/** The title its saves gave the first task they opened, kept once the
+	 *  task closes (sessionTaskTitleOf), so it is named one way all day. */
+	taskTitle?: string;
 	/** It is a review of course topics: opened on topics with a review's
 	 *  words (`openedAsReview`), whatever it is named now. The list always
 	 *  sets it; a summary made elsewhere may leave it out. */

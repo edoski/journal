@@ -217,8 +217,10 @@ export function moreWords(hidden: readonly CalendarEntry[]): string {
 export function lookWords(entry: CalendarEntry, today: string): string {
 	const review = entry.kind === "review" && entry.day === today ? entry.topic.review : null;
 	if (review?.kind === "due") return overdueWords(review.overdue, today);
-	// Open work says Home's status for it ("Left off today", "Your turn"), never a word of its own (round 12, 2 n2).
-	if ((entry.kind === "task" || entry.kind === "session") && lookOf(entry) === "task" && entry.status) return entry.status;
+	// Open work says Home's status for it ("Left off today", "Your turn"), never a word of its own (round 12, 2 n2), and so
+	// does a lesson or practice left for next time, never its kind (round 13, 2 n4: "Eigenvalues and eigenvectors · Practice");
+	// a review stays Review (round 9, 2 m4).
+	if ((entry.kind === "task" || entry.kind === "session") && entry.status && (lookOf(entry) === "task" || lookOf(entry) === "lesson" || lookOf(entry) === "practice")) return entry.status;
 	return LOOKS[lookOf(entry)].words;
 }
 
@@ -426,7 +428,7 @@ export function calendarEntries({
 			waits: sessionState(chat) === "your-turn",
 			topic: sessionTopic(chat, courses),
 			task: held,
-			status: held ? openWorkStatus(listed, chat, held) : null,
+			status: held || sessionState(chat) === "left" ? openWorkStatus(listed, chat, held) : null,
 		});
 	}
 	return entries.sort((a, b) => a.day.localeCompare(b.day) || rankOf(a) - rankOf(b));

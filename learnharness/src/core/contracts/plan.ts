@@ -126,12 +126,31 @@ interface PlanCall {
 	input: unknown;
 }
 
+/** Whether `step` is one `of` rests on, directly or through others: a
+ *  step before it in teaching order on every path. */
+function restsOn(tree: PlanTree, of: string, step: string): boolean {
+	const seen = new Set<string>();
+	const queue = [of];
+	while (queue.length > 0) {
+		const at = queue.shift()!;
+		for (const edge of tree.edges) {
+			if (edge.to !== at || seen.has(edge.from)) continue;
+			if (edge.from === step) return true;
+			seen.add(edge.from);
+			queue.push(edge.from);
+		}
+	}
+	return false;
+}
+
 /** Where the lesson stands, from its calls in order: a tagged question
  *  moves the position there (leaving a node marks it visited); a
  *  lesson_progress call marks its `done` nodes visited and, when one is the
  *  current node, leaves it, so nothing is current until the next tag. A
- *  question on a step already done is a recall check and moves nothing.
- *  Ids missing from the tree move nothing. */
+ *  question on a step already done is a recall check and moves nothing. A
+ *  question on a step the current one rests on, taught out of order, marks
+ *  it visited and leaves the position where it was (round 13, 2 n5: step 6
+ *  of 7 went back to step 5). Ids missing from the tree move nothing. */
 function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanStatuses {
 	const ids = new Set(tree.nodes.map((n) => n.id));
 	let current: string | null = null;
@@ -144,6 +163,11 @@ function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanSt
 			// A question on a step already done is a recall check: the strip
 			// moves only forward (round 12, 2 n6: step 7 back to step 6).
 			if (done.has(nodeId)) continue;
+			// The strip never moves back to a step behind the one he is on.
+			if (current !== null && current !== nodeId && restsOn(tree, current, nodeId)) {
+				visited.add(nodeId);
+				continue;
+			}
 			if (current !== null && current !== nodeId) visited.add(current);
 			current = nodeId;
 		} else if (call.name === LESSON_PROGRESS_TOOL) {

@@ -67,6 +67,7 @@ import {
 	appOpeningAt,
 	COMPACTING_LINE,
 	workingLine,
+	taskTurnOwed,
 } from "@/src/core";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { ActiveProblemContext } from "@/components/lesson/active-problem";
@@ -167,6 +168,7 @@ export function Chat({
 	course,
 	place,
 	initiallyCourseDeleted = false,
+	continueTask = false,
 }: {
 	chatId: string;
 	title: string;
@@ -189,6 +191,10 @@ export function Chat({
 	 *  opening, not his words, and draws no bubble (`appOpeningAt`). */
 	appOpening?: boolean;
 	initialPrompt?: string;
+	/** Opened by Continue on an open task it holds (`continueHref`): with
+	 *  nothing in it waiting on him, the tutor carries on at the task's
+	 *  step at once (round 13, 2 M1). */
+	continueTask?: boolean;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
 	initiallyInFlight?: boolean;
@@ -465,6 +471,17 @@ export function Chat({
 		mountContinuation.current = true;
 		if (!turnInFlight) continueIfOwed(initialMessages);
 		// mount-only by design (turnInFlight read at initial value)
+	}, []);
+	// Continue on the task this session holds: the link's ask is spent
+	// once, so a reload never asks again (round 13, 2 M1: Continue Problem
+	// sheet 4 opened the finished chat with an empty box and no turn).
+	const continuedTask = useRef(false);
+	useEffect(() => {
+		if (!continueTask || continuedTask.current) return;
+		continuedTask.current = true;
+		window.history.replaceState(window.history.state, "", `/chat/${chatId}`);
+		if (!turnInFlight && taskTurnOwed(initialMessages)) void send({ type: "task" });
+		// mount-only by design, as the continuation above
 	}, []);
 
 	const pending = findPendingToolCall(messages, pendingQuestionOf(nativeMessages));
@@ -1584,7 +1601,7 @@ export function Chat({
 								// Review, a topic's name) are its instruction to the
 								// tutor, not his message: no bubble (round 9).
 								null
-							) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
+							) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume" || p.type === "data-task-continue" || p.type === "data-probe-handoff" || p.type === "data-mode-handoff") ? (
 								// The seams between the opening questions, planning, teaching
 								// and practice draw nothing: the lesson names no phase (Edo,
 								// 14 Nov 2026), and where he is in the plan is the top bar's

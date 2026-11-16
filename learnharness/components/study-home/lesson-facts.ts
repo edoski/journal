@@ -1,5 +1,6 @@
 import { courseLabel, type CourseMap, type CourseMapArc, type StudyCourse, type TopicHandle } from "@/src/core";
 import { runupExam, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
+import { continueHref } from "@/components/nav/session-state";
 
 /** What a lesson's button does: open the session that waits, or take up the
  *  course's next step. The word names the step. */
@@ -61,7 +62,7 @@ export function lessonOf(row: TodayRow): Lesson {
 			action: "Open",
 			topics,
 			place: course ? arcPlace(course.map, topics) : null,
-			open: { kind: "session", href: `/chat/${chat.id}` },
+			open: { kind: "session", href: continueHref(chat) },
 		};
 	}
 	const { course, step } = row;

@@ -2,7 +2,7 @@ import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCours
 import { leftOffWords, overdueWords, reviewWords, slipMark, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { slipBeside } from "@/components/course-map/topic-map/topic-standing";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { currentSessions, sessionState } from "@/components/nav/session-state";
+import { currentSessions, resumableSession, sessionState } from "@/components/nav/session-state";
 
 /**
  * The sidebar's topics. Each unit (a course map topic the learner has
@@ -106,6 +106,16 @@ export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): s
  *  reads it. Pure. */
 export function nowOf(sessions: readonly ChatListItem[], handle: string, course: readonly ChatListItem[] = []): UnitNow {
 	return sessionsNow(sessions.filter((c) => ownsTopic(c, handle)), course);
+}
+
+/** The session a topic's row resumes: of those that belong to it
+ *  (`ownsTopic`), the one to pick up, as its status (`nowOf`) and its
+ *  page's Now read it; never one that only touched it on the way (round
+ *  13, 2 M1: Problem sheet 4, left for next time, was Vectors' Resume
+ *  under On your own, since the sheet's first check was on vectors).
+ *  Pure. */
+export function rowResume(unit: Pick<Unit, "sessions" | "topic">): ChatListItem | null {
+	return resumableSession(unit.sessions.filter((c) => ownsTopic(c, unit.topic.handle)));
 }
 
 /** What any of these sessions is doing now: one waits on the learner, the
@@ -224,16 +234,22 @@ export function leftWords(chat: Pick<ChatListItem, "updatedAt">, today: string):
 
 /** A topic row's one status. `live`, the lesson open on the page while it
  *  waits on him or the tutor writes (`liveChat`), gives its own topic's
- *  card "Your turn" ahead of a slip. Pure. */
-export function unitStatus(unit: Unit, today: string, live: string | null = null): UnitStatus {
+ *  card "Your turn" ahead of a slip. `asked`: Today reviews the topic
+ *  (`plannedKeys`). Pure. */
+export function unitStatus(unit: Unit, today: string, live: string | null = null, asked = false): UnitStatus {
 	const { topic } = unit;
 	const slip = unit.slip ? ({ kind: "slip", words: unit.slip, slip: slipMark(topic.signals, (handle) => handle).key } as const) : null;
 	// The lesson he is on says it waits on him, on its own topic's card, while it does (round 11, 3 n4: "Mistake to fix" while a question waited).
 	if (live && (unit.now === "your-turn" || unit.now === "working") && unit.sessions.some((c) => c.id === live && ownsTopic(c, topic.handle))) return { kind: unit.now };
 	// A wrong answer still open outranks a session that waits on him or
 	// was left for next time (round 8: Eigen's mistake hid behind "Left for
-	// next time"; round 9, 3 m13: Determinants' behind "Your turn").
-	if (slip && topic.signals.mistake && unit.now !== "working") return slip;
+	// next time"; round 9, 3 m13: Determinants' behind "Your turn"), except
+	// a lesson he left today with the mistake for its next session while
+	// Today does not review the topic: Home has no line for it and the close
+	// said where he picks up, so it says it is left off, never "Mistake to
+	// fix" while Today asks nothing (round 13, 3 N4).
+	const leftToday = unit.now === "left" && unit.sessions.some((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left" && dayOf(c.updatedAt) >= today);
+	if (slip && topic.signals.mistake && unit.now !== "working" && !(leftToday && !asked)) return slip;
 	if (unit.now === "left") {
 		const left = unit.sessions.find((c) => ownsTopic(c, topic.handle) && sessionState(c) === "left");
 		return { kind: "task", words: left ? leftWords(left, today) : leftOffWords(null, today) };

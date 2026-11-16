@@ -17,7 +17,7 @@ import type { ChatRecord, ChatSummary, CourseLink, DigestLedger, PlanTree, Sessi
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import type { ChatSession } from "../core/sdk-session.ts";
-import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, firstProblemTopicsOf, sessionModeOf, sessionTaskTitleOf, sessionTasksOf, sessionTopicsOf, studiedIn } from "../core/native-messages.ts";
 import { sessionEndOf } from "../core/session-end.ts";
 import { openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
@@ -41,7 +41,7 @@ function chatFile(id: string): string {
  *  turn-started / turn-settled, or for a turn-less write (a dismissal,
  *  compaction) by record-changed, which the sidebar refetches on. Silence
  *  here is law, not oversight. */
-function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string): ChatRecord {
+function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string, asked = false): ChatRecord {
 	const now = studyNow().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
@@ -50,7 +50,7 @@ function createChat(title: string, course?: CourseLink, topics: readonly string[
 		updatedAt: now,
 		messages: [],
 		...(course ? { course: { workspace: course.workspace, title: course.title } } : {}),
-		...(topics.length > 0 ? { topics: [...topics], appOpening: true as const } : {}),
+		...(topics.length > 0 ? { topics: [...topics], ...(asked ? {} : { appOpening: true as const }) } : {}),
 		...(arcCheck ? { arcCheck } : {}),
 	};
 	fs.mkdirSync(PATHS.chats, { recursive: true });
@@ -133,6 +133,7 @@ function listChats(): ChatSummary[] {
 						...(stoppedByHim(messages) ? { stopped: true as const } : {}),
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
+						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
 						review: openedAsReview({ topics: summary.topics, messages }),
 						studied: studiedIn(messages),
 					};

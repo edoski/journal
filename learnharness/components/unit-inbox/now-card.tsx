@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CircleDashedIcon, PlayIcon } from "lucide-react";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { sessionState } from "@/components/nav/session-state";
+import { sessionState, continueHref } from "@/components/nav/session-state";
 import { courseTitle } from "@/components/study-home/agenda-rows/row-facts";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
  *  Start), which starts the same lesson as Home's line. Pure. */
 export function nowActionOf(line: NowLine): { label: string; href: string } | { label: string; workspace: string; step: NextStep } {
 	const { row } = line;
-	if (row.kind === "session") return { label: "Resume", href: `/chat/${row.chat.id}` };
+	if (row.kind === "session") return { label: "Resume", href: continueHref(row.chat) };
 	return { label: lessonOf(row).action, workspace: row.course.map.workspace, step: row.step };
 }
 
@@ -131,7 +131,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 		const move = courseCardMove(line, chats)!;
 		return (
 			<RowCard
-				{...(move.kind === "open" ? { href: `/chat/${move.chat.id}` } : { onSelect: () => take(workspace, move) })}
+				{...(move.kind === "open" ? { href: continueHref(move.chat) } : { onSelect: () => take(workspace, move) })}
 				active={active}
 				rowKey={courseKey(workspace)}
 				parent={parent}
@@ -147,7 +147,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 	const running = sessionState(chat) === "working";
 	return (
 		<RowCard
-			href={`/chat/${chat.id}`}
+			href={continueHref(chat)}
 			active={active}
 			rowKey={sessionKey(chat.id)}
 			parent={parent}

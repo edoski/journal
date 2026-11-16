@@ -63,4 +63,12 @@ describe("the calendar's open work says Home's status (round 12, 2 n2)", () => {
 		assert.deepEqual(calendar, home.filter(Boolean));
 		assert.notEqual(calendar[0], "Unfinished");
 	});
+
+	it("a lesson moved to practice and left for next time says Left off today, never its kind (round 13, 2 n4)", () => {
+		const eigen = chat({ id: "chat_demo_eigen", title: "Eigenvalues and eigenvectors", kind: "practice", ended: "left", tasks: [], topics: ["rank"], ownTopics: ["rank"], updatedAt: `${TODAY}T09:30:00.000Z` });
+		const entry = calendarEntries({ courses: [course({ tasks: [] })], chats: [eigen], scope: null }).find((e) => e.id === "session:chat_demo_eigen")!;
+		assert.equal(lookWords(entry, TODAY), "Left off today");
+		const finished = calendarEntries({ courses: [course({ tasks: [] })], chats: [{ ...eigen, ended: "closed" }], scope: null }).find((e) => e.id === "session:chat_demo_eigen")!;
+		assert.equal(lookWords(finished, TODAY), "Practice", "a finished session still says what it was");
+	});
 });

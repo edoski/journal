@@ -240,9 +240,12 @@ const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
  * and Home's Studied today names it (round 4). A lesson left for next time
  * whose topics are all in today's review gives its line to that review
  * (`yieldsToReview`). An older session waiting on him stays in the
- * sidebar. Pure.
+ * sidebar. A session that settled after the courses were read (`settled`)
+ * ends its step's line too, until a read that knows it lands (round 13,
+ * 1 n1: after a close Home showed Start Poisson distribution for 15 s).
+ * Pure.
  */
-export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
+export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string, settled: readonly ChatListItem[] = []): TodayRow[] {
 	const since = addDays(today, -1);
 	const left = (c: ChatListItem) => sessionState(c) === "left";
 	const leftToday = (c: ChatListItem) => left(c) && lastDay(c) >= today;
@@ -251,7 +254,7 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const courseOf = (chat: ChatListItem) => (chat.course && byWorkspace.get(chat.course.workspace)) ?? null;
 	const waiting = open.filter((c) => !left(c) && lastDay(c) >= since);
 	const leftovers = open.filter((c) => left(c) && !leftToday(c) && !isReviewSession(c) && !yieldsToReview(c, courseOf(c)));
-	const ended = open.filter(leftToday);
+	const ended = [...open.filter(leftToday), ...settled];
 	const session = (chat: ChatListItem): TodayRow => ({ kind: "session", chat, course: courseOf(chat) });
 	const placed = new Set<ChatListItem>();
 	const plan: TodayRow[] = [];

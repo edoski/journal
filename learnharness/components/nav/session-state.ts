@@ -55,10 +55,15 @@ const PICK_UP_ORDER: readonly SessionState[] = ["your-turn", "working", "paused"
  *  before he said anything in it once he has started another session in
  *  its course (`course`, any sessions: those of its course are read), as
  *  that study moved past it (round 10, 2 m4: the same preview, with no
- *  later session on its own topic). A turn running now stays. Pure. */
+ *  later session on its own topic). A session holding an open task is
+ *  moved past only by a later session on that task, since the task is its
+ *  work, not the topic's (round 13, 2 M1: the morning's Kernel review
+ *  moved past Problem sheet 4, so after its close Learning had no Kernel).
+ *  A turn running now stays. Pure. */
 export function currentSessions(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): ChatListItem[] {
+	const sameWork = (of: ChatListItem, chat: ChatListItem) => chat.kind === of.kind && (!of.tasks?.length || (chat.tasks ?? []).some((key) => of.tasks!.includes(key)));
 	// Only another session moves past one: a seeded session can carry a start later than his clock (round 11, 1 N5).
-	const started = (of: ChatListItem) => sessions.reduce((last, chat) => (chat.id !== of.id && chat.kind === of.kind && chat.createdAt > last ? chat.createdAt : last), "");
+	const started = (of: ChatListItem) => sessions.reduce((last, chat) => (chat.id !== of.id && sameWork(of, chat) && chat.createdAt > last ? chat.createdAt : last), "");
 	const movedOn = (chat: ChatListItem) =>
 		chat.untouched === true && chat.ended === "cut" && course.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && other.createdAt > chat.updatedAt);
 	return sessions.filter((chat) => chat.busy || (chat.updatedAt >= started(chat) && !movedOn(chat)));
@@ -85,6 +90,23 @@ export function resumableSession(sessions: readonly ChatListItem[], course: read
 export function continueMove(sessions: readonly ChatListItem[], finished: typeof FINISHED_LESSON = FINISHED_LESSON): ContinueMove | null {
 	const chat = resumableSession(sessions) ?? sessions.find((c) => c.kind !== "practice" && sessionState(c) === "finished");
 	return chat ? CONTINUE[sessionState(chat)](chat, finished) : null;
+}
+
+/** Whether Continue on a session takes up the task it holds with a turn:
+ *  it holds an open task and nothing in it waits on him or runs, so the
+ *  tutor carries on at the task's step as it opens (round 13, 2 M1:
+ *  Continue Problem sheet 4 opened the sheet's finished chat with an empty
+ *  box). Opening it to read it, from the calendar or Earlier, asks for
+ *  nothing. */
+export function continuesTask(chat: ChatListItem): boolean {
+	return (chat.tasks?.length ?? 0) > 0 && !chat.busy && !chat.pendingQuestion && !chat.pendingProblem && chat.ended !== "cut" && chat.ended !== "mid-lesson";
+}
+
+/** Where Continue on a session goes: its chat, asked to take up its task
+ *  when `continuesTask`. Every Continue, Resume and line that picks a
+ *  session up links here. */
+export function continueHref(chat: ChatListItem): string {
+	return continuesTask(chat) ? `/chat/${chat.id}?continue=task` : `/chat/${chat.id}`;
 }
 
 /** What a paused session says (round 8): his own stop in his words, a
