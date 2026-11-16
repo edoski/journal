@@ -57,7 +57,8 @@ export type VoiceRule =
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"
-	| "card-words";
+	| "card-words"
+	| "unbuilt";
 
 export interface VoiceBreak {
 	rule: VoiceRule;

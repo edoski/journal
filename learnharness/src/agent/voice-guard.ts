@@ -249,6 +249,9 @@ const RULING_WORDS = (slip: string): AgentToolResult<unknown> => ({
 
 const DEMO_TOOL = "demo";
 
+/** Words that point at a demo or its controls. */
+const DEMO_WORD = /\bdemo(?:'s|s)?\b/i;
+
 /** Maths as a key that ignores how it was typed: TeX or Unicode, spaces,
  *  braces and `\\left`/`\\right` aside, so "(1 − λ/n)^n" in a brief and
  *  "$(1-\\lambda/n)^n$" in a step's title read the same. */
@@ -410,6 +413,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
+		case "unbuilt":
+			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "review-lesson":
 			return `This session is his review, whatever it re-teaches, so call it his review, never a lesson: ${quoted(b.excerpt)}.`;
 		default:
@@ -612,6 +617,8 @@ export class VoiceGuard {
 	private heldDemo = false;
 	/** A ruling saved with the record's confidence word was held back once. */
 	private heldRuling = false;
+	/** This turn called for a demo, which is built after the turn moves on. */
+	private building = false;
 
 	constructor(
 		messages: readonly LhMessage[],
@@ -756,7 +763,11 @@ export class VoiceGuard {
 			this.sent++;
 			return null;
 		}
-		if (call.name === DEMO_TOOL) return this.judgeDemo(call);
+		if (call.name === DEMO_TOOL) {
+			const refused = this.judgeDemo(call);
+			if (!refused) this.building = true;
+			return refused;
+		}
 		if (call.name === SAVE_TOOL && this.input.ruling && !this.heldRuling) {
 			const slip = savedRulings(call.arguments).map(recordConfidenceWord).find(Boolean);
 			if (slip) {
@@ -909,7 +920,17 @@ export class VoiceGuard {
 		if (shownBefore) out.push({ rule: "repeat", excerpt: `display ${shownBefore}` });
 		const boxed = restatingCallout(text);
 		if (boxed) out.push({ rule: "repeat", excerpt: `callout ${quoted(boxed.said)}, said above as ${quoted(boxed.before)}` });
-		return [...out, ...this.letters(text), ...this.repeats(text, true)];
+		return [...out, ...this.letters(text), ...this.repeats(text, true), ...this.unbuilt(text)];
+	}
+
+	/** Words that point at a demo this turn called for: it is built after
+	 *  the turn moves on, so he would read of a demo that is not there
+	 *  (round 13, 3 N1: "In the demo, slide d until the columns line up"
+	 *  with no demo on screen, and a question that needed it). */
+	private unbuilt(text: string): VoiceBreak[] {
+		if (!this.building) return [];
+		const said = sentences(text).find((s) => DEMO_WORD.test(s));
+		return said ? [{ rule: "unbuilt", excerpt: said.trim() }] : [];
 	}
 
 	private questionBreaks(text: string): VoiceBreak[] {
@@ -922,7 +943,7 @@ export class VoiceGuard {
 		if (twice) out.push({ rule: "reason-twice", excerpt: twice });
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
-		return [...out, ...this.letters(text), ...this.repeats(text)];
+		return [...out, ...this.letters(text), ...this.repeats(text), ...this.unbuilt(text)];
 	}
 
 	/** A demo brief that prints the formula a step not yet done is about:

@@ -34,6 +34,8 @@ export function SubagentSteerCard({ message, figures = "card" }: {
 	 *  (inline-figure.tsx), as the reading lessons draw them. */
 	figures?: "card" | "inline";
 }) {
+	// A built demo or figure is drawn at the call that asked for it.
+	if ((message.metadata as { atCall?: boolean } | undefined)?.atCall) return null;
 	const artifactPart = message.parts.find((p) => p.type === "data-subagent-artifact");
 	const data = artifactPart?.data as SubagentArtifactData | undefined;
 	// The abort steer (2026-09 dock semantics): its message-type part is
