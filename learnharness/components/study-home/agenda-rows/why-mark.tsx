@@ -44,7 +44,7 @@ export function WhyMark({ why, size = "row", words, whole = false }: { why: Why 
 	const tone = why.kind === "reply" ? "system-current:font-medium text-link" : "text-muted-foreground";
 	if (size === "row" && whole) return <WholeMark why={why} words={words} tone={tone} />;
 	if (size === "row") return <RowMark key={why.starts?.words ?? why.short} why={why} words={words} tone={tone} />;
-	const Icon = WHY_ICON[why.kind];
+	const Icon = why.starts && (words ?? why.short) === why.starts.words ? STARTS_ICON[why.starts.kind] : WHY_ICON[why.kind];
 	return (
 		// `contents`: the icon and the words are the status slot's own items (`TRAILING_SLOT`).
 		<span data-slot="why-mark" data-kind={why.kind} className={cn("contents text-callout system-current:text-label", tone)}>

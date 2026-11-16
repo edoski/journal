@@ -30,8 +30,7 @@ export interface NowLine {
 	 *  a review says the same on Home and on the sidebar's card. */
 	status: RowStatus | null;
 	/** The status's words for a 12px status slot (`slotWords` for a
-	 *  reason, whose new topic keeps its plain "Planned today" there), or
-	 *  null. */
+	 *  reason, a new topic's in Home's words), or null. */
 	slot: string | null;
 }
 
@@ -61,13 +60,17 @@ export function lineTopics(row: TodayRow): TopicHandle[] {
 	return row.step.kind === "none" ? [] : [...row.step.topics];
 }
 
-/** The reason's words for a status slot: Home's short words, except a lapse
- *  on the lead topic itself ("Not right last time", since the card already
- *  names it). Pure. */
+/** The reason's words for a status slot: Home's words, a new topic's
+ *  reason when it names topics ("After Random variables and
+ *  distributions"), never an arc, except a
+ *  lapse on the lead topic itself ("Not right last time", since the card
+ *  already names it). Pure. */
 export function slotWords(why: Why | null, lead: CourseMapTopic | null): string | null {
 	if (!why) return null;
 	if (why.kind === "missed" && lead && why.short === lapsedOnWords(lead.title)) return SLIP_WORDS.lapsed;
-	return why.short;
+	// A new topic's reason when it names the topics it waits on, as Home's line says it (round 13, 1 n5: "Planned today"
+	// beside Home's "After Random variables…"); a reason naming an arc stays plain, since a sidebar card names no arc (Edo, 14 Nov).
+	return why.starts?.kind === "after" && why.starts.words.startsWith("After ") ? why.starts.words : why.short;
 }
 
 /**
