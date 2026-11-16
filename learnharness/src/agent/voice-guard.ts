@@ -75,7 +75,15 @@ export interface TurnInput {
 	/** His message asks to guess first ("let me guess first"): the guess
 	 *  is a prediction, never a counted attempt (round 12, 2 M1). */
 	guess?: string;
+	/** A demo the tutor called for has just been built and drawn in the
+	 *  lesson: the turn's first message points him into it (round 14, m13:
+	 *  the slots demo landed above a reply that never mentioned it). */
+	demo?: boolean;
 }
+
+/** Words that send him into a demo: the demo itself, or what to do with
+ *  one of its controls. */
+const POINTS_AT_DEMO = /\bdemos?\b|\b(?:slide|slider|drag|press|click|tap|set|move|watch|turn|sweep|play|toggle|run)\b/i;
 
 /** His words asking to guess before he is told: "let me guess first",
  *  "can I guess", "I want to predict it". */
@@ -161,6 +169,10 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 			return { kind: "wrong", answers: true, words: textOf(input.content) };
 		case "dispute":
 			return { kind: "direct", answers: false, words: null, ruling: true };
+		case "subagent-steer": {
+			const result = isRecord(input.details) && input.details.kind === "demo" && isRecord(input.details.result) ? input.details.result : null;
+			return typeof result?.html === "string" && result.html.length > 0 ? { kind: "teach", answers: false, words: null, demo: true } : none;
+		}
 		case "mode-handoff":
 			return isRecord(input.details) && input.details.mode === "teach" ? { kind: "teach", answers: false, words: null, handedBack: true } : none;
 		default:
@@ -472,6 +484,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			const [letter, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
 			return `${quoted(said)} credits him with work on $${letter}$, which he never worked on in this lesson. Name the matrix he worked on, the one in the question he answered, or say whose work it was.`;
 		}
+		case "demo-unused":
+			return `The demo you called for is now on his screen, and this message never sends him into it: ${quoted(b.excerpt)}. Open on one thing to try in it, by its control ("slide n up and watch the 0 column"), and never read him a value the open question asks.`;
 		case "predict":
 			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
@@ -1023,6 +1037,7 @@ export class VoiceGuard {
 		const answered = this.input.answers ? this.earlier[this.answeredAt] : undefined;
 		const credited = creditedLetter(text, [...this.his, ...(answered ? [answered] : [])]);
 		if (credited) out.push({ rule: "credit", excerpt: `${credited.letter}|${credited.said}` });
+		if (this.input.demo && this.sent === 0 && !POINTS_AT_DEMO.test(text)) out.push({ rule: "demo-unused", excerpt: first });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;

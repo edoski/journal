@@ -59,6 +59,7 @@ export type VoiceRule =
 	| "contrast"
 	| "hint-question"
 	| "credit"
+	| "demo-unused"
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"
