@@ -56,6 +56,7 @@ export type VoiceRule =
 	| "guess"
 	| "predict"
 	| "card"
+	| "contrast"
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"
@@ -84,6 +85,11 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// (round 12, 3 D4: "Switching to an explanation of when three vectors
 	// form a basis of ℝ³.").
 	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:(?:let'?s|now,?|ok(?:ay)?,?) (?:switch|move|turn|go|head)|(?:now,? )?(?:switching|moving|turning|going|heading)|back)(?: (?:back|over|on|now))?(?: (?:to|into))? (?:(?:an?|the|some|your|more) )?(?:explanation|explaining|teaching|practice|practising|practicing|problems?|exercises?|lesson|review)\b/i },
+	// A confident miss's contrast as a formula, closing every such reply
+	// after the break was said (round 14, m15: "You held that extra freedom
+	// in x widens what Ax reaches, whereas it sends more inputs onto the
+	// same outputs.", "You held that the nullity is rows minus rank, but…").
+	{ rule: "contrast", re: /(?:^|[.!?]\s+|\n)you held that\b|\byou (?:held|believed|assumed|thought) that\b[^.?!\n]*?\b(?:whereas|when in fact|but in fact|while in fact)\b/i },
 	{ rule: "plan", re: /(?:^|\n)\s*(?:today|this lesson|in this lesson|the goal)\s*:/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },

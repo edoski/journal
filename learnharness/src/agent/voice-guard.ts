@@ -453,6 +453,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			const [card, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
 			return `His answer card already says "${card}" above your reply, and your opening says it again: ${quoted(said)}. Open on where it broke, the fact itself, never on the verdict, and never soften it.`;
 		}
+		case "contrast":
+			return `"You held that…, whereas…" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not.`;
 		case "predict":
 			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
