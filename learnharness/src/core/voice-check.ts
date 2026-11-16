@@ -524,12 +524,20 @@ const SHARED_RUN = 3;
  *  row can be a combination of two others, which checking pairs never
  *  catches", then "Counting pivots after elimination is what catches a
  *  column hiding as a combination of two others"). Null when none does. */
+/** A sentence that asks him for his next move: a question, or an
+ *  instruction to type, send, find or show something. */
+const NEXT_MOVE = /\?$|^(?:type|send|paste|write|give|find|compute|show|prove|try|answer|name|tell)\b/i;
+
 export function repeatedPoint(text: string, earlier: readonly string[]): { said: string; before: string } | null {
 	const before = earlier.flatMap((t) => sentences(prose(t).text)).map((s) => {
 		const run = contentStems(s);
 		return { s, set: new Set(run), facts: factsOf(s), runs: new Set(run.slice(0, Math.max(0, run.length - SHARED_RUN + 1)).map((_, i) => run.slice(i, i + SHARED_RUN).join(" "))) };
 	});
 	for (const said of sentences(prose(text).text)) {
+		// An ask for his next move asks for something new each time (round
+		// 12, 2 n5: "Type what part (e) asks." refused as "Type what part (d)
+		// asks." again, and the turn ended asking nothing).
+		if (NEXT_MOVE.test(said.trim())) continue;
 		const run = contentStems(said);
 		const mine = new Set(run);
 		const facts = factsOf(said);
