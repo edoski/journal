@@ -58,6 +58,7 @@ export type VoiceRule =
 	| "card"
 	| "contrast"
 	| "hint-question"
+	| "credit"
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"
@@ -646,6 +647,21 @@ export function reusedLetter(text: string, earlier: readonly string[]): { letter
 	for (const e of earlier) for (const m of namedMatrices(e)) before.set(m.letter, m.entries);
 	const reused = namedMatrices(text).find((m) => before.has(m.letter) && before.get(m.letter) !== m.entries);
 	return reused ? { letter: reused.letter, written: reused.written } : null;
+}
+
+/** A sentence that credits him with work on a matrix he never worked on:
+ *  "the two roots you found for $A$" when he found $C$'s (round 14, m18).
+ *  `his` is what he worked on: his own words and the question his answer
+ *  replies to. A matrix is a capital letter in maths; `I` is left alone,
+ *  since it is also the identity. The letter, or null. */
+export function creditedLetter(text: string, his: readonly string[]): { letter: string; said: string } | null {
+	const re = /\byou(?:'ve| have)? (?:found|computed|got|worked out|derived|calculated|wrote|solved|gave)\b[^.?!\n]{0,60}?\b(?:for|of|from|on) \$\s*([A-HJ-Z])\s*\$/g;
+	for (const m of text.matchAll(re)) {
+		const letter = m[1]!;
+		const named = new RegExp(`(?:^|[^A-Za-z\\\\])${letter}(?![A-Za-z])`);
+		if (!his.some((words) => named.test(words))) return { letter, said: m[0] };
+	}
+	return null;
 }
 
 /** A sentence that tells him how sure he was ("You were sure the kernel

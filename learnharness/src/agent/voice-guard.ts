@@ -39,7 +39,7 @@ import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -166,6 +166,17 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 		default:
 			return none;
 	}
+}
+
+/** Everything he wrote this session: his messages, his answers to its
+ *  questions and his work on its problems. */
+function hisWordsOf(messages: readonly LhMessage[]): string[] {
+	return messages.flatMap((m) => {
+		if (m.role === "user") return [textOf(m.content)];
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && isRecord(m.details) && typeof m.details.text === "string") return [m.details.text];
+		if (m.role === "custom" && m.customType === "practice-thinking") return [textOf(m.content)];
+		return [];
+	});
 }
 
 /** Every text he read from the tutor before this turn: its delivered
@@ -457,6 +468,10 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `"You held that…, whereas…" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not.`;
 		case "hint-question":
 			return `A hint gives him what the question did not, said as a statement: the next move ("Subtract row 1 from row 3 and look at what is left") or a fact the question left out. This one asks him a question instead: ${quoted(b.excerpt)}. Say the move or the fact; his question is asked again after it.`;
+		case "credit": {
+			const [letter, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
+			return `${quoted(said)} credits him with work on $${letter}$, which he never worked on in this lesson. Name the matrix he worked on, the one in the question he answered, or say whose work it was.`;
+		}
 		case "predict":
 			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
@@ -613,6 +628,8 @@ export class VoiceGuard {
 	private readonly earlier: string[];
 	/** The messages he read before this turn, questions aside. */
 	private readonly told: string[];
+	/** What he worked on this session: his own words, as he wrote them. */
+	private readonly his: string[];
 	private readonly answeredAt: number;
 	private readonly decisions = new Map<string, AgentToolResult<unknown> | null>();
 	/** How many times each kind of call was refused this turn. */
@@ -699,6 +716,7 @@ export class VoiceGuard {
 		const earlier = earlierTexts(messages);
 		this.earlier = earlier.map((e) => e.text);
 		this.told = earlier.filter((e) => !e.asked).map((e) => e.text);
+		this.his = hisWordsOf(messages);
 		// The question his answer replies to is the last one he read: a reply
 		// works on its matrix, so only what came before it counts as shown.
 		this.answeredAt = this.input.answers ? Math.max(0, this.earlier.length - 1) : this.earlier.length;
@@ -1002,6 +1020,9 @@ export class VoiceGuard {
 			const draft = this.lengthDraft;
 			if (clauses < draft.clauses && words > draft.words - draft.shortest) out.push({ rule: "length", excerpt: `joined: ${words} words where the draft had ${draft.words}, in fewer sentences` });
 		}
+		const answered = this.input.answers ? this.earlier[this.answeredAt] : undefined;
+		const credited = creditedLetter(text, [...this.his, ...(answered ? [answered] : [])]);
+		if (credited) out.push({ rule: "credit", excerpt: `${credited.letter}|${credited.said}` });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
