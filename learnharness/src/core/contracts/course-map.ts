@@ -29,9 +29,14 @@ export interface ReviewHeld {
 
 /** A day he was told that has since moved (the engine's `moved`): `from`
  *  is the day the plan gave it as yesterday ended, `by` what of his study
- *  moved it: his study today in `courses`, no study yesterday, or
- *  yesterday's plan left unfinished. */
-export type TopicMoved = { from: string; by: "study"; courses: readonly string[]; day: "today" | "yesterday" } | { from: string; by: "missed" | "left"; on?: string };
+ *  moved it: his study today in `courses`, with the titles of the topics
+ *  it waits on that study left not solid (`waitsOn`), his own answer on it
+ *  today (`answered`), no study yesterday, or yesterday's plan left
+ *  unfinished. */
+export type TopicMoved =
+	| { from: string; by: "study"; courses: readonly string[]; day: "today" | "yesterday"; waitsOn?: readonly string[] }
+	| { from: string; by: "answered" }
+	| { from: string; by: "missed" | "left"; on?: string };
 
 /** The topic's review on the day the engine's daily plan puts it: `due`
  *  exactly when that day is today, with the days since memory asked for

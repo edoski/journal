@@ -1281,8 +1281,12 @@ def moved(
     day he was told went by with an item of its plan neither answered nor
     started, that item or, when that day also showed where he stops, any
     the plan spread anew; both with ``on``, the last day he studied; ``study`` with ``day`` today, his answers today
-    in ``courses`` made a topic it waited on not ready (a topic he answered
-    or started today has its own new day and is not listed). A day that moved for none of these has no
+    in ``courses`` made a topic it waited on not ready, named in ``waits_on``
+    when they left one it needs or a competing method not solid (round 14,
+    m3: Poisson moved because Random variables slipped, and the tutor said
+    "today's day was full"); ``answered``, his own answer today on the topic
+    set a day other than the one ahead he was told (a review done on its
+    day is done, not moved). A day that moved for none of these has no
     cause in his study, so it is not listed as moved: a told day that moves
     otherwise is a fault the tests catch, never a reason to give him.
     Nothing is stored: the replay makes the days he was told again from the
@@ -1299,11 +1303,17 @@ def moved(
     def told_on(when: agenda.When, kind: str, key: str) -> date | None:
         return (when.reviews if kind == "review" else when.starts).get(key)
 
+    levels = progress.standings(record)
+    partners = progress.contrasts(record)
     result: dict[str, dict[str, Any]] = {}
     for kind, days in (("review", now.reviews), ("starts", now.starts)):
         for key, day in days.items():
             before = told_on(was, kind, key)
-            if key in mine or before is None or before == day:
+            if before is None or before == day:
+                continue
+            if key in mine:
+                if before > today:
+                    result[key] = {"from": before.isoformat(), "by": "answered"}
                 continue
             if before < today == day:
                 continue  # a day gone by, and it is today's: due, not moved
@@ -1318,6 +1328,12 @@ def moved(
                     "courses": courses,
                     "day": "today",
                 }
+                if waits := [
+                    other
+                    for other in (*progress.needs(record, key), *partners[key])
+                    if other in mine and not agenda.solid(levels[other])
+                ]:
+                    why["waits_on"] = waits
             elif replayed.afresh:
                 why = {
                     "by": "missed" if replayed.missed else "left",

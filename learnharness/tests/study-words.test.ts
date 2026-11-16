@@ -178,6 +178,9 @@ describe("why a review waits", () => {
 		assert.equal(movedWords(late, "2026-11-08", { from: "2026-11-09", by: "left" }), "Moved from 9 Nov, yesterday's plan was not finished");
 		assert.equal(movedWords(null, "2026-11-08", { from: "2026-11-10", by: "study", courses: ["Probability", "Calculus"], day: "today" as const }), "Moved from 10 Nov after your Probability and Calculus study today", "a start moves too");
 		assert.equal(movedWords(behind, "2026-11-08", { ...told, day: "yesterday" }), "Moved from 10 Nov after your Probability study yesterday", "round 9: today's work moves only what it touched, so the rest moves the next morning and says so");
+		assert.equal(movedWords(null, "2026-11-09", { ...told, waitsOn: ["Random variables and distributions"] }), "Moved from 10 Nov, since Random variables and distributions is not solid yet", "round 14, m3: the topic that slipped, never \"today's day was full\"");
+		assert.equal(movedWords(null, "2026-11-09", { ...told, waitsOn: ["Bases", "Rank"] }), "Moved from 10 Nov, since Bases and Rank are not solid yet");
+		assert.equal(movedWords(behind, "2026-11-09", { from: "2026-11-12", by: "answered" }), "Moved from 12 Nov after your answer today", "round 14, m3: Rank, told Thu 12, moved by more practice, says so");
 	});
 	it("names the last day he studied when the cause is days ago, never a 'yesterday' a week back", () => {
 		// Round 10 (1 M3): after a quiet week a close blamed a review he had done for the move.

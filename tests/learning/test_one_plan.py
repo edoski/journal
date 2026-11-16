@@ -441,6 +441,52 @@ def test_a_slip_moves_a_start_to_the_first_final_review_day_with_room(
             assert kept <= set(now["new"]), (name, began, now)
 
 
+def test_a_moved_day_says_what_of_his_study_moved_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A start that moved because a topic it needs slipped today names that
+    topic, and a review he answered ahead of the day he was told says his
+    answer moved it (round 14, m3: Poisson moved when Random variables
+    slipped and the tutor said "today's day was full"; Rank, told Thu 12,
+    read Wed 11 after more practice with no reason; here Span, told 25 Nov,
+    is missed on 9 Nov)."""
+    slipped = World(tmp_path / "slip", "slip", monkeypatch, capsys, R14)
+    poisson = next(
+        topic
+        for topic in slipped.run("probability", "map", day="2026-11-09")["topics"]
+        if topic["topic"] == "poisson"
+    )
+    assert poisson["moved"]["waits_on"] == ["random-variables"], poisson
+    seeded = World(tmp_path / "seed", "seed", monkeypatch, capsys, R14)
+    told = {
+        topic["topic"]: topic.get("review")
+        for topic in seeded.run("linear-algebra", "map", day="2026-11-08")["topics"]
+    }
+    assert told["span"] > "2026-11-12"
+    answer = {
+        "topics": ["span"],
+        "text": "Whether (1, 2) is in the span of (2, 4) and (1, 1)",
+        "response": "No, it is not a multiple of (2, 4)",
+        "help": "none",
+        "result": "incorrect",
+    }
+    monkeypatch.setenv("LEARNING_TODAY", "2026-11-09")
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps({"observations": [answer]}))
+    )
+    assert main(["--workspace", str(seeded.roots["linear-algebra"]), "save"]) == 0
+    capsys.readouterr()
+    span = next(
+        topic
+        for topic in seeded.run("linear-algebra", "map", day="2026-11-09")["topics"]
+        if topic["topic"] == "span"
+    )
+    assert span["review"] < told["span"]
+    assert span["moved"] == {"from": told["span"], "by": "answered"}, span
+
+
 EVE = json.loads((Path(__file__).parent / "golden" / "exam-eve.json").read_text())
 
 
