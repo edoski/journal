@@ -60,12 +60,12 @@ export function leastReadyFirst(handles: readonly TopicHandle[], map: Pick<Cours
 	return ranked.sort((a, b) => a.mistake - b.mistake || a.level - b.level || a.weak - b.weak || a.at - b.at).map((r) => r.topic);
 }
 
-export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam">, arcs: readonly CourseArcSection[] | null, mistakes: readonly OpenMistake[]): ExamReady {
+export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topics" | "exam" | "today">, arcs: readonly CourseArcSection[] | null, mistakes: readonly OpenMistake[]): ExamReady {
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const wontFit = readiness.parts.flatMap((p) => p.wontFit);
 	if (wontFit.length > 0) return { kind: "short", words: misfitWords(wontFit.map(titleOf))! };
 	// Never "ready" while the final review leaves a taught topic out (the engine's `map`).
-	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf)) };
+	if (map.exam?.unreviewed?.length) return { kind: "short", words: finalReviewMissWords(map.exam.unreviewed.map(titleOf), map.exam, map.today) };
 	const notReady = readiness.parts.filter((p) => partState(p) === "notYet");
 	if (notReady.length === 0) return { kind: "ready", words: READY_WORDS.ready };
 	if (arcs && notReady.length === readiness.parts.length) return { kind: "notYet", words: READY_WORDS.notYet, arcs: [], rest: null };

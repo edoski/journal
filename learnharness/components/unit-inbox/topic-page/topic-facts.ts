@@ -199,7 +199,7 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap, said?: ReadonlyM
  *  "Due since 1 Oct"; an exam is the only why it names (`heldExamWords`). */
 /** What the exam ahead means for the topic: it leaves it out, or its plan
  *  has no room to start or review it; null otherwise. */
-const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam);
+const examWords = (topic: CourseMapTopic, map: CourseMap) => leftOutWords(topic, map.exam) ?? examGapTopicWords(topic, map.exam, map.today);
 
 /** `TopicFacts.startsWhy`: the exam first, since a topic it leaves out, or
  *  has no room for, waits for the exam whatever else it waits on. */
@@ -421,7 +421,7 @@ export function topicFacts({
 		marks: silent ? [] : headMarks(topic, titleOf, map.today),
 		studied: !silent && studied ? studiedDaysWords(daysBetween(studied, map.today), map.today) : null,
 		mistake: mistakeOf(topic, attempts),
-		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam) : null) ?? waitsWords(topic, map.today),
+		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam, map.today) : null) ?? waitsWords(topic, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		action: topicAction(topic, map, chats),

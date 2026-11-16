@@ -372,6 +372,13 @@ describe("when a topic comes up", () => {
 		assert.equal(facts.waits, "No room in the final review at your pace");
 	});
 
+	it("names the final review's first day beside a review before it (round 11 integration: Binomial read Review today and No room in the final review)", () => {
+		const exam = { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-13", unreviewed: [h("binomial")], reasons: { binomial: "full" } as const };
+		const binomial = topic("binomial", { level: "assisted", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11" } });
+		const facts = topicFacts({ course: { ...COURSE, map: { ...COURSE.map, exam, topics: [...COURSE.map.topics, binomial] } }, topic: binomial, chats: [], read: null });
+		assert.equal(facts.waits, "No room in the final review from 13 Nov at your pace");
+	});
+
 	it("says from which told day a review or a start moved and what of his study moved it", () => {
 		const moved = topic("eigen", { level: "independent", introduced: "2026-11-01", review: { kind: "scheduled", date: "2026-11-11", held: { exam: null, since: "2026-11-09" } }, moved: { from: "2026-11-10", by: "study", courses: ["Probability"], day: "today" as const } });
 		assert.equal(factsOf(moved).waits, "Moved from 10 Nov after your Probability study today");

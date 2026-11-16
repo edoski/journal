@@ -429,10 +429,20 @@ export function finalReviewGapWords(topics: readonly ExamGapTopic[]): string[] {
 	];
 }
 
+/** The final review as he can place it: "the final review from 13 Nov"
+ *  while it is still ahead, so a topic it has no room for reads as
+ *  reviewed before it, never as not reviewed at all (round 11 integration:
+ *  "No room in the final review for Binomial" beside "Review Binomial
+ *  today", which the plan does before the final review); "the final
+ *  review" once it is under way. Pure. */
+function finalReviewName(exam: Pick<CourseExam, "finalReview">, today: string): string {
+	return exam.finalReview && exam.finalReview > today ? `the final review from ${shortDay(exam.finalReview)}` : "the final review";
+}
+
 /** The taught topics the final review has no room for, standing alone
  *  (the calendar's "No room in it for" reads under its final review). */
-export function finalReviewMissWords(titles: readonly string[]): string {
-	return `No room in the final review for ${listWords(titles)}`;
+export function finalReviewMissWords(titles: readonly string[], exam: Pick<CourseExam, "finalReview">, today: string): string {
+	return `No room in ${finalReviewName(exam, today)} for ${listWords(titles)}`;
 }
 
 /** His opening words in a lesson Ask the tutor starts, naming the topics. */
@@ -451,7 +461,8 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
 }
 
 /** What the exam's plan means for a topic it leaves out (`examGaps`), on
- *  the topic's own page, in the engine's reason (`exam.reasons`). */
+ *  the topic's own page, in the engine's reason (`exam.reasons`). A
+ *  review's words follow the final review's name (`finalReviewName`). */
 export const EXAM_GAP_TOPIC_WORDS: {
 	start: Readonly<Record<ExamGapReason | "none", string>>;
 	review: Readonly<Record<ExamGapReason | "none", string>>;
@@ -467,21 +478,21 @@ export const EXAM_GAP_TOPIC_WORDS: {
 	// it: "No review before the exam" read false beside "Review Wed 11 Nov"
 	// (round 9, 2 M1). The words match `finalReviewMissWords`.
 	review: {
-		none: "No room in the final review",
-		no_study_day: "No room in the final review, no study day is left in it",
-		not_ready: "No room in the final review",
-		full: "No room in the final review at your pace",
-		too_late: "No room in the final review, it starts too close to the exam",
+		none: "",
+		no_study_day: ", no study day is left in it",
+		not_ready: "",
+		full: " at your pace",
+		too_late: ", it starts too close to the exam",
 	},
 };
 
 /** The words for `topic` when the exam ahead has no room to start it
  *  (`doesNotFit`) or to review it (`unreviewed`); null otherwise. Pure. */
-export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "daysLeft" | "doesNotFit" | "unreviewed" | "reasons"> | null): string | null {
+export function examGapTopicWords(topic: Pick<CourseMapTopic, "handle">, exam: Pick<CourseExam, "daysLeft" | "doesNotFit" | "unreviewed" | "reasons" | "finalReview"> | null, today: string): string | null {
 	if (!exam || exam.daysLeft < 0) return null;
 	const reason = exam.reasons?.[topic.handle] ?? "none";
 	if (exam.doesNotFit?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.start[reason];
-	if (exam.unreviewed?.includes(topic.handle)) return EXAM_GAP_TOPIC_WORDS.review[reason];
+	if (exam.unreviewed?.includes(topic.handle)) return `No room in ${finalReviewName(exam, today)}${EXAM_GAP_TOPIC_WORDS.review[reason]}`;
 	return null;
 }
 
