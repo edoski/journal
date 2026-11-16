@@ -652,8 +652,15 @@ export class VoiceGuard {
 	private heldRuling = false;
 	/** This turn called for a demo, which is built after the turn moves on. */
 	private building = false;
-	/** The last message shown this turn ended on a question. */
+	/** A message shown this turn ended on a question: it stays the turn's
+	 *  last ask. */
 	private lastAsked = false;
+	/** His messages this turn read mid-reply that no message ending on a
+	 *  statement has followed yet: each lets one message answer it, after
+	 *  the question too (round 14, 4 major 1: "also, does the ratio test
+	 *  need the terms to be positive?" sent while it graded, and its answer
+	 *  refused under the grade's nudge question). */
+	private unanswered = 0;
 	/** The rulings this turn saved, and whether a reply or a save that
 	 *  worded one differently was held back (once a turn). */
 	private readonly rulings: string[] = [];
@@ -676,6 +683,11 @@ export class VoiceGuard {
 		// The question his answer replies to is the last one he read: a reply
 		// works on its matrix, so only what came before it counts as shown.
 		this.answeredAt = this.input.answers ? Math.max(0, this.earlier.length - 1) : this.earlier.length;
+	}
+
+	/** He sent a message the running turn has now read (a steer). */
+	heard(): void {
+		this.unanswered++;
 	}
 
 	/** Whether a tool's calls pass through the guard: the probe's end too,
@@ -784,7 +796,8 @@ export class VoiceGuard {
 				this.duplicates++;
 				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
-			if (this.lastAsked && !this.owed) return AFTER_ASKING(text);
+			const answersHim = this.unanswered > 0 && !text.trim().endsWith("?");
+			if (this.lastAsked && !this.owed && !answersHim) return AFTER_ASKING(text);
 			const ruled = this.rulings.length > 0 && this.sent === 0 && !this.heldRulingSaid && !this.rulings.some((r) => sameRuling(text, r));
 			if (ruled) {
 				this.heldRulingSaid = true;
@@ -805,7 +818,8 @@ export class VoiceGuard {
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
 			this.asked.push(...sentences(text).filter((s) => s.trim().endsWith("?")));
-			this.lastAsked = text.trim().endsWith("?");
+			if (text.trim().endsWith("?")) this.lastAsked = true;
+			else if (this.unanswered > 0) this.unanswered--;
 			this.sent++;
 			return null;
 		}
