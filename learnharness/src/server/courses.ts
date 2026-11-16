@@ -20,6 +20,16 @@ import { courseRecordForgotten } from "../store/course-records.ts";
  *  of a registered course. A course the engine could not read keeps the
  *  title its newest linked session carries, since its record cannot say. */
 export async function listCourses(): Promise<CourseListing> {
+	const listing = await listCoursesRead();
+	if (!listing.available) return listing;
+	if (!("plan" in listing)) return listing;
+	const { plan: _plan, ...courses } = listing;
+	return courses;
+}
+
+/** `listCourses` with the engine's `plan --all --days 1` output it came
+ *  from, when the engine gave one: every course's day plan, read once. */
+export async function listCoursesRead(): Promise<CourseListing | (Extract<CourseListing, { available: true }> & { plan?: unknown })> {
 	const listing = await stores.courseRecords.list();
 	if (!listing.available) return listing;
 	const chats = listing.unreadable.length > 0 ? stores.chatStore.listChats() : [];

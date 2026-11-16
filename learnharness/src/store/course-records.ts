@@ -500,6 +500,7 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 				available: true,
 				courses: read.flatMap((r) => (r && "course" in r ? [r.course] : [])),
 				unreadable: read.flatMap((r) => (r && "unreadable" in r ? [r.unreadable] : [])),
+				plan: result.json,
 			};
 		},
 		async run(workspace, verb) {

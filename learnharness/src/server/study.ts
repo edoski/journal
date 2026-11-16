@@ -8,7 +8,7 @@ import type { CourseMap, TopicHandle } from "../core/contracts/course-map.ts";
 import { courseLabel, type CourseSummary, type UnreadableCourse } from "../core/contracts/course.ts";
 import type { StudyCourse, StudyListing } from "../core/contracts/study.ts";
 import { lessonTopics } from "../core/course-map-build.ts";
-import { listCourses } from "./courses.ts";
+import { listCoursesRead } from "./courses.ts";
 import { stores } from "./stores.ts";
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -45,21 +45,34 @@ export function studyCourseOf(map: CourseMap, plan: unknown): StudyCourse {
 /** One readable course: its map and its plan's JSON (null when it failed). */
 type CourseRead = { map: CourseMap; plan: unknown };
 
+/** One course's entry in `plan --all`'s output, as that course's own
+ *  `plan` prints it (`{…, courses: [entry]}`); null when it is not there. */
+export function ownPlanOf(all: unknown, workspace: string): unknown {
+	const listing = record(all);
+	const entry = Array.isArray(listing?.courses) ? listing.courses.find((c) => record(c)?.workspace === workspace) : undefined;
+	return listing && entry ? { ...listing, courses: [entry] } : null;
+}
+
 /** Every listed course's map, told the lesson in progress there, and its
  *  `plan` over `days` (or the days a course asks for), read in parallel:
- *  the plan's JSON (null when it failed). A course the engine could not
+ *  the plan's JSON (null when it failed). A day's plan is the course's
+ *  entry in the listing's own `plan --all --days 1` (round 13, N2: Home
+ *  ran that plan again for every course). A course the engine could not
  *  list, or whose map could not be read, is in `failed`. */
 export async function readCourses(
 	days: number | ((course: CourseSummary) => number) = 1,
 ): Promise<{ available: true; read: CourseRead[]; failed: UnreadableCourse[] } | { available: false; reason: string }> {
-	const listing = await listCourses();
+	const listing = await listCoursesRead();
 	if (!listing.available) return listing;
 	const chats = stores.chatStore.listChats();
+	const all = "plan" in listing ? listing.plan : undefined;
 	const read = await Promise.all(
 		listing.courses.map(async (course): Promise<CourseRead | UnreadableCourse> => {
+			const horizon = typeof days === "number" ? days : days(course);
+			const listed = horizon === 1 ? ownPlanOf(all, course.workspace) : null;
 			const [map, plan] = await Promise.all([
 				stores.courseRecords.map(course.workspace, lessonTopics(chats, course.workspace)[0]),
-				stores.courseRecords.run(course.workspace, { verb: "plan", days: typeof days === "number" ? days : days(course) }),
+				listed ? { ok: true as const, json: listed } : stores.courseRecords.run(course.workspace, { verb: "plan", days: horizon }),
 			]);
 			return map.ok
 				? { map: map.map, plan: plan.ok ? plan.json : null }
