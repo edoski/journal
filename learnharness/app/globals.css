@@ -188,6 +188,16 @@
 	--text-title-3: 15px;
 	--text-title-3--line-height: calc(20 / 15);
 	--text-title-3--font-weight: 400;
+	/* The sidebar's row titles follow T3 Code's sidebar, not a macOS style
+	   (Edo, 16 Nov 2026): its thread row's title is `text-sm` at
+	   `font-medium` in full ink, `font-normal` at 75% ink on a quiet row
+	   (the T3 Code app's own bundle, `sidebar-row-card`). */
+	--text-sidebar-title: 14px;
+	--text-sidebar-title--line-height: calc(20 / 14);
+	--text-sidebar-title--font-weight: 500;
+	--text-sidebar-title-quiet: 14px;
+	--text-sidebar-title-quiet--line-height: calc(20 / 14);
+	--text-sidebar-title-quiet--font-weight: 400;
 	--text-headline: 13px;
 	--text-headline--line-height: calc(16 / 13);
 	--text-headline--font-weight: 700;
@@ -467,8 +477,10 @@ body {
    - .lh-lights-band  the Proposed sidebar's top band: only where the
                        lights sit over it (the Mac app), 52px; elsewhere
                        none, so the sidebar opens on its Home row
-   - .lh-rail        the folded sidebar's rail: wide enough in the Mac app
-                       that the page beside it starts clear of the lights
+   - .lh-rail-toggle the folded rail's open button: beside the lights in
+                       the Mac app, where T3 Code puts its sidebar toggle
+   - .lh-band-start  a page's band content: clear of the lights and that
+                       button while the sidebar is folded in the Mac app
    ───────────────────────────────────────────────────────────────────────── */
 .lh-electron .lh-drag {
 	-webkit-app-region: drag;
@@ -508,23 +520,32 @@ body {
 	display: block;
 	height: calc(52px / var(--lh-zoom));
 }
-.lh-electron .lh-rail {
-	width: calc(92px / var(--lh-zoom));
+/* The folded rail stays 48px in the Mac app too (Edo, 16 Nov 2026: the
+   92px rail looked "extremely thick"). The lights sit over its 52px head,
+   so its open button stands where T3 Code's sidebar toggle stands on
+   macOS: in the window's band beside the lights, 90px in
+   (`--desktop-window-controls-inset`, the T3 Code app's bundle), level
+   with the lights (Edo, 16 Nov 2026: "yes lined up"): centred on their
+   centre (--lh-lights-centre, from electron/main.cjs). Both lengths are
+   physical under zoom, as the lights are. The page's band content starts
+   a 12px gap past it (T3 Code's `--workspace-titlebar-control-gap`) while
+   the sidebar is folded. */
+.lh-electron .lh-rail-toggle {
+	position: fixed;
+	top: calc(var(--lh-lights-centre) / var(--lh-zoom));
+	left: calc(90px / var(--lh-zoom));
+	z-index: 20;
+	transform: translateY(-50%);
 }
-/* The rail's open button sits in a head as tall as a page's top bar
-   (52px), its rule on the head's bottom edge, level with the top bar's
-   bottom line. In the Mac app the lights' band already fills those 52px
-   above the head, so the rule moves to the head's top edge, the band's
-   bottom: the same line. */
-.lh-rail-head {
-	height: 52px;
+/* The lights sit over the rail's head, so its edge starts under the band:
+   the head covers the rail's border, and no line runs through the lights. */
+.lh-electron .lh-rail-head {
+	align-self: flex-start;
+	width: calc(100% + 1px);
+	background: var(--color-background);
 }
-.lh-rail-rule {
-	bottom: 0;
-}
-.lh-electron .lh-rail-rule {
-	top: -1px;
-	bottom: auto;
+.lh-electron main[data-sidebar="folded"] .lh-band-start {
+	padding-left: calc(90px / var(--lh-zoom) + 1.75rem + 0.75rem - 3rem);
 }
 
 .lh-electron .lh-wco-gutter {

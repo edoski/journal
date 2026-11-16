@@ -211,6 +211,16 @@ function killServer() {
 	}, 3000);
 }
 
+/** The traffic lights' top-left corner in the window, in points, and each
+ *  light's drawn diameter. Whole points: AppKit draws the lights on whole
+ *  points (a y of 22.5 drew them at 23). Measured in the running app on
+ *  16 Nov 2026: 14pt lights 9pt apart, the first at x 16 to 30, y 23 to 37,
+ *  so their centre is y + LIGHT_SIZE / 2 = 30. The lights stay physical
+ *  under zoom; the renderer gets that centre (--lh-lights-centre) and
+ *  centres the folded sidebar's open button on it (app/globals.css). */
+const TRAFFIC_LIGHTS = { x: 16, y: 23 };
+const LIGHT_SIZE = 14;
+
 /** Security posture (all defaults asserted explicitly; the guards are the
  *  checklist's own recommendations for localhost-app shells):
  *  - deny-by-default permission handler allowing only our loopback origin
@@ -223,21 +233,18 @@ function createWindow(url) {
 		height: 900,
 		title: PRODUCT_NAME,
 		// Merged chrome (owner, 2026-09-17): the system title bar is gone;
-		// the app's own 60px header bands ARE the title bar. The traffic
-		// lights float over the sidebar's LH wordmark band, vertically
-		// Aligned to the PHASE PILL's drawn box, not the band's geometric
-		// center (owner ask, 2026-09-17): macOS centers each 12px circle at
-		// y+6.75, and the pill box center measures 29.25 in the running app
-		// (band 0–59.5, pill box 19–39.5) — y 22.5 lands the circles at
-		// 29.25, exactly on the pill. Wordmark gutter: components/sidebar.tsx.
+		// the app's own header bands ARE the title bar, the traffic lights
+		// float over the sidebar's top band (TRAFFIC_LIGHTS, above).
 		// Dragging comes from the renderer's .lh-drag bands (app/globals.css).
 		titleBarStyle: "hiddenInset",
-		trafficLightPosition: { x: 16, y: 22.5 },
+		trafficLightPosition: TRAFFIC_LIGHTS,
 		webPreferences: {
 			contextIsolation: true,
 			sandbox: true,
 			nodeIntegration: false,
 			preload: path.join(__dirname, "preload.cjs"),
+			// The lights' centre, for the renderer's --lh-lights-centre.
+			additionalArguments: [`--lh-lights-centre=${TRAFFIC_LIGHTS.y + LIGHT_SIZE / 2}`],
 		},
 		// Live-resize + first-paint flash (owner, 2026-09-17): during a resize
 		// the native window surface changes size before Chromium's compositor
@@ -322,7 +329,7 @@ function createWindow(url) {
  * setZoomFactor, and broadcast to the renderer ("lh:zoom" — it publishes
  * --lh-zoom so gutter lengths can divide by it and stay PHYSICAL-
  * constant). The traffic lights themselves stay at their construction
- * position ({x:16, y:22.5} — Electron 44 has NO runtime setter, only
+ * position (TRAFFIC_LIGHTS — Electron 44 has NO runtime setter, only
  * the BrowserWindow option), which is HIG-correct anyway: native lights
  * hug the window corner while the web chrome compensates around them.
  * Vertical note: at large factors the taller bands' content centers

@@ -55,6 +55,8 @@ declare global {
 			/** The zoom truth (owner round 7): subscribes to "lh:zoom" pushes; returns unsubscribe. */
 			onZoom?: (cb: (factor: number) => void) => () => void;
 			getZoom?: () => Promise<number>;
+			/** The traffic lights' centre from the window's top, in points (electron/main.cjs). */
+			lightsCentre?: number;
 		};
 	}
 }
@@ -86,6 +88,7 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 		// and in the plain browser the class never appears.
 		if (IS_ELECTRON) {
 			document.documentElement.classList.add("lh-electron");
+			document.documentElement.style.setProperty("--lh-lights-centre", `${window.lh?.lightsCentre}px`);
 		}
 
 		// THE ZOOM TRUTH (owner round 7, 2026-10-05): ⌘±/⌘0 zoom the UI
@@ -166,10 +169,14 @@ export function SidebarProvider({ children, initial = { open: null, width: SIDEB
 
 /** The app frame: sidebar inline + content. Rendered once in the root layout. */
 export function AppShell({ children }: { children: React.ReactNode }) {
+	const { open } = useSidebar();
 	return (
 		<SettingsDialogProvider>
 			<UnitSidebar />
-			<main className="min-w-0 flex-1">{children}</main>
+			{/* `data-sidebar` keys the page's band gutter in the Mac app (`.lh-band-start`). */}
+			<main data-sidebar={open ? "open" : "folded"} className="min-w-0 flex-1">
+				{children}
+			</main>
 			{/* The single document-level keydown listener (keyboard wave A) —
 			    after the content in the tree, but it's window-level so order only
 			    matters for the events it dispatches, never for DOM priority. */}
