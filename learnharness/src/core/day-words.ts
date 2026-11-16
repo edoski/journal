@@ -55,7 +55,11 @@ export function studyNow(env: Record<string, string | undefined> = process.env, 
 /** The engine's JSON with `planned_words` beside every `planned` day and
  *  `starts_words` beside every `starts` day, relative to the output's own
  *  `today` when it has one, else `today`, and `from_words` beside the day a
- *  `moved` day was told for. */
+ *  `moved` day was told for. The start of a lesson he began (`starts_why`
+ *  `begun`) is the day it continues, so its words are `continues_words`,
+ *  as the app says "Lesson continues". */
+const begunStart = (topic: object): boolean => ((topic as { starts_why?: { kind?: unknown } }).starts_why)?.kind === "begun";
+
 export function withDayWords(json: unknown, today: string): unknown {
 	const own = typeof json === "object" && json !== null && typeof (json as { today?: unknown }).today === "string" ? (json as { today: string }).today : today;
 	const walk = (value: unknown): unknown => {
@@ -64,7 +68,7 @@ export function withDayWords(json: unknown, today: string): unknown {
 		const out: Record<string, unknown> = {};
 		for (const [key, inner] of Object.entries(value)) {
 			out[key] = walk(inner);
-			if ((key === "planned" || key === "starts") && typeof inner === "string" && DAY.test(inner)) out[`${key}_words`] = plannedDayWords(inner, own);
+			if ((key === "planned" || key === "starts") && typeof inner === "string" && DAY.test(inner)) out[`${key === "starts" && begunStart(value) ? "continues" : key}_words`] = plannedDayWords(inner, own);
 			if (key === "moved" && typeof inner === "object" && inner !== null && typeof (inner as { from?: unknown }).from === "string") out.moved = { ...(inner as object), from_words: longDay((inner as { from: string }).from) };
 		}
 		return out;
