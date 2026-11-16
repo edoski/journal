@@ -1,13 +1,14 @@
 "use client";
 
 import { sessionState } from "@/components/nav/session-state";
-import { NOW_SHELF_WORDS, plannedKeys, shelfStatus, waitsOnYou, type RestShelves } from "@/components/unit-inbox/now-inbox";
+import { useState } from "react";
+import { heldStatuses, liveChat, NOW_SHELF_WORDS, plannedKeys, shelfStatus, steadyLearning, waitsOnYou, type RestShelves } from "@/components/unit-inbox/now-inbox";
 import type { NowListProps } from "@/components/unit-inbox/now-list-props";
 import { SessionItem } from "@/components/unit-inbox/session-item";
 import { isUnitOpen, TopicCard, TopicSlimRow } from "@/components/unit-inbox/unit-row";
 import { UnitShelf } from "@/components/unit-inbox/unit-shelf";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { sessionTwins, type Unit } from "@/components/unit-inbox/units";
+import { sessionTwins, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 
 /**
  * The shelves at the sidebar's foot (spec: unit-inbox.md, "Today on
@@ -20,15 +21,22 @@ import { sessionTwins, type Unit } from "@/components/unit-inbox/units";
 export function NowShelves({
 	shelves,
 	courses,
+	chats,
 	today,
 	folded,
 	fold,
 	pathname,
 	s,
-}: { shelves: RestShelves } & Pick<NowListProps, "courses" | "today" | "folded" | "fold" | "pathname" | "s">) {
+}: { shelves: RestShelves } & Pick<NowListProps, "courses" | "chats" | "today" | "folded" | "fold" | "pathname" | "s">) {
 	const isOpen = (u: Unit) => isUnitOpen(u, pathname);
 	const planned = plannedKeys(courses);
 	const twins = sessionTwins(shelves.other);
+	// While a lesson is live, Learning holds still (round 11, 3 n4): its own card says it waits on him, the cards of topics it touched keep the words they had when it went live.
+	const live = liveChat(chats, pathname);
+	const statusOf = (u: Unit) => shelfStatus(u, today, planned, live?.id ?? null);
+	const [held, setHeld] = useState<{ live: string; statuses: ReadonlyMap<string, UnitStatus> } | null>(null);
+	if ((live?.id ?? null) !== (held?.live ?? null)) setHeld(live ? { live: live.id, statuses: heldStatuses(shelves.learning, statusOf, live) } : null);
+	const learning = steadyLearning(shelves.learning, statusOf, held?.statuses ?? null, live);
 	const slim = (shelf: string) => (u: Unit) => (
 		<TopicSlimRow
 			key={u.key}
@@ -36,7 +44,7 @@ export function NowShelves({
 			today={today}
 			active={isOpen(u)}
 			parent={`shelf:${shelf}`}
-			status={<UnitStatusText status={shelfStatus(u, today, planned)} />}
+			status={<UnitStatusText status={shelf === "learning" ? learning.status(u) : statusOf(u)} />}
 		/>
 	);
 	return (
@@ -55,7 +63,7 @@ export function NowShelves({
 			<UnitShelf
 				id="learning"
 				label={NOW_SHELF_WORDS.learning}
-				items={shelves.learning}
+				items={learning.units}
 				folded={folded.learning}
 				onFoldedChange={(next) => fold("learning", next)}
 				isActive={isOpen}

@@ -1,8 +1,9 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
+import { sessionState } from "@/components/nav/session-state";
 import { needsYouNow, type NeedsYou } from "@/components/study-home/needs-you";
 import { todaysReview } from "@/components/study-home/study-facts";
 import { TUTOR_WRITING, overdueWords } from "@/components/study-words";
-import { byLearning, nowOf, shelfOf, slipOf, taskOf, topicSessions, unitKey, unitStatus, type Unit, type UnitInbox, type UnitStatus } from "@/components/unit-inbox/units";
+import { byLearning, nowOf, ownsTopic, shelfOf, slipOf, taskOf, topicSessions, unitKey, unitStatus, type Unit, type UnitInbox, type UnitStatus } from "@/components/unit-inbox/units";
 
 /**
  * The sidebar's list (spec: unit-inbox.md, "Today on top"): the top is
@@ -89,8 +90,8 @@ const NONE: ReadonlySet<string> = new Set();
  *  topic in today's plan (`planned`, `plannedKeys`) with nothing more
  *  pressing says its review is due, in Home's words ("Due today", "3d
  *  overdue"). Pure. */
-export function shelfStatus(unit: Unit, today: string, planned: ReadonlySet<string> = NONE): UnitStatus {
-	const own = unitStatus(unit, today);
+export function shelfStatus(unit: Unit, today: string, planned: ReadonlySet<string> = NONE, live: string | null = null): UnitStatus {
+	const own = unitStatus(unit, today, live);
 	const dated = own.kind === "returns" || (own.kind === "review" && unit.topic.review?.kind === "scheduled");
 	if (!planned.has(unit.key) || !(dated || own.kind === "studied" || own.kind === "none")) return own;
 	return { kind: "review", words: overdueWords(unit.topic.review?.kind === "due" ? unit.topic.review.overdue : 0, today) };
@@ -113,4 +114,45 @@ export function studyDay(engineDay: string, now: Date): string {
 export function topicUnit(inbox: UnitInbox, course: StudyCourse, topic: CourseMapTopic, chats: readonly ChatListItem[]): Unit {
 	const key = unitKey(course.map.workspace, topic.handle);
 	return [...inbox.active, ...inbox.working, ...inbox.known].find((u) => u.key === key) ?? unitFor(course, topic, chats);
+}
+
+/** The lesson the sidebar holds still for: the session open at
+ *  `pathname` while it waits on him or the tutor writes in it; null on
+ *  any other page, and once it settles (left for next time, finished, or
+ *  cut). Pure. */
+export function liveChat(chats: readonly ChatListItem[], pathname: string): ChatListItem | null {
+	const open = pathname.startsWith("/chat/") ? chats.find((c) => `/chat/${c.id}` === pathname) : undefined;
+	const state = open ? sessionState(open) : null;
+	return open && (state === "your-turn" || state === "working") ? open : null;
+}
+
+/** Whether a unit is a topic the live lesson touched without it being
+ *  the lesson's own. */
+const touchedBy = (unit: Unit, live: ChatListItem | null): boolean => live !== null && unit.sessions.some((c) => c.id === live.id) && !ownsTopic(live, unit.topic.handle);
+
+/**
+ * Learning's cards while a lesson is live (round 11, 3 n4: cards for other
+ * topics appeared under Learning and changed their words at each save): a
+ * card for a topic the lesson touched keeps the words it had when the
+ * lesson went live (`held`, by unit key), and one the lesson brought in
+ * waits until it settles; every other card as `statusOf` says. With no
+ * live lesson, the shelf as it is. Pure.
+ */
+export function steadyLearning(
+	units: readonly Unit[],
+	statusOf: (unit: Unit) => UnitStatus,
+	held: ReadonlyMap<string, UnitStatus> | null,
+	live: ChatListItem | null,
+): { units: readonly Unit[]; status: (unit: Unit) => UnitStatus } {
+	if (!live || !held) return { units, status: statusOf };
+	return {
+		units: units.filter((u) => !touchedBy(u, live) || held.has(u.key)),
+		status: (u) => (touchedBy(u, live) ? (held.get(u.key) ?? statusOf(u)) : statusOf(u)),
+	};
+}
+
+/** The words each touched card holds while `live` is: what they say as
+ *  it goes live. Pure. */
+export function heldStatuses(units: readonly Unit[], statusOf: (unit: Unit) => UnitStatus, live: ChatListItem): ReadonlyMap<string, UnitStatus> {
+	return new Map(units.filter((u) => touchedBy(u, live)).map((u) => [u.key, statusOf(u)]));
 }

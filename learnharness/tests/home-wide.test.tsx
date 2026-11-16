@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "./helpers/app-render.tsx";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { foldLines } from "../components/study-home/agenda-rows/row-facts.ts";
-import { rowStanding, rowWords } from "../components/study-home/agenda-rows/row-standing.ts";
+import { rowStanding, rowStatus, rowWords } from "../components/study-home/agenda-rows/row-standing.ts";
 import { whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import type { TodayRow } from "../components/study-home/study-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
@@ -72,17 +72,20 @@ describe("the standing", () => {
 });
 
 describe("the rows drawn", () => {
-	it("draw the pie and one status on the lesson line, the slip in place of the standing's words, and nothing on the course line (round 10, 1 m4)", () => {
+	it("draw one status on the lesson line, the standing with its pie or the reason, and nothing on the course line (round 10, 1 m4; round 11, 1 N9)", () => {
 		const lines = [...draw().querySelectorAll('[data-slot="today-line"]')];
 		const shown = foldLines(rows).shown;
 		assert.equal(lines.length, shown.length);
 		shown.forEach((row, i) => {
-			const facts = rowStanding(row);
+			const status = rowStatus(row);
 			const cell = lines[i]!.querySelector('[data-slot="today-standing"]');
+			const why = lines[i]!.querySelector('[data-slot="today-why"]');
+			const facts = status?.kind === "standing" ? status.facts : null;
 			assert.equal(cell?.textContent ?? null, facts ? rowWords(facts) : null, `row ${i}`);
+			assert.equal(why?.textContent ?? null, status?.kind === "why" ? status.why.short : null, `row ${i}`);
 			if (facts) assert.equal(cell!.querySelector('[data-slot="topic-glyph"]')?.getAttribute("data-fill"), String(facts.standing.fill), `row ${i}`);
 			if (facts?.slip) assert.equal(cell!.getAttribute("data-slip"), facts.slip.key, `row ${i}`);
-			assert.ok(lines[i]!.querySelector('[data-slot="today-slip"]') === null, `row ${i}: no second status`);
+			assert.ok(lines[i]!.querySelector('[data-slot="today-slip"]') === null && lines[i]!.querySelector('[data-slot="today-when"]') === null, `row ${i}: no second status`);
 		});
 	});
 });

@@ -7,15 +7,15 @@ One topic on a course page (course-page.md), drawn by the split page's list. `co
 | Slot | Notes |
 |---|---|
 | pie | the topic map's 16px `TopicGlyph` (topic-map.md): dashed and empty for a topic not started, a quarter more for each step towards doing it on his own, full once he can, the warning ink on a slip; 16 before the title |
-| title | 13/18 at 500, one line, whole while it fits beside the pie, the gaps and the fact's icon, cut only past that (round 10, 1 m8: titles were cut while the fact kept its whole width); muted ink for a topic not started. His standing in the map's words follows for a screen reader only ("Kernel, Learning") |
-| fact | flush right on one edge for every row, at most 224px, its words whole or not at all, never cut mid-word: words that do not fit beside the icon wrap to a second line the 20px slot hides, leaving the icon alone (the icon's line is 20px); a review that came due says its day alone, "Due 6 Nov" for the sidebar's "Due since 6 Nov, back 20 Nov" (`factWords`, `shortReviewWords`); the hover hint always says the sidebar's whole sentence (round 10, after 1 m8 cut "Due since 6 Nov, ba…"), 12/16 at 400 muted with a 14px icon 6 before the words; "Your turn" in the accent at 500. Icons: the sidebar's and Today's for the same fact (`WHY_ICON`): a turn that waits (message-circle-question), the tutor stopped (pause), a slip (circle-x), a review (history), an open task (bookmark), today's new topic (arrow-right); a topic coming back (calendar-clock; the calendar's alarm clock means overdue); the tutor writing (the braille spinner); map-pin for "You are here". How long since he studied it has no icon, as on the sidebar, and keeps its words on a compact row. No fact, no slot |
+| title | 13/18 at 500, one line, cut at its end before the fact gives way (round 11, 1 N8); muted ink for a topic not started. His standing in the map's words follows for a screen reader only ("Kernel, Learning") |
+| fact | flush right on one edge for every row, its words always shown and whole, never cut and never an icon alone (round 11, 1 N8: a bare arrow, bookmark or check-circle sat beside rows with words): the title gives way first, cut at its end. The row says the fact's shortest whole words (`factWords`): a review by its one day, "Due 6 Nov" for the sidebar's "Due since 6 Nov", and a review the plan holds past memory's day by the day it comes back, "Back 20 Nov" for "Due since 6 Nov, back 20 Nov" (`shortReviewWords`; round 11, 2 n9: "Due 6 Nov" read as overdue while the map said back 20 Nov); a planned start by its date, "Planned 18 Nov"; a mixed-up method as "Mixed up". The hover hint always says the sidebar's whole sentence, 12/16 at 400 muted with a 14px icon 6 before the words; "Your turn" in the accent at 500. Icons: the sidebar's and Today's for the same fact (`WHY_ICON`): a turn that waits (message-circle-question), the tutor stopped (pause), a slip (circle-x), a review (history), an open task (bookmark), today's new topic (arrow-right); a topic coming back (calendar-clock; the calendar's alarm clock means overdue); the tutor writing (the braille spinner); map-pin for "You are here". How long since he studied it has no icon, as on the sidebar. No fact, no slot |
 
 ## Sizes and states
 
 | Prop | Notes |
 |---|---|
 | default | 36px, one line |
-| `compact` | 32px; the fact shows as its icon alone, its words in a hint (left) and for a screen reader |
+| `compact` | 32px; the fact's words show as on every row |
 | `detail` | a second line under the title, 13/18 muted, two lines at most; the row grows to fit (8 above and below) and the pie aligns with the title |
 | `highlighted` | holds the hover fill, for a page that ties the row to something else he points at |
 

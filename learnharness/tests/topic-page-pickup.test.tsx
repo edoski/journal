@@ -117,15 +117,24 @@ describe("Now", () => {
 				return [now.kind, now.words, now.note, now.press, now.chat];
 			}),
 			[
-				["resume", "Computing a 2×2 spectrum", "Your turn", "Resume", "chat_demo_eigen"],
-				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
+				["resume", "Eigenvalues and eigenvectors", "Your turn", "Resume", "chat_demo_eigen"],
+				["open", "Eigenvalues and eigenvectors", "Tutor writing", "Open", "chat_demo_eigen"],
 				["review", "Due since 6 Nov", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],
-				["continue", DET_STOPPED, "Left off yesterday", "Continue", "chat_demo_det"],
+				["continue", "Determinants as volume scaling", "Left off yesterday", "Continue", "chat_demo_det"],
 				["study", "Nothing due", null, "Study", null],
 			],
 		);
+	});
+
+	it("names the lesson or the task it continues, as Home names its line, never a teaching step (round 11, 2 N2 and 1 N9)", () => {
+		// Shot 49: Kernel's Now read "Which inputs does a matrix send to zero?", a step the sheet session's tutor planned; shot 41: the task under Now and the same lesson under Next by another name.
+		const sheet = chat("chat_sheet", "Continue Problem sheet 4", "2026-11-08T09:00:00.000Z", { pendingQuestion: true, topics: ["rank"], tasks: ["sheet-4"] });
+		const facts = factsOf(RANK, [sheet], [{ ...DET_PLAN, id: "chat_sheet" }]);
+		const { now } = pickupSections(facts);
+		assert.deepEqual([now.words, now.note, now.chat], ["Problem sheet 4", "Your turn", "chat_sheet"]);
+		assert.notEqual(now.words, DET_STOPPED);
 	});
 
 	it("says a reply cut short as the sidebar and Home say it, never Your turn (round 9, 2 m7)", () => {

@@ -32,6 +32,10 @@ export interface PracticePose {
 export interface GradedAnswer {
 	result: AttemptResult;
 	response: string;
+	/** The tutor's one line on what he did, the record's text as a lesson
+	 *  save writes it ("Subtracted the rank from the rows"); the problem
+	 *  stands in when absent. */
+	record?: string;
 	chose?: string;
 	byTopic?: Readonly<Record<string, AttemptResult>>;
 	/** A combined problem that failed: the topic where the answer first
@@ -121,7 +125,7 @@ function answerObservations(
 		// chosen, never on the method chosen, even when both were posed.
 		const charged = chose && topics.length > 1 ? topics.filter((t) => t !== chose) : topics;
 		const gaveUp = marks.gave_up && result === "incorrect" ? { gave_up: true } : {};
-		return { topics: charged, text: pose.statement, response: answer.response, help, result, ...(chose ? { chose } : {}), ...(marks.sure ? { sure: marks.sure } : {}), ...(marks.shown ? { shown: true } : {}), ...gaveUp };
+		return { topics: charged, text: answer.record?.trim() || pose.statement, response: answer.response, help, result, ...(chose ? { chose } : {}), ...(marks.sure ? { sure: marks.sure } : {}), ...(marks.shown ? { shown: true } : {}), ...gaveUp };
 	});
 }
 

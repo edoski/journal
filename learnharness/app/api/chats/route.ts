@@ -20,8 +20,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; name?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
+	// A start the app words for him names itself apart from its opening question (round 11, 1 N14).
+	const name = typeof body.name === "string" && body.name.trim().length > 0 ? body.name.trim() : null;
 	// The Current design's Practice switch starts the session in practice;
 	// without it the prober routes the opening, and the agents hand the
 	// session between teaching and practice from there.
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
 	// A lesson opened on topics is named after them, not the verb that
 	// opened it ("Start Poisson distribution" is "Poisson distribution");
 	// a review keeps its words (`openingTitle`).
-	const chat = createChat(titleFromPrompt(openingTitle(title, topics) || "Untitled session"), course, topics, arcCheck);
+	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics) || "Untitled session")), course, topics, arcCheck);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the

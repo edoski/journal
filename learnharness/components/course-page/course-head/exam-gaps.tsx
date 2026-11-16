@@ -4,8 +4,8 @@ import type { CourseMapTopic, StudyCourse } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MathText } from "@/components/ui/math-text";
-import { EXAM_GAP_WORDS, examGapAsk, examGapPickWords, examGapWhyWords } from "@/components/study-words";
-import { topicCreation, useStartSession } from "@/components/unit-inbox/start-unit";
+import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords } from "@/components/study-words";
+import { examGapAskCreation, topicCreation, useStartSession } from "@/components/unit-inbox/start-unit";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
 
 const PRESS = "text-body system-current:text-row text-link hover:text-link";
@@ -71,7 +71,7 @@ export function ExamGapLine({ course }: { course: StudyCourse }) {
 				size="xs"
 				className={PRESS}
 				disabled={starting !== null}
-				onClick={() => start("gap:ask", { title: examGapAsk(titles(named)), course: { workspace }, topics: named.map((t) => t.handle) })}
+				onClick={() => start("gap:ask", examGapAskCreation(workspace, titles(named), named.map((t) => t.handle)))}
 			>
 				{EXAM_GAP_WORDS.ask}
 			</Button>

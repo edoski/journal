@@ -1,5 +1,5 @@
 import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { whyOf } from "@/components/study-home/agenda-rows/row-facts";
+import { whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
 import { lineTopics } from "@/components/study-home/needs-you";
 import type { TodayRow } from "@/components/study-home/study-facts";
 import type { SlipKey } from "@/components/study-words";
@@ -37,4 +37,30 @@ export function rowStanding(row: TodayRow): RowStanding | null {
  *  second status beside the slip (round 10, 1 m4). Pure. */
 export function rowWords(facts: RowStanding): string {
 	return facts.slip?.words ?? facts.standing.words;
+}
+
+/** A Today row's one status: where he stands on its topic, or why it is
+ *  on Today. */
+export type RowStatus = { kind: "standing"; facts: RowStanding } | { kind: "why"; why: Why };
+
+/**
+ * The one status a Today row says, in words (round 11, 1 N9: "Studied
+ * today · Mistake to fix · Your turn" on one row): the tutor's own state
+ * in a session while it writes or stopped mid-reply, since that changes
+ * what the row opens on; else the slip he would act on (a miss as the
+ * row's reason, else its topic's slip); else why the row is on Today
+ * ("Your turn", "Due since 6 Nov", "Planned today", "Left off 6 Nov"),
+ * except a plain "Next up", which says only that the row is on Today;
+ * else where he stands on its topic. When he last studied it is not a
+ * status: Home's "Studied today" line names what he studied. Null with
+ * nothing to say. Pure.
+ */
+export function rowStatus(row: TodayRow): RowStatus | null {
+	const why = whyOf(row);
+	if (why && (why.kind === "working" || why.kind === "stopped" || why.kind === "missed")) return { kind: "why", why };
+	const facts = rowStanding(row);
+	if (facts?.slip) return { kind: "standing", facts };
+	// A plain "Next up" says only that the row is on Today; where he stands says more.
+	if (why && !(facts && why.kind === "next" && !why.starts)) return { kind: "why", why };
+	return facts ? { kind: "standing", facts } : null;
 }

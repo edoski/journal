@@ -135,6 +135,9 @@ export interface TopicFacts {
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
+	/** The open tasks that hold the topic (`heldTasks`), by which a
+	 *  session holding one is named. */
+	tasks: readonly CourseMapTask[];
 	/** Every session tied to the topic, newest first: its own and those
 	 *  that only touched it (`SessionEntry.own`). */
 	sessions: readonly SessionEntry[];
@@ -423,6 +426,7 @@ export function topicFacts({
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		action: topicAction(topic, map, chats),
 		pickups,
+		tasks: heldTasks(topic, map),
 		sessions: entries,
 		listed: entries.filter((entry) => !picked.has(entry.chat.id)),
 		attempts,
