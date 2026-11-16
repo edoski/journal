@@ -43,3 +43,21 @@ test("words he has whole, with the turn still running, show the line under them 
 	assert.equal(showsWorking([learner, tutor({ type: "text", text: "Your second answer is right.", state: "done" })], true), true);
 	assert.equal(showsWorking([learner, tutor({ type: "text", text: "Your second answer", state: "streaming" })], true), false, "words still arriving are the sign");
 });
+
+test("while Claude Code compacts the line shows, whatever the lesson ends on (round 14, 4 minor 10)", () => {
+	const asked = tutor({ type: "tool-explain", state: "input-available", toolCallId: "q1" });
+	assert.equal(showsWorking([learner, asked], true, true), true);
+	assert.equal(showsWorking([learner, tutor({ type: "text", text: "Row 3 equals", state: "streaming" })], true, true), true);
+	assert.equal(showsWorking([learner, asked], false, true), false, "only while a turn runs");
+});
+
+test("a question kept for the rewrite of a refused message is not posed yet: the turn still writes it (round 14, 4 minor 10: 4.5 s with no sign between compaction passes)", () => {
+	// The record of lens 4's step 21: send_to_user refused for length, then
+	// explain kept ("Kept: he reads this question right under your
+	// rewritten message"), then Claude Code compacted before the rewrite.
+	const refused = { type: "tool-send_to_user", state: "output-error", toolCallId: "s1" };
+	const kept = { type: "tool-explain", state: "input-available", toolCallId: "q1" };
+	assert.equal(showsWorking([learner, tutor(refused, kept)], true), true, "the rewrite is owed");
+	assert.equal(showsWorking([learner, tutor(refused, { type: "text", text: "Yes, P is invertible.", state: "done" }, kept)], true), false, "the rewrite came: the question is posed");
+	assert.equal(showsWorking([learner, tutor({ type: "text", text: "Yes.", state: "done" }, kept)], true), false, "no refusal: posed, as round 12's 3 D6");
+});

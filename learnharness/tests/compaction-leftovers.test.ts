@@ -11,7 +11,7 @@ import { showsWorking } from "../components/lesson/working-sign.ts";
 test("the lesson has no compaction line of its own: a turn that compacts shows Thinking like any turn", () => {
 	const lesson = readFileSync(new URL("../components/chat.tsx", import.meta.url), "utf8");
 	assert.doesNotMatch(lesson, /Compacting the conversation/);
-	assert.match(lesson, /showsWorking\(messages, busy\)/, "the line reads the session's busy fact, a wake the server is setting up included (round 8/9: about 10 s of nothing before practice woke; handoff-busy.test.tsx)");
+	assert.match(lesson, /showsWorking\(messages, busy, compacting\)/, "the line reads the session's busy fact, a wake the server is setting up included (round 8/9: about 10 s of nothing before practice woke; handoff-busy.test.tsx)");
 	assert.equal(showsWorking([] as never, true), true);
 });
 

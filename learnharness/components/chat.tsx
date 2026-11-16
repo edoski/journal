@@ -897,7 +897,7 @@ export function Chat({
 	// turns).
 	// A turn the server is setting up itself (turn-waking) is busy too
 	// (useSessionBusy): the line shows from the start of its setup.
-	const thinking = showsWorking(messages, busy);
+	const thinking = showsWorking(messages, busy, compacting);
 	const idleLine = workingLine(messages);
 	// A failed model response (issue #110): Retry keeps the saved input
 	// and completed work, without another learner message. Offered from
