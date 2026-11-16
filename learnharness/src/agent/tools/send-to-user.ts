@@ -16,6 +16,9 @@ export const MESSAGE_DRAFT_LINES: readonly string[] = [
 	"Its length is the voice's budget for this kind of turn, counted as he reads it: " +
 		`a clause after a colon or a semicolon is one more sentence, and a sentence over ${SENTENCE_WORDS} words is two.`,
 	"A point is made once: what he was told earlier in the session is never said again, in other words, a display or a callout; say only what is new.",
+	"A handoff between teaching and practice takes no words of its own (never \"Switching to an explanation of the basis test.\"): go straight to the explanation or the problem.",
+	"Words are prose, never maths type: only the maths goes in $…$ (\"$A$ is invertible exactly when $\\det A \\neq 0$.\", never \"$A \\text{ is invertible exactly when } \\det A \\neq 0$.\").",
+	"Every answer in the record stays saved, an earlier day's included, so never tell him one is unsaved or not saved.",
 ];
 export const MESSAGE_DRAFT_RULES = MESSAGE_DRAFT_LINES.join(" ");
 

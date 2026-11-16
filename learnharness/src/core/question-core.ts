@@ -149,11 +149,10 @@ export const ONE_ASK_RULE =
 	"(\"What is the probability that exactly one of 12 bulbs fails, and why?\"), which covers each factor of a formula too; " +
 	"the question ends there.";
 
+const QUESTION_FIELD = `The single question to ask. ${ONE_ASK_RULE} ONE question per turn: ask, then end your turn — the answer determines the next.`;
+
 export const explainInputBase = Type.Object({
-	question: Type.String({
-		description:
-			`The single question to ask. ${ONE_ASK_RULE} ONE question per turn: ask, then end your turn — the answer determines the next.`,
-	}),
+	question: Type.String({ description: QUESTION_FIELD }),
 	correctAnswer: Type.String({
 		description:
 			"REQUIRED. The full correct answer in your own words, reasoning included — COMMITTED before the learner " +
@@ -162,6 +161,14 @@ export const explainInputBase = Type.Object({
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
 });
+
+/** The guess's own rule where the teach question is written (round 12,
+ *  2 M1: "Go ahead, guess." posed as a check, and his guess became the
+ *  topic's open mistake). The voice guard's `guessAsked` holds a draft to
+ *  it; a probe question has no prediction to pose. */
+export const GUESS_RULE =
+	"A guess he asks to make (\"let me guess first\"), or one you invite (\"Take a guess\"), is posed as type predict, " +
+	"so it is kept and never counts; the open question is asked again once his guess is answered.";
 
 /** The TEACH-side explain object: base + the teaching-cycle role field
  *  and the plan-position field. The required pair leads the property
@@ -182,6 +189,7 @@ export const explainInputObject = Type.Object({
 			"A question off the plan with a right answer (a guess, a side check) is still this tool, tagged with the node it grows from; ask_user_question never asks one.",
 	}),
 	...explainInputBase.properties,
+	question: Type.String({ description: `${QUESTION_FIELD} ${GUESS_RULE}` }),
 });
 
 /** The DISPLAY parse for persisted explain calls (tool-parts.ts): the

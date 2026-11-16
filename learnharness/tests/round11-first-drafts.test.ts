@@ -63,3 +63,44 @@ describe("send_to_user's message field states round 12's most broken rule (round
 		assert.match(fs.readFileSync(new URL("../src/agent/voice-guard.ts", import.meta.url), "utf-8"), /a point is made once/, "the refusal says the same");
 	});
 });
+
+describe("the rules round 12's guard added are stated where the draft is written, so first drafts pass (round 12, M3's rules in M2's list)", async () => {
+	const { MESSAGE_DRAFT_LINES } = await import("../src/agent/tools/send-to-user.ts");
+	const line = (start: string) => {
+		const found = MESSAGE_DRAFT_LINES.find((l) => l.startsWith(start));
+		assert.ok(found && MESSAGE_DRAFT_RULES.includes(found), `the field carries "${start}…"`);
+		return found;
+	};
+
+	it("a narrated handoff: its example is the one the guard refuses", () => {
+		const [bad] = quoted(line("A handoff between teaching and practice"));
+		assert.ok(voiceBreaks(bad!, "teach").some((b) => b.rule === "narration"), bad);
+	});
+
+	it("words in maths type: the prose example passes and the maths-type one is refused", () => {
+		const [good, bad] = quoted(line("Words are prose, never maths type"));
+		assert.ok(!voiceBreaks(good!, "teach").some((b) => b.rule === "maths-words"), good);
+		assert.ok(voiceBreaks(bad!, "teach").some((b) => b.rule === "maths-words"), bad);
+	});
+
+	it("an answer called unsaved: the words it bans are the guard's", () => {
+		const said = line("Every answer in the record stays saved");
+		for (const draft of ["Your answer is unsaved.", "That answer is not saved."]) {
+			assert.ok(voiceBreaks(draft, "teach").some((b) => b.rule === "unsaved"), draft);
+			assert.match(said, /unsaved or not saved/);
+		}
+	});
+
+	it("a guess he asks to make is posed as a prediction, said in the teach question's field beside its one-ask rule", async () => {
+		const { explainInputObject, GUESS_RULE } = await import("../src/core/question-core.ts");
+		const field = String((explainInputObject.properties.question as { description?: string }).description);
+		assert.ok(field.includes(ONE_ASK_RULE) && field.includes(GUESS_RULE), field);
+		assert.match(GUESS_RULE, /type predict/);
+		assert.ok(!String((explainInputBase.properties.question as { description?: string }).description).includes(GUESS_RULE), "a probe question has no prediction to pose");
+	});
+
+	it("a demo's title, which the guard reads with its brief, carries no formula he is still to find", async () => {
+		const { demoInputSchema } = await import("../src/agent/tools/jobs.ts");
+		assert.match(String((demoInputSchema.properties.title as { description?: string }).description), /never a formula he is still to find/);
+	});
+});
