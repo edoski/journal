@@ -12,6 +12,7 @@ from learning import workspace as workspaces
 from learning.retrieval import (
     DUE_LIMIT,
     compact,
+    daily,
     exam,
     last_activity,
     last_studied,
@@ -261,9 +262,8 @@ def plan(
     ]
     near = any(0 <= left <= progress.RUNUP_DAYS for left in ahead)
     shown = max(days, progress.RUNUP_DAYS) if near else days
-    horizon = min(MAX_DAYS, max([shown, *(left + 1 for left in ahead)]))
     week = capacity.of(readable.values(), today)
-    together = agenda.plan(readable, today, horizon, week)
+    together = daily(readable, today).now
     journal = _journal(vault, days, today, shown)
     week_journal = (
         journal

@@ -1218,8 +1218,18 @@ def _replayed(
     name = str(workspace.directory)
     readable = capacity.final_reviews({**_readable(workspace), name: record}, today)
     week = capacity.of(readable.values(), today)
-    replayed = agenda.replay(readable, today, agenda.MAX_DAYS)
-    return replayed, readable, bool(week.study_weekdays)
+    return daily(readable, today), readable, bool(week.study_weekdays)
+
+
+def daily(readable: Mapping[str, dict[str, Any]], today: date) -> agenda.Replay:
+    """The daily plan of every course, the one every verb reads: ``plan``'s
+    days, each topic's day in ``map``, ``show`` and ``resume``, and a save's
+    receipt. Each day it replays is made with his week as that day began
+    (``agenda.replay``), so the plan he was told on a day is the plan the
+    replay makes of it later (round 11: ``plan`` made every replayed day
+    with today's week, ``map`` with each day's own, and the topic page said
+    Eigen Thu 12 Nov while the calendar and the close said Mon 16)."""
+    return agenda.replay(readable, today, agenda.MAX_DAYS)
 
 
 def when(workspace: Workspace, record: dict[str, Any], today: date) -> agenda.When:
