@@ -69,7 +69,8 @@ Build quality:
   and 600px tall, with no scrolling.
 - Maths reads as he writes it on paper: a matrix by its columns ("columns (a, c) and (b, d)") or its entries'
   names, never as code ("[[a, b], [c, d]]"); run_demo fails maths written as code.
-- Labels say what each control and readout is. No helper lines, footers or instructions under the demo
+- Labels say what each control and readout is, each in a few words that fit on one line at the demo's width
+  ("line along v", never a phrase that wraps a lone word onto a second line). No helper lines, footers or instructions under the demo
   ("Hover a bar to see…", "Resets when n changes…").
 
 THE HOUSE RULE — never deliver untested:

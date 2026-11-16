@@ -61,56 +61,47 @@ describe("a concluded practice problem as engine observations", () => {
 		assert.equal("chose" in final!, false);
 	});
 
-	it("a multi-part problem charges only the topics that went wrong", () => {
+	it("one answer is one observation with one result, a part right beside a part wrong saved partial (round 14, M2)", () => {
 		const pose = { statement: "(a) hypergeometric, (b) binomial", topics: ["hypergeometric", "binomial"] };
-		const mixed: PracticeConclusion = {
-			outcome: "movedOn",
-			rung: null,
-			result: "incorrect",
-			response: "(a) 0.5, (b) 0.2",
-			byTopic: { hypergeometric: "correct" },
-		};
+		const mixed: PracticeConclusion = { outcome: "movedOn", rung: null, result: "partial", response: "(a) 0.5, (b) 0.2" };
 		assert.equal(conclusionProblem(mixed, pose.topics), null);
-		assert.deepEqual(practiceObservations(pose, mixed, "confident").map((o) => [o.topics, o.result, o.help]), [
-			[["hypergeometric"], "correct", "none"],
-			[["binomial"], "incorrect", "none"],
-		]);
-		const nudged: PracticeConclusion = {
-			...mixed,
-			outcome: "solvedWithHints",
-			rung: "R1",
-			result: "correct",
-			byTopic: undefined,
-			firstTry: { result: "incorrect", response: "(a) 0.5, (b) 0.2", sure: "confident", byTopic: { hypergeometric: "correct" } },
-		};
+		assert.deepEqual(practiceObservations(pose, mixed, "confident").map((o) => [o.topics, o.result]), [[["hypergeometric", "binomial"], "partial"]]);
+		const nudged: PracticeConclusion = { ...mixed, outcome: "solvedWithHints", rung: "R1", result: "correct", firstTry: { result: "partial", response: "(a) 0.5, (b) 0.2", sure: "confident" } };
 		assert.deepEqual(practiceObservations(pose, nudged, "neutral").map((o) => [o.topics, o.result, o.help]), [
-			[["hypergeometric"], "correct", "none"],
-			[["binomial"], "incorrect", "none"],
+			[["hypergeometric", "binomial"], "partial", "none"],
 			[["hypergeometric", "binomial"], "correct", "Hint R1: re-described the pattern class"],
 		]);
 	});
 
-	it("a wrong method rides only on the topics not answered correctly", () => {
+	it("the recorded double save: a first try that broke at rank is one observation on rank, never a second on kernel (round 14, M2)", () => {
+		const pose = { statement: "For which t is rank A = 2?", topics: ["rank", "kernel"] };
+		const recorded = {
+			outcome: "solvedWithHints", rung: "R2", result: "correct", response: "t = 5",
+			firstTry: { result: "incorrect", response: "t = 4", sure: "confident", brokeAt: "rank", byTopic: { kernel: "correct" } },
+		} as unknown as PracticeConclusion;
+		assert.match(conclusionProblem(recorded, pose.topics)!, /^firstTry\.byTopic gives one answer a second result/);
+		const { firstTry, ...rest } = recorded;
+		const { byTopic: _second, ...first } = firstTry as unknown as Record<string, unknown>;
+		const fixed = { ...rest, firstTry: first } as unknown as PracticeConclusion;
+		assert.equal(conclusionProblem(fixed, pose.topics), null);
+		const observations = practiceObservations(pose, fixed, "confident");
+		assert.deepEqual(observations.map((o) => [o.topics, o.result, o.response]), [
+			[["rank"], "incorrect", "t = 4"],
+			[["rank", "kernel"], "correct", "t = 5"],
+		]);
+		assert.equal(new Set(observations.map((o) => o.response)).size, observations.length, "each response is saved once");
+	});
+
+	it("a wrong method rides on the observation, on the topic that should have been chosen", () => {
 		const pose = { statement: "two parts", topics: ["hypergeometric", "binomial"] };
-		const observations = practiceObservations(
-			pose,
-			{ outcome: "movedOn", rung: null, result: "incorrect", response: "binomial for both", chose: "binomial", byTopic: { binomial: "correct" } },
-			undefined,
-		);
-		assert.deepEqual(observations.map((o) => [o.topics, o.chose]), [[["hypergeometric"], "binomial"], [["binomial"], undefined]]);
+		const observations = practiceObservations(pose, { outcome: "movedOn", rung: null, result: "partial", response: "binomial for both", chose: "binomial" }, undefined);
+		assert.deepEqual(observations.map((o) => [o.topics, o.chose, o.result]), [[["hypergeometric"], "binomial", "partial"]]);
 	});
 
 	it("a wrong method is charged to the topic that should have been chosen, not the method chosen", () => {
 		const pose = { statement: "which model fits?", topics: ["hypergeometric", "binomial"] };
 		const [o] = practiceObservations(pose, { outcome: "movedOn", rung: null, result: "incorrect", response: "binomial", chose: "binomial" }, undefined);
 		assert.deepEqual([o!.topics, o!.chose], [["hypergeometric"], "binomial"]);
-	});
-
-	it("a surrendered multi-part problem still credits the part answered right", () => {
-		const pose = { statement: "two parts", topics: ["hypergeometric", "binomial"] };
-		const gaveUp: PracticeConclusion = { outcome: "surrendered", rung: "R5", result: "incorrect", response: "(a) 0.217, (b) no idea", byTopic: { hypergeometric: "correct" } };
-		assert.equal(conclusionProblem(gaveUp, pose.topics), null);
-		assert.deepEqual(practiceObservations(pose, gaveUp, undefined).map((o) => [o.topics, o.result]), [[["hypergeometric"], "correct"], [["binomial"], "incorrect"]]);
 	});
 
 	it("a given-up problem is marked given up, and the solution revealed after it is not help", () => {
@@ -146,8 +137,7 @@ describe("a concluded practice problem as engine observations", () => {
 			conclusionProblem({ ...base, firstTry: { result: "correct", response: "Yes", sure: null, chose: "affinity" } }, topics)!,
 			/^firstTry\.chose/,
 		);
-		assert.match(conclusionProblem({ ...base, byTopic: { rank: "incorrect" } }, topics)!, /byTopic names rank, which the problem was not posed with/);
-		assert.match(conclusionProblem({ ...base, byTopic: { linearity: "incorrect" } }, topics)!, /byTopic marks linearity incorrect/);
+		assert.match(conclusionProblem({ ...base, byTopic: { linearity: "incorrect" } } as PracticeConclusion, topics)!, /^byTopic gives one answer a second result/);
 		assert.equal(conclusionProblem({ ...base, result: "partial" }, topics), null, "a guessed right answer is partial");
 		assert.equal(conclusionProblem({ ...base, outcome: "movedOn", result: "incorrect" }, topics), null);
 	});
@@ -181,11 +171,11 @@ describe("conclude records the attempt, and never locks the session", async () =
 		const saves: unknown[] = [];
 		const records = { list: async () => ({ available: true, courses: [], roots: [] }), run: async (_w: string, req: unknown) => (saves.push(req), { ok: true, json: {} }) };
 		const tools = practiceTools({ chatId: "c", chatStore: { getChat: () => ({ messages: stringMessages }) } as never }, { course: { workspace: "/w", title: "T" }, records } as never);
-		const result = await tools.conclude!.execute("c1", { ...conclusion, byTopic: { independence: "correct" }, result: "partial" }, undefined);
+		const result = await tools.conclude!.execute("c1", { ...conclusion, result: "partial" }, undefined);
 		assert.notEqual(result.isError, true);
 		assert.deepEqual(
 			(saves[0] as { changes: { observations: { topics: string[]; result: string }[] } }).changes.observations.map((o) => [o.topics, o.result]),
-			[[["independence"], "correct"], [["conditional"], "partial"]],
+			[[["independence", "conditional"], "partial"]],
 		);
 	});
 

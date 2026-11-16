@@ -904,10 +904,6 @@ export interface AnsweredQuestion {
 	confidence?: Exclude<Confidence, "neutral"> | null;
 	/** He pressed Show me on it: he gave up and was shown its answer. */
 	showMe?: boolean;
-	/** Asked by the probe (`recall`), before any teaching of the session:
-	 *  on a topic not yet taught it is saved as a prediction (round 11,
-	 *  3 N1). Absent for every other question. */
-	probe?: true;
 	/** The question he answered, as `sameQuestionKey` reads it; absent for
 	 *  an answer in words or a problem's conclude. */
 	asked?: string;
@@ -1014,7 +1010,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			revealed.add(asked.key);
 			const details = m.details as { confidence?: unknown; showMe?: unknown };
 			const confidence = chosenConfidence(details.confidence) ?? null;
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), ...(m.toolName === PROBE_QUESTION_TOOL ? { probe: true as const } : {}), asked: asked.key, recorded: false });
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, recorded: false });
 		}
 	}
 	for (const [key, answer] of answered) answer.recorded = recorded.has(key);

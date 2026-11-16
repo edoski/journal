@@ -36,11 +36,11 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { LESSON_PROGRESS_TOOL } from "../core/contracts/plan.ts";
-import { normalizeQuestionType } from "../core/question-core.ts";
+import { normalizeQuestionType, PREDICT_RULE } from "../core/question-core.ts";
 import { parseQuestionInput } from "../core/tool-parts.ts";
 import { parseMermaidPlan } from "./tools/mermaid-plan.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, partialDay, afterQuestion, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, partialDay, afterQuestion, creditedLetter, asksAreHis, reasonAskedTwice, recordConfidenceWord, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -76,7 +76,15 @@ export interface TurnInput {
 	/** His message asks to guess first ("let me guess first"): the guess
 	 *  is a prediction, never a counted attempt (round 12, 2 M1). */
 	guess?: string;
+	/** A demo the tutor called for has just been built and drawn in the
+	 *  lesson: the turn's first message points him into it (round 14, m13:
+	 *  the slots demo landed above a reply that never mentioned it). */
+	demo?: boolean;
 }
+
+/** Words that send him into a demo: the demo itself, or what to do with
+ *  one of its controls. */
+const POINTS_AT_DEMO = /\bdemos?\b|\b(?:slide|slider|drag|press|click|tap|set|move|watch|turn|sweep|play|toggle|run)\b/i;
 
 /** His words asking to guess before he is told: "let me guess first",
  *  "can I guess", "I want to predict it". */
@@ -86,6 +94,11 @@ const GUESS_ASK = /\b(?:let me|i(?:'ll| will| want to| wanna|'d like to| would l
  *  "What's your guess?", "Make a prediction". Never words about a guess
  *  he already made ("your guess fails there"). */
 const GUESS_INVITE = /\b(?:go ahead(?:,| and)?\s+guess|guess (?:first|away)|(?:take|make|have) a (?:quick |first )?guess|what(?:'s| is| would be) your (?:best )?guess|what would you guess|(?:make|give) (?:me )?(?:a|your) prediction)\b/i;
+
+/** A question's words asking for his guess, as his box does ("Your
+ *  prediction, and why"): "What do you expect…", "Guess…", "Before
+ *  computing anything…". */
+const ASKS_A_GUESS = /\b(?:guess(?:es|ing)?|expect(?:s|ed|ing)?|predict(?:s|ion)?|hunch|bet|intuition|instinct|suspect)\b|\bwhat do you (?:think|imagine)\b|\bbefore (?:computing|calculating|working|checking|trying|we|you)\b/i;
 
 /** Words in his answer that say he is not sure of it or of its reason. */
 const DOUBT = /\b(?:not sure|unsure|no idea|i think|i guess|i'?m guessing|maybe|probably|don'?t (?:know|see|get)|why (?:i'?m|am i|is it|does it|can i))\b/i;
@@ -157,11 +170,26 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 			return { kind: "wrong", answers: true, words: textOf(input.content) };
 		case "dispute":
 			return { kind: "direct", answers: false, words: null, ruling: true };
+		case "subagent-steer": {
+			const result = isRecord(input.details) && input.details.kind === "demo" && isRecord(input.details.result) ? input.details.result : null;
+			return typeof result?.html === "string" && result.html.length > 0 ? { kind: "teach", answers: false, words: null, demo: true } : none;
+		}
 		case "mode-handoff":
 			return isRecord(input.details) && input.details.mode === "teach" ? { kind: "teach", answers: false, words: null, handedBack: true } : none;
 		default:
 			return none;
 	}
+}
+
+/** Everything he wrote this session: his messages, his answers to its
+ *  questions and his work on its problems. */
+function hisWordsOf(messages: readonly LhMessage[]): string[] {
+	return messages.flatMap((m) => {
+		if (m.role === "user") return [textOf(m.content)];
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName) && isRecord(m.details) && typeof m.details.text === "string") return [m.details.text];
+		if (m.role === "custom" && m.customType === "practice-thinking") return [textOf(m.content)];
+		return [];
+	});
 }
 
 /** Every text he read from the tutor before this turn: its delivered
@@ -197,7 +225,7 @@ const KIND_WORDS: Readonly<Record<TurnKind, string>> = {
 /** The rules a rewrite is still read against after its call was refused
  *  once: a question asks one thing, so no rewrite passes by asking two
  *  (round 7: a rewrite that fixed advice added a second question). */
-const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict", "guess"]);
+const HARD: ReadonlySet<VoiceRule> = new Set(["questions", "compound", "verdict", "guess", "predict"]);
 
 const SAVE_TOOL = "course_save";
 
@@ -208,6 +236,14 @@ const SESSION_AS_LESSON = /\b(?:this|today'?s|the|our|your)(?: [a-z]+)? lesson\b
 /** A reply that calls his whole answer wrong: "That's not right.", "Not
  *  right: …", "No, …", with no part named right ("but", "partly"). */
 const FLAT_MISS = /^(?:(?:that|this|it)(?:'s| is) not (?:right|correct)\b|not (?:quite )?(?:right|correct)\b|no(?=[,.]))(?![^.?!]*\b(?:but|partly|part of)\b)/i;
+
+/** An opening that restates the verdict his answer card shows above the
+ *  reply, by the result this turn saved (round 14, m19: "That's not
+ *  right." under a "Not right" card). */
+const RESTATED_VERDICT: Readonly<Record<string, { card: string; re: RegExp }>> = {
+	incorrect: { card: "Not right", re: /^(?:no[,.]\s+)?(?:(?:that|this|it|your answer)(?:'s| is) (?:not (?:quite )?(?:right|correct)|wrong|incorrect)|not (?:quite )?(?:right|correct)|wrong|incorrect)\b/i },
+	partial: { card: "Partly right", re: /^(?:(?:that|this|it|your answer)(?:'s| is) )?(?:only )?(?:partly|partially|half) (?:right|correct)\b/i },
+};
 
 /** The results a save or a conclude records for his answers. */
 function savedResults(name: string, args: unknown): string[] {
@@ -439,6 +475,22 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
 		case "day-part":
 			return `A day you name with what it holds is named whole, or by itself alone: ${b.excerpt.replace(/: /, " also holds ")}. Name every item of that day from the close's \`day_items\`, or only the day.`;
+		case "card": {
+			const [card, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
+			return `His answer card already says "${card}" above your reply, and your opening says it again: ${quoted(said)}. Open on where it broke, the fact itself, never on the verdict, and never soften it.`;
+		}
+		case "contrast":
+			return `"You held that…, whereas…" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not.`;
+		case "hint-question":
+			return `A hint gives him what the question did not, said as a statement: the next move ("Subtract row 1 from row 3 and look at what is left") or a fact the question left out. This one asks him a question instead: ${quoted(b.excerpt)}. Say the move or the fact; his question is asked again after it.`;
+		case "credit": {
+			const [letter, said] = [b.excerpt.slice(0, b.excerpt.indexOf("|")), b.excerpt.slice(b.excerpt.indexOf("|") + 1)];
+			return `${quoted(said)} credits him with work on $${letter}$, which he never worked on in this lesson. Name the matrix he worked on, the one in the question he answered, or say whose work it was.`;
+		}
+		case "demo-unused":
+			return `The demo you called for is now on his screen, and this message never sends him into it: ${quoted(b.excerpt)}. Open on one thing to try in it, by its control ("slide n up and watch the 0 column"), and never read him a value the open question asks.`;
+		case "predict":
+			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
 			return `The demo you called for this turn is still being built, so it is not on his screen: ${quoted(b.excerpt)}. It appears where you called for it once it is built, and a message tells you then. Until that message, say nothing of it and ask nothing that needs it: teach the step in words now, and point him at the demo, and ask what needs it, once it has arrived.`;
 		case "review-lesson":
@@ -606,6 +658,8 @@ export class VoiceGuard {
 	private readonly earlier: string[];
 	/** The messages he read before this turn, questions aside. */
 	private readonly told: string[];
+	/** What he worked on this session: his own words, as he wrote them. */
+	private readonly his: string[];
 	private readonly answeredAt: number;
 	private readonly decisions = new Map<string, AgentToolResult<unknown> | null>();
 	/** How many times each kind of call was refused this turn. */
@@ -654,6 +708,9 @@ export class VoiceGuard {
 	 *  was not right: the mark and the words must agree. */
 	private savedPartial = false;
 	private toldWrong = false;
+	/** The results this turn saved for his answers, which his answer
+	 *  cards show above the reply. */
+	private readonly savedVerdicts = new Set<string>();
 	private readonly noted = new Set<string>();
 	/** His answer this turn that no save has named yet, in a session with
 	 *  a course record to save it to, and whether a turn-ending call was
@@ -691,6 +748,7 @@ export class VoiceGuard {
 		const earlier = earlierTexts(messages);
 		this.earlier = earlier.map((e) => e.text);
 		this.told = earlier.filter((e) => !e.asked).map((e) => e.text);
+		this.his = hisWordsOf(messages);
 		// The question his answer replies to is the last one he read: a reply
 		// works on its matrix, so only what came before it counts as shown.
 		this.answeredAt = this.input.answers ? Math.max(0, this.earlier.length - 1) : this.earlier.length;
@@ -710,6 +768,7 @@ export class VoiceGuard {
 			this.sentAtConclude = this.sent;
 			if (savedResults(call.name, call.arguments).includes("partial")) this.savedPartial = true;
 		}
+		if (call.name === SAVE_TOOL || call.name === PRACTICE_CONCLUDE_TOOL) for (const result of savedResults(call.name, call.arguments)) this.savedVerdicts.add(result);
 		const refused = this.decide(call);
 		if (refused && call.name === SEND_TO_USER_TOOL) call.arguments = {};
 	}
@@ -872,7 +931,7 @@ export class VoiceGuard {
 			this.heldUnsure = true;
 			return UNSURE(this.input.unsure);
 		}
-		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text)]);
+		const breaks = this.held("question", [...this.questionBreaks(text), ...joinedOptions(call), ...this.guessAsked(call, text), ...this.predictUnworded(call, text)]);
 		if (breaks.length > 0) {
 			this.refused.set("question", (this.refused.get("question") ?? 0) + 1);
 			return refusal("question", call.name, text, breaks, undefined);
@@ -966,10 +1025,18 @@ export class VoiceGuard {
 		}
 		const first = sentences(text)[0]?.trim() ?? "";
 		if (this.savedPartial && FLAT_MISS.test(first)) out.push({ rule: "verdict", excerpt: first });
+		const restated = [...this.savedVerdicts].map((result) => RESTATED_VERDICT[result]).find((v) => v?.re.test(first));
+		if (restated) out.push({ rule: "card", excerpt: `${restated.card}|${first}` });
 		const compound = compoundAsk(sentences(text).filter((s) => s.trim().endsWith("?")).join(" "));
 		if (compound) out.push(compound);
 		const under = afterQuestion(text);
 		if (under.length > 0 && kind !== "hint") out.push({ rule: "advice", excerpt: under.join(" ") });
+		// A hint gives what the question did not; asked as a question, it
+		// asked the same thing again (round 14, m17: "What does R3 − R1 − R2
+		// give you?" became "What happens to row 3 during elimination if it
+		// really is row 1 plus row 2?").
+		const hintAsks = kind === "hint" ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
+		if (hintAsks) out.push({ rule: "hint-question", excerpt: hintAsks.trim() });
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;
 		if (echo) out.push({ rule: "echo", excerpt: echo });
@@ -988,6 +1055,10 @@ export class VoiceGuard {
 			const draft = this.lengthDraft;
 			if (clauses < draft.clauses && words > draft.words - draft.shortest) out.push({ rule: "length", excerpt: `joined: ${words} words where the draft had ${draft.words}, in fewer sentences` });
 		}
+		const answered = this.input.answers ? this.earlier[this.answeredAt] : undefined;
+		const credited = creditedLetter(text, [...this.his, ...(answered ? [answered] : [])]);
+		if (credited) out.push({ rule: "credit", excerpt: `${credited.letter}|${credited.said}` });
+		if (this.input.demo && this.sent === 0 && !POINTS_AT_DEMO.test(text)) out.push({ rule: "demo-unused", excerpt: first });
 		const asLesson = this.review ? SESSION_AS_LESSON.exec(text) : null;
 		if (asLesson) out.push({ rule: "review-lesson", excerpt: asLesson[0] });
 		const shownBefore = kind === "teach" ? this.shownBefore(text) : null;
@@ -1043,6 +1114,19 @@ export class VoiceGuard {
 		if (this.input.guess) return [{ rule: "guess", excerpt: `he wrote "${this.input.guess}"` }];
 		const invited = [...this.toldNow, text].map((t) => GUESS_INVITE.exec(t)?.[0]).find(Boolean);
 		return invited ? [{ rule: "guess", excerpt: invited }] : [];
+	}
+
+	/** A lesson question typed a prediction whose words never ask for his
+	 *  guess: his box says "Your prediction, and why", and his worked answer
+	 *  would be kept as "Prediction, not counted" (round 14, M3: "For the
+	 *  hour to average 3 calls whatever n we pick, what should p be, and
+	 *  why?" and "If you tried to build a map that undoes C, what would go
+	 *  wrong?" were predictions, and his derivations never counted). A guess
+	 *  invited in this turn's message is asked for. */
+	private predictUnworded(call: ToolCall, text: string): VoiceBreak[] {
+		if (call.name !== "explain" || normalizeQuestionType(isRecord(call.arguments) ? call.arguments.type : undefined) !== "predict") return [];
+		if ([...this.toldNow, text].some((t) => ASKS_A_GUESS.test(t) || GUESS_INVITE.test(t)) || this.input.guess) return [];
+		return [{ rule: "predict", excerpt: text }];
 	}
 
 	/** A matrix named with a letter an earlier one of the session has. */

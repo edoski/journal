@@ -54,6 +54,12 @@ export type VoiceRule =
 	| "operand"
 	| "asks-banned"
 	| "guess"
+	| "predict"
+	| "card"
+	| "contrast"
+	| "hint-question"
+	| "credit"
+	| "demo-unused"
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"
@@ -83,6 +89,15 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// (round 12, 3 D4: "Switching to an explanation of when three vectors
 	// form a basis of ℝ³.").
 	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:(?:let'?s|now,?|ok(?:ay)?,?) (?:switch|move|turn|go|head)|(?:now,? )?(?:switching|moving|turning|going|heading)|back)(?: (?:back|over|on|now))?(?: (?:to|into))? (?:(?:an?|the|some|your|more) )?(?:explanation|explaining|teaching|practice|practising|practicing|problems?|exercises?|lesson|review)\b/i },
+	// A confident miss's contrast as a formula, closing every such reply
+	// after the break was said (round 14, m15: "You held that extra freedom
+	// in x widens what Ax reaches, whereas it sends more inputs onto the
+	// same outputs.", "You held that the nullity is rows minus rank, but…").
+	{ rule: "contrast", re: /(?:^|[.!?]\s+|\n)you held that\b|\byou (?:held|believed|assumed|thought) that\b[^.?!\n]*?\b(?:whereas|when in fact|but in fact|while in fact)\b/i },
+	// What happens to a problem is on its card, never in his words (round
+	// 14, m14: "This problem is closed with no mark, and the explanation
+	// comes next." after Explain instead).
+	{ rule: "narration", re: /\b(?:this|the|that) (?:problem|question) is (?:now )?(?:closed|concluded|set aside|over|ended)\b|\b(?:the |an )?explanation (?:comes|is coming|follows) next\b|\b(?:closed|ended|concluded) with no mark\b/i },
 	{ rule: "plan", re: /(?:^|\n)\s*(?:today|this lesson|in this lesson|the goal)\s*:/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
@@ -634,6 +649,21 @@ export function reusedLetter(text: string, earlier: readonly string[]): { letter
 	for (const e of earlier) for (const m of namedMatrices(e)) before.set(m.letter, m.entries);
 	const reused = namedMatrices(text).find((m) => before.has(m.letter) && before.get(m.letter) !== m.entries);
 	return reused ? { letter: reused.letter, written: reused.written } : null;
+}
+
+/** A sentence that credits him with work on a matrix he never worked on:
+ *  "the two roots you found for $A$" when he found $C$'s (round 14, m18).
+ *  `his` is what he worked on: his own words and the question his answer
+ *  replies to. A matrix is a capital letter in maths; `I` is left alone,
+ *  since it is also the identity. The letter, or null. */
+export function creditedLetter(text: string, his: readonly string[]): { letter: string; said: string } | null {
+	const re = /\byou(?:'ve| have)? (?:found|computed|got|worked out|derived|calculated|wrote|solved|gave)\b[^.?!\n]{0,60}?\b(?:for|of|from|on) \$\s*([A-HJ-Z])\s*\$/g;
+	for (const m of text.matchAll(re)) {
+		const letter = m[1]!;
+		const named = new RegExp(`(?:^|[^A-Za-z\\\\])${letter}(?![A-Za-z])`);
+		if (!his.some((words) => named.test(words))) return { letter, said: m[0] };
+	}
+	return null;
 }
 
 /** A sentence that tells him how sure he was ("You were sure the kernel

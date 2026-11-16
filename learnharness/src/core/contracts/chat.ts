@@ -194,7 +194,8 @@ export const HANDOFF_TEXT =
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
-	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
+	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again. " +
+	"My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
 
 /** The wake in a session that continues an open task (round 11, 2 N2: the
  *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
@@ -381,7 +382,7 @@ export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = 
 	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
 	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
 	explain:
-		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
+		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`, with no words between: the problem's card shows how it ended, and the teaching follows.",
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has
