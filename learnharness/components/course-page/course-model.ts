@@ -100,10 +100,16 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		const group = place ? GROUP_OF[place] : "not-started";
 		// "You are here" in place of when it comes back or was studied, never in place of what needs him.
 		const here = current && group !== "needs-you" && (fact === null || fact.kind === "back" || fact.kind === "studied");
-		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5).
-		const planned: TopicFact | null = group === "not-started" && fact === null && topic.starts ? { kind: "next", words: topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` } : null;
+		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5),
+		// or, past an exam still ahead, that it waits for the exam (round 12, 1 m11: "Geometric · Planned 29 Nov"
+		// on the exam's own course page while its topic page said "Not before the exam").
+		const afterExam = Boolean(topic.starts && map.exam && map.exam.daysLeft >= 0 && topic.starts > map.exam.date);
+		const planned: TopicFact | null =
+			group === "not-started" && fact === null && topic.starts
+				? { kind: "next", words: afterExam ? `${AFTER_THE_EXAM}, ${planDay(topic.starts)}` : topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` }
+				: null;
 		const shown = here ? HERE : (planned ?? fact);
-		const words = planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
+		const words = planned && shown === planned && topic.starts && topic.starts > map.today ? (afterExam ? AFTER_THE_EXAM : `Planned ${shortDay(topic.starts)}`) : shownWords(shown, topic, map.today);
 		return { topic, group, fact: shown, factWords: words, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});
 	return { rows, said };
@@ -119,6 +125,10 @@ function shownWords(fact: TopicFact | null, topic: CourseMapTopic, today: string
 	const review = fact.kind === "review" || fact.kind === "back" ? topic.review : null;
 	return review && fact.words === reviewWords(review, today) ? shortReviewWords(review, today) : fact.words;
 }
+
+/** A row's start that waits for the exam still ahead, its day kept for the
+ *  hint. */
+const AFTER_THE_EXAM = "After the exam";
 
 /** A mixed-up method's slip on a row, the method named in its hint. */
 const MIXED_UP = "Mixed up";
