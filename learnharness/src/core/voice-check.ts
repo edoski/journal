@@ -50,6 +50,7 @@ export type VoiceRule =
 	| "review-lesson"
 	| "confidence"
 	| "letter"
+	| "reprint"
 	| "asks-banned";
 
 export interface VoiceBreak {
@@ -83,6 +84,9 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// The app's own parts are nothing he talks about (round 9: "Your message
 	// arrived in the answer field…, so that question is now closed").
 	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
+	// The open question stays above, unchanged, and the app shows no copy of
+	// it (round 11, 4 minor 6: "Here is the question again." and nothing).
+	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
 ];
 
 /** Requests in an instruction text for a form the voice bans: each names

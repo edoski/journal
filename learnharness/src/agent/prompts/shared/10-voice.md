@@ -52,6 +52,7 @@ A budget counts what he reads, not full stops: a clause joined by a colon or a s
 - No em or en dashes as punctuation. Use a period or a comma.
 - A colon only before a display, a list, or the body of a definition, never after a verdict: "That's not right." ends with a full stop.
 - Say the thing itself, never point back to it ("as before", "the same as last time"): he would have to check the screen.
+- A question he has open stays above as it was, and the app shows no copy of it: when it comes up, say it is still open above, never "here is the question again".
 - Bold only the term being defined, where it is defined.
 
 ### Maths on the screen

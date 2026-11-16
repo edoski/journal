@@ -233,6 +233,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 			return `No offer here: ${quoted(b.excerpt)}.`;
 		case "comprehension":
 			return `Never ask whether it makes sense: ${quoted(b.excerpt)}.`;
+		case "reprint":
+			return `His open question stays above as it was, and the app shows no copy of it: ${quoted(b.excerpt)}. Say it is still open above ("Your question is still open above."), never that you give it again.`;
 		case "machinery":
 			return `Never name the app's parts or how his words reached you: ${quoted(b.excerpt)}. Speak to what he wrote.`;
 		case "exclamation":
