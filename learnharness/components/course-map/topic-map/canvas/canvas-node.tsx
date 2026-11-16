@@ -66,7 +66,7 @@ export function CanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 			style={role === "via" ? { opacity: RECEDED } : receded ? { opacity: focus ? FOCUS_RECEDED : RECEDED } : undefined}
 		>
 			{current && (
-				<NodeAppendix data-slot="course-map-current-tag" className="left-3.25 h-5 px-0 text-foreground">
+				<NodeAppendix data-slot="course-map-current-tag" className="left-3.25 mb-1.5 h-5 px-0 text-foreground">
 					{CURRENT_TAG}
 				</NodeAppendix>
 			)}

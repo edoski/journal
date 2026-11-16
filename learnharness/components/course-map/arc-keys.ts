@@ -8,22 +8,30 @@ import { overlayOpen } from "@/components/spatial-arrows";
  *  switch, so the cheat sheet never offers a key that Current ignores; it joins Home's keys there when it ships. */
 export const ARC_UP = "shift+arrowup";
 export const ARC_DOWN = "shift+arrowdown";
+/** The key that goes to "You are here": its arc, then its card, focused. */
+export const GO_HERE = "h";
 
 /**
- * ⇧↑ and ⇧↓ pick the arc above and below for Stacked arcs (stack.md), from
+ * ⇧↑ and ⇧↓ pick the arc above and below for Stacked arcs (stack.md), and
+ * H goes to "You are here" from any arc of the course (`onHere`), from
  * anywhere on the page, unless a field has the key or something is open
- * over it; they stop at the first and last arc.
+ * over it; the arrows stop at the first and last arc.
  */
-export function useArcKeys(arcs: readonly CourseMapArc[] | null, value: ArcHandle | null, onSelect: (arc: ArcHandle) => void, enabled: boolean) {
+export function useArcKeys(arcs: readonly CourseMapArc[] | null, value: ArcHandle | null, onSelect: (arc: ArcHandle) => void, onHere: () => void, enabled: boolean) {
 	const at = arcs ? Math.max(0, arcs.findIndex((a) => a.handle === value)) : -1;
-	const go = useRef({ above: arcs?.[at - 1] ?? null, below: arcs?.[at + 1] ?? null, onSelect });
-	go.current = { above: arcs?.[at - 1] ?? null, below: arcs?.[at + 1] ?? null, onSelect };
+	const go = useRef({ above: arcs?.[at - 1] ?? null, below: arcs?.[at + 1] ?? null, onSelect, onHere });
+	go.current = { above: arcs?.[at - 1] ?? null, below: arcs?.[at + 1] ?? null, onSelect, onHere };
 	useEffect(() => {
 		if (!enabled) return;
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.defaultPrevented || !e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
-			if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+			if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
 			if (isTypingSurface(e) || overlayOpen()) return;
+			if (!e.shiftKey && e.key.toLowerCase() === GO_HERE) {
+				e.preventDefault();
+				go.current.onHere();
+				return;
+			}
+			if (!e.shiftKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
 			const to = e.key === "ArrowUp" ? go.current.above : go.current.below;
 			if (!to) return;
 			e.preventDefault();

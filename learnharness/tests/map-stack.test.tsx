@@ -99,7 +99,7 @@ describe("Stacked arcs' keys", () => {
 		root = createRoot(host);
 		let shown = value;
 		function Keys() {
-			useArcKeys(arcs, shown, (arc) => (picked.push(arc), (shown = arc), draw()), true);
+			useArcKeys(arcs, shown, (arc) => (picked.push(arc), (shown = arc), draw()), () => picked.push("here" as ArcHandle), true);
 			return null;
 		}
 		const draw = () => root!.render(<Keys />);
@@ -130,6 +130,13 @@ describe("Stacked arcs' keys", () => {
 		const last = await mount(arcs.at(-1)!.handle);
 		await key("ArrowDown");
 		assert.deepEqual(last, []);
+	});
+
+	it("H goes to You are here, and shift+H does not", async () => {
+		const picked = await mount(arcs[1]!.handle);
+		await key("h", false);
+		await key("H", true);
+		assert.deepEqual(picked, ["here"]);
 	});
 
 	it("never fires while he types in a field", async () => {

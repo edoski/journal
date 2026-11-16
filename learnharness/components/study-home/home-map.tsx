@@ -21,6 +21,9 @@ import { courseHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import { cn } from "@/lib/utils";
 
+/** How many frames H waits for "You are here"'s card to be drawn, about a second. */
+const FIND_HERE_FRAMES = 60;
+
 /** How far the fade reaches in from the sides and from the top and bottom. */
 const FADE = { x: 64, y: 40 };
 
@@ -108,7 +111,20 @@ export function HomeMap({
 		if (!enlarged) setWhole(false);
 	}, [enlarged]);
 	const toggleWhole = useCallback(() => setWhole((w) => !w), []);
-	useArcKeys(arcs, shownArc ?? null, (arc) => setPicked((was) => new Map(was).set(chosen, arc)), style === "stack" && !zoomedOut);
+	const goHere = useCallback(() => {
+		const here = currentArc(chosenCourse.map);
+		if (here) setPicked((was) => new Map(was).set(chosen, here));
+		setWhole(false);
+		// The card mounts once its arc is drawn, so look for it each frame until it is there.
+		let frames = FIND_HERE_FRAMES;
+		const find = () => {
+			const card = document.querySelector<HTMLElement>('[data-slot="home-map-course"][data-shown] [data-slot="course-map-node"][data-current]:not([data-slot="course-map-trail"] *)');
+			if (card) card.focus({ preventScroll: true });
+			else if (--frames > 0) requestAnimationFrame(find);
+		};
+		requestAnimationFrame(find);
+	}, [chosen, chosenCourse.map]);
+	useArcKeys(arcs, shownArc ?? null, (arc) => setPicked((was) => new Map(was).set(chosen, arc)), goHere, style === "stack");
 	useEffect(() => {
 		if (!enlarged) return;
 		// Anything open over the map claims Esc first (Radix marks it handled).
