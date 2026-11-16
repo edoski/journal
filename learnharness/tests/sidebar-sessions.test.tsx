@@ -66,6 +66,13 @@ describe("the sidebar's Sessions list", () => {
 		assert.match(det?.querySelector('[data-slot="unit-status-slot"]')?.textContent ?? "", /Tutor writing/);
 	});
 
+	it("says Left off today for a session he left with Done for today, as Home and its topic page do (round 14 integration, M1)", () => {
+		// The Sessions row said "studied Today" for the lesson he had just left; a left session is off Today, so this row is its sidebar line.
+		const left = CHATS.map((c) => (c.id === "chat_general" ? { ...c, ended: "left" as const, updatedAt: "2026-11-08T17:00:00.000Z" } : c));
+		const row = [...renderList({ open: true }, left).querySelectorAll('[data-testid="session-row"]')].find((r) => r.textContent?.includes("Why are vectors columns?"));
+		assert.equal(row?.querySelector('[data-slot="unit-status-slot"]')?.textContent, ", Left off today");
+	});
+
 	it("gives a repeated title its day", () => {
 		const again = [...CHATS, chat("chat_rank_old", { title: "Rank practice", course: { workspace: "/s/linalg", title: "Linear Algebra" }, updatedAt: "2026-11-02T09:00:00.000Z" })];
 		const twins = [...renderList({ open: true }, again).querySelectorAll('[data-slot="session-twin"]')].map((t) => t.textContent);
