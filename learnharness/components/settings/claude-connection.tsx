@@ -142,6 +142,17 @@ export function ClaudeConnectionRow() {
 	const [checking, setChecking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const mounted = useRef(false);
+	// Refresh is disabled while it checks, and the browser drops focus from
+	// a disabled button: focus comes back to it once the check is done
+	// (round 12, 4 minor 6: focus fell to the page while still signed out).
+	const refreshButton = useRef<HTMLButtonElement>(null);
+	const refocus = useRef(false);
+	useEffect(() => {
+		if (busy || !refocus.current) return;
+		refocus.current = false;
+		const active = document.activeElement;
+		if (!active || active === document.body) refreshButton.current?.focus();
+	}, [busy]);
 
 	useEffect(() => {
 		mounted.current = true;
@@ -157,6 +168,7 @@ export function ClaudeConnectionRow() {
 	// clears as soon as it is signed in, and every reader hears the result
 	// even once the dialog has closed.
 	async function refresh() {
+		refocus.current = document.activeElement === refreshButton.current;
 		setBusy(true); setChecking(true); setError(null);
 		refreshModelStatus(true);
 		try {
@@ -184,7 +196,7 @@ export function ClaudeConnectionRow() {
 	const alias = aliases(accounts ?? []);
 	return <>
 		<div className={CLAUDE_ROW} data-testid="claude-connection">
-			<ConnectionRow label={CLAUDE_LABEL} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()} />
+			<ConnectionRow label={CLAUDE_LABEL} action="Refresh" actionTestid="claude-refresh" actionRef={refreshButton} disabled={busy} onAction={() => void refresh()} />
 			{!accounts && !error && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
 			{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
 		</div>
