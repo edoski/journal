@@ -20,7 +20,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { SidebarRail } from "../components/unit-inbox/sidebar-rail.tsx";
+import { RailOpenButton, SidebarRail } from "../components/unit-inbox/sidebar-rail.tsx";
 import { TopBar } from "../components/top-bar.tsx";
 import { TooltipProvider } from "../components/ui/tooltip.tsx";
 
@@ -89,7 +89,8 @@ describe("the folded sidebar", () => {
 		`<html><body>${renderToStaticMarkup(
 			<AppRouterContext.Provider value={router as never}>
 				<TooltipProvider>
-					<SidebarRail pathname="/" onOpen={() => {}} onNewLesson={() => {}} onSettings={() => {}} />
+					<SidebarRail pathname="/" onNewLesson={() => {}} onSettings={() => {}} />
+					<RailOpenButton shown onOpen={() => {}} />
 				</TooltipProvider>
 			</AppRouterContext.Provider>,
 		)}</body></html>`,
@@ -107,7 +108,13 @@ describe("the folded sidebar", () => {
 		const head = rail.firstElementChild!;
 		assert.ok(!rail.querySelector(".lh-lights-band"), "no lights band above the button's head: it pushed the button under the line");
 		assert.ok(classes(head).includes("h-13"), "the head is the window's 52px band");
-		assert.ok(head.contains(open), "the open button is in the head");
+		// In a browser the button is centred in the head, inside the rail's
+		// 1px edge (tests/sidebar-rail-browser.test.ts measures it in Chrome).
+		const place = rule(".lh-rail-toggle");
+		assert.equal(place.position, "fixed");
+		assert.equal(place.transform, "translate(-50%, -50%)");
+		assert.equal(cssPx(place.top, {}), 52 / 2, "centred on the head's height");
+		assert.equal(cssPx(place.left, {}), (RAIL - 1) / 2, "centred on the rail's width, inside its edge");
 		const line = head.querySelector('[data-slot="sidebar-rail-rule"]')!;
 		assert.ok(classes(line).includes("bottom-0"), "the line is the band's bottom edge, under the button");
 		assert.ok(classes(head).includes("lh-rail-head"));
@@ -117,7 +124,7 @@ describe("the folded sidebar", () => {
 	it("stands the button beside the traffic lights in the Mac app, where T3 Code puts its toggle", () => {
 		assert.ok(open.closest(".lh-rail-toggle"), "the button wears the Mac app's place");
 		const place = rule(".lh-electron .lh-rail-toggle");
-		assert.equal(place.position, "fixed");
+		assert.equal(rule(".lh-rail-toggle").position, "fixed");
 		// The button's centre in window points, at every zoom: its top, less
 		// half its height when it is translated up by half.
 		const centre = (zoom: number) => {

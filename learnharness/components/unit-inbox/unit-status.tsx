@@ -7,6 +7,7 @@ import { WHY_ICON } from "@/components/study-home/agenda-rows/why-mark";
 import { TUTOR_WRITING } from "@/components/study-words";
 import type { UnitStatus } from "@/components/unit-inbox/units";
 import { cn } from "@/lib/utils";
+import { SLOT_WORDS } from "@/components/unit-inbox/row-card";
 
 /** Each fact's 12px icon, Home's reason icons where Home gives the same
  *  reason (a slip wears its own, `SLIP_ICON`); a known topic's next review wears a calendar, since the
@@ -17,6 +18,7 @@ const ICON: Record<Exclude<UnitStatus["kind"], "working" | "studied" | "none" | 
 	review: WHY_ICON.review,
 	task: WHY_ICON.task,
 	returns: CalendarClockIcon,
+	stopped: WHY_ICON.stopped,
 };
 
 /** A row's status (units.ts `unitStatus`), T3 Code's status label: a 12px
@@ -30,7 +32,7 @@ export function UnitStatusText({ status }: { status: UnitStatus }) {
 			return status.words ? (
 				<span data-slot="unit-status" data-kind="unstarted" className="contents">
 					<span className="sr-only">, </span>
-					<span className="whitespace-nowrap">{status.words}</span>
+					<span className={SLOT_WORDS}>{status.words}</span>
 				</span>
 			) : null;
 		case "working":
@@ -40,14 +42,14 @@ export function UnitStatusText({ status }: { status: UnitStatus }) {
 						<BrailleSpinner label={TUTOR_WRITING} />
 					</span>
 					<span className="sr-only">, </span>
-					<span className="whitespace-nowrap">{TUTOR_WRITING}</span>
+					<span className={SLOT_WORDS}>{TUTOR_WRITING}</span>
 				</span>
 			);
 		case "studied":
 			return (
 				<span data-slot="unit-status" data-kind="studied" className="contents">
 					<span className="sr-only">, studied </span>
-					<span className="whitespace-nowrap">{status.words}</span>
+					<span className={SLOT_WORDS}>{status.words}</span>
 				</span>
 			);
 		default: {
@@ -63,7 +65,7 @@ export function UnitStatusText({ status }: { status: UnitStatus }) {
 						<Icon aria-hidden className="size-3" />
 					</span>
 					<span className="sr-only">, </span>
-					<span className="whitespace-nowrap">{words}</span>
+					<span className={SLOT_WORDS}>{words}</span>
 				</span>
 			);
 		}

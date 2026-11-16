@@ -24,6 +24,12 @@ test("a deleted course's lesson shows no Done for today", () => {
 	assert.equal(doneTonightGone({ closedForToday: false, courseGone: true, lessonGone: false }), true);
 	assert.equal(doneTonightGone({ closedForToday: false, courseGone: false, lessonGone: true }), true);
 	assert.equal(doneTonightGone({ closedForToday: false, courseGone: false, lessonGone: false }), false);
+	// Round 14, 2 56: back in a session he left, its question open again.
+	assert.equal(doneTonightGone({ closedForToday: true, courseGone: false, lessonGone: false }), true, "closed for today with nothing open: nothing to stop");
+	assert.equal(doneTonightGone({ closedForToday: true, open: true, courseGone: false, lessonGone: false }), false, "a question open after the close can be stopped again");
+	// Round 14, m32: a review that closed itself kept Done for today in its header.
+	assert.equal(doneTonightGone({ closedForToday: false, finished: true, courseGone: false, lessonGone: false }), true, "a session the tutor ended has nothing to stop");
+	assert.equal(doneTonightGone({ closedForToday: false, finished: true, open: true, courseGone: false, lessonGone: false }), false);
 });
 
 test("opening a search result empties the search, so the agenda is back (round 9, 4 #6)", () => {

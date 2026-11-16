@@ -37,7 +37,7 @@ export function YourTurn({ above = false, afterHint = false }: { above?: boolean
  *  its reply is the one guarded voice he reads (round 8: the unguarded
  *  card stated a false fact, opened above a stop marker before any reply,
  *  and named the same thing as practice's "Model solution"). */
-export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, afterHint = false }: {
+export function ProseQuestion({ tool, toolCallId, input, output, photos, open, stepAnchor, repeat = false, afterHint = false, askedBelow = false }: {
 	tool: string;
 	toolCallId: string;
 	input: unknown;
@@ -54,12 +54,15 @@ export function ProseQuestion({ tool, toolCallId, input, output, photos, open, s
 	repeat?: boolean;
 	/** The re-ask follows a hint (`askedAfterHint`). */
 	afterHint?: boolean;
+	/** Set aside with Done for today and asked again further down
+	 *  (`leftAskedBelow`): its words are drawn there. */
+	askedBelow?: boolean;
 }) {
 	const spec = proseQuestionSpec(tool, toolCallId, input);
 	if (!spec) return null;
 	if (open) return <OpenQuestion spec={spec} stepAnchor={stepAnchor} repeat={repeat} afterHint={afterHint} />;
 	if (!output) return null;
-	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} repeat={repeat} />;
+	return <AnsweredQuestion spec={spec} toolCallId={toolCallId} input={input} output={output} photos={photos} stepAnchor={stepAnchor} repeat={repeat} askedBelow={askedBelow} />;
 }
 
 /** The question's words: the question, and "Select all that apply" for a
@@ -147,7 +150,7 @@ export function ChoiceRows({ options, multi, selected, onPick, compact = false }
 	);
 }
 
-function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor, repeat }: {
+function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor, repeat, askedBelow }: {
 	spec: ProseQuestionSpec;
 	toolCallId: string;
 	input: unknown;
@@ -155,8 +158,16 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 	photos?: readonly Photo[];
 	stepAnchor?: string;
 	repeat: boolean;
+	askedBelow: boolean;
 }) {
 	const answer = answerForPresentation(output, input);
+	if (answer.dismissed && answer.reason === "tonight" && askedBelow) {
+		return (
+			<p data-testid="prose-question-left" data-slot="prose-question" data-asked-below="" data-step-anchor={stepAnchor} className="mt-2 text-body text-muted-foreground">
+				{LESSON_WORDS.leftForTonight}
+			</p>
+		);
+	}
 	const question = (
 		<div data-testid="prose-question" data-slot="prose-question" data-repeat={repeat ? "" : undefined} data-step-anchor={stepAnchor} className="mt-2">
 			{!repeat && <QuestionWords spec={spec} />}

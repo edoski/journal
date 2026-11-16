@@ -106,6 +106,13 @@ export function turnErrorText(message: string, again = false, kept = false): Tur
 	return { kind: "failed", sentence: "The reply failed.", details: text === "" ? null : text };
 }
 
+/** Whether a failure's line says Claude isn't signed in: a send refused
+ *  before the turn started, or a turn Claude Code failed for it (round 14,
+ *  4 minor 6: the second kind stayed red after sign-in until Retry). */
+export function isSignedOutLine(message: string | undefined): boolean {
+	return message !== undefined && turnErrorText(message).kind === "signed-out";
+}
+
 /** Whether the line for a send refused because Claude was signed out has
  *  outlived its cause (round 8: it stayed red after he signed in and
  *  pressed Refresh). `since` is the status reading count when the line

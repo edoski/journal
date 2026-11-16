@@ -41,7 +41,6 @@ import { reviewRecord } from "../core/session-opening.ts";
 import { compactionInstructions, planTreeToText } from "../core/compaction.ts";
 import { PATHS } from "../../config.ts";
 import { nextChatSession } from "../core/sdk-session.ts";
-import { leftQuestionRepose } from "../core/session-end.ts";
 import type { SessionStore } from "../agent/sdk/session-files.ts";
 import { refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { emit, subscribe } from "../core/events.ts";
@@ -282,7 +281,7 @@ export async function handleChatInput(
 	// A mode handoff starts the other agent, whose brief differs.
 	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
 	const [courseBrief, courseArcs] = await Promise.all([
-		learnerInput || handoffWake ? fetchCourseBrief(record) : null,
+		learnerInput || handoffWake ? fetchCourseBrief(record, input.type === "text" ? input.text : null) : null,
 		fetchCourseArcs(record),
 	]);
 	const freshRecord = stores.chatStore.getChat(chatId);
@@ -462,7 +461,7 @@ export async function handleChatInput(
 		// save's links are kept the moment the engine takes it, so a restart
 		// before the transcript's write loses neither the mark nor the
 		// "already saved" (round 8).
-		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged, stores.chatStore.getChat(chatId)?.answerSaves), onSaved: keepSaves, review: reviewRecord(record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [] } } : {}),
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords, arcs: courseArcs, answers: recordedBySaves(answeredQuestionsOf(merged), stores.chatStore.getChat(chatId)?.answerSaves, lastSaidId), remarkable: remarkableOf(merged), onSaved: keepSaves, review: reviewRecord(record), planSteps: () => stores.chatStore.getChat(chatId)?.tree?.nodes ?? [] } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
 	// practitioner — no plan/question tools; problem + conclude, and the
@@ -573,12 +572,6 @@ export async function handleChatInput(
 				const sessionEnd = constructed.sessionEnd();
 				if (sessionEnd) stores.chatStore.saveSession(chatId, nextChatSession(record.session, sessionEnd, stores.chatStore.getChat(chatId)?.messages ?? stamped));
 				noteSteersDurable(chatId, stores.chatStore.getChat(chatId)?.messages ?? stamped);
-				// Done for today's close has settled: the questions it left are
-				// posed again from their own calls, after the session's synced
-				// point so the tutor reads them with his answer (round 12, 3 n10).
-				const settled = stores.chatStore.getChat(chatId)?.messages ?? [];
-				const reposed = leftQuestionRepose(settled);
-				if (reposed.length > 0) stores.chatStore.saveMessages(chatId, [...settled, ...reposed]);
 				// usage log append (idempotent per turn id) — the stats bar
 				// refolds this on the client after the turn settles. The
 				// provenance message is the turn's FIRST new assistant message.

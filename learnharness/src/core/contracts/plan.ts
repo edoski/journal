@@ -44,9 +44,11 @@ export interface PlanTree {
  * that fills its rows spreads past 4 across: at 12 steps 9 plans in 10 of
  * a tutor's shapes still open whole. Pinned to the pane's geometry in
  * tests/plan-map-cap.test.ts; the planning prompt and plan_init state
- * these numbers and point here.
+ * these numbers and point here. `across` is the most steps side by side a
+ * step's card is sized for: its width is the pane's clear middle split
+ * into the plan's widest row, at most four (`stepCard`, round 14, m34).
  */
-export const PLAN_MAP_CAP = { steps: 12, deep: 8 } as const;
+export const PLAN_MAP_CAP = { steps: 12, deep: 8, across: 4 } as const;
 
 // NOTE (2026-09-11 pivot, docs/probe-teach-split.md): the tree once carried
 // `currentNodeId` / `doneNodeIds` — progress fields. They are GONE by

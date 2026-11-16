@@ -4,7 +4,7 @@ import { examText } from "../components/start/course-facts.ts";
 
 describe("course facts", () => {
 	it("words the exam day and the day before, and drops a past exam", () => {
-		assert.equal(examText({ date: "d", daysLeft: 21 }), "Exam in 21 days");
+		assert.equal(examText({ date: "2026-11-29", daysLeft: 21 }), "Exam 29 Nov", "round 14, m9: the day, never a count");
 		assert.equal(examText({ date: "d", daysLeft: 0 }), "Exam today");
 		assert.equal(examText({ date: "d", daysLeft: 1 }), "Exam tomorrow");
 		assert.equal(examText({ date: "d", daysLeft: -2 }), null);

@@ -45,7 +45,7 @@ export * from "./view.ts";
 export * from "./tool-parts.ts";
 export * from "./answer-presentation.ts";
 export * from "./answer-marks.ts";
-export { closedTonight, doneTonightAtEnd, leftQuestionRepose } from "./session-end.ts";
+export { closedTonight, doneTonightAtEnd, leftQuestionRepose, sessionEndOf } from "./session-end.ts";
 export { replyCutOf, replyNeverCame } from "./turn-cut.ts";
 export { sameQuestionKey } from "./shown-help.ts";
 export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, CLAUDE_ACCOUNT_SIGNED_OUT, CLAUDE_SIGNED_OUT_STARTS, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
 import type { ChatListItem } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { sessionState, continueHref } from "@/components/nav/session-state";
+import { continueHref, pausedWords, sessionState } from "@/components/nav/session-state";
+import { localDay } from "@/components/day-change";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { monogram, rowResume, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { leftWords, monogram, rowResume, studiedWords, unitStatus, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, RowCard, rowSurface, rowTitle, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -167,6 +168,17 @@ export function TopicSlimRow({
  * day (`twin`, `sessionTwins`), so the two tell apart at a glance.
  * `highlighted` is the search's keyboard walk.
  */
+/** A session row's status, its state's one phrase on every surface
+ *  (session-state.md): Your turn, Tutor writing, "Left off today" for a
+ *  session he left with Done for today, the cut reply's words, else when
+ *  he last studied in it. Pure. */
+export function sessionRowStatus(chat: ChatListItem, state: ReturnType<typeof sessionState>, today: string): UnitStatus {
+	if (state === "working" || state === "your-turn") return { kind: state };
+	if (state === "left") return { kind: "task", words: leftWords(chat, today || localDay(new Date())) };
+	if (state === "paused") return { kind: "stopped", words: pausedWords(chat) };
+	return { kind: "studied", words: studiedWords(chat.updatedAt, today) };
+}
+
 export function SessionSlimRow({
 	chat,
 	today,
@@ -230,9 +242,7 @@ export function SessionSlimRow({
 				data-testid={state === "your-turn" ? "session-waiting" : undefined}
 				className={cn(TRAILING_SLOT, STATUS_LINE, "mt-1 self-end")}
 			>
-				<UnitStatusText
-					status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
-				/>
+				<UnitStatusText status={sessionRowStatus(chat, state, today)} />
 			</span>
 		</Button>
 	);

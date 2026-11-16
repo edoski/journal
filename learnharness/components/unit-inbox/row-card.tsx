@@ -15,16 +15,22 @@ export const rowSurface = (active: boolean) =>
 	);
 
 /**
- * Every row's trailing slot: an icon and a few words, always whole (Edo,
- * 14 Nov 2026: the status keeps its words whatever the title's length).
- * It never shrinks; the text beside it makes the room instead. Where it
+ * Every row's trailing slot: an icon and a few words, whole whatever the
+ * title's length (Edo, 14 Nov 2026). The text beside it makes the room
+ * first, the course name giving way whole; only words longer than the
+ * whole line end in an ellipsis (`SLOT_WORDS`), never cut at the card's
+ * edge (round 14, 1 n7: "After Random variables and distri"). Where it
  * sits is the sidebar's one row rule (`STATUS_LINE`, row-card.md).
  * Its mark is a flat run of icon and words (`contents` roots, every part
  * 16px tall). Give it its line's height with the padding that centres
  * one 16px line (`py-0.5` in 20px, `py-1` in 24px).
  */
 export const TRAILING_SLOT =
-	"ml-auto flex shrink-0 items-center justify-end gap-x-1 whitespace-nowrap text-callout tabular-nums text-muted-foreground";
+	"ml-auto flex min-w-0 items-center justify-end gap-x-1 whitespace-nowrap text-callout tabular-nums text-muted-foreground";
+
+/** A status's words in its slot: whole while the line holds them, else
+ *  cut with an ellipsis, the icon before them kept. */
+export const SLOT_WORDS = "min-w-0 truncate";
 
 /**
  * The sidebar's one row rule (spec: row-card.md): every row is its title,

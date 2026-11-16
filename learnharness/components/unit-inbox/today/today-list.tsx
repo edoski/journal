@@ -7,9 +7,8 @@ import type { NowListProps } from "@/components/unit-inbox/now-list-props";
 import { SessionsShelf } from "@/components/unit-inbox/now-shelves";
 import { SidebarNote } from "@/components/unit-inbox/sidebar-note";
 import { claimedKeys, steadyTop, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
-import { courseHref } from "@/components/unit-inbox/unit-href";
 import { isUnitOpen } from "@/components/unit-inbox/unit-row";
-import { UnreadableCard } from "@/components/unit-inbox/unreadable-card";
+import { UnreadableNote } from "@/components/unit-inbox/unreadable-note";
 
 /** The list's one quiet note under the cards, or none: the courses could
  *  not be read, there are none, or nothing has a card. */
@@ -23,8 +22,9 @@ function noteOf({ unavailable, courses, unreadable }: Pick<NowListProps, "unavai
  * The sidebar's list (spec: ../inbox-today.md): its top
  * is exactly Home's Today, one card per line in Today's order with Today's
  * reason, each drawn as the topic its line leads with (a waiting session on
- * no topic as itself, a course line on no topic as its course), then a card for each course whose record can't be
- * read; then one folded Sessions list, every session newest first.
+ * no topic as itself, a course line on no topic as its course), then a
+ * quiet note for each course whose record can't be read; then one folded
+ * Sessions list, every session newest first.
  * No header and no totals on top: cards leave as the day's plan empties,
  * and a card stays in its place, at 70% with Working, while the tutor
  * writes in its session.
@@ -56,7 +56,7 @@ export function TodayList(props: NowListProps) {
 				<NowCard key={item.line.key} line={item.line} unit={item.kind === "topic" ? item.unit : null} active={isOpen(item)} chats={chats} />
 			))}
 			{unreadable.map((course) => (
-				<UnreadableCard key={course.workspace} course={course} active={pathname === courseHref(course.workspace)} />
+				<UnreadableNote key={course.workspace} course={course} />
 			))}
 			{note && <SidebarNote>{note}</SidebarNote>}
 			<SessionsShelf sessions={sessions} said={said} {...props} />

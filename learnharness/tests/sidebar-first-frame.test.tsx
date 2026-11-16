@@ -29,7 +29,7 @@ const serverFrame = (initial?: { open: boolean | null; width: number }) => {
 			<Probe />
 		</SidebarProvider>,
 	);
-	return { state: html.match(/data-state="(\w+)"/)?.[1], width: Number(html.match(/data-width="(\d+)"/)?.[1]), animated: html.includes("transition-[width") };
+	return { state: html.match(/data-state="(\w+)"/)?.[1], width: Number(html.match(/data-width="(\d+)"/)?.[1]), animated: html.includes("lh-sidebar-motion") };
 };
 
 describe("the sidebar's first frame", () => {

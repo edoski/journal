@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { askedAgain, digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
+import { askedAgain, digitOption, reaskedFrom, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
 import { dismissedAnswer, emptyDockSelection } from "../src/core/index.ts";
 
 const check = { question: "Which way does $A$ stretch?", correctAnswer: "Along $(1,1)$, by 3.", type: "check" };
@@ -122,6 +122,19 @@ describe("a question asked again after a hint", () => {
 	it("skips a re-ask the guard refused: the call after it is the one he reads (round 8, this fix's live run)", () => {
 		const refused = { type: "tool-explain", toolCallId: "q2", state: "output-error", input: check };
 		assert.deepEqual([...askedAgain([{ parts: [ask("q1", check, hinted), hint, refused, ask("q3", check)] }])], ["q3"]);
+	});
+
+	it("draws a prediction posed after a side question in full: another type of question on the same step (round 14, 2 D1)", () => {
+		// "let me guess first": the tutor set the Av check aside and posed a
+		// prediction on the same node, whose words never showed.
+		const av = { ...check, nodeId: "eigenbasis", type: "check", question: "What is $Av$ for $v = 2b_1 + b_2$?" };
+		const guess = { nodeId: "eigenbasis", type: "predict", question: "Can every 2×2 matrix be made diagonal this way, and why?" };
+		const aside = dismissedAnswer("explain", av.question, "asked");
+		const lesson = [{ parts: [ask("q1", av, aside)] }, { parts: [hint, ask("q2", guess)] }];
+		assert.equal(reaskedFrom(lesson, "q2"), null, "the prediction asks something new");
+		assert.deepEqual([...askedAgain(lesson)], [], "its words are drawn");
+		const reasked = { ...av, question: "So what is $Av$ for $v = 2b_1 + b_2$?" };
+		assert.equal(reaskedFrom([{ parts: [ask("q1", av, aside)] }, { parts: [hint, ask("q2", reasked)] }], "q2"), "q1", "the check asked again, reworded, is still a re-ask");
 	});
 
 	it("draws a question that follows an answer", () => {

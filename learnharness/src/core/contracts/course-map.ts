@@ -29,9 +29,14 @@ export interface ReviewHeld {
 
 /** A day he was told that has since moved (the engine's `moved`): `from`
  *  is the day the plan gave it as yesterday ended, `by` what of his study
- *  moved it: his study today in `courses`, no study yesterday, or
- *  yesterday's plan left unfinished. */
-export type TopicMoved = { from: string; by: "study"; courses: readonly string[]; day: "today" | "yesterday" } | { from: string; by: "missed" | "left"; on?: string };
+ *  moved it: his study today in `courses`, with the titles of the topics
+ *  it waits on that study left not solid (`waitsOn`), his own answer on it
+ *  today (`answered`), no study yesterday, or yesterday's plan left
+ *  unfinished. */
+export type TopicMoved =
+	| { from: string; by: "study"; courses: readonly string[]; day: "today" | "yesterday"; waitsOn?: readonly string[] }
+	| { from: string; by: "answered" }
+	| { from: string; by: "missed" | "left"; on?: string };
 
 /** The topic's review on the day the engine's daily plan puts it: `due`
  *  exactly when that day is today, with the days since memory asked for
@@ -68,14 +73,15 @@ export type RightAnswer = "unaided" | "helped" | "guess" | "uncertain" | "partia
 
 /** Why the plan starts an untaught topic when it does, in the material's
  *  terms (the engine's `starts_why`): `begun`, a lesson he began and has not
- *  finished, which goes on that day; `next`, the next one he can start in
+ *  finished, which goes on that day (today while he works on it today, and
+ *  `then` the study day it goes on after today); `next`, the next one he can start in
  *  its arc or the course; `after`, it waited for its prerequisites
  *  (`needs`) or the methods it competes with (`partners`) to be solid;
  *  `early`, ahead of its place, from a later arc while the current one has
  *  topics left (`waitingOn`: what those wait on to be solid; `exam`: the
  *  exam's pace took it). `arc` is its arc, absent without arcs. */
 export type StartsWhy =
-	| { kind: "begun"; arc?: ArcHandle }
+	| { kind: "begun"; arc?: ArcHandle; then?: string }
 	| { kind: "next"; arc?: ArcHandle }
 	| { kind: "after"; arc?: ArcHandle; needs: readonly TopicHandle[]; partners: readonly TopicHandle[] }
 	| { kind: "early"; arc?: ArcHandle; waitingOn: readonly TopicHandle[]; exam: boolean };

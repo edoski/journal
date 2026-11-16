@@ -42,9 +42,9 @@
   "starts": {
     "invertibility": "2026-11-13",
     "inner-product": "2026-11-18",
+    "change-basis": "2026-11-19",
     "projection": "2026-11-20",
-    "change-basis": "2026-11-25",
-    "diagonalization": "2026-11-26"
+    "diagonalization": "2026-11-25"
   },
   "starts_why": {
     "invertibility": {
@@ -56,16 +56,16 @@
     "inner-product": {
       "kind": "early"
     },
-    "projection": {
-      "kind": "after",
-      "needs": [
-        "inner-product"
-      ]
-    },
     "change-basis": {
       "kind": "after",
       "needs": [
         "invertibility"
+      ]
+    },
+    "projection": {
+      "kind": "after",
+      "needs": [
+        "inner-product"
       ]
     },
     "diagonalization": {
@@ -223,7 +223,7 @@
       "review": {
         "due": "2026-10-28",
         "by": "engine",
-        "planned": "2026-11-30"
+        "planned": "2026-11-23"
       },
       "judged": "2026-10-22",
       "standing": {
@@ -292,7 +292,7 @@
       "review": {
         "due": "2026-11-06",
         "by": "engine",
-        "planned": "2026-12-02"
+        "planned": "2026-11-27"
       },
       "standing": {
         "level": "retained",

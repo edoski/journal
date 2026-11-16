@@ -1,7 +1,7 @@
 import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldExamWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
+import { dayAndNearWords, distanceWords, heldExamWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, todaySteps, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import { nowLine } from "@/components/study-home/needs-you";
@@ -477,7 +477,7 @@ export function longDayWords(day: string): string {
 
 /** How far a day is from the engine's, in the app's one form
  *  (`study-words.ts`). */
-export { distanceWords };
+export { dayAndNearWords, distanceWords };
 
 const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const short = (day: string) => SHORT.format(new Date(`${day}T00:00:00Z`));

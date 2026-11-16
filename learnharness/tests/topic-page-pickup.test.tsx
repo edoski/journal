@@ -229,17 +229,18 @@ describe("a topic not started", () => {
 		assert.deepEqual(
 			rows.map((r) => [r.getAttribute("href"), r.querySelector('[data-slot="pickup-builds-on-standing"]')!.textContent]),
 			[
-				["/unit/L3N0dWR5L2xpbmFsZw/rank", "Unfinished"],
-				["/unit/L3N0dWR5L2xpbmFsZw/kernel", "Sure, but wrong"],
+				["/unit/L3N0dWR5L2xpbmFsZw/rank", "Not right last time"],
+				["/unit/L3N0dWR5L2xpbmFsZw/kernel", "Tried, not right yet"],
 			],
-			"each says what its card on the map beside it says (round 8, 3 m12)",
+			"each says where he stands on it, its pie's words, never a session's status (round 14, m38)",
 		);
 		assert.deepEqual(
 			why?.builds.map((b) => [b.topic.handle, b.words, cardLine(facts.said.get(b.topic.handle))?.words]),
 			[
-				["rank", "Unfinished", "Unfinished"],
-				["kernel", "Sure, but wrong", "Sure, but wrong"],
+				["rank", "Not right last time", "Unfinished"],
+				["kernel", "Tried, not right yet", "Sure, but wrong"],
 			],
+			"the card beside keeps the sidebar's fact under the same pie",
 		);
 		assert.equal(document.querySelector('[data-slot="pickup-material"]')!.textContent, "Section 4.7Blitzstein and Hwang");
 	});

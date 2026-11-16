@@ -54,11 +54,19 @@ export type VoiceRule =
 	| "operand"
 	| "asks-banned"
 	| "guess"
+	| "predict"
+	| "card"
+	| "contrast"
+	| "hint-question"
+	| "credit"
+	| "demo-unused"
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"
 	| "card-words"
-	| "unbuilt";
+	| "unbuilt"
+	| "day-part"
+	| "below";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -82,6 +90,15 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// (round 12, 3 D4: "Switching to an explanation of when three vectors
 	// form a basis of ℝ³.").
 	{ rule: "narration", re: /(?:^|[.!?]\s+|\n)(?:(?:let'?s|now,?|ok(?:ay)?,?) (?:switch|move|turn|go|head)|(?:now,? )?(?:switching|moving|turning|going|heading)|back)(?: (?:back|over|on|now))?(?: (?:to|into))? (?:(?:an?|the|some|your|more) )?(?:explanation|explaining|teaching|practice|practising|practicing|problems?|exercises?|lesson|review)\b/i },
+	// A confident miss's contrast as a formula, closing every such reply
+	// after the break was said (round 14, m15: "You held that extra freedom
+	// in x widens what Ax reaches, whereas it sends more inputs onto the
+	// same outputs.", "You held that the nullity is rows minus rank, but…").
+	{ rule: "contrast", re: /(?:^|[.!?]\s+|\n)you held that\b|\byou (?:held|believed|assumed|thought) that\b[^.?!\n]*?\b(?:whereas|when in fact|but in fact|while in fact)\b/i },
+	// What happens to a problem is on its card, never in his words (round
+	// 14, m14: "This problem is closed with no mark, and the explanation
+	// comes next." after Explain instead).
+	{ rule: "narration", re: /\b(?:this|the|that) (?:problem|question) is (?:now )?(?:closed|concluded|set aside|over|ended)\b|\b(?:the |an )?explanation (?:comes|is coming|follows) next\b|\b(?:closed|ended|concluded) with no mark\b/i },
 	{ rule: "plan", re: /(?:^|\n)\s*(?:today|this lesson|in this lesson|the goal)\s*:/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
@@ -107,6 +124,14 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "reprint", re: /\b(?:still|stays|remains) (?:open )?below\b|\bopen below\b/i },
 	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
 ];
+
+/** A sentence that puts a question or his answer to it below the message
+ *  ("…the question about P is ready for your answer below."). Right only
+ *  for a question posed under it, never for one already posed, which is
+ *  above him (round 14, 4 minor 1): the guard reads which. */
+export function questionBelow(text: string): string | null {
+	return sentences(text).map((s) => s.trim()).find((s) => /\bbelow\b/i.test(s) && /\b(?:question|answer|check|prediction)s?\b/i.test(s)) ?? null;
+}
 
 /** Requests in an instruction text for a form the voice bans: each names
  *  what it asks for, so the fix is to ask within the voice instead. */
@@ -635,6 +660,21 @@ export function reusedLetter(text: string, earlier: readonly string[]): { letter
 	return reused ? { letter: reused.letter, written: reused.written } : null;
 }
 
+/** A sentence that credits him with work on a matrix he never worked on:
+ *  "the two roots you found for $A$" when he found $C$'s (round 14, m18).
+ *  `his` is what he worked on: his own words and the question his answer
+ *  replies to. A matrix is a capital letter in maths; `I` is left alone,
+ *  since it is also the identity. The letter, or null. */
+export function creditedLetter(text: string, his: readonly string[]): { letter: string; said: string } | null {
+	const re = /\byou(?:'ve| have)? (?:found|computed|got|worked out|derived|calculated|wrote|solved|gave)\b[^.?!\n]{0,60}?\b(?:for|of|from|on) \$\s*([A-HJ-Z])\s*\$/g;
+	for (const m of text.matchAll(re)) {
+		const letter = m[1]!;
+		const named = new RegExp(`(?:^|[^A-Za-z\\\\])${letter}(?![A-Za-z])`);
+		if (!his.some((words) => named.test(words))) return { letter, said: m[0] };
+	}
+	return null;
+}
+
 /** A sentence that tells him how sure he was ("You were sure the kernel
  *  came from the number of rows."): his card shows his confidence, so it
  *  only narrates (round 10, 3 m3: practice's closing words). */
@@ -691,4 +731,25 @@ export function echoOf(text: string, answer: string | null): string | null {
 	const said = bare(answer);
 	const maths = [...raw.matchAll(/\$([^$\n]+)\$/g)].map((m) => bare(m[1]!)).filter(Boolean);
 	return maths.some((m) => said.includes(m)) ? raw : null;
+}
+
+/** A day the close names with part of what it holds: the close lists one
+ *  of the day's items that is not the lesson's own (`own`, titles) and
+ *  leaves out another, so he would plan that day on half of it (round 14,
+ *  m4: Wed 11's close named the Matrix multiplication review and Linear
+ *  maps, and left out the Determinants review). `days` is the close
+ *  result's `day_items`, each day with the lesson's own topics' titles. The excerpt names the day and what it left out. */
+export function partialDay(text: string, days: Readonly<Record<string, { day_words: string; items: readonly string[]; lesson: readonly string[] }>>): string | null {
+	const said = text.toLowerCase();
+	for (const { day_words: words, items, lesson } of Object.values(days)) {
+		const mine = lesson.map((t) => t.toLowerCase());
+		const long = (words.split(", ").find((w) => /\d/.test(w)) ?? words).toLowerCase();
+		const named = said.includes(long) || (words.startsWith("tomorrow") && /\btomorrow\b/.test(said));
+		if (!named) continue;
+		const titles = items.map((item) => item.replace(/ (?:review|starts|lesson continues)$/, ""));
+		const listed = titles.filter((t) => said.includes(t.toLowerCase()));
+		const missing = items.filter((_, i) => !said.includes(titles[i]!.toLowerCase()));
+		if (missing.length > 0 && listed.some((t) => !mine.includes(t.toLowerCase()))) return `${words}: ${missing.join(", ")}`;
+	}
+	return null;
 }

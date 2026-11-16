@@ -118,42 +118,27 @@ describe("a Show me is saved as practice saves it (round 8, 2 M3)", () => {
 	});
 });
 
-describe("a re-mark corrects only what this session saved or he disputed (round 8, 2 m1)", () => {
+describe("a re-mark corrects only what he disputed (round 8, 2 m1; round 14, m12)", () => {
 	it("an older answer he did not dispute is refused, naming the fix, and nothing is saved", async () => {
 		const check = asked("check");
 		const { saves, tools } = savingCourse(check.messages);
 		const refused = await courseSave(tools, [attempt({ question: check.id }), attempt({ corrects: ["o31"], result: "correct" })]);
 		assert.equal(refused.isError, true);
-		assert.match(refused.text, /o31 was not saved in this session, and he did not dispute it/);
+		assert.match(refused.text, /he did not dispute o31, so it stands as recorded: never re-mark an answer on your own/);
 		assert.equal(saves.length, 0);
 	});
 
-	it("an answer this session saved may be set right; a ruling re-marks only what his dispute named; his own report may correct any", async () => {
+	it("an answer this session saved stands too, even in the turn that saved it; a ruling re-marks only what his dispute named; his own report may correct any", async () => {
 		const check = asked("check");
 		const first = saved({ changes: { observations: [attempt({ question: check.id })] } });
 		const messages = [...check.messages, ...first.messages];
 		const { saves, tools } = savingCourse(messages);
-		assert.equal((await courseSave(tools, [attempt({ corrects: ["o6"], result: "partial" })])).isError, false);
+		assert.match((await courseSave(tools, [attempt({ corrects: ["o6"], result: "partial" })])).text, /he did not dispute o6/);
 		assert.match((await courseSave(tools, [attempt({ corrects: ["o6"], disputed: "It was right", ruling: "It was" })])).text, /he disputed no mark of o6/);
 		assert.equal((await courseSave(tools, [{ kind: "self_report", topics: ["eigen"], text: "Says the old answer was a typo", corrects: ["o2"] }])).isError, false);
 		const disputing = savingCourse([...messages, newDisputeMessage({ answerId: check.id, observations: ["o6"], said: "It was right" }, "Question")]);
 		assert.equal((await courseSave(disputing.tools, [attempt({ corrects: ["o6"], disputed: "It was right", ruling: "It was" })])).isError, false);
-		assert.equal(saves.length, 2);
-	});
-
-	it("an answer saved earlier in the same turn may be set right in that turn, though the turn began before it was saved", async () => {
-		const check = asked("check");
-		const { saves, tools } = savingCourse(check.messages);
-		assert.equal((await courseSave(tools, [attempt({ question: check.id })])).isError, false);
-		const remark = await courseSave(tools, [attempt({ corrects: ["o41"], result: "partial" })]);
-		assert.equal(remark.isError, false, remark.text);
-		assert.equal(saves.length, 2);
-	});
-
-	it("an answer saved just before a restart is this session's own, from the save kept with the lesson, though the transcript lost its receipt (round 8: J2's re-mark rule meeting J5's kept saves)", () => {
-		const check = asked("check");
-		assert.equal(remarkableOf(check.messages).saved.has("o6"), false);
-		assert.equal(remarkableOf(check.messages, { [check.id]: ["o6"] }).saved.has("o6"), true);
+		assert.equal(saves.length, 1);
 	});
 });
 
@@ -199,8 +184,9 @@ describe("his confidence is the one he chose", () => {
 		const check = asked("check", { text: "2", confidence: "neutral" });
 		const recorded = call("course_save", { changes: { observations: [attempt()] } }, { text: JSON.stringify({ saved: ["o5"] }) });
 		const first = said("I'm sure it's 2");
-		const { saves, tools } = savingCourse([...recorded.messages, ...check.messages, first]);
-		await courseSave(tools, [attempt({ question: check.id, sure: "confident", corrects: ["o5"] }), attempt({ question: "his-message", sure: "confident" })]);
+		const disputed = newDisputeMessage({ answerId: check.id, observations: ["o5"], said: "It was right" }, "Question");
+		const { saves, tools } = savingCourse([...recorded.messages, ...check.messages, disputed, first]);
+		await courseSave(tools, [attempt({ question: check.id, sure: "confident", corrects: ["o5"], disputed: "It was right", ruling: "It was right." }), attempt({ question: "his-message", sure: "confident" })]);
 		assert.equal("sure" in saves[0]!.observations![0]!, false);
 		assert.equal("sure" in saves[0]!.observations![1]!, false, "a message carries no meter");
 	});

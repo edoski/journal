@@ -35,6 +35,19 @@ export function claimedKeys(item: NowItem): string[] {
 	return [itemKey(item), ...topics.map((t) => unitKey(workspace, t.handle))];
 }
 
+/** The topics an item's line asks of him: a session's own topics (the
+ *  lesson's, a review's), never one its lesson only touched on the way
+ *  (round 14, m28: the course page's Needs you listed Random variables
+ *  beside the Poisson lesson that reviewed it, which no Today line asks);
+ *  any other line's own key. Pure. */
+export function askedKeys(item: NowItem): string[] {
+	const { row, topics } = item.line;
+	if (item.kind !== "session" || !row.course) return [itemKey(item)];
+	const { workspace } = row.course.map;
+	const own = new Set<string>(item.chat.ownTopics ?? []);
+	return [itemKey(item), ...topics.filter((t) => own.has(t.handle) || t === item.line.lead).map((t) => unitKey(workspace, t.handle))];
+}
+
 /**
  * The sidebar's top: Today's lines (`needs.lines`, at most five, in Home's
  * order), one card each. A session's line is its session card, one per

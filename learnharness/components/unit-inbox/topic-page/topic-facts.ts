@@ -1,6 +1,6 @@
 import { isReviewSession, markHow, topicOpening, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapTask, type CourseMapTopic, type SessionPlan, type StartsWhy, type StudyCourse, type TopicAttempt, type TopicHandle, type TopicRecord, type TopicRef } from "@/src/core";
-import { cardLine, slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { slipBeside, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords, lessonBegun, LESSON_WORDS, MARK_HOW_WORDS, movedWords, reviewWords, SLIP_WORDS, startsAfterWords, startsWhyTells, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -87,9 +87,10 @@ export interface HeadMark {
 export interface BuildsOn {
 	topic: CourseMapTopic;
 	standing: Standing;
-	/** What its card on the map says (`cardLine`), else where he stands:
-	 *  one word for one topic on the page (round 8: Rank read "Partly
-	 *  right" here and "Your turn" on its card). */
+	/** Where he stands on it, its pie's words: how ready it is, never a
+	 *  session's status (round 14, m38: "Basis and dimension · Your turn"
+	 *  said nothing of how ready it was). The card beside keeps the
+	 *  sidebar's fact under the same pie. */
 	words: string;
 	href: string;
 }
@@ -128,6 +129,10 @@ export interface TopicFacts {
 	 *  its first lesson and, when it waits behind other courses' new
 	 *  topics, which (`startsAfterWords`); null otherwise. */
 	starts: { day: string; waits: string | null } | null;
+	/** A lesson he began: the day the engine's daily plan first reviews the
+	 *  topic, after the lesson goes on (the topic read's `firstReview`);
+	 *  null otherwise or when the plan reviews it on none. */
+	firstReview: string | null;
 	/** For a topic not started, what the exam ahead means for it
 	 *  (`examWords`): it leaves it out, or its plan has no room to start
 	 *  it; null otherwise. */
@@ -188,13 +193,13 @@ export function buildsMapOf(topic: CourseMapTopic, map: CourseMap): CourseMap | 
 
 /** The topics a topic builds on, from the course map's `needs` edges, in
  *  the engine's path order, each with where he stands on it. */
-export function buildsOn(topic: CourseMapTopic, map: CourseMap, said?: ReadonlyMap<TopicHandle, Said>): BuildsOn[] {
+export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 	const needs = new Set(map.edges.flatMap((edge) => (edge.kind === "needs" && edge.topic === topic.handle ? [edge.prerequisite] : [])));
 	return map.topics
 		.filter((t) => needs.has(t.handle))
 		.map((t) => {
 			const standing = standingOf(t);
-			return { topic: t, standing, words: cardLine(said?.get(t.handle))?.words ?? standing.words, href: unitHref(map.workspace, t.handle) };
+			return { topic: t, standing, words: standing.words, href: unitHref(map.workspace, t.handle) };
 		});
 }
 
@@ -415,7 +420,9 @@ export function topicFacts({
 	const entries = sessionEntries(sessions, read?.plans ?? [], map.today, topic.handle);
 	const pickups = pickupsOf(topic, map, entries, chats, read?.record ?? null, map.today);
 	const picked = new Set(pickups.flatMap((pickup) => (pickup.kind === "session" ? [pickup.chat.id] : [])));
-	const silent = topic.level === "new" && sessions.length > 0;
+	// A lesson he began says "Lesson in progress" (`standingWords`), never "Not started" (round 14, m36: the begun
+	// Poisson page left an empty band under its title); only a topic not started that a session merely touched is silent.
+	const silent = topic.level === "new" && sessions.length > 0 && !lessonBegun(topic);
 	const studied = lastStudiedDay(topic, entries, attempts);
 	const said = sidebarSays(courses, chats, map.workspace);
 	return {
@@ -429,6 +436,7 @@ export function topicFacts({
 		mistake: mistakeOf(topic, attempts),
 		waits: (topic.level !== "new" ? examGapTopicWords(topic, map.exam, map.today) : null) ?? waitsWords(topic, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: examWords(topic, map) ? null : topic.moved ? movedWords(null, map.today, topic.moved) : startsAfterWords(topic.startsAfter) } : null,
+		firstReview: lessonBegun(topic) ? (read?.firstReview ?? null) : null,
 		startsWhy: topic.level === "new" ? startsReason(topic, map) : null,
 		exam: topic.level === "new" ? examWords(topic, map) : null,
 		action: topicAction(topic, map, chats),
@@ -437,7 +445,7 @@ export function topicFacts({
 		sessions: entries,
 		listed: entries.filter((entry) => !picked.has(entry.chat.id)),
 		attempts,
-		builds: buildsOn(topic, map, said),
+		builds: buildsOn(topic, map),
 		buildsMap: buildsMapOf(topic, map),
 		said,
 		refs: read?.record?.refs ?? [],

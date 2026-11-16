@@ -126,17 +126,27 @@ function brokeAtField() {
 		Type.String({
 			minLength: 1,
 			description:
-				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone; give the topics answered right before the break their result in byTopic.",
+				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone. One answer has one result: never a result per topic.",
 		}),
 	);
 }
 
-function byTopicField() {
+/** A problem's labelled parts that went differently (round 8's per-part
+ *  charging, kept one result per topic by round 14's M2). */
+function partsField() {
 	return Type.Optional(
-		Type.Record(Type.String(), attemptResult("correct, partial or incorrect"), {
-			description:
-				"When the pose's topics went differently in this answer (a multi-part problem with one part right): the result of each topic that differs from result, by its handle in the pose's topics. Topics left out take result.",
-		}),
+		Type.Array(
+			Type.Object({
+				part: Type.String({ minLength: 1, description: "The part's label as the problem's statement writes it: \"(a)\", \"2)\"." }),
+				topics: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, description: "The posed topics this part tests, each in this part alone." }),
+				result: attemptResult("This part's result."),
+			}),
+			{
+				minItems: 2,
+				description:
+					"Only when the problem's statement has labelled parts ((a), (b)… or 1), 2)…) that test different topics and went differently: each part, the topics it tests and its result, so each topic takes its own part's result. Each topic in one part at most; a topic in no part takes result, which is the whole answer's (partial when the parts differ). A problem with no labelled parts has one result: never parts. Leave brokeAt out.",
+			},
+		),
 	);
 }
 
@@ -189,8 +199,8 @@ export const concludeInputObject = Type.Object({
 				"When his final answer used a wrongly chosen method: that method's course topic handle. A wrong method he later corrected goes in firstTry.chose.",
 		}),
 	),
-	byTopic: byTopicField(),
 	brokeAt: brokeAtField(),
+	parts: partsField(),
 	firstTry: Type.Optional(
 		Type.Object(
 			{
@@ -204,8 +214,8 @@ export const concludeInputObject = Type.Object({
 				chose: Type.Optional(
 					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
 				),
-				byTopic: byTopicField(),
 				brokeAt: brokeAtField(),
+				parts: partsField(),
 			},
 			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
 		),
@@ -254,11 +264,13 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 		response: input.response,
 		...(input.record ? { record: input.record } : {}),
 		...(input.chose ? { chose: input.chose } : {}),
-		...(input.byTopic ? { byTopic: input.byTopic } : {}),
+		// A result per topic, sent unasked, gives one answer two results.
+		...("byTopic" in input ? { byTopic: (input as { byTopic?: unknown }).byTopic } : {}),
 		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
+		...(input.parts ? { parts: input.parts } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};
-	const problem = conclusionProblem(conclusion, topics);
+	const problem = conclusionProblem(conclusion, topics, pose.statement);
 	if (problem) return { refused: problem, text: "" };
 	// His newest message came from Ask: a question, never his answer, and
 	// the confidence of an earlier note is not its (round 5).

@@ -53,6 +53,7 @@ import {
 	type SessionMode,
 	disputeText,
 } from "./contracts/chat.ts";
+import { LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import { compactAnswerForModel, normalizeQuestionType, type QuestionAnswerData } from "./question-core.ts";
 import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 import type { MarkResult } from "./contracts/marks.ts";
@@ -904,10 +905,6 @@ export interface AnsweredQuestion {
 	confidence?: Exclude<Confidence, "neutral"> | null;
 	/** He pressed Show me on it: he gave up and was shown its answer. */
 	showMe?: boolean;
-	/** Asked by the probe (`recall`), before any teaching of the session:
-	 *  on a topic not yet taught it is saved as a prediction (round 11,
-	 *  3 N1). Absent for every other question. */
-	probe?: true;
 	/** The question he answered, as `sameQuestionKey` reads it; absent for
 	 *  an answer in words or a problem's conclude. */
 	asked?: string;
@@ -1014,7 +1011,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			revealed.add(asked.key);
 			const details = m.details as { confidence?: unknown; showMe?: unknown };
 			const confidence = chosenConfidence(details.confidence) ?? null;
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), ...(m.toolName === PROBE_QUESTION_TOOL ? { probe: true as const } : {}), asked: asked.key, recorded: false });
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, recorded: false });
 		}
 	}
 	for (const [key, answer] of answered) answer.recorded = recorded.has(key);
@@ -1503,6 +1500,27 @@ function trailingBatchOwner(messages: readonly LhMessage[]): number {
 	return messages[i]?.role === "assistant" ? i : -1;
 }
 
+/** Whether the tutor's turn holding the reply at `end` closed what it was
+ *  for before its words there, as the turn's own stop reads it: a clean
+ *  `conclude` of practice or a clean `lesson_progress` with `close`, called
+ *  by the tutor since the input that opened the turn. Pure. */
+function closedInTurn(messages: readonly LhMessage[], end: number): boolean {
+	for (let i = end; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "assistant") {
+			if (nativeInputCause(m as AgentMessage, messages.slice(0, i) as AgentMessage[]) !== "neutral") return false;
+			continue;
+		}
+		if (m.provider === "synthetic") continue;
+		const closes = m.content.some((b) =>
+			b.type === "toolCall" &&
+			(b.name === PRACTICE_CONCLUDE_TOOL || (b.name === LESSON_PROGRESS_TOOL && lessonProgressOf(b.arguments)?.close === true)) &&
+			messages.some((r) => r.role === "toolResult" && r.toolCallId === b.id && !r.isError));
+		if (closes) return true;
+	}
+	return false;
+}
+
 export function needsContinuation(record: readonly LhMessage[]): boolean {
 	// Context markers written after an answer (the course brief rides every
 	// learner input) carry no input of their own: what is owed is read from
@@ -1545,6 +1563,10 @@ export function needsContinuation(record: readonly LhMessage[]): boolean {
 		(m) => (MODE_HANDOFF_TOOLS[m.toolName] !== undefined || m.toolName === "probe_done") && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true,
 	);
 	if (handedOff) return false;
+	// Closing words end their turn on purpose (teacher-agent `endsTurnFor`),
+	// so the record ends on their result and nothing is owed (round 14, M1:
+	// a continue after the close asked the left question again).
+	if (results.some((m) => m.toolName === SEND_TO_USER_TOOL && !m.isError) && closedInTurn(messages, start)) return false;
 	const answered = new Set(results.map((m) => m.toolCallId));
 	const calls = (content as Array<{ type?: string; id?: string }>).filter(
 		(b) => b.type === "toolCall" && typeof b.id === "string",

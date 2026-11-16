@@ -153,7 +153,7 @@ export function reaskedFrom(messages: ReadonlyArray<{ parts: readonly QuestionPa
 			if (part.toolCallId === toolCallId) {
 				if (previous?.toolCallId && leftOpen(previous.output)) return asksAgain(previous, part) ? previous.toolCallId : null;
 				const same = lastOfKind.get(questionKindOf(part));
-				return same?.toolCallId && leftForToday(same.output) && sameStep(same, part) ? same.toolCallId : null;
+				return same?.toolCallId && leftForToday(same.output) && asksAgain(same, part) ? same.toolCallId : null;
 			}
 			previous = part;
 			lastOfKind.set(questionKindOf(part), part);
@@ -180,10 +180,25 @@ function leftForToday(output: unknown): boolean {
 }
 
 /** Whether `next` asks `left` again, in whatever words: the same kind of
- *  question on the same plan step. A question of another form or step
- *  after a hint or a side question is a new one, and draws its words. */
+ *  question on the same plan step, of the same type unless its words are
+ *  the same. A question of another form, step or type after a hint or a
+ *  side question is a new one, and draws its words (round 14, 2 D1: a
+ *  prediction posed on the step of the check he set aside to guess first
+ *  showed only "Your turn, on the question above"). */
 function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
-	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next);
+	return questionKindOf(left) === questionKindOf(next) && sameStep(left, next) && (sameType(left, next) || sameQuestionWords(left, next));
+}
+
+function sameType(a: QuestionPart, b: QuestionPart): boolean {
+	const type = (part: QuestionPart) => normalizeQuestionType((part.input as { type?: unknown } | undefined)?.type) ?? "check";
+	return type(a) === type(b);
+}
+
+function sameQuestionWords(a: QuestionPart, b: QuestionPart): boolean {
+	const words = (part: QuestionPart) => (part.input as { question?: unknown } | undefined)?.question;
+	const x = words(a);
+	const y = words(b);
+	return typeof x === "string" && typeof y === "string" && sameQuestionKey(x) === sameQuestionKey(y);
 }
 
 /** Whether `next` asks again, in the same words, a question he answered
@@ -194,10 +209,7 @@ function asksAgain(left: QuestionPart, next: QuestionPart): boolean {
 function sameWords(left: QuestionPart, next: QuestionPart): boolean {
 	const answer = left.output as Partial<QuestionAnswerData> | undefined;
 	if (!answer || answer.dismissed === true || answer.hintRequested === true || !answer.text?.trim().endsWith("?")) return false;
-	const words = (part: QuestionPart) => (part.input as { question?: unknown } | undefined)?.question;
-	const x = words(left);
-	const y = words(next);
-	return typeof x === "string" && typeof y === "string" && questionKindOf(left) === questionKindOf(next) && sameQuestionKey(x) === sameQuestionKey(y);
+	return questionKindOf(left) === questionKindOf(next) && sameQuestionWords(left, next);
 }
 
 function sameStep(a: QuestionPart, b: QuestionPart): boolean {
@@ -227,6 +239,29 @@ export function leftOpenOf(messages: ReadonlyArray<{ parts: readonly QuestionPar
  *  answer (`sameWords`). */
 export function askedAgain(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
 	return new Set(reasks(messages).map((r) => r.id));
+}
+
+/** The questions Done for today set aside that are asked again further
+ *  down (the app's re-pose when he opens the session, or an older
+ *  record's re-ask under the close): the next question of its kind asks it
+ *  again (`asksAgain`). Its words are drawn once, where he answers it, and
+ *  the set-aside one keeps only "Left for next time" (round 14, M1 and the
+ *  cross-surface check: opened again, the page drew the left question
+ *  twice). */
+export function leftAskedBelow(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
+	const out = new Set<string>();
+	const waiting = new Map<string, QuestionPart>();
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (!asked(part)) continue;
+			const kind = questionKindOf(part);
+			const left = waiting.get(kind);
+			if (left?.toolCallId && asksAgain(left, part)) out.add(left.toolCallId);
+			waiting.delete(kind);
+			if (part.toolCallId && leftForToday(part.output)) waiting.set(kind, part);
+		}
+	}
+	return out;
 }
 
 /** The re-asks (`askedAgain`) that follow a hint: the hint may itself end

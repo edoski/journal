@@ -246,7 +246,11 @@ function movedOf(value: unknown): { moved: TopicMoved } | Record<string, never> 
 	const m = record(value);
 	const from = str(m?.from);
 	if (!m || !from) return {};
-	if (m.by === "study") return { moved: { from, by: "study", courses: strings(m.courses), day: m.day === "yesterday" ? "yesterday" : "today" } };
+	if (m.by === "study") {
+		const waitsOn = strings(m.waits_on);
+		return { moved: { from, by: "study", courses: strings(m.courses), day: m.day === "yesterday" ? "yesterday" : "today", ...(waitsOn.length > 0 ? { waitsOn } : {}) } };
+	}
+	if (m.by === "answered") return { moved: { from, by: "answered" } };
 	const on = str(m.on);
 	return m.by === "missed" || m.by === "left" ? { moved: { from, by: m.by, ...(on ? { on } : {}) } } : {};
 }
@@ -322,10 +326,12 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 		m,
 		parsed.map((t) => ({ handle: t.handle, excluded: t.excluded !== undefined, arc: t.rawArc })),
 	);
+	const titles = new Map(parsed.map((t) => [t.handle as string, t.title]));
 	const topics = parsed.map(({ needs: _needs, contrasts: _contrasts, rawArc, rawWhy, ...topic }): CourseMapTopic => {
 		const arc = block.arcOf(rawArc);
 		const startsWhy = startsWhyOf(rawWhy, listed, block.arcOf);
-		return { ...topic, ...(arc ? { arc } : {}), ...(startsWhy ? { startsWhy } : {}) };
+		const moved = topic.moved?.by === "study" && topic.moved.waitsOn ? { moved: { ...topic.moved, waitsOn: topic.moved.waitsOn.map((h) => titles.get(h) ?? h) } } : {};
+		return { ...topic, ...moved, ...(arc ? { arc } : {}), ...(startsWhy ? { startsWhy } : {}) };
 	});
 	const current = str(m.current);
 	const tasks = (Array.isArray(m.tasks) ? m.tasks : []).flatMap((entry) => {

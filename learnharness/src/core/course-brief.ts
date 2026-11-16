@@ -68,6 +68,8 @@ function dueLine(d: Json, role: BriefRole): string {
 		.filter(Boolean)
 		.join(", ");
 	let line = `- ${str(d.topic) ?? "?"}${facts ? ` (${facts})` : ""}`;
+	const asked = list(d.asked).filter((a): a is string => typeof a === "string");
+	if (asked.length > 0) line += `\n  asked in its earlier reviews, newest first: ${asked.map((a) => `"${a}"`).join("; ")}`;
 	if (role === "practice") {
 		if (str(d.prompt)) line += `\n  prompt: ${d.prompt}`;
 		const points = list(d.points).filter((p): p is string => typeof p === "string");
@@ -230,18 +232,24 @@ function overdueLine(map: CourseMap): string {
 /** One course's plan: its exam and final review, its overdue reviews,
  *  then each planned day's reviews and new topics by title, every review
  *  of every topic. Empty when it plans nothing. */
-function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boolean): string[] {
+function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boolean, live: ReadonlySet<string>): string[] {
 	const byHandle = new Map(map.topics.map((t) => [t.handle, t]));
 	const title = (handle: TopicHandle) => byHandle.get(handle)?.title ?? handle;
 	const shown = (handle: TopicHandle) => byHandle.has(handle) && !byHandle.get(handle)!.excluded;
+	// The lesson's own topics carry no plan note: their day moves with his
+	// answers in it, and the close names it (round 14, m2: "Your plan now
+	// starts Poisson distribution on Wednesday 11 November…" mid-lesson,
+	// while the close and the calendar said Tue 10).
 	const dayLines = days.flatMap((d) => {
 		const reviews = d.reviews.filter(shown).map((h) => {
 			const { review, moved } = byHandle.get(h)!;
+			if (live.has(h)) return noted(title(h), LIVE_NOTE);
 			if (!review || review.date !== d.date) return title(h);
 			return noted(title(h), moved ? movedNote(moved, map.today) : reviewNote(review, map.today));
 		});
 		const newTopic = (h: TopicHandle) => {
 			const { moved, startsWhy, starts: day } = byHandle.get(h)!;
+			if (live.has(h)) return noted(title(h), LIVE_NOTE);
 			return noted(title(h), moved && day === d.date ? movedNote(moved, map.today) : startNote(startsWhy, title));
 		};
 		// A lesson he began goes on that day, as the app says it, never a start.
@@ -268,13 +276,17 @@ function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boole
 	return [head.join(" · "), overdueLine(map), ...dayLines];
 }
 
+/** A topic of this session's own lesson in the plan: no note, since its
+ *  day is the close's to name. */
+const LIVE_NOTE = "this session's topic: its day is the close's to say, not yours now";
+
 /** The daily plan of every course, the lesson's own first. Empty when no
  *  course plans anything. */
-function planLines(plans: CoursePlans | undefined): string[] {
+function planLines(plans: CoursePlans | undefined, live: readonly string[]): string[] {
 	if (!plans) return [];
 	const own = (workspace: string) => workspace === plans.workspace;
 	const ordered = [...plans.courses].sort((a, b) => Number(own(b.map.workspace)) - Number(own(a.map.workspace)));
-	const courses = ordered.flatMap(({ map, days }) => coursePlanLines(map, days, own(map.workspace)));
+	const courses = ordered.flatMap(({ map, days }) => coursePlanLines(map, days, own(map.workspace), own(map.workspace) ? new Set(live) : new Set()));
 	if (courses.length === 0) return [];
 	return [
 		"Daily plan of every course, as the calendar shows it: each day's reviews and new topics, every review of every topic. A day you tell him is one of these, unless a save this turn gave the topic a newer one. Say a day moved only where its note says “moved from”, with that note's cause; otherwise name the day alone:",
@@ -348,29 +360,57 @@ export function lastStudiedOf(plan: unknown): LastStudied | null {
  *  haven't studied since Monday 9 November", read off a note, after study
  *  on 10 and 17 Nov). */
 function studiedLine({ date, daysAgo }: LastStudied): string {
-	const when = daysAgo === 0 ? "today" : daysAgo === 1 ? `yesterday, ${dayWithWeekday(date)}` : `on ${dayWithWeekday(date)}, ${daysAgo} days ago`;
+	const when = daysAgo === 0 ? "today" : daysAgo === 1 ? `yesterday, ${dayWithWeekday(date)}` : `on ${dayWithWeekday(date)}`;
 	return `He last studied this course ${when}: the only day to tell him he last studied, never a moved day's note.`;
 }
 
-/** A topic he opened that his plan starts on a later day: he starts it
- *  ahead of plan, and the lesson's first words say so (round 13, 1 n7: a
- *  start 11 days early opened on a bare probe). Never a reason the plan
- *  does not give. */
-function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[]): string[] {
+/** "A", "A and B", "A, B and C". */
+const listedWords = (names: readonly string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+
+/** What starting `topic` today costs him, in the plan's own facts: what it
+ *  builds on is not solid yet (its start waits on it), or today's plan
+ *  still holds other work, in any course. Null when it costs nothing. */
+function earlyCost(plans: CoursePlans, map: CourseMap, topic: CourseMapTopic): string | null {
+	const titleIn = (m: CourseMap, h: TopicHandle) => m.topics.find((t) => t.handle === h)?.title ?? h;
+	const waits = topic.startsWhy?.kind === "after" ? [...topic.startsWhy.needs, ...topic.startsWhy.partners] : [];
+	const shaky = waits.length > 0 ? `${listedWords(waits.map((h) => titleIn(map, h)))}, which it builds on, ${waits.length > 1 ? "are" : "is"} not solid yet` : null;
+	const held = plans.courses.flatMap(({ map: m, days }) => {
+		const today = days.find((d) => d.date === m.today);
+		if (!today) return [];
+		return [...today.reviews.map((h) => `your ${titleIn(m, h)} review`), ...today.new.filter((h) => h !== topic.handle).map((h) => titleIn(m, h))];
+	});
+	const planned = held.length > 0 ? `today's plan still holds ${listedWords(held)}` : null;
+	const costs = [shaky, planned].filter((c): c is string => c !== null);
+	return costs.length > 0 ? costs.join(", and ") : null;
+}
+
+/** A topic he started today, from its page or a row, that his plan starts
+ *  on a later day: the lesson's first words say so, with what starting it
+ *  early costs him, and only then (round 13, 1 n7: a start 11 days early
+ *  opened on a bare probe; round 14, m1: the line opened every lesson, a
+ *  lesson he had begun, and the Ask-the-tutor reply). `opening` is the
+ *  session's first words: a start opens with the topic's title ("Start" and
+ *  it, or it alone); a continue, a question and a free message never do.
+ *  Never a reason the plan does not give. */
+function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly string[], opening: string | null): string[] {
 	const map = plans?.courses.find((c) => c.map.workspace === plans.workspace)?.map;
-	if (!map) return [];
+	if (!plans || !map || !opening) return [];
+	const words = opening.trim().replace(/^Start\s+/, "").toLowerCase();
 	return opened.flatMap((handle) => {
 		const topic = map.topics.find((t) => t.handle === handle);
-		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today) return [];
+		if (!topic || topic.level !== "new" || !topic.starts || topic.starts <= map.today || lessonBegun(topic)) return [];
+		if (words !== topic.title.toLowerCase()) return [];
+		const cost = earlyCost(plans, map, topic);
+		if (!cost) return [];
 		const day = longDay(topic.starts);
-		return [`Ahead of plan: his plan starts ${topic.title} on ${day}, and he starts it today. Your first message to him says so in one plain sentence ("${topic.title} is ahead of your plan, which starts it on ${day}."), with no reason of your own, then the lesson goes on.`];
+		return [`Ahead of plan: his plan starts ${topic.title} on ${day}, and he starts it today. Your first message to him says so in one plain sentence ("${topic.title} is ahead of your plan, which starts it on ${day}: ${cost}."), with no reason of your own, then the lesson goes on.`];
 	});
 }
 
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
+	{ runup, arcCheck, plan, opened = [], opening = null, live = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; opening?: string | null; live?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -380,13 +420,13 @@ export function projectCourseBrief(
 	const due = list(r.due);
 
 	const lines: string[] = [];
-	const examLine = typeof exam.days_left === "number" ? ` · exam in ${exam.days_left} days` : "";
+	const examLine = typeof exam.date === "string" ? ` · exam on ${longDay(exam.date)}` : "";
 	lines.push(`[Course record] ${str(course.title) ?? "Untitled course"} · today ${dayWithWeekday(str(r.today))}${examLine}`);
 	if (str(course.goal)) lines.push(`About the course, in his words: ${course.goal}`);
 	if (studied) lines.push(studiedLine(studied));
 	if (opened.length > 0 && review) lines.push(`Opened on: ${opened.join(", ")}, as its review. He pressed its button, and the app posted his first message. The session is his review, whatever it re-teaches.`);
 	else if (opened.length > 0) lines.push(`Opened on: ${opened.join(", ")}. He pressed the action on its page, and the app posted his first message.`);
-	if (!review) lines.push(...aheadOfPlanLines(plan, opened));
+	if (!review) lines.push(...aheadOfPlanLines(plan, opened, opening));
 	const topics = list(path.topics)
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
@@ -416,7 +456,7 @@ export function projectCourseBrief(
 	} else {
 		lines.push("Due today: nothing.");
 	}
-	const planned = planLines(plan);
+	const planned = planLines(plan, live);
 	lines.push(...planned);
 	const weak = list(r.weak);
 	if (weak.length > 0) lines.push("Weak:", ...weak.map((w) => weakLine(withDetail(w, detail), role)));

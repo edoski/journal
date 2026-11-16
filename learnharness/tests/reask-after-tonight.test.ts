@@ -50,3 +50,29 @@ describe("reaskedFrom after Done for today", () => {
 		assert.equal(reaskedFrom(messages, "c3"), null);
 	});
 });
+
+describe("the left question is drawn once when it is asked again (round 14 integration, M1)", () => {
+	it("a question set aside for today and asked again further down keeps only Left for next time", async () => {
+		const { leftAskedBelow } = await import("../components/lesson/prose/prose-question-data.ts");
+		const messages = view(
+			[explain("c1", "Which inputs does $A$ send to zero?", tonight)],
+			[{ type: "text", toolCallId: "" }],
+			[explain("c2", "Which inputs does $A$ send to zero?")],
+		);
+		assert.deepEqual([...leftAskedBelow(messages)], ["c1"]);
+		assert.deepEqual([...leftAskedBelow(view([explain("c1", "Write P(X ≥ 2).", tonight)]))], [], "never asked again: its words stay");
+		assert.deepEqual([...leftAskedBelow(view([explain("c1", "Write P(X ≥ 2).", tonight)], [explain("c2", "What is the mean?", undefined, "poisson")]))], [], "another step's question is a new one");
+	});
+
+	it("the set-aside card draws its words only when it is not asked again below", async () => {
+		const React = await import("react");
+		(globalThis as Record<string, unknown>).React = React;
+		const { renderToStaticMarkup } = await import("react-dom/server");
+		const { ProseQuestion } = await import("../components/lesson/prose/prose-question.tsx");
+		const card = (askedBelow: boolean) =>
+			renderToStaticMarkup(React.createElement(ProseQuestion, { tool: "explain", toolCallId: "c1", input: { type: "check", nodeId: "n", question: "Which inputs does A send to zero?", correctAnswer: "x" }, output: tonight as never, open: false, askedBelow }));
+		assert.match(card(false), /Which inputs does A send to zero\?[\s\S]*Left for next time/);
+		assert.doesNotMatch(card(true), /Which inputs/);
+		assert.match(card(true), /Left for next time/);
+	});
+});

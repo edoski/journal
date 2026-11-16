@@ -363,7 +363,7 @@ function steerText(kind: JobKind, result: ResearchResult | DemoResult | VisualRe
 	if (kind === "demo")
 		return `The demo "${(result as DemoResult).title}" is built, headlessly tested, and rendered in the lesson. Builder notes: ${
 			(result as DemoResult).notes ?? "(none)"
-		}.\nTeach with it — reference its controls by name and point the learner at what to try.`;
+		}.\nTeach with it: your next message opens on one thing to try in it, by its control's name, and never reads him a value the open question asks.`;
 	return `The figure is drawn, verified by inspection, and rendered in the lesson. Maker notes: ${
 		(result as VisualResult).notes ?? "(none)"
 	}.\nReference its elements as you teach.`;

@@ -56,7 +56,7 @@ test("each non-connected state says what to do, with one Refresh and no sign-in 
 	for (const [status, sentence] of cases) {
 		install([[status]]);
 		await mount();
-		assert.match(text(rows()[0], "claude-connection-state")!, sentence);
+		assert.match(document.querySelector('[data-testid="claude-connection-state"]')?.textContent ?? "", sentence);
 		assert(document.body.textContent!.includes(CLAUDE_LABEL));
 		assert(document.body.textContent!.includes(CLAUDE_NOTICE));
 		assert.deepEqual([...document.querySelectorAll("button")].map((b) => b.textContent), ["Refresh"], `${status.connection.state}: only Refresh`);
@@ -171,4 +171,30 @@ test("the note about the plan is a row of its own after the last account", async
 	const parts = [...host!.children];
 	assert.deepEqual(parts.map((el) => el.getAttribute("data-testid")), ["claude-connection", "claude-account", "claude-notice"], "the header, each account and the note are sibling rows the group parts with hairlines");
 	assert.equal(parts.at(-1)!.textContent, CLAUDE_NOTICE);
+});
+
+/** Round 14, 4 minor 7: with the token folder moved aside, the sign-in
+ *  dialog read "This account isn't signed in…" under each of four
+ *  accounts, and "can't find your Claude accounts" still listed the plain
+ *  `claude` standing in for them. */
+test("every account failing alike says it once, above the names; none found in T3 Code lists none", async () => {
+	const out = (id: string, email: string) => account(id, id, { state: "signed-out" }, null, email);
+	install([[out("claude-subscription-a", "a@example.com"), out("claude-subscription-b", "b@example.com"), out("claude-subscription-c", "c@example.com"), out("claude-subscription-d", "d@example.com")]]);
+	await mount();
+	const said = [...document.querySelectorAll('[data-testid="claude-connection-state"]')].map((p) => p.textContent);
+	assert.deepEqual(said, ["This account isn't signed in. Sign in to it again in T3 Code, then press Refresh."], "said once");
+	assert.deepEqual(rows().map((r) => text(r, "claude-account-name")), ["a@example.com", "b@example.com", "c@example.com", "d@example.com"], "every account still named");
+	await act(async () => root?.unmount()); host?.remove(); stopSignals?.();
+
+	install([[{ ...account("claude-subscription", "Claude Code", { state: "signed-out" }, null, "edoxtreme@example.com", "default"), account: { providerId: "claude-subscription", label: "Claude Code", email: "edoxtreme@example.com", auth: "default", notInT3: true } }]]);
+	await mount();
+	assert.equal(rows().length, 0, "no account listed when none is found");
+	assert.match(document.body.textContent!, /can't find your Claude accounts in T3 Code/);
+	assert.doesNotMatch(document.body.textContent!, /edoxtreme/);
+});
+
+test("accounts that fail differently, or a mix with one signed in, keep a line under each", async () => {
+	install([[account("claude-subscription", "Main", connected, null, "main@example.com", "default"), account("claude-subscription-work", "Work", { state: "signed-out" }, null, "work@example.com")]]);
+	await mount();
+	assert.equal(document.querySelectorAll('[data-testid="claude-connection-state"]').length, 2);
 });

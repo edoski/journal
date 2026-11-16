@@ -194,7 +194,8 @@ export const HANDOFF_TEXT =
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
-	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
+	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again. " +
+	"My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
 
 /** The wake in a session that continues an open task (round 11, 2 N2: the
  *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
@@ -303,8 +304,11 @@ const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, 
  *  close names only what the record keeps (round 9, 3 m7: "You still have
  *  the kernel problem you closed … to pick up"), and only this session's:
  *  another session's open work is Home's to name (round 12, 3 D7: Rank
- *  practice closed on "Part (c) of Problem sheet 4 is still open"). */
-const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
+ *  practice closed on "Part (c) of Problem sheet 4 is still open"). The
+ *  problem he left open is named once, as set aside (round 14, m31: "Your
+ *  Rank and the column space review is on Wednesday 11 November." left the
+ *  4 × 6 system unnamed). */
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:
@@ -314,7 +318,7 @@ export const DONE_TONIGHT_TEXT = {
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
 		`${DONE_GRADED} ${DONE_CLOSE}`,
 	practice:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so never name it as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so name it only as set aside, never as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
 		`${DONE_GRADED} ${DONE_CLOSE_PRACTICE}`,
 } as const;
 
@@ -381,7 +385,7 @@ export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = 
 	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
 	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
 	explain:
-		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
+		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`, with no words between: the problem's card shows how it ended, and the teaching follows.",
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has
@@ -479,6 +483,9 @@ export interface ChatSummary {
 	/** The tutor's last turn ended because he stopped it (`stoppedByHim`),
 	 *  not because the app restarted: a cut session then says he stopped it. */
 	stopped?: true;
+	/** The tutor's last turn failed (Claude Code refused or broke off), so
+	 *  it never replied: a paused session says it couldn't reply. */
+	failed?: true;
 	/** He has said nothing in it past the words it opened with, so it
 	 *  holds nothing of his to pick up (`currentSessions`). */
 	untouched?: true;

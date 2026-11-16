@@ -27,6 +27,7 @@ import { CHAT_EFFORT, CLAUDE_MODEL } from "../core/contracts/claude.ts";
 
 const PROBE_DONE_TOOL = "probe_done";
 import { VoiceGuard } from "./voice-guard.ts";
+import { ClosedTurn } from "./closed-turn.ts";
 
 /**
  * The two teaching-side agents (docs/probe-teach-split.md): the PROBER and
@@ -158,6 +159,8 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// before he sees it, and one that breaks it is rewritten.
 	const voice = new VoiceGuard((opts.messages ?? []) as LhMessage[], endsTurnFor(kind), opts.course?.review === true, opts.course !== undefined);
 	const spoken = (tool: AgentTool<any, any>) => (voice.guards(tool.name) ? voice.wrap(tool) : tool);
+	// Nothing new starts once the session closed for today in this turn.
+	const closing = new ClosedTurn((opts.messages ?? []) as LhMessage[]);
 	return new SdkAgent({
 		engine,
 		systemPrompt,
@@ -168,9 +171,13 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			...tools,
 			...(opts.course ? Object.values(courseTools(opts.course)) : []),
 			...(opts.tools === undefined ? [withArgumentHeal(sendToUserTool)] : []),
-		].map(spoken),
-		screen: (call) => voice.screen(call),
+		].map(spoken).map((tool) => closing.wrap(tool)),
+		screen: (call) => {
+			closing.screen(call);
+			voice.screen(call);
+		},
 		settle: (message) => voice.settle(message),
+		heard: () => voice.heard(),
 		// Ordinary text never reaches him where send_to_user is his channel.
 		...(opts.tools === undefined ? { screenText: (text: string) => voice.screenText(text), beforeEnd: () => voice.beforeEnd() } : {}),
 		builtins: FILE_TOOLS,
