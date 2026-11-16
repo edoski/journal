@@ -62,7 +62,7 @@ describe("a lesson he began", () => {
 		const course = { ...COURSE, map: { ...MAP, today: "2026-11-11" }, newToday: ["poisson", "geometric"] as never[] };
 		const rows = todayRows([course], [lesson], "2026-11-11");
 		assert.deepEqual(
-			rows.map((row) => (row.kind === "session" ? `session ${row.chat.id}` : `course ${row.step.kind} ${row.step.topics?.join(",")}`)),
+			rows.map((row) => (row.kind === "session" ? `session ${row.chat.id}` : `course ${row.step.kind} ${"topics" in row.step ? row.step.topics.join(",") : ""}`)),
 			["session poisson", "course topic geometric"],
 		);
 	});
