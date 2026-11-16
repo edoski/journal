@@ -8,7 +8,7 @@ Research (16 Nov, the pass's scratchpad): common region (a bounded area) groups 
 
 - **The whole course, never one arc.** A `grouped` skin (`../map-skin.ts`, `drawingOf`) draws every topic of a course with arcs. The arc a page shows (Home's Today row he points at, the course page's arc) is framed by the camera, as `framed` frames topics; the overview also opens it.
 - **The strip gives way.** Home's and the course page's arc strip is not drawn: the map names the arcs, in order (`home-map.tsx`, `split-course.tsx`).
-- **Each arc is numbered** in study order and named by its pill (`ArcMark`: the number, then `ArcPill` with its ring and whole name), so first and next read at a glance. Arcs side by side keep study order left to right (`layeredDrawing`'s `order`).
+- **Each arc is numbered** in study order and named quietly (`arc-label.tsx`: the number, then its whole name in the muted ink, the arc he is in in the foreground; Edo, 16 Nov 2026: the pills were "too in the way"), so first and next read at a glance. Arcs side by side keep study order left to right (`layeredDrawing`'s `order`).
 - Canvas tree's grammar inside and between arcs (`../canvas/canvas-layout.ts`, `layeredDrawing`): centred ports, one bracket per source, lanes 24 apart, implied needs left to their chain.
 - Focus lights a topic, what it needs and what it leads to, as Canvas tree does; an arc holding the topic in focus raises its border, and a line between arcs rises when a need of the topic runs along it. Nothing moves on hover.
 - A course without arcs, or with one, draws as Canvas tree.
@@ -18,7 +18,7 @@ Research (16 Nov, the pass's scratchpad): common region (a bounded area) groups 
 | Part | File |
 |---|---|
 | Arc regions layout: each arc alone, the arcs as boxes, one line per pair of arcs | `arc-layout.ts` |
-| An arc's number and pill | `arc-mark.tsx` |
+| An arc's number and name, quiet | `arc-label.tsx` |
 | A region, or a folded arc's card | `arc-region.tsx` |
 | The line between two arcs: drawn with the needs, in their inks and paths | `../canvas/canvas-lines.tsx` |
 | The skin for regions and overview | `arc-skin.ts` |
