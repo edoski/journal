@@ -23,8 +23,10 @@ export type ClaudeConnection =
 	| { state: "missing" }
 	| { state: "error"; message: string };
 
-/** token: T3 Code's setup token; profile: its own Claude Code config dir; default: the plain signed-in `claude`. */
-export interface ClaudeAccount { providerId: string; label: string; email: string | null; auth: "token" | "profile" | "default" }
+/** token: T3 Code's setup token; profile: its own Claude Code config dir; default: the plain signed-in `claude`.
+ *  `notInT3`: the stand-in for the plain `claude` when T3 Code lists no Claude account at all, so his
+ *  accounts are missing from T3 Code (round 13, 4 minor 6). */
+export interface ClaudeAccount { providerId: string; label: string; email: string | null; auth: "token" | "profile" | "default"; notInT3?: true }
 
 /** The weekly window as Claude Code last reported it. resetsAt is Unix seconds. */
 export interface ClaudeUsage { percentLeft: number; resetsAt: number | null; limited: boolean; checkedAt: number }

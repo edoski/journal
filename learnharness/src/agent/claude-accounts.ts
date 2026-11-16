@@ -37,8 +37,8 @@ function expandHome(path: string, home: string): string {
 	return path === "~" ? home : path.startsWith("~/") ? join(home, path.slice(2)) : path;
 }
 
-function synthetic(home: string): LoadedClaudeAccount {
-	return { providerId: CLAUDE_SUBSCRIPTION.providerId, label: "Claude Code", email: readEmail(null, home), auth: "default", instanceId: null };
+function synthetic(home: string, notInT3: boolean): LoadedClaudeAccount {
+	return { providerId: CLAUDE_SUBSCRIPTION.providerId, label: "Claude Code", email: readEmail(null, home), auth: "default", instanceId: null, ...(notInT3 ? { notInT3: true as const } : {}) };
 }
 
 /** Enabled `claudeAgent` instances from T3 Code's settings. When T3 Code is
@@ -72,7 +72,7 @@ export function loadClaudeAccounts({ t3Dir, home: homeArg }: ClaudeAccountPaths 
 		} else if (isDefaultHome) accounts.push({ ...base, auth: "default" });
 		else accounts.push({ ...base, auth: "profile", configDir: configDir! });
 	}
-	if (!accounts.some((account) => account.providerId === CLAUDE_SUBSCRIPTION.providerId)) accounts.unshift(synthetic(home));
+	if (!accounts.some((account) => account.providerId === CLAUDE_SUBSCRIPTION.providerId)) accounts.unshift(synthetic(home, accounts.length === 0));
 	return accounts;
 }
 
@@ -101,8 +101,8 @@ export function claudeConfigDirs({ t3Dir, home: homeArg }: ClaudeAccountPaths = 
 }
 
 /** The client-safe view: no token, no paths. */
-export function publicClaudeAccount({ providerId, label, email, auth }: LoadedClaudeAccount): ClaudeAccount {
-	return { providerId, label, email, auth };
+export function publicClaudeAccount({ providerId, label, email, auth, notInT3 }: LoadedClaudeAccount): ClaudeAccount {
+	return { providerId, label, email, auth, ...(notInT3 ? { notInT3 } : {}) };
 }
 
 /** How a child runs on this account. A token account gets a private config

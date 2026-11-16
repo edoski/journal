@@ -70,13 +70,14 @@ test("an absolute homePath equal to ~/.claude is the default home too, and a pro
 });
 
 test("without T3 Code, with unreadable settings, or with no default-home account, a synthetic default account stands in", () => {
-	const synthetic = { providerId: "claude-subscription", label: "Claude Code", email: "me@example.com", auth: "default" };
+	const synthetic = { providerId: "claude-subscription", label: "Claude Code", email: "me@example.com", auth: "default", notInT3: true };
 	const missing = fakeHome({ emails: { "": "me@example.com" } });
 	assert.deepEqual(loadClaudeAccounts({ home: missing }).map(publicClaudeAccount), [synthetic]);
 	const broken = fakeHome({ settings: "{not json", emails: { "": "me@example.com" } });
 	assert.deepEqual(loadClaudeAccounts({ home: broken }).map(publicClaudeAccount), [synthetic]);
 	const noDefault = fakeHome({ instances: { claude_2: FOUR.claude_2 }, emails: { "": "me@example.com" } });
 	assert.deepEqual(loadClaudeAccounts({ home: noDefault }).map((a) => a.providerId), ["claude-subscription", "claude-subscription-claude_2"]);
+	assert.equal(loadClaudeAccounts({ home: noDefault }).map(publicClaudeAccount)[0]!.notInT3, undefined, "beside T3 Code's own accounts, the stand-in is no sign they are missing");
 	const [plain] = loadClaudeAccounts({ home: missing });
 	assert.equal(claudeLaunch(plain!, root), undefined, "the synthetic default inherits the environment untouched");
 });
