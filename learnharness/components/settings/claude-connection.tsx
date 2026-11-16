@@ -111,7 +111,7 @@ export async function readClaudeAccounts(refresh: boolean): Promise<ClaudeAccoun
  *  it, and Use this account (or In use) at the right. `current` is
  *  undefined until the model status loads. `alias` names the account as T3
  *  Code does when another row signs in with the same email. Exported for tests. */
-export function AccountRow({ status, current, busy, onUse, alias, checking = false }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void; alias?: string; checking?: boolean }) {
+export function AccountRow({ status, current, busy, onUse, alias, checking = false, note = true }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void; alias?: string; checking?: boolean; note?: boolean }) {
 	const { account, connection, usage, modelMissing } = status;
 	const connected = connection.state === "connected";
 	const inUse = current === account.providerId;
@@ -125,10 +125,27 @@ export function AccountRow({ status, current, busy, onUse, alias, checking = fal
 				? <span className="text-callout text-muted-foreground" data-testid="claude-in-use">In use</span>
 				: connected && current !== undefined && <Button type="button" size="compact" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" data-testid="claude-use-account" disabled={busy} onClick={onUse}>Use this account</Button>}
 		</div>
-		<p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(checking ? null : connection, account)}</p>
+		{note && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(checking ? null : connection, account)}</p>}
 		{!checking && connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
 		{modelMissing && <p className={connectionNoteClass("danger")} data-testid="claude-model-missing">{CLAUDE_MODEL_MISSING_LINE}</p>}
 	</div>;
+}
+
+/** What the account list shows: a line above it, when it says the same
+ *  for every account, and the rows (round 14, 4 minor 7: four accounts
+ *  each read "This account isn't signed in…", and "can't find your Claude
+ *  accounts" still listed the plain `claude` standing in for them). With
+ *  none found in T3 Code, no account is listed; with every account
+ *  failing alike, the line is said once and the rows show only names.
+ *  Exported for tests. */
+export function accountList(statuses: readonly ClaudeAccountStatus[]): { line: string | null; rows: readonly ClaudeAccountStatus[]; notes: boolean } {
+	const failing = statuses.filter((status) => status.connection.state !== "connected");
+	if (statuses.length > 0 && statuses.every((status) => status.account.notInT3 && status.connection.state !== "connected")) {
+		return { line: claudeConnectionSentence(statuses[0]!.connection, statuses[0]!.account), rows: [], notes: false };
+	}
+	const said = new Set(failing.map((status) => claudeConnectionSentence(status.connection, status.account)));
+	if (statuses.length > 1 && failing.length === statuses.length && said.size === 1) return { line: [...said][0]!, rows: statuses, notes: false };
+	return { line: null, rows: statuses, notes: true };
 }
 
 /** T3 Code's name for each account whose email another row shares, so two
@@ -198,13 +215,15 @@ export function ClaudeConnectionRow() {
 	}
 
 	const alias = aliases(accounts ?? []);
+	const list = accountList(accounts ?? []);
+	const line = !accounts && !error ? claudeConnectionSentence(null) : list.line && (checking ? claudeConnectionSentence(null) : list.line);
 	return <>
 		<div className={CLAUDE_ROW} data-testid="claude-connection">
 			<ConnectionRow label={CLAUDE_LABEL} action="Refresh" actionTestid="claude-refresh" actionRef={refreshButton} disabled={busy} onAction={() => void refresh()} />
-			{!accounts && !error && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
+			{line && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{line}</p>}
 			{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
 		</div>
-		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} checking={checking} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
+		{list.rows.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} checking={checking} note={list.notes} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
 		<p className={cn(CLAUDE_ROW, connectionNoteClass("muted"))} data-testid="claude-notice">{CLAUDE_NOTICE}</p>
 	</>;
 }
