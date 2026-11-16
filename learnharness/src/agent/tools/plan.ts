@@ -61,8 +61,13 @@ async function lessonDays(course: CourseToolContext, candidates: readonly string
 	for (const topic of mapped.map.topics) {
 		if (!wanted.has(topic.handle)) continue;
 		if (topic.review) days[topic.handle] = { planned: topic.review.date, planned_words: plannedDayWords(topic.review.date, mapped.map.today) };
-		// A lesson he began continues that day, as the app says it.
-		else if (topic.starts && topic.startsWhy?.kind === "begun") days[topic.handle] = { continues: topic.starts, continues_words: plannedDayWords(topic.starts, mapped.map.today) };
+		// A lesson he began continues that day, as the app says it; one he
+		// worked on today is today's until the close, which names the day
+		// it goes on after today (round 14, m2).
+		else if (topic.starts && topic.startsWhy?.kind === "begun") {
+			const day = topic.starts === mapped.map.today && topic.startsWhy.then ? topic.startsWhy.then : topic.starts;
+			days[topic.handle] = { continues: day, continues_words: plannedDayWords(day, mapped.map.today) };
+		}
 		else if (topic.starts) days[topic.handle] = { starts: topic.starts, starts_words: plannedDayWords(topic.starts, mapped.map.today) };
 	}
 	return days;

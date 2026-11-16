@@ -483,3 +483,16 @@ describe("a topic started ahead of plan (round 13, 1 n7)", () => {
 		assert.doesNotMatch(projectCourseBrief(TODAY, "teach", { plan: linalg, opened: ["inner-product"], review: true }).text, /Ahead of plan/);
 	});
 });
+
+describe("the lesson's own topics in the plan (round 14, m2)", () => {
+	it("carry no moved note or start reason, so the tutor never announces the live lesson's day mid-lesson", () => {
+		const moving = courseMap("/study/probability", "Probability", null, [topic("poisson", "Poisson distribution", { ...untaught("2026-11-11", { kind: "next" }), moved: { from: "2026-11-09", by: "study", courses: ["Probability"], day: "today" } }), topic("binomial", "Binomial distribution", { review: scheduled("2026-11-12"), moved: { from: "2026-11-10", by: "answered" } })]);
+		const days = [day("2026-11-11", [], ["poisson"]), day("2026-11-12", ["binomial"])];
+		const plans = { workspace: "/study/probability", courses: [{ map: moving, days }], unread: [] };
+		const away = projectCourseBrief(TODAY, "teach", { plan: plans }).text;
+		assert.match(away, /Poisson distribution \(moved from Mon 9 Nov after your Probability study today\)/);
+		const inside = projectCourseBrief(TODAY, "teach", { plan: plans, live: ["poisson", "binomial"] }).text;
+		assert.doesNotMatch(inside, /\(moved from/);
+		assert.match(inside, /start Poisson distribution \(this session's topic: its day is the close's to say, not yours now\)/);
+	});
+});

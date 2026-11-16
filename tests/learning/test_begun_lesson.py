@@ -47,12 +47,15 @@ def test_a_begun_lesson_goes_on_the_next_study_day(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The evening after the second Poisson lesson, Poisson goes on the next
-    day, and its review the day after, never as a first lesson days later."""
+    """The evening after the second Poisson lesson, Poisson is today's, since
+    he worked on it today, and goes on the next day, its review the day
+    after, never as a first lesson days later (round 14, m2: a lesson he
+    works on today stays today's)."""
     days = world(tmp_path, "d10-end", monkeypatch, capsys)
     plan = days.plan("2026-11-10")["probability"]
-    assert starts(plan)["poisson"] == "2026-11-11"
-    assert plan["plan"]["why"]["poisson"] == {"kind": "begun"}
+    assert starts(plan)["poisson"] == "2026-11-10"
+    then = {"kind": "begun", "then": "2026-11-11"}
+    assert plan["plan"]["why"]["poisson"] == then
     reviews = [d["date"] for d in plan["plan"]["days"] if "poisson" in d["reviews"]]
     assert reviews[0] == "2026-11-12"
     shown = next(
@@ -61,10 +64,13 @@ def test_a_begun_lesson_goes_on_the_next_study_day(
         if t["topic"] == "poisson"
     )
     assert (shown["starts"], shown["starts_why"], shown.get("moved")) == (
-        "2026-11-11",
-        {"kind": "begun"},
+        "2026-11-10",
+        then,
         None,
     )
+    tomorrow = days.plan("2026-11-11")["probability"]
+    assert starts(tomorrow)["poisson"] == "2026-11-11"
+    assert tomorrow["plan"]["why"]["poisson"] == {"kind": "begun"}
 
 
 def test_a_night_after_a_begun_lesson_moves_no_day(
@@ -82,10 +88,14 @@ def test_a_night_after_a_begun_lesson_moves_no_day(
     told = {
         key: day
         for key, day in within(planned_days(evening, untaught), "2026-12-08").items()
-        if day >= "2026-11-10" or key == ("probability", "new", "poisson")
+        if day >= "2026-11-10"
     }
+    # The evening's plan holds the lesson today, the day he worked on it,
+    # and says the day it goes on (round 14, m2).
+    goes_on = evening["probability"]["plan"]["why"]["poisson"]["then"]
+    told[("probability", "new", "poisson")] = goes_on
     now = within(planned_days(morning, untaught), "2026-12-08")
-    assert told[("probability", "new", "poisson")] == "2026-11-10"
+    assert goes_on == "2026-11-10"
     assert now == told
 
 

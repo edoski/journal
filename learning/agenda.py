@@ -170,7 +170,8 @@ class Why(TypedDict, total=False):
     """Why the plan starts a topic when it does, in the material's terms.
 
     ``kind`` is ``begun`` (a lesson he began and has not finished, which goes
-    on: ``_continued``), ``next`` (the next topic of its arc, or of the path, he can
+    on: ``_continued``; ``then``, on a lesson he worked on today, the study
+    day it goes on after today), ``next`` (the next topic of its arc, or of the path, he can
     start), ``after`` (on a day the plan reached it, it waited for ``needs``,
     prerequisites not yet solid, or ``partners``, competing methods not yet
     solid, to be told apart from them), or ``early`` (ahead of its place:
@@ -182,6 +183,7 @@ class Why(TypedDict, total=False):
 
     kind: str
     arc: str
+    then: str
     behind: str
     needs: list[str]
     partners: list[str]
@@ -1101,24 +1103,41 @@ def _select(
 
 
 def _continued(
-    courses: list[_Course], day: date, week: Capacity
+    courses: list[_Course], day: date, week: Capacity, today: date
 ) -> dict[str, list[str]]:
     """Each lesson he began and has not finished goes on on ``day`` when it
-    is a study day after the last day he worked on it: its start is the one
+    is a study day after the last day he worked on it, or today when he
+    worked on it today: its start is the one
     he made the day he began it, so it takes no new topic's room, waits for
     nothing it needs and never moves to a later day for want of one. Its
     first review is the day after, as for any start (round 12, 1 D3: two
     Poisson sessions in, the plan put its first lesson on Sat 14 Nov and
-    the course head said there was no room to start it)."""
+    the course head said there was no room to start it). A lesson he works
+    on today is today's: a save inside it never moves it to a later day
+    while he is in it, and its ``then`` is the study day it goes on after
+    today, the day a close names, its first review the day after that; it
+    is never work he left that day (``_day``), since he worked on it
+    (round 14, m2: the review inside the Poisson lesson moved the lesson
+    from 10 to 11 Nov while it was open)."""
     found: dict[str, list[str]] = {course.name: [] for course in courses}
     if not week.studies(day):
         return found
     for course in courses:
         for topic, worked in course.lessons.items():
-            if topic in course.untaught and day > worked:
+            if topic in course.untaught and (day > worked or day == worked == today):
                 course.start(topic, day)
                 arc = course.arc(topic)
-                course.why[topic] = {"kind": "begun", **({"arc": arc} if arc else {})}
+                why: Why = {"kind": "begun", **({"arc": arc} if arc else {})}
+                if day == worked == today:
+                    later = day + timedelta(days=1)
+                    while not week.studies(later) and (later - day).days < MAX_DAYS:
+                        later += timedelta(days=1)
+                    why["then"] = later.isoformat()
+                    if course.asks:
+                        course._set_due(
+                            topic, later, progress.FIRST_RETRIEVAL_DAYS, solid=False
+                        )
+                course.why[topic] = why
                 found[course.name].append(topic)
     return found
 
@@ -1680,6 +1699,7 @@ def _day(
             topic
             for planned in ended.days.get(name, [])[: (day - studied).days]
             for topic in (*planned["reviews"], *planned["new"])
+            if studied.isoformat() not in _lessons(morning[name]).get(topic, {})
         }
         for name in kept
     }
@@ -1971,7 +1991,7 @@ def _planned(
             for topic in reviews[course.name]:
                 course.place(topic)
                 course.reviewed(topic, day)
-        starts = _continued(courses, day, week)
+        starts = _continued(courses, day, week, today)
         passed = 0
         if told is not None:
             for course in courses:

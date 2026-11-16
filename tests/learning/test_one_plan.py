@@ -487,6 +487,26 @@ def test_a_moved_day_says_what_of_his_study_moved_it(
     assert span["moved"] == {"from": told["span"], "by": "answered"}, span
 
 
+def test_a_lesson_he_works_on_today_stays_today(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A save inside a begun lesson never moves the lesson off today, and the
+    map gives the study day it goes on after today, the one a close names
+    (round 14, m2: the Random variables review inside the Poisson lesson
+    moved the lesson from 10 to 11 Nov while it was open)."""
+    seeded = World(tmp_path, "lesson-mid", monkeypatch, capsys, R14)
+    poisson = next(
+        topic
+        for topic in seeded.run("probability", "map", day="2026-11-10")["topics"]
+        if topic["topic"] == "poisson"
+    )
+    assert poisson["starts"] == "2026-11-10", poisson
+    assert poisson["starts_why"] == {"kind": "begun", "then": "2026-11-11"}
+    assert "moved" not in poisson
+
+
 EVE = json.loads((Path(__file__).parent / "golden" / "exam-eve.json").read_text())
 
 

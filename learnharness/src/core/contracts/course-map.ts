@@ -73,14 +73,15 @@ export type RightAnswer = "unaided" | "helped" | "guess" | "uncertain" | "partia
 
 /** Why the plan starts an untaught topic when it does, in the material's
  *  terms (the engine's `starts_why`): `begun`, a lesson he began and has not
- *  finished, which goes on that day; `next`, the next one he can start in
+ *  finished, which goes on that day (today while he works on it today, and
+ *  `then` the study day it goes on after today); `next`, the next one he can start in
  *  its arc or the course; `after`, it waited for its prerequisites
  *  (`needs`) or the methods it competes with (`partners`) to be solid;
  *  `early`, ahead of its place, from a later arc while the current one has
  *  topics left (`waitingOn`: what those wait on to be solid; `exam`: the
  *  exam's pace took it). `arc` is its arc, absent without arcs. */
 export type StartsWhy =
-	| { kind: "begun"; arc?: ArcHandle }
+	| { kind: "begun"; arc?: ArcHandle; then?: string }
 	| { kind: "next"; arc?: ArcHandle }
 	| { kind: "after"; arc?: ArcHandle; needs: readonly TopicHandle[]; partners: readonly TopicHandle[] }
 	| { kind: "early"; arc?: ArcHandle; waitingOn: readonly TopicHandle[]; exam: boolean };

@@ -230,18 +230,24 @@ function overdueLine(map: CourseMap): string {
 /** One course's plan: its exam and final review, its overdue reviews,
  *  then each planned day's reviews and new topics by title, every review
  *  of every topic. Empty when it plans nothing. */
-function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boolean): string[] {
+function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boolean, live: ReadonlySet<string>): string[] {
 	const byHandle = new Map(map.topics.map((t) => [t.handle, t]));
 	const title = (handle: TopicHandle) => byHandle.get(handle)?.title ?? handle;
 	const shown = (handle: TopicHandle) => byHandle.has(handle) && !byHandle.get(handle)!.excluded;
+	// The lesson's own topics carry no plan note: their day moves with his
+	// answers in it, and the close names it (round 14, m2: "Your plan now
+	// starts Poisson distribution on Wednesday 11 November…" mid-lesson,
+	// while the close and the calendar said Tue 10).
 	const dayLines = days.flatMap((d) => {
 		const reviews = d.reviews.filter(shown).map((h) => {
 			const { review, moved } = byHandle.get(h)!;
+			if (live.has(h)) return noted(title(h), LIVE_NOTE);
 			if (!review || review.date !== d.date) return title(h);
 			return noted(title(h), moved ? movedNote(moved, map.today) : reviewNote(review, map.today));
 		});
 		const newTopic = (h: TopicHandle) => {
 			const { moved, startsWhy, starts: day } = byHandle.get(h)!;
+			if (live.has(h)) return noted(title(h), LIVE_NOTE);
 			return noted(title(h), moved && day === d.date ? movedNote(moved, map.today) : startNote(startsWhy, title));
 		};
 		// A lesson he began goes on that day, as the app says it, never a start.
@@ -268,13 +274,17 @@ function coursePlanLines(map: CourseMap, days: readonly PlannedDay[], own: boole
 	return [head.join(" · "), overdueLine(map), ...dayLines];
 }
 
+/** A topic of this session's own lesson in the plan: no note, since its
+ *  day is the close's to name. */
+const LIVE_NOTE = "this session's topic: its day is the close's to say, not yours now";
+
 /** The daily plan of every course, the lesson's own first. Empty when no
  *  course plans anything. */
-function planLines(plans: CoursePlans | undefined): string[] {
+function planLines(plans: CoursePlans | undefined, live: readonly string[]): string[] {
 	if (!plans) return [];
 	const own = (workspace: string) => workspace === plans.workspace;
 	const ordered = [...plans.courses].sort((a, b) => Number(own(b.map.workspace)) - Number(own(a.map.workspace)));
-	const courses = ordered.flatMap(({ map, days }) => coursePlanLines(map, days, own(map.workspace)));
+	const courses = ordered.flatMap(({ map, days }) => coursePlanLines(map, days, own(map.workspace), own(map.workspace) ? new Set(live) : new Set()));
 	if (courses.length === 0) return [];
 	return [
 		"Daily plan of every course, as the calendar shows it: each day's reviews and new topics, every review of every topic. A day you tell him is one of these, unless a save this turn gave the topic a newer one. Say a day moved only where its note says “moved from”, with that note's cause; otherwise name the day alone:",
@@ -370,7 +380,7 @@ function aheadOfPlanLines(plans: CoursePlans | undefined, opened: readonly strin
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
-	{ runup, arcCheck, plan, opened = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
+	{ runup, arcCheck, plan, opened = [], live = [], review = false, studied = null }: { runup?: { plan: unknown; workspace: string }; arcCheck?: string; plan?: CoursePlans; opened?: readonly string[]; live?: readonly string[]; review?: boolean; studied?: LastStudied | null } = {},
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -416,7 +426,7 @@ export function projectCourseBrief(
 	} else {
 		lines.push("Due today: nothing.");
 	}
-	const planned = planLines(plan);
+	const planned = planLines(plan, live);
 	lines.push(...planned);
 	const weak = list(r.weak);
 	if (weak.length > 0) lines.push("Weak:", ...weak.map((w) => weakLine(withDetail(w, detail), role)));

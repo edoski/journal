@@ -22,7 +22,7 @@ import { studyDay } from "../core/day-words.ts";
 import { subscribe } from "../core/events.ts";
 import { lastStudiedOf, projectCourseBrief, type CoursePlans } from "../core/course-brief.ts";
 import { reviewRecord } from "../core/session-opening.ts";
-import { newCourseContextMessage, sessionModeOf, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
+import { newCourseContextMessage, sessionModeOf, sessionTopicsOf, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
 import { planDays, plannedOf } from "./calendar.ts";
 import { stores } from "./stores.ts";
 import { readCourses } from "./study.ts";
@@ -40,7 +40,7 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 		// reports: the open course's own plan carries it.
 		const [resumed, read] = await Promise.all([keptResume(workspace), fetchCoursePlans(record.id, workspace)]);
 		const runup = role === "practice" && read?.own ? { plan: read.own, workspace } : undefined;
-		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan: read?.plans, opened: openedOn(record), review: reviewRecord(record), studied: lastStudiedOf(read?.own) });
+		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan: read?.plans, opened: openedOn(record), live: liveTopics(record), review: reviewRecord(record), studied: lastStudiedOf(read?.own) });
 		console.error(`[chat ${record.id}] course brief skipped: ${resumed.message}`);
 	} catch (err) {
 		console.error(`[chat ${record.id}] course brief skipped:`, err);
@@ -170,6 +170,12 @@ export async function courseBriefReadsSettled(): Promise<void> {
  *  set `topics` at creation. A session the tutor named took its topic from
  *  that name instead (and is `named`), and an arc's check carries its own
  *  block, so neither was opened on a topic. */
+/** The topics of the session's own lesson: those it was opened on and
+ *  those its saves answered (`sessionTopicsOf`, as the close reads them). */
+function liveTopics(record: ChatRecord): readonly string[] {
+	return [...new Set([...(record.topics ?? []), ...sessionTopicsOf(record.messages)])];
+}
+
 function openedOn(record: ChatRecord): readonly string[] {
 	return record.named || record.arcCheck ? [] : (record.topics ?? []);
 }
