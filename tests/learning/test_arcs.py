@@ -1603,6 +1603,38 @@ def test_restore_puts_a_backup_back_after_keeping_what_it_replaces(
         migrate.restore(tmp_path)
 
 
+def test_a_deleted_course_s_kept_record_moves_with_its_folder(
+    tmp_path: Path,
+) -> None:
+    """The record kept of a deleted course still counts toward his pace
+    (``records.history``), which reads only this engine's schema, so a
+    migration moves it, backed up, and ``restore`` puts it back."""
+    workspace = course(tmp_path, "calculus")
+    migrate.migrate(workspace)
+    records.forget(workspace, [], course=True)
+    [kept] = sorted(workspace.forgotten.glob("*.json"))
+    up = kept.read_bytes()
+    assert list(records.history()) == [str(kept)]
+
+    report = migrate.migrate(None, to=6)
+    assert report["courses"] == {str(workspace.directory): "empty"}
+    assert report["forgotten"] == {str(kept): "migrated"}
+    assert json.loads(kept.read_text())["schema"] == 6
+    backup = Path(report["backup"]) / f"{migrate.key(workspace)}-{kept.stem}"
+    assert (backup / "course.json").read_bytes() == up
+    assert json.loads((backup / "origin.json").read_text()) == {"record": str(kept)}
+
+    again = migrate.migrate(None)
+    assert again["forgotten"] == {str(kept): "migrated"}
+    assert kept.read_bytes() == up, "down then up is byte-identical"
+    assert list(records.history()) == [str(kept)], "it counts toward his pace again"
+    assert migrate.migrate(None)["forgotten"] == {str(kept): "current"}
+
+    restored = migrate.restore(Path(report["backup"]))
+    assert restored["restored"] == {str(kept): "restored"}
+    assert kept.read_bytes() == up
+
+
 def test_the_cli_migrates_on_purpose_only(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

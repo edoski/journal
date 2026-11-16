@@ -3,7 +3,10 @@
 Only ``python -m learning migrate`` runs this: no load, save, app start or MCP
 start does. Each course moves under its record's lock, after its file is
 copied byte for byte to ``backups/v<from>-<stamp>/<key>/course.json`` in the
-learning support folder, with ``origin.json`` naming where it came from.
+learning support folder, with ``origin.json`` naming where it came from. The
+records kept of a course deleted there (``.study/forgotten/``) move with it,
+each backed up in ``<key>-<its name>/``, since they still count toward his
+pace (``records.history``) and an engine reads only its own schema.
 
 Up (6 to 7) changes only ``schema``, since schema 7 only adds optional fields.
 Down (7 to 6) keeps only what the schema 6 engine reads, so a prediction,
@@ -169,17 +172,30 @@ def _down(stored: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _backup(batch: Path, workspace: Workspace, text: str) -> None:
-    folder = batch / key(workspace)
+def _backup(batch: Path, name: str, record: Path, text: str) -> None:
+    folder = batch / name
     folder.mkdir(parents=True)
     storage.publish_text(folder / "course.json", text)
-    origin = {"record": str(workspace.record.absolute())}
+    origin = {"record": str(record.absolute())}
     storage.publish_text(folder / "origin.json", json.dumps(origin) + "\n")
 
 
 def _move(workspace: Workspace, to: int, batch: Path) -> str:
     """One course to schema ``to``: ``migrated``, ``current`` or ``empty``."""
-    path = workspace.record
+    return _move_record(workspace.record, key(workspace), to, batch)
+
+
+def _move_forgotten(workspace: Workspace, to: int, batch: Path) -> dict[str, str]:
+    """The records kept of the course deleted in ``workspace`` to schema
+    ``to``, by path: each ``migrated`` or ``current``."""
+    return {
+        str(path): _move_record(path, f"{key(workspace)}-{path.stem}", to, batch)
+        for path in sorted(workspace.forgotten.glob("*.json"))
+    }
+
+
+def _move_record(path: Path, name: str, to: int, batch: Path) -> str:
+    """One stored record to schema ``to``, backed up in ``batch/name``."""
     with storage.lock(storage.lock_path(path)):
         stored = storage.load(path)
         if stored is None:
@@ -194,7 +210,7 @@ def _move(workspace: Workspace, to: int, batch: Path) -> str:
             )
         moved = _up(stored) if to == CURRENT else _down(stored)
         schema.validate_record({**moved, "schema": CURRENT})
-        _backup(batch, workspace, path.read_text(encoding="utf-8"))
+        _backup(batch, name, path, path.read_text(encoding="utf-8"))
         storage.publish_text(path, storage.encode(moved))
     return "migrated"
 
@@ -204,13 +220,17 @@ def _report(
 ) -> dict[str, Any]:
     batch = _batch(f"v{PREVIOUS if to == CURRENT else CURRENT}")
     moved: dict[str, str] = {}
+    forgotten: dict[str, str] = {}
     for course in courses:
         try:
             moved[str(course.directory)] = _move(course, to, batch)
+            forgotten.update(_move_forgotten(course, to, batch))
         except (ValueError, OSError) as error:
             failed[str(course.directory)] = str(error)
     report: dict[str, Any] = {"to": to, "courses": moved}
-    if "migrated" in moved.values():
+    if forgotten:
+        report["forgotten"] = forgotten
+    if "migrated" in (*moved.values(), *forgotten.values()):
         report["backup"] = str(batch)
     if failed:
         report["failed"] = failed
@@ -247,9 +267,7 @@ def restore(batch: Path) -> dict[str, Any]:
         text = (origin.parent / "course.json").read_text(encoding="utf-8")
         with storage.lock(storage.lock_path(record)):
             if record.is_file():
-                _backup(
-                    keep, Workspace(record.parent.parent), record.read_text("utf-8")
-                )
+                _backup(keep, origin.parent.name, record, record.read_text("utf-8"))
             storage.publish_text(record, text)
         restored[str(record)] = "restored"
     report: dict[str, Any] = {"restored": restored}
