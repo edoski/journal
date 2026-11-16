@@ -321,7 +321,7 @@ const REASON_UNDER = /\b(?:why|reasons?|justify|explain|show how|how you (?:got|
 const quoted = (text: string) => `"${text.length > 160 ? `${text.slice(0, 157)}…` : text}"`;
 
 /** What to fix for each break, in the voice's own terms. */
-function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string {
+export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string {
 	switch (b.rule) {
 		case "praise":
 			return `No praise or performed reaction: ${quoted(b.excerpt)}.`;

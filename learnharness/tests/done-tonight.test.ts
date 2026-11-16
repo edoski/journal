@@ -26,7 +26,7 @@ const { handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { inputAppends, parseChatInput } = await import("../src/core/input-events.ts");
-const { activeProblemOf, newProblemDismissedMarker, newUserMessage, pendingQuestionOf, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL } = await import("../src/core/native-messages.ts");
+const { activeProblemOf, newProblemDismissedMarker, newThinkingMessage, newUserMessage, pendingQuestionOf, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL } = await import("../src/core/native-messages.ts");
 const { closedTonight, doneTonightAtEnd, sessionEndOf } = await import("../src/core/session-end.ts");
 const { projectView } = await import("../src/core/view.ts");
 const { DONE_TONIGHT_TEXT } = await import("../src/core/contracts/chat.ts");
@@ -117,6 +117,24 @@ describe("the tonight input", () => {
 	it("names only this session's open work, never another session's (round 12, 3 D7: Rank practice closed on \"Part (c) of Problem sheet 4 is still open\")", () => {
 		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps for next time from this session, an open task this session worked on at its place/);
 		assert.match(DONE_TONIGHT_TEXT.practice, /never another session's open work/);
+	});
+
+	it("keeps a problem whose answer was still being graded open for the closing turn to grade (round 13, 4 M2: ⌘⇧D 2.5 s after a right answer printed Left for next time under it while the record saved it)", () => {
+		const sent = newThinkingMessage("call_p1", "the rank is 1", "guessing");
+		const stopped = assistant("a_cut", [], "aborted");
+		for (const messages of [[...problemPose(), sent], [...problemPose(), sent, stopped]]) {
+			const record = { messages, kind: "practice" as const };
+			const appends = inputAppends(record, { type: "tonight" });
+			assert.deepEqual(appends.map((m) => m.role === "custom" ? m.customType : m.role), ["ungraded-answer", "done-tonight"], "nothing drops the problem");
+			assert.match(String((appends[0] as { content: string }).content), /conclude/);
+			assert.equal(activeProblemOf([...messages, ...appends])?.toolCallId, "call_p1", "the closing turn concludes it with its result");
+			assert.equal(projectView([...messages, ...appends]).some((m) => m.parts.some((p) => p.type === "text" && /UNGRADED/.test((p as { text: string }).text))), false, "the note is the tutor's alone");
+		}
+	});
+
+	it("still drops a problem whose last answer the tutor already answered", () => {
+		const record = { messages: [...problemPose(), newThinkingMessage("call_p1", "the rank is 2"), assistant("a_fb", [{ type: "text", text: "Look at row 2 again." }], "stop")], kind: "practice" as const };
+		assert.equal(inputAppends(record, { type: "tonight" })[0]?.role === "custom" && (inputAppends(record, { type: "tonight" })[0] as { customType: string }).customType, "problem-dismissed");
 	});
 
 	it("carries the conclude pair a discard left waiting", () => {

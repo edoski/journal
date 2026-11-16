@@ -60,6 +60,8 @@ import {
 	newUngradedAnswerMessage,
 	ungradedAnswerOf,
 	newAskedMessage,
+	newUngradedWorkMessage,
+	workAwaitingGradeOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
 import { markLinks } from "./answer-marks.ts";
@@ -427,7 +429,9 @@ export function disputeAppends(record: { messages: LhMessage[]; answerSaves?: An
  *  newest batch resolves as a dismissal with reason "tonight", adjacent to
  *  its call, so its answer is never revealed and nothing grades it. An
  *  active problem is dropped the way a discard drops it, with its conclude
- *  pair carried now instead of by a later input. The marker comes last:
+ *  pair carried now instead of by a later input, unless his work on it
+ *  waits for its grade (`workAwaitingGradeOf`): the closing turn grades
+ *  that through `conclude`. The marker comes last:
  *  the learner input the turn answers. */
 export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMode }): LhMessage[] {
 	const withheld = questionCallsOf(record.messages)
@@ -435,9 +439,11 @@ export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMo
 		.map((call) => newAnswerResult(call.toolCallId, call.tool,
 			dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight")));
 	const active = activeProblemOf(record.messages);
-	const dropped = active
-		? [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId, "tonight")]
-		: dismissalConclusion(record);
+	const dropped = !active
+		? dismissalConclusion(record)
+		: workAwaitingGradeOf(record.messages, active.toolCallId)
+			? [newUngradedWorkMessage()]
+			: [newProblemDismissedMarker(active.toolCallId), ...concludedByDismissalPair(active.toolCallId, "tonight")];
 	return [...withheld, ...dropped, ...ungradedNote(record), newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))];
 }
 

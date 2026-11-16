@@ -88,4 +88,38 @@ describe("an answer's mark shows as soon as the record holds it", () => {
 		await page.fire("turn-settled", { chatId: "chat_other" });
 		assert.equal(page.reads(), before);
 	});
+
+	it("the burst of events a turn ends on never throws away the read already under way (round 13, 4 minor 8: marks landed 2 to 9 s after the reply)", async () => {
+		const pending: Array<{ resolve: () => void; signal?: AbortSignal | null }> = [];
+		let open = 0;
+		let most = 0;
+		globalThis.fetch = ((_input: string, init?: RequestInit) => {
+			open++;
+			most = Math.max(most, open);
+			return new Promise<Response>((resolve, reject) => {
+				const signal = init?.signal;
+				signal?.addEventListener("abort", () => { open--; reject(new DOMException("aborted", "AbortError")); });
+				pending.push({ signal, resolve: () => { open--; resolve(Response.json({ ok: true, marks: { toolu_e6: MARK } })); } });
+			});
+		}) as typeof fetch;
+		const handlers = new Map<string, (data: string) => void>();
+		const source: NotifySource = { close() {}, onOpen() {}, onEvent: (name, cb) => void handlers.set(name, cb) };
+		const host = document.createElement("div");
+		document.body.appendChild(host);
+		root = createRoot(host);
+		const render = (s: number | null) => act(async () => root!.render(<ServerEventsProvider connect={() => source}><Marks settled={s} /></ServerEventsProvider>));
+		const fire = (name: string, payload: unknown) => act(async () => handlers.get(name)!(JSON.stringify(payload)));
+		await render(null);
+		// The turn ends: its persist, its settle, then the window's own record.
+		await fire("record-changed", { chatId: CHAT });
+		await fire("turn-settled", { chatId: CHAT });
+		await render(14);
+		assert.equal(pending.length, 1, "one read at a time: the events wait for it");
+		await act(async () => pending[0]!.resolve());
+		assert.equal(document.querySelector("[data-testid=marks]")!.textContent, "toolu_e6", "the first read's marks show as soon as it returns");
+		assert.equal(pending.length, 2, "one more read covers the events that came during it");
+		await act(async () => pending[1]!.resolve());
+		assert.equal(pending.length, 2, "and no more");
+		assert.equal(most, 1, "reads never overlap");
+	});
 });

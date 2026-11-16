@@ -41,7 +41,7 @@ export function claudeAccountName(status: Pick<ClaudeAccountStatus, "account" | 
 }
 
 /** One plain sentence per state. Sign-in always happens in Claude Code or T3 Code itself. */
-export function claudeConnectionSentence(connection: ClaudeConnection | null, account?: Pick<ClaudeAccount, "auth">): string {
+export function claudeConnectionSentence(connection: ClaudeConnection | null, account?: Pick<ClaudeAccount, "auth" | "notInT3">): string {
 	if (!connection) return "Checking Claude Code…";
 	switch (connection.state) {
 		case "connected":
@@ -49,6 +49,10 @@ export function claudeConnectionSentence(connection: ClaudeConnection | null, ac
 		case "missing":
 			return "Claude Code is not installed. Install Claude Code, run `claude` in a terminal and sign in, then press Refresh.";
 		case "signed-out":
+			// His accounts live in T3 Code: with none listed there, the plain
+			// `claude` stands in, and the fix is T3 Code's, not a terminal's
+			// (round 13, 4 minor 6).
+			if (account?.notInT3) return "LearnHarness can't find your Claude accounts in T3 Code. Open T3 Code, check them, then press Refresh.";
 			return account?.auth === "token"
 				? "This account isn't signed in. Sign in to it again in T3 Code, then press Refresh."
 				: "Run `claude` in a terminal and sign in with your Claude account, then press Refresh.";

@@ -768,8 +768,10 @@ export class SessionModel {
 		} else if (input.type === "tonight") {
 			// Done for tonight: the withheld questions, a dropped problem and
 			// the line land at once. A dropped problem's synthesized conclude
-			// pair waits for the record.
-			for (const m of tonightAppends({ messages: [...this.base, ...this.tail] })) {
+			// pair waits for the record. The reply still streaming is the one
+			// the server stops, so it answered nothing (workAwaitingGradeOf).
+			const streaming = this.streamingMessageId;
+			for (const m of tonightAppends({ messages: [...this.base, ...this.tail].filter((m) => m.id !== streaming) })) {
 				if (m.role === "custom" || (m.role === "toolResult" && isQuestionTool(m.toolName))) optimistic.push({ ...m, id: localId() });
 			}
 		} else if (input.type === "dispute") {
