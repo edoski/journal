@@ -196,6 +196,40 @@ describe("the guard's turn", () => {
 		assert.deepEqual(rules(broken, ask("What is $\\dim \\ker A$, and what is $\\operatorname{rank} A^T$?")), ["compound"], "a broken one is refused for its own break, in the same round as the message");
 	});
 
+	it("any turn-ending call beside a refused message runs, and the turn ends on the rewrite (round 12, 3 M1: whatever rule refused the message)", async () => {
+		const handoff = { name: "practice", label: "practice", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: "Handed off." }], details: { ok: true }, terminate: true }) } as AgentTool<any>;
+		for (const draft of ["You got it right: rank 2.", "$2$ pivots survive, so the rank is $2$."]) {
+			const guard = new VoiceGuard(answering("rank 2"), (name) => name === "practice");
+			const refused = rules(guard, send(draft));
+			assert.ok(refused.length > 0, `the draft is refused: ${draft}`);
+			const call = { type: "toolCall" as const, id: `h-${++n}`, name: "practice", arguments: {} };
+			assert.deepEqual(rules(guard, call), [], "the handoff is never refused for the message");
+			const ran = await guard.wrap(handoff).execute(call.id, {});
+			assert.equal(ran.isError, undefined);
+			assert.equal(ran.terminate, false, "it waits for the rewrite to end the turn");
+			assert.match((ran.content.at(-1) as { text: string }).text, /rewritten message/);
+		}
+		const guard = new VoiceGuard(answering("rank 2"), (name) => name === "practice");
+		rules(guard, send("You got it right: rank 2."));
+		const call = { type: "toolCall" as const, id: `h-${++n}`, name: "practice", arguments: {} };
+		rules(guard, call);
+		await guard.wrap(handoff).execute(call.id, {});
+		const rewrite = send("The pivots sit in columns 1 and 3.");
+		assert.deepEqual(rules(guard, rewrite), []);
+		assert.equal((await guard.wrap(sendToUserTool).execute(rewrite.id, rewrite.arguments as never)).terminate, true, "the rewrite ends the turn the handoff began");
+	});
+
+	it("words with nothing for him beside a handoff may be dropped: one note, then the turn ends (round 12, 3 D4 with the narration rule)", async () => {
+		const handoff = { name: "practice", label: "practice", description: "", parameters: {} as never, execute: async () => ({ content: [{ type: "text" as const, text: "Handed off." }], details: { ok: true }, terminate: true }) } as AgentTool<any>;
+		const guard = new VoiceGuard(answering("rank 2"), (name) => name === "practice");
+		rules(guard, send("You got it right: rank 2."));
+		const call = { type: "toolCall" as const, id: `h-${++n}`, name: "practice", arguments: {} };
+		rules(guard, call);
+		await guard.wrap(handoff).execute(call.id, {});
+		assert.match(guard.beforeEnd() ?? "", /if nothing in it was for him, end your turn/);
+		assert.equal(guard.beforeEnd(), undefined, "told once");
+	});
+
 	it("counts a table as a display, not as sentences", () => {
 		const turn = [newUserMessage("Poisson"), assistant([send("A step.")]), newUserMessage("does every topic get a review before the exam?")];
 		const answer = "Yes, for every topic you start before the exam:\n\n| Day | Reviews |\n| --- | --- |\n| Sat 14 Nov | Poisson, Expectation |\n| Sun 15 Nov | Geometric, Binomial |\n| Mon 16 Nov | Variance, Bayes' rule |\n\nCovariance starts after the exam, so it gets none.";
@@ -360,6 +394,21 @@ describe("a real turn on the Agent SDK", () => {
 		assert.match(told, /your message was refused and you sent no rewrite/);
 		const calls = agent.state.messages.slice(3).filter((m) => m.role === "assistant").map((m) => (m as { content: { type: string; id?: string }[] }).content.filter((b) => b.type === "toolCall").map((b) => b.id));
 		assert.deepEqual(calls, [["m1"], [], ["m2", "q1"]], "posed under the rewrite the note asked for");
+	});
+
+	it("a kept question whose words had nothing for him is posed once the tutor ends its turn after the note (round 12, 3 M1)", async () => {
+		const question = { question: "What is $\\dim \\ker A$?", type: "check", nodeId: "rank", correctAnswer: "1, by rank-nullity." };
+		const { engine, faux } = scripted([
+			fauxAssistantMessage([fauxToolCall(SEND_TO_USER_TOOL, { message: "You got it right: rank 2." }, { id: "m1" }), fauxToolCall("explain", question, { id: "q1" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage(""),
+			fauxAssistantMessage(""),
+			fauxAssistantMessage("A fourth reply must not run."),
+		]);
+		const agent = createTeacherAgent(undefined, { engine, messages: asAgentMessages(answering("rank 2")) });
+		await agent.continue();
+		assert.equal(faux.state.callCount, 3);
+		const calls = agent.state.messages.slice(3).filter((m) => m.role === "assistant").map((m) => (m as { content: { type: string; id?: string }[] }).content.filter((b) => b.type === "toolCall").map((b) => b.id));
+		assert.deepEqual(calls, [["m1"], [], ["q1"]], "he still gets the question, as the turn's last reply");
 	});
 
 	it("a rewrite that asks its own question poses that one: the kept question is let go (round 12, 3 M1)", async () => {

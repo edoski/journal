@@ -14,11 +14,16 @@
  * call (the refusal's details keep it). A refused question never showed:
  * the question dock waits for the call's result.
  *
- * A question sent beside a refused message is read by its own rules and,
- * well-formed, kept rather than refused (round 12, 3 M1: 25 of the
- * evaluators' 81 refusals were a question refused only because the message
- * before it was): `settle` takes it out of the reply that asked it, and
- * poses it under the rewrite once that passes, which ends the turn.
+ * One refused call never refuses the next well-formed one, whatever rule
+ * refused it (round 12, 3 M1: 25 of the evaluators' 81 refusals were a
+ * question refused only because the message before it was). A question
+ * sent beside a refused message is read by its own rules and, well-formed,
+ * kept: `settle` takes it out of the reply that asked it and poses it under
+ * the rewrite once that passes, which ends the turn. Any other turn-ending
+ * call (a handoff, a problem's pose, the probe's end) runs where it was
+ * called, and the rewrite ends the turn it began. A refused message with
+ * nothing for him (a narrated handoff) may be dropped: after one note the
+ * turn ends, and what was kept or ran still reaches him.
  *
  * Ordinary text never reaches him (round 7: an answer written as plain
  * text skipped every rule): `screenText` takes it out of the reply as it
@@ -350,14 +355,6 @@ const ASKED_AFTER_PROBE = (text: string): AgentToolResult<unknown> => ({
 	details: { withheld: "after-probe", text },
 });
 
-/** A call that would end the turn while a refused message is still owed:
- *  he would never get the rewrite. */
-const OWED = (tool: string): AgentToolResult<unknown> => ({
-	content: [{ type: "text", text: `Not done: your message before this was not shown to him, so he has nothing to read yet. Send the rewritten message with send_to_user first, then call ${tool} again.` }],
-	isError: true,
-	details: { withheld: "owed" },
-});
-
 /** A question kept for the rewrite of the message refused beside it. Not
  *  an error, and it does not end the turn: the rewrite poses it. */
 const KEPT = (tool: string): AgentToolResult<null> => ({
@@ -365,6 +362,10 @@ const KEPT = (tool: string): AgentToolResult<null> => ({
 	details: null,
 	terminate: false,
 });
+
+/** Any other turn-ending call beside a refused message: it ran, and the
+ *  rewrite ends the turn. */
+const WAITS = "It ends your turn once your rewritten message reaches him: send the rewrite with send_to_user, and do not call it again.";
 
 /** A turn-ending call after ordinary text: he never reads that text. */
 const PLAIN_OWED = (tool: string): AgentToolResult<unknown> => ({
@@ -377,6 +378,9 @@ const PLAIN_OWED = (tool: string): AgentToolResult<unknown> => ({
  *  ordinary text it wrote, or a message refused and never rewritten. */
 const PLAIN_TEXT_NOTE = "Not shown to him: he never sees ordinary text, only what you send with send_to_user. Send your reply to him with send_to_user now, with nothing else.";
 const OWED_NOTE = "Not shown to him: your message was refused and you sent no rewrite, so he has nothing to read. Send the rewritten message with send_to_user now.";
+/** The same, once something after the message was kept or ran: words that
+ *  had nothing for him may be dropped (a narrated handoff). */
+const OWED_END_NOTE = "Not shown to him: your message was refused and you sent no rewrite. Send the rewritten message with send_to_user now; if nothing in it was for him, end your turn, and what you called after it still reaches him.";
 /** A turn after practice handed back that would end with nothing for him
  *  to do (round 7: Explain instead ended on an explanation and no action). */
 const NEXT_ACTION_NOTE = "He has nothing to do next. End this turn on one question for him with your question tool, or, once he has answered your check, hand the session back to the problems with practice.";
@@ -478,6 +482,10 @@ export class VoiceGuard {
 	private kept: { call: ToolCall; text: string; ran: boolean; from?: { message: AssistantMessage; index: number } } | null = null;
 	/** The questions kept this turn, taken out of the replies that asked them. */
 	private readonly keptIds = new Set<string>();
+	/** The other turn-ending calls beside a refused message, and whether one
+	 *  ran: the rewrite ends the turn. */
+	private readonly waiting = new Set<string>();
+	private waited = false;
 	/** The rewrite that poses the kept question, and the one that posed it:
 	 *  its result ends the turn, whether it runs before the reply settles or
 	 *  after. */
@@ -553,10 +561,15 @@ export class VoiceGuard {
 			this.noted.add(UNSAVED_NOTE);
 			return UNSAVED_NOTE;
 		}
+		if (this.owed && (this.kept?.ran || this.waited)) {
+			if (this.noted.has(OWED_END_NOTE)) return undefined;
+			this.noted.add(OWED_END_NOTE);
+			return OWED_END_NOTE;
+		}
 		if (this.probeEnded || this.posed) return undefined;
 		const shown = this.sent > 0;
 		const leftNoWayOn = this.input.work === true && shown && !this.concluded && !this.owed && !this.said.some(leavesAWayOn);
-		const note = (!shown || this.kept) && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
+		const note = !shown && this.owed ? OWED_NOTE : !shown && this.plain ? PLAIN_TEXT_NOTE : this.input.handedBack ? NEXT_ACTION_NOTE : leftNoWayOn ? NUDGE_NOTE : undefined;
 		if (!note || this.noted.has(note)) return undefined;
 		this.noted.add(note);
 		return note;
@@ -573,14 +586,21 @@ export class VoiceGuard {
 				const partial = tool.name === SAVE_TOOL && savedResults(tool.name, params).includes("partial");
 				if (partial && this.toldWrong) return SAVED_AGAINST_WORDS;
 				const result = await tool.execute(toolCallId, params, signal, onUpdate);
+				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				if (this.kept?.call.id === toolCallId) {
 					if (result.isError) this.letGo();
 					else { this.kept.ran = true; return KEPT(tool.name); }
 				}
-				const poses = (this.releasing === toolCallId && this.kept?.ran) || this.posedUnder === toolCallId;
+				if (this.waiting.has(toolCallId)) {
+					if (result.isError) this.waiting.delete(toolCallId);
+					else {
+						this.waited = true;
+						return { ...result, content: [...result.content, { type: "text", text: WAITS }], terminate: false };
+					}
+				}
+				const poses = (this.releasing === toolCallId && (this.kept?.ran || this.waited)) || this.posedUnder === toolCallId;
 				if (poses && !result.isError) return { ...result, terminate: true };
 				if (partial && !result.isError) this.savedPartial = true;
-				if (tool.name === PROBE_DONE_TOOL && !result.isError && isRecord(result.details) && result.details.ok === true) this.probeEnded = true;
 				return result;
 			},
 		};
@@ -621,7 +641,7 @@ export class VoiceGuard {
 			}
 			this.owed = false;
 			this.lengthDraft = null;
-			if (this.kept) this.releasing = call.id;
+			if (this.kept || this.waiting.size > 0) this.releasing = call.id;
 			this.toldNow.push(text);
 			if (FLAT_MISS.test(sentences(text)[0]?.trim() ?? "")) this.toldWrong = true;
 			this.said.push(text);
@@ -634,13 +654,20 @@ export class VoiceGuard {
 		// kept for the rewrite; any other turn-ending call is held once for
 		// each refused message (a rewrite may be refused again), or once for
 		// ordinary text.
-		const keeps = this.owed && (QUESTION_TOOLS as readonly string[]).includes(call.name);
-		if (!keeps && (this.owed || (this.plain && this.sent === 0)) && this.heldForOwed < Math.max(1, this.refused.get("message") ?? 0) && this.endsTurn(call.name)) {
+		const question = (QUESTION_TOOLS as readonly string[]).includes(call.name);
+		const keeps = this.owed && question;
+		if (!this.owed && this.plain && this.sent === 0 && this.heldForOwed < 1 && this.endsTurn(call.name)) {
 			this.heldForOwed++;
-			return this.owed ? OWED(call.name) : PLAIN_OWED(call.name);
+			return PLAIN_OWED(call.name);
 		}
-		if (call.name === PRACTICE_PROBLEM_TOOL) return this.judgeProblem(call);
-		if (!(QUESTION_TOOLS as readonly string[]).includes(call.name)) return null;
+		const waits = this.owed && !question && this.endsTurn(call.name);
+		if (call.name === PRACTICE_PROBLEM_TOOL) {
+			const refused = this.judgeProblem(call);
+			if (!refused && waits) this.waiting.add(call.id);
+			return refused;
+		}
+		if (waits) this.waiting.add(call.id);
+		if (!question) return null;
 		const text = questionText(call);
 		if (!text) return null;
 		if (this.input.unsure && this.sent === 0 && !this.owed && !this.heldUnsure) {
@@ -678,8 +705,11 @@ export class VoiceGuard {
 		}
 		const kept = this.kept;
 		const rewrite = this.releasing !== null && message.content.some((b) => b.type === "toolCall" && b.id === this.releasing);
+		// The turn ends on a reply that calls nothing, after the note that let
+		// words with nothing for him go: the kept question is its last word.
+		const ending = this.noted.has(OWED_END_NOTE) && !message.content.some((b) => b.type === "toolCall");
 		const asks = message.content.some((b) => b.type === "toolCall" && (QUESTION_TOOLS as readonly string[]).includes(b.name) && this.decisions.get(b.id) === null);
-		if (!kept?.ran || !rewrite || asks) return;
+		if (!kept?.ran || !(rewrite || ending) || asks) return;
 		message.content.push(kept.call);
 		this.said.push(kept.text);
 		this.posed = true;
