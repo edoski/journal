@@ -56,10 +56,11 @@ const PICK_UP_ORDER: readonly SessionState[] = ["your-turn", "working", "paused"
  *  that study moved past it (round 10, 2 m4: the same preview, with no
  *  later session on its own topic). A turn running now stays. Pure. */
 export function currentSessions(sessions: readonly ChatListItem[], course: readonly ChatListItem[] = []): ChatListItem[] {
-	const started = (kind: ChatListItem["kind"]) => sessions.reduce((last, chat) => (chat.kind === kind && chat.createdAt > last ? chat.createdAt : last), "");
+	// Only another session moves past one: a seeded session can carry a start later than his clock (round 11, 1 N5).
+	const started = (of: ChatListItem) => sessions.reduce((last, chat) => (chat.id !== of.id && chat.kind === of.kind && chat.createdAt > last ? chat.createdAt : last), "");
 	const movedOn = (chat: ChatListItem) =>
 		chat.untouched === true && chat.ended === "cut" && course.some((other) => other.id !== chat.id && other.course?.workspace === chat.course?.workspace && other.createdAt > chat.updatedAt);
-	return sessions.filter((chat) => chat.busy || (chat.updatedAt >= started(chat.kind) && !movedOn(chat)));
+	return sessions.filter((chat) => chat.busy || (chat.updatedAt >= started(chat) && !movedOn(chat)));
 }
 
 /** The session to pick up among some: of the current ones

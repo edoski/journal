@@ -356,11 +356,34 @@ export function withLessonHere(courses: readonly StudyCourse[], chats: readonly 
 	});
 }
 
+/** The session Continue on an open task opens, the one every surface
+ *  opens for it: of the sessions that hold the task, the one the session
+ *  model picks up (`continueMove`), so a newer session on the task moves
+ *  past an older one left on it; null when none is opened. Pure. */
+export function taskChat(chats: readonly ChatListItem[], workspace: string, key: string): ChatListItem | null {
+	const move = continueMove(taskSessions(chats, workspace, key));
+	return move?.kind === "open" ? move.chat : null;
+}
+
+/** Whether every task a session holds continues in another session
+ *  (`taskChat`): a later session on the work moved past it. Pure. */
+function movedPast(chat: ChatListItem, chats: readonly ChatListItem[]): boolean {
+	const workspace = chat.course?.workspace;
+	const tasks = chat.tasks ?? [];
+	return workspace !== undefined && tasks.length > 0 && tasks.every((key) => {
+		const current = taskChat(chats, workspace, key);
+		return current !== null && current.id !== chat.id;
+	});
+}
+
 /** The sessions to pick up, most recent first: never one whose course was
  *  deleted, which is history (round 4: a deleted course's lesson stayed at
- *  the top of Today). Pure. */
+ *  the top of Today), nor one a later session on its task moved past
+ *  (`movedPast`), so Home opens the chat the topic page opens (round 11,
+ *  1 N5: Home reopened the lesson's first chat at a question he had
+ *  answered in its second). Pure. */
 export function openSessions(chats: readonly ChatListItem[]): ChatListItem[] {
 	return chats
-		.filter((c) => !c.courseDeleted && PICK_UP.has(sessionState(c)))
+		.filter((c) => !c.courseDeleted && PICK_UP.has(sessionState(c)) && !movedPast(c, chats))
 		.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 }
