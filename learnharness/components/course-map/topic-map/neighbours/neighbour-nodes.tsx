@@ -53,7 +53,7 @@ export function NeighbourBandNode({ data, positionAbsoluteX }: NodeProps<Neighbo
 				band.side === "before" ? "justify-start" : "justify-end",
 			)}
 		>
-			<span className="absolute flex items-center" style={{ height: BAND_LABEL, left, ...(band.side === "before" ? { top: 0 } : { bottom: 0 }) }}>
+			<span className="absolute flex items-center" style={{ height: BAND_LABEL, left: 0, transform: `translateX(${left}px)`, ...(band.side === "before" ? { top: 0 } : { bottom: 0 }) }}>
 				{label}
 			</span>
 		</button>

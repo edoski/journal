@@ -35,7 +35,7 @@ export function BandNode({ data, width }: NodeProps<BandFlowNode>) {
 				ruleStretches(0, width ?? 0, band.crossings).map(([from, to]) => (
 					<span key={from} data-slot="arc-band-rule" className={cn("absolute top-0 h-px", lit ? "bg-white/20" : "bg-white/10")} style={{ left: from, width: to - from }} />
 				))}
-			<div data-slot="arc-band-label" className="absolute flex h-6 items-center bg-background pr-2" style={{ left, top: 8, maxWidth: margin - 32 }}>
+			<div data-slot="arc-band-label" className="absolute flex h-6 items-center bg-background pr-2" style={{ left: 0, top: 8, maxWidth: margin - 32, transform: `translateX(${left}px)` }}>
 				<ArcLabel number={band.number} handle={band.arc.handle} title={band.arc.title} here={band.here} />
 			</div>
 		</div>
