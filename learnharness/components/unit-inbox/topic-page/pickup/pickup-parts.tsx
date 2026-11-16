@@ -318,12 +318,14 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 				<LineText>{now.words}</LineText>
 			</span>
 			<NowPress now={now} busy={busy} onAct={onAct} className="justify-self-end" />
+			{/* The note wraps whole, and Now carries no reason line under it: why the topic comes now is the pane's
+			    Builds on and In your material (round 12, 3 n9: "Planned Thu 12 Nov, after Probabi…" cut, with a
+			    two-line reason under it). */}
 			{now.note && (
-				<span data-slot="pickup-now-note" className="col-start-2 truncate text-callout system-current:text-label text-muted-foreground">
+				<span data-slot="pickup-now-note" className="col-start-2 text-pretty text-callout system-current:text-label text-muted-foreground">
 					<MathText>{now.note}</MathText>
 				</span>
 			)}
-			{now.why && <StartsWhyLine why={now.why} className="col-start-2" />}
 		</div>
 	);
 }
