@@ -471,6 +471,11 @@ export function leftOutWords(topic: Pick<CourseMapTopic, "handle" | "starts">, e
 	return topic.starts && topic.starts > exam.date ? "Not on the exam; after it" : "Not on the exam";
 }
 
+/** A course page row's status for a topic the exam's plan has no room to
+ *  start before the exam, its planned day in the row's hint (round 12,
+ *  1 m11). */
+export const AFTER_EXAM = "After the exam";
+
 /** What the exam's plan means for a topic it leaves out (`examGaps`), on
  *  the topic's own page, in the engine's reason (`exam.reasons`). A
  *  review's words follow the final review's name (`finalReviewName`). */
