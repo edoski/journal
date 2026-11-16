@@ -38,9 +38,10 @@ export type WhyMarkSize = "row" | "slot";
  * at 400. `words` replaces the reason's own short words (the sidebar's
  * slot words, `NowLine.slot`).
  */
-export function WhyMark({ why, size = "row", words }: { why: Why | null; size?: WhyMarkSize; words?: string | null }) {
+export function WhyMark({ why, size = "row", words, whole = false }: { why: Why | null; size?: WhyMarkSize; words?: string | null; whole?: boolean }) {
 	if (!why) return <span />;
 	const tone = why.kind === "reply" ? "system-current:font-medium text-link" : "text-muted-foreground";
+	if (size === "row" && whole) return <WholeMark why={why} words={words} tone={tone} />;
 	if (size === "row") return <RowMark key={why.starts?.words ?? why.short} why={why} words={words} tone={tone} />;
 	const Icon = WHY_ICON[why.kind];
 	return (
@@ -53,6 +54,20 @@ export function WhyMark({ why, size = "row", words }: { why: Why | null; size?: 
 			<span className="whitespace-nowrap">
 				<MathText>{words ?? why.short}</MathText>
 			</span>
+		</span>
+	);
+}
+
+/** Home's line end, its words whole (`whole`): the row's one status, so
+ *  the lesson's title gives way first (round 11, 1 N14: "Not right last
+ *  time: Matrix multipli…" cut with half the row empty). A new topic's
+ *  reason shows in its few words (`startsWhyShort`). */
+function WholeMark({ why, words, tone }: { why: Why; words?: string | null; tone: string }) {
+	const Icon = why.starts ? STARTS_ICON[why.starts.kind] : WHY_ICON[why.kind];
+	return (
+		<span data-slot="today-why" data-kind={why.kind} data-starts={why.starts?.kind} className={cn("inline-flex items-center gap-1.5 justify-self-end text-callout whitespace-nowrap system-current:text-label", tone)}>
+			<Icon aria-hidden className="size-3.5 shrink-0" />
+			<MathText>{why.starts?.words ?? words ?? why.short}</MathText>
 		</span>
 	);
 }

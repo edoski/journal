@@ -318,16 +318,16 @@ describe("Today", () => {
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
-	it("gives each line its pie, its course ending in how long ago it was studied, and its lesson ending in where he stands on its one topic and an icon and a few words for why it is on Today, with no button and no review counted", () => {
+	it("gives each line its pie, its course, and its lesson ending in its one status, where he stands or why it is on Today, with no button and no review counted (round 11, 1 N9)", () => {
 		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} done={[]} busy={false} onContinue={() => {}} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesOn your ownDue since 7 Nov", "Linear AlgebraStudied todayEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last timeNext up", "Linear AlgebraContinue Problem sheet 4Check on your ownLeft off 5 Nov"],
+			["Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct", "Real AnalysisReview SequencesDue since 7 Nov", "Linear AlgebraEigen lessonYour turn", "ProbabilityContinue Bayes' ruleNot right last time", "Linear AlgebraContinue Problem sheet 4Check on your own"],
 		);
 		assert.equal(lines[2]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["next", 1], ["task", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|today)\?$/);
@@ -430,18 +430,18 @@ describe("what a line of Today reads", () => {
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/);
 	};
 
-	it("hybrid: each line has its pie, its course ending in how long ago it was studied, and its lesson ending in where he stands on its one topic and an icon and a few words for why it is on Today", () => {
+	it("hybrid: each line has its pie, its course, and its lesson ending in its one status (round 11, 1 N9)", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
 			"Linear AlgebraReview Linear independence, Rank, SpanDue since 23 Oct",
-			"Real AnalysisReview SequencesOn your ownDue since 7 Nov",
-			"Linear AlgebraStudied todayEigen lessonYour turn",
-			"ProbabilityContinue Bayes' ruleNot right last timeNext up",
-			"Linear AlgebraContinue Problem sheet 4Check on your ownLeft off 5 Nov",
+			"Real AnalysisReview SequencesDue since 7 Nov",
+			"Linear AlgebraEigen lessonYour turn",
+			"ProbabilityContinue Bayes' ruleNot right last time",
+			"Linear AlgebraContinue Problem sheet 4Check on your own",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 5);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1], ["next", 1], ["task", 1]]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["review", 1], ["review", 1], ["reply", 1]]);
 		plain(doc);
 	});
 });

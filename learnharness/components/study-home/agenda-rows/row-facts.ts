@@ -177,14 +177,6 @@ export function studiedAgo(row: TodayRow): string | null {
 /** Some days ago in Home's words, the app's one form (`study-words.ts`). */
 export { agoWords };
 
-/** What Home's row shows of its clock, labelled: "Studied 6 Nov" beside
- *  the course, so it never reads as the line's reason ("7d ago · Planned
- *  today", round 8). Null where `studiedAgo` is. Pure. */
-export function studiedLabel(row: TodayRow): string | null {
-	const days = studiedDays(row);
-	return days === null || !row.course ? null : studiedDaysWords(days, row.course.map.today);
-}
-
 /** When the learner last studied a line's course, in words: "Studied
  *  today", "Studied 4 Nov", or "Not studied yet"; null for a line with no
  *  course. Pure. */

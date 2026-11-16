@@ -14,6 +14,7 @@ Why a line is on Today, as an icon and a few words. `why-mark.tsx` (`WhyMark`, `
 | Size | Where | Icon | Gap | Width | `data-slot` |
 |---|---|---|---|---|---|
 | `row` (default) | Home's hybrid row, the lesson line's end | 14px | 6px | up to 224, flush right in its grid cell | `today-why` |
+| `row`, `whole` | Home's hybrid row, its one status (round 11, 1 N14) | 14px | 6px | its words' own width, never cut; a new topic's reason in its few words (`startsWhyShort`) | `today-why` |
 | `slot` | a sidebar card's status slot | 12px (T3 Code's `size-3` status icon) | 4px | its slot's width; the words truncate, the icon stays | `why-mark` |
 
 ## Tokens and states
