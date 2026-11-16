@@ -80,7 +80,7 @@ An arc the next exam does not examine whole reads Partly on the exam or Not on t
 | the connection dropped mid-reply | The connection dropped before the tutor finished replying. |
 | another window answered the question he was typing in | Answered in another window. What you typed here is in the box below. (once the next question holds the box: Answered in another window. Press Esc to see what you typed here.) |
 | a question or problem opens while the message box holds words he has not sent | Your unsent message is kept. Press Esc to see it. (until he sees it, empties the box or the box shows again) |
-| another window asked for a hint on it, or asked the tutor something | Another window asked for a hint. / Another window asked the tutor something. Then: What you typed here comes back when the tutor asks the question again. |
+| another window asked for a hint on it, or asked the tutor something | Another window asked for a hint. What you typed here comes back when the hint is done. / Another window asked the tutor something. What you typed here comes back when the tutor asks the question again. |
 | he stops for the day | Done for today; a question he left reads Left for next time, in full; a problem he left reads Left for next time. |
 | he skips | a question: Skipped, then the question; a problem: You skipped this problem. |
 | the lesson's course was deleted | This course was deleted. Its lessons stay as history. (with what he had written: What you wrote here is in the new lesson box.) Start a new lesson |

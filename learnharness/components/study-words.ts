@@ -599,7 +599,7 @@ export const LESSON_WORDS = {
 	leftQuestionPlaceholder: "Your answer to the question above, or ask anything",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	answeredElsewhereOpen: "Answered in another window. Press Esc to see what you typed here.",
-	hintElsewhere: "Another window asked for a hint. What you typed here comes back when the tutor asks the question again.",
+	hintElsewhere: "Another window asked for a hint. What you typed here comes back when the hint is done.",
 	askedElsewhere: "Another window asked the tutor something. What you typed here comes back when the tutor asks the question again.",
 	/** A question or problem opened over words still in the message box
 	 *  (round 11, 4 minor 2: a message kept while the app was down sat
