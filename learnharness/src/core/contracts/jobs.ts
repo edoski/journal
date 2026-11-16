@@ -434,8 +434,8 @@ function abortText(kind: JobKind): string {
 // (core/contracts/chat.ts — single source); the UI renders the quiet
 // system line off the customType. Nothing human-looking is persisted, ever.
 
-export function buildProbeHandoffSteer(chatId: string, review = false): SteerMessage {
-	return newHandoffMessage(chatId, review);
+export function buildProbeHandoffSteer(chatId: string, review = false, task = false): SteerMessage {
+	return newHandoffMessage(chatId, review, task);
 }
 
 /** A mode handoff's wake (tools/handoff.ts): like the probe handoff, it

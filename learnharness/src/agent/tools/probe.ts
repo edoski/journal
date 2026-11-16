@@ -1,7 +1,7 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { probeDoneInputSchema, PROBE_DONE_ACK_TEXT } from "../../core/contracts.ts";
-import { danglingQuestionOf, hasProbeDone, type LhMessage } from "../../core/native-messages.ts";
+import { danglingQuestionOf, hasProbeDone, sessionTasksOf, type LhMessage } from "../../core/native-messages.ts";
 import type { ChatStore } from "../../core/ports.ts";
 import { reviewRecord } from "../../core/session-opening.ts";
 import { buildProbeHandoffSteer, type SteerMessage } from "../../core/contracts.ts";
@@ -81,7 +81,9 @@ export function probeDoneTool(ctx: ProbeDoneContext): Record<string, AgentTool<a
 					return { ok: false, error: "The probe is already concluded — probe_done fires exactly once." };
 				}
 				try {
-					ctx.deliver(buildProbeHandoffSteer(ctx.chatId, reviewRecord(record)));
+					// A session holding an open task carries on with its next step,
+					// never a lesson from the topic's basics (round 11, 2 N2).
+					ctx.deliver(buildProbeHandoffSteer(ctx.chatId, reviewRecord(record), sessionTasksOf(record.messages).length > 0));
 				} catch (err) {
 					console.error(`[chat ${ctx.chatId}] probe handoff queueing failed:`, err);
 					// The handoff is recoverable-by-design (the next client message

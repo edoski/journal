@@ -196,6 +196,17 @@ export const HANDOFF_TEXT =
 	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
 	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
 
+/** The wake in a session that continues an open task (round 11, 2 N2: the
+ *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
+ *  nine-step rank–nullity lesson from its basics put in front of part (d),
+ *  which he had just been asked to type). The task's next step is the plan;
+ *  a gap the assessment names may come before it; a step that needs his
+ *  material waits for it. */
+export const TASK_HANDOFF_TEXT =
+	"Next: carry on with my open task at the step the assessment says comes next. It is my task, not a lesson: plan only that step with plan_init, one node named for the part it is, with a node before it only for a gap the assessment names, never a lesson on the topic from its basics. " +
+	"If the step needs something from me first, such as a part's text, ask me for it in one plain line, unless that is already asked above, and end your turn; work the step once I send it. Otherwise pose the step straight away. " +
+	"I have already read the probe's feedback above, so never say it again.";
+
 /** What a review's wake adds (round 9, 2 m4): a review that turns into
  *  teaching said nothing of the switch and closed on "the lesson", since
  *  the wake asked only to start teaching. */
