@@ -42,7 +42,8 @@ export const demoInputSchema = Type.Object({
 		description:
 			"Precise brief for the builder: the concept, the parameters/controls and what each does, the interactions, and the visual style. " +
 			"The builder sees NOTHING else of the lesson — include everything it needs, including necessary formulas and constants. " +
-			"It never prints a formula, value or result he is still to find (a step not yet done, or the open question): label each control and readout by what it is (\"chance per slot\"), never by the result.",
+			"It never prints a formula, value or result he is still to find (a step not yet done, or the open question): label each control and readout by what it is (\"chance per slot\"), never by the result. " +
+			"Write maths as he reads it: a matrix by its columns (\"columns (a, c) and (b, d)\"), never as code (\"[[a, b], [c, d]]\").",
 	}),
 });
 
