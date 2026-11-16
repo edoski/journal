@@ -47,8 +47,9 @@ export const HOME_WIDTH = "max-w-[80rem]";
 
 /** Home's edges: the pages' own column (`PAGE_COLUMN`), so its tabs, map
  *  and Today start where a course or topic page's head and columns do,
- *  24px under the band. */
-const HOME_FRAME = cn(PAGE_COLUMN, "pt-19");
+ *  24px under the window's title band, which only the Mac app has
+ *  (`.lh-lights-band`, in `HomeFrame`). */
+const HOME_FRAME = cn(PAGE_COLUMN, "pt-6");
 
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
