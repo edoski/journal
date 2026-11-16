@@ -194,7 +194,8 @@ export const HANDOFF_TEXT =
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else. " +
-	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again.";
+	"I have already read the probe's feedback above, so the first step builds on it with something new and never says it again. " +
+	"My last probe answer got only its mark, with no words: when it was not right, the first step's first sentence names the part it missed, and the step builds from there.";
 
 /** The wake in a session that continues an open task (round 11, 2 N2: the
  *  lesson's wake turned Problem sheet 4, answered right at part (c), into a
