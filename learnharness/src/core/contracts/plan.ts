@@ -129,7 +129,8 @@ interface PlanCall {
 /** Where the lesson stands, from its calls in order: a tagged question
  *  moves the position there (leaving a node marks it visited); a
  *  lesson_progress call marks its `done` nodes visited and, when one is the
- *  current node, leaves it, so nothing is current until the next tag.
+ *  current node, leaves it, so nothing is current until the next tag. A
+ *  question on a step already done is a recall check and moves nothing.
  *  Ids missing from the tree move nothing. */
 function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanStatuses {
 	const ids = new Set(tree.nodes.map((n) => n.id));
@@ -140,6 +141,9 @@ function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanSt
 		if (POSITION_QUESTION_TOOLS.includes(call.name)) {
 			const nodeId = (call.input as { nodeId?: unknown } | undefined)?.nodeId;
 			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue;
+			// A question on a step already done is a recall check: the strip
+			// moves only forward (round 12, 2 n6: step 7 back to step 6).
+			if (done.has(nodeId)) continue;
 			if (current !== null && current !== nodeId) visited.add(current);
 			current = nodeId;
 		} else if (call.name === LESSON_PROGRESS_TOOL) {
