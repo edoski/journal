@@ -51,7 +51,9 @@ export async function POST(req: Request) {
 	// A lesson opened on topics is named after them, not the verb that
 	// opened it ("Start Poisson distribution" is "Poisson distribution");
 	// a review keeps its words (`openingTitle`).
-	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics) || "Untitled session")), course, topics, arcCheck);
+	// A start named apart from its opening asks his question in his words
+	// (Ask the tutor), which shows as his message (round 13, 1 n8).
+	const chat = createChat(titleFromPrompt(name ?? (openingTitle(title, topics) || "Untitled session")), course, topics, arcCheck, name !== null);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the

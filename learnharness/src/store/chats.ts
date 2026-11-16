@@ -41,7 +41,7 @@ function chatFile(id: string): string {
  *  turn-started / turn-settled, or for a turn-less write (a dismissal,
  *  compaction) by record-changed, which the sidebar refetches on. Silence
  *  here is law, not oversight. */
-function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string): ChatRecord {
+function createChat(title: string, course?: CourseLink, topics: readonly string[] = [], arcCheck?: string, asked = false): ChatRecord {
 	const now = studyNow().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
@@ -50,7 +50,7 @@ function createChat(title: string, course?: CourseLink, topics: readonly string[
 		updatedAt: now,
 		messages: [],
 		...(course ? { course: { workspace: course.workspace, title: course.title } } : {}),
-		...(topics.length > 0 ? { topics: [...topics], appOpening: true as const } : {}),
+		...(topics.length > 0 ? { topics: [...topics], ...(asked ? {} : { appOpening: true as const }) } : {}),
 		...(arcCheck ? { arcCheck } : {}),
 	};
 	fs.mkdirSync(PATHS.chats, { recursive: true });
