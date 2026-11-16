@@ -5,18 +5,20 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** The column every page sits in: centred, up to 80rem, 24px sides, 24px
- *  under the window's 52px band and above its foot. Home wears it
- *  too, so moving between pages no edge moves. */
+ *  above the window's foot. Home wears it too, so moving between pages no
+ *  edge moves. */
 export const PAGE_COLUMN = "mx-auto w-full max-w-[80rem] px-6 pb-6";
 
 /**
  * The page frame (spec: page-frame.md) every page with a head and a body
  * shares, the course page and the topic page first: one centred column
- * under the window's 52px band, its head, then its body filling the rest.
+ * whose first 32px row is centred on the band's centre line
+ * (`--lh-band-centre`), level with the folded rail's open button and
+ * Home's course tabs, its head, then its body filling the rest.
  */
 export function PageFrame({ className, children, ...rest }: ComponentProps<"div">) {
 	return (
-		<div data-slot="page-frame" className={cn(PAGE_COLUMN, "flex min-h-0 flex-1 flex-col gap-5 pt-6", className)} {...rest}>
+		<div data-slot="page-frame" className={cn(PAGE_COLUMN, "flex min-h-0 flex-1 flex-col gap-5 pt-[calc(var(--lh-band-centre)-1rem)]", className)} {...rest}>
 			{children}
 		</div>
 	);
@@ -33,11 +35,13 @@ const BETWEEN_FACTS = "*:not-first:before:ml-3 *:not-first:before:mr-1.5 *:not-f
  * 20/500 with the page's actions at its right end, then the lines under
  * it: what to do next (`lead`, 14/500 in full ink), the standing line (a
  * 16px mark and a few words per fact, muted, a thin divider between
- * facts), then any more (`children`: a mistake, an error). Every page's
- * head has the same rows: the line above the title is kept, empty, when a
- * page has none, and the lines under it take two lines' room at least, so
- * the title and the body under the head sit at the same height on every
- * page. A hairline under it closes the head off from the page's body.
+ * facts), then any more (`children`: a mistake, an error). The head's
+ * first row stands on the band's centre line: the title, or the line
+ * above it when a page has one, a 32px row so it centres there (Edo,
+ * 16 Nov 2026: the course page's title should align with the open button,
+ * as Home's tabs do, with no empty line above it). The lines under the
+ * title take two lines' room at least. A hairline under it closes the
+ * head off from the page's body.
  */
 export function PageHead({
 	eyebrow,
@@ -61,9 +65,11 @@ export function PageHead({
 } & Omit<ComponentProps<"header">, "title">) {
 	return (
 		<header data-slot="page-head" className={cn("flex shrink-0 flex-col gap-1 border-b border-border/60 pb-4", className)} {...rest}>
-			<p data-slot="page-eyebrow" aria-hidden={eyebrow ? undefined : true} className="h-4 truncate text-callout text-muted-foreground">
-				{eyebrow}
-			</p>
+			{eyebrow && (
+				<p data-slot="page-eyebrow" className="flex h-8 min-w-0 items-center truncate text-callout text-muted-foreground">
+					{eyebrow}
+				</p>
+			)}
 			<div className="flex min-h-8 items-center justify-between gap-4">
 				<h1 data-slot="page-title" className="min-w-0 text-title-1 text-pretty text-foreground">
 					{title}
