@@ -33,9 +33,10 @@ export interface CourseToolContext {
 	 *  record when the turn starts: an answer always arrives before the turn
 	 *  that records it. Absent: none yet. */
 	answers?: ReadonlyMap<string, AnsweredQuestion>;
-	/** What a re-mark may correct (answer-marks.ts `remarkableOf`), read
-	 *  with `answers`. Absent: the rule is not applied. */
-	remarkable?: { saved: ReadonlySet<string>; disputed: ReadonlySet<string> };
+	/** The attempts his disputes named, the only ones a re-mark may
+	 *  correct (answer-marks.ts `remarkableOf`), read with `answers`.
+	 *  Absent: none. */
+	remarkable?: { disputed: ReadonlySet<string> };
 	/** Keeps a save's links with the lesson the moment the engine took it:
 	 *  each answer it named and the observation that records it (round 8:
 	 *  a restart between the engine's write and the transcript's lost the
@@ -116,30 +117,24 @@ function questionAsText(o: Record<string, unknown>, answer: AnsweredQuestion): b
  *  through: the session's record holds them only from the next turn. */
 const savedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
 
-/** The attempts each session's saves recorded in this turn, from their
- *  receipts: this session saved them, so it may set them right in the same
- *  turn, though `remarkable` was read before they existed. */
-const recordedThisTurn = new WeakMap<CourseToolContext, Set<string>>();
-
 /** The help a Show me gave, in the words practice's Show me saves (its
  *  R5 rung): one rule for a shown answer, in a lesson as in practice
  *  (round 8, 2 M3: a lesson's Show me was saved as no help). */
 export const SHOW_ME_HELP = RUNG_HELP.R5;
 
-/** Why a re-mark is refused: it corrects an attempt this session did not
- *  save and he did not dispute (round 8, 2 m1: the tutor silently re-marked
- *  an older answer to a different question). A dispute's ruling corrects
- *  only an attempt he disputed; his own statement (a self_report) may
- *  correct any. Null when it may stand. */
+/** Why a re-mark is refused: he did not ask for it. Only a ruling on his
+ *  dispute re-marks an attempt, and only one the dispute named; his own
+ *  statement (a self_report) may correct any (Edo, round 14 m12: the tutor
+ *  re-marked older answers unasked, "I've changed the mark on your earlier
+ *  answer…", o43 over the seeded o37). Null when it may stand. */
 function remarkRefused(o: Record<string, unknown>, i: number, remarkable: CourseToolContext["remarkable"]): string | null {
-	if (!remarkable || (o.kind ?? "attempt") === "self_report" || !Array.isArray(o.corrects)) return null;
-	const disputed = "disputed" in o;
-	const allowed = disputed ? remarkable.disputed : remarkable.saved;
-	const outside = o.corrects.filter((id): id is string => typeof id === "string" && !allowed.has(id));
-	if (outside.length === 0) return null;
-	return disputed
-		? `observations[${i}].corrects: he disputed no mark of ${outside.join(", ")}. A ruling re-marks only the attempts his dispute named.`
-		: `observations[${i}].corrects: ${outside.join(", ")} ${outside.length > 1 ? "were" : "was"} not saved in this session, and he did not dispute ${outside.length > 1 ? "them" : "it"}, so ${outside.length > 1 ? "they stand" : "it stands"} as recorded: never re-mark an answer on your own. Leave the re-mark out; a new answer is simply a new attempt.`;
+	if ((o.kind ?? "attempt") === "self_report" || !Array.isArray(o.corrects)) return null;
+	const targets = o.corrects.filter((id): id is string => typeof id === "string");
+	if (!("disputed" in o)) {
+		return `observations[${i}].corrects: he did not dispute ${targets.join(", ") || "it"}, so ${targets.length > 1 ? "they stand" : "it stands"} as recorded: never re-mark an answer on your own, and never tell him a mark changed. Leave the re-mark out; a new answer is simply a new attempt.`;
+	}
+	const outside = targets.filter((id) => !remarkable?.disputed.has(id));
+	return outside.length === 0 ? null : `observations[${i}].corrects: he disputed no mark of ${outside.join(", ")}. A ruling re-marks only the attempts his dispute named.`;
 }
 
 /** What a save's observations say, ruled by the answers they name: each
@@ -216,37 +211,25 @@ function namedQuestions(
 	return { observations, questions, refused };
 }
 
-/** Why a re-mark the tutor makes unasked is refused: it brings another
- *  response than the attempt it corrects, so it is a new answer saved over
- *  an old mark (round 11, 2 n4: his new answer on the eigen-equation raised
- *  the seeded o34 from partly right, prompted, to right on his own, with no
- *  word to him and no card of its own). A ruling on his dispute and his own
- *  report are his to word. Null when every such re-mark keeps its answer;
- *  the record is read only for a save that holds one. */
-async function remarkWithNewAnswer(ctx: CourseToolContext, observations: readonly unknown[]): Promise<string | null> {
-	const remarks = observations.flatMap((o, i) =>
-		isObject(o) && (o.kind ?? "attempt") === "attempt" && !("disputed" in o) && Array.isArray(o.corrects) && typeof o.response === "string" && o.response.trim()
-			? [{ i, response: o.response, targets: o.corrects.filter((t): t is string => typeof t === "string") }]
-			: [],
-	);
-	if (remarks.length === 0) return null;
-	const shown = await ctx.records.run(ctx.course.workspace, { verb: "show", handles: [...new Set(remarks.flatMap((r) => r.targets))] });
-	if (!shown.ok) return null;
-	const items = ((shown.json as { items?: Record<string, { response?: unknown }> } | null)?.items ?? {}) as Record<string, { response?: unknown }>;
-	const squash = (text: unknown) => (typeof text === "string" ? text.replace(/[\s$]+/g, "").toLowerCase() : "");
-	for (const { i, response, targets } of remarks) {
-		const changed = targets.find((t) => t in items && squash(items[t]!.response) !== squash(response));
-		if (!changed) continue;
-		const was = typeof items[changed]!.response === "string" ? `its response was ${JSON.stringify(items[changed]!.response)}` : "it holds no response";
-		return `observations[${i}].corrects: ${changed} is another answer (${was}), so this is not a re-mark of it. A re-mark keeps the answer it corrects and sets only its mark, and you tell him in one line what changed. His new answer is a new attempt: name its question (or "his-message"), leave corrects out, and send it again.`;
+/** A ruling keeps the confidence he gave the answer it re-marks, since a
+ *  ruling judges his answer and he never gave it another (round 14, m12: a
+ *  re-mark saved `sure: confident` over an answer he never marked). Each
+ *  re-mark takes the `sure` of the first attempt it corrects, none when
+ *  that had none; the record is read only for a save that holds one. */
+async function remarksKeepConfidence(ctx: CourseToolContext, observations: readonly unknown[]): Promise<unknown[]> {
+	const remarks = observations.flatMap((o, i) => (isObject(o) && (o.kind ?? "attempt") === "attempt" && Array.isArray(o.corrects) && typeof o.corrects[0] === "string" ? [{ i, target: o.corrects[0] as string }] : []));
+	if (remarks.length === 0) return [...observations];
+	const shown = await ctx.records.run(ctx.course.workspace, { verb: "show", handles: [...new Set(remarks.map((r) => r.target))] });
+	if (!shown.ok) return [...observations];
+	const items = ((shown.json as { items?: Record<string, { sure?: unknown }> } | null)?.items ?? {}) as Record<string, { sure?: unknown }>;
+	const kept = [...observations];
+	for (const { i, target } of remarks) {
+		if (!(target in items)) continue;
+		const { sure: _given, ...rest } = kept[i] as Record<string, unknown>;
+		const sure = items[target]!.sure;
+		kept[i] = typeof sure === "string" ? { ...rest, sure } : rest;
 	}
-	return null;
-}
-
-/** The observation ids a save's receipt gives (`saved`). */
-function receiptIds(json: unknown): string[] {
-	const saved = (json as { saved?: unknown } | null)?.saved;
-	return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : [];
+	return kept;
 }
 
 /** Hands the lesson each named answer's observation id, from the
@@ -283,20 +266,14 @@ export async function saveCourse(ctx: CourseToolContext, changes: unknown, probl
 	const answers = ctx.answers ?? new Map<string, AnsweredQuestion>();
 	const saved = savedThisTurn.get(ctx) ?? new Set<string>();
 	savedThisTurn.set(ctx, saved);
-	const recorded = recordedThisTurn.get(ctx) ?? new Set<string>();
-	recordedThisTurn.set(ctx, recorded);
-	const remarkable = ctx.remarkable && { saved: new Set([...ctx.remarkable.saved, ...recorded]), disputed: ctx.remarkable.disputed };
-	const named = problem ? { observations: listed, questions: listed.map(() => null), refused: null } : namedQuestions(listed, answers, saved, remarkable);
+	const named = problem ? { observations: listed, questions: listed.map(() => null), refused: null } : namedQuestions(listed, answers, saved, ctx.remarkable);
 	if (named.refused) return { ok: false, kind: "validation", message: named.refused };
-	const newAnswer = await remarkWithNewAnswer(ctx, named.observations);
-	if (newAnswer) return { ok: false, kind: "validation", message: newAnswer };
-	const ruled = withShownHelp(named.observations, (_o, i) => {
+	const ruled = withShownHelp(await remarksKeepConfidence(ctx, named.observations), (_o, i) => {
 		const question = named.questions[i];
 		return question ? answers.get(question)?.seenBefore === true : problem?.seen === true;
 	});
 	const result = await ctx.records.run(ctx.course.workspace, { verb: "save", changes: { ...patch, observations: ruled.observations } });
 	if (result.ok) for (const key of problem ? [problem.id] : named.questions) if (key) saved.add(key);
-	if (result.ok) for (const id of receiptIds(result.json)) recorded.add(id);
 	if (result.ok && !problem) keepLinks(ctx, named.questions, result.json);
 	const note = shownHelpNote(ruled.helped);
 	if (!result.ok || !note || typeof result.json !== "object" || result.json === null) return result;
