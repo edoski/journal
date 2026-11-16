@@ -1,7 +1,8 @@
 /**
  * Stacked arcs (stack.md; Edo, 16 Nov 2026): each arc exactly as Canvas
  * tree draws it, the arcs stacked in study order and disconnected, one arc
- * framed at a time, and a rail and ⇧↑ ⇧↓ that glide one arc up or down.
+ * framed at a time, and ⇧↑ ⇧↓ that glide one arc up or down; Home picks
+ * the arc with the quiet selector Bands uses.
  * The glide itself is probed in the running app.
  */
 import React, { act } from "react";
@@ -18,7 +19,7 @@ import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin
 import { STACK_SKIN } from "../components/course-map/topic-map/stack/stack-skin.ts";
 import type { CanvasLine } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
 import { MAP_STYLE_OPTIONS } from "../components/course-map/topic-map/map-style.ts";
-import { ArcTravel } from "../components/course-map/arc-travel.tsx";
+import { useArcKeys } from "../components/course-map/arc-keys.ts";
 import { DEMO_ARC_COURSES, DEMO_LINEAR_ALGEBRA, DEMO_PROBABILITY } from "./fixtures/demo-arcs.ts";
 
 const arcsOf = (course: CourseMap) => course.arcs!.map((a) => a.handle);
@@ -81,7 +82,7 @@ describe("Stacked arcs' drawing", () => {
 	});
 });
 
-describe("Stacked arcs' rail", () => {
+describe("Stacked arcs' keys", () => {
 	let root: Root | null = null;
 	let host: HTMLDivElement | null = null;
 	afterEach(async () => {
@@ -97,28 +98,19 @@ describe("Stacked arcs' rail", () => {
 		document.body.appendChild(host);
 		root = createRoot(host);
 		let shown = value;
-		const draw = () => root!.render(<ArcTravel arcs={arcs} value={shown} onSelect={(arc) => (picked.push(arc), (shown = arc), draw())} />);
+		function Keys() {
+			useArcKeys(arcs, shown, (arc) => (picked.push(arc), (shown = arc), draw()), true);
+			return null;
+		}
+		const draw = () => root!.render(<Keys />);
 		await act(async () => draw());
 		return picked;
 	}
-	const step = (way: "up" | "down") => document.querySelector<HTMLButtonElement>(`[data-slot="arc-travel-step"][data-way="${way}"]`)!;
-	const here = () => document.querySelector('[data-slot="arc-travel-here"]')!.getAttribute("data-arc");
 	const keydown = (key: string, shiftKey: boolean) => Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key, shiftKey, altKey: false, metaKey: false, ctrlKey: false }) as unknown as Event;
 	const key = (k: string, shiftKey = true) =>
 		act(async () => {
 			document.body.dispatchEvent(keydown(k, shiftKey));
 		});
-
-	it("names the arc shown between the arcs above and below, whole, and glides to one pressed", async () => {
-		const picked = await mount(arcs[3]!.handle);
-		assert.equal(here(), arcs[3]!.handle);
-		assert.equal(step("up").getAttribute("data-arc"), arcs[2]!.handle);
-		assert.equal(step("down").getAttribute("data-arc"), arcs[4]!.handle);
-		assert.match(step("up").textContent ?? "", new RegExp(arcs[2]!.title));
-		await act(async () => step("down").dispatchEvent(new dom.window.Event("click", { bubbles: true }) as unknown as Event));
-		assert.deepEqual(picked, [arcs[4]!.handle]);
-		assert.equal(here(), arcs[4]!.handle);
-	});
 
 	it("⇧↑ and ⇧↓ move one arc, and plain arrows are left to the page", async () => {
 		const picked = await mount(arcs[1]!.handle);
@@ -129,17 +121,13 @@ describe("Stacked arcs' rail", () => {
 		assert.deepEqual(picked, [arcs[2]!.handle, arcs[3]!.handle, arcs[2]!.handle]);
 	});
 
-	it("disables the way up at the first arc and the way down at the last, and the keys stop there", async () => {
+	it("stops at the first arc and the last", async () => {
 		const first = await mount(arcs[0]!.handle);
-		assert.ok(step("up").disabled);
-		assert.ok(!step("down").disabled);
 		await key("ArrowUp");
 		assert.deepEqual(first, []);
 		await act(async () => root?.unmount());
 		host?.remove();
 		const last = await mount(arcs.at(-1)!.handle);
-		assert.ok(step("down").disabled);
-		assert.ok(!step("up").disabled);
 		await key("ArrowDown");
 		assert.deepEqual(last, []);
 	});

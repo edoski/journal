@@ -6,7 +6,7 @@ import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
 import { ArcStrip } from "@/components/course-map/arc-strip";
 import { ArcSelector } from "@/components/course-map/arc-selector";
-import { ArcTravel } from "@/components/course-map/arc-travel";
+import { useArcKeys } from "@/components/course-map/arc-keys";
 import { arcShare, shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
@@ -82,7 +82,7 @@ export function HomeMap({
 	const arcs = shownArcs(chosenCourse.map);
 	// Every map style but Current names the arcs with the quiet selector (arc-selector.md); Stacked arcs with its rail.
 	const style = useMapSkin().style;
-	const quietSelector = style !== "current" && style !== "stack";
+	const quietSelector = style !== "current";
 	// The arc he picked on the strip, per course, for the visit.
 	const [picked, setPicked] = useState<ReadonlyMap<string, ArcHandle>>(new Map());
 	const follow = (followed === undefined ? litArc(chosenCourse, highlight) : followed) ?? null;
@@ -106,6 +106,7 @@ export function HomeMap({
 		if (!enlarged) setWhole(false);
 	}, [enlarged]);
 	const toggleWhole = useCallback(() => setWhole((w) => !w), []);
+	useArcKeys(arcs, shownArc ?? null, (arc) => setPicked((was) => new Map(was).set(chosen, arc)), style === "stack" && !zoomedOut);
 	useEffect(() => {
 		if (!enlarged) return;
 		// Anything open over the map claims Esc first (Radix marks it handled).
@@ -148,20 +149,6 @@ export function HomeMap({
 						setWhole(false);
 					}}
 				/>
-			)}
-			{arcs && style === "stack" && (
-				<>
-					{/* The selector's row stays as room: the rail runs down over it into the map's top fade, clear of every card. */}
-					<div aria-hidden="true" className="h-7 shrink-0" />
-					{!zoomedOut && (
-						<ArcTravel
-							className="absolute top-10 left-0 z-10"
-							arcs={arcs}
-							value={shownArc ?? null}
-							onSelect={(arc) => setPicked((was) => new Map(was).set(chosen, arc))}
-						/>
-					)}
-				</>
 			)}
 			{arcs && style === "current" && (
 				<ArcStrip

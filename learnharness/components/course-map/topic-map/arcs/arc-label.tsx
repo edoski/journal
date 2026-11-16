@@ -3,8 +3,7 @@ import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 
 /**
- * An arc named quietly on the map, where a chapter starts (Bands) or on
- * the arc rail (Stacked arcs): its place in study order, then its whole
+ * An arc named quietly on the map, where a chapter starts (Bands): its place in study order, then its whole
  * name, both in the muted ink, never a pill (Edo, 16 Nov 2026: the pills
  * were "too in the way"). `here` brightens the name of the arc he is in.
  */
