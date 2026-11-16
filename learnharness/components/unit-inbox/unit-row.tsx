@@ -9,7 +9,7 @@ import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
 import { monogram, rowResume, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
-import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, ROW_TITLE, RowCard, rowSurface, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
+import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, RowCard, rowSurface, rowTitle, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MathText, mathPlain } from "@/components/ui/math-text";
@@ -86,7 +86,7 @@ export function isUnitOpen(unit: Unit, pathname: string): boolean {
 
 /**
  * A topic on the list, a card (`RowCard`): the course's mark and name with
- * the status slot, then the topic's title at 14/500. A click opens the
+ * the status slot, then the topic's title (`rowTitle`). A click opens the
  * topic's page; a topic the tutor writes in recedes until hovered.
  */
 export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
@@ -146,7 +146,7 @@ export function TopicSlimRow({
 						title={unit.course.title}
 						className={cn("mt-0.5", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
 					/>
-					<span data-slot="unit-row-title" className={cn(ROW_TITLE, active ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground")}>
+					<span data-slot="unit-row-title" className={rowTitle(active)}>
 						<MathText>{unit.topic.title}</MathText>
 					</span>
 				</span>
@@ -214,11 +214,7 @@ export function SessionSlimRow({
 				)}
 				<span
 					data-slot="unit-row-title"
-					className={cn(
-						ROW_TITLE,
-						active || state === "your-turn" ? "text-foreground" : "text-muted-foreground group-hover/sidebar-row:text-foreground",
-						state === "your-turn" && "",
-					)}
+					className={rowTitle(active || highlighted || state === "your-turn")}
 				>
 					<MathText>{chat.title}</MathText>
 					{twin && (

@@ -11,13 +11,15 @@ The app's visual system on one page: what every page draws with, where each valu
 | `text-large-title` | Large Title | 26 / 32 / 400 | the composer's question |
 | `text-title-1` | Title 1 | 22 / 26 / 400 | a page's title, Home's question and every dialog's and sheet's title: one kind of title, one look |
 | `text-title-3` | Title 3 | 15 / 20 / 400 | the calendar's day numbers |
-| `text-headline` | Headline | 13 / 16 / 700 | an item's title over its own line: a sidebar card, a Today row, the topic page's Now, a mistake, a page's lead, the lesson's name in its top bar |
+| `text-headline` | Headline | 13 / 16 / 700 | an item's title over its own line: a Today row, the topic page's Now, a mistake, a page's lead, the lesson's name in its top bar |
 | `text-body` | Body | 13 / 16 / 400 | everything else that reads: nav, tabs, buttons, page facts, one-line list rows (the course page's topics), the maps' card titles, Settings, the lesson's trail |
+| `text-sidebar-title` | T3 Code's sidebar thread title | 14 / 20 / 500 | a sidebar row's title in full ink: every card, the open row, a session waiting on him |
+| `text-sidebar-title-quiet` | T3 Code's quiet thread title | 14 / 20 / 400 | a shelf row's title at rest, at 75% ink, full on hover or focus |
 | `text-callout` | Callout | 12 / 15 / 400 | meta: a row's course line, standing, slip and reason, section headers, a page's eyebrow, tooltips, a map card's line and the maps' tags (You are here, Next) |
 | `text-subheadline` | Subheadline | 11 / 14 / 400 | calendar events, a card's caption in the lesson |
 | `text-caption-2` | Caption 2 | 10 / 13 / 500 | the course's two-letter badge |
 
-Weight comes with the style, never from a `font-*` class: emphasis is Headline, and meta that was 500 is Callout at 400 with its ink saying the rest. A map card's title is Body, since Headline's bold cut the current topic's name on its fixed card. Lesson prose stays at his reading size (`text-prose`, Settings), and its markdown headings, tables and KaTeX are the prose's own.
+The sidebar's row titles are the one exception to Apple's styles: they follow T3 Code's sidebar (the T3 Code app's own row card, `text-sm` at `font-medium`, `font-normal` at 75% ink on a quiet row), since a Headline title read as bold beside T3 Code's (Edo, 16 Nov 2026). Weight comes with the style, never from a `font-*` class: emphasis is Headline, and meta that was 500 is Callout at 400 with its ink saying the rest. A map card's title is Body, since Headline's bold cut the current topic's name on its fixed card. Lesson prose stays at his reading size (`text-prose`, Settings), and its markdown headings, tables and KaTeX are the prose's own.
 
 **Shipped** (Edo, 17 Nov 2026: "Ship it"): the Visual system switch and Current's type are deleted, and every use names its macOS style. The older names (`text-caption`, `text-label`, `text-row`, `text-control`, `text-subheading`, `text-heading`, `text-display`, and `text-xs`…`text-3xl` through `--lh-text-*`) remain only where no switch ever named a macOS style; a new use takes a macOS style. Maths renders at 1.1em (KaTeX).
 
@@ -57,7 +59,7 @@ Words come from `study-words.ts` and `topic-standing.ts` (`standingOf`, `slipBes
 
 ## Frame
 
-- **Window band:** 52px at the top, a drag strip; the lesson's top bar sits in it, 16 in from the sidebar.
+- **Window band:** 52px at the top, a drag strip; the lesson's top bar sits in it, 16 in from the sidebar. Folded, the sidebar is a 48px rail whose head is the band; in the Mac app its open button stands in the band beside the traffic lights at 90px, as T3 Code's toggle does, and the band's content starts 12px past it (unit-inbox.md, "Folded").
 - **Page column** (`PAGE_COLUMN`, `page-frame/page-frame.tsx`): centred, up to 80rem, 24 sides, 24 under the band and above the foot. At 1512 with the sidebar open it is 1256 wide and its content runs from x=280 to 1488; a page's first line sits at y=76, its title at y=99. The course page, the topic page and Home sit on it.
 - **Lesson column:** centred, about 736 wide, as T3 Code's and Claude Desktop's (Edo, 14 Nov 2026).
 - **Settings:** a dialog, 880 wide, its own nav column.

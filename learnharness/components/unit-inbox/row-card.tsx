@@ -36,9 +36,18 @@ export const TRAILING_SLOT =
  */
 export const ROW_FRAME = "flex flex-col px-2.5 py-2";
 
-/** Every row's title: 14px on a 20px line, wrapping onto a second line
- *  and cut only past it. */
-export const ROW_TITLE = "line-clamp-2 min-w-0 text-body text-pretty";
+/** Every row's title: T3 Code's thread title, 14px on a 20px line,
+ *  wrapping onto a second line and cut only past it. `loud` is a row
+ *  that needs him or is open (a card, the open row, a session waiting on
+ *  him): 500 in full ink. Otherwise it is T3 Code's quiet row, 400 at 75%
+ *  ink until the row is hovered or has keyboard focus. */
+export const rowTitle = (loud: boolean) =>
+	cn(
+		"line-clamp-2 min-w-0 text-pretty",
+		loud
+			? "text-sidebar-title text-foreground"
+			: "text-sidebar-title-quiet text-foreground/75 group-hover/sidebar-row:text-foreground group-has-[:focus-visible]/sidebar-row:text-foreground",
+	);
 
 /** A shelf row's first line: the course mark beside the title. */
 export const ROW_BODY = "flex min-w-0 items-start gap-2";
@@ -71,7 +80,7 @@ export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";
  * under the one row rule (`ROW_FRAME`): line 1 the course's mark and name
  * with the status slot, on one line always: the status keeps its words and
  * the name gives way, whole, when both do not fit (the mark still names
- * the course), never cut to "Linear Alg…". Then the title at 14/500 on the name's edge, where a
+ * the course), never cut to "Linear Alg…". Then the title, T3 Code's at 500 (`rowTitle`), on the name's edge, where a
  * shelf row's title starts, two lines at most; the whole card one link,
  * its action (if any) over the status slot. `recede` dims a card the tutor
  * writes in to 70% until its row is hovered or anything in it (the card or
@@ -119,7 +128,7 @@ export function RowCard({
 						{status}
 					</span>
 				</span>
-			<span data-slot="unit-row-title" className={cn(ROW_TITLE, "mt-1 pl-6 text-headline text-foreground")}>
+			<span data-slot="unit-row-title" className={cn(rowTitle(true), "mt-1 pl-6")}>
 				<MathText>{title}</MathText>
 			</span>
 		</>

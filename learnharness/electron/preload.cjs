@@ -14,6 +14,10 @@
  *   publishes it as --lh-zoom so physical-constant lengths (the traffic-
  *   light gutter) can divide by it.
  *
+ *   window.lh.lightsCentre — the traffic lights' centre from the window's
+ *   top, in points (TRAFFIC_LIGHTS in electron/main.cjs, passed as
+ *   --lh-lights-centre); the renderer publishes it as --lh-lights-centre.
+ *
  *   window.lh.pickFolder() — the system folder picker for Context's Link a
  *   folder; resolves to the folder's path, or null when cancelled.
  *
@@ -29,6 +33,7 @@ contextBridge.exposeInMainWorld("lh", {
 		return () => ipcRenderer.removeListener("lh:zoom", listener);
 	},
 	getZoom: () => ipcRenderer.invoke("lh:zoom:get"),
+	lightsCentre: Number(process.argv.find((arg) => arg.startsWith("--lh-lights-centre="))?.split("=")[1]),
 	pickFolder: () => ipcRenderer.invoke("lh:pick-folder"),
 	/** The machine woke from sleep; returns unsubscribe. */
 	onResume: (cb) => {

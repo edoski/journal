@@ -54,7 +54,7 @@ export function TopBar({
 	return (
 		<header
 			onMouseDown={onMouseDown}
-			className={`${drag ? "lh-drag " : ""}lh-wco-gutter flex select-none items-center border-b border-border ${size === "slim" ? "h-13 gap-2 px-4" : "h-15 gap-3 px-3"}`}
+			className={`${drag ? "lh-drag " : ""}lh-wco-gutter lh-band-start flex select-none items-center border-b border-border ${size === "slim" ? "h-13 gap-2 px-4" : "h-15 gap-3 px-3"}`}
 		>
 			{children}
 		</header>

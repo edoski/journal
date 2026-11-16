@@ -42,7 +42,8 @@ describe("desktop window chrome", () => {
 	it("keeps the proven traffic lights in a sandboxed window", () => {
 		const options = windowOptions();
 		assert.equal(options.titleBarStyle, "hiddenInset");
-		assert.deepEqual(options.trafficLightPosition, { x: 16, y: 22.5 });
+		assert.deepEqual(options.trafficLightPosition, { x: 16, y: 23 });
+		assert.deepEqual(options.webPreferences.additionalArguments, ["--lh-lights-centre=30"], "the renderer gets the lights' centre: 23 + 14 / 2");
 		assert.equal(options.webPreferences.contextIsolation, true);
 		assert.equal(options.webPreferences.sandbox, true);
 		assert.equal(options.webPreferences.nodeIntegration, false);
@@ -60,11 +61,14 @@ describe("desktop window chrome", () => {
 				},
 				ipcRenderer: { on() {} },
 			}),
+			// A sandboxed preload's process carries the window's arguments.
+			process: { argv: ["electron", "--lh-lights-centre=30"] },
 		};
 		runInNewContext(readFileSync(new URL("../electron/preload.cjs", import.meta.url), "utf8"), context);
 		assert.deepEqual(Object.keys(bridge).sort(), [
-			"expandWindow", "getZoom", "onResume", "onZoom", "pickFolder",
+			"expandWindow", "getZoom", "lightsCentre", "onResume", "onZoom", "pickFolder",
 		]);
+		assert.equal(bridge.lightsCentre, 30);
 	});
 });
 
