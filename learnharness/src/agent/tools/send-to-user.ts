@@ -4,14 +4,20 @@ import { SEND_TO_USER_TOOL } from "../../core/native-messages.ts";
 import { serverExecute } from "../tool-execute.ts";
 import { SENTENCE_WORDS } from "../../core/voice-check.ts";
 
-/** The voice rules a first draft broke most often, stated where the draft is
- *  written (round 11: 22 refusals for a sentence opening on a formula or a
- *  turn past its budget, each one more model round trip); voice-check holds
- *  both examples and the count to them. */
-export const MESSAGE_DRAFT_RULES =
+/** The voice rules first drafts break most often, stated where the draft
+ *  is written, one line each, so a rule joins the list by adding its line
+ *  (round 11: 22 refusals for a sentence opening on a formula or a turn past
+ *  its budget; round 12: a point made twice, 18 of the evaluators' 81
+ *  refusals, and length 14, each one more model round trip). voice-check
+ *  holds the examples and the counts to them. */
+export const MESSAGE_DRAFT_LINES: readonly string[] = [
 	"Every sentence opens with a word, never a symbol or a formula (\"The matrix $A$ takes vectors with 5 entries.\", " +
-	"never \"$A$ takes vectors with 5 entries.\"). Its length is the voice's budget for this kind of turn, counted as he reads it: " +
-	`a clause after a colon or a semicolon is one more sentence, and a sentence over ${SENTENCE_WORDS} words is two.`;
+		"never \"$A$ takes vectors with 5 entries.\").",
+	"Its length is the voice's budget for this kind of turn, counted as he reads it: " +
+		`a clause after a colon or a semicolon is one more sentence, and a sentence over ${SENTENCE_WORDS} words is two.`,
+	"A point is made once: what he was told earlier in the session is never said again, in other words, a display or a callout; say only what is new.",
+];
+export const MESSAGE_DRAFT_RULES = MESSAGE_DRAFT_LINES.join(" ");
 
 const sendToUserInput = Type.Object({
 	message: Type.String({
