@@ -381,7 +381,7 @@ export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = 
 	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
 	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
 	explain:
-		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
+		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`, with no words between: the problem's card shows how it ended, and the teaching follows.",
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has

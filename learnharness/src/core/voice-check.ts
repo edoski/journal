@@ -90,6 +90,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	// in x widens what Ax reaches, whereas it sends more inputs onto the
 	// same outputs.", "You held that the nullity is rows minus rank, but…").
 	{ rule: "contrast", re: /(?:^|[.!?]\s+|\n)you held that\b|\byou (?:held|believed|assumed|thought) that\b[^.?!\n]*?\b(?:whereas|when in fact|but in fact|while in fact)\b/i },
+	// What happens to a problem is on its card, never in his words (round
+	// 14, m14: "This problem is closed with no mark, and the explanation
+	// comes next." after Explain instead).
+	{ rule: "narration", re: /\b(?:this|the|that) (?:problem|question) is (?:now )?(?:closed|concluded|set aside|over|ended)\b|\b(?:the |an )?explanation (?:comes|is coming|follows) next\b|\b(?:closed|ended|concluded) with no mark\b/i },
 	{ rule: "plan", re: /(?:^|\n)\s*(?:today|this lesson|in this lesson|the goal)\s*:/i },
 	{ rule: "plan", re: /\b(?:we'?ll start with|let'?s start with|so first|first,? a (?:check|question) on|before (?:we|you) (?:compute|start|go on|move on|begin)|needs? one clean answer|planned to start|is planned for|comes back for review today, so|the lesson (?:starts|will start|begins|opens) with)\b/i },
 	{ rule: "offer", re: /\b(?:want (?:a|me to|to)|would you like|shall (?:we|I))\b[^.?!\n]*\?/i },
