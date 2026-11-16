@@ -114,6 +114,8 @@
 	--lh-map-line: color-mix(in srgb, white 33%, var(--background));
 	--lh-map-line-lit: color-mix(in srgb, white 70%, var(--background));
 	--lh-map-line-receded: color-mix(in srgb, white 10%, var(--background));
+	/* A line to a neighbouring arc's faded card (Tree and neighbours). */
+	--lh-map-line-context: color-mix(in srgb, white 18%, var(--background));
 
 	/* Shape: 8 controls and rows, 12 cards, docks and menus, 20 the composer. */
 	--lh-radius-sm: 8px;
@@ -307,6 +309,7 @@ body {
 	--color-map-line: var(--lh-map-line);
 	--color-map-line-lit: var(--lh-map-line-lit);
 	--color-map-line-receded: var(--lh-map-line-receded);
+	--color-map-line-context: var(--lh-map-line-context);
 }
 
 /* Mermaid diagrams: keep wide charts inside the content column. Mermaid

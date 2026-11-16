@@ -13,8 +13,10 @@ import { onPolishChange, polishVariant } from "@/components/dev/polish-variant.j
  *  - `bands`: the arcs as chapters top to bottom in study order, each
  *    numbered in the margin, a hairline between (bands/bands.md);
  *  - `overview`: each arc one card, the one he is in open in place to its
- *    topics (overview/overview.md). */
-export const MAP_STYLE_OPTIONS = ["tree", "regions", "bands", "overview"] as const;
+ *    topics (overview/overview.md);
+ *  - `neighbours`: Tree and neighbours, Canvas tree's one arc between faded
+ *    bands for the arcs before and after (neighbours/neighbours.md). */
+export const MAP_STYLE_OPTIONS = ["tree", "regions", "bands", "overview", "neighbours"] as const;
 export type MapStyle = "current" | (typeof MAP_STYLE_OPTIONS)[number];
 
 const DEV = process.env.NODE_ENV === "development";

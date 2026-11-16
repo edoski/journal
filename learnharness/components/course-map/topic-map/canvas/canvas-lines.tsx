@@ -19,18 +19,21 @@ export interface CanvasLine {
 	topic?: TopicHandle;
 	/** For a line between arcs, the needs it stands for, `prerequisite>topic`. */
 	needs?: readonly string[];
+	/** A line to or from a neighbouring arc's card (Tree and neighbours), always in the context ink. */
+	faded?: boolean;
 }
 
 /** How a line reads: at rest, lit with the topic in focus or the lit
  *  chain, or receded while something else is. */
-export type LineInk = "rest" | "lit" | "receded";
+export type LineInk = "rest" | "lit" | "receded" | "context";
 /** Drawn in this order, so a lit line passes over the rest. */
-export const LINE_INKS: readonly LineInk[] = ["receded", "rest", "lit"];
+export const LINE_INKS: readonly LineInk[] = ["context", "receded", "rest", "lit"];
 
 export type CanvasLinesFlowEdge = Edge<{ lines: readonly CanvasLine[] }, "canvasLines">;
 
 /** Each line's ink, from the topic in focus or else the lit chain. Pure. */
 export function inkOf(line: CanvasLine, focus: Focus | null, chain: ReadonlySet<TopicHandle> | null): LineInk {
+	if (line.faded) return "context";
 	if (focus) {
 		const on = line.needs ? line.needs.some((key) => key.split(">").includes(focus.topic)) : focus.lines.has(lineKey(line.prerequisite!, line.topic!));
 		return on ? "lit" : "receded";
@@ -52,7 +55,7 @@ export function inkPaths(lines: readonly CanvasLine[], focus: Focus | null, chai
 	return paths;
 }
 
-const STROKE: Record<LineInk, string> = { rest: "stroke-map-line", lit: "stroke-map-line-lit", receded: "stroke-map-line-receded" };
+const STROKE: Record<LineInk, string> = { rest: "stroke-map-line", lit: "stroke-map-line-lit", receded: "stroke-map-line-receded", context: "stroke-map-line-context" };
 
 /**
  * Every line of the canvas (canvas.md, Lines), drawn as one React Flow

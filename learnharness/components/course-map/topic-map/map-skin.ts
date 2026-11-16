@@ -61,6 +61,9 @@ export interface MapSkin {
 	/** The edges it draws, when not one per need along the layout's routes
 	 *  (`routes` stay the needs: the camera frames a topic's next topics by them). */
 	edges?: (map: CourseMap, layout: TopicMapLayout) => Edge[];
+	/** Grows a one-arc drawing (`base`, laid out on `view`) with what it shows around the arc: its neighbouring
+	 *  arcs (Tree and neighbours). */
+	around?: (course: CourseMap, view: ArcView, arc: ArcHandle | undefined, base: TopicMapLayout) => TopicMapLayout;
 	/** Nodes that are not topics (arc regions, headers), placed in the drawing. */
 	decorations?: (map: CourseMap, layout: TopicMapLayout) => Node[];
 	/** Where an arrow key goes from a topic; null at the drawing's edge. */
@@ -102,7 +105,8 @@ export const CURRENT_SKIN: MapSkin = {
 export function drawingOf(skin: MapSkin, course: CourseMap, arc: ArcHandle | undefined, opened: ArcHandle | null = null): { view: ArcView; layout: TopicMapLayout; framedArc: ArcHandle | null } {
 	if (!skin.grouped || !course.arcs || course.arcs.length < 2) {
 		const view = arcView(course, arc);
-		return { view, layout: skin.layout(view.map.topics, view.map.edges, new Set(view.entry.keys())), framedArc: null };
+		const base = skin.layout(view.map.topics, view.map.edges, new Set(view.entry.keys()));
+		return { view, layout: skin.around?.(course, view, arc, base) ?? base, framedArc: null };
 	}
 	const current = currentArc(course);
 	const shown = opened ?? (arc && course.arcs.some((a) => a.handle === arc) ? arc : null);
