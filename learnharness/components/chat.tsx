@@ -715,9 +715,14 @@ export function Chat({
 	// goes HOME: refetch the record, drop the orphan, put the draft back in
 	// the composer, open the dialog. The draft stays in the composer until
 	// the learner re-sends it (owner ruling 2026-10-09).
+	// Whether the refused send carried words he typed (the opening's draft,
+	// or what stays in the box until a send is accepted): only then does the
+	// line say they are still in the box (round 11, 4 minor 3).
+	const [refusedWords, setRefusedWords] = useState(false);
 	useEffect(() => {
 		if (!error) return;
 		if (!parseProviderKeyRefusal(error.message)) return; // a real error keeps the honest banner
+		setRefusedWords(Boolean(draftRef.current?.trim() || textRef.current.trim()));
 		// The draft restore and the dialog open land together after the
 		// record refetch (the honest truth minus the refused send).
 		let cancelled = false;
@@ -1738,7 +1743,7 @@ export function Chat({
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}

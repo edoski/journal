@@ -76,14 +76,18 @@ export function isCourseDeletedRefusal(message: string | undefined): boolean {
 }
 
 /** `again`: the press before failed the same way, so the line says so
- *  where its words allow (round 9: a second Enter changed nothing). */
-export function turnErrorText(message: string, again = false): TurnErrorText {
+ *  where its words allow (round 9: a second Enter changed nothing).
+ *  `kept`: the refused turn carried words he typed, which went back into
+ *  the box; a press with no words (Next problem) says nothing of the box
+ *  (round 11, 4 minor 3: "What you wrote is still in the box." over an
+ *  empty box). */
+export function turnErrorText(message: string, again = false, kept = false): TurnErrorText {
 	const raw = message.trim();
 	if (UNREACHABLE.test(raw)) {
 		return { kind: "offline", sentence: `${again ? "Still can't" : "Couldn't"} reach the app. Check it's running, then try again.`, details: null };
 	}
 	if (parseProviderKeyRefusal(raw)) {
-		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply. What you wrote is still in the box.", details: null };
+		return { kind: "signed-out", sentence: `Claude isn't signed in, so the tutor couldn't reply.${kept ? " What you wrote is still in the box." : ""}`, details: null };
 	}
 	if (CLAUDE_SIGNED_OUT_STARTS.some((start) => raw.startsWith(start))) {
 		return { kind: "signed-out", sentence: "Claude isn't signed in, so the tutor couldn't reply.", then: "sign-in-retry", details: null };
