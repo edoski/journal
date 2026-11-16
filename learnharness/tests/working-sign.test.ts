@@ -36,3 +36,10 @@ test("a posed question ends the line: what is left is the turn closing, and he c
 	assert.equal(showsWorking([learner, tutor({ type: "tool-problem", state: "output-available", toolCallId: "p1" })], true), false, "a posed problem too");
 	assert.equal(showsWorking([learner, tutor({ type: "tool-explain", state: "output-error", toolCallId: "q3" })], true), true, "a refused question never reached him");
 });
+
+test("words he has whole, with the turn still running, show the line under them (round 13, 4 #2)", () => {
+	// Round 13: after a practice problem's closing words, 6 to 16 s went by
+	// with no sign while the tutor's last call ran.
+	assert.equal(showsWorking([learner, tutor({ type: "text", text: "Your second answer is right.", state: "done" })], true), true);
+	assert.equal(showsWorking([learner, tutor({ type: "text", text: "Your second answer", state: "streaming" })], true), false, "words still arriving are the sign");
+});
