@@ -19,9 +19,9 @@ describe("the brief says when he last studied the course", () => {
 	});
 
 	it("names it as the one day to tell him", () => {
-		const today = projectCourseBrief(RESUME, "teacher", { studied: { date: "2026-11-17", daysAgo: 0 } }).text;
+		const today = projectCourseBrief(RESUME, "teach", { studied: { date: "2026-11-17", daysAgo: 0 } }).text;
 		assert.match(today, /He last studied this course today\b[^\n]*never a moved day's note/);
-		const earlier = projectCourseBrief(RESUME, "teacher", { studied: { date: "2026-11-09", daysAgo: 8 } }).text;
+		const earlier = projectCourseBrief(RESUME, "teach", { studied: { date: "2026-11-09", daysAgo: 8 } }).text;
 		assert.match(earlier, /He last studied this course on 2026-11-09 \(Monday\), 8 days ago/);
 	});
 });

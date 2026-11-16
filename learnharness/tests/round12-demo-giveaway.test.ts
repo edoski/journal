@@ -19,7 +19,7 @@ import { demoInputSchema } from "../src/agent/tools/jobs.ts";
 const recorded = JSON.parse(fs.readFileSync(new URL("./fixtures/round12/poisson-demo.json", import.meta.url), "utf8")) as { plan_init: { mermaid: string }; demo: { title: string; brief: string } };
 
 let n = 0;
-const call = (name: string, args: Record<string, unknown>): ToolCall => ({ type: "toolCall", id: `c-${++n}`, name, arguments: args });
+const call = (name: string, args: object): ToolCall => ({ type: "toolCall", id: `c-${++n}`, name, arguments: args as ToolCall["arguments"] });
 const ok = (c: ToolCall): LhMessage => ({ id: `r-${++n}`, role: "toolResult", toolCallId: c.id, toolName: c.name, content: [{ type: "text", text: "{\"ok\":true}" }], details: {}, isError: false, timestamp: 1 }) as LhMessage;
 const assistant = (content: unknown[]): LhMessage => ({ ...fauxAssistantMessage(""), content, id: `a-${++n}` }) as LhMessage;
 
