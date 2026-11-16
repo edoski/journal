@@ -27,8 +27,8 @@ describe("needsYouNow", () => {
 
 	it("gives every session to pick up since yesterday its own line, the newest first, after the plan's reviews (round 10, 1 m2); a course keeps its line when no session shown works on its step", () => {
 		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
-		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Linear Algebra", "Real Analysis", "Calculus I"]);
-		assert.deepEqual(also.map((l) => label(l.row)), ["session chat_eigen", "session chat_rank"]);
+		assert.deepEqual(lines.map((l) => label(l.row)), ["Probability", "Linear Algebra", "Real Analysis", "Calculus I", "session chat_eigen"]);
+		assert.deepEqual(also.map((l) => label(l.row)), ["session chat_rank"], "the lesson he is in today keeps a line (round 11, 3 n5)");
 		assert.ok(!lines.some((l) => l.key === "chat_old"), "a session waiting from before yesterday gets no line");
 	});
 

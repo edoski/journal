@@ -42,11 +42,25 @@ export function followedRow(rows: readonly TodayRow[], pointed: string | null): 
 /** At most this many lines; past it the last line names the other courses. */
 export const MAX_LINES = 5;
 
-/** Today's lines as shown: the first lines, and the courses folded into
- *  the last one ("Also today"). Pure. */
+/** Whether a line is a session he is in: it waits on him, the tutor
+ *  writes in it or stopped mid-reply, and he last worked in it today. */
+function inToday(row: TodayRow): boolean {
+	if (row.kind !== "session" || !row.course) return false;
+	const state = sessionState(row.chat);
+	return (state === "your-turn" || state === "working" || state === "paused") && localDay(new Date(row.chat.updatedAt)) >= row.course.map.today;
+}
+
+/** Today's lines as shown: the first lines, then the first session he is
+ *  in today that the fold would hide, as the last full line (round 11,
+ *  3 n5: the lesson he had just left folded into "Also today:" below two
+ *  sessions the seed dated later the same day), and the rest folded into
+ *  the last line ("Also today"), so a lesson left on an earlier day still
+ *  comes after the plan. At most MAX_LINES full lines and the fold, which
+ *  still fit his window with the Studied today line. Pure. */
 export function foldLines(rows: readonly TodayRow[]): { shown: readonly TodayRow[]; also: readonly TodayRow[] } {
-	const shown = rows.length > MAX_LINES ? rows.slice(0, MAX_LINES - 1) : rows;
-	return { shown, also: rows.slice(shown.length) };
+	if (rows.length <= MAX_LINES) return { shown: rows, also: [] };
+	const shown = [...rows.slice(0, MAX_LINES - 1), ...rows.slice(MAX_LINES - 1).filter(inToday).slice(0, 1)];
+	return { shown, also: rows.filter((row) => !shown.includes(row)) };
 }
 
 /** The key React keeps a line by: a session's id, else its course and

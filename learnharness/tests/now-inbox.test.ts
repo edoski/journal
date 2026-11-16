@@ -75,11 +75,11 @@ describe("restShelves", () => {
 		const learning = restShelves(inbox, new Set(top.map((u) => u.key))).learning;
 		assert.deepEqual(
 			learning.filter(waitsOnYou).map((u) => u.topic.handle),
-			["eigen", "rank", "det"],
-			"the sessions Today folds after the plan (round 10, 1 m2), and one from before yesterday",
+			["rank", "det"],
+			"the session Today folds after the plan and the lesson he is in (round 10, 1 m2; round 11, 3 n5), and one from before yesterday",
 		);
-		assert.deepEqual(learning.slice(0, 3).map((u) => u.topic.handle), ["eigen", "rank", "det"]);
-		assert.ok(!learning.slice(3).some(waitsOnYou));
+		assert.deepEqual(learning.slice(0, 2).map((u) => u.topic.handle), ["rank", "det"]);
+		assert.ok(!learning.slice(2).some(waitsOnYou));
 	});
 });
 
