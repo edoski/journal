@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
 import { ArcStrip } from "@/components/course-map/arc-strip";
+import { ArcSelector } from "@/components/course-map/arc-selector";
 import { arcShare, shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { useMapSkin } from "@/components/course-map/topic-map/map-skins";
@@ -78,8 +79,8 @@ export function HomeMap({
 	const [opensWhole, setOpensWhole] = useState<ReadonlyMap<string, boolean>>(new Map());
 	const chosenCourse = courses.find((c) => c.map.workspace === chosen)!;
 	const arcs = shownArcs(chosenCourse.map);
-	// A map style that marks the arcs off on the map itself names them there, in order; the strip gives way.
-	const groupedMap = useMapSkin().skin.grouped === true;
+	// Every map style but Current names the arcs with the quiet selector (arc-selector.md).
+	const quietSelector = useMapSkin().style !== "current";
 	// The arc he picked on the strip, per course, for the visit.
 	const [picked, setPicked] = useState<ReadonlyMap<string, ArcHandle>>(new Map());
 	const follow = (followed === undefined ? litArc(chosenCourse, highlight) : followed) ?? null;
@@ -134,7 +135,19 @@ export function HomeMap({
 					</Hint>
 				</div>
 			</div>
-			{arcs && !groupedMap && (
+			{arcs && quietSelector && (
+				<ArcSelector
+					className="shrink-0"
+					arcs={arcs.map((a) => ({ handle: a.handle, title: a.title, share: arcShare(chosenCourse, a.handle) }))}
+					value={shownArc ?? null}
+					here={currentArc(chosenCourse.map)}
+					onSelect={(arc) => {
+						setPicked((was) => new Map(was).set(chosen, arc));
+						setWhole(false);
+					}}
+				/>
+			)}
+			{arcs && !quietSelector && (
 				<ArcStrip
 					quiet
 					className="shrink-0"
