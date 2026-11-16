@@ -49,7 +49,7 @@ export function NeighbourBandNode({ data, positionAbsoluteX }: NodeProps<Neighbo
 			aria-label={`Open ${band.arc.title}`}
 			onClick={() => openArc?.(band.arc.handle)}
 			className={cn(
-				"group/band pointer-events-auto relative flex size-full cursor-pointer flex-col rounded-xl bg-white/[0.02] px-4 text-left outline-none transition-colors hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+				"group/band pointer-events-auto relative flex size-full cursor-pointer flex-col px-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
 				band.side === "before" ? "justify-start" : "justify-end",
 			)}
 		>
