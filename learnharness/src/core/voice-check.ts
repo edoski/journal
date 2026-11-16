@@ -57,6 +57,7 @@ export type VoiceRule =
 	| "predict"
 	| "card"
 	| "contrast"
+	| "hint-question"
 	| "unsaved"
 	| "maths-words"
 	| "reason-twice"

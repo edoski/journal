@@ -455,6 +455,8 @@ export function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string):
 		}
 		case "contrast":
 			return `"You held that…, whereas…" reads as a formula after the break is already said: ${quoted(b.excerpt)}. Leave it out; say one plain sentence of contrast only when it adds something the break did not.`;
+		case "hint-question":
+			return `A hint gives him what the question did not, said as a statement: the next move ("Subtract row 1 from row 3 and look at what is left") or a fact the question left out. This one asks him a question instead: ${quoted(b.excerpt)}. Say the move or the fact; his question is asked again after it.`;
 		case "predict":
 			return `A prediction asks for his guess, and this question asks him to work something out: ${quoted(b.excerpt)}. ${PREDICT_RULE} So pose it as \`type: check\`, counted; only a question he cannot yet work out is a prediction, and its words then ask for his guess ("What do you expect…").`;
 		case "unbuilt":
@@ -978,6 +980,12 @@ export class VoiceGuard {
 		if (compound) out.push(compound);
 		const under = afterQuestion(text);
 		if (under.length > 0 && kind !== "hint") out.push({ rule: "advice", excerpt: under.join(" ") });
+		// A hint gives what the question did not; asked as a question, it
+		// asked the same thing again (round 14, m17: "What does R3 − R1 − R2
+		// give you?" became "What happens to row 3 during elimination if it
+		// really is row 1 plus row 2?").
+		const hintAsks = kind === "hint" ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
+		if (hintAsks) out.push({ rule: "hint-question", excerpt: hintAsks.trim() });
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;
 		if (echo) out.push({ rule: "echo", excerpt: echo });

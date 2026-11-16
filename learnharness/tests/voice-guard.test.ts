@@ -130,7 +130,7 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 
 describe("turns within the voice pass untouched", () => {
 	const good: Array<[string, LhMessage[], ToolCall]> = [
-		["a hint, one question", [newUserMessage("Graphs"), assistant([ask("Build the transpose.", "recall")]), hinted("x")], send("When you meet $v$ in the list of $u$, which edge of $G^T$ does that edge of $G$ become?")],
+		["a hint, one move said as a statement (round 14, m17)", [newUserMessage("Graphs"), assistant([ask("Build the transpose.", "recall")]), hinted("x")], send("Each time you meet $v$ in the list of $u$, add $u$ to the list of $v$ in $G^T$.")],
 		[
 			"a wrong answer, where it broke and the correct move",
 			answering("No row is a multiple of another, so rank 3"),
