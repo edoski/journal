@@ -44,12 +44,16 @@ export function DoneTonightLine() {
 	return <SectionBreak testId="done-tonight-line" label={LESSON_WORDS.doneTonight} />;
 }
 
-/** Whether Done for today is out of sight: the lesson is closed for today,
- *  or its course or the lesson itself was deleted, where there is nothing
- *  left to stop (round 8: a deleted course's lesson kept a greyed-out
- *  Done for today). */
-export function doneTonightGone({ closedForToday, courseGone, lessonGone }: { closedForToday: boolean; courseGone: boolean; lessonGone: boolean }): boolean {
-	return closedForToday || courseGone || lessonGone;
+/** Whether Done for today is out of sight: the lesson is closed for today
+ *  with nothing open in it, or its course or the lesson itself was deleted,
+ *  where there is nothing left to stop (round 8: a deleted course's lesson
+ *  kept a greyed-out Done for today). A question or problem open after an
+ *  earlier close, as the one he left is when he comes back, can be stopped
+ *  again (round 14, 2 56: a live question with no Done and a dead ⌘⇧D).
+ *  A session the tutor ended (`finished`: a review that closed itself) has
+ *  nothing left to stop either (round 14, m32). */
+export function doneTonightGone({ closedForToday, open = false, finished = false, courseGone, lessonGone }: { closedForToday: boolean; open?: boolean; finished?: boolean; courseGone: boolean; lessonGone: boolean }): boolean {
+	return ((closedForToday || finished) && !open) || courseGone || lessonGone;
 }
 
 /** Where his keys go once Done for today has settled: the composer, which

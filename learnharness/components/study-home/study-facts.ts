@@ -80,8 +80,11 @@ export function todaySteps(course: StudyCourse): NextStep[] {
 		steps.push({ kind: "task", key: task.key, title: task.title, updated: task.updated, topics: held.length > 0 ? held : current ? [current.handle] : [] });
 	}
 	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
-	// A lesson he began goes on today: Continue, never Start (round 12, 1 D3).
-	for (const group of [planned.filter(lessonBegun), planned.filter((t) => !lessonBegun(t))]) {
+	// A lesson he began goes on today: Continue, never Start (round 12, 1 D3),
+	// and the open task holding it is that Continue (round 14, M7: Home listed
+	// the begun Poisson lesson twice on the exam eve, as its task and its topic).
+	const held = new Set(steps.flatMap((s) => (s.kind === "task" ? s.topics : [])));
+	for (const group of [planned.filter((t) => lessonBegun(t) && !held.has(t.handle)), planned.filter((t) => !lessonBegun(t))]) {
 		if (group.length > 0) steps.push({ kind: "topic", title: titleList(group.map((t) => t.title)), topics: group.map((t) => t.handle), fresh: !lessonBegun(group[0]!), planned: true });
 	}
 	if (steps.length > 0) return steps;
@@ -276,7 +279,10 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 				}
 				continue;
 			}
-			const lesson = own(leftovers, step);
+			// An older session still open on the step's task is its line, so Home says that session's own status,
+			// as the calendar and the topic page do (round 14, m28: "Left off 10 Nov" here, "Your turn" there).
+			const holder = step.kind === "task" ? open.find((c) => !left(c) && c.course?.workspace === course.map.workspace && c.tasks?.includes(step.key)) : undefined;
+			const lesson = own(leftovers, step) ?? holder;
 			if (laterOnly(step)) {
 				if (!lesson) later.push({ kind: "course", course, step });
 			} else if (!lesson) {

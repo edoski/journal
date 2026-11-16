@@ -4,6 +4,7 @@ import { pausedWords, sessionState } from "@/components/nav/session-state";
 import { continueWords, planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { leftWords, taskWords } from "@/components/unit-inbox/units";
 import { localDay } from "@/components/day-change";
+import { sessionName } from "@/components/study-home/day-record";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
@@ -79,19 +80,15 @@ export function courseTitle(row: TodayRow): string {
 	return row.kind === "session" && row.chat.course ? courseLabel(row.chat.course) : "No course";
 }
 
-/** A line's lesson in words: the waiting session's title, or the course's
- *  next step ("Review A, B"). A lesson left for next time reads as the step
- *  it takes up: "Continue" and the title of the task it holds, the words
- *  that task's own line reads, else "Continue" and its own title (round
- *  10, 1 m5: "Continue Eigenvalues and eigenvectors lesson" became
- *  "Eigenvalues and eigenvectors" once the lesson took the task's line,
- *  and "Also today: Continuity" had no verb). Pure. */
+/** A line's lesson in words: the session's one name (`sessionName`, the
+ *  title of the task it holds), or the course's next step ("Review A, B").
+ *  A lesson left for next time reads as the step it takes up: "Continue"
+ *  and that name, the words the task's own line reads (round 10, 1 m5:
+ *  "Also today: Continuity" had no verb). Pure. */
 export function lessonTitle(row: TodayRow): string {
 	if (row.kind === "course") return stepWords(row.step);
-	if (sessionState(row.chat) !== "left") return row.chat.title;
-	const held = new Set(row.chat.tasks ?? []);
-	const task = row.course?.map.tasks.find((t) => held.has(t.key));
-	return continueWords(task?.title ?? row.chat.title);
+	const name = sessionName(row.chat, row.course?.map.tasks ?? []);
+	return sessionState(row.chat) === "left" ? continueWords(name) : name;
 }
 
 /** Why a line is on Today: its kind (which picks its icon) and the few

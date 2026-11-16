@@ -18,6 +18,7 @@ const ICON: Record<Exclude<UnitStatus["kind"], "working" | "studied" | "none" | 
 	review: WHY_ICON.review,
 	task: WHY_ICON.task,
 	returns: CalendarClockIcon,
+	stopped: WHY_ICON.stopped,
 };
 
 /** A row's status (units.ts `unitStatus`), T3 Code's status label: a 12px

@@ -44,6 +44,9 @@ const askOptionProps = {
 	description: Type.Optional(
 		Type.String({ description: "Never shown to him: the label alone says what the option is." }),
 	),
+	stops: Type.Optional(
+		Type.Boolean({ description: "True on an option that ends the session for today (\"Stop here for today\"): picking it is his Done for today, so the app closes the session as that does." }),
+	),
 };
 
 /** GLM wobble guard (owner-approved, 2026-09-26): models sometimes emit
@@ -250,6 +253,14 @@ export const askInputSchema = Type.Object({
 // call boundary in execute (askOptionProblems, above).
 
 export type AskToolInput = Static<typeof askInputSchema>;
+
+/** Whether his answer to a choices question picked an option the tutor
+ *  marked as ending the session for today (`stops`). Pure. */
+export function picksStop(input: unknown, answer: { answers?: ReadonlyArray<{ index?: number }> }): boolean {
+	const options = parseOptionsIfString((input as { options?: unknown } | null)?.options as string | undefined);
+	if (!Array.isArray(options)) return false;
+	return (answer.answers ?? []).some((picked) => typeof picked.index === "number" && (options[picked.index - 1] as { stops?: unknown } | undefined)?.stops === true);
+}
 export type ExplainToolInput = Static<typeof explainInputObject>;
 
 /** A real selected answer, in the order the options were displayed. */

@@ -31,7 +31,7 @@
  * turn rides one composition.
  */
 
-import { dismissedAnswer, type QuestionAnswerData } from "./question-core.ts";
+import { dismissedAnswer, picksStop, type QuestionAnswerData } from "./question-core.ts";
 import { parsePhotos, type Photo } from "./photos.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import type { LhMessage } from "./native-messages.ts";
@@ -339,7 +339,12 @@ export function inputAppends(
 			if (!pending || pending.toolCallId !== input.toolCallId) {
 				throw new ChatInputError("answer input targets no pending question call");
 			}
-			return [newAnswerResult(input.toolCallId, pending.tool, input.answer, input.photos)];
+			const result = newAnswerResult(input.toolCallId, pending.tool, input.answer, input.photos);
+			// His pick of the tutor's own stop is his Done for today (round 14,
+			// M6: "Stop here for today" sent as a plain answer opened sheet 4).
+			return pending.tool === "ask_user_question" && picksStop(pending.input, input.answer)
+				? [result, newDoneTonightMessage(respondingAgentOf(record.messages, record.kind))]
+				: [result];
 		}
 		case "continue":
 			return dismissalConclusion(record);

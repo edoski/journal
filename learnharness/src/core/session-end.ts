@@ -1,7 +1,7 @@
 import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, lessonProgressOf } from "./contracts/plan.ts";
 import type { SessionEnd, SessionMode } from "./contracts/chat.ts";
-import { danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTasksOf, type LhMessage } from "./native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, endsInDismissal, nativeInputCause, isQuestionRepose, needsContinuation, NEUTRAL_MARKERS, newQuestionRepose, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, problemInputForConclude, sessionModeOf, sessionTasksOf, type LhMessage } from "./native-messages.ts";
 import { phaseAt3Lh } from "./phases.ts";
 import { chargedTopics, type PracticeConclusion } from "./practice-attempts.ts";
 
@@ -30,13 +30,13 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	const messages = record.at(-1) && isQuestionRepose(record.at(-1)!) ? record.slice(0, -1) : record;
 	const last = [...messages].reverse().find((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
 	if (!last) return "closed";
+	const done = doneTonightAt(messages);
+	if (done !== null && closeSettled(messages, last)) return leftOpen(messages, done, tree, initial, topics) ? "left" : "closed";
 	if (last.role === "toolResult") {
 		if (needsContinuation(messages)) return "cut";
 		return endsInDismissal(messages) ? "mid-lesson" : "closed";
 	}
 	if (last.role !== "assistant" || last.stopReason !== "stop") return "cut";
-	const done = doneTonightAt(messages);
-	if (done !== null) return leftOpen(messages, done, tree, initial, topics) ? "left" : "closed";
 	if (closedTonight(messages)) return "closed";
 	if (sessionModeOf(messages, initial) === "practice") {
 		if (tree && stepsLeft(tree, messages)) return "mid-lesson";
@@ -48,6 +48,19 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	const { current } = derivePlanStatusesLh(tree, messages);
 	if (current === null) return "mid-lesson";
 	return asks(last) && tree.edges.some((edge) => edge.from === current) ? "mid-lesson" : "closed";
+}
+
+/** Whether the turn after his Done for today has settled, whatever it did
+ *  past its close: it stopped, it ended at its closing words with nothing
+ *  owed, or it posed something after the close he never asked for (round
+ *  14, M1: a re-ask after the closing words read cut, so "Your turn"
+ *  everywhere). A turn that failed, was stopped or ran tools it never
+ *  answered still owes its close. Pure. */
+function closeSettled(messages: readonly LhMessage[], last: LhMessage): boolean {
+	if (last.role === "toolResult") return !needsContinuation(messages);
+	if (last.role !== "assistant") return false;
+	if (last.stopReason === "stop") return true;
+	return last.stopReason === "toolUse" && (danglingQuestionOf(messages) !== null || activeProblemOf(messages) !== null);
 }
 
 /** Whether his Done for today stopped work still open: it set aside a
@@ -163,18 +176,20 @@ function doneTonightAt(messages: readonly LhMessage[]): number | null {
 }
 
 /** The questions he left open when he pressed Done for today, asked
- *  again once the tutor's close has settled: one app-made message whose
- *  calls pose each, as the tutor did, so the box serves it after Resume as
- *  before Done, Hint, Show me and his confidence included (round 12,
- *  3 n10: they worked only once the tutor asked it again). No tutor turn
+ *  again when he next opens the session (`reposeLeftQuestions`): one
+ *  app-made message whose calls pose each, as the tutor did, so the box
+ *  serves it after Resume as before Done, Hint, Show me and his confidence
+ *  included (round 12, 3 n10: they worked only once the tutor asked it
+ *  again). Never under the closing words (round 14, M1: "Your turn" and the
+ *  question again right after "We'll stop here for today"). No tutor turn
  *  poses it, and his Done for today stays his latest input. Empty unless
- *  that Done set a question aside, the close after it finished, and nothing
+ *  that Done set a question aside, the close after it settled, and nothing
  *  is posed yet. Pure. */
 export function leftQuestionRepose(messages: readonly LhMessage[]): LhMessage[] {
 	const done = doneTonightAt(messages);
 	if (done === null || danglingQuestionOf(messages)) return [];
-	const close = messages.findLast((m, i) => i > done && m.role === "assistant");
-	if (close?.role !== "assistant" || close.stopReason !== "stop") return [];
+	const last = messages.findLast((m) => !(m.role === "custom" && NEUTRAL_MARKERS.includes(m.customType)));
+	if (!messages.some((m, i) => i > done && m.role === "assistant") || !last || !closeSettled(messages, last)) return [];
 	const left: string[] = [];
 	for (let i = done - 1; i >= 0; i--) {
 		const m = messages[i]!;

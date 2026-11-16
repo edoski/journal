@@ -7,7 +7,7 @@
  * transcript leaves the server.
  */
 
-import { markLinks } from "../core/answer-marks.ts";
+import { markLinks, savedOf } from "../core/answer-marks.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { chosenSure } from "../core/contracts/marks.ts";
 import { derivePlanStatusesLh, lhToolCalls } from "../core/contracts/plan.ts";
@@ -79,10 +79,14 @@ function refsOf(topic: Record<string, unknown>, sources: Record<string, unknown>
 }
 
 /** Which session saved each observation, from the sessions' transcripts:
- *  every attempt their answers' marks link (`markLinks`). Pure. */
+ *  every attempt their answers' marks link (`markLinks`), and every one
+ *  their own saves' receipts name (`savedOf`), so an answer saved with
+ *  no card to mark, as a seeded session's or one given in words, still sits
+ *  under its session's line in Earlier (round 14, m30). Pure. */
 export function savedBy(chats: readonly ChatRecord[]): Map<string, string> {
 	const saved = new Map<string, string>();
 	for (const chat of chats) for (const ids of Object.values(markLinks(chat))) for (const id of ids) saved.set(id, chat.id);
+	for (const chat of chats) for (const id of savedOf(chat.messages, chat.answerSaves)) if (!saved.has(id)) saved.set(id, chat.id);
 	return saved;
 }
 

@@ -109,7 +109,7 @@ describe("the tonight input", () => {
 	});
 
 	it("closes practice on what the record keeps, never on the problem it dropped (round 9, 3 m7: \"You still have the kernel problem you closed … to pick up\")", () => {
-		assert.match(DONE_TONIGHT_TEXT.practice, /never name it as something he picks up or still has/);
+		assert.match(DONE_TONIGHT_TEXT.practice, /name it only as set aside, never as something he picks up or still has/);
 		assert.match(DONE_TONIGHT_TEXT.practice, /only what his record keeps/);
 		assert.doesNotMatch(DONE_TONIGHT_TEXT.practice, /the kernel problem/, "no dropped problem offered as the example of what he picks up");
 	});
@@ -234,7 +234,7 @@ describe("Done for today on the server", () => {
 		assert.equal(withheld[0]!.details.reason, "tonight");
 		assert.equal(withheld[0]!.details.committed, undefined, "the answer stays hidden in the record");
 		assert.ok(saved.some((m) => m.role === "custom" && m.customType === "done-tonight"), "the marker is saved");
-		assert.match(JSON.stringify(saved.at(-4)), /Good place to stop/, "the closing turn ran, then the app asked the check again");
+		assert.match(JSON.stringify(saved.at(-3)), /Good place to stop/, "the closing turn ran, and nothing is asked under it (round 14, M1)");
 		assert.equal(histories.length, 3, "the check, then the closing words and the request after their send_to_user");
 		assert.match(histories[1]!, /stopped for today/, "the model reads the check as left, not answered");
 		assert.match(histories[1]!, /DONE FOR TODAY/);
@@ -273,5 +273,14 @@ describe("Done for today while the tutor is working", () => {
 		assert.equal(saved.find((m) => m.role === "assistant")?.stopReason, "aborted", "the tutor's turn was stopped, its partial saved");
 		assert.equal(closedTonight(saved), true, "the lesson is closed for today");
 		runningTurn(chat.id)?.abort();
+	});
+});
+
+describe("the practice close names the problem he left open (round 14, m31)", () => {
+	it("as set aside, by what it is on, never as something he picks up", () => {
+		const text = DONE_TONIGHT_TEXT.practice;
+		assert.match(text, /a problem he left open, named once by what it is on \(the 4 × 6 system\), as set aside/);
+		assert.match(text, /never as something he picks up/);
+		assert.doesNotMatch(text, /never name it/);
 	});
 });

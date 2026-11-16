@@ -116,6 +116,23 @@ function transcriptLinks(messages: readonly LhMessage[]): Record<string, string[
 	return links;
 }
 
+/** Every attempt this session's saves and problems recorded, its receipts
+ *  and the saves kept with the lesson the moment the engine took them,
+ *  since a restart can lose the transcript's receipt (round 8). Pure. */
+export function savedOf(messages: readonly LhMessage[], kept?: AnswerSaves): Set<string> {
+	const saved = new Set<string>(Object.values(kept ?? {}).flat());
+	for (const message of messages) {
+		if (message.role !== "toolResult" || message.isError) continue;
+		if (message.toolName === "conclude") {
+			const receipt = CONCLUDE_RECEIPT.exec(textOf(message.content));
+			if (receipt) for (const id of savedIds(receipt[1]!)) saved.add(id);
+		} else if (message.toolName === "course_save") {
+			for (const id of savedIds(textOf(message.content))) saved.add(id);
+		}
+	}
+	return saved;
+}
+
 /** What a re-mark in this session may correct: every attempt a dispute of
  *  his named, which only a ruling on that dispute re-marks (Edo, round 14
  *  m12: never re-mark unasked). Pure. */

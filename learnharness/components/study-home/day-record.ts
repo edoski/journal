@@ -20,10 +20,7 @@ import { localDay } from "@/components/day-change";
  */
 export function doneToday(chats: readonly ChatListItem[], now: Date, courses: readonly StudyCourse[] = []): string[] {
 	const today = localDay(now);
-	const tasks = new Map(courses.flatMap((course) => course.map.tasks.map((task) => [`${course.map.workspace}#${task.key}`, task.title] as const)));
-	// A session holding an open task is named by it, so two sessions of one lesson read as one (round 11, 1 N9), and
-	// by the title it gave its task once that task closed, so it reads one way all day (round 13, 1 n9).
-	const title = (chat: ChatListItem) => (chat.tasks ?? []).map((key) => tasks.get(`${chat.course?.workspace}#${key}`)).find((t) => t !== undefined) ?? chat.taskTitle ?? chat.title;
+	const title = (chat: ChatListItem) => sessionName(chat, courses.find((c) => c.map.workspace === chat.course?.workspace)?.map.tasks ?? []);
 	const name = (chat: ChatListItem) => title(chat).trim().toLowerCase();
 	const shared = new Map<string, Set<string>>();
 	for (const chat of chats) shared.set(name(chat), (shared.get(name(chat)) ?? new Set()).add(chat.course?.workspace ?? ""));
@@ -32,6 +29,17 @@ export function doneToday(chats: readonly ChatListItem[], now: Date, courses: re
 		.sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0))
 		.map((chat) => (shared.get(name(chat))!.size > 1 && chat.course ? `${title(chat)} in ${courseLabel(chat.course)}` : title(chat)));
 	return [...new Set(named)];
+}
+
+/** A session's one name, wherever Home names it (round 14, m29: "Problem
+ *  sheet 4" on its line while it waited, "Problem sheet 4: rank and
+ *  nullity" once left and in Studied today): the title of the open task it
+ *  holds (`tasks`, its course's), so two sessions of one lesson read as one
+ *  (round 11, 1 N9), else the title it gave its task once that task closed,
+ *  so it reads one way all day (round 13, 1 n9), else its own. Pure. */
+export function sessionName(chat: ChatListItem, tasks: ReadonlyArray<{ key: string; title: string }>): string {
+	const held = new Set(chat.tasks ?? []);
+	return tasks.find((t) => held.has(t.key))?.title ?? chat.taskTitle ?? chat.title;
 }
 
 /** The part of the learner's day an hour falls in, in words: "this

@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { slotWords } from "@/components/study-home/needs-you";
 import { nowFor, plannedKeys, restTopics, shelfStatus } from "@/components/unit-inbox/now-inbox";
-import { claimedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
+import { askedKeys, todayTop, type NowItem } from "@/components/unit-inbox/today/today-top";
 import { buildInbox, unitKey, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 import type { Why } from "@/components/study-home/agenda-rows/row-facts";
 import { lapsedNow, overdueWords, SLIP_WORDS, TUTOR_WRITING, type SlipKey } from "@/components/study-words";
@@ -98,7 +98,8 @@ export function sidebarSays(courses: readonly StudyCourse[], chats: readonly Cha
 	const topics = new Map(map.topics.map((t) => [unitKey(map.workspace, t.handle), t]));
 	const inbox = buildInbox(courses, chats, null);
 	const today = new Map<string, NowItem>();
-	for (const item of todayTop(nowFor(courses, chats, null, map.today), inbox, chats)) for (const key of claimedKeys(item)) if (!today.has(key)) today.set(key, item);
+	// Needs you holds only what Today asks (Edo): a session's own topics, not every topic it touched.
+	for (const item of todayTop(nowFor(courses, chats, null, map.today), inbox, chats)) for (const key of askedKeys(item)) if (!today.has(key)) today.set(key, item);
 	for (const [key, item] of today) {
 		const topic = topics.get(key);
 		if (topic) said.set(topic.handle, { place: "today", fact: todayFact(item, topic, map.today) });

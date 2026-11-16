@@ -1,6 +1,7 @@
 import { abortRuns, backgroundRuns, runsEnded } from "../agent/subagents/background-runs.ts";
 import { isJobLive } from "../agent/subagents/aborts.ts";
 import { titleFromPrompt } from "../core/contracts.ts";
+import { leftQuestionRepose } from "../core/session-end.ts";
 import { stores } from "./stores.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
 import { clearTurnFailure } from "./turn-runs.ts";
@@ -18,6 +19,18 @@ import { discardChatDeliveries } from "./jobs.ts";
 
 export const { createChat, getChat, listChats } = stores.chatStore;
 export { titleFromPrompt };
+
+/** He opens a session he left with Done for today: the questions he left
+ *  open are posed again from their own calls (`leftQuestionRepose`), after
+ *  the session's synced point so the tutor reads them with his answer.
+ *  Nothing while a turn runs. Whether it posed any. */
+export function reposeLeftQuestions(chatId: string): boolean {
+	if (isTurnRunning(chatId)) return false;
+	const messages = stores.chatStore.getChat(chatId)?.messages ?? [];
+	const reposed = leftQuestionRepose(messages);
+	if (reposed.length > 0) stores.chatStore.saveMessages(chatId, [...messages, ...reposed]);
+	return reposed.length > 0;
+}
 
 /** How long the wind-down wait may take before the caller gets a retryable
  *  503 (an aborted digest ends at its next model-call boundary —

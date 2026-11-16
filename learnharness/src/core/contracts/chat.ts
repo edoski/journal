@@ -304,8 +304,11 @@ const DONE_CLOSE = `Then close in at most two sentences: what he picks up next, 
  *  close names only what the record keeps (round 9, 3 m7: "You still have
  *  the kernel problem you closed … to pick up"), and only this session's:
  *  another session's open work is Home's to name (round 12, 3 D7: Rank
- *  practice closed on "Part (c) of Problem sheet 4 is still open"). */
-const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
+ *  practice closed on "Part (c) of Problem sheet 4 is still open"). The
+ *  problem he left open is named once, as set aside (round 14, m31: "Your
+ *  Rank and the column space review is on Wednesday 11 November." left the
+ *  4 × 6 system unnamed). */
+const DONE_CLOSE_PRACTICE = `Then close in at most two sentences: a problem he left open, named once by what it is on (the 4 × 6 system), as set aside, never as something he picks up; then only what his record keeps for next time from this session, an open task this session worked on at its place (part (c) of the sheet), never another session's open work, and the day of his next review when the plan gives one, never by what it asks; a topic not started is one he starts, never a review. ${DONE_LIMITS}`;
 
 export const DONE_TONIGHT_TEXT = {
 	prober:
@@ -315,7 +318,7 @@ export const DONE_TONIGHT_TEXT = {
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
 		`${DONE_GRADED} ${DONE_CLOSE}`,
 	practice:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so never name it as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and nothing keeps it, so name it only as set aside, never as something he picks up or still has; a question he left open was never answered: don't grade either, and pose nothing more today. " +
 		`${DONE_GRADED} ${DONE_CLOSE_PRACTICE}`,
 } as const;
 

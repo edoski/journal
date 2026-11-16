@@ -1,9 +1,10 @@
 /**
  * Round 12, 3 n10 (flagged two rounds running): after Done for today and
  * Resume, the question box's Hint, Show me and confidence worked only if
- * the tutor posed the question again. Once the close settles, the app
- * poses every question Done for today left open again from its own saved
- * call, with no tutor turn, so the normal question box serves it after
+ * the tutor posed the question again. When he opens the session again
+ * (never under the closing words: round 14, M1), the app poses every
+ * question Done for today left open again from its own saved call, with
+ * no tutor turn, so the normal question box serves it after
  * Resume as before Done: his hint, worked step and confidence ride its
  * answer. The session still reads left for today until he answers.
  */
@@ -27,6 +28,7 @@ const { createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
 const { handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
+const { reposeLeftQuestions } = await import("../src/server/chats.ts");
 const { newCourseContextMessage, newUserMessage, pendingQuestionOf } = await import("../src/core/native-messages.ts");
 const { inputAppends } = await import("../src/core/input-events.ts");
 const { leftQuestionRepose } = await import("../src/core/session-end.ts");
@@ -89,9 +91,11 @@ describe("the question Done for today left, after the close", () => {
 		assert.equal((await turn(engine, chat.id, { type: "tonight" })).status, 200);
 		const turnsAtClose = histories.length;
 
+		assert.equal(pendingQuestionOf(chatStore.getChat(chat.id)!.messages), null, "nothing is asked under the closing words (round 14, M1)");
+		assert.equal(reposeLeftQuestions(chat.id), true, "he opens the session again");
 		const saved = chatStore.getChat(chat.id)!.messages;
 		const open = pendingQuestionOf(saved);
-		assert.ok(open, "after the close the left question is posed again: the box has a call to serve");
+		assert.ok(open, "back in the session, the left question is posed again: the box has a call to serve");
 		assert.notEqual(open.toolCallId, "call-left", "a new call: the left one keeps its Left for next time");
 		assert.equal(open.tool, "explain");
 		assert.deepEqual(open.input, CHECK, "its own saved call, word for word");
@@ -130,6 +134,7 @@ describe("the question Done for today left, after the close", () => {
 		const chat = chatStore.createChat("Test: nothing left open");
 		await turn(engine, chat.id, { type: "text", text: "teach me the planets" });
 		await turn(engine, chat.id, { type: "tonight" });
+		assert.equal(reposeLeftQuestions(chat.id), false);
 		assert.equal(pendingQuestionOf(chatStore.getChat(chat.id)!.messages), null);
 	});
 });
