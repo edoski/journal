@@ -19,8 +19,7 @@ import { layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-l
 import { TREE_SKIN } from "../components/course-map/topic-map/canvas/canvas-skin.ts";
 import { BANDS_SKIN } from "../components/course-map/topic-map/bands/bands-skin.ts";
 import { REGIONS_SKIN } from "../components/course-map/topic-map/regions/regions-skin.ts";
-import { CanvasLinesEdge, inkPaths, type CanvasLine, type CanvasLinesFlowEdge } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
-import type { EdgeProps } from "@xyflow/react";
+import { LinePaths, inkPaths, snapTo, trackPieces, type CanvasLine } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
 import { focusOf } from "../components/course-map/topic-map/canvas/canvas-focus.ts";
 import type { MapSkin } from "../components/course-map/topic-map/map-skin.ts";
 
@@ -47,8 +46,8 @@ function steps(d: string): string[] {
 	return out;
 }
 
-/** What React Flow hands the lines edge: only its data matters to it. */
-const edgeProps = (lines: CanvasLine[]) => ({ data: { lines } }) as unknown as EdgeProps<CanvasLinesFlowEdge>;
+/** The lines drawn as the edge draws them, unsnapped (a server render). */
+const drawnLines = (lines: CanvasLine[]) => <LinePaths pieces={trackPieces(lines, null, null)} snap={null} />;
 
 const draw = (skin: MapSkin, topics: readonly CourseMapTopic[], needs: readonly CourseMapEdge[]) => {
 	const layout = skin.layout(topics, needs, new Set());
@@ -71,11 +70,13 @@ describe("the map's lines", () => {
 		assert.ok(new Set(all).size < all.length, "the fixture has needs that share a run");
 		const paths = inkPaths(lines, null, null);
 		assert.deepEqual([...paths.keys()], ["rest"]);
-		const markup = renderToStaticMarkup(<svg><CanvasLinesEdge {...edgeProps(lines)} /></svg>);
+		const markup = renderToStaticMarkup(<svg>{drawnLines(lines)}</svg>);
 		const { document } = parseHTML(`<html><body>${markup}</body></html>`);
 		const drawn = [...document.querySelectorAll('[data-slot="course-map-line"]')];
 		assert.equal(drawn.length, 1, "one path for every line at rest");
 		assert.equal(drawn[0]!.getAttribute("stroke-width"), "1");
+		const zoomed = parseHTML(`<html><body>${renderToStaticMarkup(<svg><LinePaths pieces={trackPieces(lines, null, null)} snap={null} scale={0.8} /></svg>)}</body></html>`).document;
+		assert.equal(zoomed.querySelector('[data-slot="course-map-line"]')!.getAttribute("stroke-width"), "1.25", "1 screen pixel at the camera's zoom");
 		assert.match(drawn[0]!.getAttribute("class") ?? "", /^stroke-map-line$/);
 	});
 
@@ -83,10 +84,44 @@ describe("the map's lines", () => {
 		const { layout } = draw(TREE_SKIN, TOPICS, NEEDS);
 		const lines: CanvasLine[] = layout.routes.map((r) => ({ key: `${r.prerequisite}>${r.topic}`, points: r.points, prerequisite: r.prerequisite, topic: r.topic }));
 		const focus = focusOf(h("c"), NEEDS, layout.routes);
-		const markup = renderToStaticMarkup(<svg><CanvasLinesEdge {...edgeProps(lines)} /></svg>);
-		assert.ok(markup.length > 0);
 		const paths = inkPaths(lines, focus, null);
 		assert.deepEqual([...paths.keys()].sort(), ["lit", "receded"]);
+	});
+
+	it("draws a stretch two inks share once, in the brighter ink", () => {
+		// A faded line from a neighbour's card and a resting line run down the same stretch into one card.
+		const lines: CanvasLine[] = [
+			{ key: "near:x>c", points: [[100, 0], [100, 200]], prerequisite: h("x"), topic: h("c"), faded: true },
+			{ key: "a>c", points: [[100, 120], [100, 200]], prerequisite: h("a"), topic: h("c") },
+		];
+		const pieces = trackPieces(lines, null, null);
+		const runs = (ink: "rest" | "context") => (pieces.get(ink) ?? []).map((p) => (p.kind === "run" ? [p.at, p.from, p.to] : null));
+		assert.deepEqual(runs("rest"), [[100, 120, 200]]);
+		assert.deepEqual(runs("context"), [[100, 0, 120]], "the faded ink stops where the resting line takes the stretch");
+	});
+
+	it("draws a run several lines share once, whatever their corners", () => {
+		const lines: CanvasLine[] = [
+			{ key: "a>b", points: [[0, 0], [0, 100]], prerequisite: h("a"), topic: h("b") },
+			{ key: "a>c", points: [[0, 0], [0, 50], [80, 50], [80, 100]], prerequisite: h("a"), topic: h("c") },
+		];
+		const rest = trackPieces(lines, null, null).get("rest")!;
+		const vertical = rest.filter((p) => p.kind === "run" && p.vertical && p.at === 0);
+		assert.equal(vertical.length, 1, "the shared trunk is one run");
+		assert.deepEqual(vertical[0]!.kind === "run" && [vertical[0]!.from, vertical[0]!.to], [0, 100]);
+	});
+
+	it("snaps every line onto whole device pixels at any camera", () => {
+		for (const [camera, dpr] of [[[13.37, -4.2, 0.837], 2], [[0.5, 0.25, 1], 1], [[-220.1, 33.3, 0.62], 2]] as const) {
+			const snap = snapTo(camera, dpr);
+			for (const v of [0, 17.25, 403.3333, 1000.5]) {
+				const device = (snap(v, "x") * camera[2] + camera[0]) * dpr;
+				// One CSS pixel covers `dpr` device pixels: on a 2x screen the centre sits on a pixel edge, on a 1x screen mid-pixel.
+				const off = dpr % 2 === 1 ? 0.5 : 0;
+				assert.ok(Math.abs(device - off - Math.round(device - off)) < 1e-6, `${v} at ${camera.join(",")} lands on the grid`);
+				assert.ok(Math.abs(snap(v, "x") - v) * camera[2] <= 0.5 / dpr + 1e-9, "moved at most half a device pixel");
+			}
+		}
 	});
 
 	it("paints its inks opaque, so nothing a line overlaps shows through or adds up", () => {

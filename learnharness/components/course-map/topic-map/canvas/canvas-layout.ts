@@ -19,7 +19,7 @@ const GAP = 48;
 /** The least space between two lines side by side, and between a bracket and the cards above and below it. */
 const LANE = 24;
 /** How far a line's corner bends. */
-const CORNER = 8;
+export const CORNER = 8;
 /** Optimal decrossing up to this many topics, the two-layer heuristic above (d3-dag: optimal decrossing is for small graphs only). */
 const OPTIMAL_DECROSS_LIMIT = 25;
 /** A sideways step shorter than this reads as a nudge, not a turn: a card that can sit straight over or under its neighbour does. */
