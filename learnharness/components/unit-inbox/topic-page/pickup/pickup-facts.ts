@@ -1,6 +1,6 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import { reviewAsked, type TopicRef } from "@/src/core";
+import { reviewAsked, type ChatListItem, type TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
 import { pausedWords } from "@/components/nav/session-state";
@@ -89,15 +89,18 @@ function heldPastDue(review: TopicFacts["topic"]["review"], today: string): stri
 	return review.held.since < today ? reviewWords(review, today) : overdueWords(0, today);
 }
 
-/** The step a lesson stopped on, when its tutor planned. */
-function stoppedOn(entry: SessionEntry | undefined): string | null {
-	if (!entry || !isPlanned(entry)) return null;
-	return entry.plan.tree.nodes.find((node) => node.id === entry.plan.current)?.title ?? null;
+/** A session's one name, as Home's line names it: the title of the open
+ *  task it holds, else its own title; never a step its tutor planned,
+ *  which the lesson map beside marks (round 11, 2 N2: Kernel's Now read
+ *  "Which inputs does a matrix send to zero?"). */
+function sessionName(chat: ChatListItem, facts: TopicFacts): string {
+	const held = new Set(chat.tasks ?? []);
+	return facts.pickups.find((pickup) => pickup.kind === "task" && held.has(pickup.task.key))?.title ?? facts.tasks.find((task) => held.has(task.key))?.title ?? chat.title;
 }
 
 /** Now, from the page's action (`topicAction`, all seven rows). A session
- *  to open names the step it stopped on; a topic still being learned with
- *  no task names where its newest lesson that planned stopped, which the
+ *  to open is named as Home names it (`sessionName`); a topic still being
+ *  learned with no task names its newest lesson that planned, which the
  *  new session continues from. */
 export function nowItem(facts: TopicFacts): NowItem {
 	const { action } = facts;
@@ -111,7 +114,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 			return {
 				...base,
 				icon: action.kind === "open" ? "writing" : left ? "task" : "reply",
-				words: stoppedOn(entry) ?? action.chat.title,
+				words: sessionName(action.chat, facts),
 				note: action.kind === "open" ? TUTOR_WRITING : left ? leftWords(action.chat, facts.today) : entry?.state === "paused" ? pausedWords(action.chat) : "Your turn",
 				chat: action.chat.id,
 			};
@@ -121,13 +124,12 @@ export function nowItem(facts: TopicFacts): NowItem {
 		case "continue": {
 			if ("chat" in action) {
 				const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
-				return { ...base, icon: action.task ? "task" : "standing", words: stoppedOn(entry) ?? action.task?.title ?? action.chat.title, note: action.task?.step ?? (entry ? `Left off ${dayWords(entry.day, facts.today).toLowerCase()}` : null), chat: action.chat.id };
+				return { ...base, icon: action.task ? "task" : "standing", words: action.task?.title ?? sessionName(action.chat, facts), note: action.task?.step ?? (entry ? `Left off ${dayWords(entry.day, facts.today).toLowerCase()}` : null), chat: action.chat.id };
 			}
 			if (action.task) return { ...base, icon: "task", words: action.task.title, note: action.task.step };
 			const last = facts.sessions.find((entry) => entry.own && isPlanned(entry));
-			const step = stoppedOn(last);
-			return step && last
-				? { ...base, icon: "standing", words: step, note: `Left off ${dayWords(last.day, facts.today).toLowerCase()}` }
+			return last
+				? { ...base, icon: "standing", words: sessionName(last.chat, facts), note: `Left off ${dayWords(last.day, facts.today).toLowerCase()}` }
 				: { ...base, icon: "standing", words: "Next lesson" };
 		}
 		case "start":
