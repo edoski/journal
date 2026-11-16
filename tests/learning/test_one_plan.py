@@ -252,3 +252,35 @@ def test_the_exam_eve_starts_what_the_rest_of_the_exam_stands_on(
     ]
     assert starts == ["expectation"]
     assert "expectation" not in days.get("does_not_fit", [])
+
+
+def test_a_save_tells_the_day_every_view_then_shows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The receipt of a save names, for each review it set, the day the
+    topic page and the calendar show right after it (round 11, report 4:
+    one review told Sat 14 Nov by the save, "corrected" to Thu 12 Nov by
+    the tutor, and shown Fri 13 Nov on its page)."""
+    world = World(tmp_path, "lesson-review", monkeypatch, capsys)
+    answer = {
+        "topics": ["binomial"],
+        "text": "Exactly 4 heads in 10 tosses",
+        "response": "(1/2)^10",
+        "help": "none",
+        "result": "incorrect",
+    }
+    monkeypatch.setenv("LEARNING_TODAY", "2026-11-09")
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps({"observations": [answer]}))
+    )
+    assert main(["--workspace", str(world.roots["probability"]), "save"]) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    told = {topic: review["planned"] for topic, review in receipt["reviews"].items()}
+    assert told, "the save set a review"
+    shown = map_days(world.maps("2026-11-09"))
+    planned = planned_days(world.plan("2026-11-09"), set())
+    for topic, day in told.items():
+        assert shown[("probability", "reviews", topic)] == day, topic
+        assert planned[("probability", "reviews", topic)] == day, topic
