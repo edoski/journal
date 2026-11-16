@@ -26,7 +26,7 @@ import type { ToolCall } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "../core/pending.ts";
 import { normalizeQuestionType } from "../core/question-core.ts";
 import { answeredQuestionsOf, GRADED_QUESTION_TOOLS, isRealAnswer, opensTurn, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, savedQuestionsOf, SEND_TO_USER_TOOL, UNGRADED_ANSWER, failedOutputCallIds, sendToUserText, type LhMessage } from "../core/native-messages.ts";
-import { adviceSentences, afterQuestion, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
+import { adviceSentences, afterQuestion, asksAreHis, reasonAskedTwice, clausesOf, closingMoral, compoundAsk, echoOf, heavySentences, leavesAWayOn, narratedConfidence, problemAdvice, restatingCallout, reusedLetter, repeatedAdvice, repeatedPoint, restatesWithoutReason, SENTENCE_WORDS, sentences, voiceBreaks, type TurnKind, type VoiceBreak, type VoiceRule } from "../core/voice-check.ts";
 
 type Family = "message" | "question";
 
@@ -312,6 +312,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 			return `Closing words never tell him how sure he was, which his card already shows, and never restate the break your feedback named: drop ${quoted(b.excerpt)} and keep only the one move that was not obvious.`;
 		case "letter":
 			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
+		case "reason-twice":
+			return `A "Show that…" already asks for his reason, so it takes no ", and why?": ${quoted(b.excerpt)}. End it with a full stop, and pose a part he typed in his words, all of it.`;
 		case "maths-words":
 			return `Words are prose, never maths type: ${quoted(b.excerpt)} sets a phrase in a formula. Write the sentence as prose with only its maths in $…$ ("$A$ is invertible exactly when $\\det A \\neq 0$").`;
 		case "unsaved":
@@ -711,8 +713,12 @@ export class VoiceGuard {
 
 	private questionBreaks(text: string): VoiceBreak[] {
 		const out = voiceBreaks(text).filter((b) => b.rule !== "headings");
+		// A part he typed is the sheet's own and is posed in his words, all
+		// of it, whatever it asks (round 12, 2 n5).
 		const compound = compoundAsk(text);
-		if (compound) out.push(compound);
+		if (compound && !asksAreHis(text, this.input.words)) out.push(compound);
+		const twice = reasonAskedTwice(text);
+		if (twice) out.push({ rule: "reason-twice", excerpt: twice });
 		const advice = [...new Set([...afterQuestion(text), ...adviceSentences(text)])];
 		if (advice.length > 0) out.push({ rule: "advice", excerpt: advice.join(" ") });
 		return [...out, ...this.letters(text), ...this.repeats(text)];

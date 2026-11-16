@@ -55,7 +55,8 @@ export type VoiceRule =
 	| "asks-banned"
 	| "guess"
 	| "unsaved"
-	| "maths-words";
+	| "maths-words"
+	| "reason-twice";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -443,6 +444,24 @@ export function questionAsks(text: string): string[] {
 export function compoundAsk(text: string): VoiceBreak | null {
 	const asks = questionAsks(text);
 	return asks.length > 1 ? { rule: "compound", excerpt: asks.join(" / ") } : null;
+}
+
+/** The asks of a question that are all his own words: each one's content
+ *  words are in the message he sent, as when he typed a sheet's part and
+ *  the tutor poses it (round 12, 2 n5: "and check it against rank-nullity"
+ *  dropped, since two asks were refused). */
+export function asksAreHis(text: string, words: string | null): boolean {
+	if (!words) return false;
+	const his = stems(prose(words).text);
+	const asks = questionAsks(text);
+	return asks.length > 0 && asks.every((ask) => contentStems(ask).every((w) => his.has(w)));
+}
+
+/** A "Show that…" or "Prove…" that also ends ", and why?": it already asks
+ *  for his reason (round 12, 2 n5: "Show that dim ker A = 2, and why?"). */
+export function reasonAskedTwice(text: string): string | null {
+	const last = sentences(prose(text).text).filter((s) => s.trim()).at(-1)?.trim() ?? "";
+	return /^(?:show|prove|explain|justify|derive|verify|deduce)\b[^?]*,\s*and why\?$/i.test(last) ? last : null;
 }
 
 /** Whether a reply's last sentence leaves him a move: a question, or an
