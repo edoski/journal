@@ -898,7 +898,7 @@ def _candidates(
         for rank, item in enumerate(items):
             topic = item["topic"]
             examined = course.exam_of(topic) is not None
-            if reviewing and examined:
+            if reviewing and examined and not course.just_learned(topic, item):
                 key: tuple[Any, ...] = (
                     0,
                     distance,
@@ -911,7 +911,7 @@ def _candidates(
             tier = course.tier(topic, day)
             learning = tier == RELEARNING
             gating = learning and topic in gates
-            if course.just_learned(topic, item) and not reviewing:
+            if course.just_learned(topic, item) and (not reviewing or examined):
                 key = (
                     -1,
                     not gating,
@@ -1033,8 +1033,9 @@ def _select(
             if quota[course.name] <= 0:
                 continue
             quota[course.name] -= 1
-        if key[0] == 0:
-            picked.taken.append((key[1], course))
+        if course.reviewing(day) and course.exam_of(topic) is not None:
+            assert course.exam is not None
+            picked.taken.append((float((course.exam.day - day).days), course))
         picked.chosen[course.name].append(topic)
         room -= 1
         for entry in partners:
@@ -1964,6 +1965,9 @@ def _reasons(
         else:
             reasons[topic] = "full" if topic in course.ready_once else "not_ready"
     starts = {t: date.fromisoformat(d["date"]) for d in course.days for t in d["new"]}
+    for topic, replayed in course.replayed.items():
+        if topic not in starts and (taught := _learned_on(replayed)):
+            starts[topic] = taught
     no_review_day = not _study_days(week, max(exam.final, today), eve)
     for topic in unreviewed:
         first = starts.get(topic)
@@ -1977,7 +1981,11 @@ def _reasons(
 def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[str]:
     """Of an exam course's topics taught by its exam, those neither reviewed
     in its final review so far nor planned there: no room before the exam.
-    Known once the plan reaches the eve of the exam."""
+    The day a topic is taught is no review of it, so one first taught inside
+    the final review is left out until its first review is answered or
+    planned (round 12, 1 D4: Poisson, first counted two days before the
+    exam, had its first review after it, and nothing said so). Known once
+    the plan reaches the eve of the exam."""
     exam = course.exam
     last = course.days[-1]["date"] if course.days else ""
     eve = (exam.day - timedelta(days=1)).isoformat() if exam else ""
@@ -1985,6 +1993,14 @@ def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[st
         return []
     final, end = exam.final.isoformat(), exam.day.isoformat()
     levels = progress.standings(record)
+    answered = {
+        topic
+        for topic, replayed in course.replayed.items()
+        if any(
+            day >= final and kind != progress.LEARNING
+            for day, kind in replayed.days.items()
+        )
+    }
     reviewed = {
         topic
         for day in course.days
@@ -2000,5 +2016,11 @@ def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[st
         if course.exam_of(topic) is not None
         if (levels[topic]["level"] != "new" or topic in started)
         and topic not in reviewed
-        and levels[topic].get("last", {}).get("date", "") < final
+        and topic not in answered
     ]
+
+
+def _learned_on(replayed: progress.Replay) -> date | None:
+    """The day a topic was taught, its learning day (``progress.replay``)."""
+    days = [day for day, kind in replayed.days.items() if kind == progress.LEARNING]
+    return date.fromisoformat(min(days)) if days else None

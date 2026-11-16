@@ -131,3 +131,38 @@ def test_the_final_review_owns_the_days_starts(
     assert starts(plan["probability"])["expectation"] == "2026-11-17"
     assert "expectation" not in probability.get("unreviewed", [])
     assert starts(plan["linear-algebra"])["linear-maps"] > "2026-11-19"
+
+
+def test_a_first_review_the_exam_leaves_no_day_for_is_named(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Poisson's first answer that counts comes on the Probability exam's
+    eve: its first review would fall on the exam, so the final review names
+    it as started too close to the exam, never leaving it out unsaid
+    (round 12, 1 D4: the day it was taught counted as its review)."""
+    moved = json.loads(json.dumps(ROUND12))
+    eve = "2026-11-18"
+    record = moved["checkpoints"]["d17-post-poisson"]["probability"]
+    record["observations"]["o23"].update(date=eve, recorded="2026-11-18T09:00:00+00:00")
+    record["topics"]["poisson"].update(introduced=eve, judged=eve)
+    record["topics"]["poisson"]["review"]["due"] = "2026-11-19"
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    plan = World(tmp_path / "eve", "d17-post-poisson", monkeypatch, capsys, moved)
+    course = plan.plan(eve)["probability"]["plan"]
+    assert "poisson" in course["unreviewed"]
+    assert course["reasons"]["poisson"] == "too_late"
+
+
+def test_a_first_review_in_its_own_final_review_comes_first(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Taught two days before its exam, Poisson's first review, the one review
+    it can have, takes the eve before the solid topics the final review
+    repeats."""
+    plan = world(tmp_path, "d17-post-poisson", monkeypatch, capsys).plan("2026-11-17")
+    days = plan["probability"]["plan"]["days"]
+    assert [d["date"] for d in days if "poisson" in d["reviews"]][0] == "2026-11-18"
