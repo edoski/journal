@@ -66,7 +66,7 @@ export interface VoiceBreak {
 }
 
 /** Sentences of prose each kind may carry, displays aside. */
-const SENTENCES: Readonly<Record<TurnKind, number>> = { teach: 4, right: 4, wrong: 5, hint: 1, direct: 6, close: 2 };
+export const SENTENCE_BUDGETS: Readonly<Record<TurnKind, number>> = { teach: 4, right: 4, wrong: 5, hint: 1, direct: 6, close: 2 };
 /** Displays each kind may carry. */
 const DISPLAYS: Readonly<Record<TurnKind, number>> = { teach: 1, right: 1, wrong: 1, hint: 0, direct: Infinity, close: 0 };
 
@@ -263,7 +263,7 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (words) out.push({ rule: "maths-words", excerpt: words });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
-	if (load > SENTENCES[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCES[kind]}` });
+	if (load > SENTENCE_BUDGETS[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCE_BUDGETS[kind]}` });
 	// A formula alone is a display written inline, not a sentence.
 	const symbol = said.find((s) => /^X\b/.test(s.trim()) && /[A-Za-z]{2,}/.test(s.trim().slice(1)));
 	if (symbol) out.push({ rule: "symbol", excerpt: symbol });
