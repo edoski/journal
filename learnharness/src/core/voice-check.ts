@@ -53,7 +53,8 @@ export type VoiceRule =
 	| "reprint"
 	| "operand"
 	| "asks-banned"
-	| "guess";
+	| "guess"
+	| "unsaved";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -88,6 +89,10 @@ const PHRASES: ReadonlyArray<{ rule: VoiceRule; re: RegExp }> = [
 	{ rule: "machinery", re: /\b(?:answer|input|text|message) (?:field|box)\b|\bthe dock\b/i },
 	// The open question stays above, unchanged, and the app shows no copy of
 	// it (round 11, 4 minor 6: "Here is the question again." and nothing).
+	// Every answer in the record stays saved, an earlier day's included, and
+	// the app says when the record can't be read (round 12, 4 minor 2: "so
+	// it stays unsaved", of an answer saved on 4 Nov).
+	{ rule: "unsaved", re: /\bunsaved\b|\b(?:is|are|was|were|stays?|remains?)(?: still)? not (?:yet )?(?:saved|recorded|kept)\b|\b(?:isn't|aren't|wasn't|weren't)(?: yet)? (?:saved|recorded|kept)\b|\b(?:can't|cannot|couldn't|could not) be (?:saved|recorded|kept)\b/i },
 	{ rule: "reprint", re: /\bhere it is again\b|\bhere(?:'s| is) (?:the |that |your |this )?(?:question|it|check) (?:again|once more)\b|\b(?:I'?ll|I will|let me) (?:repeat|re-?ask|ask) (?:it|the question|that question|the check)(?: again| below)?\b|\b(?:repeating|asking) (?:it|the question) again\b/i },
 ];
 

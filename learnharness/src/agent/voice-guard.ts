@@ -312,6 +312,8 @@ function fixFor(b: VoiceBreak, kind: TurnKind | undefined, text: string): string
 			return `Closing words never tell him how sure he was, which his card already shows, and never restate the break your feedback named: drop ${quoted(b.excerpt)} and keep only the one move that was not obvious.`;
 		case "letter":
 			return `${b.excerpt.split(" ")[0]} already names another matrix in this session, so he cannot tell which one a step means. Name this matrix with a letter the session has not used yet: ${quoted(b.excerpt.slice(b.excerpt.indexOf(" ") + 1))}.`;
+		case "unsaved":
+			return `Never tell him an answer is not saved: every answer in the record stays saved, an earlier day's included, and the app itself says when his record can't be read: ${quoted(b.excerpt)}. Leave it out.`;
 		case "guess":
 			return `${b.excerpt.startsWith("he wrote ") ? `He asked to guess first (${b.excerpt})` : `You invited a guess (${quoted(b.excerpt)})`}, so his answer is a guess before he is told, never a counted attempt: pose it as a prediction, \`type: predict\`, tagged with the step it grows from, so it is kept and never counts. Ask the open question again once his guess is answered.`;
 		case "review-lesson":
