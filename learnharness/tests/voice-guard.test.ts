@@ -65,7 +65,8 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 		const turn = [newUserMessage("Rank"), assistant([send("A step.")]), newUserMessage("why is the number of pivots the same however I row reduce?")];
 		const answer =
 			"No. Whatever order you use, you always get the same number of pivots, because that number measures something that row operations leave unchanged. Think of the rows of $A$ as vectors that span a subspace, called the row space. Each row operation replaces one row with a combination of the rows, and it can be undone, so every row you have before and after an operation still lies in the same subspace. The rows move around inside it, but the subspace is the same. The nonzero rows of any echelon form are independent, because each one starts in a pivot column where the rows below it have zeros. They also still span the row space, so they form a basis of it:\n\n$$\n\\text{number of pivots} = \\dim(\\text{row space of } A)\n$$\n\nA dimension does not depend on which basis you happen to reach. In problem 1, every order of operations gives you two independent rows that span the same plane in $\\mathbb{R}^5$, so you always get two pivots.";
-		assert.deepEqual(rules(new VoiceGuard(turn), send(answer)), ["length"]);
+		// Its display also sets "number of pivots" and "row space of" in maths type (round 12, 3 D5).
+		assert.deepEqual(rules(new VoiceGuard(turn), send(answer)), ["maths-words", "length"]);
 	});
 
 	it("a 3-sentence close after Done for today", () => {

@@ -54,7 +54,8 @@ export type VoiceRule =
 	| "operand"
 	| "asks-banned"
 	| "guess"
-	| "unsaved";
+	| "unsaved"
+	| "maths-words";
 
 export interface VoiceBreak {
 	rule: VoiceRule;
@@ -235,6 +236,18 @@ export function clausesOf(text: string): { words: number; clauses: number; short
  *  2 n9: "the dimension of im," from a lone `$\operatorname{im}$`). */
 const LONE_OPERATOR = /(?<!\$)\$\s*\\(?:ker|det|dim|operatorname\{[A-Za-z]+\}|mathrm\{(?:im|rank|span|tr)\})\s*\$(?!\$)/;
 
+/** Words set in maths type: a `\\text{…}` holding a phrase of three words
+ *  or more, which reads as a sentence in KaTeX's serif (round 12, 3 D5:
+ *  "A \\text{ is invertible exactly when } \\det A \\neq 0"). A label of
+ *  one or two words in a formula stays ("Bin", "Bayes risk", "for"). */
+const TEXT_IN_MATHS = /\\(?:text|textrm|textit|mbox)\{([^{}]*)\}/g;
+export function mathsWords(text: string): string | null {
+	for (const m of text.matchAll(TEXT_IN_MATHS)) {
+		if ((m[1]!.match(/[A-Za-z][A-Za-z'-]*/g) ?? []).length >= 3) return m[0];
+	}
+	return null;
+}
+
 export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	const { text: plain, displays } = prose(text);
 	const out = phraseBreaks(plain, new Set(kind === "direct" ? ["offer"] : []));
@@ -244,6 +257,8 @@ export function voiceBreaks(text: string, kind?: TurnKind): VoiceBreak[] {
 	if (asked.length > 1) out.push({ rule: "questions", excerpt: asked.join(" ") });
 	const lone = LONE_OPERATOR.exec(text);
 	if (lone) out.push({ rule: "operand", excerpt: lone[0] });
+	const words = mathsWords(text);
+	if (words) out.push({ rule: "maths-words", excerpt: words });
 	if (!kind) return out;
 	const load = sentenceLoad(said);
 	if (load > SENTENCES[kind]) out.push({ rule: "length", excerpt: `${load} sentences, budget ${SENTENCES[kind]}` });
