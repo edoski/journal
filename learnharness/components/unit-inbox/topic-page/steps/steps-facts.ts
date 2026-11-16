@@ -109,16 +109,27 @@ export interface StepMark {
 	tag: string | null;
 }
 
-/** Each step's mark: the step the lesson's newest tagged question was
- *  about, steps earlier questions were about, and the rest. "Left off
- *  here" only while the plan has a step still ahead: on a lesson that went
- *  through every step it would say he stopped partway. */
+/** The step the map rings: while the lesson waits on him, the step his
+ *  open question asks about (`asked`), a check back on a step done
+ *  included, so "Your turn" names the question in front of him (round 14,
+ *  m40: "Your turn on Undoing and the image" while the open question was
+ *  about collisions); else where the lesson stands (`current`). Pure. */
+export function ringedStep(plan: SessionPlan, waits: boolean): string | null {
+	const asked = plan.asked && plan.tree.nodes.some((node) => node.id === plan.asked) ? plan.asked : null;
+	return waits && asked ? asked : plan.current;
+}
+
+/** Each step's mark: the ringed step (`ringedStep`), steps earlier
+ *  questions were about, and the rest. "Left off here" only while the
+ *  plan has a step still ahead: on a lesson that went through every step
+ *  it would say he stopped partway. */
 export function stepMarks(plan: SessionPlan, waits: boolean): Map<string, StepMark> {
-	const visited = new Set(plan.visited);
-	const ahead = plan.tree.nodes.some((node) => node.id !== plan.current && !visited.has(node.id));
+	const ring = ringedStep(plan, waits);
+	const visited = new Set(plan.current && plan.current !== ring ? [...plan.visited, plan.current] : plan.visited);
+	const ahead = plan.tree.nodes.some((node) => node.id !== ring && !visited.has(node.id));
 	return new Map(
 		plan.tree.nodes.map((node): [string, StepMark] => {
-			if (node.id === plan.current) return [node.id, { status: "current", tag: waits || !ahead ? null : "Left off here" }];
+			if (node.id === ring) return [node.id, { status: "current", tag: waits || !ahead ? null : "Left off here" }];
 			return [node.id, { status: visited.has(node.id) ? "visited" : "upcoming", tag: null }];
 		}),
 	);

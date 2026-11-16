@@ -10,7 +10,8 @@
 import { markLinks } from "../core/answer-marks.ts";
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { chosenSure } from "../core/contracts/marks.ts";
-import { derivePlanStatusesLh } from "../core/contracts/plan.ts";
+import { derivePlanStatusesLh, lhToolCalls } from "../core/contracts/plan.ts";
+import { POSITION_QUESTION_TOOLS } from "../core/question-core.ts";
 import type { SessionPlan, TopicAttempt, TopicReadResponse, TopicRecord, TopicRef } from "../core/contracts/topic.ts";
 import { planDays, plannedOf } from "./calendar.ts";
 import { listCourses } from "./courses.ts";
@@ -112,12 +113,25 @@ export function topicRecordOf(show: unknown, handle: string, taskKeys: readonly 
 	};
 }
 
+/** The step the newest step-tagged question asks about, whatever the
+ *  strip's position does with it (a check back on a step done moves
+ *  nothing there); null before any. Pure. */
+export function askedStep(tree: NonNullable<ChatRecord["tree"]>, messages: ChatRecord["messages"]): string | null {
+	const ids = new Set(tree.nodes.map((node) => node.id));
+	const tagged = lhToolCalls(messages).flatMap((call) => {
+		const nodeId = POSITION_QUESTION_TOOLS.includes(call.name) ? (call.input as { nodeId?: unknown } | undefined)?.nodeId : undefined;
+		return typeof nodeId === "string" && ids.has(nodeId) ? [nodeId] : [];
+	});
+	return tagged.at(-1) ?? null;
+}
+
 /** A stored session's plan and where its transcript puts him on it, or
  *  null when its tutor authored none. Pure. */
 export function sessionPlanOf(chat: ChatRecord): SessionPlan | null {
 	const { tree } = chat;
 	if (!tree || tree.nodes.length === 0) return null;
 	const { current, visited } = derivePlanStatusesLh(tree, chat.messages);
+	const asked = askedStep(tree, chat.messages);
 	return {
 		id: chat.id,
 		tree: {
@@ -126,6 +140,7 @@ export function sessionPlanOf(chat: ChatRecord): SessionPlan | null {
 		},
 		current,
 		visited: [...visited],
+		...(asked !== current ? { asked } : {}),
 	};
 }
 

@@ -68,6 +68,11 @@ export interface SessionPlan {
 	current: string | null;
 	/** Nodes of earlier step-tagged questions. */
 	visited: string[];
+	/** The node the newest step-tagged question asks about, a check back on
+	 *  a step done before included, which `current` does not follow; absent
+	 *  or null before any. Where his turn is while the lesson waits on him
+	 *  (round 14, m40). */
+	asked?: string | null;
 }
 
 /** What GET /api/topic answers. `record` is null when the engine could not

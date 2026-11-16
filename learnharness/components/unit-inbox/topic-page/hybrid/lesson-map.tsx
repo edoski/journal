@@ -8,7 +8,7 @@ import { MIN_ZOOM, type Camera, cameraAt, centreOf, chainOf, isWalkKey, neighbou
 import { TopicMapContext, type TopicMapState } from "@/components/course-map/topic-map/topic-node";
 import { mapFade } from "@/components/study-home/map-frame";
 import { StepNode, type StepFlowNode } from "@/components/unit-inbox/topic-page/steps/step-node";
-import { STEP_SIZE, TAG_ROOM, stepsCamera, stepsLayout, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
+import { STEP_SIZE, TAG_ROOM, ringedStep, stepsCamera, stepsLayout, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
 import { mathPlain } from "@/components/ui/math-text";
@@ -100,7 +100,8 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 			})),
 		[drawing],
 	);
-	const current = plan.tree.nodes.find((node) => node.id === plan.current) ?? null;
+	const ring = ringedStep(plan, waits);
+	const current = plan.tree.nodes.find((node) => node.id === ring) ?? null;
 	return (
 		<div data-slot="topic-lesson-map" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
 			{/* The provider takes the drawing too, so a server render has it before any effect runs. */}
