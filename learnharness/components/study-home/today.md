@@ -53,4 +53,5 @@ What needs the learner now is exactly Today's lines: `needs-you.ts` (`needsYouNo
 | `NowLine.why` | Home's reason, `whyOf(row)` |
 | `NowLine.topics` | `lineTopics(row)` on the line's course map: a waiting session's topics on its course's map, in map order (none with no course); a course's step topics (a review in the plan's order, at most five; a task's held topics, else the current topic; the topic step's topic; none for "none") |
 | `NowLine.lead` | the topic the line's reason is about (`leadOf`), moved first in `topics`, the topic the sidebar's card opens (titled by `NowLine.title`; with no lead the card is its course's): a lapse's lapsed topic, an open task's current topic when the task holds it, else the first of them; null with none |
-| `NowLine.slot` | the reason's words for a 12px status slot: `why.short`, except a lapse on the lead itself reads "Not right last time" (the slip's words, `components/study-words.ts`) and a task's words stop at the first colon ("At part (c)") |
+| `NowLine.status` | the line's one status, Home's row's (`rowStatus`), so the card and the row say the same |
+| `NowLine.slot` | the status's words for a 12px status slot; for a reason: `why.short`, except a lapse on the lead itself reads "Not right last time" (the slip's words, `components/study-words.ts`) and a task's words stop at the first colon ("At part (c)") |

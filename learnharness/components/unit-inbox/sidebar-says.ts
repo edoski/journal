@@ -49,7 +49,9 @@ const WHY_FACT: Record<Why["kind"], TopicFact["kind"]> = { reply: "your-turn", w
  *  says its own (round 5: Random variables read "2d overdue", Binomial's
  *  days, while due today). Pure. */
 function todayFact(item: NowItem, topic: CourseMapTopic, today: string): TopicFact | null {
-	const { why } = item.line;
+	const { why, status } = item.line;
+	// The line's one status (`rowStatus`): a slip it says in place of a plain "Next up" (round 12, 1 m3).
+	if (status?.kind === "standing" && status.facts.slip) return { kind: "slip", words: status.facts.slip.words, slip: status.facts.slip.key };
 	if (why?.kind === "review" || why?.kind === "missed") {
 		if (why.kind === "missed" && lapsedNow(topic.signals)) return { kind: "slip", words: SLIP_WORDS.lapsed, slip: "lapsed" };
 		if (topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue, today) };

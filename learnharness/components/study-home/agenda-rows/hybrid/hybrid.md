@@ -15,12 +15,11 @@ Thesis: Edo liked progress, recency and reason (13 Nov 2026) and asked for one r
 
 ## One status
 
-Edo, 15 Nov 2026, on the first Standing column (its words alone): "feels a bit barebones, needs maybe a standard icon set for it … a bit more detailed somehow but without too much verbosity". Round 11 (1 N9) found rows saying three statuses at once ("Studied today · Mistake to fix · Your turn"), so a row says one (`rowStatus`, `row-standing.ts`), the first that holds:
+Edo, 15 Nov 2026, on the first Standing column (its words alone): "feels a bit barebones, needs maybe a standard icon set for it … a bit more detailed somehow but without too much verbosity". Round 11 (1 N9) found rows saying three statuses at once ("Studied today · Mistake to fix · Your turn"), so a row says one (`rowStatus`, `row-standing.ts`), the first that holds, and the sidebar's card for the line says the same (`NowLine.status`; round 12, 1 m3 and 2 n2: Home said "Mistake to fix" where the sidebar said "Your turn" for one session, and "Check again another day" beside "Due today" for one review):
 
-1. the tutor's own state in a session while it writes or stopped mid-reply ("Tutor writing", "Reply cut off"), since that changes what the row opens on;
-2. the slip he would act on: a miss as the row's reason ("Not right last time: Chain rule"), else its one topic's slip ("Check on your own", "Mistake to fix", "Mixed up with Gaussian elimination", from `slipBeside`, the rule the sidebar and the topic page's head read);
-3. why the row is on Today ("Your turn", "Due since 6 Nov", "Planned today", "Left off 6 Nov", "At part (c)"), except a plain "Next up", which says only that the row is on Today;
-4. where he stands on its one topic (`standingOf`), exactly what the map card and the topic page's head say beside the same pie.
+1. why the row is on Today, since that is what its press opens on: the tutor's own state in a session ("Your turn", "Tutor writing", "Reply cut off"), a miss as the review's reason ("Not right last time: Chain rule"), "Due since 6 Nov", "Planned today", "Left off 6 Nov", "At part (c)"; except a plain "Next up", which says only that the row is on Today;
+2. the slip he would act on, its one topic's ("Check on your own", "Mistake to fix", "Mixed up with Gaussian elimination", from `slipBeside`, the rule the sidebar and the topic page's head read); the pie keeps a slip's warning ink under a reason too;
+3. where he stands on its one topic (`standingOf`), exactly what the map card and the topic page's head say beside the same pie.
 
 | Part | Notes |
 |---|---|

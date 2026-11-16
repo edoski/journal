@@ -2,6 +2,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/s
 import { foldLines, lessonTitle, lineKey, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
 import { laterOnly, openSessions, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { lapsedNow, lapsedOnWords, SLIP_WORDS } from "@/components/study-words";
+import { rowStatus, rowWords, type RowStatus } from "@/components/study-home/agenda-rows/row-standing";
 
 /** One of Today's lines with what the sidebar draws it by: its reason, the
  *  topics it takes up (resolved on its course's map) and the one it leads
@@ -23,7 +24,12 @@ export interface NowLine {
 	/** The topic the line's reason is about (`leadOf`), `topics[0]`, or
 	 *  null. */
 	lead: CourseMapTopic | null;
-	/** The reason's words for a 12px status slot, or null with no reason. */
+	/** The line's one status, Home's row's (`rowStatus`), so a session or
+	 *  a review says the same on Home and on the sidebar's card. */
+	status: RowStatus | null;
+	/** The status's words for a 12px status slot (`slotWords` for a
+	 *  reason, whose new topic keeps its plain "Planned today" there), or
+	 *  null. */
 	slot: string | null;
 }
 
@@ -92,7 +98,9 @@ function nowLine(row: TodayRow): NowLine {
 	const why = whyOf(row);
 	const lead = leadOf(row, taken, why);
 	const topics = lead ? [lead, ...taken.filter((t) => t !== lead)] : taken;
-	return { key: lineKey(row), row, title: lessonTitle(row), why, topics, lead, slot: slotWords(why, lead) };
+	const status = rowStatus(row);
+	const slot = status?.kind === "standing" ? rowWords(status.facts) : status ? slotWords(status.why, lead) : null;
+	return { key: lineKey(row), row, title: lessonTitle(row), why, topics, lead, status, slot };
 }
 
 /**
