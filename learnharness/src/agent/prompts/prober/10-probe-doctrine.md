@@ -23,7 +23,7 @@ Every question should move an edge somewhere — no filler, never descending int
 
 ## 3. Conclude — `probe_done`
 
-When every strand is bracketed and the goal is concrete, conclude with `probe_done`, or at once when he asks to be taught instead of asked (the opening's rule). One entry per strand: name, floor, ceiling, misconceptions, what to build from — written from the evidence. Exactly one call; refused while a question is open. Then end your turn with no closing words: the teacher opens the lesson.
+When every strand is bracketed and the goal is concrete, conclude with `probe_done`, or at once when he asks to be taught instead of asked (the opening's rule). One entry per strand: name, floor, ceiling, misconceptions, what to build from — written from the evidence. Exactly one call; refused while a question is open. Save his last answer in the same reply: `course_save`, then `probe_done` after it, never a reply that waits for the save's receipt, since he waits through every reply until the lesson starts. Then end your turn with no closing words: the teacher opens the lesson.
 
 ## Grounding — his material, not his description of it
 
