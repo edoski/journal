@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult } from "./tool-execute.ts";
-import type { Usage } from "@earendil-works/pi-ai";
+import type { ToolCall, Usage } from "@earendil-works/pi-ai";
 import { SdkAgent } from "./sdk/agent.ts";
 import type { SdkEngine } from "./sdk/engine.ts";
 import type { SessionStore } from "./sdk/session-files.ts";
@@ -21,7 +21,8 @@ import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS } from "../core/pending.ts";
-import { MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL, opensTurn, type LhMessage } from "../core/native-messages.ts";
+import { MODE_HANDOFF_TOOLS, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, SEND_TO_USER_TOOL, opensTurn, type LhMessage } from "../core/native-messages.ts";
+import { LESSON_PROGRESS_TOOL, lessonProgressOf } from "../core/contracts/plan.ts";
 import { CHAT_EFFORT, CLAUDE_MODEL } from "../core/contracts/claude.ts";
 
 const PROBE_DONE_TOOL = "probe_done";
@@ -111,12 +112,25 @@ export interface AgentBuildOptions {
  * after it were only written to be withheld (round 9: 7 s of the 70 s
  * before teaching).
  */
-export function endsTurnFor(kind: AgentKind): (toolName: string) => boolean {
-	return (name) =>
+export function endsTurnFor(kind: AgentKind): (toolName: string, earlier?: readonly ToolCall[]) => boolean {
+	return (name, earlier = []) =>
 		(QUESTION_TOOLS as readonly string[]).includes(name) ||
 		(kind === "practice" && name === PRACTICE_PROBLEM_TOOL) ||
 		(kind === "prober" && name === PROBE_DONE_TOOL) ||
-		MODE_HANDOFF_TOOLS[name] !== undefined;
+		MODE_HANDOFF_TOOLS[name] !== undefined ||
+		(name === SEND_TO_USER_TOOL && closedBefore(kind, earlier));
+}
+
+/** Whether this turn already closed what it was for, so the words after it
+ *  are its last: practice's clean conclude ("Then you END YOUR TURN") and
+ *  the lesson's close (`lesson_progress` with `close`, "then write your
+ *  closing words"). The model's own end after those words was one more
+ *  call that wrote only ordinary text the voice guard withholds: 6 to 16 s
+ *  with nothing on his screen after a practice problem (round 13, 4 #2). */
+function closedBefore(kind: AgentKind, earlier: readonly ToolCall[]): boolean {
+	if (kind === "practice") return earlier.some((c) => c.name === PRACTICE_CONCLUDE_TOOL);
+	if (kind === "teacher") return earlier.some((c) => c.name === LESSON_PROGRESS_TOOL && lessonProgressOf(c.arguments)?.close === true);
+	return false;
 }
 
 /** Claude Code's own file tools, which every tutor agent reads his files with. */

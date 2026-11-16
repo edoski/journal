@@ -14,7 +14,8 @@
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { emit } from "../core/events.ts";
+import { studyDay } from "../core/day-words.ts";
+import { emit, subscribe } from "../core/events.ts";
 import {
 	courseLabel,
 	type CourseResult,
@@ -353,7 +354,7 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
  *  the material folder, so it announces nothing: announcing it made every
  *  reader that refetches on `course-changed` and scans again loop. */
 const WRITE_VERBS: ReadonlySet<CourseVerb["verb"]> = new Set(["save", "sources", "forget-course"]);
-const writes = (verb: CourseVerb): boolean => WRITE_VERBS.has(verb.verb) && !("scan" in verb);
+const isWrite = (verb: CourseVerb): boolean => WRITE_VERBS.has(verb.verb) && !("scan" in verb);
 
 /** Whether the course was deleted: the engine's `forget --course` unlinks
  *  the record and leaves the initialised `.study` folder behind. An
@@ -381,11 +382,117 @@ export function watchCourseRecord(workspace: string, onChange: () => void): () =
 	}
 }
 
+/** A file's identity as a key: the engine replaces a record whole on every
+ *  save, so a write moves its inode, and an edit in place its size or time.
+ *  A folder's moves when an entry comes or goes. "-" when it is missing. */
+function stamp(file: string): string {
+	try {
+		const s = fs.statSync(file, { bigint: true });
+		return `${s.ino}:${s.size}:${s.mtimeNs}`;
+	} catch {
+		return "-";
+	}
+}
+
+/** The registered workspaces in the engine's registry, `{workspaces: {dir: …}}`;
+ *  none when it is missing or unreadable (the engine then reads none). */
+function registered(registry: string): string[] {
+	try {
+		const parsed = JSON.parse(fs.readFileSync(registry, "utf-8")) as { workspaces?: unknown };
+		return Object.keys(record(parsed.workspaces) ?? {}).sort();
+	} catch {
+		return [];
+	}
+}
+
+/** What one engine read reads besides its arguments, as one key: the study
+ *  day (`learning/clock.py`), the engine's registry and global preferences
+ *  in its support folder (`learning/workspace.py`), and for every registered
+ *  course, every course's history feeding his pace, its `.study` marker,
+ *  record and deleted records. The read is the same while this key is. */
+function readState(env: NodeJS.ProcessEnv): { key: string; listed: ReadonlySet<string> } {
+	const support = path.join(env.HOME ?? "", "Library", "Application Support", "Learning");
+	const registry = path.join(support, "workspaces.json");
+	const workspaces = registered(registry);
+	const courses = workspaces.map((w) => folderState(w));
+	return { key: [studyDay(env), stamp(registry), stamp(path.join(support, "preferences.json")), ...courses].join("\n"), listed: new Set(workspaces) };
+}
+
+function folderState(workspace: string): string {
+	const study = path.join(workspace, ".study");
+	return `${workspace} ${stamp(path.join(study, "workspace.json"))} ${stamp(path.join(study, "course.json"))} ${stamp(path.join(study, "forgotten"))}`;
+}
+
+/** The verbs whose every input is in `readState`, `map` among them, kept
+ *  until it moves.
+ *  `plan` also reads his Journal (the day's study table and schedule),
+ *  which the app does not see change, so a plan is only shared while it
+ *  runs; `sources --scan` walks the material folder and is never shared. */
+const KEPT_READS: ReadonlySet<string> = new Set(["show", "resume", "standing", "arcs", "search"]);
+
+/** The engine's kept reads, one set per engine (its interpreter and
+ *  repository), on `globalThis` so every route's copy of this module shares
+ *  them. `writes` moves on every write the app makes or announces. */
+interface EngineReads {
+	reads: Map<string, { state: string; exit: Promise<Exit> }>;
+	writes: number;
+	current: string;
+}
+type EngineReadsGlobal = { __lhEngineReads?: Map<string, EngineReads> };
+
+function engineReads(engine: EngineCommand): EngineReads {
+	const g = globalThis as typeof globalThis & EngineReadsGlobal;
+	const all = (g.__lhEngineReads ??= new Map());
+	const id = `${engine.python}\u0000${engine.root}\u0000${(engine.env ?? process.env).HOME ?? ""}`;
+	let found = all.get(id);
+	if (!found) {
+		const created: EngineReads = { reads: new Map(), writes: 0, current: "" };
+		// A write announced by another path (the folder watch, the map
+		// builder, a test) drops what was read before it.
+		subscribe((event) => {
+			if (event.type === "course-changed" || event.type === "courses-changed") created.writes++;
+		});
+		all.set(id, created);
+		found = created;
+	}
+	return found;
+}
+
 export function createCourseRecords(engine: EngineCommand): CourseRecords {
+	// One engine run per read of one state of the records (round 13, N2):
+	// every page, window and turn reads the engine, and a child replays every
+	// course's history each time, so one save set off a dozen identical reads
+	// at once, each 10 to 34 s on a loaded Mac, with the tutor's own saves
+	// waiting behind them. Every reader of a read the state still holds gets
+	// the one run; a failed run is not kept.
+	const kept = engineReads(engine);
+	const { reads } = kept;
+	const shared = (workspace: string | null, args: string[], verbName: string, keep: boolean): Promise<CourseResult> => {
+		const { key, listed } = readState(engine.env ?? process.env);
+		const state = `${kept.writes}\n${key}`;
+		if (state !== kept.current) {
+			kept.current = state;
+			for (const [read, entry] of reads) if (entry.state !== state) reads.delete(read);
+		}
+		const read = [...args, ...(workspace && !listed.has(workspace) ? [folderState(workspace)] : [])].join("\u0000");
+		const found = reads.get(read);
+		// Each reader parses the output itself, so none sees another's edits.
+		if (found?.state === state) return found.exit.then((exit) => toResult(exit, verbName));
+		const exit = exec(engine, args, "");
+		reads.set(read, { state, exit });
+		void exit.then((e) => {
+			if ((!keep || !toResult(e, verbName).ok) && reads.get(read)?.exit === exit) reads.delete(read);
+		});
+		return exit.then((e) => toResult(e, verbName));
+	};
+	const written = <T>(result: T): T => {
+		kept.writes++;
+		return result;
+	};
 	return {
 		forgotten: courseRecordForgotten,
 		async list() {
-			const result = toResult(await exec(engine, ["plan", "--all", "--days", "1"], ""), "plan");
+			const result = await shared(null, ["plan", "--all", "--days", "1"], "plan", false);
 			if (!result.ok) return { available: false, reason: result.message };
 			const entries = (result.json as { courses?: unknown }).courses;
 			const read = (Array.isArray(entries) ? entries : []).map(entryOf);
@@ -393,27 +500,32 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 				available: true,
 				courses: read.flatMap((r) => (r && "course" in r ? [r.course] : [])),
 				unreadable: read.flatMap((r) => (r && "unreadable" in r ? [r.unreadable] : [])),
+				plan: result.json,
 			};
 		},
 		async run(workspace, verb) {
 			const { args, stdin } = argsFor(verb);
+			if (verb.verb === "plan" || KEPT_READS.has(verb.verb)) return shared(workspace, ["--workspace", workspace, ...args], verb.verb, verb.verb !== "plan");
 			const result = toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
 			// A save that timed out may have landed too: announce it.
-			if (writes(verb) && (result.ok || result.kind === "io")) emit("course-changed", { workspace });
+			if (isWrite(verb) && (result.ok || result.kind === "io")) {
+				written(null);
+				emit("course-changed", { workspace });
+			}
 			return result;
 		},
 		async map(workspace, here) {
-			const result = toResult(await exec(engine, ["--workspace", workspace, "map", ...(here ? ["--here", here] : [])], ""), "map");
+			const result = await shared(workspace, ["--workspace", workspace, "map", ...(here ? ["--here", here] : [])], "map", true);
 			if (!result.ok) return result;
 			const map = courseMapOf(workspace, result.json);
 			return map ? { ok: true, map } : { ok: false, kind: "io", message: "map printed an unexpected shape" };
 		},
 		async create(directory, { title, exam }) {
-			const init = toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init");
+			const init = written(toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init"));
 			if (!init.ok) return init;
 			const workspace = str((init.json as { workspace?: unknown } | null)?.workspace) ?? directory;
 			const record = exam ? { title, exam: { date: exam } } : { title };
-			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify(record)), "save");
+			const saved = written(toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify(record)), "save"));
 			emit("course-changed", { workspace });
 			return saved.ok ? { ok: true, workspace } : saved;
 		},

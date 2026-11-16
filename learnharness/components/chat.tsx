@@ -92,7 +92,7 @@ import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keep
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
-import { CourseGoneLine } from "@/components/lesson/course-gone";
+import { courseDeletedBy, CourseGoneLine } from "@/components/lesson/course-gone";
 import { CourseUnreadableLine } from "@/components/lesson/course-unreadable";
 import { ProseComposer, proseBox, proseOpenKey, type ProseOpen } from "@/components/lesson/prose/prose-composer";
 import { ProseAnswerProvider, useProseAnswer } from "@/components/lesson/prose/prose-answer";
@@ -1334,7 +1334,10 @@ export function Chat({
 			.catch(() => {});
 	};
 	useEffect(() => checkCourseRef.current(), []);
-	useServerEvent("courses-changed", () => checkCourseRef.current());
+	useServerEvent("courses-changed", (p) => {
+		if (courseDeletedBy(p, course?.workspace)) setCourseGone(true);
+		else checkCourseRef.current();
+	});
 	useServerEvent("record-changed", (p) => {
 		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
 		// turn's markers landing at its write-ahead. Idle: adopt the record

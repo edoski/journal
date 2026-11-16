@@ -363,7 +363,8 @@ export function projectView(record: readonly LhMessage[], live?: LiveTurnState):
 						} else {
 							const text = sendToUserText(block);
 							if (text !== undefined) {
-								rest.push({ type: "text", id: `${m.id}-t${textN++}`, text, state: "done" });
+								// Streaming while its reply does: words still arriving.
+								rest.push({ type: "text", id: `${m.id}-t${textN++}`, text, state: streamingMessage ? "streaming" : "done" });
 							}
 						}
 						// No live tool card or acknowledgement: this channel is

@@ -25,8 +25,9 @@ export interface SdkAgentConfig {
 	messages: AgentMessage[];
 	/** A clean call of this tool ends the turn, once every such call in the
 	 *  same reply resolved cleanly (a failed one is retried within the turn).
-	 *  A result's own `terminate` overrides it either way. */
-	endsTurn: (toolName: string) => boolean;
+	 *  `earlier` holds the turn's clean calls before it. A result's own
+	 *  `terminate` overrides it either way. */
+	endsTurn: (toolName: string, earlier?: readonly ToolCall[]) => boolean;
 	/** The record's map to its Claude Code session; absent on a new lesson
 	 *  and on one from before sessions (the turn seeds one from the record). */
 	session?: ChatSession;
@@ -204,8 +205,9 @@ export class SdkAgent {
 				afterReply(() => this.emit({ type: "tool_execution_end", toolCallId: outcome.toolCall.id, toolName: outcome.toolCall.name, result: outcome.result, isError: outcome.isError, ...(outcome.durationMs === undefined ? {} : { durationMs: outcome.durationMs }) }));
 			},
 			endsTurn: (call, outcome) => {
-				if (outcome.isError || !(outcome.result.terminate ?? this.config.endsTurn(call.name))) return false;
-				const siblings = calls.get(call.id)?.assistant.content.filter((b): b is ToolCall => b.type === "toolCall" && b.id !== call.id && this.config.endsTurn(b.name)) ?? [];
+				const earlier = [...outcomes.values()].filter((o) => !o.isError && o.toolCall.id !== call.id).map((o) => o.toolCall);
+				if (outcome.isError || !(outcome.result.terminate ?? this.config.endsTurn(call.name, earlier))) return false;
+				const siblings = calls.get(call.id)?.assistant.content.filter((b): b is ToolCall => b.type === "toolCall" && b.id !== call.id && this.config.endsTurn(b.name, earlier)) ?? [];
 				const ends = siblings.every((b) => outcomes.get(b.id)?.isError === false);
 				if (ends) endedByTool = true;
 				return ends;

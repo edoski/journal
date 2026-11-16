@@ -291,8 +291,15 @@ describe("rename and delete a course", () => {
 	it("DELETE has the engine forget the course record; it leaves the list and its folder stays", async () => {
 		const { stores } = await import("../src/server/stores.ts");
 		stores.courseMapLedgers.save(RUST, { done: [{ fingerprint: "f", files: ["notes.md"], at: "2026-11-08T10:00:00Z" }] } as never);
+		const { subscribe } = await import("../src/core/events.ts");
+		const changes: unknown[] = [];
+		const off = subscribe((e) => {
+			if (e.type === "courses-changed") changes.push(e);
+		});
 		const res = await deleteCourseRoute(send("DELETE", { workspace: RUST }));
+		off();
 		assert.equal(res.status, 200, await res.clone().text());
+		assert.deepEqual(changes, [{ type: "courses-changed", deleted: RUST }], "the change names the course, so its open lessons say so with no read of the list (round 13, 4 #4)");
 		assert.deepEqual(engineCalls().filter((c) => c.args[1] === RUST).at(-1)!.args.slice(2), ["forget", "--course"]);
 		assert.ok(!(await listed()).some((c) => c.workspace === RUST));
 		assert.ok(fs.existsSync(RUST));
@@ -364,9 +371,11 @@ describe("a course-linked turn", () => {
 		const verbs = linked.map((c) => c.args[2]);
 		// The second turn's brief reads nothing: no course changed since the
 		// first read them (round 12, 3 D8: eleven engine processes a turn).
-		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "resume", "save"], "turn brief, the agent's resume, conclude's save");
+		// The agent's own course_resume reads what the brief read, so it is the
+		// brief's run (round 13, N2: one engine run per read of one state).
+		assert.deepEqual(verbs.filter((v) => v !== "plan" && v !== "show" && v !== "map"), ["resume", "save"], "the turn brief's resume, which the agent's resume shares, and conclude's save");
 		assert.equal(verbs.filter((v) => v === "map").length, 1, "the brief reads every course's daily plan, once");
-		assert.equal(verbs.filter((v) => v === "show").length, 2, "each turn reads whether the course has arcs");
+		assert.equal(verbs.filter((v) => v === "show").length, 1, "each turn asks whether the course has arcs; no record changed between the two, so the second turn's answer is the first's run");
 		assert.equal(verbs.filter((v) => v === "plan").length, 1, "the brief reads the daily plan, practice's exam run-up with it, once");
 		const save = linked.find((c) => c.args[2] === "save")!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
@@ -499,7 +508,9 @@ describe("a course-linked turn", () => {
 		};
 		const flat = (await (await createChat({ title: "no arcs yet", course: { workspace: LINALG } })).json()) as { id: string };
 		await turn(flat.id, { type: "text", text: "teach me rank" }, build(flat.id));
+		// The course gains arcs the way it does for real: a save, announced.
 		process.env.FAKE_ENGINE_SHOW = JSON.stringify({ arcs: { spaces: { title: "Vector spaces" } }, topics: {} });
+		(await import("../src/core/events.ts")).emit("course-changed", { workspace: LINALG });
 		try {
 			const grouped = (await (await createChat({ title: "arcs", course: { workspace: LINALG } })).json()) as { id: string };
 			await turn(grouped.id, { type: "text", text: "teach me rank" }, build(grouped.id));

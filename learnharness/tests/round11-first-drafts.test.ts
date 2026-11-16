@@ -104,3 +104,18 @@ describe("the rules round 12's guard added are stated where the draft is written
 		assert.match(String((demoInputSchema.properties.title as { description?: string }).description), /never a formula he is still to find/);
 	});
 });
+
+describe("send_to_user's message field gives each kind of turn's budget, the guard's own (round 13, 3 N2)", () => {
+	it("names every budget the guard counts, so a first draft fits it", async () => {
+		const { SENTENCE_BUDGETS } = await import("../src/core/voice-check.ts");
+		const { MESSAGE_DRAFT_LINES } = await import("../src/agent/tools/send-to-user.ts");
+		const line = MESSAGE_DRAFT_LINES.find((l) => l.startsWith("Its length is"))!;
+		for (const [kind, words] of [["teach", "a teaching turn"], ["right", "a right answer"], ["wrong", "a wrong answer"], ["hint", "a hint"], ["direct", "a direct answer to his question"], ["close", "closing words"]] as const) {
+			const budget = SENTENCE_BUDGETS[kind];
+			assert.ok(line.includes(`${words} ${budget}`), `${words}: ${budget}`);
+			const fits = Array.from({ length: budget }, (_, i) => `The rank is ${i + 2} here.`).join(" ");
+			assert.ok(!voiceBreaks(fits, kind).some((b) => b.rule === "length"), `${kind}: ${budget} sentences pass`);
+			assert.ok(voiceBreaks(`${fits} The rank is one more.`, kind).some((b) => b.rule === "length"), `${kind}: one more is refused`);
+		}
+	});
+});

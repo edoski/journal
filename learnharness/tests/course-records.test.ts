@@ -60,7 +60,8 @@ describe("course records adapter (fake engine)", () => {
 				{ workspace: "/s/odd", error: "an engine before problems" },
 			],
 		});
-		const listing = await createCourseRecords(engine).list();
+		const { plan, ...listing } = (await createCourseRecords(engine).list()) as { plan?: unknown };
+		assert.equal((plan as { today?: string }).today, "2026-11-07", "the plan the list came from comes with it");
 		assert.deepEqual(listing, {
 			available: true,
 			courses: [
