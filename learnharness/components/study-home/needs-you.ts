@@ -3,6 +3,8 @@ import { foldLines, lessonTitle, lineKey, whyOf, type Why } from "@/components/s
 import { laterOnly, openSessions, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { lapsedNow, lapsedOnWords, SLIP_WORDS } from "@/components/study-words";
 import { rowStatus, rowWords, type RowStatus } from "@/components/study-home/agenda-rows/row-standing";
+import { sessionState } from "@/components/nav/session-state";
+import { localDay } from "@/components/day-change";
 
 /** One of Today's lines with what the sidebar draws it by: its reason, the
  *  topics it takes up (resolved on its course's map) and the one it leads
@@ -112,10 +114,14 @@ export function nowLine(row: TodayRow): NowLine {
  * topics it takes up. Only today's work: a course whose next item the
  * plan dates on a later day, or with nothing to take up, has no line, so
  * neither Today nor its fold ("Also today") names it. Home draws `rows`;
- * the sidebar's top draws `lines`, each as the topic it leads with. Pure.
+ * the sidebar's top draws `lines`, each as the topic it leads with. With
+ * `readAt`, when the courses' read began, a session finished today since
+ * then ends its step's line before the next read knows it (`todayRows`).
+ * Pure.
  */
-export function needsYouNow(courses: readonly StudyCourse[], chats: readonly ChatListItem[], today: string): NeedsYou {
-	const rows = todayRows(courses, openSessions(chats), today).filter((row) => row.kind === "session" || !laterOnly(row.step));
+export function needsYouNow(courses: readonly StudyCourse[], chats: readonly ChatListItem[], today: string, readAt?: string): NeedsYou {
+	const settled = readAt === undefined ? [] : chats.filter((c) => !c.courseDeleted && c.updatedAt > readAt && sessionState(c) === "finished" && localDay(new Date(c.updatedAt)) === today);
+	const rows = todayRows(courses, openSessions(chats), today, settled).filter((row) => row.kind === "session" || !laterOnly(row.step));
 	const { shown, also } = foldLines(rows);
 	return { rows, lines: shown.map(nowLine), also: also.map(nowLine) };
 }

@@ -107,7 +107,7 @@ function HomeBody({
 				return <Notice>No courses yet. Start a lesson from New lesson and pick a course there.</Notice>;
 			}
 			const today = state.courses[0]!.map.today;
-			const { rows } = needsYouNow(state.courses, state.chats, today);
+			const { rows } = needsYouNow(state.courses, state.chats, today, state.readAt);
 			return (
 				<>
 					{children({

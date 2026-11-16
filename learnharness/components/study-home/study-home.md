@@ -56,7 +56,7 @@ Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is moun
 
 | State | Shows |
 |---|---|
-| loading | "Reading your courses…", only before this window has read Home once; a later visit shows the last Home read until its own read lands (round 12, 1 m8) |
+| loading | "Reading your courses…", only before this window has read Home once; a later visit shows the last Home read until its own read lands (round 12, 1 m8). The sessions and the courses land each on their own, so Today lists the live lesson and drops a line a session finished since the courses were read, without waiting on the engine (round 13, 3 N3, 1 n1) |
 | engine unavailable | `CoursesUnavailable` with its fix |
 | read failed | "Couldn't read your courses." with Try again |
 | no courses | "No courses yet. Start a lesson from New lesson and pick a course there." |
