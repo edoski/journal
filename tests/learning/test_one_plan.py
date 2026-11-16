@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from learning import capacity, planning, records, retrieval
+from learning import agenda, capacity, planning, records, retrieval
 from learning.__main__ import main
 from learning.workspace import initialize, resolve
 
@@ -326,41 +326,84 @@ def test_deleting_a_course_moves_no_day_of_another(
         } == {}
 
 
-def test_full_is_said_only_of_days_at_his_limit(
+R14 = json.loads(
+    (Path(__file__).parent / "golden" / "demo-world-r14.json").read_text("utf-8")
+)
+
+
+@pytest.mark.parametrize("world", [WORLD, R14], ids=["round-11", "round-14"])
+def test_the_final_review_fills_its_free_days_with_what_it_left_out(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    world: dict[str, Any],
 ) -> None:
-    """The plan says his pace fills the final review only when every day of
-    it holds his limit (round 13, 1 n4: "your pace fills every day of the
-    final review" while days of it held room)."""
-    world = World(tmp_path, "seed", monkeypatch, capsys)
-    found = world.plan("2026-11-08")
-    course = found["linear-algebra"]["plan"]
-    assert course["unreviewed"] == ["rank"]
-    exam = world.run("linear-algebra", "map", day="2026-11-08")["exam"]
+    """A final review leaves a taught topic without a review only when every
+    study day of it holds his limit, and only then says his pace is full
+    (round 14, M10: 14 and 17 Nov held no Probability item while Binomial,
+    Poisson and Geometric read "No room in the final review"; round 13,
+    1 n4: "full" while days held room)."""
+    seeded = World(tmp_path, "seed", monkeypatch, capsys, world)
+    found = seeded.plan("2026-11-08")
     held: dict[str, int] = {}
     for other in found.values():
         for day in (other.get("plan") or {}).get("days", []):
             held[day["date"]] = held.get(day["date"], 0) + len(day["reviews"])
     monkeypatch.setenv("LEARNING_TODAY", "2026-11-08")
-    stored = {name: records.read(resolve(root)) for name, root in world.roots.items()}
+    stored = {name: records.read(resolve(root)) for name, root in seeded.roots.items()}
     week = capacity.of(
         capacity.final_reviews(stored, date(2026, 11, 8)).values(), date(2026, 11, 8)
-    )
-    first, last = (
-        date.fromisoformat(exam["final_review"]),
-        date.fromisoformat(exam["date"]),
-    )
-    span = (first + timedelta(days=n) for n in range((last - first).days))
-    free = [
-        day
-        for day in span
-        if week.studies(day)
-        and held.get(day.isoformat(), 0) < week.room(day, "reviews")
-    ]
-    assert free, "a day of the final review has room"
-    assert "rank" not in course.get("reasons", {})
+    ).resting(capacity.exam_days(stored.values()))
+    for name in EXAMS:
+        course = found[name]["plan"]
+        exam = seeded.run(name, "map", day="2026-11-08")["exam"]
+        first, last = (
+            date.fromisoformat(exam["final_review"]),
+            date.fromisoformat(exam["date"]),
+        )
+        span = (first + timedelta(days=n) for n in range((last - first).days))
+        free = [
+            day.isoformat()
+            for day in span
+            if week.studies(day)
+            and held.get(day.isoformat(), 0) < week.room(day, "reviews")
+        ]
+        reasons = course.get("reasons", {})
+        left = [
+            topic
+            for topic in course.get("unreviewed", [])
+            if reasons.get(topic) != "too_late"
+        ]
+        assert not (left and free), (name, left, free)
+        assert all(reasons.get(topic) == "full" for topic in left), (name, reasons)
+
+
+def test_filling_the_final_review_keeps_every_day_he_was_told(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The topics the final review left out take its free room beside what
+    the days he was told hold: today's saves keep every review the plan as
+    today began gave a topic they did not touch (round 14, M10: Binomial and
+    Poisson had no review before the exam, and Sat 14 Nov held one item)."""
+    seeded = World(tmp_path, "seed", monkeypatch, capsys, R14)
+    found = seeded.plan("2026-11-08")
+    final = {
+        topic
+        for day in found["probability"]["plan"]["days"]
+        if "2026-11-13" <= day["date"] < "2026-11-19"
+        for topic in day["reviews"]
+    }
+    assert {"binomial", "poisson"} <= final
+    monkeypatch.setenv("LEARNING_TODAY", "2026-11-08")
+    stored = {name: records.read(resolve(root)) for name, root in seeded.roots.items()}
+    made = agenda.replay(stored, date(2026, 11, 8), WINDOW)
+    for name, record in stored.items():
+        touched = agenda.touched(record, date(2026, 11, 8))
+        for began, now in zip(made.began.days[name], made.now.days[name]):
+            kept = {topic for topic in began["reviews"] if topic not in touched}
+            assert kept <= set(now["reviews"]), (name, began, now)
 
 
 EVE = json.loads((Path(__file__).parent / "golden" / "exam-eve.json").read_text())

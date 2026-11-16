@@ -35,8 +35,10 @@ Reviews, when there are more than fit:
      lighter day takes less of it and a day off none; its not-yet-solid
      topics come back as their short intervals ask. Every taught topic is due
      by the final review, so each is reviewed before the exam whenever his
-     limit leaves room for it; the plan names those it leaves without one
-     (``Plan.unreviewed``), each with why (``Reason``).
+     limit leaves room for it, a day he was told keeping what it holds while
+     its free room takes what the final review left out (``_left_out``); the
+     plan names those it leaves without one (``Plan.unreviewed``), each with
+     why (``Reason``).
   2. a review an exam's untaught topics wait on (a topic not yet solid that
      they need, or a competing method of theirs), nearest exam first: the
      rest of that exam's path cannot start before it is solid, so it carries
@@ -954,12 +956,24 @@ def _kept_reviews(
     earlier one told him, and a day may hold more than his limit by what a
     save moved past the reviews it found there. A topic moves when the step's save touched it, or
     when its start, kept from the plan before, is no longer ready: its
-    reviews then follow its new start, never one before it."""
+    reviews then follow its new start, never one before it.
+
+    A final review's free room also takes, in the same order, the exam's
+    topics it left out, those the plan before gave no day before the exam
+    (``_left_out``): placing one moves no day he was told, and leaving the room empty
+    sent him into the exam with topics never reviewed (round 14, M10: 14 and
+    17 Nov held no Probability item while Binomial, Poisson and Geometric
+    read "No room in the final review")."""
     chosen = {
         c.name: [t for t in told.kept(c.name, day, "reviews") if not c.moves(t)]
         for c in courses
     }
-    if not any(course.due_moving(day) for course in courses):
+    filling = (
+        week.studies(day)
+        and sum(len(topics) for topics in chosen.values()) < room
+        and any(c.reviewing(day) and not c.none_due(day) for c in courses)
+    )
+    if not filling and not any(course.due_moving(day) for course in courses):
         return chosen
     candidates, quota = _candidates(courses, day, week)
     for course in courses:
@@ -975,8 +989,18 @@ def _kept_reviews(
         for topic in topics
     ]
     moved = 0
+    taken = len(kept)
+    told_ahead: dict[str, set[str]] = {}
     for key, name, owner, topic in candidates:
         if not owner.moves(topic):
+            if not filling or taken >= room or not owner.reviewing(day):
+                continue
+            if name not in told_ahead:
+                told_ahead[name] = _told_before_exam(owner, day, told)
+            if topic not in chosen[name] and _left_out(owner, topic, told_ahead[name]):
+                chosen[name].append(topic)
+                moved += 1
+                taken += 1
             continue
         ahead = (
             len(kept) if told.yields else sum(other < key for other in kept)
@@ -985,11 +1009,38 @@ def _kept_reviews(
         if week.studies(day) and ahead < room and (not final or quota[name] > 0):
             chosen[name].append(topic)
             moved += 1
+            taken += 1
             if final:
                 quota[name] -= 1
         else:
             owner.wait(topic, None)
     return chosen
+
+
+def _told_before_exam(course: _Course, day: date, told: _Told) -> set[str]:
+    """The topics the plan before the step reviews from ``day`` to the day
+    before ``course``'s exam."""
+    assert course.exam is not None
+    return {
+        topic
+        for planned in told.plan.days[course.name][
+            (day - told.on).days : (course.exam.day - told.on).days
+        ]
+        for topic in planned["reviews"]
+    }
+
+
+def _left_out(course: _Course, topic: str, told_ahead: set[str]) -> bool:
+    """A review of the exam's that its final review left out: due, examined,
+    untouched by the step, and given no day before the exam by the plan
+    before it (``told_ahead``). Its only day is the spaced one after the exam
+    that being left out gave it, so placing it moves no day of the final
+    review he was told."""
+    return (
+        not course.moves(topic)
+        and course.exam_of(topic) is not None
+        and topic not in told_ahead
+    )
 
 
 @dataclass
