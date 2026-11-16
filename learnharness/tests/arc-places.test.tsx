@@ -153,7 +153,7 @@ describe("the topic page", () => {
 		assert.ok(plain.querySelector('[data-slot="arc-pill"]') === null);
 	});
 
-	it("says why a topic not started comes when it does, under its planned first lesson", () => {
+	it("says why a topic not started comes when it does in Scheduled, never under Now, whose planned day wraps whole", () => {
 		const startsWhy: StartsWhy = { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] };
 		const diag = { ...LINALG_ARCS.map.topics.find((t) => t.handle === "diag")!, starts: "2026-11-11", startsWhy };
 		const course = { ...LINALG_ARCS, map: { ...LINALG_ARCS.map, topics: LINALG_ARCS.map.topics.map((t) => (t.handle === "diag" ? diag : t)) } };
@@ -162,9 +162,11 @@ describe("the topic page", () => {
 		const { now } = pickupSections(facts);
 		assert.deepEqual([now.kind, now.note, now.why], ["start", "Planned Wed 11 Nov", facts.startsWhy]);
 		const doc = render(<SectionsPane facts={facts} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
-		const line = doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]')!;
-		assert.equal(line.textContent, "After Eigenvalues and eigenvectors, which it needs");
-		assert.equal(line.getAttribute("data-kind"), "after");
+		// Round 12, 3 n9: Now carries no reason line, and its planned day wraps whole.
+		assert.ok(doc.querySelector('[data-slot="pickup-now"] [data-slot="topic-starts-why"]') === null, "no reason line under Now");
+		const note = doc.querySelector('[data-slot="pickup-now-note"]')!;
+		assert.equal(note.textContent, "Planned Wed 11 Nov");
+		assert.ok(!note.className.includes("truncate"), "the planned day is never cut");
 		const withSession = topicFacts({ course, topic: diag, chats: [chat("d", { topics: ["diag"], pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })], read: null });
 		assert.deepEqual(pickupSections(withSession).scheduled?.why, facts.startsWhy, "Scheduled's first lesson says it too, when Now does not start it");
 		const covariance = { ...diag, handle: "covariance" as TopicHandle, starts: undefined, startsWhy: undefined, excluded: "Outside the exam: it covers chapters 2-4, and covariance is section 7.3" };

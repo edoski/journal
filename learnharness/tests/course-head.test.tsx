@@ -147,6 +147,14 @@ describe("what the final review leaves out (round 6: Variance had no word, Rando
 		assert.doesNotMatch(both.textContent ?? "", /\d/, "no counts");
 	});
 
+	it("names the one topic it offers when the line names two (round 12, 1 m2: \"No room… for Inner products and Orthogonal projection… Start it today\")", () => {
+		const needs = [{ kind: "needs" as const, topic: h("projection"), prerequisite: h("inner") }];
+		const c = gapped(["inner", "projection"], [], { inner: "full", projection: "full" });
+		const map = { ...c.map, topics: [...c.map.topics, topic("inner", { title: "Inner products" }), topic("projection", { title: "Orthogonal projection" })], edges: needs };
+		const line = gapLine({ ...c, map })!;
+		assert.deepEqual([...line.querySelectorAll("button")].map((b) => b.textContent), ["Start Inner products today", EXAM_GAP_WORDS.ask]);
+	});
+
 	it("says the round-8 gap in two sentences, your pace once, every reason naming the topics it alone covers (round 8: five sentences)", () => {
 		const c = gapped(["expectation", "variance"], ["binomial", "poisson", "geometric"], { expectation: "full", variance: "not_ready", binomial: "full", poisson: "full", geometric: "too_late" });
 		const map = { ...c.map, topics: [...c.map.topics, topic("expectation"), topic("geometric")] };

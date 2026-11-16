@@ -1,0 +1,225 @@
+{
+ "today": "2026-11-10",
+ "revision": 20,
+ "title": "Probability",
+ "exam": {
+  "date": "2026-11-19",
+  "days_left": 9,
+  "leaves_out": [
+   "covariance"
+  ],
+  "final_review": "2026-11-13",
+  "unreviewed": [
+   "geometric"
+  ],
+  "reasons": {
+   "geometric": "full"
+  }
+ },
+ "current": "random-variables",
+ "focus": "poisson-lesson",
+ "tasks": [
+  {
+   "key": "poisson-lesson",
+   "title": "Start the Poisson distribution",
+   "step": "Answer the open question on the batch of $2000$ chips",
+   "updated": "2026-11-10",
+   "topics": [
+    "poisson"
+   ]
+  }
+ ],
+ "topics": [
+  {
+   "topic": "conditional",
+   "title": "Conditional probability",
+   "needs": [],
+   "contrasts": [],
+   "level": "retained",
+   "introduced": "2026-10-19",
+   "review": "2026-11-18",
+   "held": true,
+   "due": "2026-11-13",
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "total-probability",
+   "title": "Law of total probability",
+   "needs": [
+    "conditional"
+   ],
+   "contrasts": [],
+   "level": "independent",
+   "introduced": "2026-10-25",
+   "review": "2026-11-13",
+   "held": true,
+   "due": "2026-11-07",
+   "weak": true,
+   "gap": "You forget to weight each case by its probability",
+   "mistake": true,
+   "lapsed": true,
+   "confident_errors": 1,
+   "tasks": []
+  },
+  {
+   "topic": "bayes",
+   "title": "Bayes' rule",
+   "needs": [
+    "conditional",
+    "total-probability"
+   ],
+   "contrasts": [],
+   "level": "retained",
+   "introduced": "2026-10-27",
+   "review": "2026-11-15",
+   "held": true,
+   "due": "2026-11-11",
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "independence",
+   "title": "Independent events",
+   "needs": [],
+   "contrasts": [],
+   "level": "independent",
+   "introduced": "2026-11-02",
+   "review": "2026-11-16",
+   "held": true,
+   "due": "2026-11-08",
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "random-variables",
+   "title": "Random variables and distributions",
+   "needs": [],
+   "contrasts": [],
+   "level": "independent",
+   "introduced": "2026-11-05",
+   "review": "2026-11-14",
+   "held": true,
+   "due": "2026-11-12",
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "binomial",
+   "title": "Binomial distribution",
+   "needs": [
+    "random-variables",
+    "independence"
+   ],
+   "contrasts": [
+    "poisson",
+    "geometric"
+   ],
+   "level": "independent",
+   "introduced": "2026-11-05",
+   "review": "2026-11-14",
+   "held": true,
+   "due": "2026-11-11",
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "poisson",
+   "title": "Poisson distribution",
+   "needs": [
+    "random-variables"
+   ],
+   "contrasts": [
+    "binomial"
+   ],
+   "level": "new",
+   "starts": "2026-11-11",
+   "starts_why": {
+    "kind": "begun"
+   },
+   "weak": false,
+   "tasks": [
+    "poisson-lesson"
+   ]
+  },
+  {
+   "topic": "geometric",
+   "title": "Geometric distribution",
+   "needs": [
+    "random-variables",
+    "independence"
+   ],
+   "contrasts": [
+    "binomial"
+   ],
+   "level": "new",
+   "starts": "2026-11-10",
+   "starts_why": {
+    "kind": "after",
+    "needs": [
+     "random-variables"
+    ]
+   },
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "expectation",
+   "title": "Expectation and linearity",
+   "needs": [
+    "random-variables"
+   ],
+   "contrasts": [],
+   "level": "new",
+   "starts": "2026-11-12",
+   "starts_why": {
+    "kind": "after",
+    "needs": [
+     "random-variables"
+    ]
+   },
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "variance",
+   "title": "Variance",
+   "needs": [
+    "expectation"
+   ],
+   "contrasts": [],
+   "level": "new",
+   "starts": "2026-11-15",
+   "starts_after": [
+    "Linear Algebra"
+   ],
+   "starts_why": {
+    "kind": "after",
+    "needs": [
+     "expectation"
+    ]
+   },
+   "weak": false,
+   "tasks": []
+  },
+  {
+   "topic": "covariance",
+   "title": "Covariance and correlation",
+   "needs": [
+    "variance"
+   ],
+   "contrasts": [],
+   "level": "new",
+   "starts": "2026-11-24",
+   "starts_after": [
+    "Linear Algebra",
+    "Real Analysis"
+   ],
+   "starts_why": {
+    "kind": "next"
+   },
+   "weak": false,
+   "tasks": []
+  }
+ ]
+}

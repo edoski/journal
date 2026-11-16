@@ -35,6 +35,7 @@ class World:
         checkpoint: str,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
+        world: dict[str, Any] = WORLD,
     ) -> None:
         self.monkeypatch, self.capsys = monkeypatch, capsys
         self.roots: dict[str, Path] = {}
@@ -42,7 +43,7 @@ class World:
             folder = root / name
             folder.mkdir(parents=True)
             initialize(folder)
-            record = WORLD["checkpoints"][checkpoint].get(name) or WORLD["steady"][name]
+            record = world["checkpoints"][checkpoint].get(name) or world["steady"][name]
             (folder / ".study" / "course.json").write_text(json.dumps(record))
             self.roots[name] = folder
         monkeypatch.setenv("VAULT_DIR", str(root / "vault"))

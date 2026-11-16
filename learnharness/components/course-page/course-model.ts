@@ -103,8 +103,11 @@ function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses
 		// A topic not started says the day the plan starts it, not the group's own "Not started" (round 5).
 		const planned: TopicFact | null = group === "not-started" && fact === null && topic.starts ? { kind: "next", words: topic.starts <= map.today ? "Planned today" : `Planned ${planDay(topic.starts)}` } : null;
 		const shown = here ? HERE : (planned ?? fact);
-		// A start the exam's plan has no room for before the exam says so, its day in the hint (round 12, 1 m11: "Planned 29 Nov" on the exam's own course page).
-		const afterExam = planned && shown === planned && topic.starts && map.exam && map.exam.daysLeft >= 0 && topic.starts > map.exam.date && (map.exam.doesNotFit ?? []).includes(topic.handle);
+		// A start the exam's plan puts after an exam still ahead, one it has no room for or leaves out, says so,
+		// its day in the hint (round 12, 1 m11: "Geometric · Planned 29 Nov" on the exam's own course page while
+		// its topic page said "Not before the exam").
+		const waits = [...(map.exam?.doesNotFit ?? []), ...(map.exam?.leavesOut ?? [])].includes(topic.handle);
+		const afterExam = planned && shown === planned && topic.starts && map.exam && map.exam.daysLeft >= 0 && topic.starts > map.exam.date && waits;
 		const words = afterExam ? AFTER_EXAM : planned && shown === planned && topic.starts && topic.starts > map.today ? `Planned ${shortDay(topic.starts)}` : shownWords(shown, topic, map.today);
 		return { topic, group, fact: shown, factWords: words, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
 	});

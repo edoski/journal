@@ -62,12 +62,12 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable, Hashable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import date, timedelta
 import functools
+from datetime import date, timedelta
 import math
 from typing import Any, TypeVar
 
-from learning import arc_rules, progress
+from learning import arc_rules, memo, progress
 
 # Two weeks: each weekday is seen at least twice at near-full weight, and a new
 # routine outweighs the old one within a week.
@@ -125,6 +125,10 @@ class Capacity:
     study_weekdays: frozenset[int]
     evidence: float
     off: frozenset[date] = field(default=frozenset())
+    rooms: dict[tuple[date, str], int] = field(
+        default_factory=dict, compare=False, hash=False, repr=False
+    )
+    """Each day's room this week gave, as the plan asked for it (``room``)."""
 
     def studies(self, day: date) -> bool:
         """Whether he studies on this day: on his study weekdays, as his
@@ -132,8 +136,12 @@ class Capacity:
         return day.weekday() in self.study_weekdays and day not in self.off
 
     def resting(self, days: Iterable[date]) -> Capacity:
-        """The same week, holding nothing on ``days`` too."""
-        return replace(self, off=self.off | frozenset(days))
+        """The same week, holding nothing on ``days`` too: one week per read
+        of the plan (``memo``), so the days' room is worked out once."""
+        off = self.off | frozenset(days)
+        return memo.once(
+            "resting", (self, off), lambda: replace(self, off=off, rooms={})
+        )
 
     def on(self, day: date) -> Weekday:
         return self.weekdays[day.weekday()]
@@ -141,7 +149,10 @@ class Capacity:
     def room(self, day: date, kind: str) -> int:
         """A study day's whole items of ``kind`` from his fractional rates,
         the fractions carried within the calendar week (``whole``)."""
-        return _room(self, day, kind)
+        key = (day, kind)
+        if key not in self.rooms:
+            self.rooms[key] = _room(self, day, kind)
+        return self.rooms[key]
 
     def share(self, day: date, last: date) -> float:
         """``day``'s part of the reviews he does from ``day`` to ``last``: by
@@ -182,7 +193,6 @@ class Capacity:
         }
 
 
-@functools.lru_cache(maxsize=4096)
 def _room(week: Capacity, day: date, kind: str) -> int:
     def rate(other: date) -> float:
         if not week.studies(other):
@@ -223,12 +233,19 @@ def pace(rest: int, left: int, day: date, studies: Callable[[date], bool]) -> in
 # --- what each day shows ------------------------------------------------------
 
 
-def first_day(replayed: progress.Replay, topic: dict[str, Any]) -> date | None:
-    """The day he started the topic: its first lesson on record, or the day
-    it was introduced."""
+def first_day(
+    replayed: progress.Replay,
+    topic: dict[str, Any],
+    lesson: Mapping[str, str | None] | None = None,
+) -> date | None:
+    """The day he started the topic: its first lesson on record, the day it
+    was introduced, or the first day of a lesson he began on it
+    (``progress.lessons``), whichever came first."""
     started = topic.get("introduced")
     learning = [day for day, kind in replayed.days.items() if kind == progress.LEARNING]
-    first = min([*learning, *([started] if started else [])], default=None)
+    first = min(
+        [*learning, *([started] if started else []), *(lesson or {})], default=None
+    )
     return date.fromisoformat(first) if first else None
 
 
@@ -302,10 +319,12 @@ def _new_short(
     exam = progress.exam_plan(record)
     if exam is None:
         return set()
+    lessons = progress.lessons(record)
     starts = {
         key: first
         for key, replay in replayed.items()
-        if (first := first_day(replay, record["topics"][key])) is not None
+        if (first := first_day(replay, record["topics"][key], lessons.get(key)))
+        is not None
     }
     order = progress.path_order(record)
     partners = progress.contrasts(record)
@@ -364,6 +383,16 @@ def exam_days(records: Iterable[dict[str, Any]]) -> frozenset[date]:
 
 
 def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]:
+    """``_activity``, once per read of the plan for the same records
+    (``memo``)."""
+    records = list(records)
+    if not memo.active():
+        return _activity(records, today)
+    key = (today, tuple(memo.content(record) for record in records))
+    return dict(memo.once("activity", key, lambda: _activity(records, today)))
+
+
+def _activity(records: list[dict[str, Any]], today: date) -> dict[date, Done]:
     """Every day with recorded study, across the given courses: reviews
     answered on a review day, topics started, and, on a day the plan held
     work for, whether he stopped with work owed, today's as it stands now
@@ -373,13 +402,13 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
     would replay it earlier than it stood (no credit for late answers, and
     reviews pulled to the final review), and a review the plan never proposed
     is no sign he stopped."""
-    records = list(records)
     reviews: dict[date, int] = defaultdict(int)
     new: dict[date, int] = defaultdict(int)
     replayed = [progress.replays(record) for record in records]
     for record, replays in zip(records, replayed, strict=True):
+        lessons = progress.lessons(record)
         for key, replay in replays.items():
-            first = first_day(replay, record["topics"][key])
+            first = first_day(replay, record["topics"][key], lessons.get(key))
             if first is not None:
                 new[first] += 1
             for day, kind in replay.days.items():
@@ -397,7 +426,11 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
             exam_of = progress.examining(record)
             for key, replay in progress.replays({**record, "exam": {}}).items():
                 left |= _reviews_left(replay, exam_of(key), today + timedelta(days=1))
-        short |= _new_short(record, replays, week.planned, week.study)
+        short |= memo.once(
+            "new_short",
+            (memo.content(record), week.planned, week.study),
+            functools.partial(_new_short, record, replays, week.planned, week.study),
+        )
     return _settled(
         {
             day: Done(
@@ -596,8 +629,16 @@ def estimate(
     days: dict[date, Done], today: date, rest: frozenset[date] = frozenset()
 ) -> Capacity:
     """His week from his study through ``today``, today's as saved so far,
-    holding nothing on the exam days ``rest``."""
+    holding nothing on the exam days ``rest``; once per read of the plan for
+    the same days (``memo``)."""
     past = {day: done for day, done in days.items() if day <= today}
+    if not memo.active():
+        return _estimate(past, today, rest)
+    key = (today, rest, tuple(sorted(past.items())))
+    return memo.once("estimate", key, lambda: _estimate(past, today, rest))
+
+
+def _estimate(past: dict[date, Done], today: date, rest: frozenset[date]) -> Capacity:
     week = _study_weekdays(past, today, rest)
     reviews = _kind(past, "reviews", "reviews_short", None)
     new = _kind(past, "new", "new_short", PRIOR_NEW)

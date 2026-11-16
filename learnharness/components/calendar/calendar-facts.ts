@@ -1,7 +1,7 @@
 import { isReviewSession, taskTopics, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type PlannedDay, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
-import { distanceWords, heldExamWords, leftOutWords, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
+import { distanceWords, heldExamWords, leftOutWords, lessonBegun, movedWords, overdueWords, startsAfterWords, type ExamGapTopic } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 
@@ -211,7 +211,8 @@ export function lookOf(entry: CalendarEntry): EntryLook {
 		case "review":
 			return entry.overdue ? "overdue" : "review";
 		case "new":
-			return "new";
+			// A lesson he began goes on: it is no new topic (round 12, 1 D3).
+			return entry.topic.startsWhy?.kind === "begun" ? "lesson" : "new";
 		case "task":
 			return "task";
 		case "session":
@@ -350,7 +351,8 @@ export function calendarEntries({
 			}
 			for (const handle of day.new) {
 				const topic = topicOf(handle);
-				if (topic) fresh(topic, day.date);
+				// A lesson he began goes on today under its open task's own entry: one piece of work, one entry.
+				if (topic && !(day.date === today && lessonBegun(topic))) fresh(topic, day.date);
 			}
 		}
 		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));

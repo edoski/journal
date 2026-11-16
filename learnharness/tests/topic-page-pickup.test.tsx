@@ -99,12 +99,12 @@ function order(document: Document): string[] {
 }
 
 describe("Now", () => {
-	it("says since when a review the plan holds past its due day is due, as the sidebar says it, never Nothing due (round 4) or Nothing planned today (round 8, 1 D11)", () => {
+	it("says a review the plan holds past its due day by the plan's day, never Due today beside it (round 12, 1 m1, 2 n1), Nothing due (round 4) or Nothing planned today (round 8, 1 D11)", () => {
 		const held = topic("binomial", { title: "Binomial distribution", level: "assisted", introduced: "2026-11-05", review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-06" } } });
 		const { now, scheduled } = pickupSections(factsOf(held));
-		assert.equal(now.words, "Due since 6 Nov, back 10 Nov", "with the day the plan brings it back, as the sidebar says it");
+		assert.equal(now.words, "Nothing today", "Scheduled gives the plan's day, the head memory's");
 		const today = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-08" } } });
-		assert.equal(pickupSections(factsOf(today)).now.words, "Due today");
+		assert.equal(pickupSections(factsOf(today)).now.words, "Nothing today");
 		assert.equal(scheduled?.kind, "review");
 		const ahead = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-09" } } });
 		assert.equal(pickupSections(factsOf(ahead)).now.words, "Nothing due", "a review memory asks for later is not due yet");

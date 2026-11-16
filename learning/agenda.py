@@ -105,9 +105,18 @@ weekday holds two: two unrelated topics in
 one sitting split his attention, and nothing but a pace asks for them. A pace
 that needs two still takes two, related ones first. A topic a course cannot start before its exam does not
 fit, and the plan says why (``Reason``). Before any pace, an untaught topic that a taught topic needs starts first,
-nearest exam first: what he has already started stands on it. A start that
+nearest exam first: what he has already started stands on it; but a course
+in its final review takes its own starts, gaps and pace, before any other
+course's, since its exam is days away. A start that
 waits while other courses' new topics take the days names them
 (``When.starts_after``).
+
+A lesson he began on a topic not yet taught (an open task holds it,
+``progress.lessons``) is started on the day he began it: it goes on on the
+next study day after the last day he worked on it, takes no new topic's
+room, waits for nothing it needs, and is reviewed the day after, as any
+start is (``_continued``; round 12, 1 D3: two Poisson lessons whose
+answers were all predictions left its first lesson planned days later).
 
 New topics follow the material. The path runs arc by arc, and a start comes
 from the window: the earliest arc with topics left (the arc of the earliest
@@ -145,7 +154,7 @@ from datetime import UTC, date, datetime, timedelta
 import math
 from typing import Any, Literal, TypedDict
 
-from learning import arc_rules, capacity, progress, schema
+from learning import arc_rules, capacity, memo, progress, schema
 from learning.capacity import Capacity
 
 # The longest plan the engine makes: a year from today, so every review on
@@ -158,7 +167,8 @@ RELEARNING, EXAM_AHEAD, NO_EXAM, EXAM_PASSED = range(4)
 class Why(TypedDict, total=False):
     """Why the plan starts a topic when it does, in the material's terms.
 
-    ``kind`` is ``next`` (the next topic of its arc, or of the path, he can
+    ``kind`` is ``begun`` (a lesson he began and has not finished, which goes
+    on: ``_continued``), ``next`` (the next topic of its arc, or of the path, he can
     start), ``after`` (on a day the plan reached it, it waited for ``needs``,
     prerequisites not yet solid, or ``partners``, competing methods not yet
     solid, to be told apart from them), or ``early`` (ahead of its place:
@@ -246,6 +256,33 @@ class _Course:
     """With work saved today, the topics it touched: only these take new
     days, every other keeps the day the plan as today began gave it
     (``_Told``). None with nothing saved today: every topic moves."""
+    lessons: dict[str, date] = field(default_factory=dict)
+    """The lessons he has begun on topics not yet taught, each with the last
+    day he worked on it (``_lessons``): each goes on on the next study day
+    (``_continued``)."""
+
+    soonest: str | None = field(default=None, init=False)
+    """The earliest review day on record, read again after a review moves
+    (``_set_due``): a day before it has none due, which most of a year's
+    plan is, so the day needs no look at each topic."""
+    sought: bool = field(default=False, init=False)
+    listed: dict[date, list[dict[str, Any]]] = field(default_factory=dict, init=False)
+    """Each day's reviews due (``due_items``) until a review moves."""
+
+    def none_due(self, day: date) -> bool:
+        """No review on record is due by ``day``."""
+        if not self.sought:
+            self.soonest = min(
+                (
+                    due
+                    for topic in self.record["topics"].values()
+                    if "excluded" not in topic
+                    and (due := topic.get("review", {}).get("due")) is not None
+                ),
+                default=None,
+            )
+            self.sought = True
+        return self.soonest is None or self.soonest > day.isoformat()
 
     def moves(self, topic: str) -> bool:
         return self.moving is None or topic in self.moving
@@ -271,6 +308,11 @@ class _Course:
             progress.asks(record),
             progress.free_arcs(record),
             gaps=_gaps(record, set(untaught)),
+            lessons={
+                key: date.fromisoformat(max(days))
+                for key, days in _lessons(record).items()
+                if key in untaught
+            },
         )
 
     def ahead(self, day: date) -> bool:
@@ -415,8 +457,14 @@ class _Course:
     def due_items(self, day: date) -> list[dict[str, Any]]:
         """The reviews due on ``day``, in the course's own order. A course that
         takes no questions has none."""
-        if not self.asks or (self.exam is not None and self.exam.day == day):
+        if (
+            not self.asks
+            or (self.exam is not None and self.exam.day == day)
+            or self.none_due(day)
+        ):
             return []
+        if day in self.listed:
+            return self.listed[day]
         items = progress.due(
             self.record,
             day,
@@ -425,7 +473,10 @@ class _Course:
             limit=0,
             replayed=self.replayed,
         )
-        return [item for item in items if self.levels[item["topic"]]["level"] != "new"]
+        self.listed[day] = [
+            item for item in items if self.levels[item["topic"]]["level"] != "new"
+        ]
+        return self.listed[day]
 
     def due_moving(self, day: date) -> bool:
         """Whether a topic that moves has a review due on ``day``
@@ -596,6 +647,8 @@ class _Course:
         entry = dict(self.record["topics"][topic])
         entry["review"] = {**entry.get("review", {}), "due": due.isoformat()}
         self.record["topics"][topic] = entry
+        self.sought = False
+        self.listed.clear()
 
     def wait(self, topic: str, final: str | None) -> None:
         """A full day left it out; ``final`` is the course whose final review
@@ -845,7 +898,7 @@ def _candidates(
         for rank, item in enumerate(items):
             topic = item["topic"]
             examined = course.exam_of(topic) is not None
-            if reviewing and examined:
+            if reviewing and examined and not course.just_learned(topic, item):
                 key: tuple[Any, ...] = (
                     0,
                     distance,
@@ -858,7 +911,7 @@ def _candidates(
             tier = course.tier(topic, day)
             learning = tier == RELEARNING
             gating = learning and topic in gates
-            if course.just_learned(topic, item) and not reviewing:
+            if course.just_learned(topic, item) and (not reviewing or examined):
                 key = (
                     -1,
                     not gating,
@@ -980,14 +1033,38 @@ def _select(
             if quota[course.name] <= 0:
                 continue
             quota[course.name] -= 1
-        if key[0] == 0:
-            picked.taken.append((key[1], course))
+        if course.reviewing(day) and course.exam_of(topic) is not None:
+            assert course.exam is not None
+            picked.taken.append((float((course.exam.day - day).days), course))
         picked.chosen[course.name].append(topic)
         room -= 1
         for entry in partners:
             order.remove(entry)
         order[index:index] = partners
     return picked
+
+
+def _continued(
+    courses: list[_Course], day: date, week: Capacity
+) -> dict[str, list[str]]:
+    """Each lesson he began and has not finished goes on on ``day`` when it
+    is a study day after the last day he worked on it: its start is the one
+    he made the day he began it, so it takes no new topic's room, waits for
+    nothing it needs and never moves to a later day for want of one. Its
+    first review is the day after, as for any start (round 12, 1 D3: two
+    Poisson sessions in, the plan put its first lesson on Sat 14 Nov and
+    the course head said there was no room to start it)."""
+    found: dict[str, list[str]] = {course.name: [] for course in courses}
+    if not week.studies(day):
+        return found
+    for course in courses:
+        for topic, worked in course.lessons.items():
+            if topic in course.untaught and day > worked:
+                course.start(topic, day)
+                arc = course.arc(topic)
+                course.why[topic] = {"kind": "begun", **({"arc": arc} if arc else {})}
+                found[course.name].append(topic)
+    return found
 
 
 def _new(
@@ -1107,32 +1184,54 @@ def _new(
     if begun is not None:
         room = max(room, sum(paces.values()) - begun)
     others = [course for course in courses if course.new_end(day) is None]
-    for course in [*exams, *others]:
+
+    def gap(course: _Course) -> int:
+        """Its untaught topics a taught one stands on (``_gaps``)."""
         startable = course.startable(day)
         gaps = course.gaps.intersection(startable)
         if room > 0 and gaps:
-            room -= take(course, room, gaps, pool=startable, bound=False)
+            return take(course, room, gaps, pool=startable, bound=False)
+        return 0
+
+    def paced(course: _Course) -> int:
+        """Its exam's pace, past the window when holding would raise it."""
+        if room <= 0 or course.name not in paces:
+            return 0
+        pace = paces[course.name]
+        taken = take(course, min(room, pace), set(course.scoped))
+        end = course.new_end(day)
+        assert end is not None
+        left = _study_days(week, day, end)
+        if (
+            room - taken > 0
+            and taken < pace
+            and progress.holding_raises(
+                left,
+                len(course.scoped),
+                before[course.name],
+                _room_after(week, day, end),
+            )
+        ):
+            more = min(room - taken, pace - taken)
+            taken += take(course, more, set(course.scoped), bound=False, pace=True)
+        return taken
+
+    # A final review owns the day's starts: its exam's topics, those the rest
+    # of the exam stands on first, come before any other course's, even a
+    # topic another course already stands on (round 12, 1 D2: two days
+    # before the Probability exam Linear Algebra started Linear maps, and
+    # Expectation, which Variance needs, started on the eve, too late for a
+    # review).
+    reviewing = [course for course in exams if course.reviewing(day)]
+    for course in reviewing:
+        room -= gap(course)
+        room -= paced(course)
+    for course in [*exams, *others]:
+        if course not in reviewing:
+            room -= gap(course)
     for course in exams:
-        if room > 0 and course.name in paces:
-            pace = paces[course.name]
-            taken = take(course, min(room, pace), set(course.scoped))
-            room -= taken
-            end = course.new_end(day)
-            assert end is not None
-            left = _study_days(week, day, end)
-            if (
-                room > 0
-                and taken < pace
-                and progress.holding_raises(
-                    left,
-                    len(course.scoped),
-                    before[course.name],
-                    _room_after(week, day, end),
-                )
-            ):
-                scoped = set(course.scoped)
-                more = min(room, pace - taken)
-                room -= take(course, more, scoped, bound=False, pace=True)
+        if course not in reviewing:
+            room -= paced(course)
     open_ = [course for course in others if course.exam is None or course.outside(day)]
     if not any(course.reviewing(day) for course in exams):
         room -= share(open_)
@@ -1160,18 +1259,39 @@ def _kept_new(
 
 
 def touched(record: dict[str, Any], today: date) -> set[str]:
-    """The topics he answered or started today: a prediction, which never
-    counts, moves nothing."""
+    """The topics he answered or started today, a lesson he worked on
+    included: a prediction, which never counts, moves nothing else."""
     day = today.isoformat()
-    return {
+    return (
+        {
+            topic
+            for item in record["observations"].values()
+            if item["date"] >= day and schema.counts(item)
+            for topic in item["topics"]
+        }
+        | {
+            key
+            for key, topic in record["topics"].items()
+            if topic.get("introduced", "") >= day
+        }
+        | {key for key, days in _lessons(record).items() if max(days) >= day}
+    )
+
+
+def _lessons(record: dict[str, Any]) -> dict[str, dict[str, str | None]]:
+    """The lessons he has begun on topics not yet taught
+    (``progress.lessons``): a lesson worked on a day is a start that day,
+    though its predictions count for nothing."""
+    taught = {
         topic
         for item in record["observations"].values()
-        if item["date"] >= day and schema.counts(item)
+        if schema.counts(item)
         for topic in item["topics"]
-    } | {
-        key
-        for key, topic in record["topics"].items()
-        if topic.get("introduced", "") >= day
+    }
+    return {
+        key: days
+        for key, days in progress.lessons(record).items()
+        if key not in taught and "introduced" not in record["topics"][key]
     }
 
 
@@ -1199,7 +1319,9 @@ def _answers(record: dict[str, Any], day: date) -> dict[str, dict[str, Any]]:
 def _starts(record: dict[str, Any], day: date) -> dict[str, Stamp]:
     """The topics he started on ``day``, each at its first answer that day,
     or, with none, after every answer: a lesson opened and not yet
-    answered is the latest thing he did."""
+    answered is the latest thing he did. A lesson he worked on that day, on
+    a topic not yet taught, starts at his first prediction in it, else after
+    every answer (``_lessons``)."""
     when = day.isoformat()
     answers = _answers(record, day)
     found: dict[str, Stamp] = {}
@@ -1208,6 +1330,10 @@ def _starts(record: dict[str, Any], day: date) -> dict[str, Stamp]:
             continue
         stamps = [_stamp(item) for item in answers.values() if key in item["topics"]]
         found[key] = min(stamps, default=_LATE)
+    for key, days in _lessons(record).items():
+        if when in days:
+            first = days[when]
+            found[key] = (0, datetime.fromisoformat(first)) if first else _LATE
     return found
 
 
@@ -1230,10 +1356,25 @@ def as_of(
     def before(item: dict[str, Any]) -> bool:
         if item["date"] != when:
             return bool(item["date"] < when or item["date"] > last)
-        return stamp is not None and (not schema.counts(item) or _stamp(item) <= stamp)
+        return stamp is not None and (
+            not (schema.counts(item) or item.get("predicted")) or _stamp(item) <= stamp
+        )
 
     observations = {
         key: item for key, item in record["observations"].items() if before(item)
+    }
+    late = stamp is not None and stamp >= _LATE
+
+    def made(name: str, task: dict[str, Any]) -> bool:
+        """Whether the task's ``name`` day had come: a task holds no time, so
+        one made or moved on ``day`` comes after every answer that day."""
+        on = str(task.get(name, ""))
+        return not (when < on <= last or (on == when and not late))
+
+    tasks = {
+        key: task if made("updated", task) else {**task, "updated": task["created"]}
+        for key, task in record["tasks"].items()
+        if made("created", task)
     }
     starts = _starts(record, day)
     later = {
@@ -1254,7 +1395,7 @@ def as_of(
         if key not in observations
         for topic in item["topics"]
     }
-    before_ = {**record, "observations": observations}
+    before_ = {**record, "observations": observations, "tasks": tasks}
     replayed = progress.replays({**before_, "topics": topics})
     for key in dropped & topics.keys():
         review = topics[key].get("review", {})
@@ -1425,7 +1566,8 @@ def replay(
     day, is study past the plan, and takes no place from a review still
     planned today.
     """
-    return _day(records, today, days, week, today, told=True)
+    with memo.scope():
+        return _day(records, today, days, week, today, told=True)
 
 
 def _day(
@@ -1586,20 +1728,40 @@ def _at(
 
 
 def _last_studied(records: Mapping[str, dict[str, Any]], today: date) -> date | None:
-    """The last day before today he answered, with an answer that counts, or
-    started a topic, in any course."""
+    """The last day before today he studied, in any course: he answered
+    with an answer that counts, started a topic, or worked in a lesson,
+    whether its answers were predictions or it is taught since
+    (``progress.lessons``; round 12, 1 m7: the tutor said "you haven't
+    studied since Monday 9 November" of a Poisson lesson on 10 Nov whose
+    answers were all predictions)."""
     when = today.isoformat()
-    days = {
-        item["date"]
-        for record in records.values()
-        for item in record["observations"].values()
-        if item["date"] < when and schema.counts(item)
-    } | {
-        str(topic["introduced"])
-        for record in records.values()
-        for topic in record["topics"].values()
-        if str(topic.get("introduced", "")) < when and topic.get("introduced")
-    }
+    days = (
+        {
+            item["date"]
+            for record in records.values()
+            for item in record["observations"].values()
+            if item["date"] < when and schema.counts(item)
+        }
+        | {
+            str(topic["introduced"])
+            for record in records.values()
+            for topic in record["topics"].values()
+            if str(topic.get("introduced", "")) < when and topic.get("introduced")
+        }
+        | {
+            day
+            for record in records.values()
+            for lesson in progress.lessons(record).values()
+            for day in lesson
+            if day < when
+        }
+        | {
+            item["date"]
+            for record in records.values()
+            for item in record["observations"].values()
+            if item["date"] < when and item.get("predicted")
+        }
+    )
     return date.fromisoformat(max(days)) if days else None
 
 
@@ -1666,9 +1828,14 @@ def _planned(
             course.moving = set(told.touched.get(course.name, ()))
     done = capacity.Done(
         new=sum(
-            capacity.first_day(course.replayed[key], course.record["topics"][key])
+            capacity.first_day(
+                course.replayed[key],
+                course.record["topics"][key],
+                lessons.get(key),
+            )
             == today
             for course in courses
+            for lessons in [progress.lessons(course.record)]
             for key in course.replayed
         )
     )
@@ -1708,12 +1875,12 @@ def _planned(
             for topic in reviews[course.name]:
                 course.place(topic)
                 course.reviewed(topic, day)
-        starts = {course.name: list[str]() for course in courses}
+        starts = _continued(courses, day, week)
         if told is not None:
             for course in courses:
                 assert course.moving is not None
                 for topic in told.kept(course.name, day, "new"):
-                    if course.moves(topic):
+                    if course.moves(topic) or topic in starts[course.name]:
                         continue
                     if topic in course.untaught and course.ready(topic):
                         course.start(topic, day, course.front(course.startable(day)))
@@ -1807,6 +1974,9 @@ def _reasons(
         else:
             reasons[topic] = "full" if topic in course.ready_once else "not_ready"
     starts = {t: date.fromisoformat(d["date"]) for d in course.days for t in d["new"]}
+    for topic, replayed in course.replayed.items():
+        if topic not in starts and (taught := _learned_on(replayed)):
+            starts[topic] = taught
     no_review_day = not _study_days(week, max(exam.final, today), eve)
     for topic in unreviewed:
         first = starts.get(topic)
@@ -1820,7 +1990,11 @@ def _reasons(
 def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[str]:
     """Of an exam course's topics taught by its exam, those neither reviewed
     in its final review so far nor planned there: no room before the exam.
-    Known once the plan reaches the eve of the exam."""
+    The day a topic is taught is no review of it, so one first taught inside
+    the final review is left out until its first review is answered or
+    planned (round 12, 1 D4: Poisson, first counted two days before the
+    exam, had its first review after it, and nothing said so). Known once
+    the plan reaches the eve of the exam."""
     exam = course.exam
     last = course.days[-1]["date"] if course.days else ""
     eve = (exam.day - timedelta(days=1)).isoformat() if exam else ""
@@ -1828,6 +2002,14 @@ def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[st
         return []
     final, end = exam.final.isoformat(), exam.day.isoformat()
     levels = progress.standings(record)
+    answered = {
+        topic
+        for topic, replayed in course.replayed.items()
+        if any(
+            day >= final and kind != progress.LEARNING
+            for day, kind in replayed.days.items()
+        )
+    }
     reviewed = {
         topic
         for day in course.days
@@ -1843,5 +2025,11 @@ def _unreviewed(course: _Course, record: dict[str, Any], today: date) -> list[st
         if course.exam_of(topic) is not None
         if (levels[topic]["level"] != "new" or topic in started)
         and topic not in reviewed
-        and levels[topic].get("last", {}).get("date", "") < final
+        and topic not in answered
     ]
+
+
+def _learned_on(replayed: progress.Replay) -> date | None:
+    """The day a topic was taught, its learning day (``progress.replay``)."""
+    days = [day for day, kind in replayed.days.items() if kind == progress.LEARNING]
+    return date.fromisoformat(min(days)) if days else None

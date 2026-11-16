@@ -187,6 +187,8 @@ function movedNote(moved: TopicMoved, today: string): string {
 function startNote(why: StartsWhy | undefined, title: (handle: TopicHandle) => string): string | null {
 	if (!why) return null;
 	switch (why.kind) {
+		case "begun":
+			return "the lesson he began goes on";
 		case "next":
 			return why.arc ? "next in its arc" : "next in the course";
 		case "after": {
