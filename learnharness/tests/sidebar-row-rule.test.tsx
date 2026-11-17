@@ -16,7 +16,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { buildInbox } from "../components/unit-inbox/units.ts";
-import { SessionSlimRow, TopicCard, TopicSlimRow } from "../components/unit-inbox/unit-row.tsx";
+import { SessionSlimRow, TopicCard } from "../components/unit-inbox/unit-row.tsx";
 import { CHATS, COURSES, TODAY } from "./fixtures/now-demo.ts";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
@@ -28,7 +28,7 @@ describe("the sidebar's one row rule", () => {
 	const unit = buildInbox(COURSES, CHATS, null).active[0]!;
 
 	it("keeps a card's status on its course line, the name giving way, and its title to two lines", () => {
-		const doc = render(<TopicCard unit={unit} today={TODAY} active={false} />);
+		const doc = render(<TopicCard unit={unit} map={COURSES.find((c) => c.map.workspace === unit.course.workspace)!.map} chats={CHATS} today={TODAY} active={false} />);
 		const slot = doc.querySelector('[data-slot="unit-status-slot"]')!;
 		const line = slot.parentElement!;
 		assert.ok(line.querySelector('[data-slot="unit-card-course"]'), "the status shares the course line");
@@ -41,10 +41,7 @@ describe("the sidebar's one row rule", () => {
 	});
 
 	it("gives a shelf row's status a line of its own under a title of two lines at most", () => {
-		for (const doc of [
-			render(<TopicSlimRow unit={unit} today={TODAY} active={false} />),
-			render(<SessionSlimRow chat={CHATS[0]!} today={TODAY} active={false} onOpen={() => {}} />),
-		]) {
+		for (const doc of [render(<SessionSlimRow chat={CHATS[0]!} today={TODAY} active={false} onOpen={() => {}} />)]) {
 			const row = doc.querySelector('[data-testid="unit-row"], [data-testid="session-row"]')!;
 			const title = row.querySelector('[data-slot="unit-row-title"]')!;
 			assert.ok(classes(title).includes("line-clamp-2"), "two title lines at most");

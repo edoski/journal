@@ -17,7 +17,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { buildInbox } from "../components/unit-inbox/units.ts";
-import { SessionSlimRow, TopicCard, TopicSlimRow } from "../components/unit-inbox/unit-row.tsx";
+import { SessionSlimRow, TopicCard } from "../components/unit-inbox/unit-row.tsx";
 import { CHATS, COURSES, TODAY } from "./fixtures/now-demo.ts";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
@@ -41,21 +41,19 @@ describe("the sidebar's titles are T3 Code's", () => {
 	});
 
 	it("gives every card its full-ink title and never Headline's bold", () => {
-		const card = titleClasses(<TopicCard unit={unit} today={TODAY} active={false} />);
+		const card = titleClasses(<TopicCard unit={unit} map={COURSES.find((c) => c.map.workspace === unit.course.workspace)!.map} chats={CHATS} today={TODAY} active={false} />);
 		assert.ok(card.includes("text-sidebar-title") && card.includes("text-foreground"), `a card's title: ${card.join(" ")}`);
 		assert.ok(!card.includes("text-headline"), "Headline is 700: Edo read it as bold");
 	});
 
 	it("keeps a shelf row quiet at rest and full ink when open or waiting on him", () => {
 		for (const quiet of [
-			titleClasses(<TopicSlimRow unit={unit} today={TODAY} active={false} />),
 			titleClasses(<SessionSlimRow chat={CHATS[3]!} today={TODAY} active={false} onOpen={() => {}} />),
 		]) {
 			assert.ok(quiet.includes("text-sidebar-title-quiet") && quiet.includes("text-foreground/75"), `a quiet row: ${quiet.join(" ")}`);
 			assert.ok(quiet.includes("group-hover/sidebar-row:text-foreground"), "full ink on hover, as T3 Code's");
 		}
 		for (const loud of [
-			titleClasses(<TopicSlimRow unit={unit} today={TODAY} active />),
 			titleClasses(<SessionSlimRow chat={CHATS[3]!} today={TODAY} active onOpen={() => {}} />),
 			titleClasses(<SessionSlimRow chat={CHATS[0]!} today={TODAY} active={false} onOpen={() => {}} />),
 		]) {

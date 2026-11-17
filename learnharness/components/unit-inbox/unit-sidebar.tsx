@@ -131,6 +131,8 @@ export function UnitSidebar() {
 			s,
 		};
 	}, [state, scope, folded, fold, s]);
+	// A found topic's press reads its course's map, as its page does (`topicPress`).
+	const maps = useMemo(() => new Map(state.status === "ready" ? state.courses.map((c) => [c.map.workspace, c.map]) : []), [state]);
 	const walked = s.kbdIndex !== null ? found?.sessions[s.kbdIndex]?.id : undefined;
 	const isOpen = (u: Unit) => isUnitOpen(u, s.pathname);
 	const today = state.status === "ready" ? state.inbox.today : "";
@@ -276,7 +278,7 @@ export function UnitSidebar() {
 										{found.units.length > 0 && <ResultsLabel>Topics</ResultsLabel>}
 										{/* One row design for every topic found: its course, then its title (round 6: known topics drew slim rows among the cards). */}
 										{found.units.map((u) => (
-											<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
+											<TopicCard key={u.key} unit={u} map={maps.get(u.course.workspace)!} chats={s.chats ?? []} today={today} active={isOpen(u)} />
 										))}
 										{found.sessions.length > 0 && <ResultsLabel>Sessions</ResultsLabel>}
 										{found.sessions.map((c) => (

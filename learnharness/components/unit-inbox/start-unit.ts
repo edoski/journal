@@ -5,14 +5,8 @@ import { useRouter } from "next/navigation";
 import { SessionStarter, type SessionCreation } from "@/components/start-session";
 import type { Unit } from "@/components/unit-inbox/units";
 import { topicOpening, type ChatListItem, type CourseMap, type CourseMapTopic } from "@/src/core";
-import { topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
+import { ACTION_WORDS, topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { examGapAsk } from "@/components/study-words";
-
-/** The row action that starts a session on a unit, worded as the course map's. */
-export const STUDY_WORDS = "Study";
-
-/** What a start needs of a unit: its key, its topic and its course. */
-export type StartableUnit = Pick<Unit, "key"> & { topic: Pick<Unit["topic"], "title" | "handle" | "review">; course: Pick<Unit["course"], "workspace" | "today"> };
 
 /** Starts a session (`creation`) and opens it; when it cannot start (no
  *  models set up), the composer opens instead. `starting` is the key of
@@ -48,22 +42,17 @@ export function topicCreation(workspace: string, topic: Pick<Unit["topic"], "tit
  *  (`topicAction`) takes it: the session to open (`resume`), else what to
  *  start, an open task continued as the page continues it, else a session
  *  on the topic. `continues` when it picks up a session or a task he began,
- *  so the press reads Continue, never Start (round 12, 1 D5: the course
+ *  so the press reads Continue, never Start; `word` the page's word for it (round 12, 1 D5: the course
  *  head's "Start Poisson distribution" opened a second chat for the lesson
  *  he had begun). Pure. */
-export function topicPress(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): { resume: ChatListItem | null; creation: SessionCreation; continues: boolean } {
+export function topicPress(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): { resume: ChatListItem | null; creation: SessionCreation; continues: boolean; word: string } {
 	const action = topicAction(topic, map, chats);
 	const creation = topicCreation(map.workspace, topic, map.today);
 	const continues = action.kind === "resume" || action.kind === "open" || action.kind === "continue";
-	if ("chat" in action) return { resume: action.chat, creation, continues };
-	if (action.kind !== "continue") return { resume: null, creation, continues };
-	return { resume: null, creation: { title: action.opening, course: { workspace: map.workspace }, topics: [topic.handle], ...(action.from ? { resume: { from: action.from } } : {}) }, continues };
-}
-
-/** Starts a session on a unit in its course (`topicCreation`). */
-export function useStartUnit(): { start: (unit: StartableUnit) => void; starting: string | null } {
-	const { start, starting } = useStartSession();
-	return { start: useCallback((unit: StartableUnit) => start(unit.key, topicCreation(unit.course.workspace, unit.topic, unit.course.today)), [start]), starting };
+	const word = ACTION_WORDS[action.kind];
+	if ("chat" in action) return { resume: action.chat, creation, continues, word };
+	if (action.kind !== "continue") return { resume: null, creation, continues, word };
+	return { resume: null, creation: { title: action.opening, course: { workspace: map.workspace }, topics: [topic.handle], ...(action.from ? { resume: { from: action.from } } : {}) }, continues, word };
 }
 
 /** The name of the session Ask the tutor opens from a course head that

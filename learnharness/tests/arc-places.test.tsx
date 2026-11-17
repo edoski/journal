@@ -117,7 +117,7 @@ describe("the sidebar's cards", () => {
 		const today = render(<NowCard line={line!} unit={topicUnit(inbox, LINALG_ARCS, line!.lead!, [])} active={false} />);
 		assert.equal(today.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
 		const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
-		const found = render(<TopicCard unit={unitFor(LINALG_ARCS, rank, [])} today={TODAY} active={false} />);
+		const found = render(<TopicCard unit={unitFor(LINALG_ARCS, rank, [])} map={LINALG_ARCS.map} chats={[]} today={TODAY} active={false} />);
 		assert.equal(found.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
 	});
 });

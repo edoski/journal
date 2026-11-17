@@ -2,24 +2,20 @@
 
 import Link from "next/link";
 import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
-import type { ChatListItem } from "@/src/core";
+import type { ChatListItem, CourseMap } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { continueHref, pausedWords, sessionState } from "@/components/nav/session-state";
 import { localDay } from "@/components/day-change";
-import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
+import { topicPress, useStartSession } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { leftWords, monogram, rowResume, studiedWords, unitStatus, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
+import { leftWords, monogram, studiedWords, unitStatus, type Unit, type UnitStatus } from "@/components/unit-inbox/units";
 import { CARD_ACTION_PLACE, ROW_ACTION, ROW_BODY, ROW_FRAME, ROW_ITEM, RowCard, rowSurface, rowTitle, STATUS_LINE, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MathText, mathPlain } from "@/components/ui/math-text";
 
 export { rowSurface };
-
-/** Where a shelf row's action sits: over its status slot, on the row's
- *  last line, where the status always is (`ROW_FRAME`). */
-export const SLIM_ACTION_PLACE = "right-2.5 bottom-2.5 h-5";
 
 /** A course's 16px mark, T3 Code's project monogram: its initials in a
  *  rounded tile tinted 14% by its own ink, in SF Pro at 500. The letters
@@ -40,25 +36,25 @@ export function CourseMark({ title, className }: { title: string; className?: st
 	);
 }
 
-/** The row's one action, over its status slot: Resume opens the session
- *  of its own waiting on the learner (or running), else Study starts a new
- *  one on the topic. Shown on hover and on keyboard focus. */
-function RowAction({ unit, className }: { unit: Unit; className?: string }) {
-	const { start, starting } = useStartUnit();
-	const resume = rowResume(unit);
-	const label = resume ? "Resume" : STUDY_WORDS;
-	const Icon = resume ? PlayIcon : SquarePenIcon;
+/** The row's one action, over its status slot: its topic's press, as the
+ *  topic page takes it (`topicPress`): the session it opens, or the task or
+ *  lesson he began picked up, else a new session on the topic. Shown on
+ *  hover and on keyboard focus. */
+function RowAction({ unit, map, chats, className }: { unit: Unit; map: CourseMap; chats: readonly ChatListItem[]; className?: string }) {
+	const { start, starting } = useStartSession();
+	const press = topicPress(unit.topic, map, chats);
+	const Icon = press.continues ? PlayIcon : SquarePenIcon;
 	const props = {
 		"data-slot": "row-action",
-		"aria-label": `${label}: ${mathPlain(unit.topic.title)}`,
+		"aria-label": `${press.word}: ${mathPlain(unit.topic.title)}`,
 		className: cn(ROW_ACTION, className),
 	} as const;
-	if (resume) {
+	if (press.resume) {
 		return (
 			<Button asChild variant="quiet" size="xs" {...props}>
-				<Link href={continueHref(resume)} onClick={blurAfterPointerClick}>
+				<Link href={continueHref(press.resume)} onClick={blurAfterPointerClick}>
 					<Icon aria-hidden />
-					{label}
+					{press.word}
 				</Link>
 			</Button>
 		);
@@ -69,13 +65,13 @@ function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
-				start(unit);
+				start(unit.key, press.creation);
 				blurAfterPointerClick(e);
 			}}
 			{...props}
 		>
 			<Icon aria-hidden />
-			{label}
+			{press.word}
 		</Button>
 	);
 }
@@ -90,7 +86,7 @@ export function isUnitOpen(unit: Unit, pathname: string): boolean {
  * the status slot, then the topic's title (`rowTitle`). A click opens the
  * topic's page; a topic the tutor writes in recedes until hovered.
  */
-export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
+export function TopicCard({ unit, map, chats, today, active, parent }: { unit: Unit; map: CourseMap; chats: readonly ChatListItem[]; today: string; active: boolean; parent?: string }) {
 	return (
 		<RowCard
 			href={unitHref(unit.course.workspace, unit.topic.handle)}
@@ -101,62 +97,9 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 			course={unit.course.title}
 			status={<UnitStatusText status={unitStatus(unit, today)} />}
 			title={unit.topic.title}
-			action={<RowAction unit={unit} className={CARD_ACTION_PLACE} />}
+			action={<RowAction unit={unit} map={map} chats={chats} className={CARD_ACTION_PLACE} />}
 			recede={unit.now === "working"}
 		/>
-	);
-}
-
-/**
- * A known topic on its shelf, under the sidebar's one row rule
- * (`ROW_FRAME`): the course's mark, greyed until hovered, beside the
- * title, two lines at most, then when it comes back on a line of its own,
- * right-aligned, so every shelf row keeps one pitch whatever its title.
- * A click opens the topic's page; the action starts a review now.
- * `status` and `action` replace the slot's fact and the action (the
- * shelves under Today).
- */
-export function TopicSlimRow({
-	unit,
-	today,
-	active,
-	parent,
-	status,
-	action,
-}: {
-	unit: Unit;
-	today: string;
-	active: boolean;
-	parent?: string;
-	status?: React.ReactNode;
-	action?: React.ReactNode;
-}) {
-	return (
-		<li data-slot="unit-slim" className={ROW_ITEM}>
-			<Link
-				href={unitHref(unit.course.workspace, unit.topic.handle)}
-				onClick={blurAfterPointerClick}
-				aria-current={active ? "page" : undefined}
-				data-sidebar-row={unit.key}
-				data-sidebar-parent={parent}
-				data-testid="unit-row"
-				className={cn(rowSurface(active), ROW_FRAME)}
-			>
-				<span className={ROW_BODY}>
-					<CourseMark
-						title={unit.course.title}
-						className={cn("mt-0.5", !active && "opacity-40 grayscale group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0")}
-					/>
-					<span data-slot="unit-row-title" className={rowTitle(active)}>
-						<MathText>{unit.topic.title}</MathText>
-					</span>
-				</span>
-				<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, STATUS_LINE, "mt-1")}>
-					{status ?? <UnitStatusText status={unitStatus(unit, today)} />}
-				</span>
-			</Link>
-			{action ?? <RowAction unit={unit} className={SLIM_ACTION_PLACE} />}
-		</li>
 	);
 }
 
