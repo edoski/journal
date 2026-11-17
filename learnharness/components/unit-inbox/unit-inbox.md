@@ -76,6 +76,7 @@ Edo, 13 Nov 2026: the list showed "a spam of sessions" and did not say what to p
 - The non-search list of `unit-sidebar.tsx` is `today/today-list.tsx` (`TodayList`), handed `NowListProps` (`now-list-props.ts`): Today's lines under the course filter (`nowFor`), the inbox, the courses, the linked sessions, the study day (`studyDay`: the engine's, else his own date while the engine is down), whether the courses could be read, the folds and the sidebar. While the list loads it shows `NowSkeleton`.
 - Its parts: `now-inbox.ts` (pure: `nowFor`, `unitFor`, `topicUnit`, `restTopics`, `restSessions`, `saidOnTop`, `shelfStatus`, `SESSIONS_WORDS`; `tests/now-inbox.test.ts`), `now-card.tsx` (a line as a card, `now-card.md`), `row-card.tsx` (the card shell `TopicCard` shares, `row-card.md`), `now-shelves.tsx` (`SessionsShelf`) with `now-skeleton.tsx` and `sidebar-note.tsx` (`now-shelves.md`; `tests/sidebar-sessions.test.tsx`), `StatusMark` at size `slot` (`status-mark.md`; a row's own status through `UnitStatusMark`).
 - The course filter keeps only the chosen course's lines: its course line and the sessions in it.
+- A card's click is its line's press on Home (`cardPress`, reading Home's `linePress`; Edo, 17 Nov 2026): it resumes or takes up the lesson, never opens the topic's page, so the same line does one thing in both places on one screen. The topic's page is a click on its map card, its row on the course page's road, or a search result.
 
 ## Sources
 

@@ -7,56 +7,61 @@ import { sessionState, continueHref } from "@/components/nav/session-state";
 import { courseTitle } from "@/components/study-home/agenda-rows/row-facts";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { NowLine } from "@/components/study-home/needs-you";
-import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
+import { courseMove, type CourseMove } from "@/components/study-home/study-facts";
+import { linePress } from "@/components/study-home/agenda-rows/line-target";
 import type { ChatListItem } from "@/src/core";
-import type { PressWord } from "@/components/study-words";
 import { useStartScope } from "@/components/start/start-scope";
 import { CARD_ACTION_PLACE, ROW_ACTION, RowCard } from "@/components/unit-inbox/row-card";
 import { CourseMark, UnitStatusMark } from "@/components/unit-inbox/unit-row";
 import { courseKey, sessionKey } from "@/components/unit-inbox/now-inbox";
-import { unitHref } from "@/components/unit-inbox/unit-href";
 import { reasonMark } from "@/components/unit-inbox/fact-icon";
 import { StatusMark } from "@/components/unit-inbox/status-mark";
 import type { Unit } from "@/components/unit-inbox/units";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** What a line's action does, as Home's line does, in Home's word for it
- *  (`lessonOf`): Resume the session that waits, or the course's next step
- *  (Review, Continue or Start), which starts the same lesson as Home's
- *  line. Pure. */
-export function nowActionOf(line: NowLine): { label: PressWord; href: string } | { label: PressWord; workspace: string; step: NextStep } {
-	const { row } = line;
-	const label = lessonOf(row).action;
-	if (row.kind === "session") return { label, href: continueHref(row.chat) };
-	return { label, workspace: row.course.map.workspace, step: row.step };
+/**
+ * Where a Today card goes, pressed, the card or its action: where Home's
+ * line goes (`linePress`, the one function Home's row reads), its course's
+ * step taken up as Home takes it (`courseMove`): the session that waits or
+ * holds the step (`href`), else a lesson started on it (`move`). Never the
+ * topic page (Edo, 17 Nov 2026: the card does what Home's row does) and
+ * never the course page (round 8: "Continue Problem sheet 4" opened it).
+ * Pure.
+ */
+export function cardPress(line: NowLine, chats: readonly ChatListItem[]): { href: string } | { workspace: string; move: CourseMove } {
+	const press = linePress(line.row);
+	if ("href" in press) return press;
+	const move = courseMove(press.course, chats, press.step);
+	return move.kind === "open" ? { href: continueHref(move.chat) } : { workspace: press.course.map.workspace, move };
 }
 
-/** Where a course line's card goes, as Home's line goes (`courseMove`): the
- *  session that holds its step, else a lesson started on it. Never the
- *  course page (round 8: "Continue Problem sheet 4" opened the course page;
- *  only its small Continue continued the work). Pure. */
-export function courseCardMove(line: NowLine, chats: readonly ChatListItem[]): CourseMove | null {
-	const { row } = line;
-	return row.kind === "course" ? courseMove(row.course, chats, row.step) : null;
+/** What a card's press does, from the sidebar's one start: a link, or a
+ *  lesson taken up (`take`). */
+function useCardPress(line: NowLine, chats: readonly ChatListItem[]): { href: string } | { onSelect: () => void } {
+	const { take } = useStartScope();
+	const press = cardPress(line, chats);
+	return "href" in press ? press : { onSelect: () => take(press.workspace, press.move) };
 }
 
 /** The line's action over the card's status slot, shown on hover and on
- *  keyboard focus. */
+ *  keyboard focus: the card's press (`cardPress`) in Home's word for it
+ *  (`lessonOf`), Resume, Review, Continue or Start. */
 export function NowAction({ line, title, className, chats = [] }: { line: NowLine; title: string; className?: string; chats?: readonly ChatListItem[] }) {
-	const { take, starting } = useStartScope();
-	const action = nowActionOf(line);
+	const { starting } = useStartScope();
+	const press = useCardPress(line, chats);
+	const label = lessonOf(line.row).action;
 	const props = {
 		"data-slot": "row-action",
-		"aria-label": `${action.label}: ${title}`,
+		"aria-label": `${label}: ${title}`,
 		className: cn(ROW_ACTION, className),
 	} as const;
-	if ("href" in action) {
+	if ("href" in press) {
 		return (
 			<Button asChild variant="quiet" size="xs" {...props}>
-				<Link href={action.href} onClick={blurAfterPointerClick}>
+				<Link href={press.href} onClick={blurAfterPointerClick}>
 					<PlayIcon aria-hidden />
-					{action.label}
+					{label}
 				</Link>
 			</Button>
 		);
@@ -67,14 +72,13 @@ export function NowAction({ line, title, className, chats = [] }: { line: NowLin
 			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
-				const move = courseCardMove(line, chats);
-				if (move) take(action.workspace, move);
+				press.onSelect();
 				blurAfterPointerClick(e);
 			}}
 			{...props}
 		>
 			<PlayIcon aria-hidden />
-			{action.label}
+			{label}
 		</Button>
 	);
 }
@@ -82,14 +86,14 @@ export function NowAction({ line, title, className, chats = [] }: { line: NowLin
 /**
  * One of Today's lines as a sidebar card (spec: now-card.md), under the
  * line's one name (Home's lesson, `NowLine.title`), with the line's reason
- * in its status slot. With a `unit` it is the topic the line leads with:
- * the line's action over the slot, and a click opens the topic's page.
- * Without one it is a waiting session on no topic of its course's map (or
- * on no course): its course or "No course", Your turn (or Working at 70%
- * while the tutor writes in it), and a click opens the session; or a
- * course's line with no topic to lead with (a task that holds none): the
- * line's action, and a click takes it up as Home's line does
- * (`courseCardMove`).
+ * in its status slot. A click does what Home's line does (`cardPress`): it
+ * opens the session that waits or holds the line's step, else starts the
+ * lesson on it. With a `unit` it is the topic the line leads with, with the
+ * line's action over the slot. Without one it is a waiting session on no
+ * topic of its course's map (or on no course): its course or "No course",
+ * Your turn (or Working at 70% while the tutor writes in it); or a course's
+ * line with no topic to lead with (a task that holds none), with the line's
+ * action.
  */
 export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowLine; unit: Unit | null; active: boolean; parent?: string; chats?: readonly ChatListItem[] }) {
 	// The line's one status, Home's row's (`NowLine.status`): its reason, else the slip or where he stands, with the pie.
@@ -103,12 +107,12 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 			<span />
 		);
 	const { row } = line;
-	const { take } = useStartScope();
+	const press = useCardPress(line, chats);
 	if (unit) {
 		const working = unit.now === "working";
 		return (
 			<RowCard
-				href={unitHref(unit.course.workspace, unit.topic.handle)}
+				{...press}
 				active={active}
 				rowKey={unit.key}
 				parent={parent}
@@ -123,10 +127,9 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 	}
 	if (row.kind === "course") {
 		const { workspace, title } = row.course.map;
-		const move = courseCardMove(line, chats)!;
 		return (
 			<RowCard
-				{...(move.kind === "open" ? { href: continueHref(move.chat) } : { onSelect: () => take(workspace, move) })}
+				{...press}
 				active={active}
 				rowKey={courseKey(workspace)}
 				parent={parent}
@@ -142,7 +145,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 	const running = sessionState(chat) === "working";
 	return (
 		<RowCard
-			href={continueHref(chat)}
+			{...press}
 			active={active}
 			rowKey={sessionKey(chat.id)}
 			parent={parent}

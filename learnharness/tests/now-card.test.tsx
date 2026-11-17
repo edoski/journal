@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { needsYouNow } from "../components/study-home/needs-you.ts";
-import { NowCard, nowActionOf } from "../components/unit-inbox/now-card.tsx";
+import { NowCard, cardPress } from "../components/unit-inbox/now-card.tsx";
 import { topicUnit } from "../components/unit-inbox/now-inbox.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
 import type { StudyCourse } from "../src/core/index.ts";
@@ -58,7 +58,8 @@ describe("NowCard", () => {
 			["Resume: Eigenvalues lesson", "Resume: Rank practice", "Review: Review Random variables and distributions, Law of total probability, Bayes' rule", "Review: Review Linear independence"],
 		);
 		assert.equal(cards[0]!.querySelector('[data-slot="row-action"]')?.getAttribute("href"), "/chat/chat_eigen");
-		assert.equal(cards[2]!.querySelector('[data-testid="unit-row"]')?.getAttribute("href")?.startsWith("/unit/"), true);
+		assert.equal(cards[0]!.querySelector('[data-testid="unit-row"]')?.getAttribute("href"), "/chat/chat_eigen", "a click resumes the session, as Home's line does, not the topic's page");
+		assert.equal(cards[2]!.querySelector('[data-testid="unit-row"]')?.tagName, "BUTTON", "a click starts the review, as Home's line does");
 	});
 
 	it("draws a waiting session on no topic as its own card, opening the session, with no action", () => {
@@ -91,9 +92,12 @@ describe("NowCard", () => {
 		assert.equal(doc.querySelector('[data-slot="row-action"]')?.textContent, "Continue");
 	});
 
-	it("takes Home's word for a course line's action", () => {
+	it("takes up a course line's own step, as Home's line does", () => {
+		const press = cardPress(lines[2]!, CHATS);
+		assert.ok("move" in press && press.move.kind === "start");
+		assert.equal(press.workspace, "/s/prob");
 		const row = lines[2]!.row;
-		assert.deepEqual(nowActionOf(lines[2]!), { label: "Review", workspace: "/s/prob", step: row.kind === "course" ? row.step : null }, "the line's own step, so it starts that lesson");
-		assert.deepEqual(nowActionOf(lines[0]!), { label: "Resume", href: "/chat/chat_eigen" });
+		assert.deepEqual(press.move.topics, row.kind === "course" && row.step.kind !== "none" ? row.step.topics : null, "the line's own step, so it starts that lesson");
+		assert.deepEqual(cardPress(lines[0]!, CHATS), { href: "/chat/chat_eigen" });
 	});
 });

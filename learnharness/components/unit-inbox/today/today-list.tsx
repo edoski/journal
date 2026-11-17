@@ -45,7 +45,7 @@ export function TodayList(props: NowListProps) {
 	const isOpen = (item: NowItem) => {
 		if (item.kind === "topic") return isUnitOpen(item.unit, pathname);
 		if (item.kind === "session") return pathname === `/chat/${item.chat.id}`;
-		// A course card takes up its task (`courseCardMove`), never the course page, so it is open in a session holding that task (round 10, 2: it stayed selected on the course page).
+		// A course card takes up its task (`cardPress`), never the course page, so it is open in a session holding that task (round 10, 2: it stayed selected on the course page).
 		const { step } = item.line.row.kind === "course" ? item.line.row : { step: null };
 		return step?.kind === "task" && chats.some((c) => pathname === `/chat/${c.id}` && (c.tasks ?? []).includes(step.key));
 	};

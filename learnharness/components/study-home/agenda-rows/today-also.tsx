@@ -6,7 +6,7 @@ import { mathPlain } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 import { courseTitle, lessonTitle, lineKey, whyOf } from "@/components/study-home/agenda-rows/row-facts";
 import type { NextStep, TodayRow } from "@/components/study-home/study-facts";
-import { continueHref } from "@/components/nav/session-state";
+import { linePress } from "@/components/study-home/agenda-rows/line-target";
 
 /** What a folded line's button leaves out, for its tooltip: its course and
  *  why it is on Today, as a full line says them: "Calculus I. Back in 21d".
@@ -26,21 +26,24 @@ export function TodayAlso({ rows, busy, onContinue, className }: { rows: readonl
 	return (
 		<li data-slot="today-also" className={cn("flex h-13 min-w-0 items-center gap-1 text-body text-muted-foreground", className)}>
 			<span className="mr-3 shrink-0">Also today:</span>
-			{rows.map((row) => (
-				<Hint key={row.kind === "session" ? row.chat.id : row.course.map.workspace} label={alsoHint(row)} side="top">
-					{row.kind === "session" ? (
-						<Button variant="quiet" size="sm" asChild data-line={lineKey(row)} className={label}>
-							<Link href={continueHref(row.chat)}>
+			{rows.map((row) => {
+				const press = linePress(row);
+				return (
+					<Hint key={lineKey(row)} label={alsoHint(row)} side="top">
+						{"href" in press ? (
+							<Button variant="quiet" size="sm" asChild data-line={lineKey(row)} className={label}>
+								<Link href={press.href}>
+									<MathLine>{lessonTitle(row)}</MathLine>
+								</Link>
+							</Button>
+						) : (
+							<Button variant="quiet" size="sm" disabled={busy} onClick={() => onContinue(press.course.map.workspace, press.step)} data-line={lineKey(row)} className={label}>
 								<MathLine>{lessonTitle(row)}</MathLine>
-							</Link>
-						</Button>
-					) : (
-						<Button variant="quiet" size="sm" disabled={busy} onClick={() => onContinue(row.course.map.workspace, row.step)} data-line={lineKey(row)} className={label}>
-							<MathLine>{lessonTitle(row)}</MathLine>
-						</Button>
-					)}
-				</Hint>
-			))}
+							</Button>
+						)}
+					</Hint>
+				);
+			})}
 		</li>
 	);
 }
