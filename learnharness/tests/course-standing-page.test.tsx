@@ -80,7 +80,7 @@ describe("exam readiness, from the engine's sorting", () => {
 		assert.equal(partState(part({ notYet: [h("rank")], wontFit: [h("kernel")] })), "short");
 	});
 
-	it("with arcs, names the arcs not ready as bubbles, and says so plainly when none is ready", () => {
+	it("with arcs, names the arcs not ready, and says so plainly when none is ready", () => {
 		const view = viewOf(course(true));
 		const some = examReady(readiness(part({ arc: a("spaces"), solid: [h("span")] }), part({ arc: a("maps"), notYet: [h("rank")] })), view.course.map, view.arcs, []);
 		assert.equal(some.kind, "notYet");
@@ -167,7 +167,7 @@ const STANDING: CourseStanding = {
 };
 
 describe("the open mistakes", () => {
-	it("words each in the tutor's words, the diagnosis first, with when, help, its arc's bubble and its hint", () => {
+	it("words each in the tutor's words, the diagnosis first, with when, help, its arc and its hint", () => {
 		const view = viewOf(course(true));
 		const rows = mistakeRows(STANDING, view.course, [], view.arcs);
 		assert.deepEqual(
@@ -179,7 +179,7 @@ describe("the open mistakes", () => {
 		);
 	});
 
-	it("without arcs the rows wear no bubble; a press resumes the session that waits on the topic, else starts one", () => {
+	it("without arcs the rows name no arc; a press resumes the session that waits on the topic, else starts one", () => {
 		const waiting = { id: "c1", title: "Rank", kind: "teach", createdAt: "2026-11-08T09:00:00Z", updatedAt: "2026-11-08T09:00:00Z", messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false, course: { workspace: WS, title: "Linear Algebra" }, topics: ["rank"], ownTopics: ["rank"] } as ChatListItem;
 		const rows = mistakeRows(STANDING, course(false), [waiting], null);
 		assert.ok(rows.every((r) => r.arc === null));

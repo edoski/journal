@@ -1,0 +1,9 @@
+# Arc label
+
+`ArcLabel` in `arc-label.tsx` (`data-slot="arc-label"`, `data-arc` its handle) is the one way the app names an arc wherever it lists or links one: the map's arc list (`arc-index.tsx`), the course page's road (`../course-page/road/road-arc.tsx`), the readiness answer and the exam's run-up (`../course-page/course-head/ready-fact.tsx`, `head-parts.tsx`), the mistakes (`../course-page/standing/mistake-list.tsx`) and the lesson's roadmap (`../lesson/lesson-roadmap.tsx`).
+
+Its place in the course's study order (`data-slot="arc-number"`, from `namedArc` in `src/core/contracts/course-arcs.ts`, counted from 1), then its whole name, in `text-callout` and the muted ink. Never a pill and no ring (Edo, 16 Nov 2026: the pills were "too in the way"; the arc list's "no pill, no count"). `here` brightens the name (the arc a map shows). The label is never a press itself: the row or link it sits in is, and when that press is a `group/arc` the pointer brightens the label too. A name wider than its room ends in "…"; each place gives it the room it has (the mistakes three fifths of their line).
+
+An arc never shows as "Course · Arc" text after a course name (Edo, 14 Nov 2026, three times: sidebar cards, Today's rows, the topic head); it is this label, or not named at all. The topic page's head names its arc as linked words after the course for now; the one breadcrumb (`Crumbs`, round 14's finding 14) will draw it.
+
+The arc tabs that once sat over the map (bubbles, Edo 14 Nov 2026) are gone: the map's arc list replaced them (Edo, 16 Nov 2026), so no arc is drawn as a bubble anywhere.

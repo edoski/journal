@@ -781,7 +781,7 @@ export function moreWords(hidden: number, page: number): string {
 }
 /** How ready he is for the exam, in the engine's own sorting (its
  *  `standing`): every part solid, not yet, or not all of it fits. "Not
- *  ready yet in" leads the bubbles of the arcs that are not. */
+ *  ready yet in" leads the names of the arcs that are not (`ArcLabel`). */
 export const READY_WORDS = {
 	ready: "Ready for the exam",
 	notYet: "Not ready for the exam yet",

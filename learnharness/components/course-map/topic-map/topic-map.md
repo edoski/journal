@@ -55,7 +55,7 @@ Stacked arcs (Edo, 16 Nov 2026: "we keep them disconnected… instead of being a
 - **The keys** (`../arc-keys.ts`, the cheat sheet's Home rows; the course page's map takes them too): ⇧↑ and ⇧↓ glide to the arc above and below, stopping at the first and last; ⌘J goes to "You are here" from any arc, gliding to its arc and focusing its card, and leaves Whole course, from anywhere on the page, a field included (a ⌘ chord, so it never takes a letter from a composer; Edo, 17 Nov 2026). The arrows wait while a field has the key or something is open over it; Home's own keys take plain arrows, f, o, c and -.
 - **The course page** draws the same arc list left of its map pane; an arc shown there opens in the page's own list of arcs (split-course.md).
 
-`ArcPill` (`../arc-pill.md`) is how an arc is named anywhere else (the course head, What next, the topic head), never as "Course · Arc" text.
+`ArcLabel` (`../arc-label.md`) is how an arc is named everywhere else it is listed or linked (the road, the readiness answer, the exam's run-up, the mistakes, the lesson's roadmap), never as "Course · Arc" text.
 
 ## Sources
 

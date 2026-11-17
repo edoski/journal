@@ -19,7 +19,7 @@ const map = {
 
 describe("lessonPlaceOf", () => {
 	it("takes the first candidate topic the map lists, with that topic's arc", () => {
-		assert.deepEqual(lessonPlaceOf(map, ["not-listed", "eigen", "kernel"]), { topic: { handle: "eigen", title: "Eigenvalues and eigenvectors" }, arc: { title: "Spectra" } });
+		assert.deepEqual(lessonPlaceOf(map, ["not-listed", "eigen", "kernel"]), { topic: { handle: "eigen", title: "Eigenvalues and eigenvectors" }, arc: { number: 2, handle: "spectra", title: "Spectra" } });
 	});
 
 	it("names no arc in a course without arcs, and nothing for a lesson with no listed topic", () => {

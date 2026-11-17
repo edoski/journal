@@ -10,7 +10,7 @@ import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
 import { dayAndNearWords, finalReviewWords, longDayWords, roadLines, roadOf, spanWords } from "@/components/calendar/calendar-facts";
 import { ContextSheet } from "@/components/course-context/context-sheet";
-import { ArcPill } from "@/components/course-map/arc-pill";
+import { ArcLabel } from "@/components/course-map/arc-label";
 import { arcOnPage } from "@/components/course-page/course-head/course-head";
 import type { ExamReady } from "@/components/course-page/standing/standing-model";
 import { ReadyWords } from "@/components/course-page/standing/ready-line";
@@ -68,9 +68,14 @@ export function ExamFact({ course, runup, words, ready, className }: { course: S
 						{dayAndNearWords(exam.date, longDayWords(exam.date), map.today)}
 					</p>
 					{ready && (
-						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-1 text-callout", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>
+						<p data-slot="course-exam-ready" data-kind={ready.kind} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-callout", ready.kind === "short" ? "text-warning" : "text-muted-foreground")}>
 							<ReadyWords ready={ready} workspace={map.workspace} />
-							{ready.kind === "notYet" && ready.arcs.map((arc) => <ArcPill key={arc.handle} arc={arc} href={arcOnPage(map.workspace, arc.handle)} />)}
+							{ready.kind === "notYet" &&
+								ready.arcs.map((arc) => (
+									<Link key={arc.handle} href={arcOnPage(map.workspace, arc.handle)} className="group/arc min-w-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+										<ArcLabel {...arc} />
+									</Link>
+								))}
 						</p>
 					)}
 				</div>

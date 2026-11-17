@@ -4,6 +4,7 @@ import { useEffect, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BookOpenIcon, MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArcLabel } from "@/components/course-map/arc-label";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { MathText, mathPlain } from "@/components/ui/math-text";
@@ -222,14 +223,10 @@ function RoadmapLinks({ place, course }: { place?: LessonPlace; course: { title:
 					</span>
 				</Link>
 			)}
-			<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={LINK_ROW}>
+			<Link href={courseHref(course.workspace)} data-slot="roadmap-link" data-testid="roadmap-course" className={cn(LINK_ROW, "group/arc")}>
 				<MapIcon aria-hidden className="size-4 shrink-0" />
 				<span className="min-w-0 flex-1 truncate">Course map</span>
-				{place?.arc && (
-					<span data-slot="arc-pill" className="max-w-32 shrink-0 truncate rounded-full bg-fill-hover px-2 py-0.5 text-callout text-muted-foreground">
-						{place.arc.title}
-					</span>
-				)}
+				{place?.arc && <ArcLabel {...place.arc} className="max-w-1/2" />}
 			</Link>
 		</>
 	);

@@ -24,7 +24,6 @@ import { CHECK_WORDS, RoadArc, type ArcLineProps } from "../components/course-pa
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { OPEN_AT_FIRST, shownGroups, walkStops } from "../components/course-page/split/split-tie.ts";
 import { ServerEventsProvider } from "../components/server-events.tsx";
-import { ArcPill } from "../components/course-map/arc-pill.tsx";
 import { TopicMap } from "../components/course-map/topic-map/topic-map.tsx";
 import { arcView } from "../components/course-map/topic-map/arc-view.ts";
 import { chainOf } from "../components/course-map/topic-map/topic-map-layout.ts";
@@ -173,24 +172,6 @@ describe("the road's arc lines", () => {
 		const document = render(<SplitList groups={shownGroups(courseGroups(noArcs))} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
 		assert.equal(document.querySelectorAll('[data-slot="course-arc"]').length, 0);
 		assert.ok(document.querySelectorAll('[data-slot="course-group-header"]').length > 0);
-	});
-});
-
-describe("the arc pill", () => {
-	it("is the pill variant with the arc's ring, a link when it goes somewhere", () => {
-		const document = render(
-			<>
-				<ArcPill arc={{ handle: a("spaces"), title: "Vector spaces", share: 0.5 }} href="/x" />
-				<ArcPill arc={{ handle: a("systems"), title: "Linear systems", share: null }} />
-			</>,
-		);
-		const [linked, plain] = [...document.querySelectorAll('[data-slot="arc-pill"]')];
-		assert.equal(linked!.tagName, "A");
-		assert.equal(linked!.getAttribute("href"), "/x");
-		assert.match(linked!.className, /rounded-full/);
-		assert.ok(linked!.querySelector("svg"), "its ring");
-		assert.equal(plain!.tagName, "SPAN");
-		assert.ok(plain!.querySelector("svg") === null, "no ring for an arc with no topic live");
 	});
 });
 

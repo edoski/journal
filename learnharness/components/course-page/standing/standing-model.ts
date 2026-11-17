@@ -1,5 +1,4 @@
-import { TOPIC_LEVELS, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
-import type { PillArc } from "@/components/course-map/arc-pill";
+import { TOPIC_LEVELS, namedArc, type ChatListItem, type CourseMap, type CourseMapTopic, type CourseReadiness, type CourseStanding, type NamedArc, type OpenMistake, type ReadinessPart, type StudyCourse, type TopicHandle } from "@/src/core";
 import { misfitWords } from "@/components/calendar/calendar-facts";
 import { topicPress } from "@/components/unit-inbox/start-unit";
 import type { SessionCreation } from "@/components/start-session";
@@ -27,7 +26,7 @@ export function partState(part: ReadinessPart): PartState {
 /** The answer to "am I ready for the exam, and where not?":
  *  - `short`: topics with no room before the exam, else taught topics the
  *    final review has no room for, named (the run-up's words);
- *  - `notYet`: the arcs not ready, as their bubbles (`arcs`), none when no
+ *  - `notYet`: the arcs not ready, named (`arcs`, `ArcLabel`), none when no
  *    arc is ready; in a course the page shows without arcs, the topics,
  *    named (`words`): every one when they are few, else the least ready
  *    and "and the rest", a press that shows `rest` (every topic the line
@@ -35,7 +34,7 @@ export function partState(part: ReadinessPart): PartState {
  *  - `ready`: every part solid. */
 export type ExamReady =
 	| { kind: "short"; words: string }
-	| { kind: "notYet"; words: string; arcs: readonly PillArc[]; rest: { heading: string; topics: readonly CourseMapTopic[] } | null }
+	| { kind: "notYet"; words: string; arcs: readonly NamedArc[]; rest: { heading: string; topics: readonly CourseMapTopic[] } | null }
 	| { kind: "ready"; words: string };
 
 /** How many least-ready topics the line names before "and the rest": a
@@ -69,10 +68,7 @@ export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topi
 	if (notReady.length === 0) return { kind: "ready", words: READY_WORDS.ready };
 	if (arcs && notReady.length === readiness.parts.length) return { kind: "notYet", words: READY_WORDS.notYet, arcs: [], rest: null };
 	if (arcs) {
-		const shown = notReady.flatMap((p) => {
-			const section = arcs.find((s) => s.arc.handle === p.arc);
-			return section ? [{ handle: section.arc.handle, title: section.arc.title, share: section.share }] : [];
-		});
+		const shown = notReady.flatMap((p) => (p.arc ? (namedArc(arcs.map((s) => s.arc), p.arc) ?? []) : []));
 		if (shown.length > 0) return { kind: "notYet", words: READY_WORDS.notYetIn, arcs: shown, rest: null };
 	}
 	const notYet = notReady.flatMap((p) => p.notYet);
@@ -85,7 +81,7 @@ export function examReady(readiness: CourseReadiness, map: Pick<CourseMap, "topi
 
 /** One open mistake as a row: the topic, what went wrong in the tutor's
  *  words (the diagnosis, else the newest answer), its slip's icon, when,
- *  whether it had help, what it was on, the topic's arc bubble, and what
+ *  whether it had help, what it was on, the topic's arc, and what
  *  a press does: Resume the session that waits on the topic, else start
  *  one on it, as the sidebar's rows do. */
 export interface MistakeRow {
@@ -97,7 +93,7 @@ export interface MistakeRow {
 	helped: boolean;
 	/** What it was on, with his answer: the row's hint. */
 	hint: string | null;
-	arc: PillArc | null;
+	arc: NamedArc | null;
 	/** The session its press opens: the one the topic's page would. */
 	resume: ChatListItem | null;
 	/** What its press starts when it opens none: the open task continued
@@ -125,7 +121,7 @@ function mistakeDayWords(day: string, today: string): string {
 
 /** The open mistakes in the engine's order, newest first, as rows; a
  *  topic the map no longer lists is left out. `arcs` are the arcs the page
- *  shows, whose bubbles the rows wear. A row's press is its topic page's
+ *  shows, whose names the rows wear. A row's press is its topic page's
  *  action (`topicAction`): the session waiting on the topic, else the open
  *  task continued from the lesson that holds it, else a session on the
  *  topic (round 10, 2 m1: the Eigen row started a fresh session while the
@@ -139,7 +135,6 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 		// The icon the sidebar and the map draw for the topic's slip, else this mistake's own.
 		const shared = slipMark(topic.signals, (h) => map.topics.find((t) => t.handle === h)?.title ?? h).key;
 		const slip: SlipKey = shared !== "repaired" && shared !== "check" ? shared : newest?.confident ? "confident" : newest?.chose ? "mixed" : m.gap ? "gap" : "lapsed";
-		const section = arcs?.find((s) => s.arc.handle === topic.arc);
 		const said = newest ? [newest.on, newest.response && `You answered ${newest.response}`].filter((s): s is string => Boolean(s)) : [];
 		return [
 			{
@@ -149,7 +144,7 @@ export function mistakeRows(standing: CourseStanding, course: StudyCourse, chats
 				when: m.latest ? mistakeDayWords(m.latest, map.today) : null,
 				helped: Boolean(newest?.helped),
 				hint: said.length > 0 ? said.join(". ") : null,
-				arc: section ? { handle: section.arc.handle, title: section.arc.title, share: section.share } : null,
+				arc: arcs && topic.arc ? namedArc(arcs.map((s) => s.arc), topic.arc) : null,
 				...pressOf(topic, map, chats),
 				workspace: map.workspace,
 				href: unitHref(map.workspace, topic.handle),

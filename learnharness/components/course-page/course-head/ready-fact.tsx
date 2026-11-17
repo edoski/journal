@@ -6,8 +6,7 @@ import { CalendarOffIcon, CircleCheckIcon, CircleDotDashedIcon, TriangleAlertIco
 import type { CourseStanding } from "@/src/core";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Hint } from "@/components/ui/hint";
-import { Ring } from "@/components/ui/pie";
-import { MathText } from "@/components/ui/math-text";
+import { ArcLabel } from "@/components/course-map/arc-label";
 import { NOT_READY_ARCS_WORDS, READY_FACT_WORDS, noExamWords } from "@/components/study-words";
 import type { CourseView } from "@/components/course-page/course-model";
 import { arcOnPage } from "@/components/course-page/course-head/course-head";
@@ -71,12 +70,9 @@ export function ReadyFact({ view, ready }: { view: CourseView; ready: ExamReady 
 							<li key={arc.handle}>
 								<Link
 									href={arcOnPage(map.workspace, arc.handle)}
-									className="flex h-8 min-w-0 items-center gap-2.5 rounded-md px-1 text-body text-foreground outline-none hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring"
+									className="group/arc flex h-8 min-w-0 items-center rounded-md px-1 outline-none hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring"
 								>
-									{arc.share === null ? <span className="size-4 shrink-0" /> : <Ring aria-hidden share={arc.share} />}
-									<span className="min-w-0 truncate">
-										<MathText>{arc.title}</MathText>
-									</span>
+									<ArcLabel {...arc} />
 								</Link>
 							</li>
 						))}

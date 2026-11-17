@@ -115,7 +115,7 @@ export function RoadArc({
 								handle={arc.handle}
 								title={arc.title}
 								here={shown}
-								className={cn("min-w-0 overflow-hidden transition-colors group-hover/arc:text-foreground motion-reduce:transition-none [&>span:last-child]:truncate", past && !shown && "opacity-60")}
+								className={cn(past && !shown && "opacity-60")}
 							/>
 							{section.current && <span aria-hidden="true" data-slot="road-here" className="size-1.5 shrink-0 rounded-full bg-ring" />}
 							<span className="flex-1" />

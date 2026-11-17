@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { HandHelpingIcon } from "lucide-react";
-import { ArcPill } from "@/components/course-map/arc-pill";
+import { ArcLabel } from "@/components/course-map/arc-label";
 import { SLIP_ICON } from "@/components/slip-icons";
 import { MISTAKE_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { continueHref } from "@/components/nav/session-state";
 const ROW = "-mx-3 flex h-auto min-h-12 w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-1.5 text-left font-normal whitespace-normal";
 
 /** One open mistake (spec: standing/standing.md): its slip's mark, the
- *  topic and its arc's bubble, then what went wrong in the tutor's words
+ *  topic and its arc's name (`ArcLabel`), then what went wrong in the tutor's words
  *  and when, a hand when it had help. The whole row starts fixing it:
  *  Resume the session that waits on the topic, else a new one on it. */
 export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: ReturnType<typeof useStartSession>["start"]; starting: string | null }) {
@@ -32,7 +32,7 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<span className="flex min-w-0 items-center gap-3">
 					<MathLine className="min-w-0 flex-1 text-headline text-foreground">{row.topic.title}</MathLine>
-					{row.arc && <ArcPill arc={row.arc} className="max-w-3/5 shrink-0" />}
+					{row.arc && <ArcLabel {...row.arc} className="max-w-3/5" />}
 				</span>
 				<span className="flex min-w-0 items-start gap-3 text-callout text-muted-foreground">
 					<span data-slot="mistake-words" className="line-clamp-2 min-w-0 flex-1">

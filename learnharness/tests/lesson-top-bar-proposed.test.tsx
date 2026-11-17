@@ -11,6 +11,7 @@ import { LessonTopBar, topicCrumbShown } from "../components/lesson/lesson-top-b
 import { LessonRoadmap } from "../components/lesson/lesson-roadmap.tsx";
 import { DoneTonightButton } from "../components/lesson/done-tonight.tsx";
 import type { RoadmapStep } from "../components/lesson/roadmap-facts.ts";
+import type { ArcHandle } from "../src/core/index.ts";
 
 // The lesson's top bar on the real Radix layers: the crumbs, Done for
 // today and where the lesson is (the roadmap's strip and panel). Fetch is
@@ -72,7 +73,7 @@ const STEPS: RoadmapStep[] = [
 	{ id: "equation", title: "The eigen-equation", status: "current", done: false, next: false, taught: true },
 	{ id: "compute", title: "Computing a $2 \\times 2$ spectrum", status: "upcoming", done: false, next: true, taught: false },
 ];
-const PLACE = { topic: { handle: "eigen", title: "Eigenvalues and eigenvectors" }, arc: { title: "Spectra" } };
+const PLACE = { topic: { handle: "eigen", title: "Eigenvalues and eigenvectors" }, arc: { number: 3, handle: "spectra" as ArcHandle, title: "Spectra" } };
 const COURSE = { title: "Linear Algebra", workspace: "/courses/la" };
 
 function Roadmap({ onJump = () => {} }: { onJump?: (id: string) => void }) {
@@ -122,12 +123,12 @@ describe("where the lesson is", () => {
 		assert.equal(panel.isConnected && document.querySelector('[data-testid="roadmap-panel"]') !== null, false, "the panel closes on the jump");
 	});
 
-	it("leads up to the topic's page and the course map, with the topic's arc as a bubble", async () => {
+	it("leads up to the topic's page and the course map, with the topic's arc named as every list names it", async () => {
 		await mount(<Roadmap />);
 		await click(element('[data-testid="roadmap"]'));
 		assert.match(element('[data-testid="roadmap-topic"]').getAttribute("href")!, /^\/unit\/[^/]+\/eigen$/);
 		assert.match(element('[data-testid="roadmap-course"]').getAttribute("href")!, /^\/unit\/[^/]+$/);
-		assert.equal(element('[data-slot="arc-pill"]').textContent, "Spectra");
+		assert.equal(element('[data-testid="roadmap-course"] [data-slot="arc-label"]').textContent, "3Spectra");
 	});
 
 	it("the strip's spoken name reads its maths as words, never as TeX", async () => {

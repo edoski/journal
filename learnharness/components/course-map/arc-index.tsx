@@ -54,7 +54,7 @@ export function ArcIndex({ arcs, value, here, onSelect, className }: { arcs: rea
 						className="lh-no-drag group/arc flex items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						style={{ height: ROW }}
 					>
-						<ArcLabel number={i + 1} handle={arc.handle} title={arc.title} here={shown} className="transition-colors group-hover/arc:text-foreground motion-reduce:transition-none" />
+						<ArcLabel number={i + 1} handle={arc.handle} title={arc.title} here={shown} />
 						{isHere && <span aria-hidden="true" data-slot="arc-index-here" className="size-1.5 shrink-0 rounded-full bg-ring" />}
 					</button>
 				);
