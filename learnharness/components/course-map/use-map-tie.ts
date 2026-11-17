@@ -98,4 +98,3 @@ export function useMapTie({ chain = null, onHold }: { chain?: readonly CourseMap
 	};
 }
 
-export type MapTie = ReturnType<typeof useMapTie>;

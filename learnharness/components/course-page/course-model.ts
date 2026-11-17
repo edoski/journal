@@ -144,9 +144,6 @@ export interface CourseArcSection {
 	/** One of its topics is one Home's Today takes up: the line says
 	 *  "Needs you" in place of where the arc stands. */
 	needsYou: boolean;
-	/** Its ring: the share of its live topics he can do on his own, as
-	 *  Home's ring counts a course; null for an arc with none live. */
-	share: number | null;
 	/** "Partly on the exam" or "Not on the exam", when the next exam leaves
 	 *  some arc out and this one is not wholly on it; else null. */
 	exam: string | null;
@@ -156,9 +153,8 @@ export interface CourseArcSection {
 
 /**
  * The course's arcs in study order (spec: course-page.md, "Arcs"), each
- * with its topics as the page's rows (the groups' words and facts), its
- * ring, "Needs you" when Today takes up one of its topics, and its exam
- * words. Null for a course `shownArcs` gives none. `chats` and `courses`
+ * with its topics as the page's rows (the groups' words and facts),
+ * "Needs you" when Today takes up one of its topics, and its exam words. Null for a course `shownArcs` gives none. `chats` and `courses`
  * as `courseGroups` reads them. Pure.
  */
 export function courseArcs(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): CourseArcSection[] | null {
@@ -176,19 +172,10 @@ export function courseArcs(course: StudyCourse, chats: readonly ChatListItem[] =
 			arc,
 			topics,
 			needsYou: topics.some((row) => row.group === "needs-you"),
-			share: arcShare(course, arc.handle),
 			exam: leavesSomeOut && (cover === "part" || cover === "none") ? ARC_EXAM_WORDS[cover] : null,
 			current: arc.handle === here,
 		};
 	});
-}
-
-/** An arc's ring: the share of its live topics he can do on his own, as
- *  Home's ring counts a course (`courseProgress`); null with none live. */
-export function arcShare(course: StudyCourse, arc: ArcHandle): number | null {
-	const live = course.map.topics.filter((t) => t.arc === arc && t.excluded === undefined);
-	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
-	return progress ? progress.solid / progress.of : null;
 }
 
 /**

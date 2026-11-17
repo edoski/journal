@@ -137,7 +137,7 @@ describe("the topic page", () => {
 
 	it("names the arc after the course as a link, its one label, opening the course page on that arc, and none without arcs", () => {
 		const facts = topicFacts({ course: LINALG_ARCS, topic: rank, chats: [], read: null });
-		assert.deepEqual(facts.arc, { number: 2, handle: "systems", title: "Linear systems", share: 0 });
+		assert.deepEqual(facts.arc, { number: 2, handle: "systems", title: "Linear systems" });
 		const doc = render(<TopicHead facts={facts} />);
 		const link = doc.querySelector('[data-slot="crumbs"] [data-slot="crumb"][data-kind="arc"]')!;
 		assert.ok(link, "the arc follows the course");
@@ -147,8 +147,6 @@ describe("the topic page", () => {
 		assert.equal(link.getAttribute("href"), `${courseHref("/s/linalg")}?arc=systems`);
 		assert.match(link.getAttribute("class")!, /\btruncate\b/, "a long name ends in …");
 		assert.ok(doc.querySelector('[data-slot="arc-pill"]') === null, "words, never a pill");
-		const vectors = LINALG_ARCS.map.topics.find((t) => t.handle === "vectors")!;
-		assert.equal(topicFacts({ course: LINALG_ARCS, topic: vectors, chats: [], read: null }).arc?.share, 1, "Vectors and Linear independence are both his own");
 		const plain = render(<TopicHead facts={topicFacts({ course: LINALG, topic: rank, chats: [], read: null })} />);
 		assert.equal(topicFacts({ course: LINALG, topic: rank, chats: [], read: null }).arc, null);
 		assert.ok(plain.querySelector('[data-slot="crumb"][data-kind="arc"]') === null);

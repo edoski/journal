@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { neighbourOf, type Point } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { CANVAS_NODE, layoutCanvas, orthogonalPath, transitiveReduction } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
+import { CANVAS_NODE, layoutCanvas, transitiveReduction } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
+import { piecesOf, piecesPath } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
 import { focusOf } from "../components/course-map/topic-map/canvas/canvas-focus.ts";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -90,13 +91,16 @@ describe("the canvas's drawing", () => {
 	});
 
 	it("draws a line at right angles, with rounded corners", () => {
-		const d = orthogonalPath([
-			[0, 0],
-			[0, 30],
-			[100, 30],
-			[100, 60],
-		]);
-		assert.match(d, /^M0,0 L0,22 Q0,30 8,30 L92,30 Q100,30 100,38 L100,60$/);
+		const d = piecesPath(
+			piecesOf([
+				[0, 0],
+				[0, 30],
+				[100, 30],
+				[100, 60],
+			]),
+			null,
+		);
+		assert.equal(d, "M0,0 L0,22 M8,30 L92,30 M100,38 L100,60 M0,22 Q0,30 8,30 M92,30 Q100,30 100,38");
 	});
 });
 

@@ -27,7 +27,7 @@ import {
 } from "../components/study-home/study-facts.ts";
 import { lessonOf } from "../components/study-home/lesson-facts.ts";
 import { Today } from "../components/study-home/today.tsx";
-import { courseProgress, foldLines, lessonTitle, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
+import { courseProgress, foldLines, lessonTitle, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { alsoHint } from "../components/study-home/agenda-rows/today-also.tsx";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { UnreadableLines } from "../components/study-home/unreadable-course.tsx";
@@ -394,18 +394,6 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(whyOf(row), { kind: "review", short: "Planned Sun 29 Nov" }, "the plan's day, the same words as every course line with nothing today");
 		const empty = rowOf({ ...done, map: { ...done.map, topics: done.map.topics.map((t) => ({ ...t, review: null })) } });
 		assert.equal(lessonTitle(empty), "Start a lesson", "with no review dated at all, the tutor proposes");
-	});
-
-	it("gives a course's line no clock: the course's last study is not the line's (round 9, 1 D5)", () => {
-		assert.deepEqual([0, 3, null].map((days) => studiedAgo(rowOf({ ...LINALG, lastActiveDaysAgo: days }))), [null, null, null]);
-	});
-
-	it("gives each row one clock: a session its own last turn, an open task none beside its Left off", () => {
-		const started = chat({ id: "new", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, updatedAt: new Date(2026, 10, 8, 9, 30).toISOString() });
-		const row = todayRows([{ ...LINALG, lastActiveDaysAgo: 3 }], [started], TODAY).find((r) => r.kind === "session");
-		assert.equal(studiedAgo(row!), "Today", "a session started minutes ago never reads 3d ago");
-		const task = rowOf({ ...LINALG, due: [], lastActiveDaysAgo: 0 });
-		assert.deepEqual([studiedAgo(task), whyOf(task)?.short], [null, "Left off 5 Nov"], "no Today above Left off 5 Nov");
 	});
 
 	it("counts how much of a course he can do on his own, weak topics left out", () => {

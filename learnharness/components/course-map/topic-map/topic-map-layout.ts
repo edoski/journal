@@ -176,9 +176,6 @@ export interface Camera {
 	zoom: number;
 }
 
-/** The whole lesson shows on a topic page's step map when it fits the
- *  frame at this scale or more: below it its titles drop under 10px. */
-export const WHOLE_COURSE_ZOOM = 0.75;
 /** The smallest scale a course map opens at: its 13px card titles draw at
  *  10.4px, about the 11px under which a title is too small to read (the
  *  round-3 evaluation, 14 Nov 2026; 75% drew them at 9.75px). Not 85%,
@@ -234,19 +231,6 @@ export function wholeExtent(layout: TopicMapLayout, frame: Frame, fitted: number
 /** A topic's centre in a drawing. */
 export function centreOf(layout: TopicMapLayout, placed: PlacedTopic): Point {
 	return [placed.x + layout.node.width / 2, placed.y + layout.node.height / 2];
-}
-
-/**
- * Where the map opens: the whole course in the frame when it fits at 75%
- * or more, else full size on the current topic (the first topic when the
- * course has no current one). Pure.
- */
-export function openingCamera(layout: TopicMapLayout, current: TopicHandle | null, frame: Frame, room: Room): Camera {
-	const zoom = wholeZoom(layout, frame, room);
-	const middle: Point = [layout.width / 2, layout.height / 2];
-	if (zoom >= WHOLE_COURSE_ZOOM) return cameraAt(layout, middle, zoom, frame, room);
-	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
-	return cameraAt(layout, at ? centreOf(layout, at) : middle, 1, frame, room);
 }
 
 /** The scales a map may open at when the whole course does not fit: full

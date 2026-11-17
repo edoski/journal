@@ -335,29 +335,3 @@ function asTopicLayout(drawing: LayeredDrawing, needs: readonly Need[], node: No
 	const routes: Route[] = needs.map((n) => ({ prerequisite: n.prerequisite, topic: n.topic, points: drawing.lines.get(`${n.prerequisite}>${n.topic}`) ?? [] }));
 	return { node, width: drawing.width, height: drawing.height, topics: placed, routes, layers: drawing.layers as TopicHandle[][] };
 }
-
-/** A route's corners as an SVG path, each corner rounded by up to `CORNER`. Pure. */
-export function orthogonalPath(points: readonly Point[]): string {
-	const [start, ...rest] = points;
-	if (!start) return "";
-	let d = `M${start[0]},${start[1]}`;
-	rest.forEach((at, i) => {
-		const before = points[i]!;
-		const after = rest[i + 1];
-		if (!after) {
-			d += ` L${at[0]},${at[1]}`;
-			return;
-		}
-		const inLen = Math.hypot(at[0] - before[0], at[1] - before[1]);
-		const outLen = Math.hypot(after[0] - at[0], after[1] - at[1]);
-		const k = Math.min(CORNER, inLen / 2, outLen / 2);
-		if (k < 0.5) {
-			d += ` L${at[0]},${at[1]}`;
-			return;
-		}
-		const a: Point = [at[0] - ((at[0] - before[0]) / inLen) * k, at[1] - ((at[1] - before[1]) / inLen) * k];
-		const b: Point = [at[0] + ((after[0] - at[0]) / outLen) * k, at[1] + ((after[1] - at[1]) / outLen) * k];
-		d += ` L${a[0]},${a[1]} Q${at[0]},${at[1]} ${b[0]},${b[1]}`;
-	});
-	return d;
-}

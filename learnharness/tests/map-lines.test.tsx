@@ -17,7 +17,7 @@ import { parseHTML } from "linkedom";
 import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import { layoutCanvas } from "../components/course-map/topic-map/canvas/canvas-layout.ts";
 import { mapEdges } from "../components/course-map/topic-map/map-drawing.ts";
-import { LinePaths, inkPaths, snapTo, trackPieces, type CanvasLine } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
+import { LinePaths, snapTo, trackPieces, type CanvasLine } from "../components/course-map/topic-map/canvas/canvas-lines.tsx";
 import { focusOf } from "../components/course-map/topic-map/canvas/canvas-focus.ts";
 
 const h = (handle: string) => handle as TopicHandle;
@@ -63,8 +63,7 @@ describe("the map's lines", () => {
 		const lines: CanvasLine[] = layout.routes.map((r) => ({ key: `${r.prerequisite}>${r.topic}`, points: r.points, prerequisite: r.prerequisite, topic: r.topic }));
 		const all = lines.flatMap((l) => steps(`M${l.points.map((p) => p.join(",")).join(" L")}`));
 		assert.ok(new Set(all).size < all.length, "the fixture has needs that share a run");
-		const paths = inkPaths(lines, null, null);
-		assert.deepEqual([...paths.keys()], ["rest"]);
+		assert.deepEqual([...trackPieces(lines, null, null).keys()], ["rest"]);
 		const markup = renderToStaticMarkup(<svg>{drawnLines(lines)}</svg>);
 		const { document } = parseHTML(`<html><body>${markup}</body></html>`);
 		const drawn = [...document.querySelectorAll('[data-slot="course-map-line"]')];
@@ -79,8 +78,7 @@ describe("the map's lines", () => {
 		const { layout } = draw(TOPICS, NEEDS);
 		const lines: CanvasLine[] = layout.routes.map((r) => ({ key: `${r.prerequisite}>${r.topic}`, points: r.points, prerequisite: r.prerequisite, topic: r.topic }));
 		const focus = focusOf(h("c"), NEEDS, layout.routes);
-		const paths = inkPaths(lines, focus, null);
-		assert.deepEqual([...paths.keys()].sort(), ["lit", "receded"]);
+		assert.deepEqual([...trackPieces(lines, focus, null).keys()].sort(), ["lit", "receded"]);
 	});
 
 	it("draws a stretch two inks share once, in the brighter ink", () => {

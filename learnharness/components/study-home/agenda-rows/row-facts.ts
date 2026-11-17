@@ -163,30 +163,6 @@ export function whyOf(row: TodayRow): Why | null {
 	}
 }
 
-/** The days since the line's one clock, which only a session's line has:
- *  since he last wrote in that session, so one started minutes ago is 0;
- *  none for one left for next time, whose reason dates it ("Left off 6
- *  Nov"), so a row never shows two days.
- *  A course's line has none (round 9, 1 D5: it showed the course's last
- *  study, so "Studied today" sat on "Start Linear maps", a topic never
- *  studied, and every row repeated the same day); its reason says what
- *  the row is about. Null for a line with no clock. Pure. */
-function studiedDays(row: TodayRow): number | null {
-	if (row.kind !== "session" || sessionState(row.chat) === "left") return null;
-	const today = row.course?.map.today;
-	if (!today) return null;
-	const at = new Date(row.chat.updatedAt);
-	const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
-	return Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000));
-}
-
-/** The line's one clock, short enough for a trailing column: "Today",
- *  "Yesterday", "6 Nov" (`studiedDays`). Pure. */
-export function studiedAgo(row: TodayRow): string | null {
-	const days = studiedDays(row);
-	return days === null || !row.course ? null : agoWords(days, row.course.map.today);
-}
-
 /** Some days ago in Home's words, the app's one form (`study-words.ts`). */
 export { agoWords };
 

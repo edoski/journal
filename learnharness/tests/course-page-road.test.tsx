@@ -213,7 +213,7 @@ describe("the road", () => {
 describe("the topic page's head, the course head's twin", () => {
 	const facts = {
 		course: { workspace: "/study/linalg", title: "Linear Algebra" },
-		arc: { handle: a("maps"), title: "Linear maps", share: 0.5 },
+		arc: { handle: a("maps"), title: "Linear maps" },
 		topic: topic("rank"),
 		today: "2026-11-08",
 		standing: { fill: 0.5, words: "Partly right" },

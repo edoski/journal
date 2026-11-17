@@ -4,7 +4,6 @@ import { agoWords, ATTEMPT_WORDS, examGapTopicWords, heldExamWords, leftOutWords
 import { continueMove, pausedWords, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, ownsTopic, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
 import { continueWords } from "@/components/study-home/study-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -103,9 +102,8 @@ export interface StartsReason {
 export interface TopicFacts {
 	course: { workspace: string; title: string };
 	/** The arc the topic lies in, named with its place in study order
-	 *  (`namedArc`), with its ring's share (the topics of it he can do on his
-	 *  own, as Home's ring counts a course); null in a course without arcs. */
-	arc: (NamedArc & { share: number | null }) | null;
+	 *  (`namedArc`); null in a course without arcs. */
+	arc: NamedArc | null;
 	topic: CourseMapTopic;
 	/** The engine's study day. */
 	today: string;
@@ -371,15 +369,10 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	return { result, words: result === "partly" ? ATTEMPT_WORDS.partly : null };
 }
 
-/** The arc a topic lies in, by handle and title, with the share of its
- *  live topics he can do on his own (`courseProgress` over them); null in
- *  a course without arcs or for a topic the arc list does not hold. Pure. */
+/** The arc a topic lies in, by handle and title; null in a course without
+ *  arcs or for a topic the arc list does not hold. Pure. */
 function arcOf(course: StudyCourse, topic: CourseMapTopic): TopicFacts["arc"] {
-	const arc = topic.arc && course.map.arcs ? namedArc(course.map.arcs, topic.arc) : null;
-	if (!arc) return null;
-	const live = course.map.topics.filter((t) => t.arc === arc.handle && t.excluded === undefined);
-	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
-	return { ...arc, share: progress ? progress.solid / progress.of : null };
+	return topic.arc && course.map.arcs ? namedArc(course.map.arcs, topic.arc) : null;
 }
 
 /** Everything the page draws, from the course, every course (Today

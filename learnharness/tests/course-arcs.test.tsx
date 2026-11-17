@@ -98,13 +98,6 @@ describe("the course page's arcs", () => {
 		assert.equal(needs.eigenvalues, false);
 	});
 
-	it("draws each arc's ring as the share of its topics he can do on his own", () => {
-		assert.deepEqual(
-			courseArcs(ARCS)!.map((s) => s.share),
-			[1, 0, 0],
-		);
-	});
-
 	it("says which arcs the exam leaves out only when it leaves some out", () => {
 		assert.ok(courseArcs(ARCS)!.every((s) => s.exam === null), "an exam over the whole course says nothing");
 		const scoped = (exam: object) => courseArcs({ ...ARCS, map: { ...ARCS.map, exam: { ...ARCS.map.exam!, ...exam } } })!.map((s) => s.exam);

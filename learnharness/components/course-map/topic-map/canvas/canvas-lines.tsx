@@ -159,13 +159,6 @@ export function piecesPath(pieces: readonly Piece[], snap: Snap): string {
 		.join(" ");
 }
 
-/** Each ink's track as one path (`trackPieces`, `piecesPath`). Pure. */
-export function inkPaths(lines: readonly CanvasLine[], focus: Focus | null, chain: ReadonlySet<TopicHandle> | null, snap: Snap = null): Map<LineInk, string> {
-	const paths = new Map<LineInk, string>();
-	for (const [ink, pieces] of trackPieces(lines, focus, chain)) paths.set(ink, piecesPath(pieces, snap));
-	return paths;
-}
-
 const STROKE: Record<LineInk, string> = { rest: "stroke-map-line", lit: "stroke-map-line-lit", receded: "stroke-map-line-receded" };
 
 /** The screen's device pixels per CSS pixel; 0 on a server render, which draws unsnapped. */

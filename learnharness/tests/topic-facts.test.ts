@@ -11,9 +11,7 @@ import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { SessionPlan, TopicAttempt, TopicRecord } from "../src/core/contracts/topic.ts";
-import { studiedAgo } from "../components/study-home/agenda-rows/row-facts.ts";
 import { slipOf } from "../components/unit-inbox/units.ts";
-import type { TodayRow } from "../components/study-home/study-facts.ts";
 import {
 	agoWords,
 	attemptMark,
@@ -251,16 +249,6 @@ describe("where he stands, in the app's one wording", () => {
 });
 
 describe("the page's words for time", () => {
-	const row = (days: number): TodayRow => {
-		const at = new Date(`${COURSE.map.today}T12:00:00`);
-		at.setDate(at.getDate() - days);
-		return { kind: "session", course: COURSE, chat: { id: "c", title: "Lesson", kind: "teach", createdAt: at.toISOString(), updatedAt: at.toISOString(), messageCount: 2, phase: "teach", pendingQuestion: true, pendingProblem: false, busy: false } };
-	};
-
-	it("are Home's, for every day from today to more than a year back", () => {
-		for (let days = 0; days <= 400; days++) assert.equal(agoWords(days, COURSE.map.today), studiedAgo(row(days)), `ago ${days}`);
-	});
-
 	it("say the day he last studied the topic, never a count of days (round 9, 2 m5)", () => {
 		assert.deepEqual([0, 1, 2, 13, 60].map((days) => studiedWords(days, "2026-11-08")), ["Studied today", "Studied yesterday", "Studied 6 Nov", "Studied 26 Oct", "Studied 9 Sept"]);
 	});

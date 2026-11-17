@@ -21,12 +21,13 @@ import {
 	NODE_HEIGHT,
 	NODE_WIDTH,
 	READABLE_ZOOM,
+	cameraAt,
 	cardFit,
+	centreOf,
 	chainOf,
 	framedCamera,
 	layoutTopicMap,
 	neighbourOf,
-	openingCamera,
 	type Camera,
 	type TopicMapLayout,
 } from "../components/course-map/topic-map/topic-map-layout.ts";
@@ -247,49 +248,6 @@ describe("topic map geometry", () => {
 	});
 });
 
-describe("where the map opens", () => {
-	const layout = layoutTopicMap(MAP.topics, MAP.edges);
-	const ROOM = { x: 64, y: 60 };
-	/** A topic's box on screen under a camera. */
-	const onScreen = (camera: Camera, handle: string) => {
-		const placed = layout.topics.get(h(handle))!;
-		const left = placed.x * camera.zoom + camera.x;
-		const top = placed.y * camera.zoom + camera.y;
-		return { left, top, right: left + NODE_WIDTH * camera.zoom, bottom: top + NODE_HEIGHT * camera.zoom };
-	};
-
-	it("shows the whole course, clear of the frame's faded edge, when it fits at three quarters or more", () => {
-		const frame = { width: 1192, height: 740 };
-		const camera = openingCamera(layout, MAP.current, frame, ROOM);
-		assert.ok(camera.zoom >= 0.75 && camera.zoom < 1);
-		for (const handle of Object.keys(NEEDS)) {
-			const box = onScreen(camera, handle);
-			assert.ok(box.left >= ROOM.x * camera.zoom - 0.5 && box.right <= frame.width - ROOM.x * camera.zoom + 0.5, `${handle} is in view across`);
-			assert.ok(box.top >= ROOM.y * camera.zoom - 0.5 && box.bottom <= frame.height - ROOM.y * camera.zoom + 0.5, `${handle} is in view down`);
-		}
-	});
-
-	it("opens at full size on the current topic when the course does not fit", () => {
-		const frame = { width: 896, height: 350 };
-		const camera = openingCamera(layout, MAP.current, frame, ROOM);
-		assert.equal(camera.zoom, 1);
-		const box = onScreen(camera, "rank");
-		assert.ok(Math.abs((box.left + box.right) / 2 - frame.width / 2) <= 0.5, "centred across");
-		assert.ok(Math.abs((box.top + box.bottom) / 2 - frame.height / 2) <= 0.5, "centred down");
-	});
-
-	it("never looks past the drawing: a current topic on the first layer sits a room's depth under the frame's top", () => {
-		const camera = openingCamera(layout, h("vectors"), { width: 896, height: 350 }, ROOM);
-		assert.equal(onScreen(camera, "vectors").top, ROOM.y);
-	});
-
-	it("centres a drawing narrower than the frame, and opens on the first topic when the course has no current one", () => {
-		const chain = layoutTopicMap([topic("a"), topic("b"), topic("c"), topic("d"), topic("e"), topic("f")], edgesOf({ b: ["a"], c: ["b"], d: ["c"], e: ["d"], f: ["e"] }));
-		const camera = openingCamera(chain, null, { width: 896, height: 350 }, ROOM);
-		assert.deepEqual(camera, { x: (896 - NODE_WIDTH) / 2, y: ROOM.y, zoom: 1 });
-	});
-});
-
 describe("where a course map opens framed", () => {
 	/** A fixed card for the camera's arithmetic, apart from the map's own (canvas-layout.ts; topic-map-framing.test.ts
 	 *  frames the map's own drawing), so each case's premise holds whatever the map's card becomes. */
@@ -397,7 +355,7 @@ describe("where a course map opens framed", () => {
 	it("shows more topics than centring the current one at full size would", () => {
 		const frame = { width: 784, height: 700 };
 		const framed = sort(framedCamera(layout, MAP.current, frame, FADE, TAG), frame);
-		const centred = sort(openingCamera(layout, MAP.current, frame, { x: FADE.x, y: FADE.y + TAG }), frame);
+		const centred = sort(cameraAt(layout, centreOf(layout, layout.topics.get(MAP.current!)!), 1, frame, { x: FADE.x, y: FADE.y + TAG }), frame);
 		assert.ok(framed.clear.length > centred.clear.length, `${framed.clear.length} against ${centred.clear.length}`);
 		assert.ok(framed.cut.length <= centred.cut.length);
 	});
