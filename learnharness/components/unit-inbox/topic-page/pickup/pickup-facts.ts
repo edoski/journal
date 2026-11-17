@@ -1,10 +1,10 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
-import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { reviewAsked, type ChatListItem, type TopicRef } from "@/src/core";
 import { earlierSessions, trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { leftWords } from "@/components/unit-inbox/units";
 import { continueHref, pausedWords } from "@/components/nav/session-state";
-import { FIRST_LESSON, TUTOR_WRITING, overdueWords, startsAfterWords } from "@/components/study-words";
+import { FIRST_LESSON, TUTOR_WRITING, overdueWords, pressWord, startsAfterWords, type PressWord } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -32,7 +32,7 @@ export interface NowItem {
 	 *  task's "Part (c)"; null when the words say it all. */
 	note: string | null;
 	/** The press, the head button's word: "Resume", "Start". */
-	press: string;
+	press: PressWord;
 	/** The session the press opens, which the map can show; null when the press starts one. */
 	chat: string | null;
 	/** Where the press goes when it opens a session (`continueHref`). */
@@ -118,7 +118,7 @@ function sessionName(chat: ChatListItem, facts: TopicFacts): string {
  *  new session continues from. */
 export function nowItem(facts: TopicFacts): NowItem {
 	const { action } = facts;
-	const press = ACTION_WORDS[action.kind];
+	const press = pressWord(action.kind);
 	const base = { kind: action.kind, press, chat: null, note: null };
 	switch (action.kind) {
 		case "resume":

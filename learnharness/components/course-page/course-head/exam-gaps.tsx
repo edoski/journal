@@ -5,7 +5,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MathText } from "@/components/ui/math-text";
-import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, examWayWords, type ExamWayVerb } from "@/components/study-words";
+import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, pressWord } from "@/components/study-words";
 import { examGapAskCreation, topicPress, useStartSession } from "@/components/unit-inbox/start-unit";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
 import { continueHref } from "@/components/nav/session-state";
@@ -42,7 +42,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 		if (resume) router.push(continueHref(resume));
 		else start(`gap:${topic.handle}`, creation);
 	};
-	const verb = (way: { topic: CourseMapTopic; starts: boolean }): ExamWayVerb => (!way.starts ? "review" : press(way.topic).continues ? "continue" : "start");
+	const verb = (way: { topic: CourseMapTopic; starts: boolean }) => (!way.starts ? "review" : press(way.topic).continues ? "continue" : "start");
 	// "Start it today" only where "it" is the one topic the line names; with two
 	// named, the press names its own (round 12, 1 m2: "No room… for Inner
 	// products and Orthogonal projection… Start it today").
@@ -77,7 +77,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 					<DropdownMenuContent align="start">
 						{others.map((way) => (
 							<DropdownMenuItem key={way.topic.handle} onSelect={() => open(way.topic)}>
-								<MathText>{`${examWayWords(verb(way))} ${way.topic.title}`}</MathText>
+								<MathText>{`${pressWord(verb(way))} ${way.topic.title}`}</MathText>
 							</DropdownMenuItem>
 						))}
 					</DropdownMenuContent>

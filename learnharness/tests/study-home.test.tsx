@@ -283,7 +283,7 @@ describe("lessons", () => {
 	it("words a waiting session from the course topics its transcript worked on", () => {
 		const waiting = chat({ id: "q", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
 		const reply = lessonOf(todayRows([LINALG], [waiting], TODAY).find((r) => r.kind === "session")!);
-		assert.deepEqual([reply.kind, reply.title, reply.detail, reply.action], ["reply", "Eigen lesson", "Waiting for your reply", "Open"]);
+		assert.deepEqual([reply.kind, reply.title, reply.detail, reply.action], ["reply", "Eigen lesson", "Waiting for your reply", "Resume"]);
 		assert.deepEqual(reply.open, { kind: "session", href: "/chat/q" });
 		assert.deepEqual(reply.topics, ["eigen"]);
 		assert.equal(reply.place, null, "no arc to name in a course without arcs");

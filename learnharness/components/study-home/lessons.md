@@ -11,7 +11,7 @@ Today's lines as lessons in plain words, which the study home, the course page a
 | place | the arc the lesson sits in, when every one of its topics lies in that arc (`arcPlace`); none when its topics span arcs (a review mixes arcs by design) and in a course without arcs. Never drawn on the row: pointing at the row picks this arc on Home's map (`HomeMap`'s `arc`), as the course tab slides to its course | the lesson's topics' `arc` on the course map, the arc from `map.arcs` |
 | title | the session's title, "Review A, B, C", "Continue <task or topic>", "Start a lesson" | `stepWords` |
 | detail | "Waiting for your reply"; "Then <task or topic>" after reviews, left out when it only repeats a review; the open task's step | the session's state, the map's tasks |
-| action | Open (a session), Review, Continue, Start | the lesson's kind |
+| action | the press's one word (`pressWord`, `../study-words.ts`): Resume (a session), Review, Continue, Start. Home's row never shows it; the course page's Now and the sidebar's hover action do | the lesson's kind |
 
 A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place replaced "topic 5–7 of 24" when arcs landed (design v2, 5.4). Edo turned down the arc as row text (14 Nov 2026): it shows on Home's map, in its arc list, while he points at the row.
 

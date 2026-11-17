@@ -371,18 +371,25 @@ export const EXAM_GAP_WORDS = {
 	/** A topic he began, whose press picks its session or task up (round 12, 1 D5). */
 	continue: "Continue it today",
 	ask: "Ask the tutor",
-	/** Each topic in Start one today's menu: "Start Variance", "Review Rank", "Continue Poisson distribution". */
-	startTopic: "Start",
-	reviewTopic: "Review",
-	continueTopic: "Continue",
 } as const;
 
-/** What a way in does: start a topic, review one, or continue one he began. */
-export type ExamWayVerb = "start" | "review" | "continue";
+/** What a press on a topic or a Today line does: resume a session that
+ *  waits on him (`open`: one the tutor is writing in), review the topic,
+ *  continue a task or a lesson he began, start a topic, or study it again. */
+export type PressKind = "resume" | "open" | "review" | "continue" | "start" | "study";
 
-/** A way in's verb before its topic: "Start", "Review", "Continue". */
-export function examWayWords(verb: ExamWayVerb): string {
-	return verb === "start" ? EXAM_GAP_WORDS.startTopic : verb === "review" ? EXAM_GAP_WORDS.reviewTopic : EXAM_GAP_WORDS.continueTopic;
+const PRESS_WORDS = { resume: "Resume", open: "Resume", review: "Review", continue: "Continue", start: "Start", study: "Study" } as const;
+
+/** The press's word. */
+export type PressWord = (typeof PRESS_WORDS)[PressKind];
+
+/** The one word a press says, on every surface (the topic page's Now, the
+ *  course page's Now, the sidebar's hover action, the calendar, the exam's
+ *  ways in): a session he picks up reads Resume whether it waits on him or
+ *  the tutor is writing in it (audit 17 Nov 2026, finding 2: the topic page
+ *  said Open where the course page said Resume). Pure. */
+export function pressWord(kind: PressKind): PressWord {
+	return PRESS_WORDS[kind];
 }
 
 /** A topic the exam's plan leaves out, by title, with the engine's reason
@@ -438,8 +445,8 @@ export function examGapWhyWords(start: readonly ExamGapTopic[], review: readonly
 /** The pick among the topics he can take up today, as its press says it:
  *  "Start Expectation and linearity today", "Review Binomial distribution
  *  today". */
-export function examGapPickWords(verb: ExamWayVerb, title: string): string {
-	return `${examWayWords(verb)} ${title} today`;
+export function examGapPickWords(verb: "start" | "review" | "continue", title: string): string {
+	return `${pressWord(verb)} ${title} today`;
 }
 
 /** The taught topics the final review leaves out, a line per reason,

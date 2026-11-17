@@ -118,7 +118,7 @@ describe("Now", () => {
 			}),
 			[
 				["resume", "Eigenvalues and eigenvectors", "Your turn", "Resume", "chat_demo_eigen"],
-				["open", "Eigenvalues and eigenvectors", "Tutor writing", "Open", "chat_demo_eigen"],
+				["open", "Eigenvalues and eigenvectors", "Tutor writing", "Resume", "chat_demo_eigen"],
 				["review", "Due since 6 Nov", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],

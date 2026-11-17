@@ -4,7 +4,7 @@ The hybrid topic page's history pane (`SectionsPane`, which `HybridTopic` always
 
 Edo's ask (13 Nov 2026): resuming is resuming his study, tracked across lessons, within a lesson and across its steps, so it belongs in the page, inside the list of sessions, not on the composer. The sessions sorted by relevance, with quiet dividers saying what to pick up now, what is scheduled, what comes next and what is past.
 
-Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and `nowline` (a calendar's now-line), which are deleted with the Resume switch's composer options. Thesis: the history sorted by relevance, as an inbox: Now, Next, Scheduled, Earlier. Now is the first row, larger words, an accent rule on the Now label's left edge, the press word in the accent (`sections.tsx`).
+Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and `nowline` (a calendar's now-line), which are deleted with the Resume switch's composer options. Thesis: the history sorted by relevance, as an inbox: Now, Next, Scheduled, Earlier. Now is the first row, larger words, an accent rule on the Now label's left edge (`sections.tsx`). Its press, once the word in the accent, is the course page's Now's pill (`PagePress`, audit 17 Nov 2026, finding 2: Edo saw the pill last, on 17 Nov).
 
 ## Sections (`pickup-facts.ts`, pure)
 
@@ -38,7 +38,7 @@ Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (ke
 ## Shared parts (`pickup-parts.tsx`)
 
 - `Divider`, `Section`: a 32px label in `text-label` with a hairline to the column's end.
-- `NowPress`: the press stretched over its container (`after:absolute inset-0`), so the whole row is the press; a link to the session it opens, else a button that starts one. The press word in the accent with a 16px arrow that moves 2px on hover. Its focus ring is inset, inside the pane's clip.
+- `NowPress`: the press stretched over its container (`after:absolute inset-0`), so the whole row is the press; a link to the session it opens, else a button that starts one. It shows the page's press (`PagePress`, `../../../page-frame/page-frame.md`), the course page's Now's own: the word (`pressWord`) and a 16px arrow in a 32px pill, the arrow moving 2px while the row (`group/press`) is hovered. Its focus ring is inset, inside the pane's clip.
 - `NowRow`: 1rem icon column, the words in `text-control` medium wrapping to two lines at most, the press flush right, then the note in `text-label` muted. Bleeds 12px as Home's row; `marked` draws a 2px accent rule (`NOW_RULE`) in the rows' gutter, on the x where the section labels' text starts. A plain row like the list's other rows, no fill or ring at rest even when its lesson is on the map (Edo, 13 Nov 2026): its weight is its type and the accent rule.
 - `NextList`: a session is the history's own row (`SessionItem`) with its map button; a review is Home's one-line row (`../row-classes.ts`), a button that starts the session; an unfinished task is the two-line row, its title over the step it stopped on, so the step (often a formula) gets the row's width.
 - `ScheduledEntry`, `EarlierDays` (the history's `SessionItem` and `AttemptEntry` with their `date` column, 4.5rem, the day on each day's first row), and no map button: pointing at a lesson row, Now's included, puts its steps on the map (hybrid.md). A session row says "Tutor writing" while the tutor writes.

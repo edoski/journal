@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { SessionStarter, type SessionCreation } from "@/components/start-session";
 import type { Unit } from "@/components/unit-inbox/units";
 import { topicOpening, type ChatListItem, type CourseMap, type CourseMapTopic } from "@/src/core";
-import { ACTION_WORDS, topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
-import { examGapAsk } from "@/components/study-words";
+import { topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
+import { examGapAsk, pressWord, type PressWord } from "@/components/study-words";
 
 /** Starts a session (`creation`) and opens it; when it cannot start (no
  *  models set up), the composer opens instead. `starting` is the key of
@@ -42,14 +42,14 @@ export function topicCreation(workspace: string, topic: Pick<Unit["topic"], "tit
  *  (`topicAction`) takes it: the session to open (`resume`), else what to
  *  start, an open task continued as the page continues it, else a session
  *  on the topic. `continues` when it picks up a session or a task he began,
- *  so the press reads Continue, never Start; `word` the page's word for it (round 12, 1 D5: the course
+ *  so the press reads Continue, never Start; `word` its one word (`pressWord`) (round 12, 1 D5: the course
  *  head's "Start Poisson distribution" opened a second chat for the lesson
  *  he had begun). Pure. */
-export function topicPress(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): { resume: ChatListItem | null; creation: SessionCreation; continues: boolean; word: string } {
+export function topicPress(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): { resume: ChatListItem | null; creation: SessionCreation; continues: boolean; word: PressWord } {
 	const action = topicAction(topic, map, chats);
 	const creation = topicCreation(map.workspace, topic, map.today);
 	const continues = action.kind === "resume" || action.kind === "open" || action.kind === "continue";
-	const word = ACTION_WORDS[action.kind];
+	const word = pressWord(action.kind);
 	if ("chat" in action) return { resume: action.chat, creation, continues, word };
 	if (action.kind !== "continue") return { resume: null, creation, continues, word };
 	return { resume: null, creation: { title: action.opening, course: { workspace: map.workspace }, topics: [topic.handle], ...(action.from ? { resume: { from: action.from } } : {}) }, continues, word };

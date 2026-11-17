@@ -50,8 +50,6 @@ function continueAction(sessions: readonly ChatListItem[], opening: string, task
 	return "open" in press ? { kind: "continue", chat: press.open, task } : { kind: "continue", ...press, task };
 }
 
-export const ACTION_WORDS: Record<TopicAction["kind"], string> = { resume: "Resume", open: "Open", review: "Review", continue: "Continue", start: "Start", study: "Study" };
-
 /** A place to pick the topic back up: the session that waits or is being
  *  written, or an open task that holds the topic. */
 export type Pickup =

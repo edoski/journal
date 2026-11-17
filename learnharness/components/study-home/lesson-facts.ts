@@ -1,10 +1,7 @@
 import { courseLabel, type CourseMap, type CourseMapArc, type StudyCourse, type TopicHandle } from "@/src/core";
 import { runupExam, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 import { continueHref } from "@/components/nav/session-state";
-
-/** What a lesson's button does: open the session that waits, or take up the
- *  course's next step. The word names the step. */
-export type LessonAction = "Open" | "Review" | "Continue" | "Start";
+import { pressWord, type PressKind, type PressWord } from "@/components/study-words";
 
 /**
  * One lesson of Today in plain words, the same for every study home: what
@@ -20,7 +17,9 @@ export interface Lesson {
 	exam: string | null;
 	title: string;
 	detail: string | null;
-	action: LessonAction;
+	/** The press's word (`pressWord`): Resume the session that waits, or
+	 *  the word for the course's next step. */
+	action: PressWord;
 	/** The course topics the lesson works on. */
 	topics: readonly TopicHandle[];
 	/** The arc every topic of the lesson lies in (`arcPlace`): the arc
@@ -29,7 +28,7 @@ export interface Lesson {
 	open: { kind: "session"; href: string } | { kind: "course"; workspace: string };
 }
 
-const ACTION: Record<NextStep["kind"], LessonAction> = { review: "Review", task: "Continue", topic: "Continue", none: "Start" };
+const PRESS: Record<NextStep["kind"], PressKind> = { review: "review", task: "continue", topic: "continue", none: "start" };
 
 /** The arc some topics lie in, when every one of them lies in the same
  *  arc; null when they span arcs (a review mixes arcs by design), when
@@ -59,7 +58,7 @@ export function lessonOf(row: TodayRow): Lesson {
 			exam: course ? runupExam(course) : null,
 			title: chat.title,
 			detail: "Waiting for your reply",
-			action: "Open",
+			action: pressWord("resume"),
 			topics,
 			place: course ? arcPlace(course.map, topics) : null,
 			open: { kind: "session", href: continueHref(chat) },
@@ -77,7 +76,7 @@ export function lessonOf(row: TodayRow): Lesson {
 		exam: runupExam(course),
 		title: stepWords(step),
 		detail: step.kind === "review" && then ? `Then ${then}` : null,
-		action: step.kind === "topic" && course.lastActiveDaysAgo === null ? "Start" : ACTION[step.kind],
+		action: pressWord(step.kind === "topic" && course.lastActiveDaysAgo === null ? "start" : PRESS[step.kind]),
 		topics,
 		place: arcPlace(course.map, topics),
 		open: { kind: "course", workspace: course.map.workspace },

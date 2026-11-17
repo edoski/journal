@@ -209,17 +209,12 @@ export function openingArc(sections: readonly CourseArcSection[]): ArcHandle | n
 	return (sections.find((s) => s.current) ?? sections[0])?.arc.handle ?? null;
 }
 
-/** The words on the course's one button: the same as Home's lesson, with
- *  the topic page's Resume for a session that waits on him. */
-export type CourseAction = "Resume" | "Review" | "Continue" | "Start";
-
 /** The header's lesson: Home's line for this course (`todayRows`), as a
- *  lesson in Today's words, why it is next, and the button's word. */
+ *  lesson in Today's words (its press's word too), and why it is next. */
 export interface CourseNext {
 	row: TodayRow;
 	lesson: Lesson;
 	why: Why | null;
-	action: CourseAction;
 }
 
 /** What the course's button takes up, exactly as Home's line for it would:
@@ -231,8 +226,7 @@ export interface CourseNext {
 export function courseNext(course: StudyCourse, open: readonly ChatListItem[]): CourseNext {
 	const mine = open.filter((c) => c.course?.workspace === course.map.workspace);
 	const row: TodayRow = todayRows([course], mine, course.map.today)[0] ?? { kind: "course", course, step: nextStepOf(course) };
-	const lesson = lessonOf(row);
-	return { row, lesson, why: whyOf(row), action: lesson.action === "Open" ? "Resume" : lesson.action };
+	return { row, lesson: lessonOf(row), why: whyOf(row) };
 }
 
 /** The header's facts, each a few words; null where the course has none. */

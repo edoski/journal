@@ -12,6 +12,7 @@ import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { NowLine } from "@/components/study-home/needs-you";
 import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import type { ChatListItem } from "@/src/core";
+import type { PressWord } from "@/components/study-words";
 import { useContinueCourse } from "@/components/unit-inbox/continue-course";
 import { CARD_ACTION_PLACE, ROW_ACTION, RowCard, SLOT_WORDS } from "@/components/unit-inbox/row-card";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
@@ -22,13 +23,15 @@ import type { Unit } from "@/components/unit-inbox/units";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** What a line's action does, as Home's line does: Resume the session that
- *  waits, or the course's next step in Home's word (Review, Continue or
- *  Start), which starts the same lesson as Home's line. Pure. */
-export function nowActionOf(line: NowLine): { label: string; href: string } | { label: string; workspace: string; step: NextStep } {
+/** What a line's action does, as Home's line does, in Home's word for it
+ *  (`lessonOf`): Resume the session that waits, or the course's next step
+ *  (Review, Continue or Start), which starts the same lesson as Home's
+ *  line. Pure. */
+export function nowActionOf(line: NowLine): { label: PressWord; href: string } | { label: PressWord; workspace: string; step: NextStep } {
 	const { row } = line;
-	if (row.kind === "session") return { label: "Resume", href: continueHref(row.chat) };
-	return { label: lessonOf(row).action, workspace: row.course.map.workspace, step: row.step };
+	const label = lessonOf(row).action;
+	if (row.kind === "session") return { label, href: continueHref(row.chat) };
+	return { label, workspace: row.course.map.workspace, step: row.step };
 }
 
 /** Where a course line's card goes, as Home's line goes (`courseMove`): the

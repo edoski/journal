@@ -17,9 +17,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
 import { dayAndNearWords, distanceWords, finalReviewWords, longDayWords, lookOf, lookWords, LOOKS, misfitWords, roadLines, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
-import { finalReviewGapWords } from "@/components/study-words";
+import { finalReviewGapWords, pressWord } from "@/components/study-words";
 import { planDay } from "@/components/study-home/study-facts";
 import { MathText } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
@@ -287,7 +286,7 @@ function EntryActions({ entry, busy, onStart }: { entry: Exclude<CalendarEntry, 
 	const { topic } = entry;
 	const workspace = entry.course.workspace;
 	const handle = topic?.handle ?? null;
-	const words = ACTION_WORDS[entry.kind === "task" ? "continue" : entry.action.kind];
+	const words = pressWord(entry.kind === "task" ? "continue" : entry.action.kind);
 	const press: StartArgs | ChatListItem =
 		entry.kind === "task"
 			? entry.move.kind === "open"

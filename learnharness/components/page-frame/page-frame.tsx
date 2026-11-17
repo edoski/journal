@@ -1,5 +1,8 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+import { ArrowRightIcon } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import type { PressWord } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
 /** The column every page sits in: centred, up to 80rem, 24px sides, 24px
@@ -109,3 +112,16 @@ export function PageFact({ icon, children, className, ...rest }: { icon: ReactNo
 	);
 }
 
+/** The page's one press, the course page's Now and the topic page's Now
+ *  alike: its word (`pressWord`) in a 32px pill in the send button's fill,
+ *  centred on its row, the arrow stepping right while the row
+ *  (`group/press`) is hovered. Drawn inside the row that is the press,
+ *  never a control of its own. */
+export function PagePress({ word }: { word: PressWord }) {
+	return (
+		<span data-slot="page-press" className={cn(buttonVariants({ size: "pill" }), "pointer-events-none shrink-0 self-center font-medium")}>
+			{word}
+			<ArrowRightIcon aria-hidden className="size-4 transition-transform duration-150 group-hover/press:translate-x-0.5 motion-reduce:transition-none" />
+		</span>
+	);
+}

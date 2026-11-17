@@ -237,7 +237,7 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(courseFacts(odes).studied, "First lesson Thu 19 Nov, after Probability's and Linear Algebra's new topics");
 		const today = course({ exam: null, current: null, focus: null, tasks: [], topics: [topic("ode-intro", { starts: "2026-11-08" })], edges: [] }, { lastActiveDaysAgo: null, due: [] });
 		assert.equal(courseFacts(today).studied, "First lesson today");
-		assert.equal(courseNext(today, []).action, "Start");
+		assert.equal(courseNext(today, []).lesson.action, "Start");
 	});
 
 	it("gives each topic not started the day the plan starts it, not the group's own words", () => {
@@ -248,7 +248,7 @@ describe("the header's facts and next lesson", () => {
 
 	it("takes up Home's next step for the course: today's reviews first, in Today's words", () => {
 		const next = courseNext(course(), []);
-		assert.equal(next.action, "Review");
+		assert.equal(next.lesson.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
 		assert.equal(next.why?.short, "Due since 29 Oct");
@@ -257,9 +257,9 @@ describe("the header's facts and next lesson", () => {
 	it("resumes a session in this course that has waited on him since yesterday, once nothing is planned before it, and ignores one in another course", () => {
 		const mine = chat("c1", { title: "Rank practice", pendingQuestion: true, updatedAt: "2026-11-08T08:00:00.000Z" });
 		const other = chat("c2", { pendingQuestion: true, course: { workspace: "/study/prob", title: "Probability" }, updatedAt: "2026-11-08T09:00:00.000Z" });
-		assert.equal(courseNext(course(), [other, mine]).action, "Review", "today's review comes first, as on Home (round 10, 1 m2)");
+		assert.equal(courseNext(course(), [other, mine]).lesson.action, "Review", "today's review comes first, as on Home (round 10, 1 m2)");
 		const next = courseNext(course({}, { due: [] }), [other, mine]);
-		assert.equal(next.action, "Resume");
+		assert.equal(next.lesson.action, "Resume");
 		assert.equal(next.lesson.title, "Rank practice");
 		assert.deepEqual(next.lesson.open, { kind: "session", href: "/chat/c1" });
 	});
@@ -267,7 +267,7 @@ describe("the header's facts and next lesson", () => {
 	it("still takes up the course's next step once he ended today's lesson on it with Done for today, which Home leaves off Today", () => {
 		const left = chat("c1", { title: "Review Span", topics: [h("span")], ended: "left", updatedAt: "2026-11-08T12:00:00.000Z" });
 		const next = courseNext(course({ tasks: [], focus: null }), [left]);
-		assert.equal(next.action, "Review");
+		assert.equal(next.lesson.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
 		assert.equal(courseNext(course(), [left]).lesson.title, `Continue ${course().map.tasks[0]!.title}`, "with an open task, the line Home still has for the course");
@@ -275,7 +275,7 @@ describe("the header's facts and next lesson", () => {
 
 	it("starts a lesson in a course with nothing to review, no task and no current topic", () => {
 		const next = courseNext(course({ topics: [], tasks: [], current: null, focus: null }, { due: [] }), []);
-		assert.equal(next.action, "Start");
+		assert.equal(next.lesson.action, "Start");
 		assert.equal(next.lesson.title, "Start a lesson");
 	});
 });

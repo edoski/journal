@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
-import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, ChevronDownIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon } from "lucide-react";
+import { BookmarkIcon, BookOpenIcon, ChevronDownIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FIRST_LESSON, LESSON_GOES_ON, moreWords } from "@/components/study-words";
 import { daysThatFit } from "@/components/unit-inbox/topic-page/pickup/earlier-fit";
 import { Button } from "@/components/ui/button";
+import { PagePress } from "@/components/page-frame/page-frame";
 import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
@@ -51,28 +52,22 @@ export function Section({ label, now, children }: { label: string; now?: boolean
 /**
  * Now's press, stretched over its whole container (`relative`) so the
  * container is the press: a link to the session it opens, else a button
- * that starts one. It carries the press word in the accent with an arrow,
- * so the row says what it does. Siblings with `relative z-10` stay their
- * own controls.
+ * that starts one. It shows the page's press (`PagePress`), the course
+ * page's Now's own, so the row says what it does. Siblings with
+ * `relative z-10` stay their own controls.
  */
 export function NowPress({ now, busy, onAct, className }: { now: NowItem; busy: boolean; onAct?: () => void; className?: string }) {
 	const press = cn(
-		"flex shrink-0 items-center gap-1 text-body text-link outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset",
+		"flex shrink-0 outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset",
 		className,
-	);
-	const words = (
-		<>
-			{now.press}
-			<ArrowRightIcon aria-hidden className="size-4 transition-transform duration-150 group-hover/now:translate-x-0.5 motion-reduce:transition-none" />
-		</>
 	);
 	return now.chat ? (
 		<Link href={now.href ?? `/chat/${now.chat}`} data-slot="pickup-now-press" aria-disabled={busy || undefined} onClick={busy ? (event) => event.preventDefault() : undefined} className={press}>
-			{words}
+			<PagePress word={now.press} />
 		</Link>
 	) : (
 		<button type="button" data-slot="pickup-now-press" disabled={busy || !onAct} onClick={onAct} className={cn(press, "disabled:opacity-50")}>
-			{words}
+			<PagePress word={now.press} />
 		</button>
 	);
 }
@@ -308,7 +303,7 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 			data-action={now.kind}
 			data-shown={onMap || undefined}
 			className={cn(
-				"group/now relative grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg py-3 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
+				"group/press relative grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg py-3 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
 				BLEED,
 				marked && NOW_RULE,
 			)}
