@@ -31,7 +31,7 @@
  * turn rides one composition.
  */
 
-import { dismissedAnswer, picksStop, type QuestionAnswerData } from "./question-core.ts";
+import { dismissedAnswer, picksStop, type LeftDraft, type QuestionAnswerData } from "./question-core.ts";
 import { parsePhotos, type Photo } from "./photos.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
 import type { LhMessage } from "./native-messages.ts";
@@ -97,8 +97,10 @@ export type ChatInput =
 	 *  chip or Enter on an empty composer. Practice sessions only, and
 	 *  only with nothing active (mid-problem input rides the dock). */
 	| { type: "next" }
-	/** Done for tonight: he stops now, whatever is open. */
-	| { type: "tonight" }
+	/** Done for tonight: he stops now, whatever is open. `draft` is what he
+	 *  had typed in the open question's box (`toolCallId`), kept with the
+	 *  question it was left on (`LeftDraft`). */
+	| { type: "tonight"; draft?: { toolCallId: string } & LeftDraft }
 	/** Continue pressed on an open task the session holds, with nothing
 	 *  in it waiting on him: the tutor carries on at the task's step
 	 *  (round 13, 2 M1). */
@@ -289,8 +291,18 @@ export function parseChatInput(input: unknown): ChatInput {
 			};
 		case "next":
 			return { type: "next" };
-		case "tonight":
-			return { type: "tonight" };
+		case "tonight": {
+			const draft = i.draft as { toolCallId?: unknown; text?: unknown; confidence?: unknown } | undefined;
+			if (draft === undefined) return { type: "tonight" };
+			if (!draft || typeof draft.toolCallId !== "string" || !draft.toolCallId || typeof draft.text !== "string") {
+				throw new ChatInputError("tonight input draft requires toolCallId and text");
+			}
+			if (draft.confidence !== undefined && !isConfidence(draft.confidence)) {
+				throw new ChatInputError(`tonight input draft confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
+			}
+			if (!draft.text.trim()) return { type: "tonight" };
+			return { type: "tonight", draft: { toolCallId: draft.toolCallId, text: draft.text, ...(draft.confidence !== undefined ? { confidence: draft.confidence } : {}) } };
+		}
 		case "task":
 			return { type: "task" };
 		case "dispute": {
@@ -382,7 +394,7 @@ export function inputAppends(
 			return [...dismissalConclusion(record), newNextMessage()];
 		}
 		case "tonight":
-			return tonightAppends(record);
+			return tonightAppends(record, input.draft);
 		case "task":
 			return taskContinueAppends(record);
 		case "dispute":
@@ -449,11 +461,15 @@ export function disputeAppends(record: { messages: LhMessage[]; answerSaves?: An
  *  waits for its grade (`workAwaitingGradeOf`): the closing turn grades
  *  that through `conclude`. The marker comes last:
  *  the learner input the turn answers. */
-export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMode }): LhMessage[] {
+export function tonightAppends(record: { messages: LhMessage[]; kind?: SessionMode }, draft?: { toolCallId: string } & LeftDraft): LhMessage[] {
 	const withheld = questionCallsOf(record.messages)
 		.filter((call) => call.status === "answerable")
-		.map((call) => newAnswerResult(call.toolCallId, call.tool,
-			dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight")));
+		.map((call) => {
+			const left = dismissedAnswer(toolQuestionKind(call.tool), parseQuestionInput(call.tool, call.input)?.question ?? "", "tonight");
+			// His half answer stays with the question it was left on.
+			const kept = draft?.toolCallId === call.toolCallId ? { text: draft.text, ...(draft.confidence ? { confidence: draft.confidence } : {}) } : null;
+			return newAnswerResult(call.toolCallId, call.tool, kept ? { ...left, draft: kept } : left);
+		});
 	const active = activeProblemOf(record.messages);
 	const dropped = !active
 		? dismissalConclusion(record)

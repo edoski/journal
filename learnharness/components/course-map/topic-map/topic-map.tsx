@@ -5,14 +5,16 @@ import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, useStoreApi, type
 import type { ArcHandle, CourseMap, CourseMapEdge, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
-import { READABLE_ZOOM, TAG_ROOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, neighbourOf, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
+import { READABLE_ZOOM, TAG_ROOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, neighbourOf, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type NodeSize, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, type CardData, type TopicMapState } from "./topic-node";
 import { CURRENT_TAG, cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { litCamera, litFollow } from "./lit-camera";
 import { cardNode, drawingOf, mapEdges, trailOf, type Trail } from "./map-drawing";
 import type { ArcView } from "./arc-view";
-import { CanvasNode } from "./canvas/canvas-node";
+import { CanvasNode, CardContent } from "./canvas/canvas-node";
+import { BaseNode } from "./canvas/base-node";
+import { CANVAS_NODE } from "./canvas/canvas-layout";
 import { CanvasLinesEdge } from "./canvas/canvas-lines";
 import { CanvasFrame } from "./canvas/canvas-frame";
 import { CanvasChrome } from "./canvas/canvas-chrome";
@@ -119,7 +121,8 @@ export function TopicMap({
 		setShownArc(arc);
 		setTrailArc(!whole && shownArc && arc && !reducedMotion() ? shownArc : null);
 	}
-	const { view, layout } = useMemo(() => drawingOf(course, arc), [course, arc]);
+	const card = useCardBox(course);
+	const { view, layout } = useMemo(() => drawingOf(course, arc, card.box), [course, arc, card.box]);
 	const trail = useMemo(() => (trailArc && arc ? trailOf(course, trailArc, arc, layout) : null), [course, trailArc, arc, layout]);
 	const endTravel = useCallback((from: ArcHandle) => setTrailArc((was) => (was === from ? null : was)), []);
 	const map = view.map;
@@ -129,14 +132,62 @@ export function TopicMap({
 		[map, said, layout, titleOf, view, trail],
 	);
 	const edges = useMemo<Edge[]>(() => mapEdges(layout, trail), [layout, trail]);
-	const here = map.current ? titleOf(map.current) : null;
+	// The course's own title for where he is, whichever arc is drawn (round 15, 2 free: "You are at eigen.").
+	const here = course.current ? (course.topics.find((t) => t.handle === course.current)?.title ?? null) : null;
 	const graph = useMemo<MapGraph>(
 		() => ({ edges: map.edges, current: map.current, caption: `${map.title}: ${map.topics.length} topics, prerequisites above the topics that need them.${here ? ` You are at ${here}.` : ""}` }),
 		[map.edges, map.current, map.title, map.topics.length, here],
 	);
 	return (
-		<CardMap graph={graph} layout={layout} nodes={nodes} edges={edges} margin={margin} highlight={highlight} marked={marked} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} fitsDown={fitsDown} />
+		<>
+			<CardMap graph={graph} layout={layout} nodes={nodes} edges={edges} margin={margin} highlight={highlight} marked={marked} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} fitsDown={fitsDown} />
+			{card.measurer}
+		</>
 	);
+}
+
+/**
+ * Every card's box on a course's map (canvas.md, Node): as wide as the
+ * course's widest topic title needs on one line, `CANVAS_NODE` at the
+ * least, so a title stays on one line and whole (Edo: map titles stay on
+ * one line, and You are here and its next topics are whole; round 15, 1 m8
+ * and 4 minor 11: "Random variables and distri…"). Each title is measured
+ * in a hidden copy of its card's body (`CardContent`, `whole`), again once
+ * the web fonts a formula needs have loaded. One box for the whole course,
+ * so moving between its arcs no card changes size.
+ */
+function useCardBox(course: CourseMap): { box: NodeSize; measurer: React.ReactNode } {
+	const ref = useRef<HTMLDivElement>(null);
+	const [width, setWidth] = useState<number>(CANVAS_NODE.width);
+	const titles = useMemo(() => [...new Set(course.topics.map((t) => t.title))], [course.topics]);
+	const key = titles.join("\n");
+	useLayoutEffect(() => {
+		const box = ref.current;
+		if (!box) return;
+		let live = true;
+		const measure = () => {
+			if (!live) return;
+			const widest = Math.max(0, ...[...box.children].map((card) => card.getBoundingClientRect().width));
+			const next = Math.max(CANVAS_NODE.width, Math.ceil(widest));
+			setWidth((was) => (was === next ? was : next));
+		};
+		measure();
+		void document.fonts?.ready.then(measure);
+		return () => {
+			live = false;
+		};
+	}, [key]);
+	const box = useMemo(() => ({ width, height: CANVAS_NODE.height }), [width]);
+	const measurer = (
+		<div ref={ref} aria-hidden="true" data-slot="map-card-measurer" className="pointer-events-none invisible fixed top-0 left-0 flex flex-col items-start">
+			{titles.map((title) => (
+				<BaseNode key={title} className="w-max border">
+					<CardContent whole data={{ kind: "topic", title, topic: { level: "independent" }, standing: { fill: 1, slipping: false, words: "", short: "" } } as unknown as CardData} />
+				</BaseNode>
+			))}
+		</div>
+	);
+	return { box, measurer };
 }
 
 /** What a map draws, whatever its cards are: a course's topics or a lesson's steps (topic-map.md, Node). */

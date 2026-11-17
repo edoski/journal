@@ -430,7 +430,7 @@ function assertExamWarnings(s: Survey) {
 // ─── 6. one status and one line per session ────────────────────────────────
 
 /** The words that say where a session stands (session-state.md), as every surface draws them. */
-const SESSION_STATUS = /^(Your turn|Left off .+|Tutor writing|Reply cut off|You stopped the tutor)$/;
+const SESSION_STATUS = /^(Your turn|Left off .+|Tutor writing|Reply cut off|Stopped by you)$/;
 /** A status without the topic a card's slip adds ("Not right last time: …"). */
 const statusWords = (words: string) => words.replace(/:\s.*$/, "").trim();
 /** The session a link opens, never a new one (`/chat/new`). */

@@ -34,6 +34,29 @@ describe("the line Home's map follows", () => {
 	});
 });
 
+describe("the line Home's map rests on (round 15, 3 free)", () => {
+	const chat = (id: string, workspace: string, updatedAt: string) => ({ id, course: { workspace, title: workspace }, updatedAt }) as never;
+	const IN_LA: TodayRow = { kind: "session", chat: { id: "chat_invertible" }, course: course("la") } as never;
+
+	it("is the session he is in, though another course's line comes first: mid Linear Algebra lesson, Home opened on Probability", () => {
+		const chats = [chat("chat_review", "pr", "2026-11-08T09:00:00Z"), chat("chat_invertible", "la", "2026-11-08T10:30:00Z")];
+		assert.equal(followedRow([PR, IN_LA], null, chats), IN_LA);
+	});
+
+	it("is the first line of the course he last studied, when its session is not a line", () => {
+		assert.equal(followedRow([PR, LA], null, [chat("chat_old", "la", "2026-11-07T18:00:00Z")]), LA);
+	});
+
+	it("is Today's first line with a course when he studied no course Today lists", () => {
+		assert.equal(followedRow([PR, LA], null, [chat("chat_calc", "calc", "2026-11-08T11:00:00Z")]), PR);
+		assert.equal(followedRow([PR, LA], null, []), PR);
+	});
+
+	it("gives way to the line he points at", () => {
+		assert.equal(followedRow([PR, IN_LA], lineKey(PR), [chat("chat_invertible", "la", "2026-11-08T10:30:00Z")]), PR);
+	});
+});
+
 describe("a line reporting that he points at it", () => {
 	it("adds nothing when nothing follows", () => {
 		assert.deepEqual(pointProps(LA, {}), {});

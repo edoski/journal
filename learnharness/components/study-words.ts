@@ -83,8 +83,9 @@ export const LESSON_GOES_ON = "Lesson continues";
  *  since. */
 const WRONG_LAST_WORDS = "Not right last time";
 
-/** Right on his own, on the day its check has come. */
-const RIGHT_ON_YOUR_OWN = "Right on your own";
+/** Right on his own, on the day its check has come, and a map card's
+ *  short standing for it any day. */
+export const RIGHT_ON_YOUR_OWN = "Right on your own";
 
 /** A slip's words for each of the engine's signals but a mixed-up method,
  *  which names the method (`slipWords`). */
@@ -657,6 +658,10 @@ export const LESSON_WORDS = {
 	messageKept: "Your unsent message is kept. Press Esc to see it.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
+	/** A problem Done for today closed: its unsent work is dropped (Edo's
+	 *  ruling), so the line says what became of the problem, never a
+	 *  "Left for next time" with nothing under it (round 15, 3 m1). */
+	problemSetAside: "Problem set aside for today",
 	skippedProblem: "You skipped this problem.",
 	unreadableCourse: "Couldn't read this course's record",
 	unreadableNotSaved: "What you answer here isn't saved until it can be read again.",

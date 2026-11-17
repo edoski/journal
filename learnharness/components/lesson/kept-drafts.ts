@@ -12,7 +12,7 @@
  * question to be asked again after Hint, a side question or Done for today).
  */
 
-import { sameQuestionKey, type Confidence, type Photo, type QuestionFormDraft } from "@/src/core";
+import { sameQuestionKey, type Confidence, type LeftDraft, type Photo, type QuestionFormDraft } from "@/src/core";
 
 const PREFIX = "lh.kept.";
 
@@ -306,6 +306,29 @@ export function carriedForm(carry: KeptWords, textMode: boolean): QuestionFormDr
 		text: textMode ? text : "",
 		confidence: carry.form?.confidence ?? "neutral",
 	};
+}
+
+/** A question box's words as the half answer Done for today keeps with
+ *  the lesson (`LeftDraft`): what he typed, as one text, and how sure he
+ *  said he was; null when he typed nothing. Pure. */
+export function leftDraftOf(kept: KeptWords | undefined): LeftDraft | null {
+	const text = joinAsTyped(kept?.form ? [kept.form.text, kept.form.other, kept.form.thinking] : [kept?.text]);
+	if (!text) return null;
+	const confidence = kept?.form?.confidence ?? kept?.confidence;
+	return { text, ...(confidence ? { confidence } : {}) };
+}
+
+/** The half answer kept with the question `toolCallId`, which Done for
+ *  today set aside (`QuestionAnswerData.draft`); null when none. Pure. */
+export function leftDraftAt(messages: ReadonlyArray<{ parts: ReadonlyArray<{ toolCallId?: string; output?: unknown }> }>, toolCallId: string): LeftDraft | null {
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (part.toolCallId !== toolCallId) continue;
+			const draft = (part.output as { draft?: unknown } | undefined)?.draft as LeftDraft | undefined;
+			if (draft && typeof draft.text === "string" && draft.text.trim()) return draft;
+		}
+	}
+	return null;
 }
 
 /** Forgets a lesson's question and problem boxes other than the ones still

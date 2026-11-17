@@ -5,6 +5,7 @@ The three app rules every portalled shadcn primitive carries (`overlay.ts`). The
 | Rule | How | Why |
 |---|---|---|
 | One Esc closes one layer | Every content's `onEscapeKeyDown` goes through `claimEscape`, which stops the event | Radix hears Esc on `document` in the capture phase and lets it run on; the window shortcut (`keyboard-shortcuts.tsx`) would then also abort the turn or dismiss the pending question |
+| A hint never takes the Esc where he types | A tooltip's `onEscapeKeyDown` goes through `tooltipEscape`: it closes the hint and claims the Esc, except from a field he types in, where the Esc goes on to the field's own action | A hint the pointer left open over the meter took the answer box's Esc, so its first Esc did nothing he could see (round 15, 3 free) |
 | Clickable over a drag band | `lh-no-drag` on every portalled content | Portals leave `.lh-drag`'s automatic carve-out, which only covers native controls, so a menu row over the 52–60px top band could drag the window |
 | One z stack | dialogs 50 (`DIALOG_LAYER`); menus, selects and popovers 70 (`OVERLAY_LAYER`); tooltips 80 | A list opened inside a dialog and a hint inside a popover always draw on top |
 

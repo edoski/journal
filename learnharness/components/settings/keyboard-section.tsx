@@ -8,8 +8,8 @@
  * Rebind flow: click Rebind → the row listens for the next keydown
  * (capture phase, preventDefault — nothing types anywhere), eventBinding
  * normalizes it, saveOverrides persists. Escape cancels. displayOnly
- * actions (a surface owns those keys — the question dock's row machine)
- * are listed for reading but never rebindable.
+ * actions (a surface owns those keys — the question dock's row machine,
+ * the meter, Esc) are listed for reading but never rebindable.
  *
  * Thin: no conflict detection — if a new binding collides with another
  * action's, the first match in registry order wins; the cheat sheet shows
@@ -91,13 +91,13 @@ export function KeyboardSection() {
 	const overridden = (id: KeyAction) => overrides[id] !== undefined;
 
 	const action = "h-7 px-2 font-normal";
-	// Settings lists what can be changed; the keys a screen owns (the
-	// question's) stay in the cheat sheet.
-	const changeable = KEYBOARD_ACTIONS.filter((a) => !a.displayOnly);
+	// Every key, the ones a screen owns (the question's, the meter's ⌥↑ ⌥↓,
+	// Esc) listed as fixed, with no Change (round 15, 3 free: Settings named
+	// neither the meter's keys nor Esc).
 	return (
 		<>
 			{KEY_SCOPES.map(({ scope, label }) => {
-				const actions = changeable.filter((a) => a.scope === scope);
+				const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
 				if (!actions.length) return null;
 				return (
 					<SettingsGroup key={scope} label={label} testid={`kbd-scope-${scope}`}>

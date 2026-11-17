@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDialogSubject } from "@/components/ui/overlay";
 import { cn } from "@/lib/utils";
+import { takeHeld } from "@/components/held-asks";
 import { ExamDayField, MaterialField } from "@/components/new-course-fields";
 import { DeleteCourseDialog, RenameCourseDialog } from "@/components/course-manage-dialogs";
 import { useServerEvent } from "@/components/server-events";
@@ -228,9 +229,14 @@ export function CoursePicker({ courses, workspace, onChange, onNew, onManage, as
 		if (asked > 0) setOpen(true);
 	}, [asked]);
 	useEffect(() => {
-		const onPick = () => setOpen(true);
+		const onPick = (e: Event) => {
+			e.preventDefault();
+			setOpen(true);
+		};
 		const name = kbdEventForAction("pick-course");
 		window.addEventListener(name, onPick);
+		// ⌘O pressed while this page was on its way (⌘N, then ⌘O; held-asks.ts).
+		if (takeHeld("pick-course")) setOpen(true);
 		return () => window.removeEventListener(name, onPick);
 	}, []);
 	return (

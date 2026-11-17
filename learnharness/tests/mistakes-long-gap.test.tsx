@@ -3,9 +3,9 @@
  * wrote for Eigen in round 8 (66 words, inline maths): the popover opens
  * (round 8, 2 B1: the line dropped one word per render and React stopped it
  * at 50 nested updates, "Maximum update depth exceeded" in `MathLine`), the
- * topic's line runs to its box's edge, where the box's ellipsis cuts the
- * word that does not fit when a letter of it fits, and the gap runs to two
- * lines whole, for the box to end (round 9, 2 m2: cut at one line).
+ * topic's name shows whole (round 15, 2 n2: cut to ten letters), and the gap
+ * runs to three lines whole, for the box to end (round 9, 2 m2: cut at one
+ * line; round 15, 2 n2: at two).
  */
 
 import React, { act } from "react";
@@ -71,7 +71,7 @@ afterEach(async () => {
 });
 
 describe("Mistakes with a long gap", () => {
-	it("opens; the topic's line draws the words that fit its box and the word its ellipsis cuts, and the gap runs whole to two lines", async () => {
+	it("opens; the topic's name shows whole, and the gap runs whole to three lines", async () => {
 		const host = document.createElement("div");
 		document.body.appendChild(host);
 		root = createRoot(host);
@@ -93,13 +93,10 @@ describe("Mistakes with a long gap", () => {
 		const rows = [...document.querySelectorAll("[data-slot=mistake-row]")];
 		assert.equal(rows.length, 2, "the list opens with both mistakes");
 		const gap = rows[0]!.querySelector("[data-slot=mistake-words]")!;
-		assert.match(gap.getAttribute("class") ?? "", /\bline-clamp-2\b/);
-		assert.ok(gap.textContent!.startsWith("You read a diagonal entry") && gap.textContent!.endsWith("yet is diagonal."), "the whole gap, for the box to end at its second line");
-		const line = rows[0]!.querySelectorAll(".truncate")[0]!;
-		const words = EIGEN_TITLE.split(" ");
-		let fits = 1;
-		while (`${words.slice(0, fits + 1).join(" ")}…`.length * CHAR <= BOX) fits++;
-		const letterFits = `${words.slice(0, fits).join(" ")} ${words[fits]![0]}…`.length * CHAR <= BOX;
-		assert.equal(line.textContent, `${words.slice(0, letterFits ? fits + 1 : fits).join(" ")}…`);
+		assert.match(gap.getAttribute("class") ?? "", /\bline-clamp-3\b/);
+		assert.ok(gap.textContent!.startsWith("You read a diagonal entry") && gap.textContent!.endsWith("yet is diagonal."), "the whole gap, for the box to end at its third line");
+		const name = rows[0]!.querySelector("[data-slot=mistake-topic]")!;
+		assert.equal(name.textContent, EIGEN_TITLE, "the topic's whole name (round 15, 2 n2: cut to ten letters)");
+		assert.doesNotMatch(name.getAttribute("class") ?? "", /\b(truncate|line-clamp-\d)\b/);
 	});
 });

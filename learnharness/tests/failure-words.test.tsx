@@ -76,6 +76,6 @@ test("a reply he stopped reads as his stop; one a restart cut reads as cut off",
 	assert.equal(stoppedByHim([user("u1"), reply("a1", "aborted", "")]), true, "before its first word too");
 	assert.equal(stoppedByHim([user("u1")]), false, "the app restarted before any reply");
 	assert.equal(stoppedByHim([user("u1"), reply("a1", "error")]), false);
-	assert.equal(pausedWords({ stopped: true }), "You stopped the tutor");
+	assert.equal(pausedWords({ stopped: true }), "Stopped by you");
 	assert.equal(pausedWords({}), "Reply cut off");
 });

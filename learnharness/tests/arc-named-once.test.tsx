@@ -152,7 +152,10 @@ describe("an arc is named one way", () => {
 
 		assert.deepEqual({ slot: list.slot, number: list.number, text: list.text, pill: list.pill, ring: list.ring }, { slot: "arc-label", number: "2", text: "2Linear maps", pill: false, ring: false });
 		for (const [where, seen] of Object.entries({ road, mistakes, answer, runup, roadmap })) {
-			assert.deepEqual({ slot: seen.slot, number: seen.number, text: seen.text, inner: seen.inner, pill: seen.pill, ring: seen.ring }, { slot: list.slot, number: list.number, text: list.text, inner: list.inner, pill: false, ring: false }, `${where} names the arc as the arc list does`);
+			// The mistakes give the topic the line: the arc's number, its name
+			// kept for a screen reader (round 15, 2 n2).
+			const inner = where === "mistakes" ? list.inner.map((c) => c?.replace(/\btruncate\b/, "sr-only") ?? null) : list.inner;
+			assert.deepEqual({ slot: seen.slot, number: seen.number, text: seen.text, inner: seen.inner, pill: seen.pill, ring: seen.ring }, { slot: list.slot, number: list.number, text: list.text, inner, pill: false, ring: false }, `${where} names the arc as the arc list does`);
 			assert.deepEqual(list.classes.filter((c) => !seen.classes.includes(c)), [], `${where} wears the label's own look`);
 		}
 	});

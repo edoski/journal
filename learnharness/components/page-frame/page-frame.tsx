@@ -103,7 +103,7 @@ export function PageHead({
 					{title}
 				</h1>
 				{actions && (
-					<div data-slot="page-actions" className="-mr-2 flex shrink-0 items-center gap-1">
+					<div data-slot="page-actions" className="lh-no-drag -mr-2 flex shrink-0 items-center gap-1">
 						{actions}
 					</div>
 				)}

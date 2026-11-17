@@ -38,12 +38,12 @@ No card names them (Edo, 16 Nov 2026: the fixed focus card beside the enlarged m
 
 ## Node
 
-232×68 (`CANVAS_NODE`), radius 12, one surface.
+68 tall and as wide as the course's widest topic title needs on one line, 232 at the least (`CANVAS_NODE`; `useCardBox` in `../topic-map.tsx` measures each title in a hidden copy of the card's body), one box for every card of the course, so a title is never cut and moving between arcs no card changes size (Edo: map titles stay on one line, and You are here and its next topics are whole; round 15, 1 m8 and 4 minor 11: "Random variables and distri…"). Radius 12, one surface.
 
 | Part | Notes |
 |---|---|
-| header strip | 24 tall, a hairline under it: the card's line (`cardLine`, the sidebar's fact with its icon) or where he stands. Tinted by what it asks: the accent at 14% where a session waits on him, the warning ink at 10% for a slip, white 4% for a plan, a review or a task, none for where he stands |
-| content | the app's pie (`TopicGlyph`) and the title on one 18px line (`MathLine`) |
+| header strip | 24 tall, a hairline under it: the card's line (`cardLine`, the sidebar's fact with its icon) or where he stands, in its short words (`Standing.short`: "Right on your own", without "check another day", which the topic's page says; round 15, 2 n5: cut at the card's edge). Tinted by what it asks: the accent at 14% where a session waits on him, the warning ink at 10% for a slip, white 4% for a plan, a review or a task, none for where he stands |
+| content | the app's pie (`TopicGlyph`) and the title on one 18px line, whole (`MathLine`, never cutting in a card sized to it) |
 | current | `ring` border and 3px halo; "You are here" (11/14 at 500, the foreground ink) just above the card, on the header's text line (`NodeAppendix`, `course-map-tag`, its words alone: Edo, 15 Nov 2026, "the You are here label's bg looks terrible, get rid of it") |
 | a lesson's step | the same card (`CardData`'s `step`), less what a step lacks: no header strip (a step has no standing and no sidebar fact), the lesson panel's mark in the pie's slot (an 8px circle: primary where the lesson stopped, filled muted where a question was about it, a ring ahead), its title whole on as many lines as the card is tall, the tutor's summary on hover. Its tag says "Left off here", "Your turn" or "Next" (`../../../unit-inbox/topic-page/hybrid/hybrid.md`) |
 | focus | a 2px `ring` ring inside the card |

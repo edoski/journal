@@ -73,10 +73,15 @@ describe("the sidebar's Sessions list", () => {
 		assert.equal(row?.querySelector('[data-slot="unit-status-slot"]')?.textContent, ", Left off today");
 	});
 
-	it("gives a repeated title its day", () => {
+	it("gives a repeated title its day, once: after the title only when its status names no day (round 15, 1 m8 and 4 minor 10)", () => {
 		const again = [...CHATS, chat("chat_rank_old", { title: "Rank practice", course: { workspace: "/s/linalg", title: "Linear Algebra" }, updatedAt: "2026-11-02T09:00:00.000Z" })];
-		const twins = [...renderList({ open: true }, again).querySelectorAll('[data-slot="session-twin"]')].map((t) => t.textContent);
-		assert.deepEqual(twins, [", 8 Nov", ", 2 Nov"]);
+		const doc = renderList({ open: true }, again);
+		const twins = [...doc.querySelectorAll('[data-slot="session-twin"]')].map((t) => t.textContent);
+		assert.deepEqual(twins, [", 8 Nov"], "Your turn names no day; the old one's status is its day");
+		for (const row of doc.querySelectorAll('[data-testid="session-row"]')) {
+			const text = row.textContent ?? "";
+			for (const day of text.match(/\d{1,2} [A-Z][a-z]{2}/g) ?? []) assert.equal(text.split(day).length - 1, 1, `"${text}" prints ${day} once`);
+		}
 	});
 
 	it("keeps only the chosen course's sessions under the course filter", () => {

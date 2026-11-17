@@ -20,6 +20,7 @@ import {
 	type Confidence,
 	type DockSelection,
 	type KeyAction,
+	type LeftDraft,
 	type Photo,
 	type PracticeRequest,
 	type QuestionAnswerData,
@@ -62,6 +63,10 @@ export interface ProseComposerProps {
 	/** The question call the open question asks again, left open by a hint
 	 *  or a side question just before it: its carried work fills this one. */
 	reaskOf?: string | null;
+	/** What he had typed when Done for today set aside the question this one
+	 *  asks again, kept with the lesson (`leftDraftAt`): the box opens with
+	 *  it when this window kept nothing of its own. */
+	leftDraft?: LeftDraft | null;
 	initialDraft?: QuestionFormDraft;
 	onSaveDraft: (draft: QuestionFormDraft) => void;
 	onSubmitAnswer: (output: QuestionAnswerData, photos?: Photo[]) => void;
@@ -123,6 +128,7 @@ function AnswerComposer({
 	busy,
 	carryScope,
 	reaskOf,
+	leftDraft,
 	initialDraft,
 	onSaveDraft,
 	onSubmitAnswer,
@@ -156,13 +162,18 @@ function AnswerComposer({
 			const keptText = kept?.form ? kept.form.text || kept.form.other || kept.form.thinking : kept?.text;
 			const carry = !keptText && spec && carryScope ? takeCarry(carryScope, spec.data.question, reaskOf) : undefined;
 			const carried = carry ? carriedForm(carry.words, true) : undefined;
+			// Else the half answer the lesson kept when Done for today set this
+			// question aside, on every way back and in any window (round 15, 3 m1).
+			const left = !kept && !carried && leftDraft ? leftDraft : null;
 			if (keptText) setText(keptText);
 			else if (carried) setText(carried.text);
+			else if (left) setText(left.text);
 			// How sure he was comes back with his words (round 8: a reload
 			// and a refused send reset the meter to Neutral).
 			const keptSure = kept?.form?.confidence ?? kept?.confidence;
 			if (keptText && keptSure) setConfidence(keptSure);
 			else if (carried) setConfidence(carried.confidence);
+			else if (left?.confidence) setConfidence(left.confidence);
 			void carry?.photos.then((list) => {
 				if (textMode) restorePhotos(list.map((photo, i) => ({ id: `carried_${i}_${Date.now()}`, photo })));
 			});

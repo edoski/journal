@@ -1,9 +1,9 @@
 import { Position, type Edge, type Node } from "@xyflow/react";
 import type { ArcHandle, CourseMap } from "@/src/core";
 import { arcView, type ArcView } from "./arc-view";
-import type { PlacedTopic, TopicMapLayout } from "./topic-map-layout";
+import type { NodeSize, PlacedTopic, TopicMapLayout } from "./topic-map-layout";
 import type { CardData } from "./topic-node";
-import { layoutCanvas } from "./canvas/canvas-layout";
+import { CANVAS_NODE, layoutCanvas } from "./canvas/canvas-layout";
 import { linesEdge, type CanvasLine } from "./canvas/canvas-lines";
 
 /** Where a handle sits on a node of a given size. */
@@ -29,10 +29,11 @@ export interface Trail {
 export const ARC_GAP = 160;
 
 /** What a map draws for a page: one arc of the course (`arcView`), or the whole course when it has no arcs or the
- *  page shows them all, laid out as the canvas draws it (canvas/canvas.md). Pure. */
-export function drawingOf(course: CourseMap, arc: ArcHandle | undefined): { view: ArcView; layout: TopicMapLayout } {
+ *  page shows them all, laid out as the canvas draws it (canvas/canvas.md), each card `node` in size (the course's
+ *  widest title whole, `useCardBox`). Pure. */
+export function drawingOf(course: CourseMap, arc: ArcHandle | undefined, node: NodeSize = CANVAS_NODE): { view: ArcView; layout: TopicMapLayout } {
 	const view = arcView(course, arc);
-	return { view, layout: layoutCanvas(view.map.topics, view.map.edges, new Set(view.entry.keys())) };
+	return { view, layout: layoutCanvas(view.map.topics, view.map.edges, new Set(view.entry.keys()), node) };
 }
 
 /** The arc `from` drawn beside `to`'s drawing (`shown`), as the arcs stack in study order: above it when it comes
@@ -43,7 +44,7 @@ export function trailOf(course: CourseMap, from: ArcHandle, to: ArcHandle, shown
 	const a = arcs.findIndex((arc) => arc.handle === from);
 	const b = arcs.findIndex((arc) => arc.handle === to);
 	if (a < 0 || b < 0 || a === b) return null;
-	const { view, layout } = drawingOf(course, from);
+	const { view, layout } = drawingOf(course, from, shown.node);
 	return { arc: from, view, layout, dx: (shown.width - layout.width) / 2, dy: a < b ? -(layout.height + ARC_GAP) : shown.height + ARC_GAP };
 }
 

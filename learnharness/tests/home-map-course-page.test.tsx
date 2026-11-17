@@ -38,7 +38,8 @@ describe("Home's map header and the course page (N4)", () => {
 
 	it("pressing another tab only shows its map; pressing the chosen tab opens its course page", async () => {
 		await mount();
-		const [first, second] = tabTitles() as string[];
+		const first = tab()!;
+		const second = (tabTitles() as string[]).find((title) => title !== first);
 		await pressWithPointer(trigger(second!));
 		assert.equal(tab(), second);
 		assert.deepEqual(pushed, [], "a tab not yet chosen only shows its map");

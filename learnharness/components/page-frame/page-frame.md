@@ -19,6 +19,10 @@ Edo's ruling for maps (14 Nov 2026): "You are here" and the topics right after i
 
 Other actions in `actions` are quiet shadcn `Button`s of the row size with a 16px icon and muted words (the course page's Add material), so nothing in the head competes with Now's press under it.
 
+## The window's band
+
+Every page that fills the window (Home, the course page, a topic page, the calendar, the start screen) sits in `WindowPage` (`window-page.tsx`), which draws the window's 52px band first in its DOM: the Mac app's drag region, which Electron resolves in DOM order. The band paints under the page (`-z-10` in the page's own stacking context), so a control drawn in it always takes the click, and the head's actions (`page-actions`) are `lh-no-drag`, so the Mac app hands them the click instead of dragging the window. Round 15, 2 D1: each page drew its own band over a head row that was not positioned, and Mistakes and Context on the course page could not be clicked. Test: `tests/window-band-presses.test.ts` (real Chrome, a browser and the Mac app).
+
 ## One height on every page
 
 Every page's head has the same rows at the same heights, whatever it fills them with: the line above the title is kept when a page has none (the course page), and the lines under the title take two lines' room even when a page fills one (the topic page, unless it says a mistake). So the title sits at the same height on every page (y=99 at 1512×982 with the sidebar open) and so does the body under the head (y=221), and moving between the course page and a topic page nothing jumps (round 4: the titles sat at 79 and 99, the columns at 201 and 193). The rows live here, never as offsets on a page. A head that says more than two lines under its title (a topic page with a mistake and a start's error) grows, and only then.
