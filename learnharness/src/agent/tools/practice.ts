@@ -126,7 +126,7 @@ function brokeAtField() {
 		Type.String({
 			minLength: 1,
 			description:
-				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone. One answer has one result: never a result per topic.",
+				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone, and no other topic is credited. One answer has one result: never a result per topic. A problem whose labelled parts went differently gives parts instead.",
 		}),
 	);
 }
