@@ -17,6 +17,7 @@ import type { SplitListHandle } from "@/components/course-page/split/split-list"
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
 import { OPEN_AT_FIRST, aimOf, shownGroups } from "@/components/course-page/split/split-tie";
 import { useMapTie, type PointBy } from "@/components/course-map/use-map-tie";
+import { useListWalk } from "@/components/list-walk/use-list-walk";
 
 /** What the course page's head and road are handed by the page they sit
  *  in (`SplitBody`): the course, the arc the map shows and which sections
@@ -42,8 +43,8 @@ export interface CourseColumns {
 	/** The list's handle, which the map hands the walk back to. */
 	listRef: RefObject<SplitListHandle | null>;
 	onEnterMap: (handle: TopicHandle) => void;
-	/** Up from the list's first stop: Now's row. */
-	onExitTop: () => void;
+	/** The page's list walk (`useListWalk`): Up from the road's first stop reaches Now's row. */
+	onWalkKey: (e: KeyboardEvent<HTMLElement>) => void;
 }
 
 /**
@@ -106,18 +107,11 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 	const list = useRef<SplitListHandle>(null);
 	const drawing = useRef<SplitMapHandle>(null);
 
-	/** Now's row joins the arrow walk: Up from the first row reaches it, Down returns to the rows. */
-	const action = () => headerBox.current?.querySelector<HTMLElement>("[data-slot=course-action]") ?? null;
-	const onHeaderKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-		if (e.target !== action() || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-		if (e.key === "ArrowDown") {
-			e.preventDefault();
-			list.current?.focusFirst();
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			(e.target as HTMLElement).blur();
-		}
-	};
+	// The road walks as every page's list does; its head is Now's row: Up from the first stop reaches it, Down returns.
+	const walk = useListWalk({
+		stops: () => list.current?.stops() ?? [],
+		head: () => headerBox.current?.querySelector<HTMLElement>("[data-slot=course-action]") ?? null,
+	});
 
 	const columns: CourseColumns = {
 		view,
@@ -133,12 +127,12 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 		onPoint: (handle, by) => tie.pointTopic("list", handle, by),
 		listRef: list,
 		onEnterMap: (to) => drawing.current?.focus(to),
-		onExitTop: () => action()?.focus(),
+		onWalkKey: walk.onKeyDown,
 	};
 
 	return (
 		<PageFrame className={cn("h-full", enlarged && "max-w-none")}>
-			<div ref={headerBox} className="contents" onKeyDown={onHeaderKeyDown}>
+			<div ref={headerBox} className="contents" onKeyDown={walk.onHeadKeyDown}>
 				<CourseHead {...columns} />
 				{!enlarged && <CourseNow {...columns} />}
 			</div>

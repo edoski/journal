@@ -23,7 +23,7 @@ export function columnsOf(view: CourseView, standing: CourseStanding | null = nu
 		onPoint: noop,
 		listRef: createRef(),
 		onEnterMap: noop,
-		onExitTop: noop,
+		onWalkKey: noop,
 		...over,
 	};
 }

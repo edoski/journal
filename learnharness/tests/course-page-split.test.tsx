@@ -16,7 +16,8 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { OPEN_AT_FIRST, aimOf, walkStops, shownGroups, topicAt, walkTo } from "../components/course-page/split/split-tie.ts";
+import { OPEN_AT_FIRST, aimOf, walkStops, shownGroups, topicAt } from "../components/course-page/split/split-tie.ts";
+import { walkTo } from "../components/list-walk/use-list-walk.ts";
 import { NO_LIGHTS, lightsOf, type MapLights, type Pointed } from "../components/course-map/use-map-tie.ts";
 import { WholeCourseButton } from "../components/course-map/topic-map/whole-course-button.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
@@ -124,7 +125,7 @@ describe("the list's groups and rows", () => {
 
 	it("draws each topic of an open group as a 32px row linking to its page, its reason's icon and words showing", () => {
 		const shown = shownGroups(groups);
-		const document = render(<SplitList groups={shown} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={noArcLine} />);
+		const document = render(<SplitList groups={shown} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={noArcLine} />);
 		const rows = [...document.querySelectorAll('[data-slot="course-topic-row"]')];
 		const openTopics = shown.filter((g) => OPEN_AT_FIRST[g.id]).flatMap((g) => g.topics);
 		assert.equal(rows.length, openTopics.length);
@@ -136,7 +137,7 @@ describe("the list's groups and rows", () => {
 	});
 
 	it("opens Needs you and Learning and folds Not started and On your own under headers he can open", () => {
-		const document = render(<SplitList groups={shownGroups(groups)} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={noArcLine} />);
+		const document = render(<SplitList groups={shownGroups(groups)} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={noArcLine} />);
 		const headers = [...document.querySelectorAll('[data-slot="course-group-header"]')];
 		assert.deepEqual(
 			headers.map((h) => [h.textContent, h.tagName, h.getAttribute("aria-expanded")]),
@@ -151,7 +152,7 @@ describe("the list's groups and rows", () => {
 	});
 
 	it("marks the row of the topic he points at on the map, and only that row", () => {
-		const document = render(<SplitList groups={shownGroups(groups)} open={OPEN_AT_FIRST} onOpenChange={noop} marked={h("span")} onPoint={noop} onEnterMap={noop} arcLine={noArcLine} />);
+		const document = render(<SplitList groups={shownGroups(groups)} open={OPEN_AT_FIRST} onOpenChange={noop} marked={h("span")} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={noArcLine} />);
 		const marked = [...document.querySelectorAll('[data-slot="course-topic-row"][data-highlighted]')];
 		assert.deepEqual(
 			marked.map((r) => r.getAttribute("href")),

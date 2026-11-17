@@ -117,7 +117,7 @@ describe("the road's arc lines", () => {
 	const sections = courseArcs(ARCS)!;
 	const line = (props: ArcLineProps) => <RoadArc {...props} number={sections.indexOf(props.section) + 1} starts={null} />;
 	const draw = (open: Record<string, boolean>, checks = true) =>
-		render(<SplitList groups={[]} arcs={sections} open={open} onOpenChange={noop} onCheck={checks ? noop : undefined} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
+		render(<SplitList groups={[]} arcs={sections} open={open} onOpenChange={noop} onCheck={checks ? noop : undefined} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={line} />);
 
 	it("folds every arc but the open one to its line, in study order, and draws only the open arc's topics", () => {
 		const document = draw({ systems: true });
@@ -156,7 +156,7 @@ describe("the road's arc lines", () => {
 		}
 		assert.equal(draw({}, false).querySelectorAll('[data-slot="course-arc-check"]').length, 0, "no Check it without a way to start it");
 		const noneReady = courseArcs({ ...ARCS, map: { ...ARCS.map, arcs: ARCS.map.arcs!.map((x) => ({ ...x, state: "learning" as const })) } })!;
-		const quiet = render(<SplitList groups={[]} arcs={noneReady} open={{}} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
+		const quiet = render(<SplitList groups={[]} arcs={noneReady} open={{}} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={line} />);
 		assert.equal(quiet.querySelectorAll('[data-slot="course-arc-check"]').length, 0);
 	});
 
@@ -169,7 +169,7 @@ describe("the road's arc lines", () => {
 	});
 
 	it("keeps the four groups for a course without arcs", () => {
-		const document = render(<SplitList groups={shownGroups(courseGroups(noArcs))} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
+		const document = render(<SplitList groups={shownGroups(courseGroups(noArcs))} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={line} />);
 		assert.equal(document.querySelectorAll('[data-slot="course-arc"]').length, 0);
 		assert.ok(document.querySelectorAll('[data-slot="course-group-header"]').length > 0);
 	});

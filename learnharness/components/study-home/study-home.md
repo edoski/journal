@@ -42,13 +42,15 @@ Edo's notes, 15 Nov 2026, N1: a wider Home gives the map more room, "but also th
 
 ## Keys
 
-Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is mounted and in the capture phase, so they run before the page's arrows (`spatial-arrows.ts`). None fires while he types in a field, holds a modifier, or has a dialog, menu or popover open. The ? sheet lists them under Home.
+Home owns its keys (`home-keys.ts`, `useHomeKeys`), window-wide while it is mounted and in the capture phase, so they run before the page's arrows (`spatial-arrows.ts`). Today walks as every page's list does (`useListWalk`, `../list-walk/list-walk.md`), with no head: the map above it stays out of the walk (N3). None fires while he types in a field, holds a modifier, or has a dialog, menu or popover open. The ? sheet lists them under Home.
 
 | Key | What it does |
 |---|---|
 | ← → | the map shows the course left or right of the chosen one, from anywhere on the page outside the map (the map's cards, tabs and arc list keep their own arrows); past the first or last tab the key is the page's again, so ← still reaches the sidebar (Edo's notes, 15 Nov 2026, N2) |
 | f | presses the map's enlarge button: the map takes Home, and f again brings it back (N2) |
-| ↑ ↓ | walk only Today's lines, the lessons Also today folds in included, never the tabs or the map above them: with nothing focused ↓ takes the first and ↑ the last, and at either end focus stays (N3) |
+| ↑ ↓ | walk only Today's lines, the lessons Also today folds in included, never the tabs or the map above them: with nothing focused ↓ takes the first and ↑ the last, and at either end focus stays, ↑ on the first line included (N3) |
+| Home End | jump to Today's first or last line, as on every page's list |
+| Esc | leaves the walk |
 | o | opens the focused line, as a click does (N3) |
 | c | opens the focused line's course page (N3); with no line focused, the page of the course whose map shows (N4) |
 

@@ -56,23 +56,3 @@ export function topicAt(target: EventTarget | null): TopicHandle | null {
 	const node = el && typeof el.closest === "function" ? el.closest(".react-flow__node") : null;
 	return (node?.getAttribute("data-id") as TopicHandle | null | undefined) ?? null;
 }
-
-/** Where a key walks the list's rows from row `at` of `count`: Down and
- *  Up step (stopping at the ends), Home and End jump. `at` null is no row
- *  focused yet: Down and Home enter at the first, Up and End at the last.
- *  Null for any other key, or nowhere to go. */
-export function walkTo(key: string, at: number | null, count: number): number | null {
-	if (count === 0) return null;
-	switch (key) {
-		case "ArrowDown":
-			return at === null ? 0 : at + 1 < count ? at + 1 : null;
-		case "ArrowUp":
-			return at === null ? count - 1 : at > 0 ? at - 1 : null;
-		case "Home":
-			return at === 0 ? null : 0;
-		case "End":
-			return at === count - 1 ? null : count - 1;
-		default:
-			return null;
-	}
-}

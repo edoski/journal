@@ -129,7 +129,7 @@ describe("an arc is named one way", () => {
 		const list = reading("maps", "the arc list");
 
 		const line = (props: ArcLineProps) => <RoadArc {...props} number={view.arcs!.indexOf(props.section) + 1} starts={null} shown={props.section.arc.handle === "spaces"} />;
-		await mount(<SplitList groups={[]} arcs={view.arcs!.filter((s) => s.arc.handle === "maps")} open={{}} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
+		await mount(<SplitList groups={[]} arcs={view.arcs!.filter((s) => s.arc.handle === "maps")} open={{}} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={line} />);
 		const road = reading("maps", "the road");
 
 		await mount(<MistakeList rows={mistakeRows(STANDING, COURSE, [], view.arcs)} />);

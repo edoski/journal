@@ -42,10 +42,11 @@ describe("the cheat sheet groups them in plain words", () => {
 		);
 	});
 
-	it("Pages: move with the arrows, open with Enter", () => {
+	it("Pages: move with the arrows, open with Enter, jump to a list's ends", () => {
 		assert.deepEqual(rows("Pages"), [
 			["Move between rows and links", "↑ ↓ ← →"],
 			["Open the row or link", "↵"],
+			["Jump to the list's first or last row", "Home End"],
 		]);
 	});
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent, Ref } from "react";
 import type { TopicHandle } from "@/src/core";
 import type { PointBy } from "@/components/course-map/use-map-tie";
 import { HistoryPane } from "@/components/unit-inbox/topic-page/hybrid/history";
@@ -12,41 +13,61 @@ import { BuildsOnList, EarlierDays, MaterialList, NextList, NowRow, ScheduledEnt
  * relevance into Now, Next, Scheduled and Earlier, each under a quiet
  * divider. Now is the weightiest row, marked in the accent; an empty
  * section is not drawn. While Now starts a topic, Builds on and In your
- * material say why it comes now.
+ * material say why it comes now. The sections are the page's list walk
+ * (`listRef`, `onWalkKey`; list-walk.md).
  */
-export function SectionsPane({ facts, busy, onAct, onTask, shown, onShow, onPoint, className }: HybridPaneProps & { onPoint?: (handle: TopicHandle | null, by: PointBy) => void }) {
+export function SectionsPane({
+	facts,
+	busy,
+	onAct,
+	onTask,
+	shown,
+	onShow,
+	onPoint,
+	listRef,
+	onWalkKey,
+	className,
+}: HybridPaneProps & {
+	onPoint?: (handle: TopicHandle | null, by: PointBy) => void;
+	/** The sections' box, whose row presses the walk steps through. */
+	listRef?: Ref<HTMLDivElement>;
+	/** The page's list walk (`useListWalk`'s `onKeyDown`). */
+	onWalkKey?: (e: KeyboardEvent<HTMLElement>) => void;
+}) {
 	const { now, next, scheduled, review, earlier, why } = pickupSections(facts);
 	return (
 		<HistoryPane className={className}>
-			<Section label="Now">
-				<NowRow now={now} facts={facts} busy={busy} onAct={onAct} shown={shown} onShow={onShow} marked />
-			</Section>
-			{why && why.builds.length > 0 && (
-				<Section label="Builds on">
-					<BuildsOnList builds={why.builds} onPoint={onPoint} />
+			<div ref={listRef} onKeyDown={onWalkKey} className="contents">
+				<Section label="Now">
+					<NowRow now={now} facts={facts} busy={busy} onAct={onAct} shown={shown} onShow={onShow} marked />
 				</Section>
-			)}
-			{why && why.refs.length > 0 && (
-				<Section label="In your material">
-					<MaterialList refs={why.refs} />
-				</Section>
-			)}
-			{next.length > 0 && (
-				<Section label="Next">
-					<NextList items={next} busy={busy} onTask={onTask} shown={shown} onShow={onShow} />
-				</Section>
-			)}
-			{scheduled && (
-				<Section label="Scheduled">
-					<ScheduledEntry kind={scheduled.kind} day={scheduled.day} waits={scheduled.waits} why={scheduled.why} />
-					{review && <ScheduledEntry kind="review" day={review.day} waits={null} />}
-				</Section>
-			)}
-			{earlier.length > 0 && (
-				<Section label="Earlier">
-					<EarlierDays days={earlier} shown={shown} onShow={onShow} titleOf={facts.titleOf} />
-				</Section>
-			)}
+				{why && why.builds.length > 0 && (
+					<Section label="Builds on">
+						<BuildsOnList builds={why.builds} onPoint={onPoint} />
+					</Section>
+				)}
+				{why && why.refs.length > 0 && (
+					<Section label="In your material">
+						<MaterialList refs={why.refs} />
+					</Section>
+				)}
+				{next.length > 0 && (
+					<Section label="Next">
+						<NextList items={next} busy={busy} onTask={onTask} shown={shown} onShow={onShow} />
+					</Section>
+				)}
+				{scheduled && (
+					<Section label="Scheduled">
+						<ScheduledEntry kind={scheduled.kind} day={scheduled.day} waits={scheduled.waits} why={scheduled.why} />
+						{review && <ScheduledEntry kind="review" day={review.day} waits={null} />}
+					</Section>
+				)}
+				{earlier.length > 0 && (
+					<Section label="Earlier">
+						<EarlierDays days={earlier} shown={shown} onShow={onShow} titleOf={facts.titleOf} />
+					</Section>
+				)}
+			</div>
 		</HistoryPane>
 	);
 }

@@ -1,6 +1,6 @@
 # Split course page
 
-The course page (course-page.md): the list and the map side by side in the app's linked columns (`../../linked-columns/linked-columns.md`), with no line between them (14 Nov 2026), the left column the road (`../road/road.md`; Edo picked Road, 17 Nov 2026). Thesis: the list says what to do, the map says where it sits, and pointing at one shows it in the other. `split-course.tsx` (the page, `SplitBody`), `split-list.tsx` (left pane, which `RoadList` draws), `split-map.tsx` (right pane), `split-tie.ts` (where the map opens and the list's walk, pure; tests in `tests/course-page-split.test.tsx`); what ties the two panes is the maps' one tie (`useMapTie`, `../../course-map/map-tie.md`), with the chain lit. `data-slot` `course-split` (the linked columns), `course-split-list` and `course-split-list-scroller`, `course-split-map`; the rows, groups and header keep their shared slots.
+The course page (course-page.md): the list and the map side by side in the app's linked columns (`../../linked-columns/linked-columns.md`), with no line between them (14 Nov 2026), the left column the road (`../road/road.md`; Edo picked Road, 17 Nov 2026). Thesis: the list says what to do, the map says where it sits, and pointing at one shows it in the other. `split-course.tsx` (the page, `SplitBody`), `split-list.tsx` (left pane, which `RoadList` draws), `split-map.tsx` (right pane), `split-tie.ts` (where the map opens and the list's walk's stops, pure; tests in `tests/course-page-split.test.tsx`); what ties the two panes is the maps' one tie (`useMapTie`, `../../course-map/map-tie.md`), with the chain lit. `data-slot` `course-split` (the linked columns), `course-split-list` and `course-split-list-scroller`, `course-split-map`; the rows, groups and header keep their shared slots.
 
 ## Layout
 
@@ -37,11 +37,11 @@ The map is Home's map (`TopicMap`, topic-map.md) with Home's camera: the course 
 
 ## Keyboard
 
-Tab is dead app-wide (owner, 17 Sep 2026), so the page walks with arrows, as the sidebar and the map do.
+Tab is dead app-wide (owner, 17 Sep 2026), so the page walks with arrows, as the sidebar and the map do. The list walks as every page's list does (`useListWalk`, `../../list-walk/list-walk.md`), its head Now's row.
 
 - The walk's stops are each group's header and the rows of the open groups; a folded group's rows are skipped (`walkStops`).
 - With nothing focused, Down or Home steps onto the first stop, Up or End onto the last.
-- Anywhere in the list: Up and Down step, Home and End jump, Escape leaves the walk. Up on the first stop steps onto the head's button; Down from the button steps back onto the first stop, and Escape leaves it.
+- Anywhere in the list: Up and Down step and stop at the ends, Home and End jump, Escape leaves the walk. Up on the first stop steps onto Now's row; Down from it steps back onto the first stop, and Escape leaves it.
 - On a header: Enter or Space opens or folds the group, Right opens it, Left folds it.
 - On a row: Enter or Space opens it, Right steps onto its topic on the map.
 - On the map: its own walk (Up to a prerequisite, Down to a topic that needs it, Left and Right along the layer), the camera bringing each topic it reaches into view; Escape hands the walk back to that topic's row, opening its group when it is folded.

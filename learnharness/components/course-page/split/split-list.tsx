@@ -7,13 +7,13 @@ import type { CourseArcSection, CourseGroup as Group, CourseTopic } from "@/comp
 import type { ArcLineProps } from "@/components/course-page/road/road-arc";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
 import { cn } from "@/lib/utils";
-import { stopKey, walkStops, walkTo, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
+import { stopKey, walkStops, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
 import type { PointBy } from "@/components/course-map/use-map-tie";
 
-/** What the page asks of the list: focus a topic's row, or its first. */
+/** What the page asks of the list: focus a topic's row, and its walk's stops top to bottom. */
 export interface SplitListHandle {
 	focus: (handle: TopicHandle) => void;
-	focusFirst: () => void;
+	stops: () => HTMLElement[];
 }
 
 function reducedMotion(): boolean {
@@ -33,11 +33,9 @@ function reducedMotion(): boolean {
  * is below (or above) its edge fades, so a cut list reads as one that
  * goes on.
  *
- * Keyboard, for an app where Tab is dead: the arrows walk each group's
- * header and the rows of the open groups (`walkStops`). With nothing
- * focused, Down or Home steps onto the first stop and Up or End onto the
- * last; Up, Down, Home and End walk, Up on the first leaves for the
- * page head's button (`onExitTop`), and Escape leaves the walk. On a
+ * Keyboard, for an app where Tab is dead: the page's list walk
+ * (`useListWalk`, list-walk.md, `onWalkKey`) walks each group's header and
+ * the rows of the open groups (`walkStops`, read through `stops`). On a
  * header, Enter or Space opens or folds the group, Right opens it and Left
  * folds it; on a row, Right steps onto its topic on the map
  * (`onEnterMap`) and Enter or Space opens it. A topic the map hands back
@@ -53,7 +51,7 @@ export function SplitList({
 	marked,
 	onPoint,
 	onEnterMap,
-	onExitTop,
+	onWalkKey,
 	arcLine: ArcLine,
 	after,
 	ref,
@@ -71,7 +69,8 @@ export function SplitList({
 	marked: TopicHandle | null;
 	onPoint: (handle: TopicHandle | null, by: PointBy) => void;
 	onEnterMap: (handle: TopicHandle) => void;
-	onExitTop?: () => void;
+	/** The page's list walk (`useListWalk`'s `onKeyDown`). */
+	onWalkKey: (e: KeyboardEvent<HTMLElement>) => void;
 	/** How an arc's line is drawn: the road's (`RoadLine`). */
 	arcLine: ComponentType<ArcLineProps>;
 	/** What closes the list, after its last section. */
@@ -90,7 +89,6 @@ export function SplitList({
 	/** A topic the map handed back while its group was folded: focused once the group opens. */
 	const pending = useRef<TopicHandle | null>(null);
 
-	const focusStop = (stop: Stop | undefined) => (stop ? stopsEl.current.get(stopKey(stop))?.focus() : undefined);
 	const openGroup = (id: string, to: boolean) => {
 		if (Boolean(open[id]) !== to) onOpenChange(id, to);
 	};
@@ -110,7 +108,7 @@ export function SplitList({
 				pending.current = handle;
 				onOpenChange(section.id, true);
 			},
-			focusFirst: () => focusStop(stops[0]),
+			stops: () => stops.flatMap((stop) => stopsEl.current.get(stopKey(stop)) ?? []),
 		}),
 		[sections, stops, onOpenChange],
 	);
@@ -148,48 +146,12 @@ export function SplitList({
 		row?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth", container: "nearest" } as ScrollIntoViewOptions);
 	}, [marked]);
 
-	// With nothing focused, an arrow steps into the list.
-	useEffect(() => {
-		const onKeyDown = (e: globalThis.KeyboardEvent) => {
-			if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-			if (document.activeElement && document.activeElement !== document.body) return;
-			const to = walkTo(e.key, null, stops.length);
-			if (to === null) return;
-			e.preventDefault();
-			stopsEl.current.get(stopKey(stops[to]!))?.focus();
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [stops]);
-
-	/** The keys every stop shares: Up, Down, Home and End walk, Up on the first leaves the list, Escape leaves the walk. */
-	const walk = (stop: Stop, e: KeyboardEvent<HTMLElement>) => {
-		if (e.key === "Escape") {
-			e.preventDefault();
-			e.stopPropagation();
-			e.currentTarget.blur();
-			return;
-		}
-		const at = stops.findIndex((s) => stopKey(s) === stopKey(stop));
-		if (e.key === "ArrowUp" && at === 0 && onExitTop) {
-			e.preventDefault();
-			onExitTop();
-			return;
-		}
-		const to = walkTo(e.key, at, stops.length);
-		if (to === null) return;
-		e.preventDefault();
-		focusStop(stops[to]);
-	};
-
 	const onHeaderKeyDown = (id: string, e: KeyboardEvent<HTMLButtonElement>) => {
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
 		if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
 			e.preventDefault();
 			openGroup(id, e.key === "ArrowRight");
-			return;
 		}
-		walk({ kind: "group", id }, e);
 	};
 
 	const onRowKeyDown = (row: CourseTopic, e: KeyboardEvent<HTMLAnchorElement>) => {
@@ -203,9 +165,7 @@ export function SplitList({
 		if (e.key === " ") {
 			e.preventDefault();
 			e.currentTarget.click();
-			return;
 		}
-		walk({ kind: "row", handle }, e);
 	};
 
 	const row = (row: CourseTopic) => (
@@ -225,7 +185,7 @@ export function SplitList({
 	);
 
 	return (
-		<section aria-label="Topics" data-slot="course-split-list" className="flex min-h-0 flex-1 flex-col">
+		<section aria-label="Topics" data-slot="course-split-list" onKeyDown={onWalkKey} className="flex min-h-0 flex-1 flex-col">
 			{/* The rows' hover fill and focus ring reach 12px past the column; the pane makes room for them. */}
 			<div
 				ref={viewport}
@@ -253,9 +213,6 @@ export function SplitList({
 									headerRef={register({ kind: "group", id: section.arc.handle })}
 									checkRef={register({ kind: "check", id: section.arc.handle })}
 									onHeaderKeyDown={(e) => onHeaderKeyDown(section.arc.handle, e)}
-									onCheckKeyDown={(e) => {
-										if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) walk({ kind: "check", id: section.arc.handle }, e);
-									}}
 									renderItem={row}
 								/>
 							))

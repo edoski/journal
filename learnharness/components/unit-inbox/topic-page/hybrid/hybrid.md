@@ -30,6 +30,10 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 - Bounded: `HistoryPane`: a plain scroller with no bar (`data-slot="topic-history"`), a flex column whose viewport shrinks to the pane. The pane reaches 12px past the column on each side (`-mx-3`) and its list pads them back (`px-3`), so a row's 12px bleed (`../row-classes.ts`, Home's row) keeps its rounded fill and the icon's inset inside the clip; the section labels stay on the head's edge, and the rows' icons sit past the shared gutter (`GUTTER`, `../pickup/pickup.md`). An edge fades 32px only while more of the history lies past it, so at rest the first day is never dimmed.
 - A session row (`data-slot="topic-history-session"`, link `data-testid="unit-page-session"`): kind icon, title, `StatusMark` (`../../status-mark.md`: "Your turn", or the spinner and "Tutor writing"), and a lesson that planned puts its steps on the map when he points at it, by pointer or focus (`data-on-map="point"`), as Home's map follows the row he points at; Now's row does the same for its lesson. The lesson on the map has its row filled `bg-fill-selected` (`data-shown`). Round 10, 1 m8: a map button did this, a glyph with no words beside Resume and on every lesson row.
 
+## Keys
+
+The history walks as every page's list does (`useListWalk`, `../../../list-walk/list-walk.md`): its stops are each row's press, Now's first, then Builds on, Next, Earlier and Show the rest. ↑ ↓ step and stop at the ends, Home and End jump, Esc leaves the walk; ↑ on Now steps onto the head's trail, its last link (the arc, else the course), and ↓ from there comes back to Now. With nothing focused, ↓ or Home enters at Now and ↑ or End at the last row.
+
 ## Lesson map (`lesson-map.tsx`)
 
 One map on all three pages (Edo, 17 Nov 2026: "the individual lesson/graph also needs updating and be standardised; ideally it should reuse our same graph components and UI/UX as course/home pages"): the lesson's steps are drawn by the course map's own drawing (`CardMap`, `../../../course-map/topic-map/topic-map.md`), its card, lines, tags, focus, dot grid, camera and keys, not by a copy.

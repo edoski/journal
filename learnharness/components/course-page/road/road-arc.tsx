@@ -28,7 +28,6 @@ export type ArcLineProps = Omit<React.ComponentProps<"section">, "children"> & {
 	headerRef?: React.Ref<HTMLButtonElement>;
 	checkRef?: React.Ref<HTMLButtonElement>;
 	onHeaderKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
-	onCheckKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
 };
 
 /** Each arc is its own block on the road: a rail down its left edge, as tall as the arc with its open topics,
@@ -71,7 +70,6 @@ export function RoadArc({
 	headerRef,
 	checkRef,
 	onHeaderKeyDown,
-	onCheckKeyDown,
 	number,
 	starts,
 	shown = false,
@@ -141,7 +139,6 @@ export function RoadArc({
 							data-slot="course-arc-check"
 							disabled={checking}
 							onClick={onCheck}
-							onKeyDown={onCheckKeyDown}
 							className="-mr-1.5 h-6 shrink-0 gap-1.5 px-1.5 text-callout font-normal text-muted-foreground hover:text-link [&_svg]:size-3.5"
 						>
 							<ListChecksIcon aria-hidden />

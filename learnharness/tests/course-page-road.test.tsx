@@ -107,7 +107,7 @@ const columns = (view: CourseView, standing: CourseStanding | null = null): Cour
 	onPoint: noop,
 	listRef: createRef(),
 	onEnterMap: noop,
-	onExitTop: noop,
+	onWalkKey: noop,
 });
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
@@ -187,7 +187,7 @@ describe("the road", () => {
 	it("is the course's one list of arcs, drawn as the map's arc list draws its rows, so the map beside it lists none", () => {
 		const view = viewOf(course());
 		const line = (props: ArcLineProps) => <RoadArc {...props} number={view.arcs!.indexOf(props.section) + 1} starts={null} shown={props.section.arc.handle === "maps"} />;
-		const document = render(<SplitList groups={[]} arcs={view.arcs} open={{ maps: true }} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
+		const document = render(<SplitList groups={[]} arcs={view.arcs} open={{ maps: true }} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} onWalkKey={noop} arcLine={line} />);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="course-arc"] [data-slot="arc-number"]')].map((n) => n.textContent),
 			view.arcs!.map((_, i) => String(i + 1)),

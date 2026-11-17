@@ -32,6 +32,7 @@ export type KeyAction =
 	| "open-settings"
 	| "page-move"
 	| "page-open"
+	| "list-ends"
 	| "calendar-today"
 	| "calendar-week"
 	| "calendar-month"
@@ -131,6 +132,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// walk its rows and links, and Enter opens them natively.
 	{ id: "page-move", label: "Move between rows and links", scope: "global", binding: "arrows", displayOnly: true, group: "pages" },
 	{ id: "page-open", label: "Open the row or link", scope: "global", binding: "enter", displayOnly: true, group: "pages" },
+	// Every page's list walk (components/list-walk/use-list-walk.ts): Home's Today, the course page's road, the topic page's sections.
+	{ id: "list-ends", label: "Jump to the list's first or last row", scope: "global", binding: "home-end", displayOnly: true, group: "pages" },
 	// The calendar's letters, Google Calendar's; only the mounted calendar listens.
 	{ id: "calendar-today", label: "Go to today", scope: "global", binding: "t", group: "calendar" },
 	{ id: "calendar-week", label: "Show the week", scope: "global", binding: "w", group: "calendar" },
@@ -283,6 +286,7 @@ const KEY_GLYPH: Record<string, string> = {
 	arrows: "↑ ↓ ← →",
 	"arrows-lr": "← →",
 	"arrows-ud": "↑ ↓",
+	"home-end": "Home End",
 };
 
 /** Format a binding for display: "mod+shift+f" → "⌘⇧F". */

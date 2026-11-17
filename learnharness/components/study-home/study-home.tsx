@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { PAGE_COLUMN } from "@/components/page-frame/page-frame";
 import type { TopicHandle } from "@/src/core";
 import { useMapTie, type PointBy } from "@/components/course-map/use-map-tie";
+import { useListWalk } from "@/components/list-walk/use-list-walk";
 
 /** The map's share of the column while Today shows: enough to see where
  *  the current topic sits, so Today's rows lead (Edo, 12 Nov 2026). */
@@ -86,6 +87,11 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 		openShownCoursePage: () => router.push(courseHref(workspace)),
 	});
 
+	// Today walks as every page's list does. Its head is the map, whose tabs the walk never reaches (N3), so ↑ on the
+	// first line keeps it.
+	const today = useRef<HTMLDivElement>(null);
+	const walk = useListWalk({ stops: () => Array.from(today.current?.querySelectorAll<HTMLElement>("[data-line]") ?? []) });
+
 	const onPoint = (row: TodayRow, by: PointBy) => tie.point("list", { key: lineKey(row), topics: lessonOf(row).topics }, by);
 
 	return (
@@ -105,16 +111,18 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 				/>
 			</div>
 			{!enlarged && (
-				<Today
-					rows={rows}
-					done={done}
-					exam={exam}
-					busy={busy}
-					onContinue={onContinue}
-					pointed={pointed}
-					onPoint={onPoint}
-					onPointEnd={(by) => tie.point("list", null, by)}
-				/>
+				<div ref={today} className="contents" onKeyDown={walk.onKeyDown}>
+					<Today
+						rows={rows}
+						done={done}
+						exam={exam}
+						busy={busy}
+						onContinue={onContinue}
+						pointed={pointed}
+						onPoint={onPoint}
+						onPointEnd={(by) => tie.point("list", null, by)}
+					/>
+				</div>
 			)}
 		</>
 	);

@@ -106,7 +106,7 @@ export function RoadList(c: CourseColumns) {
 				marked={c.marked}
 				onPoint={c.onPoint}
 				onEnterMap={c.onEnterMap}
-				onExitTop={c.onExitTop}
+				onWalkKey={c.onWalkKey}
 				arcLine={RoadLine}
 				after={arcs && road.exam && stop && stop.stopBefore === null ? <ExamStop course={course} words={road.exam} /> : undefined}
 			/>

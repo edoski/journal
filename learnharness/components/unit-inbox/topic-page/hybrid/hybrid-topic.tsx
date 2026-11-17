@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PageFrame } from "@/components/page-frame/page-frame";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
@@ -13,6 +13,7 @@ import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections
 import { lessonBegun } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import { BuildsOnMap } from "@/components/unit-inbox/topic-page/hybrid/builds-on-map";
 import { useMapTie } from "@/components/course-map/use-map-tie";
+import { useListWalk } from "@/components/list-walk/use-list-walk";
 
 /** What the history pane is given (`../pickup/pickup.md`). */
 export interface HybridPaneProps {
@@ -48,20 +49,41 @@ export function HybridTopic({ facts, busy, error = null, onAct, onTask }: TopicP
 	// A row of Builds on lights its topic alone: the map is already the chain the topic builds on.
 	const tie = useMapTie();
 	const shown = planned.find((entry) => entry.chat.id === chosen) ?? planned.find((entry) => entry.chat.id === mapLessonAtFirst(facts.sessions, facts.action)) ?? null;
+	// The sections walk as every page's list does: each row's press is a stop, Now's first; Up from Now reaches the
+	// head's trail, its last link, and Down returns.
+	const head = useRef<HTMLDivElement>(null);
+	const pane = useRef<HTMLDivElement>(null);
+	const walk = useListWalk({
+		stops: () => Array.from(pane.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])") ?? []),
+		head: () => Array.from(head.current?.querySelectorAll<HTMLElement>("a[href]") ?? []).at(-1) ?? null,
+	});
 	const side = (className?: string) => (
-		<SectionsPane facts={facts} busy={busy} onAct={onAct} onTask={onTask} shown={shown?.chat.id ?? null} onShow={setChosen} onPoint={(handle, by) => tie.pointTopic("list", handle, by)} className={className} />
+		<SectionsPane
+			facts={facts}
+			busy={busy}
+			onAct={onAct}
+			onTask={onTask}
+			shown={shown?.chat.id ?? null}
+			onShow={setChosen}
+			onPoint={(handle, by) => tie.pointTopic("list", handle, by)}
+			listRef={pane}
+			onWalkKey={walk.onKeyDown}
+			className={className}
+		/>
 	);
 	const starting = (facts.action.kind === "start" || lessonBegun(facts)) && facts.buildsMap;
 	return (
 		<PageFrame data-testid="unit-page" data-topic-candidate="hybrid">
-			{/* Now and Scheduled say the review, so the head does not. */}
-			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review") }}>
-				{error && (
-					<p role="alert" data-slot="topic-lesson-error" className="flex min-h-5 items-center text-body text-danger">
-						{error}
-					</p>
-				)}
-			</TopicHead>
+			<div ref={head} className="contents" onKeyDown={walk.onHeadKeyDown}>
+				{/* Now and Scheduled say the review, so the head does not. */}
+				<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review") }}>
+					{error && (
+						<p role="alert" data-slot="topic-lesson-error" className="flex min-h-5 items-center text-body text-danger">
+							{error}
+						</p>
+					)}
+				</TopicHead>
+			</div>
 			{shown ? (
 				<LinkedColumns
 					data-slot="topic-panes"
