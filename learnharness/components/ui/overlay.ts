@@ -26,6 +26,21 @@ export function claimEscape(handler?: (event: KeyboardEvent) => void) {
   }
 }
 
+/** A tooltip's Esc: it closes the tooltip, and is claimed like any layer's
+ *  (a trigger refocused as its popover closes shows one, and that Esc must
+ *  not abort the turn), except where he types: there Esc is the field's own
+ *  key (the answer box's Answer or Ask, the turn's stop), and a hint the
+ *  pointer left open over the meter took it, so the first Esc did nothing
+ *  he could see (round 15, 3 free). */
+export function tooltipEscape(handler?: (event: KeyboardEvent) => void) {
+  return (event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null
+    const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)
+    if (!typing) event.stopPropagation()
+    handler?.(event)
+  }
+}
+
 /** Where his next key belongs once a layer closes (focus-home.ts): the
  *  composer's field. */
 const WHERE_HE_TYPES = '[data-testid="composer"] textarea'
