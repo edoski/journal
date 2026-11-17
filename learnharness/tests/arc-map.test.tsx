@@ -8,7 +8,7 @@
  * of arcs, and keeps ⇧↑ and ⇧↓. Its old selector (a name, a chevron, a dot
  * per arc) is gone.
  */
-import React, { act } from "react";
+import React, { act, useState } from "react";
 (globalThis as Record<string, unknown>).React = React;
 
 import assert from "node:assert/strict";
@@ -47,8 +47,42 @@ const rows = () => [...document.querySelectorAll('[data-slot="arc-index-row"]')]
 const shown = () => document.querySelector('[data-slot="arc-index-row"][data-shown]')?.getAttribute("data-arc") ?? null;
 /** The course page's map pane on one arc. */
 const coursePage = (arc: ArcHandle, onOpenArc: (arc: ArcHandle) => void) => (
-	<SplitMap map={LINALG_ARCS.map} arc={arc} arcs={ARCS} said={new Map()} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} />
+	<SplitMap map={LINALG_ARCS.map} arc={arc} arcs={ARCS} said={new Map()} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} enlarged={false} onEnlarge={noop} />
 );
+
+/** The course page's map pane, enlarging as the page does. */
+function EnlargingCoursePage({ onOpenArc }: { onOpenArc: (arc: ArcHandle) => void }) {
+	const [enlarged, setEnlarged] = useState(false);
+	return <SplitMap map={LINALG_ARCS.map} arc={a("systems")} arcs={ARCS} said={new Map()} lit={null} aim={null} reveal={null} onPoint={noop} onLeave={noop} onOpenArc={onOpenArc} enlarged={enlarged} onEnlarge={setEnlarged} />;
+}
+
+describe("the course page's map enlarged", () => {
+	it("enlarges with Home's control, and the same control or Esc brings the page back, the arc kept", async () => {
+		const opened: string[] = [];
+		await mount(<EnlargingCoursePage onOpenArc={(arc) => opened.push(arc)} />);
+		const control = () => document.querySelector('[data-slot="course-map-enlarge"]')!;
+		const key = (k: string, shiftKey = false) =>
+			act(async () => {
+				document.body.dispatchEvent(Object.assign(new dom.window.Event("keydown", { bubbles: true, cancelable: true }), { key: k, shiftKey, altKey: false, metaKey: false, ctrlKey: false }) as unknown as Event);
+			});
+		const press = () =>
+			act(async () => {
+				control().dispatchEvent(new dom.window.Event("click", { bubbles: true }) as unknown as Event);
+			});
+		assert.equal(control().getAttribute("aria-label"), "Enlarge map");
+		await press();
+		assert.equal(control().getAttribute("aria-pressed"), "true");
+		assert.equal(control().getAttribute("aria-label"), "Back to the course");
+		await press();
+		assert.equal(control().getAttribute("aria-pressed"), "false", "the same control brings the page back");
+		await press();
+		await key("ArrowDown", true);
+		assert.deepEqual(opened, ["eigenvalues"], "enlarged, ⇧↓ still glides to the next arc");
+		await key("Escape");
+		assert.equal(control().getAttribute("aria-pressed"), "false", "Esc brings the page back");
+		assert.ok(document.querySelector('[data-slot="course-split-map"]'), "the map itself stays");
+	});
+});
 
 describe("the arc list beside every course map", () => {
 	it("lists every arc in study order, the shown one under the bar and the arc he is in dotted, named whole", async () => {

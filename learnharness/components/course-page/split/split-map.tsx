@@ -7,6 +7,7 @@ import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { mapFade } from "@/components/study-home/map-frame";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
+import { EnlargeButton } from "@/components/course-map/enlarge-button";
 import { topicAt } from "@/components/course-page/split/split-tie";
 
 /** What the page asks of the map: focus a topic's node. */
@@ -30,7 +31,9 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
  * arc and Whole course always shows; without, only when the course opens
  * on less than all of it. A course with `arcs` (`ArcMap`, with no list of
  * its own beside it, since the road lists them): ⇧↑ or ⇧↓ glides to another
- * arc (`onOpenArc`), and ⌘J goes to You are here.
+ * arc (`onOpenArc`), and ⌘J goes to You are here. Home's enlarge control
+ * (`EnlargeButton`) sits beside Whole course: pressed, the map takes the
+ * page's body (`enlarged`, the page's), and pressed again or Esc returns.
  */
 export function SplitMap({
 	map,
@@ -43,6 +46,8 @@ export function SplitMap({
 	onPoint,
 	onLeave,
 	onOpenArc,
+	enlarged,
+	onEnlarge,
 	ref,
 }: {
 	map: CourseMap;
@@ -61,6 +66,9 @@ export function SplitMap({
 	onLeave: (handle: TopicHandle) => void;
 	/** Shows another arc: a press on the arc list, ⇧↑ or ⇧↓, ⌘J, or a card's "From <arc>" line. */
 	onOpenArc?: (arc: ArcHandle) => void;
+	/** Whether the map has taken the page's body. */
+	enlarged: boolean;
+	onEnlarge: (enlarged: boolean) => void;
 	ref?: Ref<SplitMapHandle>;
 }) {
 	const root = useRef<HTMLElement>(null);
@@ -139,7 +147,10 @@ export function SplitMap({
 					/>
 				</div>
 				{/* Outside the fade, in the pane's top right corner, where the fade leaves the map clear. */}
-				{canZoomOut && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} className="absolute top-0 right-0" />}
+				<div className="absolute top-0 right-0 flex items-center gap-1">
+					{canZoomOut && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} />}
+					<EnlargeButton enlarged={enlarged} onEnlarge={onEnlarge} back="Back to the course" data-slot="course-map-enlarge" />
+				</div>
 			</section>
 		</ArcMap>
 	);

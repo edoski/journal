@@ -7,7 +7,9 @@ import type { ArcHandle, CourseStanding, TopicHandle } from "@/src/core";
 import { drawingOf } from "@/components/course-map/topic-map/map-drawing";
 import { useStartArcCheck } from "@/components/unit-inbox/start-unit";
 import { PageFrame } from "@/components/page-frame/page-frame";
+import { cn } from "@/lib/utils";
 import { CourseHead, arcOnPage } from "@/components/course-page/course-head/course-head";
+import { CourseNow } from "@/components/course-page/course-head/course-now";
 import { CourseComposer } from "@/components/course-page/course-composer";
 import { RoadList } from "@/components/course-page/road/road-list";
 import { openingArc, type CourseArcSection, type CourseGroup, type CourseView } from "@/components/course-page/course-model";
@@ -56,7 +58,10 @@ export interface CourseColumns {
  * inside itself. A course with arcs shows one arc on the map, where he is
  * on arrival: opening an arc on the road shows it on the map, and showing
  * one on the map (⇧↑ ⇧↓, ⌘J) opens it on the road. The map lists no arcs
- * of its own, since the road is the course's one list of them.
+ * of its own, since the road is the course's one list of them. Enlarged,
+ * as Home's map enlarges, the map takes the page's body across the whole
+ * window: Now, the road and the composer give way, kept as they were for
+ * its return, with the arc it shows.
  */
 export function SplitBody({ view, standing, busy, onContinue }: { view: CourseView; standing: CourseStanding | null; busy: boolean; onContinue: (workspace: string) => void }) {
 	const { map } = view.course;
@@ -81,6 +86,7 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 	const layout = useMemo(() => drawingOf(map, shown?.arc.handle).layout, [shown, map]);
 	const aim = useMemo(() => aimOf(map.current, view.next.lesson.topics, shown ? [{ id: shown.arc.handle, topics: shown.topics }] : groups, layout), [map.current, view.next.lesson.topics, shown, groups, layout]);
 	const { startArcCheck, starting } = useStartArcCheck();
+	const [enlarged, setEnlarged] = useState(false);
 	const onCheck = (section: CourseArcSection) =>
 		startArcCheck(
 			map.workspace,
@@ -145,9 +151,10 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 	};
 
 	return (
-		<PageFrame className="h-full">
+		<PageFrame className={cn("h-full", enlarged && "max-w-none")}>
 			<div ref={headerBox} className="contents" onKeyDown={onHeaderKeyDown}>
 				<CourseHead {...columns} />
+				{!enlarged && <CourseNow {...columns} />}
 			</div>
 			{map.topics.length === 0 ? (
 				<p data-slot="course-notice" className="flex min-h-8 items-center text-body text-muted-foreground">
@@ -156,6 +163,8 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 			) : (
 				<LinkedColumns
 					data-slot="course-split"
+					data-enlarged={enlarged || undefined}
+					listHidden={enlarged}
 					list={<RoadList {...columns} />}
 					map={
 						<SplitMap
@@ -171,11 +180,13 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 							onPoint={pointFrom("map")}
 							onLeave={(to) => list.current?.focus(to)}
 							onOpenArc={showArc}
+							enlarged={enlarged}
+							onEnlarge={setEnlarged}
 						/>
 					}
 				/>
 			)}
-			<CourseComposer course={view.course} />
+			{!enlarged && <CourseComposer course={view.course} />}
 		</PageFrame>
 	);
 }

@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
 import { ArcMap } from "@/components/course-map/arc-map";
 import { shownArcs } from "@/components/course-page/course-model";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { WholeCourseButton } from "@/components/course-map/topic-map/whole-course-button";
-import { Button } from "@/components/ui/button";
+import { EnlargeButton } from "@/components/course-map/enlarge-button";
 import { Hint } from "@/components/ui/hint";
 import { MathText, mathPlain } from "@/components/ui/math-text";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -108,35 +107,13 @@ export function HomeMap({
 		},
 		[chosen],
 	);
-	useEffect(() => {
-		if (!enlarged) return;
-		// Anything open over the map claims Esc first (Radix marks it handled).
-		const onKey = (e: KeyboardEvent) => {
-			if (!e.defaultPrevented && e.key === "Escape") onEnlarge(false);
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [enlarged, onEnlarge]);
-
 	return (
 		<section aria-label="Course map" data-slot="home-map" data-enlarged={enlarged || undefined} className="relative flex min-h-0 flex-1 flex-col gap-2">
 			<div className="flex h-8 shrink-0 items-center justify-between gap-4">
 				<CourseTabs courses={courses} workspace={chosen} onSelect={onSelect} />
 				<div className="flex shrink-0 items-center gap-1">
 					{canZoomOut && <WholeCourseButton whole={zoomedOut} onToggle={toggleWhole} />}
-					<Hint label={enlarged ? "Back to Home" : "Enlarge map"} binding={enlarged ? "escape" : undefined} side="left">
-						<Button
-							variant="quiet"
-							size="icon-row"
-							data-slot="home-map-enlarge"
-							aria-label={enlarged ? "Back to Home" : "Enlarge map"}
-							aria-pressed={enlarged}
-							onClick={() => onEnlarge(!enlarged)}
-							className="lh-no-drag -mr-2"
-						>
-							{enlarged ? <Minimize2Icon /> : <Maximize2Icon />}
-						</Button>
-					</Hint>
+					<EnlargeButton enlarged={enlarged} onEnlarge={onEnlarge} back="Back to Home" data-slot="home-map-enlarge" className="-mr-2" />
 				</div>
 			</div>
 			<ArcMap arcs={arcs} value={shownArc ?? null} here={currentArc(chosenCourse.map)} whole={zoomedOut} onSelect={pick} onHere={leaveWhole}>

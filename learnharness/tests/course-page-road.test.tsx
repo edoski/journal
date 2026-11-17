@@ -140,8 +140,13 @@ describe("the course head", () => {
 	});
 
 	it("leaves the press to Now, under the head", () => {
-		const head = render(<CourseHead {...columns(view, NOT_READY)} />);
-		assert.ok(head.querySelector('[data-slot="page-actions"] [data-slot="course-action"]') === null, "no press among the head's actions");
+		const head = render(
+			<>
+				<CourseHead {...columns(view, NOT_READY)} />
+				<CourseNow {...columns(view, NOT_READY)} />
+			</>,
+		);
+		assert.ok(head.querySelector('[data-slot="page-head"] [data-slot="course-action"]') === null, "no press in the head");
 		const now = head.querySelector('[data-slot="course-now"] [data-slot="course-action"]');
 		assert.ok(now, "Now holds the press");
 		assert.match(text(now), /Continue|Start|Review|Resume/);

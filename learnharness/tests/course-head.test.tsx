@@ -19,6 +19,7 @@ import { examGaps, lastSessionOf, namesWords } from "../components/course-page/c
 import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
 import { topicPress } from "../components/unit-inbox/start-unit.ts";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
+import { CourseNow } from "../components/course-page/course-head/course-now.tsx";
 import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
 import { ExamGapLine } from "../components/course-page/course-head/exam-gaps.tsx";
 import { columnsOf } from "./helpers/course-columns.ts";
@@ -90,7 +91,13 @@ function viewOf(c: StudyCourse, chats: ChatListItem[] = []) {
 
 describe("the course head", () => {
 	it("keeps the title and the press in Now, puts Context in place of Add material, drops progress words and lines repeating the rows, and Studied opens the last session", () => {
-		const document = render(<CourseHead {...columnsOf(viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")]))} />);
+		const columns = columnsOf(viewOf(course({}, { due: [h("bayes")] }), [chat("b", "2026-11-06T09:00:00Z")]));
+		const document = render(
+			<>
+				<CourseHead {...columns} />
+				<CourseNow {...columns} />
+			</>,
+		);
 		const text = document.body.textContent ?? "";
 		assert.equal(document.querySelector("[data-slot=course-title]")?.textContent, "Probability");
 		assert.ok(document.querySelector("[data-slot=course-now] [data-slot=course-action]"));

@@ -25,4 +25,17 @@ describe("the linked columns", () => {
 		assert.deepEqual([...root.children].map((column) => column.firstElementChild!.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
 		assert.ok(root.querySelector("svg") === null, "no line between a row and its card");
 	});
+
+	it("gives the map the whole width with the list hidden, the list still drawn for its return (the course page's map enlarged)", () => {
+		const document = parseHTML(
+			`<html><body>${renderToStaticMarkup(<LinkedColumns data-slot="course-split" listHidden list={<div data-slot="road" />} map={<div data-slot="map" />} />)}</body></html>`,
+		).document;
+		const root = document.querySelector('[data-slot="course-split"]')!;
+		assert.match(root.getAttribute("class")!, /grid-cols-\[minmax\(0,1fr\)\]/);
+		assert.doesNotMatch(root.getAttribute("class")!, /minmax\(0,24rem\)/, "one column, not two");
+		const [list, map] = [...root.children];
+		assert.ok(list!.hasAttribute("hidden"), "the list hidden");
+		assert.ok(list!.querySelector('[data-slot="road"]'), "and still drawn");
+		assert.ok(!map!.hasAttribute("hidden") && map!.querySelector('[data-slot="map"]'));
+	});
 });

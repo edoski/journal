@@ -62,7 +62,7 @@ const noop = () => {};
 const noArcLine = () => null;
 const LAYOUT = layoutTopicMap(MAP.topics, MAP.edges);
 const drawMap = (lit: ReadonlySet<TopicHandle> | null = null, reveal: TopicHandle | null = null) =>
-	render(<SplitMap map={MAP} said={new Map()} lit={lit} aim={null} reveal={reveal} onPoint={noop} onLeave={noop} />);
+	render(<SplitMap map={MAP} said={new Map()} lit={lit} aim={null} reveal={reveal} onPoint={noop} onLeave={noop} enlarged={false} onEnlarge={noop} />);
 
 describe("what ties the two panes", () => {
 	it("lights a pointed row's topic with its whole prerequisite chain, as a hover on the map does", () => {
