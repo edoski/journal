@@ -28,7 +28,7 @@ const T3_PREVIEW_UA =
 export type Window = "browser" | "t3-preview" | "mac-app";
 
 export interface Shell {
-	open(window: Window, options?: { sidebar?: "open" | "folded"; reducedMotion?: boolean }): Promise<Page>;
+	open(window: Window, options?: { sidebar?: "open" | "folded"; reducedMotion?: boolean; search?: string }): Promise<Page>;
 	close(): Promise<void>;
 }
 
@@ -69,7 +69,7 @@ export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", r
 	const browser: Browser = await puppeteer.launch({ executablePath, headless: true, args: ["--force-device-scale-factor=1"] });
 
 	return {
-		async open(window, { sidebar = "folded", reducedMotion = false } = {}) {
+		async open(window, { sidebar = "folded", reducedMotion = false, search = "" } = {}) {
 			const page = await browser.newPage();
 			await page.setViewport({ width: 1512, height: 982 });
 			// tsx names a test's functions with an `__name` helper, which a
@@ -82,7 +82,7 @@ export async function startShell({ entry = "tests/helpers/app-shell-page.tsx", r
 				}, LIGHTS_CENTRE);
 			}
 			await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: reducedMotion ? "reduce" : "no-preference" }]);
-			await page.goto(`${origin}/?open=${sidebar === "open" ? 1 : 0}`, { waitUntil: "load" });
+			await page.goto(`${origin}/?open=${sidebar === "open" ? 1 : 0}${search}`, { waitUntil: "load" });
 			await page.waitForSelector(ready);
 			// The provider's mount effects: the Mac app's class, then motion on.
 			await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
