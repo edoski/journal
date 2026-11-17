@@ -5,28 +5,39 @@ import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { rowStatus, rowWords, type RowStanding } from "@/components/study-home/agenda-rows/row-standing";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { cn } from "@/lib/utils";
+import { cva } from "class-variance-authority";
 import { MathLine } from "@/components/ui/math-line";
 import { MathText } from "@/components/ui/math-text";
 
-/** The badge or pie beside both lines: the course line, then the lesson
- *  line with the row's one status at its end, flush right and whole, so
- *  the statuses line up down the list and the title gives way first. The
- *  hover fill's corners are at 8, as every other row with a hover fill
- *  (the sidebar's, the course page's, Settings'). */
-const ROW =
-	"-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center gap-x-4 gap-y-1 rounded-md px-3 text-left font-normal whitespace-normal data-[pointed]:bg-fill-hover";
-/** The first column at the badge's width (40px), so both lines start at
- *  one edge beside it, and the status column as wide as its words, so they
- *  show whole (round 11, 1 N14: "Not right last time: Matrix multipli…" cut
- *  beside an empty column). */
-const COLUMNS = "grid-cols-[2.5rem_minmax(0,1fr)_auto]";
+/** The hybrid row (spec: hybrid.md): the badge or pie beside both lines,
+ *  the first line muted, then the title with the row's one status at its
+ *  end, flush right and whole, so the statuses line up down the list and
+ *  the title gives way first. The hover fill's corners are at 8, as every
+ *  other row with a hover fill (the sidebar's, the course page's,
+ *  Settings'). `today`: Today's 64px row, its first column at the badge's
+ *  width (40px) so both lines start at one edge beside it, and the status
+ *  column as wide as its words, so they show whole (round 11, 1 N14:
+ *  "Not right last time: Matrix multipli…" cut beside an empty column).
+ *  `compact`: the same anatomy at 48px with a 16px pie in the first column,
+ *  for a narrower list (the course page's Road in rows). */
+export const hybridRow = cva(
+	"-mx-3 grid w-[calc(100%+1.5rem)] grid-rows-[auto_auto] content-center items-center rounded-md px-3 text-left font-normal whitespace-normal data-[pointed]:bg-fill-hover",
+	{
+		variants: {
+			size: {
+				today: "h-16 grid-cols-[2.5rem_minmax(0,1fr)_auto] gap-x-4 gap-y-1",
+				compact: "h-12 grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3 gap-y-0.5",
+			},
+		},
+		defaultVariants: { size: "today" },
+	},
+);
 
 /** A standing fact: a 14px mark, as the reason's, then its words. */
 const FACT = "flex items-center justify-self-end gap-1.5 text-callout text-muted-foreground";
 
 /** A hairline above every row but the first, inset to the text's edges. */
-const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
+export const HYBRID_HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 not-first:before:top-0 not-first:before:h-px not-first:before:bg-border/50";
 
 /**
  * Agenda rows "hybrid" (spec: hybrid.md): the course's progress, the
@@ -40,8 +51,8 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 			{shown.map((row) => {
 				const status = rowStatus(row);
 				return (
-					<li key={lineKey(row)} className={HAIRLINE}>
-						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={cn(ROW, COLUMNS)} {...pointProps(row, point)}>
+					<li key={lineKey(row)} className={HYBRID_HAIRLINE}>
+						<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={hybridRow()} {...pointProps(row, point)}>
 							{/* The course's badge at the row's height with its progress round its edge, where a lone ring read as a checkbox. */}
 							<span className="row-span-2 self-center">{row.course && <CourseBadge course={row.course} />}</span>
 							<MathLine className="col-span-2 text-callout text-muted-foreground">{courseTitle(row)}</MathLine>
@@ -51,7 +62,7 @@ export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 					</li>
 				);
 			})}
-			{also.length > 0 && <TodayAlso rows={also} busy={busy} onContinue={onContinue} className={HAIRLINE} />}
+			{also.length > 0 && <TodayAlso rows={also} busy={busy} onContinue={onContinue} className={HYBRID_HAIRLINE} />}
 		</ul>
 	);
 }

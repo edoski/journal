@@ -20,7 +20,7 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  *  words); a turn that waits wears the accent, as in the sidebar and on
  *  Today. The row shows `words` ("Due 6 Nov"); the hint always holds the
  *  whole sentence (`fact.words`, "Due since 6 Nov, back 20 Nov"). */
-function Fact({ fact, words }: { fact: TopicFact; words: string }) {
+export function RowFact({ fact, words }: { fact: TopicFact; words: string }) {
 	const Icon = factIcon(fact);
 	return (
 		<Hint label={fact.words} side="left">
@@ -93,7 +93,7 @@ export function CourseTopicRow({
 						</span>
 					)}
 				</span>
-				{row.fact && <Fact fact={row.fact} words={row.factWords ?? row.fact.words} />}
+				{row.fact && <RowFact fact={row.fact} words={row.factWords ?? row.fact.words} />}
 			</Link>
 		</li>
 	);

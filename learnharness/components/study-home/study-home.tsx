@@ -20,7 +20,7 @@ const MAP_SHARE = "basis-1/2";
 
 /** How long the pointer rests on a Today line before the map follows it, so
  *  crossing lines on the way up to the map does not flip it course by course. */
-const FOLLOW_DWELL_MS = 150;
+export const FOLLOW_DWELL_MS = 150;
 
 /**
  * The agenda study home (spec: study-home.md): what to study now, in one
