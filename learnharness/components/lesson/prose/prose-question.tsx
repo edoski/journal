@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronRightIcon, EyeIcon, LightbulbIcon } from "lucide-react";
+import { BookmarkIcon, ChevronRightIcon, EyeIcon, LightbulbIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { answerForPresentation, type Photo, type QuestionAnswerData, type QuestionOption } from "@/src/core";
+import { answerForPresentation, type LeftDraft, type Photo, type QuestionAnswerData, type QuestionOption } from "@/src/core";
 import { LESSON_WORDS } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 import { proseQuestionSpec, type ProseQuestionSpec } from "@/components/lesson/prose/prose-question-data";
@@ -150,6 +150,14 @@ export function ChoiceRows({ options, multi, selected, onPick, compact = false }
 	);
 }
 
+/** A question Done for today set aside: "Left for next time", and inside
+ *  it what he had typed, as his bubble (round 15, 3 m1: the line stood
+ *  empty, his half answer gone). With nothing typed, the line alone. */
+function LeftForNextTime({ draft }: { draft?: LeftDraft }) {
+	if (!draft?.text.trim()) return <p className="text-body text-muted-foreground">{LESSON_WORDS.leftForTonight}</p>;
+	return <LearnerBubble testId="left-draft" icon={BookmarkIcon} label={LESSON_WORDS.leftForTonight} text={draft.text} />;
+}
+
 function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor, repeat, askedBelow }: {
 	spec: ProseQuestionSpec;
 	toolCallId: string;
@@ -163,9 +171,9 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 	const answer = answerForPresentation(output, input);
 	if (answer.dismissed && answer.reason === "tonight" && askedBelow) {
 		return (
-			<p data-testid="prose-question-left" data-slot="prose-question" data-asked-below="" data-step-anchor={stepAnchor} className="mt-2 text-body text-muted-foreground">
-				{LESSON_WORDS.leftForTonight}
-			</p>
+			<div data-testid="prose-question-left" data-slot="prose-question" data-asked-below="" data-step-anchor={stepAnchor} className="mt-2">
+				<LeftForNextTime draft={answer.draft} />
+			</div>
 		);
 	}
 	const question = (
@@ -180,9 +188,9 @@ function AnsweredQuestion({ spec, toolCallId, input, output, photos, stepAnchor,
 		return (
 			<>
 				{question}
-				<p data-testid="prose-question-left" className="text-body text-muted-foreground">
-					{answer.reason === "tonight" ? LESSON_WORDS.leftForTonight : LESSON_WORDS.skippedQuestion}
-				</p>
+				<div data-testid="prose-question-left">
+					{answer.reason === "tonight" ? <LeftForNextTime draft={answer.draft} /> : <p className="text-body text-muted-foreground">{LESSON_WORDS.skippedQuestion}</p>}
+				</div>
 			</>
 		);
 	}

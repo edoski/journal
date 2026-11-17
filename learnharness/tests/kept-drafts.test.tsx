@@ -129,14 +129,16 @@ describe("carriedForm", () => {
 
 const noop = () => {};
 const check = { question: "Why?", correctAnswer: "hidden", type: "check" };
+/** Every confidence the composer set, newest last. */
+const setSure: string[] = [];
 
 /** The Prose composer answering the question `key` (the check "Why?" unless
  *  told otherwise), kept in box `c1:q:<key>`. */
-async function mount(key: string, carryScope?: string, input: unknown = check, tool = "explain", reaskOf?: string) {
+async function mount(key: string, carryScope?: string, input: unknown = check, tool = "explain", reaskOf?: string, leftDraft?: { text: string; confidence?: "neutral" | "confident" | "guessing" }) {
 	const host = document.createElement("div");
 	document.body.append(host);
 	const root = createRoot(host);
-	const answer = { openKey: key, selection: emptyDockSelection(), confidence: "neutral" as const, mode: "answer" as const, toggle: noop, setConfidence: noop, setMode: noop };
+	const answer = { openKey: key, selection: emptyDockSelection(), confidence: "neutral" as const, mode: "answer" as const, toggle: noop, setConfidence: (c: string) => void setSure.push(c), setMode: noop };
 	await act(async () => root.render(
 		<StickToBottom>
 			<ProseComposer
@@ -149,6 +151,7 @@ async function mount(key: string, carryScope?: string, input: unknown = check, t
 				chatId="c1"
 				carryScope={carryScope}
 				reaskOf={reaskOf}
+				leftDraft={leftDraft}
 				onSaveDraft={noop}
 				onSubmitAnswer={noop}
 				onSubmitThinking={async () => true}
@@ -221,6 +224,35 @@ test("the question asked right after a hint takes his work even in other words",
 	try {
 		assert.equal(again.field().value, typed.text, "the re-ask opens with his work");
 		assert.equal(keptWords("carry:la"), undefined, "taken once");
+	} finally {
+		await again.done();
+	}
+});
+
+test("the question Done for today set aside opens with his half answer from the lesson's record, in a fresh window, whatever the course's carry holds (round 15, 3 m1)", async () => {
+	// Lens 3: Done for today with a half answer in the Invertible lesson, a
+	// Rank practice of the same course after it, then the lesson reopened
+	// from Sessions: the box was empty. The course keeps one carry slot,
+	// which a later lesson's hint replaces; the record keeps the half answer
+	// with the question it was left on.
+	setKeptWindow("w-fresh", { live: ["w-fresh"] });
+	carryWords("carry:la", { question: "What is the rank of B?", from: "p9" }, { text: "rank 2?" }, []);
+	const again = await mount("again", "carry:la", { ...check, question: "Is F invertible? Say why." }, "explain", "q1", { text: "det F = 0, so", confidence: "guessing" });
+	try {
+		assert.equal(again.field().value, "det F = 0, so", "the half answer is back in the box");
+		assert.equal(keptWords("c1:q:again")?.form?.text, "det F = 0, so", "and kept in the box's own place from now on");
+		assert.equal(setSure.at(-1), "guessing", "with how sure he was");
+		assert.equal(keptWords("carry:la")?.text, "rank 2?", "another question's carry is left alone");
+	} finally {
+		await again.done();
+	}
+});
+
+test("what he typed in the box since wins over the record's half answer", async () => {
+	keepWords("c1:q:again", { form: formToKept({ selection: { selected: new Set(), otherSelected: false }, thinking: "", other: "", text: "det F = 0, so F is not invertible", confidence: "confident" }) });
+	const again = await mount("again", undefined, check, "explain", "q1", { text: "det F = 0, so" });
+	try {
+		assert.equal(again.field().value, "det F = 0, so F is not invertible");
 	} finally {
 		await again.done();
 	}

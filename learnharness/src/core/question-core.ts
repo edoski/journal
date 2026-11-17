@@ -330,7 +330,19 @@ export interface QuestionAnswerData {
 	 *  something first and the question waits to be asked again. Set only
 	 *  through dismissedAnswer, so it never rides an answer. */
 	reason?: DismissReason;
+	/** What he had typed in the question's box when Done for today set it
+	 *  aside (reason "tonight"): kept with the lesson, so the line that says
+	 *  it was left shows it and the question asked again opens with it on
+	 *  every way back, in any window (round 15, 3 m1). His only: never in
+	 *  what the tutor reads (`compactAnswerForModel`), never graded. */
+	draft?: LeftDraft;
 	answeredAt: string;
+}
+
+/** His half answer to a question Done for today set aside. */
+export interface LeftDraft {
+	text: string;
+	confidence?: Confidence;
 }
 
 /** The reasons a dismissal names. A plain Esc skip names none. */

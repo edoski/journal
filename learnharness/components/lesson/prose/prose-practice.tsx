@@ -56,7 +56,7 @@ export function ProseConclude({ toolCallId, input, output, reveal }: {
 		const tonight = (output as { reason?: unknown } | undefined)?.reason === "tonight";
 		return (
 			<p data-testid="prose-conclude" className="my-1 text-body text-muted-foreground">
-				{tonight ? LESSON_WORDS.leftForTonight : LESSON_WORDS.skippedProblem}
+				{tonight ? LESSON_WORDS.problemSetAside : LESSON_WORDS.skippedProblem}
 			</p>
 		);
 	}

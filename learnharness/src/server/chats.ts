@@ -1,6 +1,7 @@
 import { abortRuns, backgroundRuns, runsEnded } from "../agent/subagents/background-runs.ts";
 import { isJobLive } from "../agent/subagents/aborts.ts";
 import { titleFromPrompt } from "../core/contracts.ts";
+import { emit } from "../core/events.ts";
 import { leftQuestionRepose } from "../core/session-end.ts";
 import { stores } from "./stores.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
@@ -28,8 +29,13 @@ export function reposeLeftQuestions(chatId: string): boolean {
 	if (isTurnRunning(chatId)) return false;
 	const messages = stores.chatStore.getChat(chatId)?.messages ?? [];
 	const reposed = leftQuestionRepose(messages);
-	if (reposed.length > 0) stores.chatStore.saveMessages(chatId, [...messages, ...reposed]);
-	return reposed.length > 0;
+	if (reposed.length === 0) return false;
+	stores.chatStore.saveMessages(chatId, [...messages, ...reposed]);
+	// A view of the lesson already open (his own lesson pressed in Sessions)
+	// takes the question asked again, and with it his half answer (round 15,
+	// 3 m1); a fresh view reads it with the page.
+	emit("record-changed", { chatId });
+	return true;
 }
 
 /** How long the wind-down wait may take before the caller gets a retryable

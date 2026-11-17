@@ -37,6 +37,8 @@ const { projectView } = await import("../src/core/view.ts");
 const { findPendingToolCall } = await import("../src/core/pending.ts");
 const { sessionState } = await import("../components/nav/session-state.ts");
 const { reaskedFrom } = await import("../components/lesson/prose/prose-question-data.ts");
+const { leftDraftAt } = await import("../components/lesson/kept-drafts.ts");
+const { subscribe } = await import("../src/core/events.ts");
 const { turnInputOf } = await import("../src/agent/voice-guard.ts");
 
 after(() => fs.rmSync(scratch, { recursive: true, force: true }));
@@ -122,6 +124,32 @@ describe("the question Done for today left, after the close", () => {
 		assert.match(sent, /Done for today with your question left open, so the app asked it again/, "and is told the app asked its left question again");
 		assert.ok(sent.includes(CHECK.question), "naming the question");
 		assert.equal(doneTonightAtEnd(after), false, "answering picks the lesson up");
+	});
+
+	it("brings back his half answer from the lesson's record, however he reopens it, and tells a view already open (round 15, 3 m1)", async () => {
+		const { engine, histories } = scripted([
+			() => fauxAssistantMessage([fauxToolCall("explain", CHECK, { id: "call-left" })], { stopReason: "toolUse" }),
+			() => sendToUser("Good place to stop. Next time we start from Mercury's orbit."),
+			() => fauxAssistantMessage(""),
+		]);
+		const chat = chatStore.createChat("Test: half answer kept");
+		await turn(engine, chat.id, { type: "text", text: "teach me the planets" });
+		assert.equal((await turn(engine, chat.id, { type: "tonight", draft: { toolCallId: "call-left", text: "Mercury, because", confidence: "guessing" } })).status, 200);
+		assert.doesNotMatch(histories.at(-1)!, /Mercury, because/, "the tutor never reads his half answer");
+		const told: string[] = [];
+		const off = subscribe((event) => {
+			if (event.type === "record-changed") told.push((event as { chatId: string }).chatId);
+		});
+		try {
+			assert.equal(reposeLeftQuestions(chat.id), true);
+		} finally {
+			off();
+		}
+		assert.deepEqual(told, [chat.id], "a view of the lesson already open takes the question asked again");
+		const view = projectView(chatStore.getChat(chat.id)!.messages);
+		const open = pendingQuestionOf(chatStore.getChat(chat.id)!.messages)!;
+		const from = reaskedFrom(view, open.toolCallId)!;
+		assert.deepEqual(leftDraftAt(view, from), { text: "Mercury, because", confidence: "guessing" }, "the box opens with it, from the record any window reads");
 	});
 
 	it("a lesson left with nothing open is not given a question", async () => {

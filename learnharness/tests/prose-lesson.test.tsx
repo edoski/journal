@@ -113,7 +113,7 @@ describe("the Prose problem", () => {
 		assert.match(shown, /data-state="open"/);
 		const solved = withMarks(<ProseConclude toolCallId="c1" input={{ outcome: "solved" }} output={{}} reveal="The rank is 2." />);
 		assert.match(solved, /data-state="closed"/);
-		assert.match(renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), /Left for next time/);
+		assert.match(renderToStaticMarkup(<ProseConclude toolCallId="c1" input={{ outcome: "dismissed" }} output={{ reason: "tonight" }} reveal="" />), /Problem set aside for today/);
 	});
 
 	it("shows what he asked for as his bubble", () => {

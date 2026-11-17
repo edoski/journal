@@ -92,7 +92,7 @@ import { showsWorking } from "@/components/lesson/working-sign";
 import { boxAfterClose, boxLine, forgetRescue, keepRescue, overtakenDraft, rescuedBox, typedAfterSend, type LeftOpen } from "@/components/lesson/stranded-draft";
 import { sendKeepingWords } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
-import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
+import { carriedForm, carryBox, carryWords, forgetClosedBoxes, joinAsTyped, keepForNewLesson, keepWords, keptWords, leftDraftAt, leftDraftOf, takeCarry, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine, doneTonightGone, focusAfterDone } from "@/components/lesson/done-tonight";
@@ -538,6 +538,8 @@ export function Chat({
 	// The question this one asks again after a hint or a side question:
 	// his carried work fills it, whatever its words (kept-drafts.ts).
 	const reaskOf = useMemo(() => (pending ? reaskedFrom(messages, pending.toolCallId) : null), [messages, pending?.toolCallId]);
+	// What he had typed when Done for today set the question this one asks again aside (round 15, 3 m1).
+	const leftDraft = useMemo(() => (reaskOf ? leftDraftAt(messages, reaskOf) : null), [messages, reaskOf]);
 
 	// THE ACTIVE PRACTICE PROBLEM (practice sessions, 2026-10-04): the
 	// same dock-ownership rule as a pending question — an active problem
@@ -947,10 +949,13 @@ export function Chat({
 	const sendTonight = useCallback(() => {
 		if (doneTonight && !workOpen) return;
 		if (localStreamRef.current) stop();
-		// His half-typed answer waits for the same question next time
-		// (kept-drafts.ts); the answer itself stays hidden.
+		// His half-typed answer waits for the same question next time: kept
+		// with the lesson, on the question it was left on (round 15, 3 m1),
+		// its photos in this Mac's carry (kept-drafts.ts). The answer itself
+		// stays hidden.
 		if (pending && carryScope) carryBox(`${chatId}:q:${pending.key}`, carryScope, { question: (pending.input as { question?: string } | null)?.question ?? "", from: pending.toolCallId });
-		void send({ type: "tonight" });
+		const draft = pending ? leftDraftOf(keptWords(`${chatId}:q:${pending.key}`)) : null;
+		void send(draft ? { type: "tonight", draft: { toolCallId: pending!.toolCallId, ...draft } } : { type: "tonight" });
 	}, [doneTonight, workOpen, send, pending, carryScope, chatId, stop]);
 	// Once the close has settled, his keys go back to the box (round 12, 1 m9).
 	useEffect(() => {
@@ -1927,6 +1932,7 @@ export function Chat({
 							chatId={chatId}
 							carryScope={carryScope}
 							reaskOf={reaskOf}
+							leftDraft={leftDraft}
 							initialDraft={pending ? questionDraft(pending.key)?.form : undefined}
 							onSaveDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
 							onSubmitAnswer={submitPendingAnswer}
