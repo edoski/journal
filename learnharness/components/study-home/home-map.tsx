@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { currentArc, type ArcHandle, type ChatListItem, type StudyCourse, type TopicHandle } from "@/src/core";
 import { shownArcs } from "@/components/course-page/course-model";
@@ -138,7 +138,7 @@ export function HomeMap({
 	);
 }
 
-/** The courses as underline tabs, the underline sliding to the chosen one.
+/** The courses as underline tabs, the bar sliding to the chosen one (`line`, tabs.md).
  *  Pressing the chosen tab again opens its course page (Edo's notes, 15
  *  Nov 2026, N4: the header's "Course page" link went), as c does. */
 function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyCourse[]; workspace: string; onSelect: (workspace: string) => void }) {
@@ -146,17 +146,6 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 	// Radix chooses a tab on mouse down, so by its click every pressed tab is chosen: whether it already was is read at pointer down.
 	const pressedChosen = useRef(false);
 	const list = useRef<HTMLDivElement>(null);
-	const [bar, setBar] = useState<{ left: number; width: number } | null>(null);
-	useLayoutEffect(() => {
-		const place = () => {
-			const tab = list.current?.querySelector<HTMLElement>('[data-slot="tabs-trigger"][data-state="active"]');
-			if (tab) setBar({ left: tab.offsetLeft, width: tab.offsetWidth });
-		};
-		place();
-		const observer = new ResizeObserver(place);
-		if (list.current) observer.observe(list.current);
-		return () => observer.disconnect();
-	}, [workspace, courses]);
 	return (
 		<Tabs value={workspace} onValueChange={onSelect}>
 			<TabsList
@@ -174,7 +163,6 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 					e.preventDefault();
 					card.focus({ preventScroll: true });
 				}}
-				className="relative [&_[data-slot=tabs-trigger]]:after:hidden"
 			>
 				{courses.map((c) => {
 					const chosen = c.map.workspace === workspace;
@@ -203,14 +191,6 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 						</TabsTrigger>
 					);
 				})}
-				{bar && (
-					<span
-						aria-hidden="true"
-						data-slot="home-map-tab-bar"
-						className="pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-foreground transition-[transform,width] duration-200 ease-out motion-reduce:transition-none"
-						style={{ width: bar.width, transform: `translateX(${bar.left}px)` }}
-					/>
-				)}
 			</TabsList>
 		</Tabs>
 	);
