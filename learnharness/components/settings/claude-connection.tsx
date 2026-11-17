@@ -131,21 +131,26 @@ export function AccountRow({ status, current, busy, onUse, alias, checking = fal
 	</div>;
 }
 
-/** What the account list shows: a line above it, when it says the same
- *  for every account, and the rows (round 14, 4 minor 7: four accounts
- *  each read "This account isn't signed in…", and "can't find your Claude
- *  accounts" still listed the plain `claude` standing in for them). With
- *  none found in T3 Code, no account is listed; with every account
- *  failing alike, the line is said once and the rows show only names.
- *  Exported for tests. */
-export function accountList(statuses: readonly ClaudeAccountStatus[]): { line: string | null; rows: readonly ClaudeAccountStatus[]; notes: boolean } {
+/** What the account list shows: a line above it, the rows, and which rows
+ *  carry their own line (round 14, 4 minor 7: four accounts each read
+ *  "This account isn't signed in…", and "can't find your Claude accounts"
+ *  still listed the plain `claude` standing in for them). With none found
+ *  in T3 Code, no account is listed. With every account failing alike, the
+ *  line is said once, on the row of the account in use, the one the
+ *  lessons run on (round 15, m23: said above four accounts, it named
+ *  none); before the account in use is known, above the names. Exported
+ *  for tests. */
+export function accountList(statuses: readonly ClaudeAccountStatus[], current?: string): { line: string | null; rows: readonly ClaudeAccountStatus[]; notes: (providerId: string) => boolean } {
 	const failing = statuses.filter((status) => status.connection.state !== "connected");
 	if (statuses.length > 0 && statuses.every((status) => status.account.notInT3 && status.connection.state !== "connected")) {
-		return { line: claudeConnectionSentence(statuses[0]!.connection, statuses[0]!.account), rows: [], notes: false };
+		return { line: claudeConnectionSentence(statuses[0]!.connection, statuses[0]!.account), rows: [], notes: () => false };
 	}
 	const said = new Set(failing.map((status) => claudeConnectionSentence(status.connection, status.account)));
-	if (statuses.length > 1 && failing.length === statuses.length && said.size === 1) return { line: [...said][0]!, rows: statuses, notes: false };
-	return { line: null, rows: statuses, notes: true };
+	if (statuses.length > 1 && failing.length === statuses.length && said.size === 1) {
+		const inUse = statuses.some((status) => status.account.providerId === current);
+		return inUse ? { line: null, rows: statuses, notes: (providerId) => providerId === current } : { line: [...said][0]!, rows: statuses, notes: () => false };
+	}
+	return { line: null, rows: statuses, notes: () => true };
 }
 
 /** T3 Code's name for each account whose email another row shares, so two
@@ -215,7 +220,7 @@ export function ClaudeConnectionRow() {
 	}
 
 	const alias = aliases(accounts ?? []);
-	const list = accountList(accounts ?? []);
+	const list = accountList(accounts ?? [], current);
 	const line = !accounts && !error ? claudeConnectionSentence(null) : list.line && (checking ? claudeConnectionSentence(null) : list.line);
 	return <>
 		<div className={CLAUDE_ROW} data-testid="claude-connection">
@@ -223,7 +228,7 @@ export function ClaudeConnectionRow() {
 			{line && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{line}</p>}
 			{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
 		</div>
-		{list.rows.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} checking={checking} note={list.notes} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
+		{list.rows.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} checking={checking} note={list.notes(status.account.providerId)} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
 		<p className={cn(CLAUDE_ROW, connectionNoteClass("muted"))} data-testid="claude-notice">{CLAUDE_NOTICE}</p>
 	</>;
 }
