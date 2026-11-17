@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
+import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
 import { lessonCreation, useLessonStart } from "@/components/start/use-lesson-start";
 import { calendarEntries } from "@/components/calendar/calendar-facts";
 import { CalendarView } from "@/components/calendar/calendar-view";
@@ -22,8 +23,15 @@ export function CalendarPage() {
 
 	if (read.status !== "ready") {
 		return (
-			<div className="flex h-dvh items-center justify-center px-6">
-				{read.status === "loading" ? <p className="text-body text-muted-foreground">Reading your courses…</p> : <CoursesUnavailable reason={read.reason} />}
+			<div className="relative flex h-dvh min-w-0 flex-col">
+				<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
+				{read.status === "loading" ? (
+					<PageReading />
+				) : (
+					<PageNotice>
+						<CoursesUnavailable reason={read.reason} />
+					</PageNotice>
+				)}
 			</div>
 		);
 	}

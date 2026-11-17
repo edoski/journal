@@ -1,9 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
-import { takeLine, useLessonStart, type LessonStart, type TakeLine } from "@/components/start/use-lesson-start";
+import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { doneToday, nearExam, type NearExam } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
@@ -54,77 +55,65 @@ export function HomeFrame({
 		<div className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
-				<div className={className}>
-					<HomeBody state={state} onRetry={retry} quiet={quiet} busy={lesson.busy} onTake={lesson.take}>
-						{children}
-					</HomeBody>
-					{lesson.error && (
-						<p role="alert" className="shrink-0 text-body text-danger">
-							{lesson.error}
-						</p>
+				<HomeBody state={state} onRetry={retry}>
+					{({ courses, chats, failed, readAt }) => (
+						<div className={className}>
+							{courses.length > 0 &&
+								children({
+									...homeOf(courses, chats, readAt),
+									busy: lesson.busy,
+									onContinue: takeLine(lesson.take, courses, chats),
+								})}
+							{(!quiet || courses.length === 0) && <UnreadableLines courses={failed} />}
+							{lesson.error && (
+								<p role="alert" className="shrink-0 text-body text-danger">
+									{lesson.error}
+								</p>
+							)}
+						</div>
 					)}
-				</div>
+				</HomeBody>
 			</main>
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</div>
 	);
 }
 
-function HomeBody({
-	state,
-	onRetry,
-	quiet,
-	busy,
-	onTake,
-	children,
-}: {
-	state: StudyHomeState;
-	onRetry: () => void;
-	quiet: boolean;
-	busy: boolean;
-	onTake: LessonStart["take"];
-	children: (home: HomeReady) => React.ReactNode;
-}) {
+/** Home's lines and what goes with them, from the courses read. */
+function homeOf(courses: readonly StudyCourse[], chats: readonly ChatListItem[], readAt: string | undefined) {
+	const { rows } = needsYouNow(courses, chats, courses[0]!.map.today, readAt);
+	return {
+		rows,
+		lessons: rows.map(lessonOf),
+		courses: todayCourses(rows, courses),
+		chats,
+		done: doneToday(chats, new Date(), courses),
+		exam: nearExam(courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
+	};
+}
+
+/** Home's read: the page's notice while it reads or can't (`PageNotice`), else its column. */
+function HomeBody({ state, onRetry, children }: { state: StudyHomeState; onRetry: () => void; children: (ready: Extract<StudyHomeState, { status: "ready" }>) => React.ReactNode }) {
 	switch (state.status) {
 		case "loading":
-			return <Notice>Reading your courses…</Notice>;
+			return <PageReading />;
 		case "unavailable":
-			return <CoursesUnavailable reason={state.reason} />;
+			return (
+				<PageNotice>
+					<CoursesUnavailable reason={state.reason} />
+				</PageNotice>
+			);
 		case "failed":
 			return (
-				<Notice>
+				<PageNotice>
 					Couldn’t read your courses.{" "}
 					<Button variant="quiet" size="sm" onClick={onRetry} className="text-link hover:text-link">
 						Try again
 					</Button>
-				</Notice>
+				</PageNotice>
 			);
-		case "ready": {
-			if (state.courses.length === 0) {
-				if (state.failed.length > 0) return <UnreadableLines courses={state.failed} />;
-				return <Notice>No courses yet. Start a lesson from New lesson and pick a course there.</Notice>;
-			}
-			const today = state.courses[0]!.map.today;
-			const { rows } = needsYouNow(state.courses, state.chats, today, state.readAt);
-			return (
-				<>
-					{children({
-						rows,
-						lessons: rows.map(lessonOf),
-						courses: todayCourses(rows, state.courses),
-						chats: state.chats,
-						done: doneToday(state.chats, new Date(), state.courses),
-						exam: nearExam(state.courses.flatMap(({ map }) => (map.exam ? [{ course: map.title, date: map.exam.date, daysLeft: map.exam.daysLeft }] : []))),
-						busy,
-						onContinue: takeLine(onTake, state.courses, state.chats),
-					})}
-					{!quiet && <UnreadableLines courses={state.failed} />}
-				</>
-			);
-		}
+		case "ready":
+			if (state.courses.length === 0 && state.failed.length === 0) return <PageNotice>No courses yet. Start a lesson from New lesson and pick a course there.</PageNotice>;
+			return children(state);
 	}
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-	return <p className="text-body text-muted-foreground">{children}</p>;
 }

@@ -5,9 +5,9 @@ import { takeLine, useLessonStart, type TakeLine } from "@/components/start/use-
 import { StartScope } from "@/components/start/start-scope";
 import { unreadableLine } from "@/components/study-home/unreadable-course";
 import { Button } from "@/components/ui/button";
-import { PageFrame } from "@/components/page-frame/page-frame";
+import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
+import { CoursesUnavailable } from "@/components/course-picker";
 import { CourseChrome } from "@/components/course-page/course-chrome";
-import { CourseHeaderSkeleton } from "@/components/course-page/course-header-skeleton";
 import type { CourseRead, CourseView } from "@/components/course-page/course-model";
 import { useCourse } from "@/components/course-page/use-course";
 import { useCourseStanding, type StandingRead } from "@/components/course-page/use-course-standing";
@@ -55,55 +55,41 @@ export function CourseFrame({ workspace, children }: { workspace: string; childr
 function CourseBody({ read, standing, onRetry, children }: { read: CourseRead; standing: StandingRead; onRetry: () => void; children: (view: CourseView, standing: CourseStanding | null) => React.ReactNode }) {
 	switch (read.status) {
 		case "loading":
-			return <Reading />;
+			return <PageReading />;
 		case "unavailable":
-			return <Notice>The study engine is not answering, so this course can’t show right now.</Notice>;
+			return (
+				<PageNotice>
+					<CoursesUnavailable reason={read.reason} />
+				</PageNotice>
+			);
 		case "failed":
 			return (
-				<Notice>
+				<PageNotice>
 					Couldn’t read this course.{" "}
 					<Button variant="quiet" size="sm" onClick={onRetry} className="text-link hover:text-link">
 						Try again
 					</Button>
-				</Notice>
+				</PageNotice>
 			);
 		case "unreadable":
 			return (
-				<Notice>
+				<PageNotice>
 					{unreadableLine(read.course.problem)}{" "}
 					<Button variant="quiet" size="sm" onClick={onRetry} className="text-link hover:text-link">
 						Try again
 					</Button>
-				</Notice>
+				</PageNotice>
 			);
 		case "missing":
 			return (
-				<Notice>
+				<PageNotice>
 					This course is not here.{" "}
 					<Button variant="quiet" size="sm" asChild className="text-link hover:text-link">
 						<Link href="/">Go to Home</Link>
 					</Button>
-				</Notice>
+				</PageNotice>
 			);
 		case "ready":
-			return standing.status === "read" ? children(read.view, standing.standing) : <Reading />;
+			return standing.status === "read" ? children(read.view, standing.standing) : <PageReading />;
 	}
-}
-
-function Reading() {
-	return (
-		<PageFrame className="h-full">
-			<CourseHeaderSkeleton />
-		</PageFrame>
-	);
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-	return (
-		<PageFrame className="h-full">
-			<p data-slot="course-notice" className="flex min-h-8 flex-wrap items-center text-body text-muted-foreground">
-				{children}
-			</p>
-		</PageFrame>
-	);
 }

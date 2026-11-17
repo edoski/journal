@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { useServerEvent } from "@/components/server-events";
 import { useDayChange } from "@/components/day-change";
-import { TopicNotice, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import { TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import { PageNotice, PageReading } from "@/components/page-frame/page-frame";
+import { CoursesUnavailable } from "@/components/course-picker";
 import { withLessonHere } from "@/components/study-home/study-facts";
 
-type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; courses: StudyCourse[]; chats: ChatListItem[] };
+type Read = { status: "loading" } | { status: "unavailable"; reason: string } | { status: "missing" } | { status: "ready"; course: StudyCourse; courses: StudyCourse[]; chats: ChatListItem[] };
 
 /** The topic's course, every course and every session, read again when a turn settles,
  *  the list changes, the course record changes or the day turns over. A
@@ -30,7 +32,8 @@ export function useUnitRead(workspace: string): Read {
 		])
 			.then(([study, { chats }]) => {
 				if (!live) return;
-				const courses = study.available ? withLessonHere(study.courses, chats) : [];
+				if (!study.available) return setRead({ status: "unavailable", reason: study.reason });
+				const courses = withLessonHere(study.courses, chats);
 				const course = courses.find((c) => c.map.workspace === workspace);
 				setRead(course ? { status: "ready", course, courses, chats } : { status: "missing" });
 			})
@@ -53,10 +56,16 @@ export function UnitPage({ workspace, handle }: { workspace: string; handle: str
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
-			{read.status === "ready" && topic ? (
+			{read.status === "loading" ? (
+				<PageReading />
+			) : read.status === "unavailable" ? (
+				<PageNotice>
+					<CoursesUnavailable reason={read.reason} />
+				</PageNotice>
+			) : read.status === "ready" && topic ? (
 				<TopicPage course={read.course} courses={read.courses} topic={topic} chats={read.chats} />
 			) : (
-				<TopicNotice>{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}</TopicNotice>
+				<PageNotice>This topic is not in the course record.</PageNotice>
 			)}
 		</div>
 	);

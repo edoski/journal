@@ -49,7 +49,7 @@ Tab is dead app-wide (owner, 17 Sep 2026), so the page walks with arrows, as the
 
 ## States
 
-The shared frame's (course-page.md): loading shows the header's skeleton, and the engine not answering, a failed or unreadable read and an unknown course each give one plain sentence. No exam leaves it out of the facts line; everything learned puts the topics under On your own with the day each comes back; a long course or topic title truncates on one line.
+The shared frame's (course-page.md): loading, the engine not answering, a failed or unreadable read and an unknown course each give the page's one notice (`PageNotice`). No exam leaves it out of the facts line; everything learned puts the topics under On your own with the day each comes back; a long course or topic title truncates on one line.
 
 ## Sources
 

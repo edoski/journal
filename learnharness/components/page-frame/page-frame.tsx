@@ -25,6 +25,29 @@ export function PageFrame({ className, children, ...rest }: ComponentProps<"div"
 	);
 }
 
+/**
+ * What a page says in its place (spec: page-frame.md, "Notices"): one
+ * line in the frame's first row, the 32px row its title takes, so nothing
+ * jumps when the page arrives or between pages. Every page's notice is
+ * this one: why it can't show (the engine down is `CoursesUnavailable`
+ * in it), and while it reads (`PageReading`).
+ */
+export function PageNotice({ children, ...rest }: ComponentProps<"div">) {
+	return (
+		<PageFrame className="h-full">
+			<div data-slot="page-notice" className="flex min-h-8 flex-wrap items-center text-body text-muted-foreground" {...rest}>
+				{children}
+			</div>
+		</PageFrame>
+	);
+}
+
+/** Every page while it reads: one sentence in the notice's place, never a
+ *  skeleton of one page's head. */
+export function PageReading() {
+	return <PageNotice role="status">Reading your courses…</PageNotice>;
+}
+
 /** A hairline between the facts of the standing line, 12px tall, 12px
  *  clear on each side. */
 const BETWEEN_FACTS = "*:not-first:before:ml-3 *:not-first:before:mr-1.5 *:not-first:before:h-3 *:not-first:before:w-px *:not-first:before:bg-border *:not-first:before:content-['']";

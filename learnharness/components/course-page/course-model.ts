@@ -276,7 +276,7 @@ export interface CourseView {
  *  not among his courses; or the course. */
 export type CourseRead =
 	| { status: "loading" }
-	| { status: "unavailable" }
+	| { status: "unavailable"; reason: string }
 	| { status: "failed" }
 	| { status: "unreadable"; course: UnreadableCourse }
 	| { status: "missing" }
@@ -288,7 +288,7 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 		case "loading":
 			return { status: "loading" };
 		case "unavailable":
-			return { status: "unavailable" };
+			return { status: "unavailable", reason: state.reason };
 		case "failed":
 			return { status: "failed" };
 		case "ready": {

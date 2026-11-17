@@ -15,7 +15,6 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseFacts, courseGroups, courseNext, courseRead, GROUP_IDS, type CourseGroup as Group } from "../components/course-page/course-model.ts";
-import { CourseHeaderSkeleton } from "../components/course-page/course-header-skeleton.tsx";
 import { CourseTopicRow } from "../components/course-page/course-topic-row.tsx";
 import { standingOf } from "../components/course-map/topic-map/topic-standing.ts";
 import { CourseGroup } from "../components/course-page/course-group.tsx";
@@ -312,14 +311,6 @@ function viewOf(c: StudyCourse) {
 	assert.equal(read.status, "ready");
 	return (read as Extract<typeof read, { status: "ready" }>).view;
 }
-
-describe("the course header", () => {
-	it("its skeleton keeps the compact head's two rows", () => {
-		const skeleton = render(<CourseHeaderSkeleton />);
-		assert.equal(skeleton.querySelector('[role="status"]')!.children.length, 2);
-	});
-
-});
 
 describe("the course topic row and group", () => {
 	const groups = courseGroups(course());

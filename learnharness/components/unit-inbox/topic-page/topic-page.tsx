@@ -6,7 +6,7 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { lessonCreation, useLessonStart } from "@/components/start/use-lesson-start";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
-import { PageFrame } from "@/components/page-frame/page-frame";
+import { PageReading } from "@/components/page-frame/page-frame";
 import { topicFacts, type Press, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 import { continueHref } from "@/components/nav/session-state";
@@ -56,7 +56,7 @@ export function TopicPage({
 	);
 	const start = (opening: string, from?: string) => lesson.start(lessonCreation(opening, workspace, { topics: [topic.handle], from }));
 	const press = (does: Press) => ("open" in does ? router.push(continueHref(does.open)) : start(does.opening, does.from));
-	if (topicRead.status === "loading") return <TopicNotice>Loading…</TopicNotice>;
+	if (topicRead.status === "loading") return <PageReading />;
 	const facts = topicFacts({ course, courses, topic, chats, read: topicRead.read });
 	const act = () => {
 		const { action } = facts;
@@ -68,16 +68,5 @@ export function TopicPage({
 			<HybridTopic facts={facts} busy={lesson.busy} error={lesson.error} onAct={act} onTask={press} />
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} />
 		</>
-	);
-}
-
-/** The one plain sentence the topic page shows in its place, in the page frame. */
-export function TopicNotice({ children }: { children: React.ReactNode }) {
-	return (
-		<PageFrame>
-			<p data-slot="topic-notice" className="flex min-h-8 items-center text-body text-muted-foreground">
-				{children}
-			</p>
-		</PageFrame>
 	);
 }

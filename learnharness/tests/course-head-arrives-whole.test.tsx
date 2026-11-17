@@ -128,8 +128,8 @@ describe("the course head arrives whole", () => {
 	it("waits for its standing when the course is read first, then shows the readiness fact and Mistakes at once", async () => {
 		const page = await mount();
 		await page.course();
-		assert.equal(head(), null, "no head without its readiness: the skeleton holds the place");
-		assert.ok(document.querySelector("[data-slot=course-header-skeleton]"));
+		assert.equal(head(), null, "no head without its readiness: the page's reading notice holds the place");
+		assert.ok(document.querySelector("[data-slot=page-notice][role=status]"));
 		await page.standing();
 		assert.deepEqual(head(), WHOLE);
 	});

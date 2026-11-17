@@ -51,8 +51,8 @@ Under the head, across the page, the step to take up with its press (course-head
 
 | State | Shows |
 |---|---|
-| loading | the header's skeleton until both the course and where he stands for the exam (`use-course-standing.ts`) are read |
-| engine not answering | "The study engine is not answering, so this course can't show right now." |
+| loading | "Reading your courses…" in the page's notice (`PageReading`, `../page-frame/page-frame.md`, "Notices", as every page) until both the course and where he stands for the exam (`use-course-standing.ts`) are read |
+| engine not answering | `CoursesUnavailable` with its fix, in the page's notice, as every page |
 | read failed | "Couldn't read this course." and Try again (Home's words) |
 | a record the engine could not read | Home's line for it ("Couldn't read this course's record." and why) and Try again |
 | a course not among his courses | "This course is not here." and Go to Home |

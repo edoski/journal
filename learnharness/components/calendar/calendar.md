@@ -1,6 +1,6 @@
 # Calendar
 
-`/calendar`: when and what is scheduled, across every course, by day. Reached from the sidebar's Calendar row, under Home. `data-slot="calendar"`.
+`/calendar`: when and what is scheduled, across every course, by day. Reached from the sidebar's Calendar row, under Home. `data-slot="calendar"`. While it reads, or with the engine down, it says so in the page's notice, as every page (`PageNotice`, `../page-frame/page-frame.md`, "Notices").
 
 ## Data
 
