@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ComponentProps } from "react";
+import { createContext, useContext, useMemo, useState, type ComponentProps } from "react";
 import type { ArcHandle, StudyCourse } from "@/src/core";
 import { PageHead } from "@/components/page-frame/page-frame";
 import { CourseFrame } from "@/components/course-page/course-frame";
@@ -13,8 +13,9 @@ import { SplitBody, type CourseColumns } from "@/components/course-page/split/sp
 import { SplitList } from "@/components/course-page/split/split-list";
 import { ReadyFact, useHeadStanding } from "@/components/course-page/candidates/shared/ready-fact";
 import { Marker, RoadArc } from "@/components/course-page/candidates/road/road-arc";
-import { arcStarts, examStop } from "@/components/course-page/candidates/road/road-model";
-import { CalendarIcon } from "lucide-react";
+import { arcStarts, examStop, roadWindow, shownStop } from "@/components/course-page/candidates/road/road-model";
+import { Button } from "@/components/ui/button";
+import { CalendarIcon, ChevronsUpDownIcon } from "lucide-react";
 
 /** Road's head (spec: road.md): the title with Mistakes, Context and the
  *  press, and one line, whether he is ready (`ReadyFact`) and when he last
@@ -82,22 +83,38 @@ function RoadLine(props: ComponentProps<typeof CourseArc<CourseTopic>>) {
 	);
 }
 
-/** Road's left column: the course's arcs in study order on one track, the
- *  exam a stop after the last arc it examines and the plan fits, or a
- *  course's four groups when it has no arcs. */
+/** The road's last line: a quiet press that shows the whole road, or
+ *  folds it back to the stretch near him. */
+function WholeRoad({ whole, onToggle }: { whole: boolean; onToggle: () => void }) {
+	return (
+		<Button variant="quiet" size="xs" data-slot="road-whole" aria-pressed={whole} onClick={onToggle} className="mt-3 h-7 w-fit gap-1.5 px-0 text-callout text-muted-foreground hover:text-foreground">
+			<ChevronsUpDownIcon aria-hidden className="size-3.5" />
+			{whole ? "Only what's near" : "Whole road"}
+		</Button>
+	);
+}
+
+/** Road's left column: the stretch of the course's road near him (the arc
+ *  he is in, the next, and any arc Today asks about), the exam a stop
+ *  where the plan reaches it, and a press for the whole road; a course's
+ *  four groups when it has no arcs. */
 function RoadList(c: CourseColumns) {
 	const { course, arcs, facts } = c.view;
+	const [whole, setWhole] = useState(false);
 	const stop = useMemo(() => (arcs ? examStop(course.map, arcs) : null), [course.map, arcs]);
-	const road = useMemo(
-		() => ({ course, exam: stop ? facts.exam : null, stopBefore: stop?.stopBefore ?? null, past: stop?.past ?? new Set<ArcHandle>(), order: arcs?.map((a) => a.arc.handle) ?? [] }),
-		[course, stop, facts.exam, arcs],
-	);
+	const shown = useMemo(() => (arcs ? roadWindow(arcs, whole) : null), [arcs, whole]);
+	const folds = Boolean(arcs && shown && arcs.length > roadWindow(arcs, false).length);
+	const road = useMemo(() => {
+		const stopBefore = arcs && shown && stop ? shownStop(arcs, shown, stop.stopBefore) : null;
+		return { course, exam: stop ? facts.exam : null, stopBefore, past: stop?.past ?? new Set<ArcHandle>(), order: shown?.map((a) => a.arc.handle) ?? [] };
+	}, [course, stop, facts.exam, arcs, shown]);
+	const examLast = Boolean(shown && road.exam && stop && road.stopBefore === null);
 	return (
 		<Road.Provider value={road}>
 			<SplitList
 				ref={c.listRef}
 				groups={c.groups}
-				arcs={arcs}
+				arcs={shown}
 				open={c.open}
 				onOpenChange={c.onOpenChange}
 				onCheck={c.onCheck}
@@ -107,7 +124,14 @@ function RoadList(c: CourseColumns) {
 				onEnterMap={c.onEnterMap}
 				onExitTop={c.onExitTop}
 				arcLine={RoadLine}
-				after={arcs && road.exam && stop && stop.stopBefore === null ? <ExamStop course={course} words={road.exam} below={false} /> : undefined}
+				after={
+					shown ? (
+						<>
+							{examLast && road.exam && <ExamStop course={course} words={road.exam} below={false} />}
+							{folds && <WholeRoad whole={whole} onToggle={() => setWhole((w) => !w)} />}
+						</>
+					) : undefined
+				}
 			/>
 		</Road.Provider>
 	);
