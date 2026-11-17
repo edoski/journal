@@ -99,7 +99,7 @@ describe("the hybrid's facts", () => {
 			[...marks].filter(([, mark]) => mark.tag || mark.status !== "upcoming").map(([id, mark]) => [titleOf(EIGEN_PLAN, [id])[0], mark.status, mark.tag]),
 			[
 				["The eigen-equation Av = λv", "visited", null],
-				["Computing a 2×2 spectrum", "current", null],
+				["Computing a 2×2 spectrum", "current", "Your turn"],
 				["An eigenbasis makes A diagonal", "upcoming", "Next"],
 			],
 		);
@@ -114,10 +114,16 @@ describe("the hybrid page drawn", () => {
 		assert.ok(document.querySelector('[data-testid="topic-action"]') === null);
 		const panes = document.querySelector('[data-slot="topic-panes"]')!;
 		assert.deepEqual([...panes.querySelectorAll(":scope > div > [data-slot]")].map((pane) => pane.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
-		const steps = [...document.querySelectorAll('[data-slot="topic-step"]')];
-		assert.equal(steps.length, 7);
+		const map = document.querySelector('[data-slot="topic-lesson-map"]')!;
+		const steps = [...map.querySelectorAll('[data-slot="course-map-node"]')];
+		assert.equal(steps.length, 7, "every step on the course map's card");
 		assert.ok(steps.every((step) => step.getAttribute("href") === "/chat/chat_demo_eigen"));
-		assert.equal(document.querySelector('[data-slot="topic-step-tag"]')!.textContent, "Next");
+		assert.deepEqual(
+			[...map.querySelectorAll('[data-slot="course-map-tag"]')].map((tag) => tag.textContent),
+			["Your turn", "Next"],
+			"the course map's tags: Your turn over the step his question asks about, Next over the one after",
+		);
+		assert.equal(map.querySelector('[data-current="true"]')!.getAttribute("data-status"), "current");
 	});
 
 	it("opens the shown lesson from Now, and shows a lesson that planned on the map when he points at it, with no unlabelled map button (round 10, 1 m8)", () => {

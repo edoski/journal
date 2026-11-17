@@ -70,7 +70,7 @@ const document = parseHTML(
 	)}</body></html>`,
 ).document;
 
-const step = (words: string) => [...document.querySelectorAll('[data-slot="topic-step"]')].find((el) => el.getAttribute("aria-label")!.startsWith(words))!;
+const step = (words: string) => [...document.querySelectorAll('[data-slot="topic-lesson-map"] [data-slot="course-map-node"]')].find((el) => el.getAttribute("aria-label")!.startsWith(words))!;
 
 describe("math on the topic page", () => {
 	it("typesets a step title's formula in its map node, and names it in plain words", () => {
@@ -78,7 +78,7 @@ describe("math on the topic page", () => {
 		assert.ok(node, "the node's label is the plain words");
 		assert.equal(node.querySelectorAll('[data-slot="math-text"] .katex').length, 1);
 		assert.doesNotMatch(node.getAttribute("aria-label")!, /\$|\\det/);
-		const caption = document.querySelector('[data-slot="topic-steps"] figcaption')!.textContent!;
+		const caption = document.querySelector('[data-slot="topic-lesson-map"] figcaption')!.textContent!;
 		assert.match(caption, /Your turn on det\(AB\) = det A · det B/);
 	});
 

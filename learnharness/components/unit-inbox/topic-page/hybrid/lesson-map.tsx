@@ -1,43 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent } from "@xyflow/react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { Edge, Node } from "@xyflow/react";
 import type { TopicHandle } from "@/src/core";
-import { NeedEdge, type NeedFlowEdge } from "@/components/course-map/topic-map/need-edge";
-import { MIN_ZOOM, type Camera, type NodeSize, cameraAt, centreOf, chainOf, isWalkKey, neighbourOf, wholeZoom } from "@/components/course-map/topic-map/topic-map-layout";
-import { TopicMapContext, type TopicMapState } from "@/components/course-map/topic-map/topic-node";
-import { mapFade } from "@/components/study-home/map-frame";
-import { STEP_CARD, StepFace, StepNode, type StepFlowNode } from "@/components/unit-inbox/topic-page/steps/step-node";
-import { STEP_SIZE, TAG_ROOM, ringedStep, stepCard, stepsAcross, stepsCamera, stepsLayout, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
+import { CardMap, type MapGraph } from "@/components/course-map/topic-map/topic-map";
+import { cardNode, mapEdges } from "@/components/course-map/topic-map/map-drawing";
+import type { NodeSize } from "@/components/course-map/topic-map/topic-map-layout";
+import type { StepData } from "@/components/course-map/topic-map/topic-node";
+import { BaseNode } from "@/components/course-map/topic-map/canvas/base-node";
+import { CardContent } from "@/components/course-map/topic-map/canvas/canvas-node";
+import { PANE_FADE, mapFade } from "@/components/study-home/map-frame";
+import { STEP_SIZE, ringedStep, stepCard, stepsAcross, stepsLayout } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
 import { mathPlain } from "@/components/ui/math-text";
 
-const nodeTypes = { step: StepNode };
-const edgeTypes = { need: NeedEdge };
-
-/** How far the fade reaches in from the sides and from the top and bottom:
- *  Home's map frame's, slimmer at the sides of this narrower column. */
-const FADE = { x: 24, y: 40 };
-/** The frame's edges fade into the page on every side, like Home's map. */
-const VIGNETTE = mapFade(FADE.x, FADE.y);
-/** As much room around the drawing as the fade, so a step at the edge pans clear of it. */
-const MARGIN = { x: FADE.x, y: FADE.y + TAG_ROOM };
-/** How long the camera takes to follow the keyboard to a step out of view. */
-const FOLLOW_MS = 200;
-
-function reducedMotion(): boolean {
-	return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
+const VIGNETTE = mapFade(PANE_FADE.x, PANE_FADE.y);
 
 /**
  * Each step's card sized to the pane (`stepCard`, round 14, m34): the
  * pane's width, read as it changes, and every card measured in a hidden
- * copy of the drawn card (`STEP_CARD`, `StepFace`), its title unwrapped
- * for the one-line width, then at the chosen width for the height. Again
- * once the web fonts a formula needs have loaded. `STEP_SIZE` until then.
+ * copy of the drawn card (`CardContent`), its title unwrapped for the
+ * one-line width, then at the chosen width for the height. Again once the
+ * web fonts a formula needs have loaded. `STEP_SIZE` until then.
  */
-function useStepCard(plan: PlannedEntry["plan"], across: number) {
+function useStepCard(steps: readonly StepData[], across: number) {
 	const root = useRef<HTMLDivElement>(null);
 	const measurer = useRef<HTMLDivElement>(null);
 	const [paneWidth, setPaneWidth] = useState(0);
@@ -62,7 +49,7 @@ function useStepCard(plan: PlannedEntry["plan"], across: number) {
 			const tallest = (): number => Math.max(0, ...cards.map((card) => card.getBoundingClientRect().height));
 			for (const card of cards) card.style.width = "max-content";
 			const oneLine = widest();
-			const next = stepCard(across, paneWidth, FADE, oneLine, (width) => {
+			const next = stepCard(across, paneWidth, PANE_FADE, oneLine, (width) => {
 				for (const card of cards) card.style.width = `${width}px`;
 				return tallest();
 			});
@@ -73,241 +60,86 @@ function useStepCard(plan: PlannedEntry["plan"], across: number) {
 		return () => {
 			live = false;
 		};
-	}, [plan, across, paneWidth]);
+	}, [steps, across, paneWidth]);
 	return { root, measurer, size };
 }
 
 /**
- * One lesson's plan in a bounded frame (spec: hybrid.md): the frame keeps
- * its size and fades its edges as Home's course map does, and the plan
- * pans inside it by wheel, trackpad or drag, with no bar. Its cards take
- * their width from the pane, at most four across, every card as tall as
- * the tallest title needs (`useStepCard`). It opens on the
- * whole plan clear of the fade when that fits at three quarters size or
- * more, else at three quarters size on the step the lesson stopped on
- * (`stepsCamera`). That step is ringed, the steps
- * right after it say Next, and every step opens the lesson.
+ * One lesson's plan as a map (spec: hybrid.md, Lesson map), drawn by the
+ * course map's own drawing (`CardMap`): its card, lines, tags, focus,
+ * camera and keys, under the topic page's fade. Each step is the course
+ * map's card less what a step lacks, its width from the pane, at most
+ * four across, every card as tall as the tallest title needs
+ * (`useStepCard`). The ringed step carries "Left off here" or "Your
+ * turn", the step after it "Next", and every step opens the lesson.
  */
 export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string }) {
 	const { plan } = entry;
 	const waits = entry.state === "your-turn";
 	const href = `/chat/${entry.chat.id}`;
-	const across = useMemo(() => stepsAcross(stepsLayout(plan).layout), [plan]);
-	const { root, measurer, size } = useStepCard(plan, across);
-	const card = size ?? STEP_SIZE;
-	const drawing = useMemo(() => stepsLayout(plan, card), [plan, card]);
-	const nodes = useMemo<StepFlowNode[]>(() => {
+	const ring = ringedStep(plan, waits) as TopicHandle | null;
+	const steps = useMemo<StepData[]>(() => {
 		const marks = hybridMarks(plan, waits);
+		const { needs } = stepsLayout(plan);
 		const titleOf = new Map(plan.tree.nodes.map((node) => [node.id, mathPlain(node.title)]));
 		// A step the plan repeats is drawn once.
-		const steps = plan.tree.nodes.filter((node, index, all) => all.findIndex((other) => other.id === node.id) === index);
-		return steps.flatMap((node) => {
+		const unique = plan.tree.nodes.filter((node, index, all) => all.findIndex((other) => other.id === node.id) === index);
+		return unique.flatMap((node) => {
 			const handle = node.id as TopicHandle;
-			const placed = drawing.layout.topics.get(handle);
 			const mark = marks.get(node.id);
-			if (!placed || !mark) return [];
-			const rests = drawing.needs.flatMap((need) => (need.kind === "needs" && need.topic === handle ? [titleOf.get(need.prerequisite) ?? need.prerequisite] : []));
-			const said = mark.status === "current" && waits ? "Your turn" : mark.tag;
-			return {
-				id: node.id,
-				type: "step" as const,
-				position: { x: placed.x, y: placed.y },
-				width: card.width,
-				height: card.height,
-				// A server render has no measured handles; these let it draw the edges.
-				handles: [
-					{ type: "target" as const, position: Position.Top, x: card.width / 2, y: 0 },
-					{ type: "source" as const, position: Position.Bottom, x: card.width / 2, y: card.height },
-				],
-				draggable: false,
-				selectable: false,
-				focusable: false,
-				ariaRole: "none" as const,
-				data: {
+			if (!mark) return [];
+			const rests = needs.flatMap((need) => (need.kind === "needs" && need.topic === handle ? [titleOf.get(need.prerequisite) ?? need.prerequisite] : []));
+			return [
+				{
+					kind: "step" as const,
 					handle,
 					title: node.title,
 					status: mark.status,
+					current: mark.status === "current",
 					tag: mark.tag,
-					label: [mathPlain(node.title), said, `Opens ${label}`].filter(Boolean).join(". "),
-					rests: rests.length ? `Rests on ${rests.join(", ")}` : null,
+					label: [mathPlain(node.title), mark.tag, `Opens ${label}`].filter(Boolean).join(". "),
+					needs: rests.length ? `Rests on ${rests.join(", ")}` : null,
 					summary: node.summary?.trim() || null,
 					href,
-					layer: placed.layer,
 				},
-			};
+			];
 		});
-	}, [plan, waits, href, label, drawing, card]);
-	const edges = useMemo<NeedFlowEdge[]>(
+	}, [plan, waits, href, label]);
+	const across = useMemo(() => stepsAcross(stepsLayout(plan).layout), [plan]);
+	const { root, measurer, size } = useStepCard(steps, across);
+	const card = size ?? STEP_SIZE;
+	const drawing = useMemo(() => stepsLayout(plan, card), [plan, card]);
+	const nodes = useMemo<Node[]>(
 		() =>
-			drawing.layout.routes.map((route) => ({
-				id: `${route.prerequisite}>${route.topic}`,
-				source: route.prerequisite,
-				target: route.topic,
-				type: "need" as const,
-				data: { points: route.points },
-				focusable: false,
-				selectable: false,
-				domAttributes: { "aria-hidden": true },
-			})),
-		[drawing],
+			steps.flatMap((step) => {
+				const placed = drawing.layout.topics.get(step.handle);
+				return placed ? [cardNode(step, placed, drawing.layout)] : [];
+			}),
+		[steps, drawing],
 	);
-	const ring = ringedStep(plan, waits);
+	const edges = useMemo<Edge[]>(() => mapEdges(drawing.layout), [drawing]);
 	const current = plan.tree.nodes.find((node) => node.id === ring) ?? null;
+	const graph = useMemo<MapGraph>(
+		() => ({
+			edges: drawing.needs,
+			current: ring,
+			caption: `${label}: ${steps.length} steps, each below the steps it rests on.${current ? ` ${waits ? "Your turn on" : "Left off at"} ${mathPlain(current.title)}.` : ""}`,
+		}),
+		[drawing.needs, ring, label, steps.length, current, waits],
+	);
 	return (
 		<div ref={root} data-slot="topic-lesson-map" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
 			<div ref={measurer} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 -z-10">
-				{plan.tree.nodes.map((node, index) => (
-					<div key={`${node.id}-${index}`} className={STEP_CARD}>
-						<StepFace status="current" title={node.title} />
-					</div>
+				{steps.map((step) => (
+					<BaseNode key={step.handle} className="flex flex-col">
+						<CardContent data={step} />
+					</BaseNode>
 				))}
 			</div>
-			{/* The provider takes the drawing too, so a server render has it before any effect runs. */}
-			<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-				<Flow
-					sized={size !== null}
-					drawing={drawing}
-					nodes={nodes}
-					edges={edges}
-					current={(current?.id as TopicHandle | undefined) ?? null}
-					caption={`${label}: ${nodes.length} steps, each below the steps it rests on.${current ? ` ${waits ? "Your turn on" : "Left off at"} ${mathPlain(current.title)}.` : ""}`}
-				/>
-			</ReactFlowProvider>
+			{/* Shown once the cards are sized to the pane, so no card jumps. */}
+			<div className={cn("relative flex min-h-0 flex-1 flex-col", size === null && "invisible")}>
+				<CardMap graph={graph} layout={drawing.layout} nodes={nodes} edges={edges} margin={PANE_FADE} opensOn={ring} fitsDown="top" />
+			</div>
 		</div>
-	);
-}
-
-function Flow({
-	sized,
-	drawing,
-	nodes,
-	edges,
-	current,
-	caption,
-}: {
-	/** The cards are sized to the pane: the map shows only then, so no card jumps. */
-	sized: boolean;
-	drawing: StepsDrawing;
-	nodes: StepFlowNode[];
-	edges: NeedFlowEdge[];
-	current: TopicHandle | null;
-	caption: string;
-}) {
-	const { layout, needs } = drawing;
-	const captionId = useId();
-	const flow = useReactFlow<StepFlowNode, NeedFlowEdge>();
-	const frameWidth = useStore((s) => s.width);
-	const frameHeight = useStore((s) => s.height);
-
-	const [active, setActive] = useState<TopicHandle | null>(null);
-	const [tabStop, setTabStop] = useState<TopicHandle | null>(current ?? layout.layers[0]?.[0] ?? null);
-	const links = useRef(new Map<TopicHandle, HTMLAnchorElement>());
-	const lit = useMemo(() => (active ? chainOf(active, needs) : null), [active, needs]);
-
-	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
-	const minZoom = frame ? Math.max(MIN_ZOOM, Math.min(1, wholeZoom(layout, frame, MARGIN))) : 1;
-
-	// The camera returns to its opening view whenever the frame grows or shrinks.
-	const [opening, setOpening] = useState<Camera | null>(null);
-	useEffect(() => {
-		if (frameWidth <= 0 || frameHeight <= 0) return;
-		setOpening(stepsCamera(layout, current, { width: frameWidth, height: frameHeight }, FADE));
-	}, [layout, current, frameWidth, frameHeight]);
-
-	// The plan and its room (in the frame's pixels, so the most the drawing needs at the smallest scale), and whatever
-	// more the opening view shows around a plan smaller than the frame.
-	const extent = useMemo<CoordinateExtent>(() => {
-		const [x, y] = [MARGIN.x / minZoom, MARGIN.y / minZoom];
-		const base: CoordinateExtent = [
-			[-x, -y],
-			[layout.width + x, layout.height + y],
-		];
-		if (!opening || frameWidth <= 0 || frameHeight <= 0) return base;
-		return [
-			[Math.min(base[0][0], -opening.x / opening.zoom), Math.min(base[0][1], -opening.y / opening.zoom)],
-			[Math.max(base[1][0], (frameWidth - opening.x) / opening.zoom), Math.max(base[1][1], (frameHeight - opening.y) / opening.zoom)],
-		];
-	}, [layout, minZoom, opening, frameWidth, frameHeight]);
-
-	// Set once the extent above holds the view, so the camera is not pulled back inside the plan's own room.
-	const [placed, setPlaced] = useState(false);
-	useEffect(() => {
-		if (opening) void flow.setViewport(opening).then(() => setPlaced(true));
-	}, [flow, opening]);
-
-	/** Brings a step the keyboard reached into view, when part of it is out of the frame. */
-	const follow = useCallback(
-		(handle: TopicHandle) => {
-			const at = layout.topics.get(handle);
-			if (!at || frameWidth <= 0) return;
-			const { x, y, zoom } = flow.getViewport();
-			const left = at.x * zoom + x;
-			const top = at.y * zoom + y;
-			const inside = left >= MARGIN.x && top >= MARGIN.y && left + layout.node.width * zoom <= frameWidth - MARGIN.x && top + layout.node.height * zoom <= frameHeight - MARGIN.y;
-			if (!inside) void flow.setViewport(cameraAt(layout, centreOf(layout, at), zoom, { width: frameWidth, height: frameHeight }, MARGIN), { duration: reducedMotion() ? 0 : FOLLOW_MS });
-		},
-		[flow, layout, frameWidth, frameHeight],
-	);
-
-	const state = useMemo<TopicMapState>(
-		() => ({
-			lit,
-			tabStop,
-			onActive: setActive,
-			onFocus: (handle) => {
-				setActive(handle);
-				setTabStop(handle);
-				if (links.current.get(handle)?.matches(":focus-visible")) follow(handle);
-			},
-			onKeyDown: (handle, event: KeyboardEvent<HTMLAnchorElement>) => {
-				if (!isWalkKey(event.key)) return;
-				const next = neighbourOf(layout, needs, handle, event.key);
-				if (!next) return;
-				event.preventDefault();
-				setTabStop(next);
-				links.current.get(next)?.focus({ preventScroll: true });
-			},
-			register: (handle, el) => {
-				if (el) links.current.set(handle, el);
-				else links.current.delete(handle);
-			},
-		}),
-		[lit, tabStop, layout, needs, follow],
-	);
-
-	return (
-		<figure data-slot="topic-steps" aria-labelledby={captionId} className="relative min-h-0 flex-1">
-			<figcaption id={captionId} className="sr-only">
-				{caption}
-			</figcaption>
-			<TopicMapContext.Provider value={state}>
-				<ReactFlow
-					nodes={nodes}
-					edges={edges}
-					nodeTypes={nodeTypes}
-					edgeTypes={edgeTypes}
-					// No `colorMode="dark"`: its `dark` class on the wrapper would restate the old theme's tokens inside the map.
-					// The opening view is set once the frame is measured; the map fades in on it.
-					className={cn("transition-opacity duration-[180ms] ease-out motion-reduce:transition-none", (!placed || !sized) && "opacity-0")}
-					minZoom={minZoom}
-					maxZoom={1}
-					translateExtent={extent}
-					panOnScroll
-					zoomOnDoubleClick={false}
-					nodesDraggable={false}
-					nodesConnectable={false}
-					nodesFocusable={false}
-					edgesFocusable={false}
-					elementsSelectable={false}
-					deleteKeyCode={null}
-					selectionKeyCode={null}
-					multiSelectionKeyCode={null}
-					panActivationKeyCode={null}
-					disableKeyboardA11y
-					// As the topic map: MIT asks for no badge (spec: topic-map.md).
-					proOptions={{ hideAttribution: true }}
-				/>
-			</TopicMapContext.Provider>
-		</figure>
 	);
 }

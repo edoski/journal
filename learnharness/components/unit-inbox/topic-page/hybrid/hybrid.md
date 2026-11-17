@@ -32,10 +32,13 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 
 ## Lesson map (`lesson-map.tsx`)
 
-- Home's course map frame: the pane keeps its size, `mapFade(24, 40)` on its edges (Home's 64 at the sides is too much for this narrower column), room around the drawing as much as the fade (plus 20 for a tag), wheel and trackpad pan inside (`panOnScroll`), drag pans, pinch zooms between `MIN_ZOOM` and full size, no bars, no controls.
-- Steps take their width from the measured pane (`stepCard`, round 14, m34: fixed cards cut "One-to-one against onto for square…"): its clear middle, inside the fade, split into the plan's widest row, at most four (`PLAN_MAP_CAP.across`), so that row fits at full size; no wider than the longest title needs on one line, and 184×64 (`STEP_SIZE`) at least while the pane allows. Every card is as tall as the tallest title needs at that width, so every title shows whole (`StepFace`, no clamp). Measured in a hidden copy of the card (`STEP_CARD`), again once web fonts load; the map shows once sized.
-- Opens on the whole plan, its tags included, clear of the fade at the largest scale up to full size, centred across and at the top of the pane, by the list's first row (round 14, m39: Kernel's two sheet parts floated mid-page); below 75% it opens at 75% on the step the lesson stopped on, the plan's edges kept inside the clear middle, and the rest a pan away (`stepsCamera`). Fades in once placed (180ms); a new lesson mounts a new map with the same fade.
-- Steps are `StepNode` (`../steps/step-node.tsx`) on `stepsLayout`, marked by `hybridMarks`: the steps tab's marks, plus "Next" over each step that rests on the one it stopped on and no question was about yet. While the lesson waits on him the ring and "Your turn" sit on the step his open question asks about (`ringedStep`, the plan's `asked`), a check back on a step done included; the strip keeps its forward-only position (round 14, m40). "Left off here" over the step a lesson that waits on nobody stopped on. Keyboard, hover chain and caption as the steps map.
+One map on all three pages (Edo, 17 Nov 2026: "the individual lesson/graph also needs updating and be standardised; ideally it should reuse our same graph components and UI/UX as course/home pages"): the lesson's steps are drawn by the course map's own drawing (`CardMap`, `../../../course-map/topic-map/topic-map.md`), its card, lines, tags, focus, dot grid, camera and keys, not by a copy.
+
+- The pane's frame: the map pane's fade on its edges (`PANE_FADE`, 24 at the sides and 40 at the top and bottom, `../../../study-home/map-frame.ts`; Home's 64 at the sides is too much for this narrower column), which the map of what a topic builds on shares. Pan, zoom and the hold while the plan fits are the course map's (topic-map.md, Behaviour).
+- Each step is the course map's card less what a step lacks (canvas.md, Node, "a lesson's step"): no header strip, since a step has no standing and no sidebar fact; the lesson panel's mark in the pie's place; its title whole; the tutor's summary on hover. The lines are the canvas's (`layoutCanvas` over `stepsLayout`'s needs): right-angled, one entry and one exit per card, the needs a longer chain implies left out.
+- Steps take their width from the measured pane (`stepCard`, round 14, m34: fixed cards cut "One-to-one against onto for square…"): its clear middle, inside the fade, split into the plan's widest row, at most four (`PLAN_MAP_CAP.across`), so that row fits at full size; no wider than the longest title needs on one line, and 184×64 (`STEP_SIZE`) at least while the pane allows. Every card is as tall as the tallest title needs at that width, so every title shows whole. Measured in a hidden copy of the card's body (`CardContent`), again once web fonts load; the map shows once sized.
+- Opens as the course map opens (`framedCamera`): the whole plan when it fits at 80% or more, centred across and at the top of the pane, by the list's first row (round 14, m39: Kernel's two sheet parts floated mid-page); else framed on the ringed step with the step after it whole. At 1512×982 a chain as deep as `PLAN_MAP_CAP` opens whole (`tests/plan-map-cap.test.ts`).
+- Marks (`hybridMarks`): the ringed step (`ringedStep`) wears the course map's ring and, above it, "Your turn" while the lesson waits on him (on the step his open question asks about, a check back on a step done included; round 14, m40), else "Left off here" while a step is still ahead; "Next" over the step after it that no question was about yet. Hover or focus lights a step with what it rests on and what rests on it (canvas.md, Focus); the arrows walk the steps as they walk the course map; the caption names the lesson, its steps and where it stands.
 
 ## A topic not started
 
@@ -43,7 +46,7 @@ Round 4 (14 Nov 2026) found the unstarted page one wide row with Start at the fa
 
 ## Math
 
-A step title, a session's title and an attempt's sentence may hold TeX; each is drawn through the shared `MathText` (`../../../ui/math-text.md`) in the map's nodes (`StepNode`) and the history's rows, and `mathPlain` gives a node's label and the map's caption plain words. A title with no formula stays plain text. KaTeX's fonts have no medium face, so a step's title strokes its math by a hairline (0.015em) to sit at the title's medium weight. Tested in `tests/topic-page-math.test.tsx`.
+A step title, a session's title and an attempt's sentence may hold TeX; each is drawn through the shared `MathText` (`../../../ui/math-text.md`) in the map's cards (`CardContent`) and the history's rows, and `mathPlain` gives a node's label and the map's caption plain words. A title with no formula stays plain text. KaTeX's fonts have no medium face, so a step's title strokes its math by a hairline (0.015em) to sit at the title's medium weight. Tested in `tests/topic-page-math.test.tsx`.
 
 ## Facts (`hybrid-facts.ts`)
 
@@ -57,7 +60,7 @@ The lesson on the map is kept while its session is listed; a lesson the history 
 
 ## Shared parts it needs
 
-It reads `TopicHead`, `WhyMark`, `trailDays` (`../trail/trail-facts.ts`), `lessonWords`, `stepsLayout`, `stepMarks` (`../steps/steps-facts.ts`) and `StepNode` (`../steps/step-node.tsx`), the parts of the deleted steps and trail candidates it kept.
+It reads `TopicHead`, `WhyMark`, `trailDays` (`../trail/trail-facts.ts`), `lessonWords`, `stepsLayout`, `stepMarks` (`../steps/steps-facts.ts`), the parts of the deleted steps and trail candidates it kept, and the course map's `CardMap`.
 
 ## Layouts tried (13 Nov 2026, throwaway sketches)
 

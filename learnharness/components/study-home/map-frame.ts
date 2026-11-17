@@ -8,3 +8,8 @@ export function mapFade(x: number, y: number): React.CSSProperties {
 		WebkitMaskComposite: "source-in",
 	};
 }
+
+/** The fade of a map pane beside a list (the topic page's lesson map and
+ *  the map of what a topic builds on): Home's map frame's, slimmer at the
+ *  sides of this narrower column. */
+export const PANE_FADE = { x: 24, y: 40 } as const;

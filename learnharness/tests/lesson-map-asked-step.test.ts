@@ -56,7 +56,7 @@ describe("the lesson map's Your turn (m40)", () => {
 	it("rings the asked step while the lesson waits on him", () => {
 		assert.equal(ringedStep(plan, true), "collisions");
 		const marks = stepMarks(plan, true);
-		assert.deepEqual(marks.get("collisions"), { status: "current", tag: null });
+		assert.deepEqual(marks.get("collisions"), { status: "current", tag: "Your turn" });
 		assert.equal(marks.get("reach")?.status, "visited", "the step being taught was asked about too");
 	});
 

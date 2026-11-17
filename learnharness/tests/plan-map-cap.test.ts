@@ -10,18 +10,25 @@ import { describe, it } from "node:test";
 import { PLAN_MAP_CAP, type PlanTree } from "../src/core/contracts/plan.ts";
 import { planDepth, planMapTooBig } from "../src/core/plan-tree.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
-import { stepsLayout, STEP_SIZE, TAG_ROOM } from "../components/unit-inbox/topic-page/steps/steps-facts.ts";
-import { LAYER_GAP, NODE_GAP, WHOLE_COURSE_ZOOM } from "../components/course-map/topic-map/topic-map-layout.ts";
+import { stepsLayout } from "../components/unit-inbox/topic-page/steps/steps-facts.ts";
+import { READABLE_ZOOM, TAG_ROOM, cardFit, framedCamera } from "../components/course-map/topic-map/topic-map-layout.ts";
 
 /** The lesson map's pane at 1512×982 with the sidebar open, measured in the
- *  running app on 14 Nov 2026, and its fade (lesson-map.tsx's FADE). */
-const PANE = { width: 696, height: 786 };
+ *  running app on 17 Nov 2026, and its fade (`PANE_FADE`). */
+const PANE = { width: 864, height: 787 };
 const FADE = { x: 24, y: 40 };
 
-/** The scale the pane opens a plan whole at (steps-facts.ts's fitZoom). */
-function fit(tree: Pick<PlanTree, "nodes" | "edges">): number {
+/** Whether the lesson map opens with every step and the tags over the first row clear of the fade, at a scale its
+ *  titles stay readable at: the course map's camera (`framedCamera`), a plan that fits sitting at the pane's top. */
+function opensWhole(tree: Pick<PlanTree, "nodes" | "edges">): boolean {
 	const { layout } = stepsLayout({ tree: { ...tree, version: 1 }, current: null, visited: [] } as never);
-	return Math.min(1, (PANE.width - FADE.x * 2) / layout.width, (PANE.height - FADE.y * 2) / (layout.height + TAG_ROOM));
+	const camera = framedCamera(layout, null, PANE, FADE, TAG_ROOM, "top");
+	if (camera.zoom < READABLE_ZOOM) return false;
+	return [...layout.topics.values()].every((at) => {
+		const left = at.x * camera.zoom + camera.x;
+		const top = (at.y - (at.layer === 0 ? TAG_ROOM : 0)) * camera.zoom + camera.y;
+		return cardFit({ left, top, right: left + layout.node.width * camera.zoom, bottom: (at.y + layout.node.height) * camera.zoom + camera.y }, PANE, FADE) === "clear";
+	});
 }
 
 function chain(n: number): Pick<PlanTree, "nodes" | "edges"> {
@@ -39,15 +46,10 @@ function grid(rows: number, wide: number): Pick<PlanTree, "nodes" | "edges"> {
 
 describe("PLAN_MAP_CAP", () => {
 	it("is what the lesson map's pane shows whole at his window, at the scale its titles stay readable", () => {
-		const across = Math.floor(((PANE.width - FADE.x * 2) / WHOLE_COURSE_ZOOM + NODE_GAP) / (STEP_SIZE.width + NODE_GAP));
-		const rows = Math.floor(((PANE.height - FADE.y * 2) / WHOLE_COURSE_ZOOM - TAG_ROOM + LAYER_GAP) / (STEP_SIZE.height + LAYER_GAP));
-		assert.deepEqual([rows, across], [8, 4]);
-		assert.equal(PLAN_MAP_CAP.deep, rows);
-		assert.equal(PLAN_MAP_CAP.across, across, "a card is sized for four across (stepCard)");
-		assert.ok(PLAN_MAP_CAP.steps <= rows * across);
-		assert.ok(fit(chain(PLAN_MAP_CAP.deep)) >= WHOLE_COURSE_ZOOM, "a chain as deep as the cap opens whole");
-		assert.ok(fit(chain(PLAN_MAP_CAP.deep + 1)) < WHOLE_COURSE_ZOOM, "one step deeper does not");
-		assert.ok(fit(grid(3, 4)) >= WHOLE_COURSE_ZOOM, "twelve steps four across open whole");
+		assert.deepEqual(PLAN_MAP_CAP, { steps: 12, deep: 8, across: 4 });
+		assert.ok(opensWhole(chain(PLAN_MAP_CAP.deep)), "a chain as deep as the cap opens whole");
+		assert.ok(!opensWhole(chain(PLAN_MAP_CAP.deep + 1)), "one step deeper does not");
+		assert.ok(opensWhole(grid(3, 4)), "twelve steps four across open whole");
 	});
 
 	it("counts a plan's depth as its longest chain of steps", () => {

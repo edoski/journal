@@ -20,7 +20,8 @@ import type { SessionPlan } from "../src/core/contracts/topic.ts";
 import { PLAN_MAP_CAP } from "../src/core/contracts/plan.ts";
 import { NODE_GAP } from "../components/course-map/topic-map/topic-map-layout.ts";
 import { STEP_SIZE, stepCard, stepsAcross, stepsLayout } from "../components/unit-inbox/topic-page/steps/steps-facts.ts";
-import { STEP_CARD, StepFace } from "../components/unit-inbox/topic-page/steps/step-node.tsx";
+import { CardContent } from "../components/course-map/topic-map/canvas/canvas-node.tsx";
+import type { StepData } from "../components/course-map/topic-map/topic-node.tsx";
 
 /** The topic page's map pane at 1512×982 with the sidebar open (measured in the running app, 16 Nov 2026), and its fade. */
 const PANE = 864;
@@ -81,11 +82,13 @@ describe("a lesson map's cards (m34)", () => {
 	});
 
 	it("draw every title whole, never clamped to two lines", () => {
-		const html = renderToStaticMarkup(<div className={STEP_CARD}><StepFace status="current" title="One-to-one against onto for square matrices" /></div>);
-		const title = parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-slot="topic-step-title"]');
+		const step: StepData = { kind: "step", handle: "onto" as never, title: "One-to-one against onto for square matrices", status: "current", current: true, tag: null, label: "", needs: null, summary: null, href: "/chat/x" };
+		const html = renderToStaticMarkup(<CardContent data={step} />);
+		const content = parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-slot="base-node-content"]');
+		const title = content?.querySelector('[data-slot="card-title"]') ?? null;
 		assert.ok(title !== null, "the step's title");
 		const classes = (title.getAttribute("class") ?? "").split(/\s+/);
 		assert.ok(!classes.some((c) => /^(line-clamp-\d|truncate)$/.test(c)), `never cut: ${classes.join(" ")}`);
-		assert.match(STEP_CARD, /\bpy-3\b/, "the card pads a wrapped title clear of its edges");
+		assert.match(content!.getAttribute("class") ?? "", /\bpy-3\b/, "the card pads a wrapped title clear of its edges");
 	});
 });

@@ -1,5 +1,6 @@
-import type { CourseMapEdge, CourseMapTopic, PlanNodeStatus, SessionPlan, TopicHandle } from "@/src/core";
-import { layoutTopicMap, NODE_GAP, WHOLE_COURSE_ZOOM, type Camera, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import type { CourseMapEdge, PlanNodeStatus, SessionPlan, TopicHandle } from "@/src/core";
+import { layoutCanvas } from "@/components/course-map/topic-map/canvas/canvas-layout";
+import { NODE_GAP, WHOLE_COURSE_ZOOM, type Camera, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { PLAN_MAP_CAP } from "@/src/core";
 import { dayWords } from "@/components/unit-inbox/topic-page/topic-facts";
 
@@ -20,15 +21,16 @@ export function lessonWords(day: string, today: string, kind: "lesson" | "practi
 	return `${kind === "lesson" ? "Lesson" : "Practice"} of ${when}`;
 }
 
-/** A plan drawn in the topic map's geometry, and its edges in the map's terms. */
+/** A plan drawn as the course map draws a course, and its edges in the map's terms. */
 export interface StepsDrawing {
 	layout: TopicMapLayout;
 	needs: CourseMapEdge[];
 }
 
 /**
- * The plan in the topic map's geometry: each step a node, each edge a
- * need, the step it rests on above it. A tutor writes the plan, so it is
+ * The plan drawn as the course map's canvas draws a course
+ * (`layoutCanvas`): each step a card `size` big, each edge a need, the
+ * step it rests on above it. A tutor writes the plan, so it is
  * read defensively: a repeated step, an edge naming a missing step, a
  * repeated edge and an edge that would close a loop are left out. The one
  * place a plan's ids become the map's handles.
@@ -56,9 +58,7 @@ export function stepsLayout(plan: SessionPlan, size: NodeSize = STEP_SIZE): Step
 		above.get(to)!.add(from);
 		needs.push({ kind: "needs", prerequisite: from as TopicHandle, topic: to as TopicHandle });
 	}
-	// The layout reads a topic's handle and nothing else.
-	const steps = ids.map((id) => ({ handle: id as TopicHandle }) as CourseMapTopic);
-	return { layout: layoutTopicMap(steps, needs, size), needs };
+	return { layout: layoutCanvas(ids.map((id) => ({ handle: id as TopicHandle })), needs, new Set(), size), needs };
 }
 
 /** A step's card before the pane is measured, and the least it is: as
@@ -133,8 +133,8 @@ export function stepsCamera(layout: TopicMapLayout, current: TopicHandle | null,
 
 export interface StepMark {
 	status: PlanNodeStatus;
-	/** "Left off here" above the current step of a lesson that does not wait
-	 *  on him; a lesson that waits says "Your turn" on its pick-up row. */
+	/** The words above the ringed step: "Your turn" while the lesson waits on
+	 *  him, else "Left off here" while a step is still ahead. */
 	tag: string | null;
 }
 
@@ -149,16 +149,17 @@ export function ringedStep(plan: SessionPlan, waits: boolean): string | null {
 }
 
 /** Each step's mark: the ringed step (`ringedStep`), steps earlier
- *  questions were about, and the rest. "Left off here" only while the
- *  plan has a step still ahead: on a lesson that went through every step
- *  it would say he stopped partway. */
+ *  questions were about, and the rest. "Your turn" on the ringed step while
+ *  the lesson waits on him, as the sidebar says it; else "Left off here",
+ *  only while the plan has a step still ahead: on a lesson that went
+ *  through every step it would say he stopped partway. */
 export function stepMarks(plan: SessionPlan, waits: boolean): Map<string, StepMark> {
 	const ring = ringedStep(plan, waits);
 	const visited = new Set(plan.current && plan.current !== ring ? [...plan.visited, plan.current] : plan.visited);
 	const ahead = plan.tree.nodes.some((node) => node.id !== ring && !visited.has(node.id));
 	return new Map(
 		plan.tree.nodes.map((node): [string, StepMark] => {
-			if (node.id === ring) return [node.id, { status: "current", tag: waits || !ahead ? null : "Left off here" }];
+			if (node.id === ring) return [node.id, { status: "current", tag: waits ? "Your turn" : ahead ? "Left off here" : null }];
 			return [node.id, { status: visited.has(node.id) ? "visited" : "upcoming", tag: null }];
 		}),
 	);

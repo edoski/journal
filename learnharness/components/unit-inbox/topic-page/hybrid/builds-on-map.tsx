@@ -2,12 +2,10 @@
 
 import type { CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
-import { mapFade } from "@/components/study-home/map-frame";
+import { PANE_FADE, mapFade } from "@/components/study-home/map-frame";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 
-/** The fade at the pane's edges, the lesson map's (lesson-map.tsx). */
-const FADE = { x: 24, y: 40 };
-const VIGNETTE = mapFade(FADE.x, FADE.y);
+const VIGNETTE = mapFade(PANE_FADE.x, PANE_FADE.y);
 
 /**
  * The map pane of a topic not started (spec: hybrid.md, "A topic not
@@ -19,7 +17,7 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
 export function BuildsOnMap({ map, said, topic, pointed }: { map: CourseMap; said: ReadonlyMap<TopicHandle, Said>; topic: TopicHandle; pointed: TopicHandle | null }) {
 	return (
 		<div data-slot="topic-builds-map" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
-			<TopicMap map={map} said={said} margin={FADE} marked={pointed ?? topic} opensOn={topic} />
+			<TopicMap map={map} said={said} margin={PANE_FADE} marked={pointed ?? topic} opensOn={topic} />
 		</div>
 	);
 }
