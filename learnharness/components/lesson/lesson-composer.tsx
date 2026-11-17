@@ -53,11 +53,14 @@ export interface LessonComposerProps {
 	/** Photos of his working: the attach button leads the toolbar,
 	 *  thumbnails wait above the field, paste and drop add more. */
 	photos?: PhotoDraft;
-	/** One row, attach on the left and send on the right, the field
-	 *  between them one line at rest that grows smoothly to three while it
-	 *  is focused or holds words or photos (a course page's composer, which
-	 *  has no other controls). */
-	collapsible?: boolean;
+	/** The host wants the composer compact: while it is (and the field is
+	 *  empty, holds no photos and is not focused) the composer is one row,
+	 *  the field on one line with send at its end, its toolbar and its head
+	 *  (a posed question's quote) folded away.
+	 *  Focusing it, or words or photos in it, opens it to the full composer.
+	 *  The course page keeps it compact; a lesson while he scrolls up its
+	 *  conversation (T3 Code's collapsed composer). */
+	compact?: boolean;
 }
 
 /** The surface's one outline: a 1px hairline at white 5% with a 3% inset
@@ -87,10 +90,10 @@ export function LessonComposer({
 	onNext,
 	onEmptyEnter,
 	photos,
-	collapsible = false,
+	compact = false,
 }: LessonComposerProps) {
 	const [focused, setFocused] = useState(false);
-	const resting = !focused && !value.trim() && !(photos?.photos.length ?? 0);
+	const collapsed = compact && !focused && !value.trim() && !(photos?.photos.length ?? 0);
 	const next = nextProblem && !answer ? { label: "Next problem", run: () => onNext?.(), testId: "next-problem-button" } : undefined;
 	const act = () => {
 		if (answer) {
@@ -127,9 +130,9 @@ export function LessonComposer({
 			data-slot="composer-field"
 			className={cn(
 				"-m-1 block field-sizing-content max-h-52 min-h-[calc(2lh+0.5rem)] w-[calc(100%+0.5rem)] resize-none overflow-y-auto bg-transparent p-1 text-body leading-relaxed text-foreground outline-none placeholder:text-muted-foreground",
-				// The one-row composer grows from one line to three as he focuses it, and back as he leaves it empty.
-				collapsible && "transition-[min-height] duration-200 ease-out motion-reduce:transition-none",
-				collapsible && (resting ? "min-h-[calc(1lh+0.5rem)] truncate" : "min-h-[calc(3lh+0.5rem)]"),
+				// Collapsed, the field is one line; it eases back to its two as the composer opens.
+				compact && "transition-[min-height] duration-200 ease-out motion-reduce:transition-none",
+				collapsed && "min-h-[calc(1lh+0.5rem)]",
 			)}
 		/>
 	);
@@ -156,8 +159,7 @@ export function LessonComposer({
 				aria-label={sendLabel}
 				disabled={sendDisabled}
 				className={cn(
-					"rounded-full transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none",
-					!collapsible && "ms-2",
+					"ms-2 rounded-full transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none",
 					stopping ? "bg-fill-selected text-foreground hover:bg-fill-selected" : "hover:bg-primary disabled:opacity-40",
 				)}
 			>
@@ -169,7 +171,7 @@ export function LessonComposer({
 			data-testid="composer"
 			data-slot="composer"
 			data-mode={answer ? "answer" : "message"}
-			data-collapsed={(collapsible && resting) || undefined}
+			data-collapsed={collapsed || undefined}
 			className={cn(SURFACE, photos?.dragging && "outline-ring")}
 			onFocus={() => setFocused(true)}
 			onBlur={(e) => {
@@ -181,21 +183,21 @@ export function LessonComposer({
 			}}
 			{...photos?.surface}
 		>
-			{head}
+			{!collapsed && head}
 			{photos && <PendingPhotos draft={photos} />}
-			{collapsible ? (
-				<div data-slot="composer-row" className="flex min-w-0 items-end gap-1 p-1.5">
-					{photos && <PhotoAttachButton draft={photos} />}
-					<div data-slot="composer-body" className="min-w-0 flex-1 px-1.5 py-0.5">
-						{field}
-					</div>
-					{sendControl}
-				</div>
-			) : (
-				<>
-					<div data-slot="composer-body" className="px-4 pt-4 pb-2">
-						{field}
-					</div>
+			<div
+				data-slot="composer-body"
+				className={cn(compact && "flex min-w-0 items-center transition-[padding] duration-200 ease-out motion-reduce:transition-none", collapsed ? "py-1.5 pr-2 pl-4" : "px-4 pt-4 pb-2")}
+			>
+				{compact ? <div className="min-w-0 flex-1">{field}</div> : field}
+				{collapsed && sendControl}
+			</div>
+			{/* The toolbar folds away while the composer is compact, sliding open as it opens (grid rows 0fr to 1fr). */}
+			<div
+				className={cn(compact && "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", compact && (collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"))}
+				inert={collapsed || undefined}
+			>
+				<div className={cn(compact && "min-h-0 overflow-hidden")}>
 					<div data-slot="composer-toolbar" className="flex min-w-0 items-center px-2 pb-2">
 						<div data-slot="composer-leading" className="flex min-w-0 flex-1 items-center gap-0.5">
 							{photos && <PhotoAttachButton draft={photos} />}
@@ -204,10 +206,10 @@ export function LessonComposer({
 						<div data-slot="composer-controls" className="flex shrink-0 items-center gap-1">
 							{toolbar}
 						</div>
-						{sendControl}
+						{!collapsed && sendControl}
 					</div>
-				</>
-			)}
+				</div>
+			</div>
 		</form>
 	);
 }
@@ -227,13 +229,18 @@ export function LessonSessionComposer({
 	sendAllowed: boolean;
 }) {
 	const [draft, setDraft] = useState(value);
-	useLayoutEffect(() => { setDraft(value); }, [revision, value]);
+	useLayoutEffect(() => {
+		setDraft(value);
+	}, [revision, value]);
 	// A photo alone is a message.
 	const canSend = sendAllowed && (draft.trim().length > 0 || (photos?.photos.length ?? 0) > 0);
-	const applyDraft = useCallback((next: string) => {
-		setDraft(next);
-		onChange(next);
-	}, [onChange]);
+	const applyDraft = useCallback(
+		(next: string) => {
+			setDraft(next);
+			onChange(next);
+		},
+		[onChange],
+	);
 	return <LessonComposer {...rest} value={draft} onChange={applyDraft} canSend={canSend} photos={photos} />;
 }
 

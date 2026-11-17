@@ -232,6 +232,8 @@ export function Chat({
 	const column = LESSON_COLUMN;
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
+	// While he reads up the conversation the composer rests compact, one row (T3 Code's; Edo, 17 Nov 2026).
+	const [readingUp, setReadingUp] = useState(false);
 
 	/* THE SCROLL MODEL (components/lesson/reading-position.ts): every action
 	 * of his that starts a turn passes here, so the lesson goes to its end
@@ -1652,6 +1654,7 @@ export function Chat({
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef} targetScrollTop={followTargetScrollTop}>
 					<SessionMessageNavigation />
+					<ReadingUp onChange={setReadingUp} />
 					<ConversationContent className="min-h-full gap-0 p-0">
 						<div data-session-find-root="" data-transcript-column="" className={`${column} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
@@ -1909,6 +1912,7 @@ export function Chat({
 								onEmptyEnter: tryAgain,
 								placeholder: pausePlaceholder(nextReady, !!tryAgain),
 								photos: composerPhotos,
+								compact: readingUp,
 							}}
 							onAskInstead={() => void askInstead()}
 							toggleRef={proseToggleRef}
@@ -2132,4 +2136,13 @@ function DockOverlay({
 			</div>
 		</div>
 	);
+}
+
+/** Tells the lesson whether he is reading up the conversation, away from its
+ *  newest reply, so its composer can rest compact. Inside the conversation,
+ *  where the scroll's state lives. */
+function ReadingUp({ onChange }: { onChange: (up: boolean) => void }) {
+	const { isAtBottom } = useStickToBottomContext();
+	useEffect(() => onChange(!isAtBottom), [isAtBottom, onChange]);
+	return null;
 }

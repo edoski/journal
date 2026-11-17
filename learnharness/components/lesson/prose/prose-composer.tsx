@@ -355,6 +355,7 @@ function AnswerComposer({
 				answer={{ onSubmit: submit, ready: ready || steering, label: steering ? "Send" : problem ? "Submit your work" : "Submit answer" }}
 				head={<OpenQuote open={open} spec={spec} selected={selection.selected} onPick={(i) => pick(i, multi)} />}
 				photos={textMode ? photos : undefined}
+				compact={message.compact}
 			/>
 			{typeof document !== "undefined" && <ShowMeConfirm what={confirmShow} onClose={() => setConfirmShow(null)} onConfirm={shown} />}
 		</>

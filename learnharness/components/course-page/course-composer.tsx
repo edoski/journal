@@ -47,7 +47,7 @@ export function CourseComposer({ course }: { course: StudyCourse }) {
 	return (
 		<div data-slot="course-composer" className="mx-auto w-full max-w-[46rem] shrink-0 pt-4">
 			<LessonComposer
-				collapsible
+				compact
 				busy={lesson.busy}
 				value={text}
 				onChange={setText}

@@ -60,15 +60,18 @@ describe("the lesson composer", () => {
 		assert.match(composer({ nextProblem: true, onNext: noop }), /data-testid="next-problem-button"/);
 	});
 
-	it("as one row (collapsible), keeps send on the right in both states and grows the field from one line to three as he focuses it", () => {
-		const rest = composer({ collapsible: true });
+	it("compact, rests as one row, the field with send at its end and the toolbar folded; words open it to the full composer", () => {
+		const rest = composer({ compact: true });
 		assert.match(rest, /data-collapsed="true"/);
-		assert.match(rest, /data-slot="composer-row"/);
-		assert.ok(rest.indexOf('data-slot="composer-body"') < rest.indexOf('data-slot="composer-send"'), "the field, then send at the row's end");
 		assert.match(rest, /min-h-\[calc\(1lh\+0\.5rem\)\]/, "one line at rest");
-		assert.match(rest, /transition-\[min-height\]/, "the growth is animated");
-		const typed = composer({ collapsible: true, value: "eigen" });
+		assert.match(rest, /grid-rows-\[0fr\]/, "the toolbar folded");
+		assert.ok(rest.indexOf('data-slot="composer-send"') < rest.indexOf('data-slot="composer-toolbar"'), "send at the field's end, not in the toolbar");
+		assert.match(rest, /transition-\[min-height\]/, "the change is animated");
+		const typed = composer({ compact: true, value: "eigen" });
 		assert.ok(!/data-collapsed/.test(typed), "words open it");
-		assert.match(typed, /min-h-\[calc\(3lh\+0\.5rem\)\]/, "three lines open");
+		assert.match(typed, /grid-rows-\[1fr\]/, "the toolbar open");
+		assert.match(typed, /data-slot="composer-body" class="flex min-w-0 items-center transition-\[padding\] duration-200 ease-out motion-reduce:transition-none px-4 pt-4 pb-2"/, "the lesson composer's own padding, open");
+		assert.ok(typed.indexOf('data-slot="composer-toolbar"') < typed.indexOf('data-slot="composer-send"'), "send back in the toolbar");
 	});
+
 });
