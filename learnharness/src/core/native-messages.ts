@@ -527,7 +527,7 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
 		id: newMessageId(),
 		role: "custom",
 		customType: UNGRADED_ANSWER,
-		content: `[UNGRADED ANSWER] His answer${which} was submitted and its answer shown to him, but your turn stopped before you graded it. It is an attempt, not a question left open: grade it and save it with course_save in this turn, before anything else, then answer what follows.`,
+		content: `[UNGRADED ANSWER] His answer${which} was submitted and its answer shown to him, but your turn stopped before you graded it. It is an attempt, not a question left open: grade it and save it with course_save in this turn, before anything else, then answer what follows. The mark the save puts under his answer tells him it came through, so never say it arrived or was received.`,
 		display: false,
 		details: {},
 		timestamp: Date.now(),
