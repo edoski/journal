@@ -25,6 +25,8 @@ import { AgendaHead } from "../components/course-page/candidates/agenda/agenda-h
 import { AgendaArc } from "../components/course-page/candidates/agenda/agenda-arc.tsx";
 import { AgendaNext } from "../components/course-page/candidates/agenda/agenda-next.tsx";
 import { RoadCourse } from "../components/course-page/candidates/road/road-course.tsx";
+import { RoadArc } from "../components/course-page/candidates/road/road-arc.tsx";
+import { ArcMap } from "../components/course-map/arc-map.tsx";
 import { arcStarts, examStop } from "../components/course-page/candidates/road/road-model.ts";
 import { ReadyFact } from "../components/course-page/candidates/shared/ready-fact.tsx";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
@@ -231,6 +233,24 @@ describe("the road", () => {
 
 	it("draws the course page's frame around it, as every candidate does", () => {
 		assert.equal(typeof RoadCourse, "function");
+	});
+
+	it("is the course's one list of arcs, drawn as the map's arc list draws its rows, so the map beside it lists none", () => {
+		const view = viewOf(course());
+		const line = (props: React.ComponentProps<typeof OverviewArc>) => <RoadArc {...props} number={view.arcs!.indexOf(props.section) + 1} starts={null} shown={props.section.arc.handle === "maps"} />;
+		const document = render(<SplitList groups={[]} arcs={view.arcs} open={{ maps: true }} onOpenChange={noop} onCheck={noop} marked={null} onPoint={noop} onEnterMap={noop} arcLine={line} />);
+		assert.deepEqual(
+			[...document.querySelectorAll('[data-slot="course-arc"] [data-slot="arc-number"]')].map((n) => n.textContent),
+			view.arcs!.map((_, i) => String(i + 1)),
+			"each arc numbered in study order, as the map's list numbers them",
+		);
+		assert.deepEqual([...document.querySelectorAll('[data-slot="road-bar"]')].map((b) => b.closest("[data-arc]")?.getAttribute("data-arc")), ["maps"], "the bar marks the arc the map shows");
+		const map = render(
+			<ArcMap arcs={view.arcs!.map((s) => s.arc)} value={a("maps")} here={a("maps")} index={false} onSelect={noop}>
+				<div />
+			</ArcMap>,
+		);
+		assert.ok(map.querySelector('[data-slot="arc-index"]') === null, "Road's map lists no arcs of its own");
 	});
 });
 

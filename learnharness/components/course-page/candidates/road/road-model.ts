@@ -36,23 +36,3 @@ export function arcStarts(section: CourseArcSection, today: string): string | nu
 	return first ? arcStartsWords(first) : null;
 }
 
-/** The stretch of the road shown before he asks for the whole of it: the
- *  arc he is in, the one after it, and any arc Today asks him about
- *  ("Needs you"), in study order; every arc when `whole`. With no arc
- *  marked current, the first not yet checked stands in. Pure. */
-export function roadWindow(sections: readonly CourseArcSection[], whole: boolean): readonly CourseArcSection[] {
-	if (whole) return sections;
-	const found = sections.findIndex((s) => s.current);
-	const here = found >= 0 ? found : Math.max(0, sections.findIndex((s) => s.arc.state !== "checked"));
-	return sections.filter((s, i) => i === here || i === here + 1 || s.needsYou);
-}
-
-/** Where the exam's stop goes once some arcs are folded away: before the
- *  first shown arc at or after its place on the whole road, or at the end
- *  (null) when none is. Pure. */
-export function shownStop(sections: readonly CourseArcSection[], shown: readonly CourseArcSection[], stopBefore: ArcHandle | null): ArcHandle | null {
-	if (stopBefore === null) return null;
-	const at = sections.findIndex((s) => s.arc.handle === stopBefore);
-	const kept = new Set(shown.map((s) => s.arc.handle));
-	return sections.slice(at).find((s) => kept.has(s.arc.handle))?.arc.handle ?? null;
-}

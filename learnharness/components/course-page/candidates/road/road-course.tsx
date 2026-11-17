@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, type ComponentProps } from "react";
+import { createContext, useContext, useMemo, type ComponentProps } from "react";
 import type { ArcHandle, StudyCourse } from "@/src/core";
 import { PageHead } from "@/components/page-frame/page-frame";
 import { CourseFrame } from "@/components/course-page/course-frame";
@@ -12,10 +12,10 @@ import { MistakesHead, MistakesPress } from "@/components/course-page/standing/m
 import { SplitBody, type CourseColumns } from "@/components/course-page/split/split-course";
 import { SplitList } from "@/components/course-page/split/split-list";
 import { ReadyFact, useHeadStanding } from "@/components/course-page/candidates/shared/ready-fact";
-import { Marker, RoadArc } from "@/components/course-page/candidates/road/road-arc";
-import { arcStarts, examStop, roadWindow, shownStop } from "@/components/course-page/candidates/road/road-model";
-import { Button } from "@/components/ui/button";
-import { CalendarIcon, ChevronsUpDownIcon } from "lucide-react";
+import { RoadArc, TRACK } from "@/components/course-page/candidates/road/road-arc";
+import { arcStarts, examStop } from "@/components/course-page/candidates/road/road-model";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /** Road's head (spec: road.md): the title with Mistakes, Context and the
  *  press, and one line, whether he is ready (`ReadyFact`) and when he last
@@ -48,73 +48,48 @@ function RoadHead({ view, standing, busy, onContinue }: CourseColumns) {
 	);
 }
 
-/** The exam as a stop on the road: its day, in full ink, its run-up on press. */
-function ExamStop({ course, words, below }: { course: StudyCourse; words: string; below: boolean }) {
+/** The exam as a row on the road's track: its day, its run-up on press. */
+function ExamStop({ course, words }: { course: StudyCourse; words: string }) {
 	const runup = useCourseRunup(course.map.workspace);
 	return (
-		<div data-slot="road-exam" className="flex h-8 items-center gap-3 text-body text-foreground">
-			<Marker above below={below}>
-				<CalendarIcon aria-hidden className="size-4" />
-			</Marker>
-			<ExamFact course={course} runup={runup} words={words} ready={null} className="font-medium [&>svg]:hidden" />
+		<div data-slot="road-exam" className={cn(TRACK, "flex h-7 items-center gap-2 text-callout text-foreground")}>
+			<CalendarIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+			<ExamFact course={course} runup={runup} words={words} ready={null} className="[&>svg]:hidden" />
 		</div>
 	);
 }
 
-/** What every line of the road reads: the course, today, where the exam sits. */
-const Road = createContext<{ course: StudyCourse; exam: string | null; stopBefore: ArcHandle | null; past: ReadonlySet<ArcHandle>; order: readonly ArcHandle[] } | null>(null);
+/** What every line of the road reads: the course, the arc the map shows, where the exam sits. */
+const Road = createContext<{ course: StudyCourse; shown: ArcHandle | null; exam: string | null; stopBefore: ArcHandle | null; past: ReadonlySet<ArcHandle>; order: readonly ArcHandle[] } | null>(null);
 
-/** One arc of the road, with the facts the road gives it. */
+/** One arc of the road, with the facts the road gives it, and the exam's row before it when the plan reaches the exam there. */
 function RoadLine(props: ComponentProps<typeof CourseArc<CourseTopic>>) {
 	const road = useContext(Road)!;
 	const { handle } = props.section.arc;
-	const at = road.order.indexOf(handle);
-	const stopHere = road.exam !== null && road.stopBefore === handle;
-	const stopLast = road.exam !== null && road.stopBefore === null;
 	return (
-		<RoadArc
-			{...props}
-			starts={arcStarts(props.section, road.course.map.today)}
-			past={road.past.has(handle)}
-			above={at > 0 || stopHere}
-			below={at < road.order.length - 1 || stopLast}
-			before={stopHere && road.exam ? <ExamStop course={road.course} words={road.exam} below /> : undefined}
-		/>
+		<>
+			{road.exam !== null && road.stopBefore === handle && <ExamStop course={road.course} words={road.exam} />}
+			<RoadArc {...props} number={road.order.indexOf(handle) + 1} starts={arcStarts(props.section, road.course.map.today)} shown={road.shown === handle} past={road.past.has(handle)} />
+		</>
 	);
 }
 
-/** The road's last line: a quiet press that shows the whole road, or
- *  folds it back to the stretch near him. */
-function WholeRoad({ whole, onToggle }: { whole: boolean; onToggle: () => void }) {
-	return (
-		<Button variant="quiet" size="xs" data-slot="road-whole" aria-pressed={whole} onClick={onToggle} className="mt-3 h-7 w-fit gap-1.5 px-0 text-callout text-muted-foreground hover:text-foreground">
-			<ChevronsUpDownIcon aria-hidden className="size-3.5" />
-			{whole ? "Only what's near" : "Whole road"}
-		</Button>
-	);
-}
-
-/** Road's left column: the stretch of the course's road near him (the arc
- *  he is in, the next, and any arc Today asks about), the exam a stop
- *  where the plan reaches it, and a press for the whole road; a course's
- *  four groups when it has no arcs. */
+/** Road's left column: every arc of the course in study order on one track, as the map's arc list draws
+ *  them (the map beside it lists none), the exam a row where the plan reaches it; a course's four groups
+ *  when it has no arcs. */
 function RoadList(c: CourseColumns) {
 	const { course, arcs, facts } = c.view;
-	const [whole, setWhole] = useState(false);
 	const stop = useMemo(() => (arcs ? examStop(course.map, arcs) : null), [course.map, arcs]);
-	const shown = useMemo(() => (arcs ? roadWindow(arcs, whole) : null), [arcs, whole]);
-	const folds = Boolean(arcs && shown && arcs.length > roadWindow(arcs, false).length);
-	const road = useMemo(() => {
-		const stopBefore = arcs && shown && stop ? shownStop(arcs, shown, stop.stopBefore) : null;
-		return { course, exam: stop ? facts.exam : null, stopBefore, past: stop?.past ?? new Set<ArcHandle>(), order: shown?.map((a) => a.arc.handle) ?? [] };
-	}, [course, stop, facts.exam, arcs, shown]);
-	const examLast = Boolean(shown && road.exam && stop && road.stopBefore === null);
+	const road = useMemo(
+		() => ({ course, shown: c.shown?.arc.handle ?? null, exam: stop ? facts.exam : null, stopBefore: stop?.stopBefore ?? null, past: stop?.past ?? new Set<ArcHandle>(), order: arcs?.map((a) => a.arc.handle) ?? [] }),
+		[course, c.shown, stop, facts.exam, arcs],
+	);
 	return (
 		<Road.Provider value={road}>
 			<SplitList
 				ref={c.listRef}
 				groups={c.groups}
-				arcs={shown}
+				arcs={arcs}
 				open={c.open}
 				onOpenChange={c.onOpenChange}
 				onCheck={c.onCheck}
@@ -124,14 +99,7 @@ function RoadList(c: CourseColumns) {
 				onEnterMap={c.onEnterMap}
 				onExitTop={c.onExitTop}
 				arcLine={RoadLine}
-				after={
-					shown ? (
-						<>
-							{examLast && road.exam && <ExamStop course={course} words={road.exam} below={false} />}
-							{folds && <WholeRoad whole={whole} onToggle={() => setWhole((w) => !w)} />}
-						</>
-					) : undefined
-				}
+				after={arcs && road.exam && stop && stop.stopBefore === null ? <ExamStop course={course} words={road.exam} /> : undefined}
 			/>
 		</Road.Provider>
 	);
@@ -145,5 +113,5 @@ function RoadList(c: CourseColumns) {
  * arcs past it muted. The head is the title and one line.
  */
 export function RoadCourse({ workspace }: { workspace: string }) {
-	return <CourseFrame workspace={workspace}>{(ready) => <SplitBody {...ready} head={(c) => <RoadHead {...c} />} list={(c) => <RoadList {...c} />} />}</CourseFrame>;
+	return <CourseFrame workspace={workspace}>{(ready) => <SplitBody {...ready} head={(c) => <RoadHead {...c} />} list={(c) => <RoadList {...c} />} mapIndex={false} />}</CourseFrame>;
 }

@@ -58,6 +58,7 @@ export function SplitMap({
 	map,
 	arc,
 	arcs = null,
+	index = true,
 	said,
 	layout: arcLayout,
 	wholeLayout = arcLayout,
@@ -74,6 +75,8 @@ export function SplitMap({
 	arc?: ArcHandle;
 	/** The course's arcs, listed beside the map; null for a course without them. */
 	arcs?: readonly CourseMapArc[] | null;
+	/** Whether the map lists its arcs beside it (`ArcMap`'s `index`). */
+	index?: boolean;
 	/** What the sidebar says for each topic (`sidebarSays`), for the cards. */
 	said: ReadonlyMap<TopicHandle, Said>;
 	/** The map's layout (`drawingOf`; with `arc`, that arc's drawing), which sizes the surface. */
@@ -256,7 +259,7 @@ export function SplitMap({
 	);
 
 	return (
-		<ArcMap arcs={arcs} value={arc ?? null} here={currentArc(map)} whole={zoomedOut} onSelect={pick} onHere={leaveWhole}>
+		<ArcMap arcs={arcs} value={arc ?? null} here={currentArc(map)} whole={zoomedOut} index={index} onSelect={pick} onHere={leaveWhole}>
 			<section
 				ref={root}
 				aria-label={`${map.title} map`}

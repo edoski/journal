@@ -99,6 +99,7 @@ export function SplitBody({
 	onContinue,
 	head = currentHead,
 	list: listOf = currentList,
+	mapIndex = true,
 }: {
 	view: CourseView;
 	standing: CourseStanding | null;
@@ -106,6 +107,8 @@ export function SplitBody({
 	onContinue: (workspace: string) => void;
 	head?: (columns: CourseColumns) => ReactNode;
 	list?: (columns: CourseColumns) => ReactNode;
+	/** Whether the map lists its arcs beside it; off when the list is itself the course's arcs (Road). */
+	mapIndex?: boolean;
 }) {
 	const { map } = view.course;
 	const { arcs } = view;
@@ -213,6 +216,7 @@ export function SplitBody({
 							map={map}
 							arc={shownArc ?? undefined}
 							arcs={arcs?.map((a) => a.arc) ?? null}
+							index={mapIndex}
 							said={view.said}
 							layout={layout}
 							wholeLayout={wholeLayout}

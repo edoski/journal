@@ -25,6 +25,7 @@ export function ArcMap({
 	value,
 	here,
 	whole = false,
+	index = true,
 	onSelect,
 	onHere,
 	children,
@@ -33,6 +34,8 @@ export function ArcMap({
 	value: ArcHandle | null;
 	here: ArcHandle | null;
 	whole?: boolean;
+	/** Whether the map lists its arcs beside it; off where the page's own list of arcs already does (Road). */
+	index?: boolean;
 	onSelect: (arc: ArcHandle) => void;
 	onHere?: () => void;
 	children: ReactNode;
@@ -54,8 +57,8 @@ export function ArcMap({
 	useArcKeys(arcs, value, onSelect, goHere);
 	return (
 		<div ref={root} data-slot="arc-map" className="flex min-h-0 flex-1">
-			{arcs && <ArcIndex className="mt-6 w-64 shrink-0 self-start" arcs={arcs} value={whole ? null : value} here={here} onSelect={onSelect} />}
-			<div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arcs && "ml-8")}>{children}</div>
+			{arcs && index && <ArcIndex className="mt-6 w-64 shrink-0 self-start" arcs={arcs} value={whole ? null : value} here={here} onSelect={onSelect} />}
+			<div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arcs && index && "ml-8")}>{children}</div>
 		</div>
 	);
 }

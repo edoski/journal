@@ -238,7 +238,7 @@ export function SplitList({
 					more.above && "mask-t-from-[calc(100%-2.5rem)]",
 				)}
 			>
-				<div className={cn("flex flex-col", arcs ? "gap-0.5" : "gap-4")}>
+				<div className={cn("flex flex-col", arcs ? (ArcLine === CourseArc ? "gap-0.5" : undefined) : "gap-4")}>
 					{arcs
 						? arcs.map((section) => (
 								<ArcLine
