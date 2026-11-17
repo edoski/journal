@@ -283,6 +283,9 @@ export class SessionModel {
 	private automaticContinuationBlocked = false;
 	/** A completed failure from THIS consume, not the previous attempt's record. */
 	private liveFailureId: string | null = null;
+	/** The failed turn whose cause is gone (`outlivedFailure`): its line
+	 *  goes, and Retry stays. */
+	private outlivedFailureId: string | null = null;
 	// The single live consume (POST response or reattach stream): a newer
 	// consume cancels the older — one reader at a time.
 	private consumeAbort: AbortController | null = null;
@@ -332,7 +335,7 @@ export class SessionModel {
 		// trying again, hide the old banner from the first Thinking frame,
 		// but show a new completed failure from this consume immediately.
 		const providerError =
-			latest !== undefined &&
+			latest !== undefined && latest.id !== this.outlivedFailureId &&
 			!this.incompleteUsageIds.has(latest.id) && (!live || latest.id === this.liveFailureId)
 				? { message: latest.errorMessage ?? "An error occurred." }
 				: null;
@@ -1112,8 +1115,23 @@ export class SessionModel {
 	/** The mount/sync continuation fold (native-messages.ts). */
 	static needsContinuation = needsContinuation;
 
+	/** Clears a failure this view holds. Nothing to clear changes nothing,
+	 *  so a caller that clears on each render never loops (round 15, M2:
+	 *  React #185 on the signed-out line). */
 	clearError(): void {
+		if (this.errorValue === null) return;
 		this.setError(null);
+	}
+
+	/** The failed turn at the record's end outlived its cause (Claude is
+	 *  signed in again): its line goes, and the turn stays failed, so Retry
+	 *  still runs it again (round 15, M2). */
+	outlivedFailure(): void {
+		const latest = failedResponseAtEnd([...this.base, ...this.tail]);
+		if (!latest || latest.id === this.outlivedFailureId) return;
+		this.mutate(() => {
+			this.outlivedFailureId = latest.id;
+		});
 	}
 
 	/** The app came back after a restart cut the turn this view was reading.

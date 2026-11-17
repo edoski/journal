@@ -43,9 +43,6 @@ describe("turnErrorText", () => {
 		assert.doesNotMatch(pressed.querySelector("[data-testid=turn-error-sentence]")!.textContent!, /still in the box/);
 		const typed = parseHTML(renderToStaticMarkup(<TurnError message={refusal} kept onOpenSettings={() => {}} />)).document;
 		assert.match(typed.querySelector("[data-testid=turn-error-sentence]")!.textContent!, /What you wrote is still in the box\.$/);
-		const html = renderToStaticMarkup(<TurnError message={refusal} onOpenSettings={() => {}} onSignIn={() => {}} />);
-		const { document } = parseHTML(html);
-		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in to Claude", "one label, as the pill and the dialog say it (round 10, 4 minor 7)");
 	});
 
 	it("reads a turn that failed because Claude was signed out as signed out, naming the buttons beside it", () => {
@@ -54,9 +51,9 @@ describe("turnErrorText", () => {
 		for (const raw of ["Claude isn't signed in on this account. No API key was used.", "Claude Code is not signed in. Run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts. No API key was used."]) {
 			const text = turnErrorText(raw);
 			assert.equal(text.kind, "signed-out", raw);
-			const { document } = parseHTML(renderToStaticMarkup(<TurnError message={raw} onRetry={() => {}} onOpenSettings={() => {}} onSignIn={() => {}} />));
+			const { document } = parseHTML(renderToStaticMarkup(<TurnError message={raw} onRetry={() => {}} onOpenSettings={() => {}} />));
 			assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "Claude isn't signed in, so the tutor couldn't reply. Sign in, then press Retry.");
-			assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in to Claude", "one label, as the pill and the dialog say it (round 10, 4 minor 7)");
+			assert.ok(document.querySelector("[data-testid=turn-error-sign-in]") === null, "the pill above the box is the one sign-in (round 15, M2)");
 			assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Retry");
 			assert.doesNotMatch(document.body.textContent ?? "", /Refresh|token|T3 Code/);
 		}

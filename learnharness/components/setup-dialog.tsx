@@ -44,9 +44,21 @@ export function SetupDialog({ open, onClose }: SetupDialogProps) {
 	const connected = status?.connected === true && openedAt !== null && read > openedAt;
 	const signedInRef = useRef(false);
 	signedInRef.current = connected;
+	// The caller's close, read at call time: an inline one is new on each
+	// render, and the close fires once per open (round 15, M2: an effect
+	// keyed on it re-ran on every render of the lesson).
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
+	const closedRef = useRef(false);
 	useEffect(() => {
-		if (open && connected) onClose();
-	}, [open, connected, onClose]);
+		if (!open) {
+			closedRef.current = false;
+			return;
+		}
+		if (!connected || closedRef.current) return;
+		closedRef.current = true;
+		onCloseRef.current();
+	}, [open, connected]);
 
 	// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim Esc at the
 	// document level so the window chain (abort) never also fires.
@@ -56,11 +68,11 @@ export function SetupDialog({ open, onClose }: SetupDialogProps) {
 			if (e.key !== "Escape") return;
 			e.preventDefault();
 			e.stopPropagation();
-			onClose();
+			onCloseRef.current();
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [open, onClose]);
+	}, [open]);
 
 	return (
 		<Dialog open={open && !connected} onOpenChange={(next) => !next && onClose()}>

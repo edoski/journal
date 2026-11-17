@@ -222,7 +222,7 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, compacting, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, stopReply, clearError, outlivedFailure, recoverDroppedStream, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
@@ -855,15 +855,18 @@ export function Chat({
 	// The signed-out line leaves with its cause (round 8): once a reading
 	// taken after the refusal says connected (the dialog re-checks as it
 	// opens, round 10), the line clears and his next key goes to the box
-	// (turn-error-text.ts refusalWatch).
+	// (turn-error-text.ts refusalWatch). A turn that failed for it keeps
+	// Retry alone: the pill above the box is the one sign-in (round 15, M2:
+	// the line stayed, and its Sign in crashed the page once Claude was back).
 	const refusalSinceRef = useRef<number | null>(null);
 	useEffect(() => {
 		const watch = refusalWatch(refusalSinceRef.current, isSignedOutLine(error?.message), modelStatus?.connected, statusRead);
 		refusalSinceRef.current = watch.since;
 		if (!watch.clear) return;
 		clearError();
+		outlivedFailure();
 		focusWhereHeTypes(document, false);
-		// clearError is stable per session.
+		// clearError and outlivedFailure are stable per session.
 	}, [error, modelStatus?.connected, statusRead]);
 	// A DELETED COURSE (course-gone.tsx): the lesson is history and has no
 	// box, so what he wrote there, sent and refused or still in the box,
@@ -1865,12 +1868,14 @@ export function Chat({
 							    fallback. Never collapsible itself. */}
 							{thinking && <ActivityLine testId="thinking-placeholder" label={compacting ? COMPACTING_LINE : idleLine} />}
 							{replyCut && !courseGone && !gone && <ReplyCut cut={replyCut} onRetry={() => void send({ type: "continue" })} />}
+							{/* A failed turn whose cause is gone (signed in again): Retry alone. */}
+							{!error && retryable && !claudeLimit && !courseGone && !gone && <ReplyCut cut="lost" onRetry={retryFailedTurn} />}
 							{openingError && <p role="alert" className="text-body text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
 							{courseGone && !gone && <CourseGoneLine kept={courseGoneKept} />}
 							{!courseGone && !gone && <CourseUnreadableLine workspace={course?.workspace} />}
 							{error && (
-								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")} onSignIn={unconnected ? undefined : () => setSetupOpen(true)}>
+								<TurnError key={error.repeat ?? 0} again={(error.repeat ?? 0) > 0} kept={refusedWords} message={dropped && healFailed ? UNREACHABLE_APP : error.message} onRetry={dropped ? healDroppedStream : retryable ? retryFailedTurn : undefined} retryLabel={dropped ? LESSON_WORDS.tryAgain : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
 								</TurnError>
 							)}
