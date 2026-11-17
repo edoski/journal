@@ -13,7 +13,7 @@ After a spacer (`mt-auto`) that rests it at the bottom of a short list.
 | holds | every session under the course filter (every course, or the chosen course's), on a topic or on none, less a session Today draws as its own card |
 | order | newest first, by its last change, as T3 Code's thread list |
 | row | one line, a session (`SessionItem`, the shelf row's anatomy), with its menu |
-| status | Your turn, the spinner and Tutor writing, or how long ago in Home's words; a title another listed session shares carries its day ("6 Nov") |
+| status | Your turn, the spinner and Tutor writing, or how long ago in Home's words; a title another listed session shares carries its day ("6 Nov") after it when its status names no day, never twice (round 15, 1 m8: "… 10 Nov … 10 Nov") |
 | folded | starts folded (`lh:topic-sidebar-folded`, `{ sessions }`); folded, it keeps in view the open page's row and a session the tutor writes in that Today does not show, with Tutor writing; a 6px accent dot on the header while a hidden session waits on him and Today does not show it (`saidOnTop`) |
 | open | 10 rows, then "Show the rest", which shows every row (`UnitShelf`) |
 

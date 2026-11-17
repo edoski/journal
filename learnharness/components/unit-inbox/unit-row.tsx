@@ -152,7 +152,8 @@ export function SessionSlimRow({
 	chat: ChatListItem;
 	/** The engine's study day, for how long ago. */
 	today: string;
-	/** The session's day when its title repeats in the list: "6 Nov". */
+	/** The session's day when its title repeats in the list: "6 Nov",
+	 *  shown after the title when its status says no day. */
 	twin?: string | null;
 	active: boolean;
 	highlighted?: boolean;
@@ -160,6 +161,11 @@ export function SessionSlimRow({
 	parent?: string;
 }) {
 	const state = sessionState(chat);
+	const status = sessionRowStatus(chat, state, today);
+	// A twin's day goes after its title only when its status names no day of
+	// its own (round 15, 1 m8 and 4 minor 10: "Total probability practice
+	// 6 Nov … 6 Nov").
+	const day = twin && status.kind !== "studied" && status.kind !== "task" ? twin : null;
 	return (
 		<Button
 			variant="list"
@@ -189,10 +195,10 @@ export function SessionSlimRow({
 					className={rowTitle(active || highlighted || state === "your-turn")}
 				>
 					<MathText>{chat.title}</MathText>
-					{twin && (
+					{day && (
 						<span data-slot="session-twin" className="ml-1.5 text-callout font-normal whitespace-nowrap text-muted-foreground">
 							<span className="sr-only">, </span>
-							{twin}
+							{day}
 						</span>
 					)}
 				</span>
@@ -202,7 +208,7 @@ export function SessionSlimRow({
 				data-testid={state === "your-turn" ? "session-waiting" : undefined}
 				className={cn(TRAILING_SLOT, STATUS_LINE, "mt-1 self-end")}
 			>
-				<UnitStatusMark status={sessionRowStatus(chat, state, today)} />
+				<UnitStatusMark status={status} />
 			</span>
 		</Button>
 	);
