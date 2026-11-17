@@ -247,7 +247,8 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
 			<ol ref={list} aria-label="Earlier" className="flex flex-col">
 				{drawn.flatMap((day) =>
 					day.rows.map((row, i) => {
-						const date = i === 0 ? day.label : null;
+						// Each day's words on its first row, every session line, and an answer from another day than its line's.
+						const date = row.label ?? (i === 0 ? day.label : null);
 						return row.kind === "session" ? (
 							<SessionItem key={row.entry.chat.id} entry={row.entry} shown={row.entry.chat.id === shown} onShow={onShow} ends={ends()} date={date} />
 						) : (
