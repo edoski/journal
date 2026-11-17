@@ -556,6 +556,33 @@ async function assertLeftToday(app: DemoApp, s: Survey, id: string, words: strin
 	assert.ok(problems.length === 0, `${s.label}: ${chat.title}, left for today:\n  ${problems.join("\n  ")}`);
 }
 
+// ─── 9. a finished lesson asks nothing ──────────────────────────────────────
+
+/** The lesson `id`, finished: its own save closed its task, then he picked the tutor's "Stop here for today".
+ *  On a later day nothing offers it again: no line of Home's Today, no sidebar card with a status, no row of
+ *  its course page's Needs you, and no Resume on its topic page (round 15, M1: 1 D1, "Continue Linear maps
+ *  and their matrices lesson · Left off 10 Nov" on the exam eve). */
+async function assertFinishedLesson(app: DemoApp, s: Survey, id: string) {
+	const { unitHref } = await import("../components/unit-inbox/unit-href.ts");
+	const problems: string[] = [];
+	const chat = s.chats.find((c) => c.id === id)!;
+	const state = sessionState(chat);
+	if (state !== "finished") problems.push(`it reads ${state}, not finished (ended ${chat.ended}, tasks ${JSON.stringify(chat.tasks)})`);
+	for (const line of s.home) if (chatOf(line.opens) === id) problems.push(`Home's Today offers it: "${line.title} · ${line.status}"`);
+	for (const [surface, status] of (await sessionStatuses(s)).get(id) ?? []) problems.push(`${surface} says "${status}"`);
+	const ws = chat.course!.workspace;
+	const own = new Set(chat.ownTopics ?? []);
+	for (const row of s.needsYou.get(ws) ?? []) if (own.has(row.handle) && /Left off|Your turn/.test(row.text)) problems.push(`its course page's Needs you lists "${row.text}"`);
+	for (const handle of own) {
+		await app.visit(unitHref(ws, handle), { fresh: true, ready: () => !!document.querySelector('[data-slot="pickup-now"]') });
+		const press = document.querySelector('[data-slot="pickup-now-press"]');
+		const opens = press ? await app.lookAt(press) : null;
+		if (chatOf(opens) === id) problems.push(`its topic page (${handle}) offers "${text(press)}" on it: "${text(document.querySelector('[data-slot="pickup-now"]'))}"`);
+	}
+	await app.unmount();
+	assert.ok(problems.length === 0, `${s.label}: ${chat.title}, finished:\n  ${problems.join("\n  ")}`);
+}
+
 // ─── the journey ───────────────────────────────────────────────────────────
 
 describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip, concurrency: false, timeout: 900_000 }, () => {
@@ -746,8 +773,29 @@ describe("the demo world across surfaces (scenarios.md, no tutor turns)", { skip
 		await holds("Tue 10 Nov, after the Poisson lesson's Done for today");
 	});
 
+	/** The Linear maps lesson begun on Mon 9 Nov, finished on Tue 10 Nov. */
+	let finishedLesson: string | null = null;
+
+	it("Tue 10 Nov, the Linear maps lesson taught through, its task closed, then the tutor's Stop here for today (round 15, M1: 1 D1)", async () => {
+		const lesson = app.chats().find((c) => c.course?.title === "Linear Algebra" && (c.ownTopics ?? []).includes("linear-maps") && !c.review);
+		assert.ok(lesson, "Monday's Linear maps lesson");
+		const { id } = lesson;
+		app.answer(id, { words: "A matrix whose columns are the images of the basis vectors" });
+		await app.save(id, {
+			observations: [{ topics: ["linear-maps"], text: "Found the matrix of a map from the images of a basis", result: "correct", help: "none", sure: "confident" }],
+			tasks: { "linear-maps-lesson": { title: "Linear maps and their matrices lesson", topics: ["linear-maps"], step: "The matrix of a map on polynomials" } },
+		});
+		// Lens 1's 10 Nov record: the lesson's last save removes its task, then the tutor offers practice or a stop.
+		await app.save(id, { tasks: { "linear-maps-lesson": null } });
+		app.offerStop(id, "That finishes the Linear maps and their matrices lesson. Do you want some practice problems now?");
+		app.answer(id, { pick: 2 });
+		app.closes(id, "Tomorrow, Wednesday 11 November, brings your reviews.");
+		finishedLesson = id;
+		await holds("Tue 10 Nov, after the Linear maps lesson finished");
+	});
+
 	it("Tue 17 Nov, two days before the Probability exam", async () => {
 		app.day("2026-11-17");
-		await holds("Tue 17 Nov");
+		await holds("Tue 17 Nov", (s) => (finishedLesson ? assertFinishedLesson(app, s, finishedLesson) : assert.fail("the Tue 10 step finished the Linear maps lesson")));
 	});
 });

@@ -1071,6 +1071,14 @@ export function sessionSavesOf(messages: readonly LhMessage[]): Record<string, u
  *  Which of them the engine still has open, and at which step, is the
  *  engine's to say. Pure. */
 export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
+	return [...sessionTaskStatesOf(messages)].filter(([, open]) => open).map(([key]) => key);
+}
+
+/** Every engine task the session's saves (or the lesson it picked up)
+ *  wrote, by key: true while it is open, false once a save removed it, so
+ *  a session whose own saves closed the work it held is told apart from
+ *  one that held none (round 15, M1). Pure. */
+export function sessionTaskStatesOf(messages: readonly LhMessage[]): Map<string, boolean> {
 	const clean = cleanToolCallIds(messages);
 	const held = new Map<string, boolean>();
 	for (const m of messages) {
@@ -1087,7 +1095,7 @@ export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
 			}
 		}
 	}
-	return [...held].filter(([, open]) => open).map(([key]) => key);
+	return held;
 }
 
 /** The title the session's saves gave the first task they opened, the
