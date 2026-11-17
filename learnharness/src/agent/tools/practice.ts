@@ -242,8 +242,10 @@ function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: s
 	return explained && !worked;
 }
 
-/** Save a concluded problem's attempts; a refusal names what to fix. */
-async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, concludeCallId: string): Promise<{ refused?: string; text: string }> {
+/** Save a concluded problem's attempts; a refusal names what to fix. An
+ *  attempt the record would not take is kept as `unsaved`, the conclude's
+ *  own observations, which a later save writes as they are. */
+async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, concludeCallId: string): Promise<{ refused?: string; text: string; unsaved?: Record<string, unknown>[] }> {
 	if (input.outcome === "dismissed") return { text: "" };
 	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
 	const active = record ? activeProblemOf(record.messages) : null;
@@ -299,7 +301,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput, co
 			: "On your next turn, re-send exactly this with course_save: ";
 	// Each names this conclude, so the problem's card shows the mark.
 	const resend = observations.map((o) => ({ ...o, question: concludeCallId }));
-	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations: resend })}` };
+	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations: resend })}`, unsaved: observations };
 }
 
 export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording): AgentTool<typeof concludeInputObject> {
@@ -324,7 +326,10 @@ export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording):
 			gate.problemActive = false;
 			const ack = concludeResult();
 			if (!recorded.text) return ack;
-			return { ...ack, content: [{ type: "text", text: `${CONCLUDE_ACK_TEXT}\n\n${recorded.text}` }] };
+			// The observations it could not save ride its result, for the save
+			// that sends them again (round 15, M3).
+			const details = recorded.unsaved ? ({ unsaved: recorded.unsaved } as unknown as null) : ack.details;
+			return { ...ack, content: [{ type: "text", text: `${CONCLUDE_ACK_TEXT}\n\n${recorded.text}` }], details };
 		},
 	};
 }

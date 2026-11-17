@@ -156,12 +156,39 @@ function namedQuestions(
 	const refuse = (why: string) => {
 		refused ??= why;
 	};
-	const observations = listed.map((o, i) => {
+	// A problem whose conclude could not save its attempts: whatever this
+	// save sends for it, the conclude's own observations go, first try and
+	// final answer, once (round 15, M3: the pair was refused as two results
+	// for one answer, and only the first try was saved). Any other answer
+	// keeps one observation with one result.
+	const replays = new Set<number>();
+	const replayed = new Set<string>();
+	const expanded: unknown[] = [];
+	for (const o of listed) {
+		const named = isObject(o) && typeof o.question === "string" ? o.question.trim() : "";
+		const replay = named ? answers.get(named)?.replay : undefined;
+		const open = replay && !answers.get(named)!.recorded && !saved.has(named) && !("corrects" in (o as Record<string, unknown>));
+		if (!open) {
+			expanded.push(o);
+			continue;
+		}
+		if (replayed.has(named)) continue;
+		replayed.add(named);
+		for (const r of replay) {
+			replays.add(expanded.length);
+			expanded.push({ ...r, question: named });
+		}
+	}
+	const observations = expanded.map((o, i) => {
 		if (!isObject(o)) {
 			questions.push(null);
 			return o;
 		}
 		const { question, ...rest } = o;
+		if (replays.has(i)) {
+			questions.push(question as string);
+			return rest;
+		}
 		const remark = remarkRefused(rest, i, remarkable);
 		if (remark) refuse(remark);
 		if (!("question" in o)) {

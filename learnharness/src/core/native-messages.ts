@@ -915,6 +915,13 @@ export interface AnsweredQuestion {
 	/** A save that went through already recorded it, or its problem's
 	 *  conclude did. */
 	recorded: boolean;
+	/** For a problem's conclude that could not save its attempts (the
+	 *  record could not be read): the observations it would have written,
+	 *  its first try and its final answer, which a later save naming it
+	 *  writes as they are (round 15, M3: after the record came back, the
+	 *  save of the pair was refused as two results for one answer, and his
+	 *  fix was lost). */
+	replay?: readonly Record<string, unknown>[];
 	/** For an answer in words: a problem posed after his newest message was
 	 *  dropped (Done for today, or his discard) with nothing recorded, so
 	 *  nothing of it is saved (round 15, M4: the closing turn saved the
@@ -982,6 +989,7 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 	// through; an answer in words stands for his newest message then.
 	const naming = new Map<string, string[]>();
 	const recorded = new Set<string>();
+	const unsaved = new Map<string, Record<string, unknown>[]>();
 	let problem: string | null = null;
 	let lastSaid: string | null = null;
 	// A problem posed since his newest message, and whether one was dropped.
@@ -1024,6 +1032,10 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			for (const key of naming.get(m.toolCallId) ?? []) recorded.add(key);
 		} else if (m.role === "toolResult" && !m.isError && m.toolName === PRACTICE_CONCLUDE_TOOL) {
 			if (!UNSAVED_CONCLUDE.test(resultText(m))) recorded.add(m.toolCallId);
+			else {
+				const kept = (m.details as { unsaved?: unknown } | null)?.unsaved;
+				if (Array.isArray(kept) && kept.length > 0 && kept.every((o) => typeof o === "object" && o !== null)) unsaved.set(m.toolCallId, kept as Record<string, unknown>[]);
+			}
 		} else if (m.role === "toolResult" && GRADED_QUESTION_TOOLS.includes(m.toolName) && !m.isError && isRealAnswer(m.details)) {
 			const asked = posed.get(m.toolCallId);
 			if (!asked) continue;
@@ -1033,7 +1045,11 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, ...(details.showMe === true ? { showMe: true } : {}), asked: asked.key, recorded: false });
 		}
 	}
-	for (const [key, answer] of answered) answer.recorded = recorded.has(key);
+	for (const [key, answer] of answered) {
+		answer.recorded = recorded.has(key);
+		const replay = unsaved.get(key);
+		if (replay && !answer.recorded) answer.replay = replay;
+	}
 	if (lastSaid) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false, confidence: null, recorded: recorded.has(`${HIS_MESSAGE}:${lastSaid}`), ...(droppedSinceSaid ? { dropped: true as const } : {}) });
 	return { posed, answered };
 }
