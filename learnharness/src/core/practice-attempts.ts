@@ -108,9 +108,23 @@ function secondResult(topics: readonly string[], answer: GradedAnswer, statement
 	if (answer.result !== whole) return `${label}result is the whole answer's: ${whole}, since its parts went ${[...results].join(" and ")}`;
 	return null;
 }
+/** The part labels a problem's statement writes ("(a)", "(ii)", "2)"), in
+ *  order, each once. */
+export function statementParts(statement: string): string[] {
+	const labels = statement.match(/\((?:[a-z]|[ivx]{1,4})\)|(?<![\w(])\d{1,2}\)/g) ?? [];
+	return [...new Set(labels)];
+}
+
 function answerProblem(topics: readonly string[], answer: GradedAnswer, statement: string, label: string): string | null {
 	const second = secondResult(topics, answer, statement, label);
 	if (second) return second;
+	// brokeAt charges one topic and credits none other: on a problem whose
+	// labelled parts went differently, a part he got right would go
+	// uncredited (round 15, m24: (c) dim ker right on his first try, yet
+	// Kernel took nothing from it).
+	if (answer.brokeAt !== undefined && answer.result === "partial" && topics.length > 1 && statementParts(statement).length > 1) {
+		return `${label}brokeAt charges the miss to one topic and credits no other, but this problem's labelled parts went differently: give parts instead, each part as the statement labels it with the posed topics it tests and its result, so the part he got right credits its topic, and leave brokeAt out`;
+	}
 	if (answer.chose !== undefined && topicResults(topics, answer).every(([, r]) => r === "correct")) {
 		return `${label}chose marks a wrongly chosen method, so the result is not correct on every topic`;
 	}

@@ -9,11 +9,11 @@ import { turnErrorText } from "./turn-error-text";
 const ACTION = "h-8 px-2 text-body";
 
 /** A failed reply under the Proposed design (spec: turn-error.md): one plain
- *  sentence in the danger colour, then Retry, Sign in for a signed-out
- *  Claude, Open Settings for a rejected
+ *  sentence in the danger colour, then Retry (a signed-out Claude's sign-in
+ *  is the pill above the box, round 15 M2), Open Settings for a rejected
  *  key, Home for a lesson deleted elsewhere, and Details for the provider's
  *  own text. */
-export function TurnError({ message, again = false, kept = false, onRetry, retryLabel = "Retry", onOpenSettings, onSignIn, children }: {
+export function TurnError({ message, again = false, kept = false, onRetry, retryLabel = "Retry", onOpenSettings, children }: {
 	message: string;
 	/** The refused turn carried words he typed, now back in the box. */
 	kept?: boolean;
@@ -26,8 +26,6 @@ export function TurnError({ message, again = false, kept = false, onRetry, retry
 	 *  for a reply that never came says it. */
 	retryLabel?: string;
 	onOpenSettings: () => void;
-	/** Opens the sign-in dialog, for a turn refused because Claude is signed out. */
-	onSignIn?: () => void;
 	/** A provider-specific prompt shown beside the sentence (the Claude plan limit). */
 	children?: ReactNode;
 }) {
@@ -39,16 +37,12 @@ export function TurnError({ message, again = false, kept = false, onRetry, retry
 			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">
 				{text.sentence}
 				{text.then === "sign-in-retry" && (onRetry ? " Sign in, then press Retry." : " Sign in, then send again.")}
+				{text.then === "retry" && onRetry && ` Press ${retryLabel}.`}
 			</span>
 			{children}
 			{onRetry && text.kind !== "gone" && (
 				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "text-foreground")}>
 					{retryLabel}
-				</Button>
-			)}
-			{text.kind === "signed-out" && onSignIn && (
-				<Button variant="quiet" size="sm" data-testid="turn-error-sign-in" onClick={onSignIn} className={cn(ACTION, "text-foreground")}>
-					Sign in to Claude
 				</Button>
 			)}
 			{text.kind === "key" && (

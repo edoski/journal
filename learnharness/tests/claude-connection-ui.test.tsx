@@ -193,6 +193,20 @@ test("every account failing alike says it once, above the names; none found in T
 	assert.doesNotMatch(document.body.textContent!, /edoxtreme/);
 });
 
+/** Round 15, m23: the one line, "This account isn't signed in…", sat
+ *  above four accounts and named none. It now sits on the account in use. */
+test("every account failing alike says it once, on the row of the account in use", async () => {
+	const out = (id: string, email: string) => account(id, id, { state: "signed-out" }, null, email);
+	install([[out("claude-subscription-a", "a@example.com"), out("claude-subscription", "main@example.com"), out("claude-subscription-c", "c@example.com"), out("claude-subscription-d", "d@example.com")]]);
+	await mount();
+	await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+	const said = [...document.querySelectorAll('[data-testid="claude-connection-state"]')];
+	assert.equal(said.length, 1, "said once");
+	assert.equal(said[0]!.textContent, "This account isn't signed in. Sign in to it again in T3 Code, then press Refresh.");
+	assert.ok(said[0]!.closest('[data-testid="claude-account"]') === row("claude-subscription"), "on the row of the account in use, the one it names");
+	assert.equal(text(row("claude-subscription"), "claude-in-use"), "In use");
+});
+
 test("accounts that fail differently, or a mix with one signed in, keep a line under each", async () => {
 	install([[account("claude-subscription", "Main", connected, null, "main@example.com", "default"), account("claude-subscription-work", "Work", { state: "signed-out" }, null, "work@example.com")]]);
 	await mount();

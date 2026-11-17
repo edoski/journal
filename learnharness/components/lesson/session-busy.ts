@@ -44,12 +44,26 @@ export function useSessionBusy(o: {
 	attached: boolean;
 	initiallyInFlight: boolean;
 	attachIfRunning: () => void;
+	/** The connection dropped the turn this view read, and nothing says yet
+	 *  what became of it. */
+	dropped?: boolean;
 }) {
 	const [serverTurn, setServerTurn] = useState(o.initiallyInFlight);
 	const [waking, setWaking] = useState(false);
 	const [stopAsked, setStopAsked] = useState(false);
 	const serverTurnRef = useRef(serverTurn);
 	serverTurnRef.current = serverTurn;
+	const stopAskedRef = useRef(stopAsked);
+	stopAskedRef.current = stopAsked;
+	// A dropped connection leaves the turn's fact unknown: no settle may
+	// ever come (the app restarted), so the lesson stops looking busy, and
+	// the heal asks the record (round 15, m20: "Thinking…" and Stop stood
+	// through the outage under "Press Enter to try again").
+	useEffect(() => {
+		if (!o.dropped) return;
+		setServerTurn(false);
+		setWaking(false);
+	}, [o.dropped]);
 	useServerEvent("turn-started", (p) => {
 		if (p.chatId === o.chatId) setServerTurn(true);
 	});
@@ -67,13 +81,19 @@ export function useSessionBusy(o: {
 	useEffect(() => {
 		const ended = prevStatus.current !== "ready" && o.status === "ready";
 		prevStatus.current = o.status;
-		if (ended && serverTurnRef.current) attachRef.current();
+		// The turn he stopped is not one to attach to, though it has not
+		// settled yet (round 15, m21: "Thinking…" and Stop came back for 2 s
+		// after his stop, and an Enter then was swallowed).
+		if (ended && serverTurnRef.current && !stopAskedRef.current) attachRef.current();
 	}, [o.status]);
 	const localStream = o.status === "submitted" || o.status === "streaming";
 	return {
 		busy: lessonBusy({ localStream, attached: o.attached, serverTurn, waking, stopAsked }),
 		/** Read at call time by the resync and the ready flip. */
 		serverTurnRef,
+		/** His stop, held until the turn it stopped settles: nothing attaches
+		 *  to that turn meanwhile. */
+		stopAskedRef,
 		/** His stop: the reply reads as stopped until its turn settles. */
 		askStop: useCallback(() => setStopAsked(true), []),
 		/** Nothing ran to stop: the record decides. */

@@ -48,7 +48,7 @@ export * from "./answer-marks.ts";
 export { closedTonight, doneTonightAtEnd, leftQuestionRepose, sessionEndOf } from "./session-end.ts";
 export { replyCutOf, replyNeverCame } from "./turn-cut.ts";
 export { sameQuestionKey } from "./shown-help.ts";
-export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, CLAUDE_ACCOUNT_SIGNED_OUT, CLAUDE_SIGNED_OUT_STARTS, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
+export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, CLAUDE_ACCOUNT_SIGNED_OUT, CLAUDE_SIGNED_OUT_STARTS, CLAUDE_FAILED, NO_KEY, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
 export type { ClaudeAccount, ClaudeAccountStatus, ClaudeConnection, ClaudeUsage } from "./contracts/claude.ts";
 // course-context.ts: a course's context sorted from its record (pure).
 export * from "./course-context.ts";

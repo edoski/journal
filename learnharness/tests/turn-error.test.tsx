@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { turnErrorText } from "../components/lesson/turn-error-text.ts";
 import { TurnError } from "../components/lesson/turn-error.tsx";
+import { CLAUDE_FAILED } from "../src/core/index.ts";
 
 const ANTHROPIC_401 = '401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"},"request_id":"req_011"}';
 
@@ -27,11 +28,22 @@ describe("turnErrorText", () => {
 		assert.equal(turnErrorText('529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}').kind, "busy");
 	});
 
-	it("shows prose already written for people as it is, with no details", () => {
-		const curated = "Claude Code ended the reply midway. Retry. No API key was used.";
-		assert.deepEqual(turnErrorText(curated), { kind: "written", sentence: curated, details: null });
+	it("shows prose already written for people as it is, with no details, and never the API-key line (round 15, m22)", () => {
 		const claude = "Claude is limiting requests right now. Wait a minute, then retry. See https://claude.ai/settings/usage. No API key was used.";
-		assert.equal(turnErrorText(claude).kind, "written");
+		assert.deepEqual(turnErrorText(claude), { kind: "written", sentence: "Claude is limiting requests right now. Wait a minute, then retry. See https://claude.ai/settings/usage.", details: null });
+	});
+
+	it("says the tutor stopped when Claude Code failed inside the turn, naming Claude Code only in Details (round 15, m22, `101`)", () => {
+		const compaction = turnErrorText(CLAUDE_FAILED);
+		assert.deepEqual(compaction, { kind: "failed", sentence: "The tutor stopped before replying.", then: "retry", details: "Claude Code stopped with an error before it finished." });
+		const { document } = parseHTML(`<html><body>${renderToStaticMarkup(<TurnError message={CLAUDE_FAILED} onRetry={() => {}} onOpenSettings={() => {}} />)}</body></html>`);
+		assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "The tutor stopped before replying. Press Retry.");
+		assert.deepEqual([...document.querySelectorAll("button")].map((b) => b.textContent), ["Retry", "Details"], "one Retry");
+		assert.doesNotMatch(document.body.textContent ?? "", /API key|Claude Code/);
+		const midway = turnErrorText("Claude Code ended the reply midway. Retry. No API key was used.");
+		assert.equal(midway.sentence, "The tutor stopped partway through its reply.");
+		assert.equal(midway.details, "Claude Code ended the reply midway.");
+		assert.equal(turnErrorText("Claude Code sent nothing for 5 minutes, so the request was stopped. No API key was used.").sentence, "The tutor stopped before replying.");
 	});
 
 	it("reads a turn refused because Claude is signed out as one plain sentence that says his words are kept, only when he wrote some", () => {
@@ -43,9 +55,6 @@ describe("turnErrorText", () => {
 		assert.doesNotMatch(pressed.querySelector("[data-testid=turn-error-sentence]")!.textContent!, /still in the box/);
 		const typed = parseHTML(renderToStaticMarkup(<TurnError message={refusal} kept onOpenSettings={() => {}} />)).document;
 		assert.match(typed.querySelector("[data-testid=turn-error-sentence]")!.textContent!, /What you wrote is still in the box\.$/);
-		const html = renderToStaticMarkup(<TurnError message={refusal} onOpenSettings={() => {}} onSignIn={() => {}} />);
-		const { document } = parseHTML(html);
-		assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in to Claude", "one label, as the pill and the dialog say it (round 10, 4 minor 7)");
 	});
 
 	it("reads a turn that failed because Claude was signed out as signed out, naming the buttons beside it", () => {
@@ -54,9 +63,9 @@ describe("turnErrorText", () => {
 		for (const raw of ["Claude isn't signed in on this account. No API key was used.", "Claude Code is not signed in. Run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts. No API key was used."]) {
 			const text = turnErrorText(raw);
 			assert.equal(text.kind, "signed-out", raw);
-			const { document } = parseHTML(renderToStaticMarkup(<TurnError message={raw} onRetry={() => {}} onOpenSettings={() => {}} onSignIn={() => {}} />));
+			const { document } = parseHTML(renderToStaticMarkup(<TurnError message={raw} onRetry={() => {}} onOpenSettings={() => {}} />));
 			assert.equal(document.querySelector("[data-testid=turn-error-sentence]")?.textContent, "Claude isn't signed in, so the tutor couldn't reply. Sign in, then press Retry.");
-			assert.equal(document.querySelector("[data-testid=turn-error-sign-in]")?.textContent, "Sign in to Claude", "one label, as the pill and the dialog say it (round 10, 4 minor 7)");
+			assert.ok(document.querySelector("[data-testid=turn-error-sign-in]") === null, "the pill above the box is the one sign-in (round 15, M2)");
 			assert.equal(document.querySelector("[data-testid=retry-failed-turn]")?.textContent, "Retry");
 			assert.doesNotMatch(document.body.textContent ?? "", /Refresh|token|T3 Code/);
 		}

@@ -145,6 +145,7 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 	const stop = useCallback(() => model.stop(), [model]);
 	const stopReply = useCallback(() => model.stopReply(), [model]);
 	const clearError = useCallback(() => model.clearError(), [model]);
+	const outlivedFailure = useCallback(() => model.outlivedFailure(), [model]);
 	const recoverDroppedStream = useCallback(() => model.recoverDroppedStream(), [model]);
 	const resumeStream = useCallback(() => void model.resumeStream(), [model]);
 
@@ -169,6 +170,7 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 		stop,
 		stopReply,
 		clearError,
+		outlivedFailure,
 		recoverDroppedStream,
 		resumeStream,
 		setReattachSettled,

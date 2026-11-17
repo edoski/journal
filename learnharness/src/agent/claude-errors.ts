@@ -1,7 +1,6 @@
-import { CLAUDE_LIMIT_TEXT, CLAUDE_MODEL, CLAUDE_USAGE_URL } from "../core/contracts/claude.ts";
+import { CLAUDE_FAILED, CLAUDE_LIMIT_TEXT, CLAUDE_MODEL, CLAUDE_USAGE_URL, NO_KEY } from "../core/contracts/claude.ts";
 
-/** Every Claude failure the learner sees says no API key was used. */
-export const NO_KEY = " No API key was used.";
+export { CLAUDE_FAILED, NO_KEY };
 
 export interface ClaudeRateLimit { resetsAt?: number; rateLimitType?: string }
 
@@ -23,12 +22,6 @@ export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rat
 	}
 	return CLAUDE_FAILED;
 }
-
-/** Any other failure is Claude Code's own error (a compaction that keeps
- *  refilling, an internal fault): his plan and sign-in are fine, so the
- *  line says only what failed (round 12, 4 minor 3: "check \`claude\` in
- *  a terminal and your plan" with 47% of the plan left). */
-export const CLAUDE_FAILED = `Claude Code stopped with an error before it finished. Retry.${NO_KEY}`;
 
 /** LearnHarness runs only CLAUDE_MODEL, so there is nothing to fall back to. */
 export const CLAUDE_MODEL_MISSING = `${CLAUDE_MODEL.name} is not available on this Claude plan or this Claude Code version, and LearnHarness runs only ${CLAUDE_MODEL.name}. Update Claude Code, or use an account whose plan includes it.${NO_KEY}`;
