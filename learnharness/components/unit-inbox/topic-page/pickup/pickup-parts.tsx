@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 import { BookOpenIcon, ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FIRST_LESSON, LESSON_GOES_ON, moreWords } from "@/components/study-words";
+import { FIRST_LESSON, LESSON_GOES_ON, moreWords, type PressWord } from "@/components/study-words";
 import { daysThatFit } from "@/components/unit-inbox/topic-page/pickup/earlier-fit";
 import { Button } from "@/components/ui/button";
 import { PagePress } from "@/components/page-frame/page-frame";
@@ -57,7 +57,7 @@ export function Section({ label, now, children }: { label: string; now?: boolean
  * page's Now's own, so the row says what it does. Siblings with
  * `relative z-10` stay their own controls.
  */
-export function NowPress({ now, busy, onAct, className }: { now: NowItem; busy: boolean; onAct?: () => void; className?: string }) {
+export function NowPress({ now, busy, onAct, className }: { now: NowItem & { press: PressWord }; busy: boolean; onAct?: () => void; className?: string }) {
 	const press = cn(
 		"flex shrink-0 outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset",
 		className,
@@ -288,7 +288,8 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 			data-action={now.kind}
 			data-shown={onMap || undefined}
 			className={cn(
-				"group/press relative grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg py-3 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
+				"group/press relative grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg py-3 transition-colors motion-reduce:transition-none",
+				now.press && "hover:bg-fill-hover",
 				BLEED,
 				marked && NOW_RULE,
 			)}
@@ -297,7 +298,7 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 			<span data-slot="pickup-now-words" className="line-clamp-2 text-headline text-foreground">
 				<LineText>{now.words}</LineText>
 			</span>
-			<NowPress now={now} busy={busy} onAct={onAct} className="justify-self-end" />
+			{now.press && <NowPress now={{ ...now, press: now.press }} busy={busy} onAct={onAct} className="justify-self-end" />}
 			{/* The note wraps whole, and Now carries no reason line under it: why the topic comes now is the pane's
 			    Builds on and In your material (round 12, 3 n9: "Planned Thu 12 Nov, after Probabi…" cut, with a
 			    two-line reason under it). */}

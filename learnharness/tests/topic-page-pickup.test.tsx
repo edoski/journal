@@ -24,6 +24,7 @@ import { sessionPlanOf, topicRecordOf } from "../src/server/topic.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
 import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
+import { SectionsPane } from "../components/unit-inbox/topic-page/pickup/sections.tsx";
 import { mapLessonAtFirst } from "../components/unit-inbox/topic-page/hybrid/hybrid-facts.ts";
 import { cardLine } from "../components/course-map/topic-map/topic-standing.ts";
 import { trailDays, TRY_WORDS } from "../components/unit-inbox/topic-page/trail/trail-facts.ts";
@@ -99,15 +100,18 @@ function order(document: Document): string[] {
 }
 
 describe("Now", () => {
-	it("says a review the plan holds past its due day by the plan's day, never Due today beside it (round 12, 1 m1, 2 n1), Nothing due (round 4) or Nothing planned today (round 8, 1 D11)", () => {
+	it("says a review the plan holds past its due day by the plan's day, never Due today beside it (round 12, 1 m1, 2 n1), in the one phrase for nothing due today, with no press (round 15, m9: \"Nothing today · Study\" and \"Nothing due · Study\")", () => {
 		const held = topic("binomial", { title: "Binomial distribution", level: "assisted", introduced: "2026-11-05", review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-06" } } });
 		const { now, scheduled } = pickupSections(factsOf(held));
-		assert.equal(now.words, "Nothing today", "Scheduled gives the plan's day, the head memory's");
+		assert.equal(now.words, "Nothing due today", "Scheduled gives the plan's day, the head memory's");
+		assert.equal(now.press, null, "no press beside the Scheduled day");
 		const today = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-08" } } });
-		assert.equal(pickupSections(factsOf(today)).now.words, "Nothing today");
+		assert.equal(pickupSections(factsOf(today)).now.words, "Nothing due today");
 		assert.equal(scheduled?.kind, "review");
 		const ahead = topic("binomial", { ...held, review: { kind: "scheduled", date: "2026-11-10", held: { exam: null, since: "2026-11-09" } } });
-		assert.equal(pickupSections(factsOf(ahead)).now.words, "Nothing due", "a review memory asks for later is not due yet");
+		assert.equal(pickupSections(factsOf(ahead)).now.words, "Nothing due today", "a review memory asks for later: the same phrase");
+		const doc = render(<SectionsPane facts={factsOf(held)} busy={false} onAct={() => {}} onTask={() => {}} shown={null} onShow={() => {}} />);
+		assert.ok(doc.querySelector('[data-slot="pickup-now-press"]') === null, "Now draws no press");
 	});
 
 	it("holds every row of the action table: what to pick up, where it stands in a few words, the press and the session it opens", () => {
@@ -123,7 +127,7 @@ describe("Now", () => {
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "First lesson", null, "Start", null],
 				["continue", "Determinants as volume scaling", "Left off yesterday", "Continue", "chat_demo_det"],
-				["study", "Nothing due", null, "Study", null],
+				["study", "Nothing due today", null, null, null],
 			],
 		);
 	});
@@ -321,9 +325,11 @@ describe("the sections drawn", () => {
 			assert.ok(document.querySelector('[data-testid="topic-action"]') === null, `${name}: no head button`);
 			const now = document.querySelector('[data-slot="pickup-now"]')!;
 			assert.equal(now.getAttribute("data-action"), facts.action.kind, name);
-			const press = now.querySelector('[data-slot="pickup-now-press"]')!;
-			if ("chat" in facts.action) assert.equal(press.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
-			else assert.equal(press.tagName, "BUTTON", name);
+			const press = now.querySelector('[data-slot="pickup-now-press"]');
+			// Nothing due today has no press (round 15, m9).
+			if (facts.action.kind === "study") assert.ok(press === null, `${name}: no press`);
+			else if ("chat" in facts.action) assert.equal(press!.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
+			else assert.equal(press!.tagName, "BUTTON", name);
 		}
 	});
 
