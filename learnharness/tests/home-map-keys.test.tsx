@@ -14,6 +14,8 @@ describe("Home's map keys (N2)", () => {
 	it("← and → move to the course left or right of the chosen one, from anywhere on Home", async () => {
 		await mount();
 		const titles = tabTitles();
+		// The map rests on the course he last studied (round 15, 3 free); walk to the first tab.
+		for (const _ of titles) await press("ArrowLeft");
 		assert.equal(tab(), titles[0]);
 		await press("ArrowRight");
 		assert.equal(tab(), titles[1]);
@@ -36,12 +38,13 @@ describe("Home's map keys (N2)", () => {
 
 	it("never fires while he types in a field or while a dialog is open", async () => {
 		await mount();
+		const resting = tab();
 		const field = document.createElement("input");
 		document.body.appendChild(field);
 		field.focus();
 		await press("ArrowRight", field);
 		await press("f", field);
-		assert.equal(tab(), tabTitles()[0]);
+		assert.equal(tab(), resting);
 		assert.ok(document.querySelector('[data-slot="home-map"][data-enlarged]') === null);
 		field.remove();
 		const dialog = document.createElement("div");

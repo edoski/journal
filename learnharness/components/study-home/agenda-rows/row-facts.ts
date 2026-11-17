@@ -1,4 +1,4 @@
-import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
+import { courseLabel, type ChatListItem, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
 import { TUTOR_WRITING, agoWords, lapsedNow, lapsedOnWords, overdueWords, startsWhyShort, startsWhyTells, studiedDaysWords } from "@/components/study-words";
 import { pausedWords, sessionState } from "@/components/nav/session-state";
 import { continueWords, planDay, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
@@ -35,11 +35,24 @@ export function pointProps(row: TodayRow, { pointed, onPoint, onPointEnd }: Pick
 	};
 }
 
-/** The line Home's map follows: the pointed line if it has a course, else
- *  the first line with one (Today's most urgent). Pure. */
-export function followedRow(rows: readonly TodayRow[], pointed: string | null): TodayRow | null {
+/** The line Home's map follows: the pointed line if it has a course; at
+ *  rest, the line of the session he is in, or he last studied (the newest
+ *  of `chats` on a course Today lists): that session's own line, else its
+ *  course's first line (round 15, 3 free: mid Linear Algebra lesson, Home
+ *  opened on Probability); else the first line with a course (Today's most
+ *  urgent). Pure. */
+export function followedRow(rows: readonly TodayRow[], pointed: string | null, chats: readonly ChatListItem[] = []): TodayRow | null {
 	const withCourse = rows.filter((row) => row.course !== null);
-	return withCourse.find((row) => lineKey(row) === pointed) ?? withCourse[0] ?? null;
+	const found = withCourse.find((row) => lineKey(row) === pointed);
+	if (found) return found;
+	const listed = new Set(withCourse.map((row) => row.course!.map.workspace));
+	const last = [...chats].filter((chat) => chat.course && listed.has(chat.course.workspace)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+	if (!last) return withCourse[0] ?? null;
+	return (
+		withCourse.find((row) => row.kind === "session" && row.chat.id === last.id) ??
+		withCourse.find((row) => row.course!.map.workspace === last.course!.workspace) ??
+		null
+	);
 }
 
 /** At most this many lines; past it the last line names the other courses. */

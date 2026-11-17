@@ -63,7 +63,7 @@ export function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enl
 	// topics alone (the maps' tie, `useMapTie`); the map stays on that line once he leaves it.
 	const tie = useMapTie({ onHold: (at) => setChosen({ by: "line", key: at.key }) });
 
-	const followed = chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null) : null;
+	const followed = chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null, chats) : null;
 	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
 	const lesson = useMemo(() => (followed ? lessonOf(followed) : null), [followed]);
 	const followedTopics = useMemo<ReadonlySet<TopicHandle> | null>(() => (lesson?.topics.length ? new Set(lesson.topics) : null), [lesson]);

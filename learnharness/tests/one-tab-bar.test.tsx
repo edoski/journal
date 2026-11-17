@@ -78,7 +78,11 @@ function noOwnUnderline(list: Element) {
 const pages = [
 	{
 		name: "Home's course tabs",
-		mount: mountHome,
+		// The map rests on the course he last studied (round 15, 3 free); start from the first tab.
+		mount: async () => {
+			await mountHome();
+			for (let i = 0; i < 4; i++) await press("ArrowLeft", dom.document.body);
+		},
 		list: () => dom.document.querySelector('[data-slot="home-map-tabs"]')!,
 		choose: () => press("ArrowRight", dom.document.body),
 	},
