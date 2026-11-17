@@ -15,4 +15,4 @@ No model chip, thinking level or cost: there is no model or thinking choice (eve
 
 ## Behaviour
 
-A session is created only when something is sent, words or a photo alone, through the one start path (`useLessonStart`, `use-lesson-start.ts`): a signed-out Claude account opens sign-in first and nothing is created until it passes. The box's words and photos survive a reload (`useStartDraft`, kept as `new`) and stay in it until the lesson has opened, so a failed start or a sign-in keeps them.
+A session is created only when something is sent, words or a photo alone, through the one start path (`useLessonStart`, `lesson-start.md`): a signed-out Claude account opens sign-in first and nothing is created until it passes. The box's words and photos survive a reload (`useStartDraft`, kept as `new`) and stay in it until the lesson has opened, so a failed start or a sign-in keeps them.

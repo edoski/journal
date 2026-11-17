@@ -28,6 +28,8 @@ import { sessionsNow, sessionTwins, unitKey, type Unit, type UnitInbox } from "@
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { StartFailure, StartScope } from "@/components/start/start-scope";
+import { useLessonStart } from "@/components/start/use-lesson-start";
 import { cn } from "@/lib/utils";
 
 /** An arc search found, with its course. */
@@ -97,7 +99,11 @@ const navLinkClass = (here: boolean) =>
  * lesson beside it, then one list: Home's Today, each line that needs him
  * now as a card that opens its page, with everything else on the folded
  * shelves at the foot (inbox-today.md). Background work shows only while
- * one runs; Settings is the footer's icon. Its right edge drags to resize,
+ * one runs; Settings is the footer's icon. Every press in it that starts a
+ * lesson (a topic's, a Today card's) goes through its one start
+ * (`StartScope`): signed out, sign-in opens; a start that fails says so in
+ * the footer beside Settings, out of the list, so no row moves and it shows
+ * at any scroll. Its right edge drags to resize,
  * as T3 Code's does; the width lasts across reloads. Folded, it is a rail
  * of icons (`SidebarRail`).
  */
@@ -141,9 +147,10 @@ export function UnitSidebar() {
 	const width = useSidebarWidth();
 	const sidebarRef = useRef<HTMLElement>(null);
 	const sidebarId = useId();
+	const lesson = useLessonStart();
 
 	return (
-		<>
+		<StartScope lesson={lesson}>
 			<aside
 				ref={sidebarRef}
 				id={sidebarId}
@@ -309,6 +316,7 @@ export function UnitSidebar() {
 								<SettingsIcon />
 							</Button>
 						</Hint>
+						<StartFailure className="min-w-0 flex-1 text-callout" />
 					</div>
 				</div>
 				</div>
@@ -316,6 +324,6 @@ export function UnitSidebar() {
 				<DeleteSessionDialog chat={s.deleting} onClose={() => s.setDeleting(null)} onDeleted={s.onDeleted} />
 			</aside>
 			{open && <SidebarResizeHandle width={width} sidebarId={sidebarId} sidebar={sidebarRef} />}
-		</>
+		</StartScope>
 	);
 }

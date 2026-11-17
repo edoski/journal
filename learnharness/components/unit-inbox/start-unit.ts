@@ -1,34 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { SessionStarter, type SessionCreation } from "@/components/start-session";
+import type { SessionCreation } from "@/components/start-session";
 import type { Unit } from "@/components/unit-inbox/units";
 import { topicOpening, type ChatListItem, type CourseMap, type CourseMapTopic } from "@/src/core";
 import { topicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 import { examGapAsk, pressWord, type PressWord } from "@/components/study-words";
-
-/** Starts a session (`creation`) and opens it; when it cannot start (no
- *  models set up), the composer opens instead. `starting` is the key of
- *  the start in flight; a press while one is in flight does nothing. */
-export function useStartSession(): { start: (key: string, creation: SessionCreation) => void; starting: string | null } {
-	const router = useRouter();
-	const starter = useRef(new SessionStarter());
-	const [starting, setStarting] = useState<string | null>(null);
-	const start = useCallback(
-		(key: string, creation: SessionCreation) => {
-			if (starting) return;
-			setStarting(key);
-			starter.current
-				.start(creation, fetch)
-				.then((href) => router.push(href))
-				.catch(() => router.push("/chat/new"))
-				.finally(() => setStarting(null));
-		},
-		[router, starting],
-	);
-	return { start, starting };
-}
 
 /** The session a start on one topic creates, linked to the topic from its
  *  first turn: its review when memory asks for it by `today`, else a
@@ -77,15 +53,4 @@ export function arcCheckCreation(workspace: string, arc: { handle: string; title
 /** A Check it session's opening and its name: "Vector spaces check". */
 export function arcCheckWords(arcTitle: string): string {
 	return `${arcTitle} check`;
-}
-
-/** Starts an arc's check (`startArcCheck`), as a press of Check it does,
- *  and opens it. `starting` is the arc whose check is starting. */
-export function useStartArcCheck(): { startArcCheck: (workspace: string, arc: { handle: string; title: string }, topics: readonly string[]) => void; starting: string | null } {
-	const { start, starting } = useStartSession();
-	const startArcCheck = useCallback(
-		(workspace: string, arc: { handle: string; title: string }, topics: readonly string[]) => start(arc.handle, arcCheckCreation(workspace, arc, topics)),
-		[start],
-	);
-	return { startArcCheck, starting };
 }

@@ -10,7 +10,7 @@ import type { NowLine } from "@/components/study-home/needs-you";
 import { courseMove, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 import type { ChatListItem } from "@/src/core";
 import type { PressWord } from "@/components/study-words";
-import { useContinueCourse } from "@/components/unit-inbox/continue-course";
+import { useStartScope } from "@/components/start/start-scope";
 import { CARD_ACTION_PLACE, ROW_ACTION, RowCard } from "@/components/unit-inbox/row-card";
 import { CourseMark, UnitStatusMark } from "@/components/unit-inbox/unit-row";
 import { courseKey, sessionKey } from "@/components/unit-inbox/now-inbox";
@@ -44,7 +44,7 @@ export function courseCardMove(line: NowLine, chats: readonly ChatListItem[]): C
 /** The line's action over the card's status slot, shown on hover and on
  *  keyboard focus. */
 export function NowAction({ line, title, className, chats = [] }: { line: NowLine; title: string; className?: string; chats?: readonly ChatListItem[] }) {
-	const { take, starting } = useContinueCourse();
+	const { take, starting } = useStartScope();
 	const action = nowActionOf(line);
 	const props = {
 		"data-slot": "row-action",
@@ -103,7 +103,7 @@ export function NowCard({ line, unit, active, parent, chats = [] }: { line: NowL
 			<span />
 		);
 	const { row } = line;
-	const { take } = useContinueCourse();
+	const { take } = useStartScope();
 	if (unit) {
 		const working = unit.now === "working";
 		return (

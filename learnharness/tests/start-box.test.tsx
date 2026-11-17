@@ -46,6 +46,8 @@ const { setKeptWindow, keptWords, NEW_LESSON_BOX } = await import("../components
 const { ServerEventsProvider } = await import("../components/server-events.tsx");
 const { StartScreen } = await import("../components/start/start-screen.tsx");
 const { CourseComposer } = await import("../components/course-page/course-composer.tsx");
+const { useLessonStart } = await import("../components/start/use-lesson-start.ts");
+const { StartFailure, StartScope } = await import("../components/start/start-scope.tsx");
 const { LINALG } = await import("./fixtures/now-demo.ts");
 setKeptWindow("w-start", { live: ["w-start"] });
 
@@ -122,9 +124,20 @@ async function mount(box: React.ReactNode) {
 	};
 }
 
+/** The course page's composer, under the page's one start, whose failure the page's head says. */
+function CoursePage() {
+	const lesson = useLessonStart();
+	return (
+		<StartScope lesson={lesson}>
+			<StartFailure />
+			<CourseComposer course={LINALG} />
+		</StartScope>
+	);
+}
+
 const boxes = [
 	{ name: "New lesson", box: () => <StartScreen />, scope: NEW_LESSON_BOX },
-	{ name: "a course page's composer", box: () => <CourseComposer course={LINALG} />, scope: `course:${WORKSPACE}` },
+	{ name: "a course page's composer", box: () => <CoursePage />, scope: `course:${WORKSPACE}` },
 ];
 
 describe("a photo alone starts a lesson", () => {

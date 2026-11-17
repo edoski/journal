@@ -10,7 +10,8 @@ import { Hint } from "@/components/ui/hint";
 import { MathLine } from "@/components/ui/math-line";
 import { mathPlain } from "@/components/ui/math-text";
 import { LineText } from "@/components/line-text";
-import { useStartSession } from "@/components/unit-inbox/start-unit";
+import { useStartScope } from "@/components/start/start-scope";
+import type { LessonStart } from "@/components/start/use-lesson-start";
 import type { MistakeRow } from "@/components/course-page/standing/standing-model";
 import { cn } from "@/lib/utils";
 import { continueHref } from "@/components/nav/session-state";
@@ -22,8 +23,9 @@ const ROW = "-mx-3 flex h-auto min-h-12 w-[calc(100%+1.5rem)] items-center gap-3
 /** One open mistake (spec: standing/standing.md): its slip's mark, the
  *  topic and its arc's name (`ArcLabel`), then what went wrong in the tutor's words
  *  and when, a hand when it had help. The whole row starts fixing it:
- *  Resume the session that waits on the topic, else a new one on it. */
-export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: ReturnType<typeof useStartSession>["start"]; starting: string | null }) {
+ *  Resume the session that waits on the topic, else a new one on it,
+ *  through the page's one start (`StartScope`). */
+export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: LessonStart["start"]; starting: string | null }) {
 	const Icon = SLIP_ICON[row.slip];
 	const key = `${row.href}#mistake`;
 	const body = (
@@ -57,7 +59,7 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 			data-slot="mistake-row"
 			aria-label={label}
 			disabled={starting !== null}
-			onClick={() => start(key, row.creation)}
+			onClick={() => start(row.creation, { key })}
 			className={ROW}
 		>
 			{body}
@@ -68,7 +70,7 @@ export function MistakeLine({ row, start, starting }: { row: MistakeRow; start: 
 
 /** The open mistakes, newest first, each a row that starts fixing it. */
 export function MistakeList({ rows, className }: { rows: readonly MistakeRow[]; className?: string }) {
-	const { start, starting } = useStartSession();
+	const { start, starting } = useStartScope();
 	return (
 		<ul data-slot="mistake-list" aria-label={MISTAKE_WORDS.title} className={cn("flex flex-col", className)}>
 			{rows.map((row) => (

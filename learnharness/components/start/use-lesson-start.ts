@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useModelSetup } from "@/components/setup-cta";
-import { SessionStarter } from "@/components/start-session";
+import { SessionStarter, type SessionCreation } from "@/components/start-session";
 import { usePhotoDraft } from "@/components/photos";
 import { keepPhotos, keepWords, keptWords } from "@/components/lesson/kept-drafts";
+import { continueHref } from "@/components/nav/session-state";
+import type { CourseMove } from "@/components/study-home/study-facts";
 
 const START_FAILURE = "Couldn’t open the session. Try again.";
 
@@ -29,31 +31,43 @@ export function useStartDraft(scope: string) {
 
 export type StartDraft = ReturnType<typeof useStartDraft>;
 
+/** A lesson in `workspace` opened on `opening`, on `topics`, picking up
+ *  the finished lesson `from`. Pure. */
+export function lessonCreation(opening: string, workspace: string, { topics = [], from }: { topics?: readonly string[]; from?: string } = {}): SessionCreation {
+	return { title: opening, course: { workspace }, ...(topics.length > 0 ? { topics } : {}), ...(from ? { resume: { from } } : {}) };
+}
+
 /**
- * Opens a lesson in a course with an opening, through the one creation path
- * (SessionStarter) and the pre-send guard every start uses: a signed-out
- * Claude account opens sign-in, and nothing is created until it passes. The caller draws `SetupDialog` from `setupOpen`.
- * `topics` are the course topics it is started on, `from` the finished
- * lesson it picks up. With a `draft`, its photos go with the opening, and
- * the box empties only once the lesson has opened: a failed start or a
- * sign-in keeps his words and photos.
+ * The one way a press opens a new session (spec: lesson-start.md): through the one creation path (SessionStarter) and the pre-send
+ * guard every start uses, so a signed-out Claude account opens sign-in and
+ * nothing is created until it passes (the caller draws `SetupDialog` from
+ * `setupOpen`), and a start that fails says so in `error`, never sending
+ * him elsewhere. `starting` is the `key` of the start in flight; a press
+ * while one is in flight does nothing. With a `draft`, its photos go with
+ * the opening, and the box empties only once the lesson has opened: a
+ * failed start or a sign-in keeps his words and photos. `error` belongs to
+ * the page it happened on, so a surface that outlives the page (the
+ * sidebar) drops it when he moves on. `take` takes up a course line's move
+ * (`courseMove`), as Home's line, the course page's Now and the sidebar's
+ * Today cards do.
  */
 export function useLessonStart() {
 	const router = useRouter();
+	const pathname = usePathname();
 	const { unconnected } = useModelSetup();
 	const starter = useRef(new SessionStarter());
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [starting, setStarting] = useState<string | null>(null);
+	const [failed, setFailed] = useState<string | null | undefined>(undefined);
 	const [setupOpen, setSetupOpen] = useState(false);
 
-	const start = (opening: string, workspace: string, { topics = [], from, draft }: { topics?: readonly string[]; from?: string; draft?: StartDraft } = {}) => {
-		if (busy) return;
+	const start = (creation: SessionCreation, { key = "lesson", draft }: { key?: string; draft?: StartDraft } = {}) => {
+		if (starting) return;
 		if (unconnected) return setSetupOpen(true);
-		setBusy(true);
-		setError(null);
+		setStarting(key);
+		setFailed(undefined);
 		const photos = draft?.photos.photos.map((p) => p.photo) ?? [];
 		void starter.current
-			.start({ title: opening, course: { workspace }, ...(topics.length > 0 ? { topics } : {}), ...(from ? { resume: { from } } : {}) }, fetch)
+			.start(creation, fetch)
 			.then(async (target) => {
 				// Photos go with the lesson's first message.
 				if (photos.length) await keepPhotos(`${target.slice(target.lastIndexOf("/") + 1)}:opening`, photos);
@@ -63,11 +77,25 @@ export function useLessonStart() {
 				}
 				router.push(target);
 			})
-			.catch(() => {
-				setBusy(false);
-				setError(START_FAILURE);
-			});
+			.catch(() => setFailed(pathname))
+			.finally(() => setStarting(null));
 	};
 
-	return { start, busy, error, setupOpen, openSetup: () => setSetupOpen(true), closeSetup: () => setSetupOpen(false) };
+	const take = (workspace: string, move: CourseMove) => {
+		if (move.kind === "open") router.push(continueHref(move.chat));
+		else start(lessonCreation(move.opening, workspace, { topics: move.topics, from: move.from }), { key: workspace });
+	};
+
+	return {
+		start,
+		take,
+		starting,
+		busy: starting !== null,
+		error: failed !== undefined && failed === pathname ? START_FAILURE : null,
+		setupOpen,
+		openSetup: () => setSetupOpen(true),
+		closeSetup: () => setSetupOpen(false),
+	};
 }
+
+export type LessonStart = ReturnType<typeof useLessonStart>;

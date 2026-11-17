@@ -8,7 +8,7 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { useModelSetup } from "@/components/setup-cta";
 import { Button } from "@/components/ui/button";
 import { NEW_LESSON_BOX } from "@/components/lesson/kept-drafts";
-import { useLessonStart, useStartDraft } from "@/components/start/use-lesson-start";
+import { lessonCreation, useLessonStart, useStartDraft } from "@/components/start/use-lesson-start";
 
 /** The heading over the composer. It names no mode: the tutor routes the
  *  request to teaching or practice itself. */
@@ -43,7 +43,7 @@ export function StartScreen() {
 		if (!draft.canSend) return;
 		const course = courseChoice.requireCourse();
 		if (!course) return;
-		lesson.start(draft.text.trim(), course, { draft });
+		lesson.start(lessonCreation(draft.text.trim(), course), { draft });
 	};
 
 	const { state } = courseChoice;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useContext, useState, type ReactNode, createContext } from "react";
+import { useState, type ReactNode } from "react";
 import { BookOpenIcon, CalendarIcon, ClockIcon, FolderOpenIcon, HistoryIcon } from "lucide-react";
 import type { CalendarCourse, StudyCourse } from "@/src/core";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,6 @@ import type { ExamReady } from "@/components/course-page/standing/standing-model
 import { ReadyWords } from "@/components/course-page/standing/ready-line";
 import { cn } from "@/lib/utils";
 
-
-/** Why the head's button could not start a lesson, set by the course frame
- *  so the alert shows under the button he pressed. */
-export const CourseLessonError = createContext<string | null>(null);
 
 /** A fact of the standing line that goes somewhere: its 16px mark and
  *  words, muted at rest and in full ink under the pointer. */
@@ -137,14 +133,4 @@ export function StudiedFact({ words, session, extra }: { words: string; session:
 			</Link>
 		</Hint>
 	);
-}
-
-/** Why the press could not start a lesson, under the head's lines. */
-export function LessonError() {
-	const error = useContext(CourseLessonError);
-	return error ? (
-		<p role="alert" data-slot="course-lesson-error" className="flex min-h-5 items-center text-body text-danger">
-			{error}
-		</p>
-	) : null;
 }

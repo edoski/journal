@@ -56,7 +56,7 @@ Keyboard: the app keeps Tab dead (`keyboard-shortcuts.tsx`, the owner's ruling o
 - A short top and a little choice: at most five cards, row 1 next, rows 2 to 5 in any order.
 - The plan leads, open loops next: each course's review and new topics for today first, then each session waiting on him since yesterday as its own card (round 10, 1 m2: only opening Problem sheet 4 put it above the exam's review). A session folded past the fifth line stays under Sessions, its dot on the folded header.
 - Due but bounded: the top follows the engine's day plan, never every topic whose review is due.
-- Interleave: Review on a course card starts that course's mixed review, as Home's line does (`useContinueCourse`).
+- Interleave: Review on a course card starts that course's mixed review, as Home's line does (`useLessonStart`'s `take`, `../start/lesson-start.md`).
 - Two things only: what to do today, then his chats, folded (16 Nov 2026); a topic returns to the top by itself when the engine plans it, and its standing lives on its course page, Home's map and its page.
 - Recede, don't move: a card the tutor writes in dims in place; nothing reshuffles while he works.
 - One rule drawn twice: the keys and reasons are tested equal to Home's (`tests/inbox-today.test.ts`, `tests/needs-you.test.ts`).

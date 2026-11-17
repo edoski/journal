@@ -19,8 +19,6 @@ export function columnsOf(view: CourseView, standing: CourseStanding | null = nu
 		showArc: noop,
 		open: shown ? { [shown.arc.handle]: true } : {},
 		onOpenChange: noop,
-		onCheck: noop,
-		checking: null,
 		marked: null,
 		onPoint: noop,
 		listRef: createRef(),

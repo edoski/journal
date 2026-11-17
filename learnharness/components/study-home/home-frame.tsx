@@ -1,10 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
-import { useLessonStart } from "@/components/start/use-lesson-start";
+import { useLessonStart, type LessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { doneToday, nearExam, type NearExam } from "@/components/study-home/day-record";
 import { needsYouNow } from "@/components/study-home/needs-you";
@@ -12,7 +11,6 @@ import { courseMove, todayCourses, type NextStep, type TodayRow } from "@/compon
 import { UnreadableLines } from "@/components/study-home/unreadable-course";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { ChatListItem, StudyCourse } from "@/src/core";
-import { continueHref } from "@/components/nav/session-state";
 
 /** What a study home draws once the courses are read. */
 export interface HomeReady {
@@ -57,7 +55,7 @@ export function HomeFrame({
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<main data-slot="study-home" className="min-h-0 flex-1 overflow-hidden">
 				<div className={className}>
-					<HomeBody state={state} onRetry={retry} quiet={quiet} busy={lesson.busy} onStart={lesson.start}>
+					<HomeBody state={state} onRetry={retry} quiet={quiet} busy={lesson.busy} onTake={lesson.take}>
 						{children}
 					</HomeBody>
 					{lesson.error && (
@@ -77,17 +75,16 @@ function HomeBody({
 	onRetry,
 	quiet,
 	busy,
-	onStart,
+	onTake,
 	children,
 }: {
 	state: StudyHomeState;
 	onRetry: () => void;
 	quiet: boolean;
 	busy: boolean;
-	onStart: (opening: string, workspace: string, options: { topics: readonly string[]; from?: string }) => void;
+	onTake: LessonStart["take"];
 	children: (home: HomeReady) => React.ReactNode;
 }) {
-	const router = useRouter();
 	switch (state.status) {
 		case "loading":
 			return <Notice>Reading your courses…</Notice>;
@@ -121,10 +118,7 @@ function HomeBody({
 						busy,
 						onContinue: (workspace, step) => {
 							const course = state.courses.find((c) => c.map.workspace === workspace);
-							if (!course) return;
-							const move = courseMove(course, state.chats, step);
-							if (move.kind === "open") router.push(continueHref(move.chat));
-							else onStart(move.opening, workspace, { topics: move.topics, from: move.from });
+							if (course) onTake(workspace, courseMove(course, state.chats, step));
 						},
 					})}
 					{!quiet && <UnreadableLines courses={state.failed} />}

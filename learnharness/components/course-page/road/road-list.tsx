@@ -9,6 +9,9 @@ import type { CourseColumns } from "@/components/course-page/split/split-course"
 import { SplitList } from "@/components/course-page/split/split-list";
 import { BLOCK, Rail, RoadArc, type ArcLineProps } from "@/components/course-page/road/road-arc";
 import { arcStarts, examStop } from "@/components/course-page/road/road-model";
+import { useStartScope } from "@/components/start/start-scope";
+import { arcCheckCreation } from "@/components/unit-inbox/start-unit";
+import type { CourseArcSection } from "@/components/course-page/course-model";
 import { cn } from "@/lib/utils";
 
 /** The exam as a row on the road's track: its day, its run-up on press. */
@@ -52,11 +55,15 @@ function RoadLine(props: ArcLineProps) {
  * The course page's left column, the road (spec: road.md): every arc of the
  * course in study order on one track, as the map's arc list draws them (the
  * map beside it lists none), the exam a row where the plan reaches it; a
- * course's four groups when it has no arcs.
+ * course's four groups when it has no arcs. Check it starts the arc's check
+ * through the page's one start (`StartScope`).
  */
 export function RoadList(c: CourseColumns) {
 	const { course, arcs, facts } = c.view;
 	const stop = useMemo(() => (arcs ? examStop(course.map, arcs) : null), [course.map, arcs]);
+	const { start, starting } = useStartScope();
+	const onCheck = (section: CourseArcSection) =>
+		start(arcCheckCreation(course.map.workspace, section.arc, section.topics.filter((t) => t.topic.excluded === undefined).map((t) => t.topic.handle)), { key: section.arc.handle });
 	// One arc open at a time, the one the map shows: opening another shows it and closes the last; closing it
 	// leaves none open (Edo, 17 Nov 2026: "only one is open at a time").
 	const shownHandle = c.shown?.arc.handle ?? null;
@@ -94,8 +101,8 @@ export function RoadList(c: CourseColumns) {
 				arcs={arcs}
 				open={open}
 				onOpenChange={onOpenChange}
-				onCheck={c.onCheck}
-				checking={c.checking}
+				onCheck={onCheck}
+				checking={starting}
 				marked={c.marked}
 				onPoint={c.onPoint}
 				onEnterMap={c.onEnterMap}

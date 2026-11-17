@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MathText } from "@/components/ui/math-text";
 import { EXAM_GAP_WORDS, examGapPickWords, examGapWhyWords, pressWord } from "@/components/study-words";
-import { examGapAskCreation, topicPress, useStartSession } from "@/components/unit-inbox/start-unit";
+import { examGapAskCreation, topicPress } from "@/components/unit-inbox/start-unit";
+import { useStartScope } from "@/components/start/start-scope";
 import { examGaps } from "@/components/course-page/course-head/head-facts";
 import { continueHref } from "@/components/nav/session-state";
 
@@ -23,11 +24,12 @@ const PRESS = "text-body text-link hover:text-link";
  * the rest; with none he can take today, Ask alone. A topic he began
  * reads Continue and opens its session, as its topic page does
  * (`topicPress`; round 12, 1 D5). Ask the tutor opens a lesson that asks,
- * in his words, how to fit them in. Engine facts only; nothing otherwise.
+ * in his words, how to fit them in. Each starts through the page's one
+ * start (`StartScope`). Engine facts only; nothing otherwise.
  */
 export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: readonly ChatListItem[] }) {
 	const router = useRouter();
-	const { start, starting } = useStartSession();
+	const { start, starting } = useStartScope();
 	const gaps = examGaps(course.map);
 	if (!gaps) return null;
 	const { workspace } = course.map;
@@ -40,7 +42,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 	const open = (topic: CourseMapTopic) => {
 		const { resume, creation } = press(topic);
 		if (resume) router.push(continueHref(resume));
-		else start(`gap:${topic.handle}`, creation);
+		else start(creation, { key: `gap:${topic.handle}` });
 	};
 	const verb = (way: { topic: CourseMapTopic; starts: boolean }) => (!way.starts ? "review" : press(way.topic).continues ? "continue" : "start");
 	// "Start it today" only where "it" is the one topic the line names; with two
@@ -90,7 +92,7 @@ export function ExamGapLine({ course, chats }: { course: StudyCourse; chats: rea
 				size="xs"
 				className={PRESS}
 				disabled={starting !== null}
-				onClick={() => start("gap:ask", examGapAskCreation(workspace, titles(named), named.map((t) => t.handle)))}
+				onClick={() => start(examGapAskCreation(workspace, titles(named), named.map((t) => t.handle)), { key: "gap:ask" })}
 			>
 				{EXAM_GAP_WORDS.ask}
 			</Button>

@@ -103,8 +103,6 @@ const columns = (view: CourseView, standing: CourseStanding | null = null): Cour
 	showArc: noop,
 	open: { maps: true },
 	onOpenChange: noop,
-	onCheck: noop,
-	checking: null,
 	marked: null,
 	onPoint: noop,
 	listRef: createRef(),

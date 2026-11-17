@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
-import { useLessonStart } from "@/components/start/use-lesson-start";
+import { lessonCreation, useLessonStart } from "@/components/start/use-lesson-start";
 import { calendarEntries } from "@/components/calendar/calendar-facts";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { useCalendarRead } from "@/components/calendar/use-calendar";
@@ -38,7 +38,7 @@ export function CalendarPage() {
 				scope={courses.some((c) => c.map.workspace === scope) ? scope : null}
 				onScopeChange={setScope}
 				busy={lesson.busy}
-				onStart={lesson.start}
+				onStart={(opening, workspace, how) => lesson.start(lessonCreation(opening, workspace, how))}
 			/>
 			{lesson.error && (
 				<p role="alert" className="absolute bottom-4 left-1/2 -translate-x-1/2 text-body text-danger">

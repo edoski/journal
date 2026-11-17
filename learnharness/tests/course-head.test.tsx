@@ -20,7 +20,7 @@ import { EXAM_GAP_WORDS, examGapAsk } from "../components/study-words.ts";
 import { topicPress } from "../components/unit-inbox/start-unit.ts";
 import { CourseHead } from "../components/course-page/course-head/course-head.tsx";
 import { CourseNow } from "../components/course-page/course-head/course-now.tsx";
-import { CourseLessonError } from "../components/course-page/course-head/head-parts.tsx";
+import { StartScope } from "../components/start/start-scope.tsx";
 import { ExamGapLine } from "../components/course-page/course-head/exam-gaps.tsx";
 import { columnsOf } from "./helpers/course-columns.ts";
 import { ServerEventsProvider } from "../components/server-events.tsx";
@@ -111,12 +111,13 @@ describe("the course head", () => {
 });
 
 describe("a lesson that could not start", () => {
+	const noop = () => {};
 	it("is said inside the head, under the button he pressed, and nothing otherwise", () => {
 		const head = (error: string | null) =>
 			render(
-				<CourseLessonError value={error}>
+				<StartScope lesson={{ start: noop, take: noop, starting: null, busy: false, error, setupOpen: false, openSetup: noop, closeSetup: noop }}>
 					<CourseHead {...columnsOf(viewOf(course()))} />
-				</CourseLessonError>,
+				</StartScope>,
 			);
 		assert.ok(head(null).querySelector('[role="alert"]') === null);
 		const alert = head("Couldn’t open the session. Try again.").querySelector('[data-slot="page-head"] [role="alert"]');

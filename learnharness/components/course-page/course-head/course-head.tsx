@@ -3,7 +3,8 @@
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { PageHead } from "@/components/page-frame/page-frame";
 import type { CourseColumns } from "@/components/course-page/split/split-course";
-import { ContextButton, LessonError, StudiedFact } from "@/components/course-page/course-head/head-parts";
+import { ContextButton, StudiedFact } from "@/components/course-page/course-head/head-parts";
+import { StartFailure } from "@/components/start/start-scope";
 import { ReadyFact, useHeadStanding } from "@/components/course-page/course-head/ready-fact";
 import { MistakesHead, MistakesPress } from "@/components/course-page/standing/mistakes-press";
 
@@ -35,7 +36,7 @@ export function CourseHead(c: CourseColumns) {
 					</>
 				}
 			>
-				<LessonError />
+				<StartFailure className="flex min-h-5 items-center text-body" />
 			</PageHead>
 		</MistakesHead>
 	);

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { SetupDialog } from "@/components/setup-dialog";
-import { useLessonStart } from "@/components/start/use-lesson-start";
+import { lessonCreation, useLessonStart } from "@/components/start/use-lesson-start";
 import { topicSessions } from "@/components/unit-inbox/units";
 import { HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { PageFrame } from "@/components/page-frame/page-frame";
@@ -54,7 +54,7 @@ export function TopicPage({
 		sessions.map((chat) => chat.id),
 		lessonBegun(topic),
 	);
-	const start = (opening: string, from?: string) => lesson.start(opening, workspace, { topics: [topic.handle], from });
+	const start = (opening: string, from?: string) => lesson.start(lessonCreation(opening, workspace, { topics: [topic.handle], from }));
 	const press = (does: Press) => ("open" in does ? router.push(continueHref(does.open)) : start(does.opening, does.from));
 	if (topicRead.status === "loading") return <TopicNotice>Loading…</TopicNotice>;
 	const facts = topicFacts({ course, courses, topic, chats, read: topicRead.read });

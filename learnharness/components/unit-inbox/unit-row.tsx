@@ -6,7 +6,8 @@ import type { ChatListItem, CourseMap } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { continueHref, pausedWords, sessionState } from "@/components/nav/session-state";
 import { localDay } from "@/components/day-change";
-import { topicPress, useStartSession } from "@/components/unit-inbox/start-unit";
+import { topicPress } from "@/components/unit-inbox/start-unit";
+import { useStartScope } from "@/components/start/start-scope";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { StatusMark } from "@/components/unit-inbox/status-mark";
 import { TUTOR_WRITING } from "@/components/study-words";
@@ -39,10 +40,10 @@ export function CourseMark({ title, className }: { title: string; className?: st
 
 /** The row's one action, over its status slot: its topic's press, as the
  *  topic page takes it (`topicPress`): the session it opens, or the task or
- *  lesson he began picked up, else a new session on the topic. Shown on
- *  hover and on keyboard focus. */
+ *  lesson he began picked up, else a new session on the topic, through the
+ *  sidebar's one start (`StartScope`). Shown on hover and on keyboard focus. */
 function RowAction({ unit, map, chats, className }: { unit: Unit; map: CourseMap; chats: readonly ChatListItem[]; className?: string }) {
-	const { start, starting } = useStartSession();
+	const { start, starting } = useStartScope();
 	const press = topicPress(unit.topic, map, chats);
 	const Icon = press.continues ? PlayIcon : SquarePenIcon;
 	const props = {
@@ -66,7 +67,7 @@ function RowAction({ unit, map, chats, className }: { unit: Unit; map: CourseMap
 			size="xs"
 			disabled={starting !== null}
 			onClick={(e) => {
-				start(unit.key, press.creation);
+				start(press.creation, { key: unit.key });
 				blurAfterPointerClick(e);
 			}}
 			{...props}

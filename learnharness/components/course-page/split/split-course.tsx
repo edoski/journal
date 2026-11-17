@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { LinkedColumns } from "@/components/linked-columns/linked-columns";
 import type { ArcHandle, CourseStanding, TopicHandle } from "@/src/core";
 import { drawingOf } from "@/components/course-map/topic-map/map-drawing";
-import { useStartArcCheck } from "@/components/unit-inbox/start-unit";
 import { PageFrame } from "@/components/page-frame/page-frame";
 import { cn } from "@/lib/utils";
 import { CourseHead, arcOnPage } from "@/components/course-page/course-head/course-head";
@@ -33,9 +32,6 @@ export interface CourseColumns {
 	showArc: (arc: ArcHandle) => void;
 	open: Readonly<Record<string, boolean>>;
 	onOpenChange: (id: string, open: boolean) => void;
-	onCheck: (section: CourseArcSection) => void;
-	/** The arc whose check is starting. */
-	checking: string | null;
 	/** The topic he points at on the map, whose row the list marks. */
 	marked: TopicHandle | null;
 	/** A row he points at or focuses, or none. */
@@ -85,14 +81,7 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 	// The map's drawing, for the topic it opens on.
 	const layout = useMemo(() => drawingOf(map, shown?.arc.handle).layout, [shown, map]);
 	const aim = useMemo(() => aimOf(map.current, view.next.lesson.topics, shown ? [{ id: shown.arc.handle, topics: shown.topics }] : groups, layout), [map.current, view.next.lesson.topics, shown, groups, layout]);
-	const { startArcCheck, starting } = useStartArcCheck();
 	const [enlarged, setEnlarged] = useState(false);
-	const onCheck = (section: CourseArcSection) =>
-		startArcCheck(
-			map.workspace,
-			section.arc,
-			section.topics.filter((t) => t.topic.excluded === undefined).map((t) => t.topic.handle),
-		);
 	/** The shown arc, kept in the address, so the head's pill (`?arc=`) always moves to it. */
 	const show = (arc: ArcHandle) => {
 		setShownArc(arc);
@@ -141,8 +130,6 @@ export function SplitBody({ view, standing, busy, onContinue }: { view: CourseVi
 		showArc,
 		open,
 		onOpenChange,
-		onCheck,
-		checking: starting,
 		marked: markedOf(pointed),
 		onPoint: pointFrom("list"),
 		listRef: list,
