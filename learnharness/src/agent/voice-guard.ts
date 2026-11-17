@@ -76,6 +76,9 @@ export interface TurnInput {
 	/** His message asks to guess first ("let me guess first"): the guess
 	 *  is a prediction, never a counted attempt (round 12, 2 M1). */
 	guess?: string;
+	/** He pressed Hint on a practice problem: its rung sets the length, and
+	 *  the hint is a statement, as a check's is (round 15, m16). */
+	hint?: boolean;
 	/** A demo the tutor called for has just been built and drawn in the
 	 *  lesson: the turn's first message points him into it (round 14, m13:
 	 *  the slots demo landed above a reply that never mentioned it). */
@@ -164,7 +167,7 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 		case "practice-request": {
 			// A hint's rung and a shown solution set their own length.
 			const request = isRecord(input.details) ? input.details.request : undefined;
-			return { kind: request === "explain" ? "teach" : undefined, answers: false, words: null };
+			return { kind: request === "explain" ? "teach" : undefined, answers: false, words: null, ...(request === "hint" ? { hint: true } : {}) };
 		}
 		case UNGRADED_ANSWER:
 			return { kind: "wrong", answers: true, words: textOf(input.content) };
@@ -1069,8 +1072,9 @@ export class VoiceGuard {
 		// A hint gives what the question did not; asked as a question, it
 		// asked the same thing again (round 14, m17: "What does R3 − R1 − R2
 		// give you?" became "What happens to row 3 during elimination if it
-		// really is row 1 plus row 2?").
-		const hintAsks = kind === "hint" ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
+		// really is row 1 plus row 2?"), on a practice problem as on a check
+		// (round 15, m16).
+		const hintAsks = kind === "hint" || this.input.hint ? sentences(text).find((s) => s.trim().endsWith("?")) : undefined;
 		if (hintAsks) out.push({ rule: "hint-question", excerpt: hintAsks.trim() });
 		const replying = this.input.answers && (this.sent === 0 || (this.concluded && this.sent === this.sentAtConclude));
 		const echo = replying ? echoOf(text, this.input.words) : null;

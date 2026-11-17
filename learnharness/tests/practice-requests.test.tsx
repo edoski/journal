@@ -46,7 +46,7 @@ describe("a problem's requests", () => {
 		assert.doesNotMatch(marker!.content, /Your thinking|Confidence:/);
 	});
 
-	it("hints climb: the first asks for a question, the second a nudge, the third one step", () => {
+	it("hints climb: the first says where to look, the second a nudge, the third one step (round 15, m16)", () => {
 		let messages = posed();
 		const rungs: string[] = [];
 		for (let i = 0; i < 3; i++) {
@@ -54,7 +54,7 @@ describe("a problem's requests", () => {
 			rungs.push(marker!.content);
 			messages = [...messages, marker!];
 		}
-		assert.match(rungs[0]!, /first hint.*one question.*No method, no step, no answer/);
+		assert.match(rungs[0]!, /first hint.*say where to look.*never a question.*No method, no step, no answer/);
 		assert.match(rungs[1]!, /second hint.*one nudge/);
 		assert.match(rungs[2]!, /hint 3.*one step.*never the rest of the solution/);
 	});

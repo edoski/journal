@@ -389,10 +389,13 @@ export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = 
 };
 
 /** Which rung a Hint request asks for, by how many hints this problem has
- *  had: the first is a question, the second a nudge, the third and later
- *  one step. Show me reveals the rest. */
+ *  had: the first says where to look, the second a nudge, the third and
+ *  later one step. Show me reveals the rest. Every rung is a statement:
+ *  the first asked "one question that points at where to look", and the
+ *  hint only rephrased the problem (round 15, m16: "Does a row of A with
+ *  nonzero entries still have to be nonzero once elimination is done?"). */
 export function hintRungText(nth: number): string {
-	if (nth <= 1) return "This is his first hint on this problem: ask him one question that points at where to look (R0 or R1). No method, no step, no answer.";
+	if (nth <= 1) return "This is his first hint on this problem: say where to look (R0 or R1), as one statement in this problem's own terms of what it did not give him, never a question and never the problem in other words. No method, no step, no answer.";
 	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
 	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
 }
