@@ -38,4 +38,4 @@ Sources: T3 Code `apps/web/src/components/chat/ChatComposer.tsx` (body `px-4 pt-
 
 ## Collapsible
 
-`collapsible` (the course page's composer): at rest, with an empty field and no photos, the surface is one row, the field (one line) with attach and send at its right; focusing it, or words or photos in it, opens the full composer. The DOM never changes between the two, so focus is kept.
+`collapsible` (the course page's composer, which has no controls but attach and send): one row, attach on the left and send on the right in every state, the field between them. At rest (empty, no photos, not focused) the field is one line (44px in all); focusing it, or words or photos in it, grows it to three lines, its min-height eased over 200ms (none under reduced motion), and leaving it empty shrinks it back. Attach and send sit at the row's bottom as the field grows, as ChatGPT's and Claude's composers keep theirs. The DOM never changes between the two, so focus is kept (Edo, 17 Nov 2026: "a clean animation, like expanding and collapsing… whatever is the best UI/UX").

@@ -59,4 +59,16 @@ describe("the lesson composer", () => {
 		assert.match(composer({ busy: true, canSend: true }), /aria-label="Send"/);
 		assert.match(composer({ nextProblem: true, onNext: noop }), /data-testid="next-problem-button"/);
 	});
+
+	it("as one row (collapsible), keeps send on the right in both states and grows the field from one line to three as he focuses it", () => {
+		const rest = composer({ collapsible: true });
+		assert.match(rest, /data-collapsed="true"/);
+		assert.match(rest, /data-slot="composer-row"/);
+		assert.ok(rest.indexOf('data-slot="composer-body"') < rest.indexOf('data-slot="composer-send"'), "the field, then send at the row's end");
+		assert.match(rest, /min-h-\[calc\(1lh\+0\.5rem\)\]/, "one line at rest");
+		assert.match(rest, /transition-\[min-height\]/, "the growth is animated");
+		const typed = composer({ collapsible: true, value: "eigen" });
+		assert.ok(!/data-collapsed/.test(typed), "words open it");
+		assert.match(typed, /min-h-\[calc\(3lh\+0\.5rem\)\]/, "three lines open");
+	});
 });
