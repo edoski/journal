@@ -7,8 +7,8 @@
  */
 
 import { coordSimplex, decrossOpt, decrossTwoLayer, graphStratify, layeringSimplex, sugiyama } from "d3-dag";
-import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "@/src/core";
-import { layoutTopicMap, type PlacedTopic, type Point, type Route, type TopicMapLayout } from "../topic-map-layout";
+import type { CourseMapEdge, TopicHandle } from "@/src/core";
+import { layoutTopicMap, type NodeSize, type PlacedTopic, type Point, type Route, type TopicMapLayout } from "../topic-map-layout";
 
 /** A card on the canvas: a header strip over its title. */
 export const CANVAS_NODE = { width: 232, height: 68 } as const;
@@ -306,28 +306,34 @@ function layeredDrawing(nodes: readonly DrawnNode[], links: readonly { source: s
 }
 
 /**
- * The course top to bottom (canvas.md, Layout and lines): a layered
+ * The cards top to bottom (canvas.md, Layout and lines): a layered
  * drawing (`layeredDrawing`) of the needs no longer path implies
- * (`transitiveReduction`), every card the same size. An implied need keeps
- * its route with no points, and the chain that implies it is its line.
+ * (`transitiveReduction`), every card `node` in size: a course's topics,
+ * or a lesson's steps sized to its pane. An implied need keeps its route
+ * with no points, and the chain that implies it is its line.
  */
-export function layoutCanvas(topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], top: ReadonlySet<TopicHandle> = new Set()): TopicMapLayout {
+export function layoutCanvas(
+	cards: readonly { handle: TopicHandle }[],
+	edges: readonly CourseMapEdge[],
+	top: ReadonlySet<TopicHandle> = new Set(),
+	node: NodeSize = CANVAS_NODE,
+): TopicMapLayout {
 	const needs = edges.filter((e): e is Need => e.kind === "needs");
-	if (needs.length === 0) return layoutTopicMap(topics, edges, CANVAS_NODE, top);
+	if (needs.length === 0) return layoutTopicMap(cards, edges, node, top);
 	const drawing = layeredDrawing(
-		topics.map((t) => ({ id: t.handle, ...CANVAS_NODE })),
+		cards.map((t) => ({ id: t.handle, ...node })),
 		transitiveReduction(needs).map((n) => ({ source: n.prerequisite, target: n.topic })),
 		top,
 	);
-	return asTopicLayout(drawing, needs);
+	return asTopicLayout(drawing, needs, node);
 }
 
-/** A drawing of topic cards as the map's layout: every need with its line, none for one its chain implies. */
-function asTopicLayout(drawing: LayeredDrawing, needs: readonly Need[]): TopicMapLayout {
+/** A drawing of cards as the map's layout: every need with its line, none for one its chain implies. */
+function asTopicLayout(drawing: LayeredDrawing, needs: readonly Need[], node: NodeSize): TopicMapLayout {
 	const placed = new Map<TopicHandle, PlacedTopic>();
 	for (const [id, box] of drawing.boxes) placed.set(id as TopicHandle, { handle: id as TopicHandle, x: box.x, y: box.y, layer: box.layer });
 	const routes: Route[] = needs.map((n) => ({ prerequisite: n.prerequisite, topic: n.topic, points: drawing.lines.get(`${n.prerequisite}>${n.topic}`) ?? [] }));
-	return { node: CANVAS_NODE, width: drawing.width, height: drawing.height, topics: placed, routes, layers: drawing.layers as TopicHandle[][] };
+	return { node, width: drawing.width, height: drawing.height, topics: placed, routes, layers: drawing.layers as TopicHandle[][] };
 }
 
 /** A route's corners as an SVG path, each corner rounded by up to `CORNER`. Pure. */

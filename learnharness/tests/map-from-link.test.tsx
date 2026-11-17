@@ -30,7 +30,7 @@ afterEach(async () => {
 const independence = LINALG_ARCS.map.topics.find((t) => t.handle === "independence")!;
 const props = (from: string | null) =>
 	({
-		data: { topic: independence, current: false, standing: standingOf(independence), line: null, label: independence.title, needs: null, href: "/unit/x/independence", from },
+		data: { kind: "topic", handle: independence.handle, title: independence.title, topic: independence, current: false, tag: null, standing: standingOf(independence), line: null, label: independence.title, needs: null, href: "/unit/x/independence", from },
 	}) as unknown as NodeProps<CanvasFlowNode>;
 
 async function mount(from: string | null, openArc?: (arc: ArcHandle) => void) {

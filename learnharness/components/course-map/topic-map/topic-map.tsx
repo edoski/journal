@@ -1,16 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, useStoreApi, type CoordinateExtent, type Edge, type Node } from "@xyflow/react";
-import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
+import { ReactFlow, ReactFlowProvider, useReactFlow, useStore, useStoreApi, type CoordinateExtent, type Edge, type Node } from "@xyflow/react";
+import type { ArcHandle, CourseMap, CourseMapEdge, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
-import { READABLE_ZOOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, neighbourOf, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
-import { TopicMapContext, type TopicData, type TopicMapState } from "./topic-node";
-import { cardLine, standingOf, topicLabel } from "./topic-standing";
+import { READABLE_ZOOM, TAG_ROOM, cameraAt, centreOf, chainOf, framedCamera, isWalkKey, neighbourOf, showsWhole, slackOf, wholeExtent, wholeZoom, type Camera, type TopicMapLayout } from "./topic-map-layout";
+import { TopicMapContext, type CardData, type TopicMapState } from "./topic-node";
+import { CURRENT_TAG, cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
 import { litCamera, litFollow } from "./lit-camera";
-import { drawingOf, handleAt, mapEdges, trailOf, type Trail } from "./map-drawing";
+import { cardNode, drawingOf, mapEdges, trailOf, type Trail } from "./map-drawing";
 import type { ArcView } from "./arc-view";
 import { CanvasNode } from "./canvas/canvas-node";
 import { CanvasLinesEdge } from "./canvas/canvas-lines";
@@ -25,13 +25,11 @@ const ROOM = { x: 48, y: 32 };
 const FOLLOW_MS = 200;
 /** How long the camera takes to glide from one arc to the next (topic-map.md, Arcs). */
 const TRAVEL_MS = 420;
-/** Room the "You are here" tag takes above its card. */
-const TAG_ROOM = 20;
 /** How far a pinch zooms in: a card reads closer, past its own size, even where the whole arc fits at 100%. */
 const MAX_ZOOM = 1.5;
 /** A shown arc's cards, a card of the arc being left (out of the map's focus, keys and links), and the one edge that
  *  draws every line. */
-const NODE_TYPES = { canvasTopic: CanvasNode, trailTopic: TrailNode };
+const NODE_TYPES = { card: CanvasNode, trail: TrailNode };
 const EDGE_TYPES = { canvasLines: CanvasLinesEdge };
 /** Every place the camera may look while it glides between arcs. */
 const ANYWHERE: CoordinateExtent = [
@@ -132,20 +130,73 @@ export function TopicMap({
 		[map, said, layout, titleOf, view, trail],
 	);
 	const edges = useMemo<Edge[]>(() => mapEdges(layout, trail), [layout, trail]);
+	const here = map.current ? titleOf(map.current) : null;
+	const graph = useMemo<MapGraph>(
+		() => ({ edges: map.edges, current: map.current, caption: `${map.title}: ${map.topics.length} topics, prerequisites above the topics that need them.${here ? ` You are at ${here}.` : ""}` }),
+		[map.edges, map.current, map.title, map.topics.length, here],
+	);
+	return (
+		<CardMap graph={graph} layout={layout} nodes={nodes} edges={edges} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
+	);
+}
+
+/** What a map draws, whatever its cards are: a course's topics or a lesson's steps (topic-map.md, Node). */
+export interface MapGraph {
+	/** The needs between its cards: a topic's prerequisites, the steps a step rests on. */
+	edges: readonly CourseMapEdge[];
+	/** The ringed card: the keyboard's first stop, and what the page's highlight never recedes with the cards it
+	 *  leads to. */
+	current: TopicHandle | null;
+	/** What a screen reader hears of the drawing. */
+	caption: string;
+}
+
+type CardMapProps = {
+	graph: MapGraph;
+	layout: TopicMapLayout;
+	nodes: Node[];
+	edges: Edge[];
+	margin?: { x: number; y: number };
+	highlight?: ReadonlySet<TopicHandle> | null;
+	marked?: TopicHandle | null;
+	zoom?: number;
+	whole?: boolean;
+	framed?: ReadonlySet<TopicHandle> | null;
+	/** The arc the camera glides away from, drawn beside this one; null at rest. */
+	trail?: Trail | null;
+	onTravelled?: (from: ArcHandle) => void;
+	onOpensWhole?: (fits: boolean) => void;
+	/** The card the map opens framed on. */
+	opensOn: TopicHandle | null;
+	onOpenArc?: (arc: ArcHandle) => void;
+	/** Where a drawing shorter than the frame sits: in its middle, or at its top (a lesson's steps, by the list's
+	 *  first row). */
+	fitsDown?: "middle" | "top";
+};
+
+/**
+ * Every map's drawing (spec: topic-map.md, canvas/canvas.md): the cards on
+ * the canvas, its lines, focus and dot grid, the camera that opens on
+ * `opensOn` and follows the keyboard and the page, and the keyboard walk.
+ * A course's map (`TopicMap`) and a lesson's step map (lesson-map.tsx)
+ * both draw through it.
+ */
+export function CardMap({ margin = ROOM, highlight = null, marked = null, whole = false, framed = null, trail = null, fitsDown = "middle", ...props }: CardMapProps) {
 	return (
 		// The provider takes the drawing too, so a server render has it before any effect runs.
-		<ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
-			<Flow map={map} layout={layout} nodes={nodes} edges={edges} titleOf={titleOf} margin={margin} highlight={highlight} marked={marked} zoom={zoom} whole={whole} framed={framed} trail={trail} onTravelled={endTravel} onOpensWhole={onOpensWhole} opensOn={opensOn === undefined ? map.current : opensOn} onOpenArc={onOpenArc} />
+		<ReactFlowProvider initialNodes={props.nodes} initialEdges={props.edges}>
+			<Flow {...props} margin={margin} highlight={highlight} marked={marked} whole={whole} framed={framed} trail={trail} fitsDown={fitsDown} />
 		</ReactFlowProvider>
 	);
 }
 
+const NO_TRAVEL = () => {};
+
 function Flow({
-	map,
+	graph,
 	layout,
 	nodes,
 	edges,
-	titleOf,
 	margin: frameMargin,
 	highlight,
 	marked,
@@ -153,29 +204,12 @@ function Flow({
 	whole,
 	framed,
 	trail,
-	onTravelled,
+	onTravelled = NO_TRAVEL,
 	onOpensWhole,
 	opensOn,
 	onOpenArc,
-}: {
-	map: CourseMap;
-	layout: TopicMapLayout;
-	/** The arc the camera glides away from, drawn beside this one; null at rest. */
-	trail: Trail | null;
-	onTravelled: (from: ArcHandle) => void;
-	nodes: Node[];
-	edges: Edge[];
-	titleOf: (handle: TopicHandle) => string;
-	margin: { x: number; y: number };
-	highlight: ReadonlySet<TopicHandle> | null;
-	marked: TopicHandle | null;
-	zoom: number | undefined;
-	whole: boolean;
-	framed: ReadonlySet<TopicHandle> | null;
-	onOpensWhole: ((fits: boolean) => void) | undefined;
-	opensOn: TopicHandle | null;
-	onOpenArc: ((arc: ArcHandle) => void) | undefined;
-}) {
+	fitsDown,
+}: Required<Pick<CardMapProps, "margin" | "highlight" | "marked" | "whole" | "framed" | "trail" | "fitsDown">> & Omit<CardMapProps, "margin" | "highlight" | "marked" | "whole" | "framed" | "trail" | "fitsDown">) {
 	const captionId = useId();
 	const margin = useMemo(() => ({ x: frameMargin.x, y: frameMargin.y + TAG_ROOM }), [frameMargin.x, frameMargin.y]);
 	const flow = useReactFlow();
@@ -184,17 +218,17 @@ function Flow({
 	const frameHeight = useStore((s) => s.height);
 
 	const [active, setActive] = useState<TopicHandle | null>(null);
-	const [tabStop, setTabStop] = useState<TopicHandle | null>(map.current ?? map.topics[0]?.handle ?? null);
+	const [tabStop, setTabStop] = useState<TopicHandle | null>(graph.current ?? layout.layers[0]?.[0] ?? null);
 	const links = useRef(new Map<TopicHandle, HTMLAnchorElement>());
 	// A hovered or focused topic's chain; else the page's highlight, with "You are here" and the topics it leads to
 	// (Edo, 14 Nov 2026: they stay whole and readable; only topics further away recede).
 	const lit = useMemo(() => {
-		if (active) return chainOf(active, map.edges);
+		if (active) return chainOf(active, graph.edges);
 		if (!highlight) return null;
-		const here = map.current;
-		const next = here ? map.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === here ? [e.topic] : [])) : [];
+		const here = graph.current;
+		const next = here ? graph.edges.flatMap((e) => (e.kind === "needs" && e.prerequisite === here ? [e.topic] : [])) : [];
 		return new Set([...highlight, ...(here ? [here] : []), ...next]);
-	}, [active, map.edges, map.current, highlight]);
+	}, [active, graph.edges, graph.current, highlight]);
 
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
 	// Zoomed out as far as the whole course, however small: the enlarged map's Whole course.
@@ -237,8 +271,8 @@ function Flow({
 	/** The arc change the camera last glided for, so a render during the glide does not start it again. */
 	const travelled = useRef<Trail | null>(null);
 	/** What the follow reads when it fires, as of the last render. */
-	const now = useRef({ layout, frame, frameMargin, reach, minZoom, current: map.current, tag: TAG_ROOM });
-	now.current = { layout, frame, frameMargin, reach, minZoom, current: map.current, tag: TAG_ROOM };
+	const now = useRef({ layout, frame, frameMargin, reach, minZoom, current: graph.current, tag: TAG_ROOM });
+	now.current = { layout, frame, frameMargin, reach, minZoom, current: graph.current, tag: TAG_ROOM };
 	const [follower] = useState(() =>
 		litFollow({
 			plan: (lit) => {
@@ -261,7 +295,7 @@ function Flow({
 		const camera = whole
 			? cameraAt(layout, middle, minZoom, size, margin)
 			: fixedZoom === undefined
-				? framedCamera(layout, opensOn, size, frameMargin, TAG_ROOM)
+				? framedCamera(layout, opensOn, size, frameMargin, TAG_ROOM, fitsDown)
 				: cameraAt(layout, middle, fixedZoom, size, margin);
 		// Zooming out to the whole course and back glides; any other move is at once. Without a duration React Flow
 		// sets the viewport synchronously; only its promise settles later.
@@ -281,7 +315,7 @@ function Flow({
 			void flow.setViewport(camera, { duration: TRAVEL_MS, ease: easeInOut }).then(() => from && onTravelled(from));
 		} else if (!trail) void flow.setViewport(camera, { duration: glide ? FOLLOW_MS : 0 });
 		setPlaced(true);
-	}, [flow, store, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, trail, onTravelled]);
+	}, [flow, store, follower, layout, opensOn, frameWidth, frameHeight, margin, frameMargin, fixedZoom, whole, minZoom, trail, onTravelled, fitsDown]);
 
 	// The topics a page points at on this drawing, which the camera follows; none while it shows the whole course.
 	const pointedAt = useMemo(() => {
@@ -320,7 +354,7 @@ function Flow({
 			},
 			onKeyDown: (handle, event: KeyboardEvent<HTMLAnchorElement>) => {
 				if (!isWalkKey(event.key)) return;
-				const next = neighbourOf(layout, map.edges, handle, event.key);
+				const next = neighbourOf(layout, graph.edges, handle, event.key);
 				if (!next) return;
 				event.preventDefault();
 				setTabStop(next);
@@ -332,17 +366,15 @@ function Flow({
 			},
 			openArc: onOpenArc,
 		}),
-		[lit, marked, tabStop, layout, map.edges, follow, onOpenArc, trail],
+		[lit, marked, tabStop, layout, graph.edges, follow, onOpenArc, trail],
 	);
 
-	const current = map.current ? titleOf(map.current) : null;
 	return (
 		<figure data-slot="course-map-graph" aria-labelledby={captionId} className="relative min-h-0 flex-1">
 			<figcaption id={captionId} className="sr-only">
-				{`${map.title}: ${map.topics.length} topics, prerequisites above the topics that need them.`}
-				{current ? ` You are at ${current}.` : ""}
+				{graph.caption}
 			</figcaption>
-			<CanvasFrame map={map} layout={layout}>
+			<CanvasFrame edges={graph.edges} layout={layout}>
 				<TopicMapContext.Provider value={state}>
 					<ReactFlow
 						nodes={nodes}
@@ -384,7 +416,7 @@ function Flow({
 	);
 }
 
-/** A drawing's topic nodes: each topic the layout places, with what its card says and where a click goes. A `trail`
+/** A drawing's topic cards: each topic the layout places, with what its card says and where a click goes. A `trail`
  *  (the arc the map is leaving) draws its cards beside the shown arc, out of the map's focus and keys. */
 function topicNodes(
 	map: CourseMap,
@@ -393,40 +425,27 @@ function topicNodes(
 	said: ReadonlyMap<TopicHandle, Said>,
 	titleOf: (handle: TopicHandle) => string,
 	trail: Trail | null = null,
-): Node<TopicData>[] {
-	const node = layout.node;
-	return map.topics.flatMap((topic): Node<TopicData>[] => {
+): Node<CardData>[] {
+	return map.topics.flatMap((topic) => {
 		const placed = layout.topics.get(topic.handle);
 		if (!placed) return [];
 		const line = cardLine(said.get(topic.handle));
 		const needs = map.edges.flatMap((e) => (e.kind === "needs" && e.topic === topic.handle ? [titleOf(e.prerequisite)] : []));
-		return [
-			{
-				id: trail ? `trail:${topic.handle}` : topic.handle,
-				type: trail ? "trailTopic" : "canvasTopic",
-				position: { x: placed.x + (trail?.dx ?? 0), y: placed.y + (trail?.dy ?? 0) },
-				width: node.width,
-				height: node.height,
-				// A server render has no measured handles; these let it draw the needs.
-				handles: [
-					{ type: "target" as const, position: Position.Top, ...handleAt(Position.Top, node) },
-					{ type: "source" as const, position: Position.Bottom, ...handleAt(Position.Bottom, node) },
-				],
-				draggable: false,
-				selectable: false,
-				focusable: false,
-				ariaRole: "none" as const,
-				data: {
-					topic,
-					current: map.current === topic.handle,
-					standing: standingOf(topic),
-					line,
-					label: topicLabel(topic, map.current === topic.handle, line),
-					needs: needs.length ? `Needs ${needs.join(", ")}` : null,
-					href: unitHref(map.workspace, topic.handle),
-					from: view.entry.get(topic.handle) ?? null,
-				},
-			},
-		];
+		const current = map.current === topic.handle;
+		const data: CardData = {
+			kind: "topic",
+			handle: topic.handle,
+			title: topic.title,
+			topic,
+			current,
+			tag: current ? CURRENT_TAG : null,
+			standing: standingOf(topic),
+			line,
+			label: topicLabel(topic, current, line),
+			needs: needs.length ? `Needs ${needs.join(", ")}` : null,
+			href: unitHref(map.workspace, topic.handle),
+			from: view.entry.get(topic.handle) ?? null,
+		};
+		return [cardNode(data, placed, layout, trail)];
 	});
 }

@@ -1,7 +1,8 @@
-import { Position, type Edge } from "@xyflow/react";
+import { Position, type Edge, type Node } from "@xyflow/react";
 import type { ArcHandle, CourseMap } from "@/src/core";
 import { arcView, type ArcView } from "./arc-view";
-import type { TopicMapLayout } from "./topic-map-layout";
+import type { PlacedTopic, TopicMapLayout } from "./topic-map-layout";
+import type { CardData } from "./topic-node";
 import { layoutCanvas } from "./canvas/canvas-layout";
 import { linesEdge, type CanvasLine } from "./canvas/canvas-lines";
 
@@ -55,4 +56,27 @@ export function mapEdges(layout: TopicMapLayout, trail: Trail | null = null): Ed
 		: [];
 	const first = layout.routes.find((route) => route.points.length > 0);
 	return linesEdge([...needs, ...trailed], first ? { source: first.prerequisite, target: first.topic } : null);
+}
+
+/** A card as React Flow's node, at its place in a drawing (`placed`), moved `by` for a `trail`'s card, which is drawn
+ *  out of the map's focus, keys and links (`TrailNode`). Pure. */
+export function cardNode(data: CardData, placed: PlacedTopic, layout: TopicMapLayout, trail: Pick<Trail, "dx" | "dy"> | null = null): Node<CardData> {
+	const node = layout.node;
+	return {
+		id: trail ? `trail:${data.handle}` : data.handle,
+		type: trail ? "trail" : "card",
+		position: { x: placed.x + (trail?.dx ?? 0), y: placed.y + (trail?.dy ?? 0) },
+		width: node.width,
+		height: node.height,
+		// A server render has no measured handles; these let it draw the needs.
+		handles: [
+			{ type: "target" as const, position: Position.Top, ...handleAt(Position.Top, node) },
+			{ type: "source" as const, position: Position.Bottom, ...handleAt(Position.Bottom, node) },
+		],
+		draggable: false,
+		selectable: false,
+		focusable: false,
+		ariaRole: "none" as const,
+		data,
+	};
 }

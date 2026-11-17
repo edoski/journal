@@ -6,7 +6,7 @@
  */
 
 import { coordSimplex, decrossOpt, decrossTwoLayer, graphStratify, layeringSimplex, sugiyama } from "d3-dag";
-import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "@/src/core";
+import type { CourseMapEdge, TopicHandle } from "@/src/core";
 
 export const NODE_WIDTH = 224;
 export const NODE_HEIGHT = 64;
@@ -59,7 +59,7 @@ export interface TopicMapLayout {
 type Need = Extract<CourseMapEdge, { kind: "needs" }>;
 
 /** One column in the given order: a course with no `needs` at all. */
-function column(topics: readonly CourseMapTopic[], node: NodeSize): TopicMapLayout {
+function column(topics: readonly { handle: TopicHandle }[], node: NodeSize): TopicMapLayout {
 	const placed = new Map<TopicHandle, PlacedTopic>();
 	topics.forEach((topic, index) => placed.set(topic.handle, { handle: topic.handle, x: 0, y: index * (node.height + NODE_GAP), layer: index }));
 	return {
@@ -81,7 +81,7 @@ function rankUnder(top: ReadonlySet<TopicHandle>, parents: ReadonlyMap<string, r
 
 /** The layered drawing of a course's needs. `top` are topics held in the
  *  first layer, above every other (an arc's entry topics, arc-view.ts). */
-export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], node: NodeSize = NODE_SIZE, top: ReadonlySet<TopicHandle> = new Set()): TopicMapLayout {
+export function layoutTopicMap(topics: readonly { handle: TopicHandle }[], edges: readonly CourseMapEdge[], node: NodeSize = NODE_SIZE, top: ReadonlySet<TopicHandle> = new Set()): TopicMapLayout {
 	const needs = edges.filter((e): e is Need => e.kind === "needs");
 	if (needs.length === 0) return column(topics, node);
 	const parents = new Map<string, string[]>(topics.map((t) => [t.handle, []]));
@@ -188,6 +188,9 @@ export function neighbourOf(layout: TopicMapLayout, edges: readonly CourseMapEdg
 	const off = (other: TopicHandle) => Math.abs((layout.topics.get(other)?.x ?? Infinity) - here.x);
 	return linked.sort((a, b) => off(a) - off(b))[0] ?? null;
 }
+
+/** Room a card's tag ("You are here", "Next") takes above it. */
+export const TAG_ROOM = 20;
 
 export interface Camera {
 	x: number;

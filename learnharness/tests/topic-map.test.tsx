@@ -440,7 +440,7 @@ describe("topic map drawing", () => {
 	});
 
 	it("tags the current topic, keeps one tab stop on it, and opens no popover", () => {
-		assert.equal(document.querySelector('[data-slot="course-map-current-tag"]')!.textContent, "You are here");
+		assert.equal(document.querySelector('[data-slot="course-map-tag"]')!.textContent, "You are here");
 		assert.equal(node("rank").getAttribute("aria-current"), "location");
 		assert.deepEqual(
 			nodes.filter((n) => n.getAttribute("tabindex") === "0").map((n) => n.getAttribute("data-testid")),

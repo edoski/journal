@@ -1,28 +1,48 @@
 "use client";
 
 import { createContext, type KeyboardEvent } from "react";
-import type { ArcHandle, CourseMapTopic, TopicHandle } from "@/src/core";
+import type { ArcHandle, CourseMapTopic, PlanNodeStatus, TopicHandle } from "@/src/core";
 import type { CardFact, Standing } from "./topic-standing";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { factIcon } from "@/components/unit-inbox/fact-icon";
 import { MathText } from "@/components/ui/math-text";
 
-/** What the map hands each card: the topic, what the card says, and where a click goes (`TopicMap` builds it once). */
-export type TopicData = {
-	topic: CourseMapTopic;
+/** What every card on a map says, a course's topic or a lesson's step (topic-map.md, Node): one card draws both. */
+type CardBase = {
+	handle: TopicHandle;
+	title: string;
+	/** Ringed: the course's current topic, or the step a lesson stopped on. */
 	current: boolean;
+	/** The words just above the card ("You are here", "Left off here", "Your turn", "Next"); null for none. */
+	tag: string | null;
+	/** Its name for a screen reader, and what it rests on by name ("Needs A, B", "Rests on A, B"). */
+	label: string;
+	needs: string | null;
+	/** Where a press goes: the topic's page, or the lesson a step belongs to. */
+	href: string;
+};
+
+/** A course's topic: its pie, and a header strip saying what it needs from him or where he stands. */
+export type TopicData = CardBase & {
+	kind: "topic";
+	topic: CourseMapTopic;
 	standing: Standing;
 	/** What the card says in its header in place of the standing (`cardLine`). */
 	line: CardFact | null;
-	/** The topic's name for a screen reader, and its prerequisites by name. */
-	label: string;
-	needs: string | null;
-	/** The topic's page. */
-	href: string;
 	/** An arc's entry topic: the earlier arc it comes from, its card faded and captioned with that arc ("From Vector
 	 *  spaces"). */
 	from: string | null;
 };
+
+/** A lesson's step: the plan's mark in place of the pie, no header strip (a step has no standing and no sidebar
+ *  fact), its title whole on as many lines as it takes (round 14, m34), and the tutor's summary on hover. */
+export type StepData = CardBase & {
+	kind: "step";
+	status: PlanNodeStatus;
+	summary: string | null;
+};
+
+export type CardData = TopicData | StepData;
 
 /** What the nodes share: the lit chain, the one tab stop, and the map's handlers. */
 export interface TopicMapState {
