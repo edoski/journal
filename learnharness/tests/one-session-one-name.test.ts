@@ -29,20 +29,20 @@ const course: StudyCourse = {
 const lesson = chat({ id: "lesson", ended: "left", tasks: [TASK.key], updatedAt: "2026-11-08T10:00:00.000Z" });
 const label = (row: TodayRow) => lessonTitle(row);
 
-describe("a lesson left for next time keeps the name its row had (round 10, 1 m5)", () => {
-	it("reads Continue and its task's title, the words the task's own row reads", () => {
+describe("a lesson left for next time keeps its one name, its status saying it was left (round 15, m5)", () => {
+	it("reads its task's title, as its sidebar card and its chat do; the course's own step for the task reads Continue", () => {
 		const morning = todayRows([course], [], TODAY);
-		assert.deepEqual(morning.map(label), ["Continue Eigenvalues and eigenvectors lesson"]);
+		assert.deepEqual(morning.map(label), ["Continue Eigenvalues and eigenvectors lesson"], "the task's own line, when no session holds it, is a step");
 		const rows = todayRows([course], openSessions([lesson]), TODAY);
 		assert.equal(rows[0]?.kind, "session", "the lesson takes the task's row");
-		assert.deepEqual(rows.map(label), ["Continue Eigenvalues and eigenvectors lesson"]);
-		assert.deepEqual(needsYouNow([course], [lesson], TODAY).lines.map((l) => l.title), ["Continue Eigenvalues and eigenvectors lesson"], "the sidebar's card the same");
+		assert.deepEqual(rows.map(label), ["Eigenvalues and eigenvectors lesson"]);
+		assert.deepEqual(needsYouNow([course], [lesson], TODAY).lines.map((l) => l.title), ["Eigenvalues and eigenvectors lesson"], "the sidebar's card the same");
 	});
 
-	it("reads Continue and its own title when it holds no task, never a bare title", () => {
+	it("reads its own title when it holds no task", () => {
 		const continuity = chat({ id: "cont", title: "Continuity", ended: "left", topics: ["continuity"], ownTopics: ["continuity"], updatedAt: "2026-11-07T10:00:00.000Z" });
 		const rows = todayRows([{ ...course, map: { ...course.map, tasks: [], focus: null } }], openSessions([continuity]), TODAY);
-		assert.ok(rows.map(label).includes("Continue Continuity"), rows.map(label).join(" | "));
+		assert.ok(rows.map(label).includes("Continuity"), rows.map(label).join(" | "));
 	});
 
 	it("never doubles the verb of a task titled with it", () => {

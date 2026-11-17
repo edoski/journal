@@ -55,7 +55,7 @@ const mapsReview = chat({ id: "maps-review", title: "Review Linear maps and thei
 describe("Home leads with today's plan (1 D1)", () => {
 	it("gives a review closed for later no line of its own, and lists the plan before a lesson left for next time", () => {
 		const rows = todayRows([linalg()], openSessions([eigenReview, eigenLesson]), TODAY);
-		assert.deepEqual(rows.map(lessonTitle), ["Review Linear maps and their matrices", "Start Inner products and orthogonality", "Continue Eigenvalues and eigenvectors"]);
+		assert.deepEqual(rows.map(lessonTitle), ["Review Linear maps and their matrices", "Start Inner products and orthogonality", "Eigenvalues and eigenvectors"]);
 	});
 
 	it("folds the closed review into its topic's next review row, which opens it", () => {
@@ -70,7 +70,7 @@ describe("Home leads with today's plan (1 D1)", () => {
 
 	it("lists the exam's course first, and every leftover after both courses' plans", () => {
 		const rows = todayRows([linalg(), PROB], openSessions([mapsReview, eigenReview, eigenLesson]), TODAY);
-		assert.deepEqual(rows.map(lessonTitle), ["Review Law of total probability", "Review Linear maps and their matrices", "Start Inner products and orthogonality", "Continue Eigenvalues and eigenvectors"]);
+		assert.deepEqual(rows.map(lessonTitle), ["Review Law of total probability", "Review Linear maps and their matrices", "Start Inner products and orthogonality", "Eigenvalues and eigenvectors"]);
 		const maps = rows[1]!;
 		assert.equal(maps.kind, "course", "today's Linear maps review is the plan's row, and it opens yesterday's review");
 	});

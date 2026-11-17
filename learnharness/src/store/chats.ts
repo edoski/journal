@@ -23,7 +23,7 @@ import { openedAsReview } from "../core/session-opening.ts";
 import { learnerWords } from "../core/session-markdown.ts";
 import { stoppedByHim } from "../core/turn-cut.ts";
 import { failedResponseAtEnd } from "../core/input-events.ts";
-import { onFirstTurn } from "../core/session-naming.ts";
+import { onFirstTurn, sessionTitleOf } from "../core/session-naming.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
@@ -111,6 +111,8 @@ function listChats(): ChatSummary[] {
 						// summaries; usage aggregates ride the full record, the picker
 						// never needs them).
 						...summary,
+						// Its one name on every surface (round 15, m5).
+						title: sessionTitleOf({ ...summary, messages }),
 						// The mode now, folded over the transcript from the
 						// mode an older record stored at creation.
 						kind,

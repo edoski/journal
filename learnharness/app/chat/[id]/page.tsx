@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
-import { openedByApp } from "@/src/core";
+import { openedByApp, sessionTitleOf } from "@/src/core";
 import { courseDeleted, getChat, isTurnRunning, lessonPlace, reposeLeftQuestions, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function ChatPage({
 		<Chat
 			key={chat.id}
 			chatId={chat.id}
-			title={chat.title}
+			title={sessionTitleOf(chat)}
 			startedIn={chat.kind}
 			topics={chat.topics}
 			appOpening={openedByApp(chat)}
