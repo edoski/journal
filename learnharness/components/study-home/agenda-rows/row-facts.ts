@@ -153,10 +153,11 @@ export function whyOf(row: TodayRow): Why | null {
 			return { kind: "task", short: taskWords(step, course.map.today) };
 		case "topic": {
 			if (step.on) return { kind: "next", short: `Planned ${planDay(step.on)}` };
-			const short = step.planned ? "Planned today" : "Next up";
+			// A planned start's reason is its plan status, the sidebar's, the course page's and the calendar's, never an
+			// arc's name (round 15, m1: "Back to Linear maps and matrices", "Next in Expectation of named distributions").
+			if (step.planned) return { kind: "next", short: "Planned today" };
 			const why = step.fresh ? course.map.topics.find((t) => t.handle === step.topics[0])?.startsWhy : undefined;
-			const early = step.planned && why?.kind === "early";
-			return why && startsWhyTells(why) && !early ? { kind: "next", short, starts: { kind: why.kind, words: startsWhyShort(why, course.map) } } : { kind: "next", short };
+			return why?.kind === "after" && startsWhyTells(why) ? { kind: "next", short: "Next up", starts: { kind: why.kind, words: startsWhyShort(why, course.map) } } : { kind: "next", short: "Next up" };
 		}
 		case "none":
 			return null;

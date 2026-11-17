@@ -27,6 +27,7 @@ import { TopicCard } from "../components/unit-inbox/unit-row.tsx";
 import { CourseResultRow } from "../components/unit-inbox/course-result-row.tsx";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 import { arcHref, courseHref } from "../components/unit-inbox/unit-href.ts";
+import { lookWords } from "../components/calendar/calendar-facts.ts";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { TopicHead } from "../components/unit-inbox/topic-page/topic-head.tsx";
 import { pickupSections } from "../components/unit-inbox/topic-page/pickup/pickup-facts.ts";
@@ -77,31 +78,34 @@ describe("Home's rows", () => {
 		}
 	});
 
-	it("give a planned new topic its reason with its own icon where the reason sits, cut to fit the row, its plain words kept for when it does not fit", () => {
-		const after = planned(LINALG_ARCS, { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] });
-		assert.deepEqual(whyOf(row(after)), { kind: "next", short: "Planned today", starts: { kind: "after", words: "After Eigenvalues and eigenvectors" } });
-		const next = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
-		assert.equal(whyOf(row(next))?.starts?.words, "Next in Eigenvalues");
-		const early = planned(LINALG_ARCS, { kind: "early", arc: arc("eigenvalues"), waitingOn: h("rank"), exam: false });
-		assert.deepEqual(whyOf(row(early)), { kind: "next", short: "Planned today" }, "round 9 (1 D6): the plan's own start never reads as a warning; the topic page keeps why");
+	it("give a planned new topic its plan status as its reason, never an arc's name, on Home's row and the sidebar's card alike (round 15, m1)", () => {
+		// Lens 1: "Start Linear maps… · Back to Linear maps and matrices" on Home, "Planned today" in the sidebar,
+		// "New topic" on the calendar; "Next in Expectation of named distributions" on the exam eve.
+		for (const why of [
+			{ kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] },
+			{ kind: "next", arc: arc("eigenvalues") },
+			{ kind: "early", arc: arc("eigenvalues"), waitingOn: h("rank"), exam: false },
+		] as StartsWhy[]) {
+			const course = planned(LINALG_ARCS, why);
+			assert.deepEqual(whyOf(row(course)), { kind: "next", short: "Planned today" }, why.kind);
+			assert.equal(needsYouNow([course], [], TODAY).lines[0]!.slot, "Planned today", `the sidebar's card (${why.kind})`);
+			const doc = render(<HybridRows rows={[row(course)]} busy={false} onContinue={() => {}} />);
+			const mark = doc.querySelector('[data-slot="today-why"]')!;
+			assert.equal(mark.textContent, "Planned today", `Home's row (${why.kind})`);
+			assert.equal(mark.getAttribute("data-starts"), null);
+		}
 		const plainEarly = planned(LINALG, { kind: "early", waitingOn: h("rank"), exam: false });
 		assert.deepEqual(whyOf(row(plainEarly)), { kind: "next", short: "Planned today" }, "no \"Early, ahead of its place\" on today's planned start");
-		const doc = render(<HybridRows rows={[row(after)]} busy={false} onContinue={() => {}} />);
-		const why = doc.querySelector('[data-slot="today-why"]')!;
-		assert.equal(why.getAttribute("data-starts"), "after");
-		assert.equal(why.textContent, "After Eigenvalues and eigenvectors");
-		assert.ok(!doc.querySelector('[data-slot="today-line"]')!.textContent!.startsWith("Linear Algebra ·"), "never on the course line");
+		const topic = LINALG_ARCS.map.topics[0]!;
+		assert.equal(lookWords({ kind: "new", day: TODAY, topic } as never, TODAY), "Planned today", "the calendar's entry on its day");
+		assert.equal(lookWords({ kind: "new", day: "2026-12-01", topic } as never, TODAY), "New topic", "a later day keeps its kind");
 	});
 
-	it("give the sidebar card a new topic's reason in Home's words when it names topics, never an arc (round 13, 1 n5)", () => {
-		const after = planned(LINALG_ARCS, { kind: "after", arc: arc("eigenvalues"), needs: h("eigen"), partners: [] });
-		const [line] = needsYouNow([after], [], TODAY).lines;
-		assert.equal(line!.slot, "After Eigenvalues and eigenvectors");
-		const doc = render(<NowCard line={line!} unit={topicUnit(buildInbox([after], [], null), after, line!.lead!, [])} active={false} />);
-		const mark = doc.querySelector('[data-slot="why-mark"]')!;
-		assert.equal(mark.textContent?.replace(", ", ""), "After Eigenvalues and eigenvectors");
-		const next = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
-		assert.equal(needsYouNow([next], [], TODAY).lines[0]!.slot, "Planned today", "Next in Eigenvalues names an arc: the card keeps its plain words");
+	it("give a new topic its Start press, as its row says Start (round 15, m1: Start Linear maps… with a Continue press)", () => {
+		const course = planned(LINALG_ARCS, { kind: "next", arc: arc("eigenvalues") });
+		const lesson = lessonOf(row(course));
+		assert.match(lesson.title, /^Start /);
+		assert.equal(lesson.action, "Start");
 	});
 
 	it("keep today's words for a planned topic in a course without arcs", () => {
