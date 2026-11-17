@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ComponentProps } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import type { ArcHandle, StudyCourse } from "@/src/core";
 import { PageHead } from "@/components/page-frame/page-frame";
 import { CourseFrame } from "@/components/course-page/course-frame";
@@ -12,7 +12,7 @@ import { MistakesHead, MistakesPress } from "@/components/course-page/standing/m
 import { SplitBody, type CourseColumns } from "@/components/course-page/split/split-course";
 import { SplitList } from "@/components/course-page/split/split-list";
 import { ReadyFact, useHeadStanding } from "@/components/course-page/candidates/shared/ready-fact";
-import { RoadArc, TRACK } from "@/components/course-page/candidates/road/road-arc";
+import { BLOCK, Rail, RoadArc } from "@/components/course-page/candidates/road/road-arc";
 import { arcStarts, examStop } from "@/components/course-page/candidates/road/road-model";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -52,12 +52,16 @@ function RoadHead({ view, standing, busy, onContinue }: CourseColumns) {
 function ExamStop({ course, words }: { course: StudyCourse; words: string }) {
 	const runup = useCourseRunup(course.map.workspace);
 	return (
-		<div data-slot="road-exam" className={cn(TRACK, "flex h-7 items-center gap-2 text-callout text-foreground")}>
+		<div data-slot="road-exam" className={cn(BLOCK, "flex h-7 items-center gap-2 text-callout text-foreground")}>
+			<Rail />
 			<CalendarIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 			<ExamFact course={course} runup={runup} words={words} ready={null} className="[&>svg]:hidden" />
 		</div>
 	);
 }
+
+/** How long the walk rests on an arc before the map shows it. */
+const MAP_FOLLOW_MS = 120;
 
 /** What every line of the road reads: the course, the arc the map shows, where the exam sits. */
 const Road = createContext<{ course: StudyCourse; shown: ArcHandle | null; exam: string | null; stopBefore: ArcHandle | null; past: ReadonlySet<ArcHandle>; order: readonly ArcHandle[] } | null>(null);
@@ -80,6 +84,24 @@ function RoadLine(props: ComponentProps<typeof CourseArc<CourseTopic>>) {
 function RoadList(c: CourseColumns) {
 	const { course, arcs, facts } = c.view;
 	const stop = useMemo(() => (arcs ? examStop(course.map, arcs) : null), [course.map, arcs]);
+	// One arc open at a time, the one the map shows: opening another shows it and closes the last; closing it
+	// leaves none open (Edo, 17 Nov 2026: "only one is open at a time").
+	const shownHandle = c.shown?.arc.handle ?? null;
+	const [openArc, setOpenArc] = useState<string | null>(shownHandle);
+	useEffect(() => setOpenArc(shownHandle), [shownHandle]);
+	const open = arcs ? (openArc ? { [openArc]: true } : {}) : c.open;
+	// The list opens at once; the map, whose redraw is the slow part, follows once the walk rests on an arc,
+	// so arrows held down never outrun the list.
+	const follow = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	useEffect(() => () => clearTimeout(follow.current), []);
+	const onOpenChange = (id: string, to: boolean) => {
+		if (!arcs) return c.onOpenChange(id, to);
+		if (to) {
+			setOpenArc(id);
+			clearTimeout(follow.current);
+			follow.current = setTimeout(() => c.showArc(id as ArcHandle), MAP_FOLLOW_MS);
+		} else if (openArc === id) setOpenArc(null);
+	};
 	const road = useMemo(
 		() => ({ course, shown: c.shown?.arc.handle ?? null, exam: stop ? facts.exam : null, stopBefore: stop?.stopBefore ?? null, past: stop?.past ?? new Set<ArcHandle>(), order: arcs?.map((a) => a.arc.handle) ?? [] }),
 		[course, c.shown, stop, facts.exam, arcs],
@@ -90,8 +112,8 @@ function RoadList(c: CourseColumns) {
 				ref={c.listRef}
 				groups={c.groups}
 				arcs={arcs}
-				open={c.open}
-				onOpenChange={c.onOpenChange}
+				open={open}
+				onOpenChange={onOpenChange}
 				onCheck={c.onCheck}
 				checking={c.checking}
 				marked={c.marked}
@@ -113,5 +135,5 @@ function RoadList(c: CourseColumns) {
  * arcs past it muted. The head is the title and one line.
  */
 export function RoadCourse({ workspace }: { workspace: string }) {
-	return <CourseFrame workspace={workspace}>{(ready) => <SplitBody {...ready} head={(c) => <RoadHead {...c} />} list={(c) => <RoadList {...c} />} mapIndex={false} />}</CourseFrame>;
+	return <CourseFrame workspace={workspace}>{(ready) => <SplitBody {...ready} head={(c) => <RoadHead {...c} />} list={(c) => <RoadList {...c} />} mapIndex={false} listWidth="24rem" />}</CourseFrame>;
 }

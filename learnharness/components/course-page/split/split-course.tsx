@@ -100,6 +100,7 @@ export function SplitBody({
 	head = currentHead,
 	list: listOf = currentList,
 	mapIndex = true,
+	listWidth,
 }: {
 	view: CourseView;
 	standing: CourseStanding | null;
@@ -109,6 +110,8 @@ export function SplitBody({
 	list?: (columns: CourseColumns) => ReactNode;
 	/** Whether the map lists its arcs beside it; off when the list is itself the course's arcs (Road). */
 	mapIndex?: boolean;
+	/** The list column's width, where a page's list needs more than the linked columns' 20rem (Road). */
+	listWidth?: `${number}rem`;
 }) {
 	const { map } = view.course;
 	const { arcs } = view;
@@ -208,6 +211,7 @@ export function SplitBody({
 			) : (
 				<LinkedColumns
 					data-slot="course-split"
+					style={listWidth ? { gridTemplateColumns: `minmax(0,${listWidth}) minmax(0,1fr)` } : undefined}
 					list={listOf(columns)}
 					map={
 						<SplitMap

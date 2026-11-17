@@ -10,9 +10,19 @@ import { GROUP_WORDS, type CourseTopic } from "@/components/course-page/course-m
 import { CHECK_WORDS, type CourseArc } from "@/components/course-page/course-arc";
 import { cn } from "@/lib/utils";
 
-/** The hairline the rows hang off, the map's arc list's track (`ArcIndex`): each row draws its own stretch,
- *  edge to edge with the next, so the track runs unbroken past open arcs and the exam. */
-export const TRACK = "relative border-l border-white/10 pl-4";
+/** Each arc is its own block on the road: a rail down its left edge, as tall as the arc with its open topics,
+ *  set apart from the next by a small gap, so the arcs read as separate containers (Edo, 17 Nov 2026). */
+export const BLOCK = "relative pr-3 pl-4";
+/** The arc's rail: quiet, and bright on the arc the map shows. */
+export function Rail({ bright = false }: { bright?: boolean }) {
+	return (
+		<span
+			aria-hidden="true"
+			data-slot={bright ? "road-bar" : "road-rail"}
+			className={cn("pointer-events-none absolute top-1 bottom-1 left-0 w-0.5 rounded-full transition-colors duration-200 motion-reduce:transition-none", bright ? "bg-foreground" : "bg-white/10")}
+		/>
+	);
+}
 
 /**
  * One arc on Road's list (spec: road.md), drawn as the map's arc list draws
@@ -22,8 +32,8 @@ export const TRACK = "relative border-l border-white/10 pl-4";
  * end the one fact the road needs ("Needs you" when Today takes up one of
  * its topics, Check it on an arc ready for its check, "Check passed", or
  * the day its first topic starts while none is, `starts`); nothing
- * otherwise. The rows hang off one hairline track; a bar on it marks the
- * arc the map shows (`shown`). An arc past the exam (`past`) is muted.
+ * otherwise. Each arc is its own block with a rail down its left, bright on
+ * the arc the map shows (`shown`). An arc past the exam (`past`) is muted.
  * Open, its topics hang under its name. Props otherwise as `CourseArc`'s,
  * so the list walks it the same way.
  */
@@ -59,10 +69,10 @@ export function RoadArc({
 				data-shown={shown || undefined}
 				data-past={past || undefined}
 				aria-labelledby={headerId}
-				className={cn(TRACK, "flex flex-col", className)}
+				className={cn(BLOCK, "flex flex-col pb-1", className)}
 				{...rest}
 			>
-				{shown && <span aria-hidden="true" data-slot="road-bar" className="pointer-events-none absolute top-0 -left-px h-7 w-0.5 rounded-full bg-foreground" />}
+				<Rail bright={shown} />
 				<h2 className="flex h-7 min-w-0 items-center gap-2">
 					<CollapsibleTrigger asChild>
 						<button
@@ -71,6 +81,10 @@ export function RoadArc({
 							id={headerId}
 							data-slot="course-arc-header"
 							onKeyDown={onHeaderKeyDown}
+							// Focus selects: walking the road opens the arc reached and closes the last.
+							onFocus={() => {
+								if (!open) onOpenChange?.(true);
+							}}
 							className="group/arc flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						>
 							<ArcLabel
@@ -112,7 +126,9 @@ export function RoadArc({
 						</Button>
 					)}
 				</h2>
-				<CollapsibleContent className="flex flex-col">{items.length > 0 && <ul className="flex flex-col pt-0.5 pb-2 pl-4">{items.map(renderItem)}</ul>}</CollapsibleContent>
+				<CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none">
+					{items.length > 0 && <ul className="flex flex-col pt-0.5 pb-1.5 pl-4">{items.map(renderItem)}</ul>}
+				</CollapsibleContent>
 			</section>
 		</Collapsible>
 	);
