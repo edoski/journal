@@ -138,7 +138,7 @@ function listChats(): ChatSummary[] {
 						...(learnerWords(messages).length <= 1 ? { untouched: true as const } : {}),
 						tasks: sessionTasksOf(messages),
 						...((t) => (t ? { taskTitle: t } : {}))(sessionTaskTitleOf(messages)),
-						review: openedAsReview({ topics: summary.topics, messages }),
+						review: openedAsReview({ title: summary.title, topics: summary.topics, messages }),
 						studied: studiedIn(messages),
 					};
 				} catch (err) {

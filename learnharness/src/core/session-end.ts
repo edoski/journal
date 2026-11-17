@@ -14,13 +14,13 @@ import { topicResults, type PracticeConclusion } from "./practice-attempts.ts";
  * partway through a lesson when it wrote the plan but taught no step, when he
  * dismissed its question, when a lesson it picked up has reached no step
  * yet, or when its turn ended in words that ask him something while the
- * step it stopped on leads to another: "mid-lesson". Practice waits on
- * him at Next problem while its work is unfinished: a lesson moved to
- * practice with plan steps left, or a session opened on topics (`topics`,
- * a review or a topic's practice) one of which he has not yet solved
- * without a hint in it, unless the tutor wrapped the round. His Done for
+ * step it stopped on leads to another: "mid-lesson". A lesson moved to
+ * practice waits on him at Next problem while its plan has steps left; any
+ * other practice round between problems asks him nothing. His Done for
  * today on work still open (a question or problem it set aside, a task it
- * holds, or a session that waited on him) leaves it for next time: "left". Words that
+ * holds, a session that waited on him, or a round opened on topics, a
+ * review or a topic's practice, one of which he has not yet solved without
+ * a hint in it, unless the tutor wrapped it) leaves it for next time: "left". Words that
  * end without a question ("Good place to stop") end the session there,
  * like anything else, as does the tutor's own close, and a practice round
  * with its work done: "closed". The questions the app posed again after
@@ -39,10 +39,10 @@ export function sessionEndOf(record: readonly LhMessage[], tree: PlanTree | unde
 	}
 	if (last.role !== "assistant" || last.stopReason !== "stop") return "cut";
 	if (closedTonight(messages)) return "closed";
-	if (sessionModeOf(messages, initial) === "practice") {
-		if (tree && stepsLeft(tree, messages)) return "mid-lesson";
-		return practiceUnfinished(messages, topics) ? "mid-lesson" : "closed";
-	}
+	// A practice round between problems asks him nothing: Next problem is his to press, so it is not his turn
+	// (round 15, m7 and m8: Rank practice read "Your turn" after a dispute with nothing asked, a 5 Nov practice on
+	// the calendar too). His Done for today still leaves its unfinished work for next time (`leftOpen`).
+	if (sessionModeOf(messages, initial) === "practice") return tree && stepsLeft(tree, messages) ? "mid-lesson" : "closed";
 	const phase = phaseAt3Lh(messages);
 	if (phase === "plan") return "mid-lesson";
 	if (phase !== "teach" || !tree) return "closed";
@@ -94,6 +94,7 @@ function leftOpen(messages: readonly LhMessage[], at: number, tree: PlanTree | u
 	if (tree && stepsLeft(tree, messages)) return true;
 	if (stopPicked(messages, start)) return false;
 	const before = messages.slice(0, start);
+	if (sessionModeOf(before, initial) === "practice" && !activeProblemOf(before) && practiceUnfinished(before, topics)) return true;
 	const end = before.length > 0 ? sessionEndOf(before, tree, initial, topics) : "closed";
 	return end === "mid-lesson" || end === "cut";
 }

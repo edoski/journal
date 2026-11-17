@@ -52,9 +52,16 @@ export function openedByApp(record: { appOpening?: true; title: string; topics?:
 
 /** Whether a session record is a review of course topics: opened on topics
  *  with a review's words ("Review Binomial distribution", or "Review" alone,
- *  the topics it was opened on saying which), whatever it is named now. */
-export function openedAsReview(record: { topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
-	return (record.topics ?? []).length > 0 && /^Review\b/.test(openingText(record.messages)?.trim() ?? "");
+ *  the topics it was opened on saying which), whatever it is named now.
+ *  Before its opening lands, the name it was created with says so: Home's
+ *  review creates the session named "Review …" and then sends the opening,
+ *  so for that moment it is already the review it takes up (round 15, m7:
+ *  the starting review showed twice on the sidebar, as Home's review line
+ *  and as its session, "Tutor writing" on both). */
+export function openedAsReview(record: { title?: string; topics?: readonly string[]; messages: readonly { role: string; content?: unknown }[] }): boolean {
+	if ((record.topics ?? []).length === 0) return false;
+	const opening = openingText(record.messages);
+	return opening === null ? REVIEW_OPENING.test(record.title ?? "") : /^Review\b/.test(opening.trim());
 }
 
 /** Whether a session is a review of course topics: the session list says so
