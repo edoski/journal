@@ -147,11 +147,11 @@ describe("the plan outranks a session he only opened (round 10, 1 m2)", () => {
 	it("leads with the exam's review, then each course's review and new topics, then the session he opened, then the tasks", () => {
 		const chats = [sheet4, { ...eigen, updatedAt: "2026-11-16T09:00:00.000Z" }, maps];
 		const rows = todayRows([la, prob], openSessions(chats), D17);
+		// Rank's review folds into sheet 4, open on Rank, in the review's place: one topic, one line (round 15, m6).
 		assert.deepEqual(rows.map((r) => (r.kind === "session" ? `session ${r.chat.id}` : lessonTitle(r))), [
 			"Review Law of total probability",
-			"Review Rank and the column space",
-			"Start Inner products and orthogonality",
 			"session sheet4",
+			"Start Inner products and orthogonality",
 			"session eigen",
 			"session maps",
 		]);

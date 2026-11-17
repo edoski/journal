@@ -194,18 +194,6 @@ function covers(chat: ChatListItem, step: NextStep): boolean {
 	return step.topics.every((h) => topics.has(h));
 }
 
-/** Whether a lesson left for next time gives its line to its topic's review
- *  today: every topic it belongs to is in its course's review today, so the
- *  review leads, one line per topic, and the lesson's line comes back once
- *  the review is done; the sidebar's shelves and the topic page still hold
- *  the lesson. A lesson waiting on him keeps its line. Pure. */
-function yieldsToReview(chat: ChatListItem, course: StudyCourse | null): boolean {
-	if (!course || sessionState(chat) !== "left" || isReviewSession(chat)) return false;
-	const own = chat.ownTopics ?? [];
-	const reviewing = new Set<string>(todaysReview(course).map((t) => t.handle));
-	return own.length > 0 && own.every((h) => reviewing.has(h));
-}
-
 /** Whether a step is the engine's plan for today: today's review, or the
  *  new topics the plan starts today. An open task, the current topic taken
  *  up with nothing planned, or an item on a later day is not. Pure. */
@@ -240,9 +228,10 @@ const lastDay = (chat: ChatListItem) => localDay(new Date(chat.updatedAt));
  * topics' next review day, when the review's line opens it (`courseMove`),
  * and its topic page keeps it meanwhile. A session he ended with Done for
  * today has no line until tomorrow: he said he is done with it for today,
- * and Home's Studied today names it (round 4). A lesson left for next time
- * whose topics are all in today's review gives its line to that review
- * (`yieldsToReview`). An older session waiting on him stays in the
+ * and Home's Studied today names it (round 4). A lesson on a topic in
+ * today's review takes that topic's review into its line, in the review's
+ * place, unless he opened a review of it, which is then the topic's line
+ * and the lesson's line comes back once that review is done. An older session waiting on him stays in the
  * sidebar. A session that settled after the courses were read (`settled`)
  * ends its step's line too, until a read that knows it lands (round 13,
  * 1 n1: after a close Home showed Start Poisson distribution for 15 s).
@@ -256,7 +245,16 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
 	const courseOf = (chat: ChatListItem) => (chat.course && byWorkspace.get(chat.course.workspace)) ?? null;
 	const waiting = open.filter((c) => !left(c) && lastDay(c) >= since);
-	const leftovers = open.filter((c) => left(c) && !leftToday(c) && !isReviewSession(c) && !yieldsToReview(c, courseOf(c)));
+	// The topics in each course's review today that a review he opened and has not finished takes up: that review
+	// is their line today.
+	const reviewed = (workspace: string | undefined) => {
+		const course = workspace === undefined ? undefined : byWorkspace.get(workspace);
+		const due = new Set<string>(course ? todaysReview(course).map((t) => t.handle) : []);
+		return new Set(open.filter((c) => c.course?.workspace === workspace && isReviewSession(c)).flatMap((c) => (c.ownTopics ?? []).filter((h) => due.has(h))));
+	};
+	// A lesson whose topics such a review takes up gives it its line until the review is done.
+	const yields = (c: ChatListItem) => (c.ownTopics ?? []).length > 0 && (c.ownTopics ?? []).every((h) => reviewed(c.course?.workspace).has(h));
+	const leftovers = open.filter((c) => left(c) && !leftToday(c) && !isReviewSession(c) && !yields(c));
 	const ended = [...open.filter(leftToday), ...settled];
 	const session = (chat: ChatListItem): TodayRow => ({ kind: "session", chat, course: courseOf(chat) });
 	const placed = new Set<ChatListItem>();
@@ -265,7 +263,27 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	const later: TodayRow[] = [];
 	for (const course of ordered) {
 		const own = (chats: readonly ChatListItem[], step: NextStep) => chats.find((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
-		for (const step of todaySteps(course)) {
+		// The course's lessons with a line today, waiting on him or left on an earlier day.
+		const lessons = [...waiting, ...leftovers].filter((c) => c.course?.workspace === course.map.workspace && c.kind !== "practice" && !isReviewSession(c));
+		const opened = reviewed(course.map.workspace);
+		for (const whole of todaySteps(course)) {
+			let step = whole;
+			// While a topic's lesson is open, today's review of the topic is that lesson's line, in the review's place
+			// (his answers there count as it), unless he opened a review of it (round 15, m6: "Review Linear maps · Due
+			// today" beside "Continue Linear maps … lesson"). The rest of the review keeps its line.
+			if (step.kind === "review" && step.on === undefined) {
+				const review = step;
+				const takers = lessons.filter((c) => (c.ownTopics ?? []).some((h) => review.topics.includes(h as TopicHandle) && !opened.has(h)));
+				for (const lesson of takers) {
+					if (placed.has(lesson)) continue;
+					placed.add(lesson);
+					plan.push(session(lesson));
+				}
+				const taken = new Set(takers.flatMap((c) => c.ownTopics ?? []));
+				const kept = review.topics.flatMap((h, i) => (taken.has(h) ? [] : [{ handle: h, title: review.titles[i]! }]));
+				if (kept.length === 0) continue;
+				step = { ...review, topics: kept.map((t) => t.handle), titles: kept.map((t) => t.title) };
+			}
 			// A task that holds a lesson the plan goes on with today is the plan's, ahead of its new starts
 			// (round 13, 1 n3: "Start Geometric" sat above "Continue Poisson distribution lesson").
 			const goesOn = step.kind === "task" && step.topics.some((h) => course.newToday.includes(h));

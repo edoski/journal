@@ -398,8 +398,11 @@ export function calendarEntries({
 			}
 			for (const handle of day.new) {
 				const topic = topicOf(handle);
-				// A lesson he began goes on today under its open task's own entry: one piece of work, one entry.
-				if (topic && !(day.date === today && lessonBegun(topic))) fresh(topic, day.date);
+				// A lesson he began goes on today under its open task's own entry, and a lesson started on it today is its
+				// start, under the session's entry: one piece of work, one entry (round 15, m6: "Linear maps · Your turn"
+				// beside "Linear maps · New topic" on Sun 8).
+				const started = day.date === today && ofToday(map.workspace).some((chat) => chat.kind !== "practice" && !isReviewSession(chat) && (chat.ownTopics ?? []).includes(handle));
+				if (topic && !(day.date === today && lessonBegun(topic)) && !started) fresh(topic, day.date);
 			}
 		}
 		const reviewing = new Set<string>((due ?? []).filter((handle) => topicOf(handle)));
