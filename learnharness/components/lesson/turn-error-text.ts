@@ -13,8 +13,8 @@ export interface TurnErrorText {
 	sentence: string;
 	/** What to do next names a button: Sign in, then Retry when the line
 	 *  offers it (round 7: a token failure said "press Refresh" beside a
-	 *  lone Retry). */
-	then?: "sign-in-retry";
+	 *  lone Retry); Retry alone, when the line offers it. */
+	then?: "sign-in-retry" | "retry";
 	/** The raw text, shown on demand; null when the sentence is the whole message. */
 	details: string | null;
 }
@@ -30,7 +30,17 @@ export const UNREACHABLE_APP = "Failed to fetch";
 
 /** The browser's own words when the request never reached the app: Chrome, Safari, Firefox. */
 const UNREACHABLE = /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?)$/i;
-import { CLAUDE_SIGNED_OUT_STARTS, isProviderKeyRefusal, PROVIDER_KEY_MISSING_CODE } from "@/src/core";
+import { CLAUDE_SIGNED_OUT_STARTS, isProviderKeyRefusal, NO_KEY, PROVIDER_KEY_MISSING_CODE } from "@/src/core";
+
+/** Claude Code's own failures inside a turn (a compaction that keeps
+ *  refilling, a reply cut midway, nothing sent): the lesson says the tutor
+ *  stopped, and names Claude Code only in Details (round 15, m22:
+ *  "Claude Code stopped with an error before it finished. Retry. No API
+ *  key was used."). */
+const CLAUDE_CODE_STOPPED = /^Claude Code (stopped with an error|ended before finishing|sent nothing)\b/;
+const CLAUDE_CODE_MIDWAY = /^Claude Code ended the reply midway\b/;
+/** The details keep what Claude Code said, without the line meant for Settings. */
+const claudeCodeDetails = (text: string) => text.replace(/\s*Retry\.$/, "");
 
 /** The chat routes' answer for a session that no longer exists. */
 const UNKNOWN_CHAT = "Unknown chat";
@@ -82,7 +92,10 @@ export function isCourseDeletedRefusal(message: string | undefined): boolean {
  *  (round 11, 4 minor 3: "What you wrote is still in the box." over an
  *  empty box). */
 export function turnErrorText(message: string, again = false, kept = false): TurnErrorText {
-	const raw = message.trim();
+	// The lesson's line never mentions an API key (round 15, m22).
+	const raw = message.trim().endsWith(NO_KEY.trim()) ? message.trim().slice(0, -NO_KEY.trim().length).trim() : message.trim();
+	if (CLAUDE_CODE_STOPPED.test(raw)) return { kind: "failed", sentence: "The tutor stopped before replying.", then: "retry", details: claudeCodeDetails(raw) };
+	if (CLAUDE_CODE_MIDWAY.test(raw)) return { kind: "failed", sentence: "The tutor stopped partway through its reply.", then: "retry", details: claudeCodeDetails(raw) };
 	if (UNREACHABLE.test(raw)) {
 		return { kind: "offline", sentence: `${again ? "Still can't" : "Couldn't"} reach the app. Check it's running, then try again.`, details: null };
 	}

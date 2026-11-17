@@ -37,6 +37,7 @@ export function TurnError({ message, again = false, kept = false, onRetry, retry
 			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">
 				{text.sentence}
 				{text.then === "sign-in-retry" && (onRetry ? " Sign in, then press Retry." : " Sign in, then send again.")}
+				{text.then === "retry" && onRetry && ` Press ${retryLabel}.`}
 			</span>
 			{children}
 			{onRetry && text.kind !== "gone" && (

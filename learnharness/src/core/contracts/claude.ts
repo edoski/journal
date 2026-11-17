@@ -50,6 +50,16 @@ export const CLAUDE_USAGE_URL = "https://claude.ai/settings/usage";
  *  plain words, no account letter or file (round 7). */
 export const CLAUDE_ACCOUNT_SIGNED_OUT = "Claude isn't signed in on this account.";
 
+/** Every Claude failure's text ends by saying no API key was used, for
+ *  Settings and the logs; the lesson's line leaves it out (round 15, m22). */
+export const NO_KEY = " No API key was used.";
+
+/** Any other failure is Claude Code's own error (a compaction that keeps
+ *  refilling, an internal fault): his plan and sign-in are fine, so the
+ *  line says only what failed (round 12, 4 minor 3: "check \`claude\` in
+ *  a terminal and your plan" with 47% of the plan left). */
+export const CLAUDE_FAILED = `Claude Code stopped with an error before it finished. Retry.${NO_KEY}`;
+
 /** How a failed turn's text starts when Claude was signed out: the lesson
  *  reads every one as signed out, with Sign in and Retry beside it. */
 export const CLAUDE_SIGNED_OUT_STARTS = [CLAUDE_ACCOUNT_SIGNED_OUT, "Claude Code is not signed in"] as const;
